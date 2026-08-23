@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-22 00:05+0000\n"
+"POT-Creation-Date: 2026-08-23 00:05+0000\n"
 "PO-Revision-Date: 2026-06-11 04:01+0000\n"
 "Last-Translator: reducedradius <feixiang512@outlook.com>\n"
 "Language: zh_Hans\n"
@@ -34481,61 +34481,72 @@ msgstr "客户端"
 msgid "Classes"
 msgstr "类别"
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentApp <flwr.agentapp.AgentApp>`\\ \\(\\)"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.agent_app.AgentApp:1 of
 #, fuzzy
 msgid "Flower AgentApp."
 msgstr "Flower 客户端。"
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentConnectors <flwr.agentapp.AgentConnectors>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.base.AgentConnectors:1 of
 #, fuzzy
 msgid "Abstract base class for AgentApp connector execution."
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`AgentEvents <flwr.agentapp.AgentEvents>`\\ \\(\\)"
+msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
+#: flwr.agentapp.base.AgentEvents:1 of
+#, fuzzy
+msgid "Abstract base class for AgentApp run events."
+msgstr "服务器策略实现的抽象基类。"
+
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentResponses <flwr.agentapp.AgentResponses>`\\ \\(\\)"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.base.AgentResponses:1 of
 #, fuzzy
 msgid "Abstract base class for AgentApp model response creation."
 msgstr "服务器策略实现的抽象基类。"
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentSession <flwr.agentapp.AgentSession>`\\ \\(\\)"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.base.AgentSession:1 of
 #, fuzzy
 msgid "Abstract base class for AgentApp runtime capabilities."
 msgstr "服务器策略实现的抽象基类。"
 
-#: ../../source/ref-api/flwr.agentapp.rst:32
+#: ../../source/ref-api/flwr.agentapp.rst:33
 #, fuzzy
 msgid "Exceptions"
 msgstr "说明"
 
-#: ../../source/ref-api/flwr.agentapp.rst:36:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:37:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`LoadAgentAppError <flwr.agentapp.LoadAgentAppError>`\\"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.agentapp.rst:36:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:37:<autosummary>:1
 #: flwr.agentapp.agent_app.LoadAgentAppError:1 of
 msgid "Error when trying to load `AgentApp`."
 msgstr ""
@@ -34603,7 +34614,8 @@ msgstr "Bases: :py:class:`object`"
 #: flwr.serverapp.server_app.ServerApp.main:4
 #: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:31
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:25
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:18 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:18
+#: of
 msgid "Examples"
 msgstr "实例"
 
@@ -34614,6 +34626,7 @@ msgstr "使用带有自定义主函数的 `ServerApp`："
 
 #: ../../source/ref-api/flwr.agentapp.AgentApp.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentConnectors.rst:15
+#: ../../source/ref-api/flwr.agentapp.AgentEvents.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentSession.rst:15
 #: ../../source/ref-api/flwr.app.Array.rst:15
@@ -34749,8 +34762,9 @@ msgstr "返回向服务器应用程序注册 main fn 的装饰器。"
 msgid "AgentConnectors"
 msgstr ""
 
-#: flwr.agentapp.base.AgentConnectors:1 flwr.agentapp.base.AgentResponses:1
-#: flwr.agentapp.base.AgentSession:1 flwr.compat.client.client.Client:1
+#: flwr.agentapp.base.AgentConnectors:1 flwr.agentapp.base.AgentEvents:1
+#: flwr.agentapp.base.AgentResponses:1 flwr.agentapp.base.AgentSession:1
+#: flwr.compat.client.client.Client:1
 #: flwr.compat.client.numpy_client.NumPyClient:1
 #: flwr.server.client_manager.ClientManager:1
 #: flwr.server.strategy.strategy.Strategy:1 flwr.serverapp.grid.grid.Grid:1
@@ -34777,6 +34791,21 @@ msgstr ""
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentConnectors.tools:1 of
 msgid "Return model-facing tool schemas for built-in connectors."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.AgentEvents.rst:2
+#, fuzzy
+msgid "AgentEvents"
+msgstr "构建文档"
+
+#: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`emit <flwr.agentapp.AgentEvents.emit>`\\ \\(event\\)"
+msgstr "server.strategy.Strategy"
+
+#: flwr.agentapp.base.AgentEvents.emit:1
+#: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
+msgid "Emit one structured run event."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:2
@@ -34919,7 +34948,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.app.Array.rst:43
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:79
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:64
-#: ../../source/ref-api/flwr.app.Context.rst:25
+#: ../../source/ref-api/flwr.app.Context.rst:28
 #: ../../source/ref-api/flwr.app.Error.rst:25
 #: ../../source/ref-api/flwr.app.Message.rst:43
 #: ../../source/ref-api/flwr.app.MessageType.rst:25
@@ -34932,7 +34961,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.common.Code.rst:19
 #: ../../source/ref-api/flwr.common.ConfigRecord.rst:64
 #: ../../source/ref-api/flwr.common.ConfigsRecord.rst:64
-#: ../../source/ref-api/flwr.common.Context.rst:25
+#: ../../source/ref-api/flwr.common.Context.rst:28
 #: ../../source/ref-api/flwr.common.DisconnectRes.rst:25
 #: ../../source/ref-api/flwr.common.Error.rst:25
 #: ../../source/ref-api/flwr.common.EvaluateIns.rst:25
@@ -34959,7 +34988,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.common.Status.rst:25
 #: ../../source/ref-api/flwr.server.Driver.rst:43
 #: ../../source/ref-api/flwr.server.Grid.rst:43
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:25
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:28
 #: ../../source/ref-api/flwr.server.ServerAppComponents.rst:25
 #: ../../source/ref-api/flwr.server.ServerConfig.rst:25
 #: ../../source/ref-api/flwr.serverapp.GaussianPrivacyEvent.rst:25
@@ -34984,6 +35013,16 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 msgid "Connector tool schema and execution API."
+msgstr ""
+
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`events <flwr.agentapp.AgentSession.events>`\\"
+msgstr ":py:obj:`reason <flwr.common.Error.reason>`\\"
+
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
+#: flwr.agentapp.AgentSession.events:1 of
+msgid "Structured run event API."
 msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
@@ -36117,32 +36156,44 @@ msgstr ""
 msgid "The ID that identifies the run series, if this run belongs to one."
 msgstr "错误的标识符。"
 
-#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
+#: ../../source/ref-api/flwr.app.Context.rst:26:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`locked <flwr.app.Context.locked>`\\ \\(\\)"
+msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
+
+#: ../../source/ref-api/flwr.app.Context.rst:26:<autosummary>:1
+#: ../../source/ref-api/flwr.common.Context.rst:26:<autosummary>:1
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:26:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1 of
+msgid "Lock this context for an atomic in-process operation."
+msgstr ""
+
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`run_id <flwr.app.Context.run_id>`\\"
 msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
 
-#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`node_id <flwr.app.Context.node_id>`\\"
 msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
 
-#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`node_config <flwr.app.Context.node_config>`\\"
 msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
 
-#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`state <flwr.app.Context.state>`\\"
 msgstr "server.strategy.Strategy"
 
-#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
 msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
 
-#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`series_id <flwr.app.Context.series_id>`\\"
 msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
@@ -36355,7 +36406,8 @@ msgid ":py:obj:`content <flwr.app.Message.content>`\\"
 msgstr ":py:obj:`content <flwr.common.Message.content>`\\"
 
 #: flwr.app.Message.children:1:<autosummary>:1 flwr.app.Message.content:1
-#: flwr.common.Message.children:1:<autosummary>:1 flwr.common.Message.content:1 of
+#: flwr.common.Message.children:1:<autosummary>:1 flwr.common.Message.content:1
+#: of
 #, fuzzy
 msgid "The content of this message."
 msgstr "评估客户端的反应。"
@@ -36366,7 +36418,8 @@ msgid ":py:obj:`error <flwr.app.Message.error>`\\"
 msgstr ":py:obj:`error <flwr.common.Message.error>`\\"
 
 #: flwr.app.Message.children:1:<autosummary>:1 flwr.app.Message.error:1
-#: flwr.common.Message.children:1:<autosummary>:1 flwr.common.Message.error:1 of
+#: flwr.common.Message.children:1:<autosummary>:1 flwr.common.Message.error:1
+#: of
 #, fuzzy
 msgid "Error captured by this message."
 msgstr "该信息捕捉到的错误。"
@@ -36630,7 +36683,8 @@ msgid ":py:obj:`ttl <flwr.app.Metadata.ttl>`\\"
 msgstr ":py:obj:`ttl <flwr.common.Metadata.ttl>`\\"
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 flwr.app.Metadata.ttl:1
-#: flwr.common.Metadata.created_at:1:<autosummary>:1 flwr.common.Metadata.ttl:1 of
+#: flwr.common.Metadata.created_at:1:<autosummary>:1 flwr.common.Metadata.ttl:1
+#: of
 #, fuzzy
 msgid "Time-to-live for this message."
 msgstr "该信息的有效时间。"
@@ -37725,7 +37779,8 @@ msgstr ""
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:15
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:8
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:15
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:8 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:8
+#: of
 #, fuzzy
 msgid "The value of the clipping norm."
 msgstr "削波法线的值。"
@@ -38137,7 +38192,8 @@ msgid ""
 "\\*\\*kwargs\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.common.rst:30:<autosummary>:1 logging.Logger.log:1 of
+#: ../../source/ref-api/flwr.common.rst:30:<autosummary>:1 logging.Logger.log:1
+#: of
 msgid "Log 'msg % args' with the integer severity 'level'."
 msgstr ""
 
@@ -38162,7 +38218,8 @@ msgstr ":py:obj:`NDArray <flwr.common.NDArray>`\\"
 #: ../../source/ref-api/flwr.common.rst:30:<autosummary>:1
 #: flwr.compat.common.parameter.ndarrays_to_parameters:1
 #: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1
-#: flwr.server.strategy.fedavg_android.FedAvgAndroid.ndarrays_to_parameters:1 of
+#: flwr.server.strategy.fedavg_android.FedAvgAndroid.ndarrays_to_parameters:1
+#: of
 msgid "Convert NumPy ndarrays to parameters object."
 msgstr ""
 
@@ -38965,32 +39022,37 @@ msgstr ":py:obj:`clear <flwr.common.ConfigsRecord.clear>`\\ \\(\\)"
 msgid ":py:obj:`object_id <flwr.common.ConfigsRecord.object_id>`\\"
 msgstr ":py:obj:`keys <flwr.common.ConfigsRecord.keys>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
+#: ../../source/ref-api/flwr.common.Context.rst:26:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`locked <flwr.common.Context.locked>`\\ \\(\\)"
+msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
+
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`run_id <flwr.common.Context.run_id>`\\"
 msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
 
-#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`node_id <flwr.common.Context.node_id>`\\"
 msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
 
-#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`node_config <flwr.common.Context.node_config>`\\"
 msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
 
-#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`state <flwr.common.Context.state>`\\"
 msgstr "server.strategy.Strategy"
 
-#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`run_config <flwr.common.Context.run_config>`\\"
 msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
 
-#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`series_id <flwr.common.Context.series_id>`\\"
 msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
@@ -39109,7 +39171,8 @@ msgstr ""
 #: flwr.common.EventType.rsplit:1 flwr.common.EventType.split:1
 #: flwr.serverapp.NeighboringRelation.rsplit:1
 #: flwr.serverapp.NeighboringRelation.split:1
-#: flwr.serverapp.SamplingMethod.rsplit:1 flwr.serverapp.SamplingMethod.split:1 of
+#: flwr.serverapp.SamplingMethod.rsplit:1 flwr.serverapp.SamplingMethod.split:1
+#: of
 msgid ""
 "Return a list of the substrings in the string, using sep as the separator"
 " string."
@@ -39918,7 +39981,8 @@ msgstr ""
 #: flwr.common.EventType.find:1 flwr.common.EventType.index:1
 #: flwr.serverapp.NeighboringRelation.find:1
 #: flwr.serverapp.NeighboringRelation.index:1
-#: flwr.serverapp.SamplingMethod.find:1 flwr.serverapp.SamplingMethod.index:1 of
+#: flwr.serverapp.SamplingMethod.find:1 flwr.serverapp.SamplingMethod.index:1
+#: of
 msgid ""
 "Return the lowest index in S where substring sub is found, such that sub "
 "is contained within S[start:end].  Optional arguments start and end are "
@@ -39928,7 +39992,8 @@ msgstr ""
 #: flwr.common.EventType.find:5 flwr.common.EventType.rfind:5
 #: flwr.serverapp.NeighboringRelation.find:5
 #: flwr.serverapp.NeighboringRelation.rfind:5
-#: flwr.serverapp.SamplingMethod.find:5 flwr.serverapp.SamplingMethod.rfind:5 of
+#: flwr.serverapp.SamplingMethod.find:5 flwr.serverapp.SamplingMethod.rfind:5
+#: of
 #, fuzzy
 msgid "Return -1 on failure."
 msgstr "Flower 服务器。"
@@ -39953,7 +40018,8 @@ msgstr ""
 #: flwr.common.EventType.index:5 flwr.common.EventType.rindex:5
 #: flwr.serverapp.NeighboringRelation.index:5
 #: flwr.serverapp.NeighboringRelation.rindex:5
-#: flwr.serverapp.SamplingMethod.index:5 flwr.serverapp.SamplingMethod.rindex:5 of
+#: flwr.serverapp.SamplingMethod.index:5 flwr.serverapp.SamplingMethod.rindex:5
+#: of
 msgid "Raises ValueError when the substring is not found."
 msgstr ""
 
@@ -40062,7 +40128,8 @@ msgstr ""
 #: flwr.serverapp.NeighboringRelation.rstrip:3
 #: flwr.serverapp.NeighboringRelation.strip:3
 #: flwr.serverapp.SamplingMethod.lstrip:3
-#: flwr.serverapp.SamplingMethod.rstrip:3 flwr.serverapp.SamplingMethod.strip:3 of
+#: flwr.serverapp.SamplingMethod.rstrip:3 flwr.serverapp.SamplingMethod.strip:3
+#: of
 msgid "If chars is given and not None, remove characters in chars instead."
 msgstr ""
 
@@ -40136,7 +40203,8 @@ msgstr ""
 #: flwr.common.EventType.rfind:1 flwr.common.EventType.rindex:1
 #: flwr.serverapp.NeighboringRelation.rfind:1
 #: flwr.serverapp.NeighboringRelation.rindex:1
-#: flwr.serverapp.SamplingMethod.rfind:1 flwr.serverapp.SamplingMethod.rindex:1 of
+#: flwr.serverapp.SamplingMethod.rfind:1 flwr.serverapp.SamplingMethod.rindex:1
+#: of
 msgid ""
 "Return the highest index in S where substring sub is found, such that sub"
 " is contained within S[start:end].  Optional arguments start and end are "
@@ -40163,21 +40231,24 @@ msgstr ""
 #: flwr.common.EventType.rsplit:3 flwr.common.EventType.split:3
 #: flwr.serverapp.NeighboringRelation.rsplit:3
 #: flwr.serverapp.NeighboringRelation.split:3
-#: flwr.serverapp.SamplingMethod.rsplit:3 flwr.serverapp.SamplingMethod.split:3 of
+#: flwr.serverapp.SamplingMethod.rsplit:3 flwr.serverapp.SamplingMethod.split:3
+#: of
 msgid "sep"
 msgstr ""
 
 #: flwr.common.EventType.rsplit:4 flwr.common.EventType.split:4
 #: flwr.serverapp.NeighboringRelation.rsplit:4
 #: flwr.serverapp.NeighboringRelation.split:4
-#: flwr.serverapp.SamplingMethod.rsplit:4 flwr.serverapp.SamplingMethod.split:4 of
+#: flwr.serverapp.SamplingMethod.rsplit:4 flwr.serverapp.SamplingMethod.split:4
+#: of
 msgid "The separator used to split the string."
 msgstr ""
 
 #: flwr.common.EventType.rsplit:6 flwr.common.EventType.split:6
 #: flwr.serverapp.NeighboringRelation.rsplit:6
 #: flwr.serverapp.NeighboringRelation.split:6
-#: flwr.serverapp.SamplingMethod.rsplit:6 flwr.serverapp.SamplingMethod.split:6 of
+#: flwr.serverapp.SamplingMethod.rsplit:6 flwr.serverapp.SamplingMethod.split:6
+#: of
 msgid ""
 "When set to None (the default value), will split on any whitespace "
 "character (including \\n \\r \\t \\f and spaces) and will discard empty "
@@ -40187,7 +40258,8 @@ msgstr ""
 #: flwr.common.EventType.rsplit:9 flwr.common.EventType.split:9
 #: flwr.serverapp.NeighboringRelation.rsplit:9
 #: flwr.serverapp.NeighboringRelation.split:9
-#: flwr.serverapp.SamplingMethod.rsplit:9 flwr.serverapp.SamplingMethod.split:9 of
+#: flwr.serverapp.SamplingMethod.rsplit:9 flwr.serverapp.SamplingMethod.split:9
+#: of
 msgid "maxsplit"
 msgstr ""
 
@@ -41850,52 +41922,57 @@ msgstr "背景"
 msgid "Bases: :py:class:`~flwr.app.message.context.Context`"
 msgstr "Bases: :py:class:`~flwr.server.strategy.fedopt.FedOpt`"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:26:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`locked <flwr.server.LegacyContext.locked>`\\ \\(\\)"
+msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
+
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`config <flwr.server.LegacyContext.config>`\\"
 msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`strategy <flwr.server.LegacyContext.strategy>`\\"
 msgstr "server.strategy.Strategy"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`client_manager <flwr.server.LegacyContext.client_manager>`\\"
 msgstr ":py:obj:`flwr.client <flwr.client>`\\"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`history <flwr.server.LegacyContext.history>`\\"
 msgstr "server.strategy.Strategy"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`run_id <flwr.server.LegacyContext.run_id>`\\"
 msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`node_id <flwr.server.LegacyContext.node_id>`\\"
 msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`node_config <flwr.server.LegacyContext.node_config>`\\"
 msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`state <flwr.server.LegacyContext.state>`\\"
 msgstr "server.strategy.Strategy"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`run_config <flwr.server.LegacyContext.run_config>`\\"
 msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`series_id <flwr.server.LegacyContext.series_id>`\\"
 msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
@@ -42270,7 +42347,8 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.server.strategy.rst:45:<autosummary>:1
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
-#: flwr.server.strategy.bulyan.Bulyan:1 flwr.serverapp.strategy.bulyan.Bulyan:1 of
+#: flwr.server.strategy.bulyan.Bulyan:1 flwr.serverapp.strategy.bulyan.Bulyan:1
+#: of
 msgid "Bulyan strategy."
 msgstr "Bulyan 策略。"
 
@@ -42318,7 +42396,8 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.strategy.rst:45:<autosummary>:1
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:1
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:1 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:1
+#: of
 #, fuzzy
 msgid "Strategy wrapper for central DP with client-side adaptive clipping."
 msgstr "用于配置具有自适应剪切功能的 DP 策略的包装器。"
@@ -42337,7 +42416,8 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.strategy.rst:45:<autosummary>:1
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:1
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:1
+#: of
 #, fuzzy
 msgid "Strategy wrapper for central DP with client-side fixed clipping."
 msgstr "封装器，用于为具有固定剪切功能的 DP 配置策略。"
@@ -42354,7 +42434,8 @@ msgstr ""
 "\\(...\\)"
 
 #: ../../source/ref-api/flwr.server.strategy.rst:45:<autosummary>:1
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:1 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:1
+#: of
 #, fuzzy
 msgid "Strategy wrapper for central DP with server-side adaptive clipping."
 msgstr "封装器，用于为具有固定剪切功能的 DP 配置策略。"
@@ -42373,7 +42454,8 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.strategy.rst:45:<autosummary>:1
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:1
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:1
+#: of
 #, fuzzy
 msgid "Strategy wrapper for central DP with server-side fixed clipping."
 msgstr "封装器，用于为具有固定剪切功能的 DP 配置策略。"
@@ -42662,7 +42744,8 @@ msgstr "Bulyan"
 msgid "Bases: :py:class:`~flwr.server.strategy.fedavg.FedAvg`"
 msgstr "server.strategy.DPFedAvgFixed"
 
-#: flwr.server.strategy.bulyan.Bulyan:3 flwr.serverapp.strategy.bulyan.Bulyan:3 of
+#: flwr.server.strategy.bulyan.Bulyan:3 flwr.serverapp.strategy.bulyan.Bulyan:3
+#: of
 msgid "Implementation based on https://arxiv.org/abs/1802.07927."
 msgstr "实施基于 https://arxiv.org/abs/1802.07927。"
 
@@ -43031,7 +43114,8 @@ msgstr "server.strategy.DPFedAvgFixed"
 msgid "This class is deprecated and will be removed in a future release."
 msgstr ""
 
-#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -43051,12 +43135,14 @@ msgstr ""
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate:1
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate:1:<autosummary>:1
 #: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1
-#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid "Aggregate evaluation losses using the given strategy."
 msgstr "整合评估结果"
 
-#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_fit "
@@ -43067,12 +43153,14 @@ msgstr ""
 "\\(server\\_round\\, results\\, failures\\)"
 
 #: flwr.server.strategy.dpfedavg_adaptive.DPFedAvgAdaptive.aggregate_fit:1
-#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid "Aggregate training results as in DPFedAvgFixed and update clip norms."
 msgstr "汇总 DPFedAvgFixed 中的训练结果并更新片段标准。"
 
-#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -43089,7 +43177,8 @@ msgstr ""
 msgid "Configure the next round of evaluation using the specified strategy."
 msgstr "配置下一轮评估。"
 
-#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_fit "
@@ -43099,7 +43188,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`evaluate <flwr.server.strategy.DPFedAvgAdaptive.evaluate>`\\ "
@@ -43122,7 +43212,8 @@ msgstr ""
 msgid "Evaluate model parameters using an evaluation function from the strategy."
 msgstr ""
 
-#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1
+#: of
 msgid ""
 ":py:obj:`initialize_parameters "
 "<flwr.server.strategy.DPFedAvgAdaptive.initialize_parameters>`\\ "
@@ -43190,7 +43281,8 @@ msgstr "DP-FedAvg"
 msgid "Bases: :py:class:`~flwr.server.strategy.strategy.Strategy`"
 msgstr "Bases: :py:class:`~flwr.server.strategy.strategy.Strategy`"
 
-#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -43201,7 +43293,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_fit "
@@ -43217,7 +43310,8 @@ msgstr ""
 msgid "Aggregate training results using unweighted aggregation."
 msgstr "汇总 DPFedAvgFixed 中的训练结果并更新片段标准。"
 
-#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -43228,7 +43322,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_fit "
@@ -43246,7 +43341,8 @@ msgid ""
 "(DP)."
 msgstr "配置下一轮训练。"
 
-#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`evaluate <flwr.server.strategy.DPFedAvgFixed.evaluate>`\\ "
@@ -43256,7 +43352,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed.aggregate_evaluate:1:<autosummary>:1
+#: of
 msgid ""
 ":py:obj:`initialize_parameters "
 "<flwr.server.strategy.DPFedAvgFixed.initialize_parameters>`\\ "
@@ -43286,13 +43383,15 @@ msgid "DifferentialPrivacyClientSideAdaptiveClipping"
 msgstr "DifferentialPrivacyClientSideAdaptiveClipping"
 
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:3
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:3 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:3
+#: of
 #, fuzzy
 msgid "Use `adaptiveclipping_mod` modifier at the client side."
 msgstr "在客户端使用 \"adaptiveclipping_mod \"修改器。"
 
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:5
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:5 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:5
+#: of
 #, fuzzy
 msgid ""
 "In comparison to `DifferentialPrivacyServerSideAdaptiveClipping`, which "
@@ -43311,14 +43410,16 @@ msgstr ""
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:3
 #: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:11
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:10
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:3 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:3
+#: of
 #, fuzzy
 msgid "The strategy to which DP functionalities will be added by this wrapper."
 msgstr "该包装器将添加 DP 功能的策略。"
 
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:12
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:5
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:13 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:13
+#: of
 #, fuzzy
 msgid "The noise multiplier for the Gaussian mechanism for model updates."
 msgstr "用于模型更新的高斯机制的噪声乘数。"
@@ -43329,14 +43430,16 @@ msgstr "用于模型更新的高斯机制的噪声乘数。"
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:10
 #: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:15
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:17
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:10 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:10
+#: of
 #, fuzzy
 msgid "The number of clients that are sampled on each round."
 msgstr "每轮取样的客户数。"
 
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:16
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:9
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:17 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:17
+#: of
 #, fuzzy
 msgid ""
 "The initial value of clipping norm. Defaults to 0.1. Andrew et al. "
@@ -43345,14 +43448,16 @@ msgstr "剪切规范的初始值。默认为 0.1。安德鲁等人建议设置�
 
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:19
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:12
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:20 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:20
+#: of
 #, fuzzy
 msgid "The desired quantile of updates which should be clipped. Defaults to 0.5."
 msgstr "需要剪切的更新量化值。默认为 0.5。"
 
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:21
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:14
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:22 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:22
+#: of
 #, fuzzy
 msgid ""
 "The learning rate for the clipping norm adaptation. Defaults to 0.2. "
@@ -43360,7 +43465,8 @@ msgid ""
 msgstr "剪切规范适应的学习率。默认为 0.2。安德鲁等人建议设置为 0.2。"
 
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:24
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:25 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:25
+#: of
 #, fuzzy
 msgid ""
 "The stddev of the noise added to the count of updates currently below the"
@@ -43373,13 +43479,15 @@ msgstr "添加到当前低于估计值的更新计数中的噪声的 stddev。�
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:15
 #: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:32
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:26
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:19 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:19
+#: of
 #, fuzzy
 msgid "Create a strategy::"
 msgstr "server.strategy"
 
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:34
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:36 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:36
+#: of
 #, fuzzy
 msgid ""
 "Wrap the strategy with the "
@@ -43387,12 +43495,14 @@ msgid ""
 msgstr "用 \"DifferentialPrivacyClientSideAdaptiveClipping \"包装器对策略进行包装："
 
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:40
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:42 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:42
+#: of
 #, fuzzy
 msgid "On the client, add the `adaptiveclipping_mod` to the client-side mods::"
 msgstr "在客户端，将 \"adaptiveclipping_mod \"添加到客户端模块中："
 
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -43403,7 +43513,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate>`\\"
 " \\(server\\_round\\, results\\, ...\\)"
 
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_fit "
@@ -43417,12 +43528,14 @@ msgstr ""
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping.aggregate_fit:1
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping.aggregate_fit:1 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping.aggregate_fit:1
+#: of
 #, fuzzy
 msgid "Aggregate training results and update clip norms."
 msgstr "汇总 DPFedAvgFixed 中的训练结果并更新片段标准。"
 
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -43433,7 +43546,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.configure_evaluate>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_fit "
@@ -43444,7 +43558,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.configure_fit>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`evaluate "
@@ -43455,7 +43570,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate>`\\"
 " \\(server\\_round\\, results\\, ...\\)"
 
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`initialize_parameters "
@@ -43470,13 +43586,15 @@ msgid "DifferentialPrivacyClientSideFixedClipping"
 msgstr "差分隐私"
 
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:3
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:3 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:3
+#: of
 #, fuzzy
 msgid "Use `fixedclipping_mod` modifier at the client side."
 msgstr "在客户端使用 `fixedclipping_mod` 修改器。"
 
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:5
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:5 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:5
+#: of
 #, fuzzy
 msgid ""
 "In comparison to `DifferentialPrivacyServerSideFixedClipping`, which "
@@ -43491,7 +43609,8 @@ msgstr ""
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:12
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:5
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:12
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:5 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:5
+#: of
 #, fuzzy
 msgid ""
 "The noise multiplier for the Gaussian mechanism for model updates. A "
@@ -43499,7 +43618,8 @@ msgid ""
 msgstr "模型更新高斯机制的噪声乘数。建议使用 1.0 或更高的值，以获得较强的隐私性。"
 
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:26
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:30 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:30
+#: of
 #, fuzzy
 msgid ""
 "Wrap the strategy with the `DifferentialPrivacyClientSideFixedClipping` "
@@ -43507,12 +43627,14 @@ msgid ""
 msgstr "用 \"DifferentialPrivacyClientSideFixedClipping \"包装器包装策略："
 
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:32
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:36 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:36
+#: of
 #, fuzzy
 msgid "On the client, add the `fixedclipping_mod` to the client-side mods::"
 msgstr "在客户端，将 \"fixedclipping_mod \"添加到客户端模块中："
 
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -43523,7 +43645,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate>`\\"
 " \\(server\\_round\\, results\\, ...\\)"
 
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_fit "
@@ -43535,11 +43658,13 @@ msgstr ""
 " \\(server\\_round\\, results\\, failures\\)"
 
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate:1:<autosummary>:1
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping.aggregate_fit:1 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping.aggregate_fit:1
+#: of
 msgid "Add noise to the aggregated parameters."
 msgstr ""
 
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -43550,7 +43675,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.configure_evaluate>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_fit "
@@ -43561,7 +43687,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.configure_fit>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`evaluate "
@@ -43572,7 +43699,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate>`\\"
 " \\(server\\_round\\, results\\, ...\\)"
 
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`initialize_parameters "
@@ -43586,7 +43714,8 @@ msgstr "server.strategy.Strategy"
 msgid "DifferentialPrivacyServerSideAdaptiveClipping"
 msgstr "DifferentialPrivacyServerSideAdaptiveClipping"
 
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:17 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:17
+#: of
 #, fuzzy
 msgid ""
 "The standard deviation of the noise added to the count of updates below "
@@ -43594,14 +43723,16 @@ msgid ""
 "`expected_num_records/20`"
 msgstr "添加到当前低于估计值的更新计数中的噪声的 stddev。安德鲁等人建议设置为 \"expected_num_records/20"
 
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:27 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:27
+#: of
 #, fuzzy
 msgid ""
 "Wrap the strategy with the DifferentialPrivacyServerSideAdaptiveClipping "
 "wrapper::"
 msgstr "用 DifferentialPrivacyServerSideFixedClipping 封装器封装策略"
 
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -43612,7 +43743,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate>`\\"
 " \\(server\\_round\\, results\\, ...\\)"
 
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_fit "
@@ -43623,7 +43755,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.aggregate_fit>`\\"
 " \\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -43634,7 +43767,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.configure_evaluate>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_fit "
@@ -43645,7 +43779,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.configure_fit>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`evaluate "
@@ -43656,7 +43791,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate>`\\"
 " \\(server\\_round\\, results\\, ...\\)"
 
-#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`initialize_parameters "
@@ -43670,14 +43806,16 @@ msgstr "server.strategy.Strategy"
 msgid "DifferentialPrivacyServerSideFixedClipping"
 msgstr "差分隐私"
 
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:19 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:19
+#: of
 #, fuzzy
 msgid ""
 "Wrap the strategy with the DifferentialPrivacyServerSideFixedClipping "
 "wrapper::"
 msgstr "用 DifferentialPrivacyServerSideFixedClipping 封装器封装策略"
 
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -43688,7 +43826,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate>`\\"
 " \\(server\\_round\\, results\\, ...\\)"
 
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_fit "
@@ -43700,11 +43839,13 @@ msgstr ""
 " \\(server\\_round\\, results\\, failures\\)"
 
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate:1:<autosummary>:1
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_fit:1 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_fit:1
+#: of
 msgid "Compute the updates, clip, and pass them for aggregation."
 msgstr ""
 
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -43715,7 +43856,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.configure_evaluate>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_fit "
@@ -43726,7 +43868,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.configure_fit>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`evaluate "
@@ -43737,7 +43880,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate>`\\"
 " \\(server\\_round\\, results\\, ...\\)"
 
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`initialize_parameters "
@@ -43745,7 +43889,8 @@ msgid ""
 " \\(client\\_manager\\)"
 msgstr "server.strategy.Strategy"
 
-#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_fit:3 of
+#: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping.aggregate_fit:3
+#: of
 msgid "Afterward, add noise to the aggregated parameters."
 msgstr ""
 
@@ -43753,7 +43898,8 @@ msgstr ""
 msgid "FaultTolerantFedAvg"
 msgstr ""
 
-#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -43764,7 +43910,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_fit "
@@ -43790,7 +43937,8 @@ msgstr ""
 msgid "Aggregate fit results using weighted average."
 msgstr ""
 
-#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -43801,7 +43949,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_fit "
@@ -43811,7 +43960,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`evaluate <flwr.server.strategy.FaultTolerantFedAvg.evaluate>`\\ "
@@ -43821,14 +43971,16 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 msgid ""
 ":py:obj:`initialize_parameters "
 "<flwr.server.strategy.FaultTolerantFedAvg.initialize_parameters>`\\ "
 "\\(client\\_manager\\)"
 msgstr ""
 
-#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`num_evaluation_clients "
@@ -43836,7 +43988,8 @@ msgid ""
 "\\(num\\_available\\_clients\\)"
 msgstr ":py:obj:`evaluate_ins <flwr.common.ServerMessage.evaluate_ins>`\\"
 
-#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 msgid ""
 ":py:obj:`num_fit_clients "
 "<flwr.server.strategy.FaultTolerantFedAvg.num_fit_clients>`\\ "
@@ -44083,7 +44236,8 @@ msgstr "DP-FedAvg"
 msgid "Implementation based on https://arxiv.org/abs/1602.05629"
 msgstr "实施基于 https://arxiv.org/abs/1602.05629"
 
-#: flwr.server.strategy.fedavg.FedAvg:5 flwr.server.strategy.fedprox.FedProx:37 of
+#: flwr.server.strategy.fedavg.FedAvg:5 flwr.server.strategy.fedprox.FedProx:37
+#: of
 #, fuzzy
 msgid ""
 "Fraction of clients used during training. In case `min_fit_clients` is "
@@ -44093,7 +44247,8 @@ msgstr ""
 "训练过程中使用的客户端比例。如果 `min_fit_clients` 大于 `fraction_fit * "
 "available_clients`，则仍会对 `min_fit_clients` 进行采样。默认为 1.0。"
 
-#: flwr.server.strategy.fedavg.FedAvg:9 flwr.server.strategy.fedprox.FedProx:41 of
+#: flwr.server.strategy.fedavg.FedAvg:9 flwr.server.strategy.fedprox.FedProx:41
+#: of
 #, fuzzy
 msgid ""
 "Fraction of clients used during validation. In case "
@@ -44189,7 +44344,8 @@ msgstr "server.strategy.Strategy"
 msgid "FedAvgAndroid"
 msgstr "DP-FedAvg"
 
-#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -44200,7 +44356,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_fit "
@@ -44210,7 +44367,8 @@ msgstr ""
 ":py:obj:`aggregate_fit <flwr.server.strategy.Krum.aggregate_fit>`\\ "
 "\\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`bytes_to_ndarray "
@@ -44223,7 +44381,8 @@ msgstr "server.strategy.Strategy"
 msgid "Deserialize NumPy array from bytes."
 msgstr "从字节反序列化 NumPy ndarray。"
 
-#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -44234,7 +44393,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_fit "
@@ -44244,7 +44404,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`evaluate <flwr.server.strategy.FedAvgAndroid.evaluate>`\\ "
@@ -44254,14 +44415,16 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1
+#: of
 msgid ""
 ":py:obj:`initialize_parameters "
 "<flwr.server.strategy.FedAvgAndroid.initialize_parameters>`\\ "
 "\\(client\\_manager\\)"
 msgstr ""
 
-#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`ndarray_to_bytes "
@@ -44274,7 +44437,8 @@ msgstr "server.strategy.Strategy"
 msgid "Serialize NumPy array to bytes."
 msgstr "从字节反序列化 NumPy ndarray。"
 
-#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`ndarrays_to_parameters "
@@ -44284,7 +44448,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`num_evaluation_clients "
@@ -44295,14 +44460,16 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1
+#: of
 msgid ""
 ":py:obj:`num_fit_clients "
 "<flwr.server.strategy.FedAvgAndroid.num_fit_clients>`\\ "
 "\\(num\\_available\\_clients\\)"
 msgstr ""
 
-#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`parameters_to_ndarrays "
@@ -44313,7 +44480,8 @@ msgstr ""
 "\\(server\\_round\\, results\\, failures\\)"
 
 #: flwr.server.strategy.fedavg_android.FedAvgAndroid.aggregate_evaluate:1:<autosummary>:1
-#: flwr.server.strategy.fedavg_android.FedAvgAndroid.parameters_to_ndarrays:1 of
+#: flwr.server.strategy.fedavg_android.FedAvgAndroid.parameters_to_ndarrays:1
+#: of
 msgid "Convert parameters object to NumPy weights."
 msgstr ""
 
@@ -44844,7 +45012,8 @@ msgstr "server.strategy.Strategy"
 msgid "FedXgbBagging"
 msgstr "FedXgbBagging"
 
-#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -44858,12 +45027,14 @@ msgstr ""
 #: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1
 #: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1
 #: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1
-#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid "Aggregate evaluation metrics using average."
 msgstr "采用加权平均法计算评估损失总额。"
 
-#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_fit "
@@ -44880,7 +45051,8 @@ msgstr ""
 msgid "Aggregate fit results using bagging."
 msgstr ""
 
-#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -44891,7 +45063,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_fit "
@@ -44901,7 +45074,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`evaluate <flwr.server.strategy.FedXgbBagging.evaluate>`\\ "
@@ -44911,7 +45085,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`initialize_parameters "
@@ -44919,7 +45094,8 @@ msgid ""
 "\\(client\\_manager\\)"
 msgstr "server.strategy.Strategy"
 
-#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`num_evaluation_clients "
@@ -44930,7 +45106,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`num_fit_clients "
@@ -44944,7 +45121,8 @@ msgstr ":py:obj:`NDArray <flwr.common.NDArray>`\\"
 msgid "FedXgbCyclic"
 msgstr "FedXgbCyclic"
 
-#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -44955,7 +45133,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_fit "
@@ -44965,7 +45144,8 @@ msgstr ""
 ":py:obj:`aggregate_fit <flwr.server.strategy.Krum.aggregate_fit>`\\ "
 "\\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -44976,7 +45156,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_fit "
@@ -44986,7 +45167,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`evaluate <flwr.server.strategy.FedXgbCyclic.evaluate>`\\ "
@@ -44996,7 +45178,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`initialize_parameters "
@@ -45004,7 +45187,8 @@ msgid ""
 "\\(client\\_manager\\)"
 msgstr "server.strategy.Strategy"
 
-#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`num_evaluation_clients "
@@ -45015,7 +45199,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`num_fit_clients "
@@ -45403,7 +45588,8 @@ msgstr "server.strategy.Strategy"
 msgid "Strategy"
 msgstr "Krum 策略。"
 
-#: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -45415,12 +45601,14 @@ msgstr ""
 "results\\, ...\\)"
 
 #: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1
-#: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid "Aggregate evaluation results."
 msgstr "整合评估结果"
 
-#: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_fit <flwr.server.strategy.Strategy.aggregate_fit>`\\ "
@@ -45435,7 +45623,8 @@ msgstr ""
 msgid "Aggregate training results."
 msgstr "整合评估结果"
 
-#: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -45446,7 +45635,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_fit <flwr.server.strategy.Strategy.configure_fit>`\\ "
@@ -45455,7 +45645,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`evaluate <flwr.server.strategy.Strategy.evaluate>`\\ "
@@ -45471,7 +45662,8 @@ msgstr ""
 msgid "Evaluate the current model parameters."
 msgstr "当前（全局）模型参数。"
 
-#: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`initialize_parameters "
@@ -45572,7 +45764,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.server.workflow.rst:24:<autosummary>:1
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:1 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:1
+#: of
 msgid "The workflow for the SecAgg+ protocol."
 msgstr ""
 
@@ -45596,7 +45789,8 @@ msgstr "工作流程"
 msgid "SecAggPlusWorkflow"
 msgstr ""
 
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:3 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:3
+#: of
 msgid ""
 "The SecAgg+ protocol ensures the secure summation of integer vectors "
 "owned by multiple parties, without accessing any individual integer "
@@ -45612,45 +45806,52 @@ msgid ""
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secagg_workflow.SecAggWorkflow:14
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:14 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:14
+#: of
 msgid "The protocol involves four main stages:"
 msgstr ""
 
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:16 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:16
+#: of
 msgid ""
 "'setup': Send SecAgg+ configuration to clients and collect their public "
 "keys."
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secagg_workflow.SecAggWorkflow:17
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:17 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:17
+#: of
 msgid ""
 "'share keys': Broadcast public keys among clients and collect encrypted "
 "secret key shares."
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secagg_workflow.SecAggWorkflow:19
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:19 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:19
+#: of
 msgid ""
 "'collect masked vectors': Forward encrypted secret key shares to target "
 "clients and collect masked model parameters."
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secagg_workflow.SecAggWorkflow:21
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:21 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:21
+#: of
 msgid ""
 "'unmask': Collect secret key shares to decrypt and aggregate the model "
 "parameters."
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secagg_workflow.SecAggWorkflow:23
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:23 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:23
+#: of
 msgid ""
 "Only the aggregated model parameters are exposed and passed to "
 "`Strategy.aggregate_fit`, ensuring individual data privacy."
 msgstr ""
 
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:26 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:26
+#: of
 msgid ""
 "The number of shares into which each client's private key is split under "
 "the SecAgg+ protocol. If specified as a float, it represents the "
@@ -45661,7 +45862,8 @@ msgid ""
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secagg_workflow.SecAggWorkflow:26
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:33 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:33
+#: of
 msgid ""
 "The minimum number of shares required to reconstruct a client's private "
 "key, or, if specified as a float, it represents the proportion of the "
@@ -45671,7 +45873,8 @@ msgid ""
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secagg_workflow.SecAggWorkflow:32
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:39 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:39
+#: of
 msgid ""
 "The maximum value of the weight that can be assigned to any single "
 "client's update during the weighted average calculation on the server "
@@ -45679,7 +45882,8 @@ msgid ""
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secagg_workflow.SecAggWorkflow:36
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:43 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:43
+#: of
 msgid ""
 "The range within which model parameters are clipped before quantization. "
 "This parameter ensures each model parameter is bounded within "
@@ -45687,7 +45891,8 @@ msgid ""
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secagg_workflow.SecAggWorkflow:40
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:47 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:47
+#: of
 msgid ""
 "The size of the range into which floating-point model parameters are "
 "quantized, mapping each parameter to an integer in [0, "
@@ -45696,7 +45901,8 @@ msgid ""
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secagg_workflow.SecAggWorkflow:44
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:51 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:51
+#: of
 msgid ""
 "The range of values from which random mask entries are uniformly sampled "
 "([0, modulus_range-1]). `modulus_range` must be less than 4294967296. "
@@ -45704,7 +45910,8 @@ msgid ""
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secagg_workflow.SecAggWorkflow:48
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:55 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:55
+#: of
 #, fuzzy
 msgid ""
 "The timeout duration in seconds. If specified, the workflow will wait for"
@@ -45712,7 +45919,8 @@ msgid ""
 "and the workflow will wait until replies for all messages are received."
 msgstr "超时时间（秒）。如果指定，该方法将在此期限内等待回复。如果指定为 \"无\"，则没有时间限制，该方法将等待直到收到所有信息的回复。"
 
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:62 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:62
+#: of
 msgid ""
 "Generally, higher `num_shares` means more robust to dropouts while "
 "increasing the computational costs; higher `reconstruction_threshold` "
@@ -45720,16 +45928,19 @@ msgid ""
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secagg_workflow.SecAggWorkflow:59
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:65 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:65
+#: of
 msgid "Too large `max_weight` may compromise the precision of the quantization."
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secagg_workflow.SecAggWorkflow:60
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:66 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:66
+#: of
 msgid "`modulus_range` must be 2**n and larger than `quantization_range`."
 msgstr ""
 
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:67 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:67
+#: of
 msgid ""
 "When `num_shares` is a float, it is interpreted as the proportion of all "
 "selected clients, and hence the number of shares will be determined in "
@@ -45737,7 +45948,8 @@ msgid ""
 " of participating clients."
 msgstr ""
 
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:70 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:70
+#: of
 msgid ""
 "Similarly, when `reconstruction_threshold` is a float, it is interpreted "
 "as the proportion of the number of shares needed for the reconstruction "
@@ -45745,7 +45957,8 @@ msgid ""
 "security threshold relative to the number of distributed shares."
 msgstr ""
 
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:74 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:74
+#: of
 msgid ""
 "`num_shares`, `reconstruction_threshold`, and the quantization parameters"
 " (`clipping_range`, `quantization_range`, `modulus_range`) play critical "
@@ -45753,7 +45966,8 @@ msgid ""
 " protocol."
 msgstr ""
 
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1
+#: of
 msgid ""
 ":py:obj:`collect_masked_vectors_stage "
 "<flwr.server.workflow.SecAggPlusWorkflow.collect_masked_vectors_stage>`\\"
@@ -45761,12 +45975,14 @@ msgid ""
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid "Execute the 'collect masked vectors' stage."
 msgstr "使用联邦学习策略"
 
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1
+#: of
 msgid ""
 ":py:obj:`setup_stage "
 "<flwr.server.workflow.SecAggPlusWorkflow.setup_stage>`\\ \\(grid\\, "
@@ -45774,12 +45990,14 @@ msgid ""
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.setup_stage:1 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.setup_stage:1
+#: of
 #, fuzzy
 msgid "Execute the 'setup' stage."
 msgstr "使用联邦学习策略"
 
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1
+#: of
 msgid ""
 ":py:obj:`share_keys_stage "
 "<flwr.server.workflow.SecAggPlusWorkflow.share_keys_stage>`\\ \\(grid\\, "
@@ -45787,11 +46005,13 @@ msgid ""
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.share_keys_stage:1 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.share_keys_stage:1
+#: of
 msgid "Execute the 'share keys' stage."
 msgstr ""
 
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1
+#: of
 msgid ""
 ":py:obj:`unmask_stage "
 "<flwr.server.workflow.SecAggPlusWorkflow.unmask_stage>`\\ \\(grid\\, "
@@ -45799,7 +46019,8 @@ msgid ""
 msgstr ""
 
 #: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.unmask_stage:1 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.unmask_stage:1
+#: of
 msgid "Execute the 'unmask' stage."
 msgstr ""
 
@@ -45863,27 +46084,31 @@ msgid ""
 "protocol."
 msgstr ""
 
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1
+#: of
 msgid ""
 ":py:obj:`collect_masked_vectors_stage "
 "<flwr.server.workflow.SecAggWorkflow.collect_masked_vectors_stage>`\\ "
 "\\(grid\\, context\\, ...\\)"
 msgstr ""
 
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1
+#: of
 msgid ""
 ":py:obj:`setup_stage <flwr.server.workflow.SecAggWorkflow.setup_stage>`\\"
 " \\(grid\\, context\\, state\\)"
 msgstr ""
 
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1
+#: of
 msgid ""
 ":py:obj:`share_keys_stage "
 "<flwr.server.workflow.SecAggWorkflow.share_keys_stage>`\\ \\(grid\\, "
 "context\\, state\\)"
 msgstr ""
 
-#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1 of
+#: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow.collect_masked_vectors_stage:1:<autosummary>:1
+#: of
 msgid ""
 ":py:obj:`unmask_stage "
 "<flwr.server.workflow.SecAggWorkflow.unmask_stage>`\\ \\(grid\\, "
@@ -46452,7 +46677,8 @@ msgstr ":py:obj:`get_node_ids <flwr.server.Driver.get_node_ids>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
 #: flwr.supercore.privacy_accounting.PrivacyAccountant.get_delta:1
-#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.get_delta:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.get_delta:1
+#: of
 msgid "Return cumulative delta at the supplied epsilon."
 msgstr ""
 
@@ -46466,7 +46692,8 @@ msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
 #: flwr.supercore.privacy_accounting.PrivacyAccountant.get_epsilon:1
-#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.get_epsilon:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.get_epsilon:1
+#: of
 msgid "Return cumulative epsilon at the supplied delta."
 msgstr ""
 
@@ -46519,11 +46746,13 @@ msgstr ""
 #: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
 #: flwr.supercore.privacy_accounting.PrivacyAccountant.would_exceed:1
-#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.would_exceed:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.would_exceed:1
+#: of
 msgid "Return whether composing an event would exceed an epsilon limit."
 msgstr ""
 
-#: flwr.supercore.privacy_accounting.PrivacyAccountant.compose:1:<autosummary>:1 of
+#: flwr.supercore.privacy_accounting.PrivacyAccountant.compose:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`config <flwr.serverapp.PrivacyAccountant.config>`\\"
 msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
@@ -46531,12 +46760,14 @@ msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
 #: flwr.serverapp.PrivacyAccountant.config:1
 #: flwr.serverapp.RdpAccountant.config:1
 #: flwr.supercore.privacy_accounting.PrivacyAccountant.compose:1:<autosummary>:1
-#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid "Return the privacy configuration."
 msgstr "配置值"
 
-#: flwr.supercore.privacy_accounting.PrivacyAccountant.compose:1:<autosummary>:1 of
+#: flwr.supercore.privacy_accounting.PrivacyAccountant.compose:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`num_releases <flwr.serverapp.PrivacyAccountant.num_releases>`\\"
 msgstr ":py:obj:`run_driver_api <flwr.server.run_driver_api>`\\ \\(\\)"
@@ -46544,7 +46775,8 @@ msgstr ":py:obj:`run_driver_api <flwr.server.run_driver_api>`\\ \\(\\)"
 #: flwr.serverapp.PrivacyAccountant.num_releases:1
 #: flwr.serverapp.RdpAccountant.num_releases:1
 #: flwr.supercore.privacy_accounting.PrivacyAccountant.compose:1:<autosummary>:1
-#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1
+#: of
 msgid "Return the number of composed private releases."
 msgstr ""
 
@@ -46674,7 +46906,8 @@ msgid ""
 msgstr ":py:obj:`run_driver_api <flwr.server.run_driver_api>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
-#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.get_privacy_spent:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.get_privacy_spent:1
+#: of
 msgid "Return cumulative privacy expenditure at delta."
 msgstr ""
 
@@ -46686,7 +46919,8 @@ msgid ""
 msgstr "server.strategy.Strategy"
 
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
-#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.load_state_dict:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.load_state_dict:1
+#: of
 msgid "Restore state produced by :meth:`state_dict`."
 msgstr ""
 
@@ -46696,7 +46930,8 @@ msgid ":py:obj:`state_dict <flwr.serverapp.RdpAccountant.state_dict>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
 
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
-#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.state_dict:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.state_dict:1
+#: of
 msgid "Return JSON-serializable accountant state."
 msgstr ""
 
@@ -46710,23 +46945,27 @@ msgstr ""
 "config=flwr.server.ServerConfig(num_rounds=3, round_timeout=600.0), "
 "...)``"
 
-#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`config <flwr.serverapp.RdpAccountant.config>`\\"
 msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
 
-#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`num_releases <flwr.serverapp.RdpAccountant.num_releases>`\\"
 msgstr ":py:obj:`run_driver_api <flwr.server.run_driver_api>`\\ \\(\\)"
 
-#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.load_state_dict:3 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.load_state_dict:3
+#: of
 msgid ""
 "The restored state must use the same privacy configuration as this "
 "accountant. Backend numeric state is rebuilt from Flower's event ledger."
 msgstr ""
 
-#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.would_exceed:3 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.would_exceed:3
+#: of
 msgid "This method does not mutate committed accountant state."
 msgstr ""
 
@@ -47106,7 +47345,8 @@ msgstr ""
 "\\(...\\)"
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:1 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:1
+#: of
 #, fuzzy
 msgid "Message-based central DP with server-side adaptive clipping."
 msgstr "用于配置具有自适应剪切功能的 DP 策略的包装器。"
@@ -47498,7 +47738,8 @@ msgid ""
 "algorithm."
 msgstr ""
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -47515,12 +47756,14 @@ msgstr ""
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid "Aggregate MetricRecords in the received Messages."
 msgstr "使用给定的策略汇总评估损失。"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -47553,7 +47796,8 @@ msgstr ""
 msgid "Aggregate ArrayRecords and MetricRecords in the received Messages."
 msgstr ""
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -47576,7 +47820,8 @@ msgstr ""
 msgid "Configure the next round of federated evaluation."
 msgstr "配置下一轮评估。"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -47599,7 +47844,8 @@ msgstr ""
 msgid "Configure the next round of federated training."
 msgstr "配置下一轮训练。"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start <flwr.serverapp.strategy.Bulyan.start>`\\ \\(grid\\, "
@@ -47618,7 +47864,8 @@ msgstr ""
 msgid "Execute the federated learning strategy."
 msgstr "使用联邦学习策略"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`summary <flwr.serverapp.strategy.Bulyan.summary>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
@@ -47699,14 +47946,16 @@ msgid ""
 msgstr ""
 
 #: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:1
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:1 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:1
+#: of
 #, fuzzy
 msgid ""
 "Bases: "
 ":py:class:`~flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase`"
 msgstr "Bases: :py:class:`~flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed`"
 
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -47717,7 +47966,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate>`\\"
 " \\(server\\_round\\, results\\, ...\\)"
 
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -47728,7 +47978,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.aggregate_fit>`\\"
 " \\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -47739,7 +47990,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.configure_evaluate>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -47750,7 +48002,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.configure_fit>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start "
@@ -47760,7 +48013,8 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`summary "
@@ -47769,7 +48023,8 @@ msgid ""
 msgstr "server.strategy.Strategy"
 
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:1
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:1
+#: of
 #, fuzzy
 msgid ""
 "Bases: "
@@ -47777,14 +48032,16 @@ msgid ""
 msgstr "Bases: :py:class:`~flwr.server.strategy.dpfedavg_fixed.DPFedAvgFixed`"
 
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:19
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:12 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:12
+#: of
 msgid ""
 "Optional accountant used to track cumulative privacy loss for model "
 "updates. Training and evaluation metrics are not included. Accounted mode"
 " requires no-amplification accounting and uniform FedAvg aggregation."
 msgstr ""
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -47795,7 +48052,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.aggregate_evaluate>`\\"
 " \\(server\\_round\\, results\\, ...\\)"
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -47806,7 +48064,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.aggregate_fit>`\\"
 " \\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -47817,7 +48076,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.configure_evaluate>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -47828,7 +48088,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.configure_fit>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`privacy_spent "
@@ -47837,11 +48098,13 @@ msgid ""
 msgstr "server.strategy.Strategy"
 
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.privacy_spent:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.privacy_spent:1
+#: of
 msgid "Return cumulative privacy expenditure, if accounting is enabled."
 msgstr ""
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start "
@@ -47851,7 +48114,8 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`summary "
@@ -47859,7 +48123,8 @@ msgid ""
 " \\(\\)"
 msgstr "server.strategy.Strategy"
 
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -47870,7 +48135,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate>`\\"
 " \\(server\\_round\\, results\\, ...\\)"
 
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -47881,7 +48147,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.aggregate_fit>`\\"
 " \\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -47892,7 +48159,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.configure_evaluate>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -47903,7 +48171,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.configure_fit>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start "
@@ -47913,7 +48182,8 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyAdaptiveBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`summary "
@@ -47921,14 +48191,16 @@ msgid ""
 " \\(\\)"
 msgstr "server.strategy.Strategy"
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:23 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:23
+#: of
 #, fuzzy
 msgid ""
 "Wrap the strategy with the `DifferentialPrivacyServerSideFixedClipping` "
 "wrapper::"
 msgstr "用 DifferentialPrivacyServerSideFixedClipping 封装器封装策略"
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -47939,7 +48211,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.aggregate_evaluate>`\\"
 " \\(server\\_round\\, results\\, ...\\)"
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -47950,7 +48223,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.aggregate_fit>`\\"
 " \\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -47961,7 +48235,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.configure_evaluate>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -47972,7 +48247,8 @@ msgstr ""
 "<flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.configure_fit>`\\"
 " \\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`privacy_spent "
@@ -47980,7 +48256,8 @@ msgid ""
 " \\(\\)"
 msgstr "server.strategy.Strategy"
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start "
@@ -47990,7 +48267,8 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`summary "
@@ -48018,7 +48296,8 @@ msgid ""
 "computing weighted averages for both ArrayRecords and MetricRecords."
 msgstr ""
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -48029,7 +48308,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -48039,7 +48319,8 @@ msgstr ""
 ":py:obj:`aggregate_fit <flwr.server.strategy.Krum.aggregate_fit>`\\ "
 "\\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -48050,7 +48331,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -48060,7 +48342,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start <flwr.serverapp.strategy.FedAdagrad.start>`\\ \\(grid\\, "
@@ -48069,12 +48352,14 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedAdagrad.summary>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -48085,7 +48370,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -48095,7 +48381,8 @@ msgstr ""
 ":py:obj:`aggregate_fit <flwr.server.strategy.Krum.aggregate_fit>`\\ "
 "\\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -48106,7 +48393,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -48116,7 +48404,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start <flwr.serverapp.strategy.FedAdam.start>`\\ \\(grid\\, "
@@ -48125,7 +48414,8 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedAdam.summary>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
@@ -48135,7 +48425,8 @@ msgstr "server.strategy.Strategy"
 msgid "Bases: :py:class:`~flwr.serverapp.strategy.strategy.Strategy`"
 msgstr "Bases: :py:class:`~flwr.server.strategy.strategy.Strategy`"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -48146,7 +48437,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -48156,7 +48448,8 @@ msgstr ""
 ":py:obj:`aggregate_fit <flwr.server.strategy.Krum.aggregate_fit>`\\ "
 "\\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -48167,7 +48460,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -48177,7 +48471,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start <flwr.serverapp.strategy.FedAvg.start>`\\ \\(grid\\, "
@@ -48186,7 +48481,8 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedAvg.summary>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
@@ -48201,7 +48497,8 @@ msgstr "服务器端优化中使用的服务器端学习率。默认为 1.0。"
 msgid "Server-side momentum factor used for FedAvgM."
 msgstr "用于 FedAvgM 的服务器端动量因子。默认为 0.0。"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -48212,7 +48509,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -48222,7 +48520,8 @@ msgstr ""
 ":py:obj:`aggregate_fit <flwr.server.strategy.Krum.aggregate_fit>`\\ "
 "\\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -48233,7 +48532,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -48243,7 +48543,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start <flwr.serverapp.strategy.FedAvgM.start>`\\ \\(grid\\, "
@@ -48252,7 +48553,8 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedAvgM.summary>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
@@ -48262,7 +48564,8 @@ msgstr "server.strategy.Strategy"
 msgid "Implementation based on https://arxiv.org/pdf/1803.01498v1"
 msgstr "实施基于 https://arxiv.org/abs/1802.07927。"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -48273,7 +48576,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -48283,7 +48587,8 @@ msgstr ""
 ":py:obj:`aggregate_fit <flwr.server.strategy.Krum.aggregate_fit>`\\ "
 "\\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -48294,7 +48599,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -48304,7 +48610,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start <flwr.serverapp.strategy.FedMedian.start>`\\ \\(grid\\, "
@@ -48313,7 +48620,8 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedMedian.summary>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
@@ -48358,7 +48666,8 @@ msgid ""
 "training begins."
 msgstr "其中，\"global_params \"是训练前的参数副本。"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -48369,7 +48678,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -48379,7 +48689,8 @@ msgstr ""
 ":py:obj:`aggregate_fit <flwr.server.strategy.Krum.aggregate_fit>`\\ "
 "\\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -48390,7 +48701,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -48400,7 +48712,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start <flwr.serverapp.strategy.FedProx.start>`\\ \\(grid\\, "
@@ -48409,7 +48722,8 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedProx.summary>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
@@ -48419,7 +48733,8 @@ msgstr "server.strategy.Strategy"
 msgid "Fraction to cut off of both tails of the distribution."
 msgstr "截取分布两个尾部的分数。默认为 0.2。"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -48430,7 +48745,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -48440,7 +48756,8 @@ msgstr ""
 ":py:obj:`aggregate_fit <flwr.server.strategy.Krum.aggregate_fit>`\\ "
 "\\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -48451,7 +48768,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -48461,7 +48779,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start <flwr.serverapp.strategy.FedTrimmedAvg.start>`\\ "
@@ -48470,7 +48789,8 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedTrimmedAvg.summary>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
@@ -48531,14 +48851,16 @@ msgstr ""
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedXgbBagging.summary>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`current_bst "
 "<flwr.serverapp.strategy.FedXgbBagging.current_bst>`\\"
 msgstr ":py:obj:`NDArray <flwr.common.NDArray>`\\"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -48549,7 +48871,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -48559,7 +48882,8 @@ msgstr ""
 ":py:obj:`aggregate_fit <flwr.server.strategy.Krum.aggregate_fit>`\\ "
 "\\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -48570,7 +48894,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -48580,7 +48905,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start <flwr.serverapp.strategy.FedXgbCyclic.start>`\\ \\(grid\\,"
@@ -48589,12 +48915,14 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedXgbCyclic.summary>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -48605,7 +48933,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -48615,7 +48944,8 @@ msgstr ""
 ":py:obj:`aggregate_fit <flwr.server.strategy.Krum.aggregate_fit>`\\ "
 "\\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -48626,7 +48956,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -48636,7 +48967,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start <flwr.serverapp.strategy.FedYogi.start>`\\ \\(grid\\, "
@@ -48645,7 +48977,8 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedYogi.summary>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
@@ -48661,7 +48994,8 @@ msgstr "Bases: :py:class:`~flwr.server.strategy.fedopt.FedOpt`"
 msgid "Number of malicious nodes in the system. Defaults to 0."
 msgstr "系统中恶意客户端的数量。默认为 0。"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -48672,7 +49006,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -48682,7 +49017,8 @@ msgstr ""
 ":py:obj:`aggregate_fit <flwr.server.strategy.Krum.aggregate_fit>`\\ "
 "\\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -48693,7 +49029,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -48703,7 +49040,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start <flwr.serverapp.strategy.Krum.start>`\\ \\(grid\\, "
@@ -48712,7 +49050,8 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`summary <flwr.serverapp.strategy.Krum.summary>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
@@ -48733,7 +49072,8 @@ msgid ""
 " 1, MultiKrum will reduce to classical Krum."
 msgstr ""
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -48744,7 +49084,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -48754,7 +49095,8 @@ msgstr ""
 ":py:obj:`aggregate_fit <flwr.server.strategy.Krum.aggregate_fit>`\\ "
 "\\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -48765,7 +49107,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -48775,7 +49118,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start <flwr.serverapp.strategy.MultiKrum.start>`\\ \\(grid\\, "
@@ -48784,7 +49128,8 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`summary <flwr.serverapp.strategy.MultiKrum.summary>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
@@ -48813,7 +49158,8 @@ msgid ""
 "when aggregating ArrayRecords following q-FedAvg."
 msgstr ""
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -48824,7 +49170,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.aggregate_evaluate>`\\ \\(server\\_round\\, "
 "results\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -48834,7 +49181,8 @@ msgstr ""
 ":py:obj:`aggregate_fit <flwr.server.strategy.Krum.aggregate_fit>`\\ "
 "\\(server\\_round\\, results\\, failures\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -48845,7 +49193,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -48855,7 +49204,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start <flwr.serverapp.strategy.QFedAvg.start>`\\ \\(grid\\, "
@@ -48864,7 +49214,8 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`summary <flwr.serverapp.strategy.QFedAvg.summary>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
@@ -48950,7 +49301,8 @@ msgid ""
 "<flwr.serverapp.strategy.Result.evaluate_metrics_serverapp>`\\"
 msgstr ":py:obj:`evaluate_ins <flwr.common.ServerMessage.evaluate_ins>`\\"
 
-#: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_evaluate "
@@ -48962,12 +49314,14 @@ msgstr ""
 "results\\, ...\\)"
 
 #: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1
-#: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid "Aggregate evaluation metrics from client nodes."
 msgstr "采用加权平均法计算评估损失总额。"
 
-#: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`aggregate_train "
@@ -48983,7 +49337,8 @@ msgstr ""
 msgid "Aggregate training results from client nodes."
 msgstr "汇总 DPFedAvgFixed 中的训练结果并更新片段标准。"
 
-#: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_evaluate "
@@ -48994,7 +49349,8 @@ msgstr ""
 "<flwr.server.strategy.Krum.configure_evaluate>`\\ \\(server\\_round\\, "
 "parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`configure_train "
@@ -49004,7 +49360,8 @@ msgstr ""
 ":py:obj:`configure_fit <flwr.server.strategy.Krum.configure_fit>`\\ "
 "\\(server\\_round\\, parameters\\, ...\\)"
 
-#: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ""
 ":py:obj:`start <flwr.serverapp.strategy.Strategy.start>`\\ \\(grid\\, "
@@ -49013,7 +49370,8 @@ msgstr ""
 ":py:obj:`FedAdagrad <flwr.server.strategy.FedAdagrad>`\\ \\(\\*\\[\\, "
 "fraction\\_fit\\, ...\\]\\)"
 
-#: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1 of
+#: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`summary <flwr.serverapp.strategy.Strategy.summary>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
@@ -87111,3 +87469,4 @@ msgstr ""
 
 #~ msgid "Alpha: not feature complete, allowed to have known issues"
 #~ msgstr "阿尔法版：功能不完整，允许存在已知问题"
+
