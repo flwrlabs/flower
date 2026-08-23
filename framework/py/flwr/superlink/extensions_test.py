@@ -78,6 +78,45 @@ def test_notify_run_started_uses_existing_event_loop(
         loop.close()
 
 
+def test_callback_completion_does_not_require_closed_event_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Remove timed-out callbacks even when their loop closes first."""
+    run = Run.create_empty(42)
+    extension = ModuleType("test_extension")
+    callback_started = threading.Event()
+    callback_release = threading.Event()
+    callback_done = threading.Event()
+
+    def on_run_started(*args: object) -> None:
+        del args
+        callback_started.set()
+        callback_release.wait(timeout=1)
+        callback_done.set()
+
+    extension.on_run_started = on_run_started  # type: ignore[attr-defined]
+    monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: extension)
+    monkeypatch.setattr(extensions, "_NOTIFICATION_CALLBACK_TIMEOUT_SECONDS", 0.01)
+    loop = asyncio.new_event_loop()
+    extensions.set_notification_loop(loop)
+
+    try:
+
+        async def notify_and_shutdown() -> None:
+            extensions.notify_run_started(run, "unknown")
+            await asyncio.to_thread(callback_started.wait, 1)
+            await extensions.shutdown_notification_loop()
+
+        loop.run_until_complete(notify_and_shutdown())
+    finally:
+        loop.close()
+
+    callback_release.set()
+    assert callback_done.wait(timeout=1)
+    with extensions._NOTIFICATION_CALLBACK_EVENTS_LOCK:
+        assert not extensions._NOTIFICATION_CALLBACK_EVENTS
+
+
 def test_notify_run_started_isolates_extension_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -46,7 +46,8 @@ _NOTIFICATION_CALLBACK_TIMEOUT_SECONDS = 1.0
 _NOTIFICATION_TASKS: set[asyncio.Task[None]] = set()
 _NOTIFICATION_QUEUE_SLOTS = threading.BoundedSemaphore(_NOTIFICATION_TASK_CAPACITY)
 _NOTIFICATION_CALLBACK_SLOTS: asyncio.Semaphore | None = None
-_NOTIFICATION_CALLBACK_EVENTS: set[asyncio.Event] = set()
+_NOTIFICATION_CALLBACK_EVENTS: set[threading.Event] = set()
+_NOTIFICATION_CALLBACK_EVENTS_LOCK = threading.Lock()
 
 
 def _try_import_sgxt() -> ModuleType | None:
@@ -134,24 +135,22 @@ def clear_notification_loop() -> None:
 async def shutdown_notification_loop() -> None:
     """Stop dispatching and wait briefly for callback workers to finish."""
     clear_notification_loop()
-    if not _NOTIFICATION_CALLBACK_EVENTS:
-        return
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + _NOTIFICATION_CALLBACK_TIMEOUT_SECONDS
+    while True:
+        with _NOTIFICATION_CALLBACK_EVENTS_LOCK:
+            pending_callbacks = tuple(_NOTIFICATION_CALLBACK_EVENTS)
+        if not pending_callbacks:
+            return
 
-    try:
-        await asyncio.wait_for(
-            asyncio.gather(
-                *(
-                    callback_event.wait()
-                    for callback_event in _NOTIFICATION_CALLBACK_EVENTS
-                )
-            ),
-            timeout=_NOTIFICATION_CALLBACK_TIMEOUT_SECONDS,
-        )
-    except TimeoutError:
-        log(
-            WARNING,
-            "Some extension callbacks did not finish during shutdown.",
-        )
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            log(
+                WARNING,
+                "Some extension callbacks did not finish during shutdown.",
+            )
+            return
+        await asyncio.sleep(min(0.01, remaining))
 
 
 def _invoke_extension(
@@ -193,19 +192,24 @@ async def _dispatch_extension(
     await callback_slots.acquire()
 
     loop = asyncio.get_running_loop()
-    completed = asyncio.Event()
+    completed = threading.Event()
+    with _NOTIFICATION_CALLBACK_EVENTS_LOCK:
+        _NOTIFICATION_CALLBACK_EVENTS.add(completed)
 
     def invoke_callback() -> None:
         try:
             _invoke_extension(callback_name, callback_args, label)
         finally:
-
-            def callback_done() -> None:
-                callback_slots.release()
+            completed.set()
+            with _NOTIFICATION_CALLBACK_EVENTS_LOCK:
                 _NOTIFICATION_CALLBACK_EVENTS.discard(completed)
-                completed.set()
-
-            loop.call_soon_threadsafe(callback_done)
+            # Release the loop-bound semaphore while the service loop is
+            # alive. If shutdown already closed it, the semaphore belongs to
+            # a retired lifespan and no longer needs to be released.
+            try:
+                loop.call_soon_threadsafe(callback_slots.release)
+            except RuntimeError:
+                pass
 
     callback_thread = threading.Thread(  # pylint: disable=consider-using-with
         target=invoke_callback,
@@ -215,22 +219,24 @@ async def _dispatch_extension(
     try:
         callback_thread.start()
     except Exception:  # pylint: disable=broad-exception-caught
+        with _NOTIFICATION_CALLBACK_EVENTS_LOCK:
+            _NOTIFICATION_CALLBACK_EVENTS.discard(completed)
         callback_slots.release()
         log(WARNING, "%s extension notification could not start.", label)
         return
-    _NOTIFICATION_CALLBACK_EVENTS.add(completed)
 
-    try:
-        await asyncio.wait_for(
-            completed.wait(), timeout=_NOTIFICATION_CALLBACK_TIMEOUT_SECONDS
-        )
-    except TimeoutError:
-        log(
-            WARNING,
-            "%s extension notification timed out after %.1f seconds.",
-            label,
-            _NOTIFICATION_CALLBACK_TIMEOUT_SECONDS,
-        )
+    deadline = loop.time() + _NOTIFICATION_CALLBACK_TIMEOUT_SECONDS
+    while not completed.is_set():
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            log(
+                WARNING,
+                "%s extension notification timed out after %.1f seconds.",
+                label,
+                _NOTIFICATION_CALLBACK_TIMEOUT_SECONDS,
+            )
+            return
+        await asyncio.sleep(min(0.01, remaining))
 
 
 def _schedule_extension(
