@@ -110,7 +110,7 @@ class RuntimeAgentEvents(AgentEvents):
             return
 
         self._closed = True
-        self._queue.put(_EVENT_PUBLISH_STOP)
+        self._queue.put_nowait(_EVENT_PUBLISH_STOP)
         self._worker.join(timeout)
         if self._worker.is_alive():
             raise TimeoutError("Timed out waiting for Agent event publisher to stop.")
