@@ -531,7 +531,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
     def _move_history_selection(self, offset: int) -> None:
         """Move the highlighted conversation history row."""
-        if self.history_block is None:
+        if self.history_block is None or self.history_loading:
             return
         self.history_block.selected_index = (
             self.history_block.selected_index + offset

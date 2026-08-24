@@ -79,6 +79,8 @@ def test_history_widget_restores_selected_context() -> None:
     assert chat.history_block is not None
     chat._move_history_selection(-1)  # pylint: disable=protected-access
     chat.history_loading = True
+    chat._move_history_selection(1)  # pylint: disable=protected-access
+    assert chat.history_block.selected_index == 0
     asyncio.run(chat._confirm_history_selection())  # pylint: disable=protected-access
     assert not chat.history_loading
     stub.ListRunSeries.assert_called_once_with(
