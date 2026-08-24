@@ -130,7 +130,7 @@ class StateTest(unittest.TestCase):
 
         # Mock datetime to simulate time passage
         # token1 should expire in HEARTBEAT_INITIAL_GRACE_PERIOD
-        # token2 should expire in HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+        # token2 should expire in HEARTBEAT_CLIENTAPP_LEASE
         with patch("datetime.datetime") as mock_dt:
             # The initial grace period should cover the time before the first
             # heartbeat, while token2 has already been renewed once.
@@ -147,5 +147,7 @@ class StateTest(unittest.TestCase):
                 seconds=HEARTBEAT_INITIAL_GRACE_PERIOD + 1
             )
 
-            # Assert: token1 should be cleaned up after its initial grace period.
+            # Assert: token1 should be cleaned up, while the renewed token remains
+            # valid under the longer active-app lease.
             self.assertFalse(state.verify_token(run_id1, token1))
+            self.assertTrue(state.verify_token(run_id2, token2))

@@ -67,6 +67,8 @@ HEARTBEAT_INTERVAL_INF = 1e300  # Large value, disabling heartbeats
 HEARTBEAT_PATIENCE = 2
 # Allow time for a large ClientApp message to start before its first heartbeat.
 HEARTBEAT_INITIAL_GRACE_PERIOD = 120
+# Allow heartbeat gaps while a large ClientApp message is being processed.
+HEARTBEAT_CLIENTAPP_LEASE = 600
 RUN_FAILURE_DETAILS_NO_HEARTBEAT = "No heartbeat received from the run."
 
 # IDs

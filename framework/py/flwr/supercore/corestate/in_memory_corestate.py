@@ -22,9 +22,8 @@ from threading import Lock
 from flwr.common import now
 from flwr.common.constant import (
     FLWR_APP_TOKEN_LENGTH,
-    HEARTBEAT_DEFAULT_INTERVAL,
+    HEARTBEAT_CLIENTAPP_LEASE,
     HEARTBEAT_INITIAL_GRACE_PERIOD,
-    HEARTBEAT_PATIENCE,
 )
 from flwr.common.logger import log
 from flwr.supercore.utils import mask_string
@@ -128,15 +127,13 @@ class InMemoryCoreState(CoreState):
             run_id = self.token_to_run_id[token]
             record = self.token_store[run_id]
             current = now().timestamp()
-            record.active_until = (
-                current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-            )
+            record.active_until = current + HEARTBEAT_CLIENTAPP_LEASE
             log(
                 DEBUG,
                 "ClientApp heartbeat accepted: run_id=%s token=%s lease_s=%s",
                 run_id,
                 mask_string(token),
-                HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL,
+                HEARTBEAT_CLIENTAPP_LEASE,
             )
             return True
 

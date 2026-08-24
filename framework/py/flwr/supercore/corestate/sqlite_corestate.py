@@ -22,9 +22,8 @@ from typing import cast
 from flwr.common import now
 from flwr.common.constant import (
     FLWR_APP_TOKEN_LENGTH,
-    HEARTBEAT_DEFAULT_INTERVAL,
+    HEARTBEAT_CLIENTAPP_LEASE,
     HEARTBEAT_INITIAL_GRACE_PERIOD,
-    HEARTBEAT_PATIENCE,
 )
 from flwr.common.logger import log
 from flwr.supercore.sqlite_mixin import SqliteMixin
@@ -124,7 +123,7 @@ class SqliteCoreState(CoreState, SqliteMixin):
 
         # Update the active_until field
         current = now().timestamp()
-        active_until = current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+        active_until = current + HEARTBEAT_CLIENTAPP_LEASE
         query = """
             UPDATE token_store
             SET active_until = :active_until
@@ -139,7 +138,7 @@ class SqliteCoreState(CoreState, SqliteMixin):
                 "ClientApp heartbeat accepted: run_id=%s token=%s lease_s=%s",
                 int64_to_uint64(rows[0]["run_id"]),
                 mask_string(token),
-                HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL,
+                HEARTBEAT_CLIENTAPP_LEASE,
             )
         else:
             log(
