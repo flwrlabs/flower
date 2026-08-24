@@ -20,6 +20,7 @@ from unittest.mock import Mock, patch
 
 from flwr.app import ConfigRecord, Context, RecordDict
 from flwr.cli.chat.chat_app import ChatApplication
+from flwr.cli.chat.chat_history import HistoryBlock
 from flwr.common.serde import context_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetRunSeriesRequest,
@@ -103,3 +104,26 @@ def test_history_handles_empty_result() -> None:
     assert chat.transcript == [
         ("class:notice", f"No conversation history found for {FEDERATION}.\n\n")
     ]
+
+
+def test_history_ignores_cancelled_selection() -> None:
+    """A cancelled history selection should not restore its conversation."""
+    stub = Mock()
+    entry = RunSeries(series_id=6, federation=FEDERATION)
+    chat = _create_chat(stub)
+    chat.history_block = HistoryBlock(FEDERATION, [entry])
+    chat.transcript.append(chat.history_block)
+    chat.history_loading = True
+
+    async def load_after_cancel(*_: object) -> list[tuple[str, str]]:
+        chat._close_history_selection()  # pylint: disable=protected-access
+        return []
+
+    with patch("flwr.cli.chat.chat_app.asyncio.to_thread", new=load_after_cancel):
+        asyncio.run(
+            chat._confirm_history_selection()  # pylint: disable=protected-access
+        )
+
+    assert chat.series_id is None
+    assert chat.transcript == []
+    assert not chat.history_loading

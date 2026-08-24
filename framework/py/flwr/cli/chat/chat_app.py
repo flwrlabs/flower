@@ -541,20 +541,25 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
     async def _confirm_history_selection(self) -> None:
         """Restore the conversation without changing the selected agent."""
-        if self.history_block is None:
+        block = self.history_block
+        if block is None:
             self.history_loading = False
             return
-        entry = self.history_block.entries[self.history_block.selected_index]
+        entry = block.entries[block.selected_index]
         try:
             messages = await asyncio.to_thread(
                 load_conversation, self.stub, entry, self.federation
             )
         except click.ClickException as exc:
+            if self.history_block is not block:
+                return
             self._close_history_selection()
             self._append_transcript("class:error", f"Error: {exc.format_message()}\n\n")
             return
         finally:
             self.history_loading = False
+        if self.history_block is not block:
+            return
         self._close_history_selection()
         self._clear_transcript()
         self.series_id = entry.series_id
