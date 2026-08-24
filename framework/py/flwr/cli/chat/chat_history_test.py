@@ -68,15 +68,11 @@ def test_history_widget_restores_selected_context() -> None:
     chat = _create_chat(stub)
     event = Mock()
 
-    assert chat._handle_command(  # pylint: disable=protected-access
-        event, "/history"
-    )
+    assert chat._handle_command(event, "/history")  # pylint: disable=protected-access
     asyncio.run(event.app.create_background_task.call_args.args[0])
     assert chat.history_block is not None
     chat._move_history_selection(-1)  # pylint: disable=protected-access
-    asyncio.run(
-        chat._confirm_history_selection()  # pylint: disable=protected-access
-    )
+    asyncio.run(chat._confirm_history_selection())  # pylint: disable=protected-access
     stub.ListRunSeries.assert_called_once_with(
         ListRunSeriesRequest(federation_id=FEDERATION, is_agent=True)
     )
@@ -95,9 +91,7 @@ def test_history_handles_empty_result() -> None:
     chat = _create_chat(stub)
     event = Mock()
 
-    assert chat._handle_command(  # pylint: disable=protected-access
-        event, "/history"
-    )
+    assert chat._handle_command(event, "/history")  # pylint: disable=protected-access
     asyncio.run(event.app.create_background_task.call_args.args[0])
     assert chat.transcript == [
         ("class:notice", f"No conversation history found for {FEDERATION}.\n\n")
