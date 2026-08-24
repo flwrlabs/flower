@@ -4,6 +4,7 @@ import sys
 import types
 from unittest.mock import MagicMock
 
+import pytest
 import torch
 
 from flwr.common import ConfigRecord, MetricRecord, RecordDict
@@ -18,7 +19,7 @@ task_stub = types.ModuleType("flowertune_llm.task")
 task_stub.state_dict_fingerprint = lambda state_dict: 0.0
 sys.modules.setdefault("flowertune_llm.task", task_stub)
 
-from flowertune_llm.fedavgstreaming import (
+from flowertune_llm.fedavgstreaming import (  # noqa: E402
     FedAvgStreaming,
     _batch_entries_by_size,
     _build_layer_chunk_entries,
@@ -196,3 +197,20 @@ def test_apply_aggregated_upload_chunk_has_no_network_arguments() -> None:
     )
 
     assert torch.equal(state_dict["layer"], torch.ones(2))
+
+
+def test_layerwise_download_failure_aborts_before_training() -> None:
+    """A missing download acknowledgement must fail instead of being ignored."""
+    strategy = FedAvgStreaming(initial_state_dict={"layer": torch.ones(2)})
+    strategy._layer_names = ["layer"]  # pylint: disable=protected-access
+    strategy._download_pipeline_depth = 1  # pylint: disable=protected-access
+    grid = MagicMock()
+    grid.send_and_receive.return_value = []
+
+    with pytest.raises(RuntimeError, match="No training messages were sent"):
+        strategy._download_layers_to_clients(  # pylint: disable=protected-access
+            grid=grid,
+            node_ids=[7],
+            state_dict={"layer": torch.ones(2)},
+            timeout=30.0,
+        )

@@ -559,6 +559,23 @@ class FedAvgStreaming(FedAvg):
                     (100.0 * (batch_idx + 1)) / len(batches),
                 )
 
+        def raise_download_failure(
+            batch_idx: int,
+            valid_count: int,
+            error_replies: list[Message],
+        ) -> None:
+            error_nodes = sorted(
+                {msg.metadata.src_node_id for msg in error_replies}
+            )
+            raise RuntimeError(
+                "Layer download failed before training: "
+                f"batch {batch_idx + 1}/{len(batches)} received "
+                f"{valid_count}/{len(node_ids)} valid acknowledgements; "
+                f"error_nodes={error_nodes or 'unknown'}. No training messages "
+                "were sent because one or more client layer directories may be "
+                "incomplete."
+            )
+
         if self._download_pipeline_depth <= 1:
             for batch_idx, batch_entries in enumerate(batches):
                 record = build_download_record(batch_idx, batch_entries)
@@ -571,6 +588,17 @@ class FedAvgStreaming(FedAvg):
                     timeout=timeout,
                 )
                 valid_replies, error_replies = _split_replies(replies)
+                if error_replies or len(valid_replies) < len(node_ids):
+                    log(
+                        INFO,
+                        "[Layer download] batch %s/%s completed with "
+                        "valid=%s errors=%s expected=%s",
+                        batch_idx + 1,
+                        len(batches),
+                        len(valid_replies),
+                        len(error_replies),
+                        len(node_ids),
+                    )
                 for msg in error_replies:
                     log(
                         WARNING,
@@ -588,6 +616,10 @@ class FedAvgStreaming(FedAvg):
                         len(batches),
                         len(valid_replies),
                         len(node_ids),
+                    )
+                if error_replies or len(valid_replies) < len(node_ids):
+                    raise_download_failure(
+                        batch_idx, len(valid_replies), error_replies
                     )
                 log_download_progress(batch_idx)
             return
@@ -633,6 +665,17 @@ class FedAvgStreaming(FedAvg):
                         "network_bytes": sum(downstream_bytes.values()),
                     },
                 )
+                if len(msg_ids) != len(messages):
+                    log(
+                        INFO,
+                        "[Layer download] batch %s/%s push incomplete: "
+                        "message_ids=%s expected=%s",
+                        next_batch_idx + 1,
+                        len(batches),
+                        len(msg_ids),
+                        len(messages),
+                    )
+                    raise_download_failure(next_batch_idx, 0, [])
                 batch_pending_counts[next_batch_idx] = len(msg_ids)
                 batch_valid_counts[next_batch_idx] = 0
                 batch_errors[next_batch_idx] = []
@@ -644,12 +687,33 @@ class FedAvgStreaming(FedAvg):
         push_more_batches()
         while completed_batches < len(batches):
             if end_time is not None and time.time() >= end_time:
+                log(
+                    INFO,
+                    "[Layer download] pipeline timeout state: completed=%s/%s "
+                    "pending_messages=%s active_batches=%s next_batch=%s timeout_s=%.1f",
+                    completed_batches,
+                    len(batches),
+                    len(pending),
+                    len(batch_pending_counts),
+                    next_batch_idx,
+                    timeout,
+                )
                 log(WARNING, "Timed out waiting for pipelined layer downloads")
-                break
+                raise TimeoutError(
+                    "Layer download timed out before training: "
+                    f"completed {completed_batches}/{len(batches)} batches with "
+                    f"{len(pending)} replies still pending after {timeout:.1f}s. "
+                    "No training messages were sent."
+                )
             if not pending:
                 push_more_batches()
                 if not pending:
-                    break
+                    raise RuntimeError(
+                        "Layer download pipeline stopped before training: "
+                        f"completed {completed_batches}/{len(batches)} batches "
+                        "and no replies remain pending. No training messages "
+                        "were sent."
+                    )
             pull_start = perf_counter()
             replies = list(grid.pull_messages(list(pending)))
             pull_ms = (perf_counter() - pull_start) * 1000.0
@@ -697,6 +761,17 @@ class FedAvgStreaming(FedAvg):
                 error_replies = batch_errors.pop(batch_idx, [])
                 valid_count = batch_valid_counts.pop(batch_idx, 0)
                 batch_pending_counts.pop(batch_idx, None)
+                if error_replies or valid_count < len(node_ids):
+                    log(
+                        INFO,
+                        "[Layer download] batch %s/%s completed with "
+                        "valid=%s errors=%s expected=%s",
+                        batch_idx + 1,
+                        len(batches),
+                        valid_count,
+                        len(error_replies),
+                        len(node_ids),
+                    )
                 for msg in error_replies:
                     log(
                         WARNING,
@@ -714,6 +789,10 @@ class FedAvgStreaming(FedAvg):
                         len(batches),
                         valid_count,
                         len(node_ids),
+                    )
+                if error_replies or valid_count < len(node_ids):
+                    raise_download_failure(
+                        batch_idx, valid_count, error_replies
                     )
                 completed_batches += 1
                 log_download_progress(batch_idx)

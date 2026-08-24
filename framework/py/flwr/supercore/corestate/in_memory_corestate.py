@@ -16,7 +16,7 @@
 
 import secrets
 from dataclasses import dataclass
-from logging import DEBUG, WARNING
+from logging import DEBUG, INFO, WARNING
 from threading import Lock
 
 from flwr.common import now
@@ -155,6 +155,12 @@ class InMemoryCoreState(CoreState):
 
             # Hook for subclasses
             if expired_records:
+                log(
+                    INFO,
+                    "ClientApp token lease expired: run_ids=%s lease_s=%s",
+                    [run_id for run_id, _ in expired_records],
+                    HEARTBEAT_CLIENTAPP_LEASE,
+                )
                 log(
                     WARNING,
                     "Expired %s ClientApp token(s): run_ids=%s",

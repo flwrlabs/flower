@@ -145,7 +145,7 @@ def make_app_heartbeat_fn_grpc(
     def fn() -> bool:
         # Call ServerAppIo API
         try:
-            res = stub.SendAppHeartbeat(req)
+            res = stub.SendAppHeartbeat(req, timeout=HEARTBEAT_CALL_TIMEOUT)
         except grpc.RpcError as e:
             log(
                 ERROR,

@@ -19,7 +19,9 @@ import time
 import unittest
 from unittest.mock import Mock
 
-from .heartbeat import HeartbeatSender
+from flwr.common.constant import HEARTBEAT_CALL_TIMEOUT
+
+from .heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
 
 
 # pylint: disable=protected-access
@@ -90,3 +92,18 @@ class TestHeartbeatSender(unittest.TestCase):
     def test_thread_is_daemon(self) -> None:
         """Test that the thread is a daemon thread."""
         self.assertTrue(self.heartbeat_sender._thread.daemon)
+
+    def test_grpc_heartbeat_has_call_deadline(self) -> None:
+        """A stalled heartbeat RPC must not block lease renewal indefinitely."""
+        stub = Mock()
+        stub.SendAppHeartbeat.return_value = Mock(success=True)
+
+        heartbeat_fn = make_app_heartbeat_fn_grpc(stub, "test-token")
+
+        self.assertTrue(heartbeat_fn())
+        request = stub.SendAppHeartbeat.call_args.args[0]
+        self.assertEqual(request.token, "test-token")
+        self.assertEqual(
+            stub.SendAppHeartbeat.call_args.kwargs["timeout"],
+            HEARTBEAT_CALL_TIMEOUT,
+        )

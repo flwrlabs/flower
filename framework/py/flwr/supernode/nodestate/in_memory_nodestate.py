@@ -16,7 +16,7 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from logging import ERROR, WARNING
+from logging import ERROR, INFO, WARNING
 from threading import Lock, RLock
 
 from flwr.common import Context, Error, Message, now
@@ -209,6 +209,22 @@ class InMemoryNodeState(
 
             # Create and store error replies for each message
             for msg in messages_to_reply:
+                expired_at = next(
+                    (
+                        active_until
+                        for run_id, active_until in expired_records
+                        if run_id == msg.metadata.run_id
+                    ),
+                    None,
+                )
+                log(
+                    INFO,
+                    "ClientApp timeout confirmed: run_id=%s message_id=%s "
+                    "token_expired_at=%s; creating error reply",
+                    msg.metadata.run_id,
+                    mask_string(msg.metadata.message_id),
+                    expired_at,
+                )
                 log(
                     WARNING,
                     "ClientApp timed out: run_id=%s message_id=%s; "

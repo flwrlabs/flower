@@ -90,13 +90,20 @@ def _restore_layer_state_from_names(
         return
 
     layer_paths = [_layer_file_path(context, layer_name) for layer_name in layer_names]
-    missing = [path for path in layer_paths if not os.path.exists(path)]
+    missing = [
+        path
+        for path in layer_paths
+        if not os.path.isfile(path) or os.path.getsize(path) == 0
+    ]
     if missing and require_all:
         preview = ", ".join(missing[:3])
         suffix = "" if len(missing) <= 3 else f" and {len(missing) - 3} more"
         raise FileNotFoundError(
-            "Layer-wise model was marked as preloaded, but expected layer files "
-            f"were not found: {preview}{suffix}"
+            "Layer-wise model files are incomplete for "
+            f"run_id={context.run_id} node_id={context.node_id}: "
+            f"{len(missing)}/{len(layer_paths)} expected layer files are missing "
+            f"or empty: {preview}{suffix}. The operation was stopped before "
+            "incomplete weights could be used."
         )
     existing_pairs = [
         (layer_name, layer_path)
@@ -376,7 +383,6 @@ def train(msg: Message, context: Context):
     if (
         aggregation_mode != "all_at_once"
         and model_preloaded
-        and STATE_LAYER_PATHS not in context.state
         and "layer_names" in config
     ):
         _restore_layer_state_from_names(
@@ -539,6 +545,12 @@ def train(msg: Message, context: Context):
             layer_paths=layer_paths,
             output_layer_dir=layer_dir(context),
         )
+        if "layer_names" in config:
+            _restore_layer_state_from_names(
+                context,
+                [str(layer_name) for layer_name in list(config["layer_names"])],
+                require_all=True,
+            )
         output_fingerprint = state_dict_fingerprint_from_layer_paths(layer_paths)
         t1 = perf_counter()
         metrics_dict = {
@@ -674,7 +686,12 @@ def train_comms(msg: Message, context: Context):
 
     for layer_idx, expected_layer_name, start, end, is_last_chunk in entries:
         layer_path = ""
-        if layer_paths:
+        if expected_layer_name:
+            # The server-provided name is authoritative. Deriving the path from
+            # it prevents stale or sparse context indices from selecting a
+            # different parameter file.
+            layer_path = _layer_file_path(context, expected_layer_name)
+        elif layer_paths:
             if layer_idx >= len(layer_paths):
                 layer_idx = len(layer_paths) - 1
             layer_path = layer_paths[layer_idx]
@@ -682,14 +699,15 @@ def train_comms(msg: Message, context: Context):
             layer_names = list(context.state[STATE_LAYER_NAMES]["names"])
             if layer_idx < len(layer_names):
                 expected_layer_name = str(layer_names[layer_idx])
-        if not layer_path and expected_layer_name:
-            layer_path = _layer_file_path(context, expected_layer_name)
         if not layer_path:
             continue
         if not os.path.exists(layer_path):
             raise FileNotFoundError(
-                "Expected layer file for layer-wise upload was not found: "
-                f"{layer_path}"
+                "Layer-wise upload cannot continue because an expected layer "
+                f"file is missing: run_id={context.run_id} "
+                f"node_id={context.node_id} layer_idx={layer_idx} "
+                f"layer_name={expected_layer_name!r} path={layer_path}. "
+                "The preceding download or DCP conversion was incomplete."
             )
 
         cache_key = context_path_key(context, layer_path)

@@ -4,6 +4,7 @@ import os
 import sys
 import types
 
+import pytest
 import torch
 from flwr.app import ArrayRecord, ConfigRecord, Context, Message, RecordDict
 
@@ -192,3 +193,72 @@ def test_layerwise_torchtitan_dcp_does_not_load_hf_model(tmp_path, monkeypatch) 
     assert isinstance(reply.content["arrays"], ArrayRecord)
     assert len(reply.content["arrays"]) == 0
     assert reply.content["_flwr_profile"]["client_name"] == "800"
+
+
+def test_train_rejects_incomplete_layer_download(tmp_path) -> None:
+    """Training must not start when any server-advertised layer is absent."""
+    context = Context(
+        run_id=701,
+        node_id=801,
+        node_config={},
+        state=RecordDict(),
+        run_config={
+            "aggregation.mode": "layerwise",
+            "aggregation.layer-write-dir": str(tmp_path),
+            "trainer.backend": "none",
+        },
+    )
+    _persist_layer_files(context, {"layer.a": torch.ones(2)}, ["layer.a"])
+    message = Message(
+        content=RecordDict({
+            "config": ConfigRecord({
+                "model_preloaded": True,
+                "layer_names": ["layer.a", "layer.b"],
+            })
+        }),
+        dst_node_id=1,
+        message_type="train",
+    )
+
+    with pytest.raises(FileNotFoundError, match="model files are incomplete"):
+        train(message, context)
+
+
+def test_train_rejects_incomplete_post_training_conversion(
+    tmp_path, monkeypatch
+) -> None:
+    """Layerwise DCP output must contain every layer before upload begins."""
+    context = Context(
+        run_id=702,
+        node_id=802,
+        node_config={},
+        state=RecordDict(),
+        run_config={
+            "aggregation.mode": "layerwise",
+            "aggregation.layer-write-dir": str(tmp_path),
+            "trainer.backend": "torchtitan",
+            "trainer.torchtitan.dcp-enabled": True,
+            "train.disable": False,
+        },
+    )
+    _persist_layer_files(context, {"layer.a": torch.ones(2)}, ["layer.a"])
+    layer_path = context.state[STATE_LAYER_PATHS]["paths"][0]
+    message = Message(
+        content=RecordDict({
+            "config": ConfigRecord({
+                "model_preloaded": True,
+                "layer_names": ["layer.a"],
+            })
+        }),
+        dst_node_id=1,
+        message_type="train",
+    )
+
+    def fake_run(_cfg, _context, _state_dict, **_kwargs):
+        os.unlink(layer_path)
+        return None
+
+    monkeypatch.setattr(client_app_module, "run_torchtitan_training", fake_run)
+
+    with pytest.raises(FileNotFoundError, match="model files are incomplete"):
+        train(message, context)
