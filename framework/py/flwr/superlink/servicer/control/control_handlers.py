@@ -724,7 +724,7 @@ def stream_run_events(
             f"Run {run_id} not found while streaming run events.",
         )
     run = runs[0]
-    # LinkState creates every run with a primary task.
+    # LinkState creates every run with a primary task, so casting is safe
     primary_task_id = cast(int, run.primary_task_id)
 
     _validate_federation_membership_in_request(
