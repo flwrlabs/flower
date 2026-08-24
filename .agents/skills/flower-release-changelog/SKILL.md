@@ -29,7 +29,7 @@ Treat the cache as the complete PR evidence source. Do not use `gh`, GitHub APIs
    - **Initial polish:** When the file contains only generated entries, classify and rewrite all PR entries.
    - **Incremental polish:** When polished items already exist, classify only unfinished entries. Preserve every existing item unless an unfinished PR is added to it.
 7. Read the JSON metadata for every PR being classified. Read its cached diff only when the title, body, and labels do not establish the user-visible or meaningful technical outcome.
-8. Group unfinished PRs into coherent release-level topics, place them into the final sections, and remove all generated headings and raw entries.
+8. Group unfinished PRs into coherent release-level topics and place them into the final sections. When the cached evidence does not support a confident grouping or summary, move the generated one-PR entry unchanged under `### UNGROUPED` instead of guessing. Remove all other generated headings and raw entries.
 9. Run the bundled inventory validator with the pre-edit inventories. Then manually review classification, wording, formatting, the complete file, and its diff before finishing.
 
 ## Classify PRs
@@ -42,6 +42,7 @@ Treat the cache as the complete PR evidence source. Do not use `gh`, GitHub APIs
 - Never omit, duplicate, or split one PR across items.
 - Keep `General improvements` last under `What's new?`.
 - Include `### Incompatible changes` only when it contains at least one PR.
+- Keep one uncertain PR per item under `### UNGROUPED`, preserve its generated title and link without adding a summary, and make `### UNGROUPED` the final section after `### Incompatible changes`. Omit the section when every PR was grouped confidently.
 
 ## Write topic items
 
@@ -97,7 +98,7 @@ When a mostly polished changelog contains only a few unfinished PRs:
 - Leave the release heading and contributor section unchanged.
 - Do not edit `framework/docs/source/changelog/index.md` or another release file.
 
-If the cached metadata and diff still do not support a confident classification or summary, ask one specific wording question instead of guessing.
+If the cached metadata and diff still do not support a confident classification or summary, move the PR under `### UNGROUPED` instead of guessing. Entries under `### UNGROUPED` remain unfinished and can be reconsidered on later incremental runs.
 
 ## Validate
 
@@ -110,4 +111,4 @@ python3 .agents/skills/flower-release-changelog/scripts/validate_release_changel
   --expected-incompatible-prs <ALL_INCOMPATIBLE_PR_NUMBERS>
 ```
 
-Omit `--expected-incompatible-prs` when the final incompatible set is empty. Add to that set any unfinished PR classified as incompatible from a cached `break(...)` title. The validator checks only that PRs are complete and unique, each displayed PR number matches its link target, links within each item are in ascending PR-number order, incompatible PRs are in the right section, and generated headings are gone. Fix every validator error, then manually review the content and confirm the final diff changes only the intended release file.
+Omit `--expected-incompatible-prs` when the final incompatible set is empty. Add to that set any unfinished PR classified as incompatible from a cached `break(...)` title. The validator checks only that PRs are complete and unique, each displayed PR number matches its link target, links within each item are in ascending PR-number order, incompatible PRs are in the right section, and generated headings other than `### UNGROUPED` are gone. Fix every validator error, then manually review the content and confirm the final diff changes only the intended release file.

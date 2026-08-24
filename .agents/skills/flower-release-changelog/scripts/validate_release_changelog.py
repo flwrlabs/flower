@@ -11,6 +11,7 @@ ALLOWED_SECTIONS = {
     "Thanks to our contributors",
     "What's new?",
     "Incompatible changes",
+    "UNGROUPED",
 }
 SECTION_RE = re.compile(r"^###\s+(.+?)\s*$", re.MULTILINE)
 PR_RE = re.compile(
