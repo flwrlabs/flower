@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Sequence
-from queue import Empty, Queue
+from queue import Empty, Full, Queue
 from threading import Lock, Thread
 from typing import Literal, cast
 
@@ -72,7 +72,7 @@ class RuntimeAgentEvents(AgentEvents):
 
     def __init__(self, stub: RuntimeHttpClient) -> None:
         self._stub = stub
-        self._queue: Queue[JSONObject | object] = Queue(
+        self._queue: Queue[TaskEvent | object] = Queue(
             maxsize=_EVENT_PUBLISH_QUEUE_SIZE
         )
         self._error_lock = Lock()
@@ -93,7 +93,14 @@ class RuntimeAgentEvents(AgentEvents):
         if not isinstance(event_type, str) or not event_type:
             raise ValueError("Run event requires a non-empty string 'type' field.")
         self._raise_worker_error()
-        self._queue.put(dict(event))
+        task_event = TaskEvent(
+            event=event_type,
+            data=strict_json_dumps(event, compact=True),
+        )
+        try:
+            self._queue.put_nowait(task_event)
+        except Full as exc:
+            raise RuntimeError("Agent event publish queue is full.") from exc
         self._raise_worker_error()
 
     def flush(self) -> None:
@@ -122,7 +129,7 @@ class RuntimeAgentEvents(AgentEvents):
                 self._queue.task_done()
                 return
 
-            batch = [cast(JSONObject, item)]
+            batch = [cast(TaskEvent, item)]
             deadline = time.monotonic() + _EVENT_PUBLISH_BATCH_WAIT
             stop_after_batch = False
             while len(batch) < _EVENT_PUBLISH_BATCH_SIZE:
@@ -136,17 +143,10 @@ class RuntimeAgentEvents(AgentEvents):
                     self._queue.task_done()
                     stop_after_batch = True
                     break
-                batch.append(cast(JSONObject, next_item))
+                batch.append(cast(TaskEvent, next_item))
 
             try:
-                task_events = [
-                    TaskEvent(
-                        event=cast(str, event["type"]),
-                        data=strict_json_dumps(event, compact=True),
-                    )
-                    for event in batch
-                ]
-                self._stub.PushTaskEvents(PushTaskEventsRequest(events=task_events))
+                self._stub.PushTaskEvents(PushTaskEventsRequest(events=batch))
             except Exception as err:  # pylint: disable=broad-exception-caught
                 with self._error_lock:
                     if self._error is None:
@@ -237,12 +237,14 @@ class RuntimeAgentResponses(AgentResponses):
         task_id: int,
         context: Context,
         start_run_request: StartRunRequest,
+        events: AgentEvents,
     ) -> None:
         self._stub = stub
         self._context = context
         self._run_id = run_id
         self._task_id = task_id
         self._start_run_request = start_run_request
+        self._events = events
 
     def create(self, request: JSONObject) -> JSONObject:
         """Create a model response through a child model task."""
@@ -442,17 +444,9 @@ class RuntimeAgentResponses(AgentResponses):
         return output_item
 
     def push_run_events(self, events: Sequence[JSONObject]) -> None:
-        """Push structured run events for `StreamRunEvents` clients."""
-        if not events:
-            return
-        task_events = [
-            TaskEvent(
-                event=cast(str, event["type"]),
-                data=strict_json_dumps(event, compact=True),
-            )
-            for event in events
-        ]
-        self._stub.PushTaskEvents(PushTaskEventsRequest(events=task_events))
+        """Queue structured run events for `StreamRunEvents` clients."""
+        for event in events:
+            self._events.emit(event)
 
     def append_and_push_run_events(self, events: list[JSONObject]) -> None:
         """Append run events to context and push them to `StreamRunEvents` clients."""

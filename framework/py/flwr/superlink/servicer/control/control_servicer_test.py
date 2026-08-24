@@ -1788,15 +1788,16 @@ class TestControlServicerAuth(unittest.TestCase):
         self.assertEqual(msgs, [])
         ctx.is_active.assert_called_once_with()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[untyped-decorator]
         [
             (TaskType.AGENT_APP, [6], 2),
             (TaskType.SERVER_APP, [5, 6], 1),
+            (None, [5, 6], 0),
         ]
     )
     def test_streamrunevents_filters_model_events_for_agentapp_runs(
         self,
-        primary_task_type: TaskType,
+        primary_task_type: TaskType | None,
         expected_event_ids: list[int],
         expected_get_tasks_calls: int,
     ) -> None:
@@ -1808,7 +1809,7 @@ class TestControlServicerAuth(unittest.TestCase):
         ctx.is_active.return_value = True
         mock_run = Mock(
             federation_id=NOOP_FEDERATION_ID,
-            primary_task_id=123,
+            primary_task_id=123 if primary_task_type is not None else None,
             status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
         )
         event_1 = TaskEvent(
@@ -1826,15 +1827,17 @@ class TestControlServicerAuth(unittest.TestCase):
             data='{"type":"response.completed"}',
         )
         mock_get_task_events = Mock(return_value=[event_1, event_2])
-        mock_get_tasks = Mock(
-            side_effect=[
-                [Task(task_id=123, type=primary_task_type)],
+        get_tasks_results = []
+        if primary_task_type is not None:
+            get_tasks_results.append([Task(task_id=123, type=primary_task_type)])
+        if primary_task_type == TaskType.AGENT_APP:
+            get_tasks_results.append(
                 [
                     Task(task_id=456, type=TaskType.MODEL),
                     Task(task_id=123, type=TaskType.AGENT_APP),
-                ],
-            ]
-        )
+                ]
+            )
+        mock_get_tasks = Mock(side_effect=get_tasks_results)
 
         # Execute
         with (
