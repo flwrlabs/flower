@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for Control API handler functions."""
 
+
 import hashlib
 import unittest
 from unittest.mock import Mock, patch
@@ -92,10 +93,6 @@ class TestControlHandlers(unittest.TestCase):
                 return_value=("flwr/demo", "v0.0.1"),
             ),
             patch.object(self.state, "store_app") as mock_store_app,
-            patch(
-                "flwr.superlink.servicer.control.control_handlers"
-                ".extensions.notify_run_started"
-            ) as notify_run_started,
         ):
             request = StartRunRequest(federation=NOOP_FEDERATION_ID)
             request.app_spec = "@flwr/demo==0.0.1"
@@ -104,11 +101,6 @@ class TestControlHandlers(unittest.TestCase):
 
         mock_store_app.assert_not_called()
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
-        notify_run_started.assert_called_once()
-        notified_run, notified_source = notify_run_started.call_args.args
-        self.assertEqual(notified_run.run_id, run.run_id)
-        self.assertEqual(notified_source, "unknown")
-        self.assertEqual(response.federation, NOOP_FEDERATION_ID)
         self.assertEqual(run.fab_hash, fab_hash)
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
         self.assertEqual(

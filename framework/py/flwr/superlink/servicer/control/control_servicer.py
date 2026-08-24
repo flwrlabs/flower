@@ -97,8 +97,6 @@ from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import ObjectStoreFactory
-from flwr.supercore.run import Run
-from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
@@ -129,22 +127,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: StartRunRequest, context: grpc.ServicerContext
     ) -> StartRunResponse:
         """Create run ID."""
-
-        def notify_after_rpc(run: Run, source: extensions.RunStartSource) -> None:
-            """Defer optional work until gRPC has finished the response."""
-            if context.add_callback(lambda: extensions.notify_run_started(run, source)):
-                return
-            # A callback can be rejected while the RPC is already terminating.
-            # The normal combined service has an event-loop boundary; this
-            # fallback preserves the notification for standalone callers.
-            extensions.notify_run_started(run, source)
-
         return control_handlers.start_run(
-            request,
-            _get_account(),
-            self.linkstate_factory.state(),
-            self.fleet_api_type,
-            notify_run_started=notify_after_rpc,
+            request, _get_account(), self.linkstate_factory.state(), self.fleet_api_type
         )
 
     def StreamLogs(  # pylint: disable=C0103

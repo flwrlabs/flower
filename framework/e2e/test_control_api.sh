@@ -77,11 +77,6 @@ background_pids=()
 cleanup() {
   if [ "${#background_pids[@]}" -gt 0 ]; then
     kill "${background_pids[@]}" 2>/dev/null || true
-    # SuperNodes may be sleeping in a retry backoff after SuperLink shuts down
-    # and can ignore SIGTERM long enough to make `wait` hang. Give graceful
-    # shutdown a short window, then force-terminate any remaining processes.
-    sleep 1
-    kill -KILL "${background_pids[@]}" 2>/dev/null || true
     wait "${background_pids[@]}" 2>/dev/null || true
   fi
 }

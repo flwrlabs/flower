@@ -168,17 +168,8 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
         # Stop in reverse startup order so dependent services disappear before
         # their backing state is considered unavailable.
-        termination_events = [
-            grpc_server.stop(grace=1) for grpc_server in reversed(self.grpc_servers)
-        ]
-        for termination_event in termination_events:
-            if not termination_event.wait(timeout=1.0):
-                log(
-                    WARN,
-                    "A SuperLink gRPC server did not terminate within 1 second; "
-                    "waiting for termination before teardown.",
-                )
-                termination_event.wait()
+        for grpc_server in reversed(self.grpc_servers):
+            grpc_server.stop(grace=1)
 
         if self.superexec_process is not None:
             self.superexec_process.terminate()

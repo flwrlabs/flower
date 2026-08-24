@@ -14,9 +14,9 @@
 # ==============================================================================
 """SuperLink API."""
 
+
 from __future__ import annotations
 
-import asyncio
 import os
 from collections.abc import AsyncIterator, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
@@ -101,7 +101,7 @@ def _get_middleware() -> list[Middleware]:
     ]
 
 
-def create_app(  # pylint: disable=too-many-statements
+def create_app(
     config: SuperLinkLifespanConfig | None = None,
     superlink_lifespan_class: type[SuperLinkLifespan] | None = None,
 ) -> FastAPI:
@@ -143,22 +143,13 @@ def create_app(  # pylint: disable=too-many-statements
     async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[dict[str, object]]:
         """Own process-lifetime resources for the combined SuperLink service."""
         log(INFO, "FastAPI lifespan: startup")
-        superlink_startup_attempted = False
-        superlink_shutdown = False
-
-        def shutdown_superlink() -> None:
-            """Shut down resources even when startup only partially succeeds."""
-            nonlocal superlink_shutdown
-            if (
-                superlink_lifespan
-                and superlink_startup_attempted
-                and not superlink_shutdown
-            ):
-                superlink_lifespan.shutdown()
-                superlink_shutdown = True
 
         try:
-            extensions.set_notification_loop(asyncio.get_running_loop())
+            if superlink_lifespan:
+                # Temporary compatibility path: start the existing gRPC APIs from
+                # FastAPI lifespan
+                superlink_lifespan.startup()
+
             lifespan_state: dict[str, object] = {}
             async with AsyncExitStack() as stack:
                 for lifespan_context in extensions.get_lifespan_contexts():
@@ -166,22 +157,11 @@ def create_app(  # pylint: disable=too-many-statements
                         lifespan_context(fastapi_app)
                     )
                     _merge_lifespan_state(lifespan_state, extension_state)
-
-                try:
-                    if superlink_lifespan:
-                        # Start gRPC only after extension resources are ready, so
-                        # a run-start notification cannot race initialization.
-                        superlink_startup_attempted = True
-                        superlink_lifespan.startup()
-                    yield lifespan_state
-                finally:
-                    shutdown_superlink()
-                    await extensions.shutdown_notification_loop()
+                yield lifespan_state
         finally:
-            # Also clean up a partially started SuperLink when startup raises
-            # before the inner shutdown block is reached.
-            shutdown_superlink()
-            await extensions.shutdown_notification_loop()
+            if superlink_lifespan:
+                superlink_lifespan.shutdown()
+
             log(INFO, "FastAPI lifespan: shutdown")
 
     fastapi_app = FastAPI(

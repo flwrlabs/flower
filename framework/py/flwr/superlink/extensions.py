@@ -32,21 +32,8 @@ SuperLinkLifespanContext = Callable[
     [FastAPI], AbstractAsyncContextManager[Mapping[str, Any] | None]
 ]
 RunStartSource = Literal["cli", "web_ui", "automation", "unknown"]
+ResultDeliveryChannel = Literal["logs", "chat"]
 _SGXT_MODULE = "flwr.ee.superlink.extensions"
-_NOTIFICATION_LOOP: AbstractEventLoop | None = None
-_NOTIFICATION_TASK_CAPACITY = 1000
-_NOTIFICATION_CALLBACK_CAPACITY = 4
-_NOTIFICATION_CALLBACK_TIMEOUT_SECONDS = 1.0
-_NOTIFICATION_TASKS: set[asyncio.Task[None]] = set()
-_NOTIFICATION_QUEUE_SLOTS = threading.BoundedSemaphore(_NOTIFICATION_TASK_CAPACITY)
-_NOTIFICATION_CALLBACK_SLOTS: asyncio.Semaphore | None = None
-_NOTIFICATION_CALLBACK_EVENTS: set[threading.Event] = set()
-_NOTIFICATION_CALLBACK_EVENTS_LOCK = threading.Lock()
-_NOTIFICATION_PENDING_SUBMISSIONS = 0
-_NOTIFICATION_PENDING_SUBMISSIONS_LOCK = threading.Lock()
-_NOTIFICATION_STANDALONE_CALLBACK_SLOTS = threading.BoundedSemaphore(
-    _NOTIFICATION_CALLBACK_CAPACITY
-)
 
 
 def _try_import_sgxt() -> ModuleType | None:
@@ -132,6 +119,38 @@ def notify_run_started(run: Run, source: RunStartSource) -> None:
         log(
             WARNING,
             "Run-start extension notification failed: %s.",
+            type(exc).__name__,
+            exc_info=exc,
+        )
+
+
+def notify_result_delivered(
+    run: Run,
+    flwr_aid: str,
+    channel: ResultDeliveryChannel,
+) -> None:
+    """Notify an optional extension after a result request was accepted.
+
+    The callback is synchronous by design. Extensions must keep this hook
+    non-blocking and best effort; the Flower framework does not create a
+    background thread for it. The run snapshot is copied before handing it to
+    the extension so the callback cannot mutate SuperLink state.
+    """
+    try:
+        sgxt = _try_import_sgxt()
+        if sgxt is None:
+            return
+
+        on_result_delivered = cast(
+            Callable[[Run, str, ResultDeliveryChannel], None] | None,
+            getattr(sgxt, "on_result_delivered", None),
+        )
+        if on_result_delivered is not None:
+            on_result_delivered(deepcopy(run), flwr_aid, channel)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        log(
+            WARNING,
+            "Result-delivered extension notification failed: %s.",
             type(exc).__name__,
             exc_info=exc,
         )
