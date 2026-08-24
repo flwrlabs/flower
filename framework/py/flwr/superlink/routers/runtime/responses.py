@@ -99,13 +99,13 @@ async def create_runtime_response(
         task = await run_in_threadpool(_authenticate, request, state)
         payload = await _read_request_payload(request)
         model_request = _model_request_from_payload(payload)
-        exchange = await run_in_threadpool(_start_exchange, state, task, model_request)
         if model_request.payload.get("stream") is True:
             return StreamingResponse(
-                _stream_response(state, exchange),
+                _stream_response(state, task, model_request),
                 media_type="text/event-stream",
                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
             )
+        exchange = await run_in_threadpool(_start_exchange, state, task, model_request)
         response = await _wait_for_response(request, state, exchange)
     except _ResponsesError as err:
         return _error_response(err)
@@ -245,15 +245,19 @@ async def _wait_for_response(
             )
 
 
-async def _stream_response(state: LinkState, exchange: _Exchange) -> AsyncIterator[str]:
-    """Relay correlated child-task events as Server-Sent Events."""
-    started_at = time.monotonic()
-    launch_deadline = started_at + _model_task_launch_timeout()
-    response_deadline = started_at + _DEFAULT_MODEL_RESPONSE_TIMEOUT
+async def _stream_response(
+    state: LinkState, task: Task, model_request: ModelRequest
+) -> AsyncIterator[str]:
+    """Create an exchange and relay its events as Server-Sent Events."""
     cursor: int | None = None
     complete = False
     sequence_number = 0
+    exchange: _Exchange | None = None
     try:
+        exchange = await run_in_threadpool(_start_exchange, state, task, model_request)
+        started_at = time.monotonic()
+        launch_deadline = started_at + _model_task_launch_timeout()
+        response_deadline = started_at + _DEFAULT_MODEL_RESPONSE_TIMEOUT
         while True:
             # The model task stores all stream events before its final reply.
             response = await run_in_threadpool(
@@ -304,7 +308,7 @@ async def _stream_response(state: LinkState, exchange: _Exchange) -> AsyncIterat
         log(ERROR, "Runtime Responses stream failed unexpectedly", exc_info=err)
         yield _stream_error("Internal server error.", "internal_error", sequence_number)
     finally:
-        if not complete:
+        if exchange is not None and not complete:
             with CancelScope(shield=True):
                 await run_in_threadpool(
                     _stop_model_task, state, exchange, "Responses stream ended early."

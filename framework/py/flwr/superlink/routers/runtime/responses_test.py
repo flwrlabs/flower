@@ -21,12 +21,14 @@ import anyio
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
+from starlette.responses import StreamingResponse
+from starlette.types import Message, Scope
 
 from flwr.common.constant import Status, SubStatus
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.constant import TaskType
-from flwr.supercore.json_message.model_message import ModelResponse
+from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.superlink.dependencies.linkstate import get_linkstate
 
 from .responses import (
@@ -77,6 +79,14 @@ def _event(event_id: int, event: str, data: str | None = None) -> TaskEvent:
         task_id=456,
         event=event,
         data=data or f'{{"type":"{event}"}}',
+    )
+
+
+def _stream_request() -> ModelRequest:
+    """Create one streaming model request."""
+    return ModelRequest.from_payload(
+        dst_task_id=0,
+        payload={"model": "model", "input": "hello", "stream": True},
     )
 
 
@@ -411,7 +421,8 @@ def test_responses_stops_and_drains_when_stream_task_group_is_cancelled() -> Non
     async def cancel_stream() -> None:
         stream = _stream_response(
             state,
-            _Exchange(agent_task_id=123, model_task_id=456),
+            state.get_task_by_token.return_value,
+            _stream_request(),
         )
 
         async def consume_stream() -> None:
@@ -429,3 +440,37 @@ def test_responses_stops_and_drains_when_stream_task_group_is_cancelled() -> Non
         456, SubStatus.STOPPED, "Responses stream ended early."
     )
     assert state.get_task_message.call_count == 2
+
+
+def test_responses_does_not_start_model_task_before_stream_iteration() -> None:
+    """Do not create a model task if the client disconnects before iteration."""
+    state = _state()
+    response_started = anyio.Event()
+
+    async def disconnect_before_streaming() -> None:
+        response = StreamingResponse(
+            _stream_response(
+                state,
+                state.get_task_by_token.return_value,
+                _stream_request(),
+            )
+        )
+
+        async def receive() -> Message:
+            await response_started.wait()
+            return {"type": "http.disconnect"}
+
+        async def send(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                response_started.set()
+                await anyio.sleep_forever()
+
+        scope: Scope = {
+            "type": "http",
+            "asgi": {"version": "3.0", "spec_version": "2.3"},
+        }
+        await response(scope, receive, send)
+
+    asyncio.run(disconnect_before_streaming())
+
+    state.create_task.assert_not_called()
