@@ -17,18 +17,28 @@
 import asyncio
 from unittest.mock import AsyncMock, Mock, patch
 
+import anyio
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
+from starlette.responses import StreamingResponse
+from starlette.types import Message, Scope
 
 from flwr.common.constant import Status, SubStatus
-from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.constant import TaskType
-from flwr.supercore.json_message.model_message import ModelResponse
+from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.superlink.dependencies.linkstate import get_linkstate
 
-from .responses import _Exchange, _ResponsesError, _wait_for_response, router
+from .responses import (
+    _Exchange,
+    _ResponsesError,
+    _sse_frame,
+    _stream_response,
+    _wait_for_response,
+    router,
+)
 
 
 def _client(state: Mock) -> TestClient:
@@ -58,6 +68,25 @@ def _reply(request_message_id: str) -> ModelResponse:
             "output": [],
         },
         reply_to_message_id=request_message_id,
+    )
+
+
+def _event(event_id: int, event: str, data: str | None = None) -> TaskEvent:
+    """Create one child model task event."""
+    return TaskEvent(
+        id=event_id,
+        run_id=789,
+        task_id=456,
+        event=event,
+        data=data or f'{{"type":"{event}"}}',
+    )
+
+
+def _stream_request() -> ModelRequest:
+    """Create one streaming model request."""
+    return ModelRequest.from_payload(
+        dst_task_id=0,
+        payload={"model": "model", "input": "hello", "stream": True},
     )
 
 
@@ -124,9 +153,16 @@ def test_responses_rejects_unsupported_fields() -> None:
     state.create_task.assert_not_called()
 
 
-def test_responses_rejects_streaming() -> None:
-    """Reject streaming until the AgentApp event flow is defined."""
+def test_responses_streams_only_child_task_events() -> None:
+    """Relay ordered child-task events and consume the final reply."""
     state = _state()
+    state.get_task_events.return_value = [
+        _event(1, "response.created", '{\n  "type": "response.created"\n}'),
+        _event(2, "response.completed"),
+    ]
+    state.get_task_message.side_effect = lambda **_: [
+        _reply(state.store_task_message.call_args.args[0].metadata.message_id)
+    ]
 
     response = _client(state).post(
         "/v1/runtime/responses",
@@ -134,14 +170,87 @@ def test_responses_rejects_streaming() -> None:
         headers={"Authorization": "Bearer task-token"},
     )
 
-    assert response.status_code == 400
-    assert response.json()["error"] == {
-        "message": "Streaming responses are not supported.",
-        "type": "invalid_request_error",
-        "param": None,
-        "code": "unsupported_parameter",
-    }
-    state.create_task.assert_not_called()
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert response.text == (
+        "event: response.created\n"
+        "data: {\n"
+        'data:   "type": "response.created"\n'
+        "data: }\n\n"
+        'event: response.completed\ndata: {"type":"response.completed"}\n\n'
+    )
+    state.get_task_events.assert_called_once_with(
+        task_ids=[456], after_task_event_id=None
+    )
+
+
+@pytest.mark.parametrize(
+    "event_name",
+    ["response.created\ninjected", "response.created\rinjected"],
+)
+def test_sse_frame_rejects_event_name_line_breaks(event_name: str) -> None:
+    """Reject event names that could inject an SSE field or frame."""
+    with pytest.raises(_ResponsesError) as exc_info:
+        _sse_frame(TaskEvent(event=event_name, data="{}"))
+
+    assert exc_info.value.status_code == 502
+    assert exc_info.value.code == "invalid_model_event"
+
+
+def test_responses_waits_for_reply_before_terminal_event() -> None:
+    """Consume the final reply before exposing its terminal stream event."""
+    state = _state()
+    state.get_task_events.return_value = [
+        _event(
+            1,
+            "response.output_text.delta",
+            '{"type":"response.output_text.delta","delta":"x"}',
+        ),
+        _event(2, "response.completed"),
+    ]
+    state.get_task_message.side_effect = [[], [_reply("request-message-id")]]
+    state.get_tasks.return_value = [
+        Task(task_id=456, status=TaskStatus(status=Status.RUNNING))
+    ]
+
+    response = _client(state).post(
+        "/v1/runtime/responses",
+        json={"model": "model", "input": "hello", "stream": True},
+        headers={"Authorization": "Bearer task-token"},
+    )
+
+    assert "event: response.output_text.delta" in response.text
+    assert "event: response.completed" in response.text
+    assert "event: error" not in response.text
+    assert state.get_task_message.call_count == 2
+
+
+def test_responses_reports_missing_terminal_event() -> None:
+    """Fail when the model reply has no matching terminal stream event."""
+    state = _state()
+    state.get_task_events.return_value = [
+        _event(
+            1,
+            "response.output_text.delta",
+            '{"type":"response.output_text.delta","delta":"x"}',
+        )
+    ]
+    state.get_task_message.side_effect = lambda **_: [
+        _reply(state.store_task_message.call_args.args[0].metadata.message_id)
+    ]
+
+    response = _client(state).post(
+        "/v1/runtime/responses",
+        json={"model": "model", "input": "hello", "stream": True},
+        headers={"Authorization": "Bearer task-token"},
+    )
+
+    assert response.text.endswith(
+        "event: error\n"
+        'data: {"type":"error","code":"model_stream_failed",'
+        '"message":"Model stream ended before a terminal event.",'
+        '"param":null,"sequence_number":1}\n\n'
+    )
 
 
 def test_responses_maps_unexpected_errors() -> None:
@@ -294,3 +403,74 @@ def test_responses_times_out_if_running_model_task_does_not_respond() -> None:
     state.finish_task.assert_called_once_with(
         456, SubStatus.STOPPED, "Responses request ended early."
     )
+
+
+def test_responses_stops_and_drains_when_stream_task_group_is_cancelled() -> None:
+    """Shield child-task cleanup from stream task-group cancellation."""
+    state = _state()
+    state.get_task_events.return_value = []
+    state.get_task_message.return_value = []
+    state.get_tasks.return_value = [
+        Task(task_id=456, status=TaskStatus(status=Status.RUNNING))
+    ]
+
+    async def wait_until_polled() -> None:
+        while not state.get_tasks.called:
+            await asyncio.sleep(0)
+
+    async def cancel_stream() -> None:
+        stream = _stream_response(
+            state,
+            state.get_task_by_token.return_value,
+            _stream_request(),
+        )
+
+        async def consume_stream() -> None:
+            await anext(stream)
+
+        with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=10):
+            async with anyio.create_task_group() as task_group:
+                task_group.start_soon(consume_stream)
+                await asyncio.wait_for(wait_until_polled(), timeout=1)
+                task_group.cancel_scope.cancel()
+
+    asyncio.run(cancel_stream())
+
+    state.finish_task.assert_called_once_with(
+        456, SubStatus.STOPPED, "Responses stream ended early."
+    )
+    assert state.get_task_message.call_count == 2
+
+
+def test_responses_does_not_start_model_task_before_stream_iteration() -> None:
+    """Do not create a model task if the client disconnects before iteration."""
+    state = _state()
+    response_started = anyio.Event()
+
+    async def disconnect_before_streaming() -> None:
+        response = StreamingResponse(
+            _stream_response(
+                state,
+                state.get_task_by_token.return_value,
+                _stream_request(),
+            )
+        )
+
+        async def receive() -> Message:
+            await response_started.wait()
+            return {"type": "http.disconnect"}
+
+        async def send(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                response_started.set()
+                await anyio.sleep_forever()
+
+        scope: Scope = {
+            "type": "http",
+            "asgi": {"version": "3.0", "spec_version": "2.3"},
+        }
+        await response(scope, receive, send)
+
+    asyncio.run(disconnect_before_streaming())
+
+    state.create_task.assert_not_called()
