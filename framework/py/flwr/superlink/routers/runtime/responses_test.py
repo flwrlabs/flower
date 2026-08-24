@@ -17,6 +17,7 @@
 import asyncio
 from unittest.mock import AsyncMock, Mock, patch
 
+import anyio
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
@@ -394,8 +395,8 @@ def test_responses_times_out_if_running_model_task_does_not_respond() -> None:
     )
 
 
-def test_responses_stops_and_drains_when_stream_is_cancelled() -> None:
-    """Stop the child task and drain its reply when the stream is cancelled."""
+def test_responses_stops_and_drains_when_stream_task_group_is_cancelled() -> None:
+    """Shield child-task cleanup from stream task-group cancellation."""
     state = _state()
     state.get_task_events.return_value = []
     state.get_task_message.return_value = []
@@ -412,12 +413,15 @@ def test_responses_stops_and_drains_when_stream_is_cancelled() -> None:
             state,
             _Exchange(agent_task_id=123, model_task_id=456),
         )
+
+        async def consume_stream() -> None:
+            await anext(stream)
+
         with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=10):
-            next_event = asyncio.ensure_future(anext(stream))
-            await asyncio.wait_for(wait_until_polled(), timeout=1)
-            next_event.cancel()
-            with pytest.raises(asyncio.CancelledError):
-                await next_event
+            async with anyio.create_task_group() as task_group:
+                task_group.start_soon(consume_stream)
+                await asyncio.wait_for(wait_until_polled(), timeout=1)
+                task_group.cancel_scope.cancel()
 
     asyncio.run(cancel_stream())
 

@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from logging import ERROR
 from typing import Annotated, cast
 
+from anyio import CancelScope
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
@@ -304,9 +305,10 @@ async def _stream_response(state: LinkState, exchange: _Exchange) -> AsyncIterat
         yield _stream_error("Internal server error.", "internal_error", sequence_number)
     finally:
         if not complete:
-            await run_in_threadpool(
-                _stop_model_task, state, exchange, "Responses stream ended early."
-            )
+            with CancelScope(shield=True):
+                await run_in_threadpool(
+                    _stop_model_task, state, exchange, "Responses stream ended early."
+                )
 
 
 async def _wait_for_terminal_reply(
