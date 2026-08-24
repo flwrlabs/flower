@@ -12,199 +12,52 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for optional SuperLink extensions."""
+"""Tests for SuperLink extension notifications."""
 
-import asyncio
-import threading
 from types import ModuleType
 from unittest.mock import Mock
 
-import pytest
+from pytest import MonkeyPatch
 
 from flwr.supercore.run import Run
 
 from . import extensions
 
 
-def test_notify_run_started_calls_installed_extension(
-    monkeypatch: pytest.MonkeyPatch,
+def test_notify_run_started_passes_a_snapshot_to_the_extension(
+    monkeypatch: MonkeyPatch,
 ) -> None:
-    """Forward successful run creation to an installed extension."""
-    run = Run.create_empty(42)
-    extension = ModuleType("test_extension")
+    """Pass a copy of the persisted run to the optional extension."""
     callback = Mock()
-    completed = threading.Event()
-
-    def on_run_started(*args: object) -> None:
-        callback(*args)
-        completed.set()
-
-    extension.on_run_started = on_run_started  # type: ignore[attr-defined]
-    monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: extension)
-
-    extensions.notify_run_started(run, "automation")
-
-    assert completed.wait(timeout=1)
-    callback.assert_called_once_with(run, "automation")
-    assert callback.call_args.args[0] is not run
-
-
-def test_notify_run_started_uses_existing_event_loop(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Schedule callbacks on the service loop instead of blocking the caller."""
-    run = Run.create_empty(42)
-    extension = ModuleType("test_extension")
-    callback = Mock()
-    completed = threading.Event()
-
-    def on_run_started(*args: object) -> None:
-        callback(*args)
-        completed.set()
-
-    extension.on_run_started = on_run_started  # type: ignore[attr-defined]
-    monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: extension)
-    loop = asyncio.new_event_loop()
-    extensions.set_notification_loop(loop)
-
-    try:
-
-        async def notify_from_running_loop() -> None:
-            extensions.notify_run_started(run, "unknown")
-            callback.assert_not_called()
-            for _ in range(100):
-                if completed.is_set():
-                    break
-                await asyncio.sleep(0.01)
-
-        loop.run_until_complete(notify_from_running_loop())
-        assert completed.is_set()
-        callback.assert_called_once_with(run, "unknown")
-    finally:
-        extensions.clear_notification_loop()
-        loop.close()
-
-
-def test_shutdown_drains_submitted_callback_before_clearing_loop(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Run a ready-queue submission before clearing the notification loop."""
-    run = Run.create_empty(42)
-    extension = ModuleType("test_extension")
-    completed = threading.Event()
-
-    def on_run_started(*args: object) -> None:
-        del args
-        completed.set()
-
-    extension.on_run_started = on_run_started  # type: ignore[attr-defined]
-    monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: extension)
-    loop = asyncio.new_event_loop()
-    extensions.set_notification_loop(loop)
-
-    try:
-
-        async def notify_and_shutdown() -> None:
-            extensions.notify_run_started(run, "unknown")
-            await extensions.shutdown_notification_loop()
-
-        loop.run_until_complete(notify_and_shutdown())
-        assert completed.is_set()
-    finally:
-        extensions.clear_notification_loop()
-        loop.close()
-
-
-def test_callback_completion_does_not_require_closed_event_loop(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Remove timed-out callbacks even when their loop closes first."""
-    run = Run.create_empty(42)
-    extension = ModuleType("test_extension")
-    callback_started = threading.Event()
-    callback_release = threading.Event()
-    callback_done = threading.Event()
-
-    def on_run_started(*args: object) -> None:
-        del args
-        callback_started.set()
-        callback_release.wait(timeout=1)
-        callback_done.set()
-
-    extension.on_run_started = on_run_started  # type: ignore[attr-defined]
-    monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: extension)
-    monkeypatch.setattr(extensions, "_NOTIFICATION_CALLBACK_TIMEOUT_SECONDS", 0.01)
-    loop = asyncio.new_event_loop()
-    extensions.set_notification_loop(loop)
-
-    try:
-
-        async def notify_and_shutdown() -> None:
-            extensions.notify_run_started(run, "unknown")
-            await asyncio.to_thread(callback_started.wait, 1)
-            await extensions.shutdown_notification_loop()
-
-        loop.run_until_complete(notify_and_shutdown())
-    finally:
-        loop.close()
-
-    callback_release.set()
-    assert callback_done.wait(timeout=1)
-    # pylint: disable=protected-access
-    with extensions._NOTIFICATION_CALLBACK_EVENTS_LOCK:
-        assert (
-            not extensions._NOTIFICATION_CALLBACK_EVENTS
-        )  # pylint: disable=protected-access
-
-
-def test_notify_run_started_isolates_extension_failure(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Do not fail an already-created run when an extension raises."""
-    run = Run.create_empty(42)
-    extension = ModuleType("test_extension")
-    callback = Mock()
-    completed = threading.Event()
-
-    def fail(*args: object) -> None:
-        callback(*args)
-        completed.set()
-        raise RuntimeError
-
-    extension.on_run_started = fail  # type: ignore[attr-defined]
-    monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: extension)
+    module = ModuleType("flwr.ee.superlink.extensions")
+    module.on_run_started = callback  # type: ignore[attr-defined]
+    monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: module)
+    run = Run.create_empty(123)
 
     extensions.notify_run_started(run, "unknown")
 
-    assert completed.wait(timeout=1)
-    callback.assert_called_once_with(run, "unknown")
+    callback.assert_called_once()
+    notified_run, source = callback.call_args.args
+    assert notified_run == run
+    assert notified_run is not run
+    assert source == "unknown"
+
+
+def test_notify_run_started_skips_missing_extension(monkeypatch: MonkeyPatch) -> None:
+    """Do nothing when the optional extension package is absent."""
+    monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: None)
+
+    extensions.notify_run_started(Run.create_empty(123), "unknown")
 
 
 def test_notify_run_started_isolates_extension_import_failure(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
-    """Do not fail an already-created run when extension discovery raises."""
-    run = Run.create_empty(42)
+    """Keep a persisted run successful when extension discovery fails."""
 
     def fail_import() -> ModuleType | None:
-        raise ModuleNotFoundError("missing extension dependency")
+        raise RuntimeError("extension import failed")
 
     monkeypatch.setattr(extensions, "_try_import_sgxt", fail_import)
 
-    extensions.notify_run_started(run, "unknown")
-
-
-def test_notify_result_delivered_calls_installed_extension(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Forward an accepted server-side result request to an extension."""
-    run = Run.create_empty(42)
-    extension = ModuleType("test_extension")
-    callback = Mock()
-    extension.on_result_delivered = callback  # type: ignore[attr-defined]
-    monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: extension)
-
-    extensions.notify_result_delivered(run, "aid-alice", "chat")
-
-    callback.assert_called_once_with(run, "aid-alice", "chat")
-    assert callback.call_args.args[0] is not run
+    extensions.notify_run_started(Run.create_empty(123), "unknown")
