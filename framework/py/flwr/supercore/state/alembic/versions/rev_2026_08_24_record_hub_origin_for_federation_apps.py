@@ -40,14 +40,9 @@ def upgrade() -> None:
             sa.Column(
                 "is_hub_app",
                 sa.Boolean(),
-                nullable=False,
-                server_default=sa.false(),
+                nullable=True,
             )
         )
-
-    # Existing associations predate provenance tracking. Leave them at the
-    # conservative false default because FAB verification metadata is shared
-    # globally by fab_hash and cannot identify the source of this association.
 
     # ### end Alembic commands ###
 

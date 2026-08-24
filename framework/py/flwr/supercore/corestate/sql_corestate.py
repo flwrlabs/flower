@@ -539,15 +539,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             query = query.limit(limit)
         with self.session() as session:
             apps = session.execute(query).all()
-            return [
-                AppInfo(
+            result = []
+            for app in apps:
+                app_info = AppInfo(
                     app_id=app.app_id,
                     fab_hash=app.fab_hash,
                     app_type=app.app_type,
-                    is_hub_app=app.is_hub_app,
                 )
-                for app in apps
-            ]
+                if app.is_hub_app is not None:
+                    app_info.is_hub_app = app.is_hub_app
+                result.append(app_info)
+            return result
 
     def delete_app(self, federation_id: str, app_id: str) -> bool:
         """Delete one federation-app association; its FAB remains in state."""

@@ -23,6 +23,7 @@ from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddAppRequest,
     AddAppResponse,
+    AppInfo,
     ListAppsRequest,
     ListAppsResponse,
     ListAutomationsRequest,
@@ -201,6 +202,24 @@ class TestControlHandlers(unittest.TestCase):
 
         self.assertEqual(round_tripped.apps[0].fab_hash, fab_hash)
         self.assertTrue(round_tripped.apps[0].is_hub_app)
+
+    def test_list_apps_preserves_unknown_hub_origin_over_wire(self) -> None:
+        """ListApps leaves unknown legacy provenance absent over the wire."""
+        app = AppInfo(
+            app_id="@flwr/demo",
+            fab_hash="legacy-hash",
+            app_type=TaskType.AGENT_APP,
+        )
+        with patch.object(self.state, "list_apps", return_value=[app]):
+            response = list_apps(
+                ListAppsRequest(federation_id=NOOP_FEDERATION_ID),
+                self.account,
+                self.state,
+            )
+
+        round_tripped = ListAppsResponse.FromString(response.SerializeToString())
+
+        self.assertFalse(round_tripped.apps[0].HasField("is_hub_app"))
 
     def test_add_and_remove_app(self) -> None:
         """AddApp stores the latest Hub FAB and RemoveApp removes the app."""
