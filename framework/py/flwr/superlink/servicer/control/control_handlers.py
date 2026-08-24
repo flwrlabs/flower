@@ -164,6 +164,7 @@ from flwr.supercore.utils import (
     resolve_account_ids,
     strict_json_dumps,
 )
+from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
@@ -466,6 +467,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     account: AccountInfo,
     state: LinkState,
     fleet_api_type: str | None,
+    source: extensions.RunStartSource = "unknown",
 ) -> StartRunResponse:
     """Create run ID."""
     log(INFO, "ControlServicer.StartRun")
@@ -652,9 +654,11 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
     log_msg = f"Created run {run_id} in federation {run.federation_id}"
     log(INFO, log_msg)
-    return StartRunResponse(
+    response = StartRunResponse(
         run_id=run_id, note=note, series_id=series_id, federation=run.federation_id
     )
+    extensions.notify_run_started(run, source)
+    return response
 
 
 def stream_logs(
@@ -721,6 +725,8 @@ def stream_run_events(
             f"Run {run_id} not found while streaming run events.",
         )
     run = runs[0]
+    # LinkState creates every run with a primary task, so casting is safe
+    primary_task_id = cast(int, run.primary_task_id)
 
     _validate_federation_membership_in_request(
         state, account.flwr_aid, run.federation_id
@@ -736,6 +742,7 @@ def stream_run_events(
         # streamed task event
         events = state.get_task_events(
             run_id=run_id,
+            task_ids=[primary_task_id],
             after_task_event_id=after_task_event_id,
         )
         for event in events:
@@ -902,6 +909,7 @@ def dispatch_automation(
             AccountInfo(flwr_aid=flwr_aid, account_name=""),
             state,
             None,
+            source="automation",
         )
     except Exception as exc:  # pylint: disable=broad-exception-caught
         state.finish_automation(
