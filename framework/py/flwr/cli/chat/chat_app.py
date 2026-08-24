@@ -249,6 +249,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             tuple[str, str] | _DetailsBlock | HistoryBlock | MarkdownBlock
         ] = []
         self.history_block: HistoryBlock | None = None
+        self.history_loading = False
         self.wrapped_transcript: StyleAndTextTuples = []
         self.wrapped_transcript_key: tuple[int, int] | None = None
         self.transcript_revision = 0
@@ -279,6 +280,9 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         @key_bindings.add("enter")
         def _submit_prompt(event: KeyPressEvent) -> None:
             if self.history_block is not None:
+                if self.history_loading:
+                    return
+                self.history_loading = True
                 event.app.create_background_task(self._confirm_history_selection())
                 return
             self._submit_prompt(event)
@@ -408,7 +412,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
     def _submit_prompt(self, event: KeyPressEvent) -> None:
         """Handle a prompt submitted from the input buffer."""
-        if self.busy:
+        if self.busy or self.history_loading:
             return
 
         prompt = self.input_buffer.text
@@ -468,6 +472,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             self._clear_transcript()
             return True
         if command == CHAT_HISTORY_COMMAND:
+            self.history_loading = True
             event.app.create_background_task(self._show_history())
             return True
         if command == CHAT_FEDERATION_COMMAND or command.startswith(
@@ -510,6 +515,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         except click.ClickException as exc:
             self._append_transcript("class:error", f"Error: {exc.format_message()}\n\n")
             return
+        finally:
+            self.history_loading = False
         if block is None:
             self._append_transcript(
                 "class:notice",
@@ -535,6 +542,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
     async def _confirm_history_selection(self) -> None:
         """Restore the conversation without changing the selected agent."""
         if self.history_block is None:
+            self.history_loading = False
             return
         entry = self.history_block.entries[self.history_block.selected_index]
         try:
@@ -545,6 +553,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             self._close_history_selection()
             self._append_transcript("class:error", f"Error: {exc.format_message()}\n\n")
             return
+        finally:
+            self.history_loading = False
         self._close_history_selection()
         self._clear_transcript()
         self.series_id = entry.series_id

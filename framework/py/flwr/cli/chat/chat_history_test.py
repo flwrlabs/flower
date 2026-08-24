@@ -69,10 +69,17 @@ def test_history_widget_restores_selected_context() -> None:
     event = Mock()
 
     assert chat._handle_command(event, "/history")  # pylint: disable=protected-access
+    assert chat.history_loading
+    chat.input_buffer.text = "Do not submit yet"
+    chat._submit_prompt(event)  # pylint: disable=protected-access
+    assert event.app.create_background_task.call_count == 1
     asyncio.run(event.app.create_background_task.call_args.args[0])
+    assert not chat.history_loading
     assert chat.history_block is not None
     chat._move_history_selection(-1)  # pylint: disable=protected-access
+    chat.history_loading = True
     asyncio.run(chat._confirm_history_selection())  # pylint: disable=protected-access
+    assert not chat.history_loading
     stub.ListRunSeries.assert_called_once_with(
         ListRunSeriesRequest(federation_id=FEDERATION, is_agent=True)
     )
