@@ -731,13 +731,6 @@ def stream_run_events(
         state, account.flwr_aid, run.federation_id
     )
 
-    agentapp_controls_events = False
-    if run.primary_task_id is not None:
-        primary_tasks = state.get_tasks(task_ids=[run.primary_task_id])
-        agentapp_controls_events = bool(
-            primary_tasks and primary_tasks[0].type == TaskType.AGENT_APP
-        )
-
     after_task_event_id = None
     if request.HasField("after_task_event_id"):
         after_task_event_id = request.after_task_event_id
@@ -751,20 +744,9 @@ def stream_run_events(
             task_ids=[primary_task_id],
             after_task_event_id=after_task_event_id,
         )
-        visible_task_ids: set[int] | None = None
-        if agentapp_controls_events and events:
-            # Model events remain private to the AgentApp's response stream. Events
-            # selected for frontend exposure are republished under the AgentApp task.
-            event_tasks = state.get_tasks(
-                task_ids=list(dict.fromkeys(event.task_id for event in events))
-            )
-            visible_task_ids = {
-                task.task_id for task in event_tasks if task.type != TaskType.MODEL
-            }
         for event in events:
             after_task_event_id = event.id
-            if visible_task_ids is None or event.task_id in visible_task_ids:
-                yield StreamRunEventsResponse(task_event=event)
+            yield StreamRunEventsResponse(task_event=event)
 
         # If the run was already finished before fetching this batch, all
         # events are returned at this point and the server ends the stream.

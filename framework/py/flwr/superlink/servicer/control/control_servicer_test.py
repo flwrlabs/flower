@@ -77,7 +77,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
@@ -1813,7 +1813,6 @@ class TestControlServicerAuth(unittest.TestCase):
         with (
             patch.object(self.state, "get_run_info", return_value=[mock_run]),
             patch.object(self.state, "get_task_events", new=mock_get_task_events),
-            patch.object(self.state, "get_tasks", new=mock_get_tasks),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=True
             ),
