@@ -1601,6 +1601,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         *,
         run_id: int | None = None,
+        task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
@@ -1612,6 +1613,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         if run_id is not None:
             query = query.where(TaskEventModel.run_id == uint64_to_int64(run_id))
+        if task_ids is not None:
+            if not task_ids:
+                return []
+            sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
+            query = query.where(TaskEventModel.task_id.in_(sint64_task_ids))
         with self.session() as session:
             rows = session.scalars(query).all()
             return [_task_event_from_model(row) for row in rows]
