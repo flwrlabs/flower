@@ -71,7 +71,7 @@ def test_chat_runs_interactive_application() -> None:
     )
     channel = Mock()
     stub = Mock()
-    federations = [Federation(name="@flower/flower-agent-execution")]
+    federations = [Federation(name="@flower/personal")]
     stub.ListFederations.return_value = ListFederationsResponse(federations=federations)
     auth_plugin = Mock()
 

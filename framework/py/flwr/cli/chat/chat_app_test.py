@@ -28,10 +28,11 @@ from flwr.supercore.constant import FLOWER_AGENT_APP_ID
 def test_chat_selects_federation_from_dropdown() -> None:
     """The federation command should offer and apply federation selections."""
     federations = [
-        Federation(name="@flower/flower-agent-execution", description="Default"),
+        Federation(name="@flower/flower-agent-execution", description="Legacy"),
+        Federation(name="@flower/personal", description="Default"),
         Federation(name="@flower/other", description="Other"),
     ]
-    completer = _ChatCompleter(Mock(), federations[0].name, federations)
+    completer = _ChatCompleter(Mock(), federations[1].name, federations)
     completions = list(
         completer.get_completions(Document("/federation @flower/o"), CompleteEvent())
     )
@@ -40,6 +41,7 @@ def test_chat_selects_federation_from_dropdown() -> None:
     application = Mock()
     with patch.object(ChatApplication, "_create_application", return_value=application):
         chat = ChatApplication(Mock(), federations, Mock())
+    assert chat.federation == "@flower/personal"
     chat.input_buffer = Mock()
     event = Mock(app=application)
 
