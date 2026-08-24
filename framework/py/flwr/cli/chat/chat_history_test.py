@@ -21,6 +21,7 @@ from unittest.mock import Mock, patch
 from flwr.app import ConfigRecord, Context, RecordDict
 from flwr.cli.chat.chat_app import ChatApplication
 from flwr.cli.chat.chat_history import HistoryBlock
+from flwr.cli.constant import CHAT_DEFAULT_FEDERATION_NAME
 from flwr.common.serde import context_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetRunSeriesRequest,
@@ -31,7 +32,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 
-FEDERATION = "@flower/flower-agent-execution"
+FEDERATION = f"@flower/{CHAT_DEFAULT_FEDERATION_NAME}"
 
 
 def _create_chat(stub: Mock) -> ChatApplication:
