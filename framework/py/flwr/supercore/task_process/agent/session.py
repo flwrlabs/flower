@@ -100,59 +100,52 @@ class RuntimeAgentEvents(AgentEvents):
         self._queue.put(task_event)
         self._raise_worker_error()
 
-    def flush(self) -> None:
-        """Wait until all queued events have been persisted."""
-        self._queue.join()
-        self._raise_worker_error()
-
-    def close(self) -> None:
-        """Flush pending events and stop the background publisher."""
+    def close(self, timeout: float | None = None) -> None:
+        """Publish pending events and stop the background publisher."""
         if self._closed:
             self._raise_worker_error()
             return
-        try:
-            self.flush()
-        finally:
-            self._closed = True
-            self._queue.put(_EVENT_PUBLISH_STOP)
-            self._worker.join()
+
+        self._closed = True
+        self._queue.put_nowait(_EVENT_PUBLISH_STOP)
+        self._worker.join(timeout)
+        if self._worker.is_alive():
+            raise TimeoutError("Timed out waiting for Agent event publisher to stop.")
         self._raise_worker_error()
+
+    def _flush(self, batch: list[TaskEvent]) -> None:
+        """Publish one batch of task events."""
+        try:
+            self._stub.PushTaskEvents(PushTaskEventsRequest(events=batch))
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            with self._error_lock:
+                if self._error is None:
+                    self._error = err
 
     def _run(self) -> None:
         """Upload queued events in small batches."""
         while True:
             item = self._queue.get()
             if item is _EVENT_PUBLISH_STOP:
-                self._queue.task_done()
                 return
 
             batch = [cast(TaskEvent, item)]
             deadline = time.monotonic() + _EVENT_PUBLISH_BATCH_WAIT
-            stop_after_batch = False
             while len(batch) < _EVENT_PUBLISH_BATCH_SIZE:
                 try:
-                    next_item = self._queue.get(
+                    item = self._queue.get(
                         timeout=max(0.0, deadline - time.monotonic())
                     )
                 except Empty:
                     break
-                if next_item is _EVENT_PUBLISH_STOP:
-                    self._queue.task_done()
-                    stop_after_batch = True
-                    break
-                batch.append(cast(TaskEvent, next_item))
 
-            try:
-                self._stub.PushTaskEvents(PushTaskEventsRequest(events=batch))
-            except Exception as err:  # pylint: disable=broad-exception-caught
-                with self._error_lock:
-                    if self._error is None:
-                        self._error = err
-            finally:
-                for _ in batch:
-                    self._queue.task_done()
-            if stop_after_batch:
-                return
+                if item is _EVENT_PUBLISH_STOP:
+                    self._flush(batch)
+                    return
+
+                batch.append(cast(TaskEvent, item))
+
+            self._flush(batch)
 
     def _raise_worker_error(self) -> None:
         """Raise a background publication failure in the AgentApp thread."""
