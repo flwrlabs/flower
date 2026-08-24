@@ -46,26 +46,9 @@ def upgrade() -> None:
             )
         )
 
-    # Before this column existed, Hub-fetched FABs were persisted with
-    # verification metadata while locally submitted FABs used an empty mapping.
-    # Use that retained metadata to preserve Hub provenance for existing rows.
-    op.execute(
-        sa.text(
-            """
-            UPDATE federation_app
-            SET is_hub_app = :is_hub_app
-            WHERE EXISTS (
-                SELECT 1
-                FROM fab
-                WHERE fab.fab_hash = federation_app.fab_hash
-                AND fab.verifications <> :empty_verifications
-            )
-            """
-        ).bindparams(
-            is_hub_app=True,
-            empty_verifications="{}",
-        )
-    )
+    # Existing associations predate provenance tracking. Leave them at the
+    # conservative false default because FAB verification metadata is shared
+    # globally by fab_hash and cannot identify the source of this association.
 
     # ### end Alembic commands ###
 
