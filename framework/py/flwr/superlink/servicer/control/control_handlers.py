@@ -724,6 +724,8 @@ def stream_run_events(
             f"Run {run_id} not found while streaming run events.",
         )
     run = runs[0]
+    # LinkState creates every run with a primary task.
+    primary_task_id = cast(int, run.primary_task_id)
 
     _validate_federation_membership_in_request(
         state, account.flwr_aid, run.federation_id
@@ -739,9 +741,7 @@ def stream_run_events(
         # streamed task event
         events = state.get_task_events(
             run_id=run_id,
-            task_ids=(
-                [run.primary_task_id] if run.primary_task_id is not None else None
-            ),
+            task_ids=[primary_task_id],
             after_task_event_id=after_task_event_id,
         )
         for event in events:
