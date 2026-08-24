@@ -109,12 +109,19 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     heartbeat_sender = None
     context: Context | None = None
     runtime_env_dir: Path | None = None
+    agent_events: RuntimeAgentEvents | None = None
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
         log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
 
         grid._retry_invoker.max_tries = 1
+
+        if agent_events is not None:
+            try:
+                agent_events.close()
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to close AgentApp event publisher", exc_info=err)
 
         if log_uploader:
             flush_logs(log_queue)
