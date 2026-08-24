@@ -169,7 +169,7 @@ def test_responses_streams_only_child_task_events() -> None:
         'event: response.completed\ndata: {"type":"response.completed"}\n\n'
     )
     state.get_task_events.assert_called_once_with(
-        run_id=789, task_ids=[456], after_task_event_id=None
+        task_ids=[456], after_task_event_id=None
     )
 
 
@@ -186,53 +186,60 @@ def test_sse_frame_rejects_event_name_line_breaks(event_name: str) -> None:
     assert exc_info.value.code == "invalid_model_event"
 
 
-def test_responses_waits_for_terminal_event_after_reply() -> None:
-    """Do not truncate a terminal event that becomes visible after its reply."""
+def test_responses_waits_for_reply_before_terminal_event() -> None:
+    """Consume the final reply before exposing its terminal stream event."""
     state = _state()
-    state.get_task_events.side_effect = [
-        [
-            _event(
-                1,
-                "response.output_text.delta",
-                '{"type":"response.output_text.delta","delta":"x"}',
-            )
-        ],
-        [_event(2, "response.completed")],
+    state.get_task_events.return_value = [
+        _event(
+            1,
+            "response.output_text.delta",
+            '{"type":"response.output_text.delta","delta":"x"}',
+        ),
+        _event(2, "response.completed"),
     ]
-    state.get_task_message.side_effect = lambda **_: [
-        _reply(state.store_task_message.call_args.args[0].metadata.message_id)
+    state.get_task_message.side_effect = [[], [_reply("request-message-id")]]
+    state.get_tasks.return_value = [
+        Task(task_id=456, status=TaskStatus(status=Status.RUNNING))
     ]
 
-    with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=0):
-        response = _client(state).post(
-            "/v1/runtime/responses",
-            json={"model": "model", "input": "hello", "stream": True},
-            headers={"Authorization": "Bearer task-token"},
-        )
+    response = _client(state).post(
+        "/v1/runtime/responses",
+        json={"model": "model", "input": "hello", "stream": True},
+        headers={"Authorization": "Bearer task-token"},
+    )
 
     assert "event: response.output_text.delta" in response.text
     assert "event: response.completed" in response.text
     assert "event: error" not in response.text
-    assert state.get_task_events.call_count == 2
+    assert state.get_task_message.call_count == 2
 
 
 def test_responses_reports_missing_terminal_event() -> None:
     """Fail when the model reply has no matching terminal stream event."""
     state = _state()
-    state.get_task_events.return_value = []
+    state.get_task_events.return_value = [
+        _event(
+            1,
+            "response.output_text.delta",
+            '{"type":"response.output_text.delta","delta":"x"}',
+        )
+    ]
     state.get_task_message.side_effect = lambda **_: [
         _reply(state.store_task_message.call_args.args[0].metadata.message_id)
     ]
 
-    with patch("flwr.superlink.routers.runtime.responses._TERMINAL_EVENT_GRACE", new=0):
-        response = _client(state).post(
-            "/v1/runtime/responses",
-            json={"model": "model", "input": "hello", "stream": True},
-            headers={"Authorization": "Bearer task-token"},
-        )
+    response = _client(state).post(
+        "/v1/runtime/responses",
+        json={"model": "model", "input": "hello", "stream": True},
+        headers={"Authorization": "Bearer task-token"},
+    )
 
-    assert "event: error" in response.text
-    assert "Model stream ended before a terminal event." in response.text
+    assert response.text.endswith(
+        "event: error\n"
+        'data: {"type":"error","code":"model_stream_failed",'
+        '"message":"Model stream ended before a terminal event.",'
+        '"param":null,"sequence_number":1}\n\n'
+    )
 
 
 def test_responses_maps_unexpected_errors() -> None:
@@ -272,7 +279,6 @@ def test_responses_stops_and_drains_when_response_wait_is_cancelled() -> None:
         exchange = _Exchange(
             agent_task_id=123,
             model_task_id=456,
-            run_id=789,
         )
         with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=10):
             response_wait = asyncio.create_task(
@@ -302,7 +308,6 @@ def test_responses_stops_and_drains_when_client_disconnects() -> None:
         exchange = _Exchange(
             agent_task_id=123,
             model_task_id=456,
-            run_id=789,
         )
         with pytest.raises(_ResponsesError) as exc_info:
             await _wait_for_response(request, state, exchange)
@@ -338,7 +343,6 @@ def test_responses_times_out_if_model_task_is_not_launched() -> None:
         exchange = _Exchange(
             agent_task_id=123,
             model_task_id=456,
-            run_id=789,
         )
         with patch(
             "flwr.superlink.routers.runtime.responses._model_task_launch_timeout",
@@ -373,7 +377,6 @@ def test_responses_times_out_if_running_model_task_does_not_respond() -> None:
         exchange = _Exchange(
             agent_task_id=123,
             model_task_id=456,
-            run_id=789,
         )
         with patch(
             "flwr.superlink.routers.runtime.responses._DEFAULT_MODEL_RESPONSE_TIMEOUT",
@@ -407,7 +410,7 @@ def test_responses_stops_and_drains_when_stream_is_cancelled() -> None:
     async def cancel_stream() -> None:
         stream = _stream_response(
             state,
-            _Exchange(agent_task_id=123, model_task_id=456, run_id=789),
+            _Exchange(agent_task_id=123, model_task_id=456),
         )
         with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=10):
             next_event = asyncio.ensure_future(anext(stream))

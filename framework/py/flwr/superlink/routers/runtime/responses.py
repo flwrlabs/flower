@@ -65,7 +65,6 @@ _TERMINAL_EVENTS = frozenset(
     {"error", "response.completed", "response.failed", "response.incomplete"}
 )
 _POLL_INTERVAL = 0.25
-_TERMINAL_EVENT_GRACE = 1.0
 _DEFAULT_MODEL_RESPONSE_TIMEOUT = 300.0
 _DEFAULT_MODEL_TASK_LAUNCH_TIMEOUT = 300.0
 _MODEL_TASK_LAUNCH_TIMEOUT_ENV = "FLWR_MODEL_TASK_LAUNCH_TIMEOUT"
@@ -77,7 +76,6 @@ class _Exchange:
 
     agent_task_id: int
     model_task_id: int
-    run_id: int
 
 
 class _ResponsesError(Exception):
@@ -208,7 +206,6 @@ def _start_exchange(
     return _Exchange(
         agent_task_id=task.task_id,
         model_task_id=model_task_id,
-        run_id=task.run_id,
     )
 
 
@@ -254,13 +251,19 @@ async def _stream_response(state: LinkState, exchange: _Exchange) -> AsyncIterat
     response_deadline = started_at + _DEFAULT_MODEL_RESPONSE_TIMEOUT
     cursor: int | None = None
     complete = False
-    response: JSONObject | None = None
-    terminal_event_deadline: float | None = None
+    sequence_number = 0
     try:
         while True:
+            # The model task stores all stream events before its final reply.
+            response = await run_in_threadpool(
+                _claim_response_or_raise_for_model_task_state,
+                state,
+                exchange,
+                launch_deadline,
+                response_deadline,
+            )
             events = await run_in_threadpool(
                 state.get_task_events,
-                run_id=exchange.run_id,
                 task_ids=[exchange.model_task_id],
                 after_task_event_id=cursor,
             )
@@ -278,26 +281,9 @@ async def _stream_response(state: LinkState, exchange: _Exchange) -> AsyncIterat
                     yield _sse_frame(event)
                     return
                 yield _sse_frame(event)
+                sequence_number += 1
 
-            if response is None:
-                response = await run_in_threadpool(
-                    _claim_response_or_raise_for_model_task_state,
-                    state,
-                    exchange,
-                    launch_deadline,
-                    response_deadline,
-                )
-                if response is not None:
-                    terminal_event_deadline = min(
-                        response_deadline,
-                        time.monotonic() + _TERMINAL_EVENT_GRACE,
-                    )
-
-            if (
-                response is not None
-                and terminal_event_deadline is not None
-                and time.monotonic() >= terminal_event_deadline
-            ):
+            if response is not None:
                 complete = True
                 yield _stream_error(
                     (
@@ -306,15 +292,16 @@ async def _stream_response(state: LinkState, exchange: _Exchange) -> AsyncIterat
                         else "Model stream ended before a terminal event."
                     ),
                     "model_stream_failed",
+                    sequence_number,
                 )
                 return
 
             await asyncio.sleep(_POLL_INTERVAL)
     except _ResponsesError as err:
-        yield _stream_error(err.message, err.code)
+        yield _stream_error(err.message, err.code, sequence_number)
     except Exception as err:  # pylint: disable=broad-exception-caught
         log(ERROR, "Runtime Responses stream failed unexpectedly", exc_info=err)
-        yield _stream_error("Internal server error.", "internal_error")
+        yield _stream_error("Internal server error.", "internal_error", sequence_number)
     finally:
         if not complete:
             await run_in_threadpool(
@@ -456,11 +443,14 @@ def _sse_frame(event: TaskEvent) -> str:
     return f"event: {event.event}\n{data_fields}\n"
 
 
-def _stream_error(message: str, code: str) -> str:
+def _stream_error(message: str, code: str, sequence_number: int) -> str:
     """Encode a terminal Responses error event."""
     data: JSONObject = {
         "type": "error",
-        "error": {"type": "server_error", "code": code, "message": message},
+        "code": code,
+        "message": message,
+        "param": None,
+        "sequence_number": sequence_number,
     }
     return f"event: error\ndata: {strict_json_dumps(data, compact=True)}\n\n"
 
