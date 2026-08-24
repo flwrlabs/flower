@@ -77,7 +77,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
@@ -1790,18 +1790,16 @@ class TestControlServicerAuth(unittest.TestCase):
 
     @parameterized.expand(  # type: ignore[untyped-decorator]
         [
-            (TaskType.AGENT_APP, [6], 2),
-            (TaskType.SERVER_APP, [5, 6], 1),
-            (None, [5, 6], 0),
+            (123, [6]),
+            (None, [5, 6]),
         ]
     )
-    def test_streamrunevents_filters_model_events_for_agentapp_runs(
+    def test_streamrunevents_returns_only_primary_task_events(
         self,
-        primary_task_type: TaskType | None,
+        primary_task_id: int | None,
         expected_event_ids: list[int],
-        expected_get_tasks_calls: int,
     ) -> None:
-        """Hide model events only when the AgentApp controls publication."""
+        """Return only events produced by the run's primary task."""
         # Prepare
         run_id = 789
         request = StreamRunEventsRequest(run_id=run_id, after_task_event_id=4)
@@ -1809,7 +1807,7 @@ class TestControlServicerAuth(unittest.TestCase):
         ctx.is_active.return_value = True
         mock_run = Mock(
             federation_id=NOOP_FEDERATION_ID,
-            primary_task_id=123 if primary_task_type is not None else None,
+            primary_task_id=primary_task_id,
             status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
         )
         event_1 = TaskEvent(
@@ -1826,24 +1824,15 @@ class TestControlServicerAuth(unittest.TestCase):
             event="response.completed",
             data='{"type":"response.completed"}',
         )
-        mock_get_task_events = Mock(return_value=[event_1, event_2])
-        get_tasks_results = []
-        if primary_task_type is not None:
-            get_tasks_results.append([Task(task_id=123, type=primary_task_type)])
-        if primary_task_type == TaskType.AGENT_APP:
-            get_tasks_results.append(
-                [
-                    Task(task_id=456, type=TaskType.MODEL),
-                    Task(task_id=123, type=TaskType.AGENT_APP),
-                ]
-            )
-        mock_get_tasks = Mock(side_effect=get_tasks_results)
+        visible_events = (
+            [event_2] if primary_task_id is not None else [event_1, event_2]
+        )
+        mock_get_task_events = Mock(return_value=visible_events)
 
         # Execute
         with (
             patch.object(self.state, "get_run_info", return_value=[mock_run]),
             patch.object(self.state, "get_task_events", new=mock_get_task_events),
-            patch.object(self.state, "get_tasks", new=mock_get_tasks),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=True
             ),
@@ -1856,9 +1845,10 @@ class TestControlServicerAuth(unittest.TestCase):
 
         # Assert
         mock_get_task_events.assert_called_once_with(
-            run_id=run_id, after_task_event_id=4
+            run_id=run_id,
+            task_ids=[primary_task_id] if primary_task_id is not None else None,
+            after_task_event_id=4,
         )
-        self.assertEqual(mock_get_tasks.call_count, expected_get_tasks_calls)
         self.assertEqual(
             [message.task_event.id for message in msgs], expected_event_ids
         )
