@@ -250,35 +250,26 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
                 f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
             ) from None
         agent_events = RuntimeAgentEvents(grid._runtime_client)
-        try:
-            responses = RuntimeAgentResponses(
-                stub=grid._runtime_client,
-                run_id=context.run_id,
-                task_id=task_id,
-                context=context,
-                start_run_request=StartRunRequest(
-                    fab=fab_to_proto(fab),
-                    override_config=user_config_to_proto(run.override_config),
-                    override_federation_config=res.federation_config,
-                    federation=run.federation_id,
-                    series_id=run.series_id,
-                ),
-                events=agent_events,
-            )
-            agent = RuntimeAgentSession(
-                responses=responses,
-                connectors=RuntimeAgentConnectors(responses),
-                events=agent_events,
-            )
-            agent_app(agent=agent, context=context)
-        except Exception:
-            try:
-                agent_events.close()
-            except Exception as close_ex:  # pylint: disable=broad-exception-caught
-                log(
-                    ERROR, "Failed to close AgentApp event publisher", exc_info=close_ex
-                )
-            raise
+        responses = RuntimeAgentResponses(
+            stub=grid._runtime_client,
+            run_id=context.run_id,
+            task_id=task_id,
+            context=context,
+            start_run_request=StartRunRequest(
+                fab=fab_to_proto(fab),
+                override_config=user_config_to_proto(run.override_config),
+                override_federation_config=res.federation_config,
+                federation=run.federation_id,
+                series_id=run.series_id,
+            ),
+            events=agent_events,
+        )
+        agent = RuntimeAgentSession(
+            responses=responses,
+            connectors=RuntimeAgentConnectors(responses),
+            events=agent_events,
+        )
+        agent_app(agent=agent, context=context)
         agent_events.close()
 
         # Set sub_status and details for successful completion
