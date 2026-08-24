@@ -20,6 +20,8 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Sequence
+from queue import Empty, Full, Queue
+from threading import Lock, Thread
 from typing import Literal, cast
 
 from google.protobuf.json_format import ParseDict
@@ -59,6 +61,101 @@ from .context_items import append_items
 
 _DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
 _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
+_EVENT_PUBLISH_BATCH_SIZE = 16
+_EVENT_PUBLISH_QUEUE_SIZE = 256
+_EVENT_PUBLISH_BATCH_WAIT = 0.05
+_EVENT_PUBLISH_STOP = object()
+
+
+class RuntimeAgentEvents(AgentEvents):
+    """Publish AgentApp-selected events through a background worker."""
+
+    def __init__(self, stub: RuntimeHttpClient) -> None:
+        self._stub = stub
+        self._queue: Queue[TaskEvent | object] = Queue(
+            maxsize=_EVENT_PUBLISH_QUEUE_SIZE
+        )
+        self._error_lock = Lock()
+        self._error: Exception | None = None
+        self._closed = False
+        self._worker = Thread(
+            target=self._run,
+            name="flwr-agent-event-publisher",
+            daemon=True,
+        )
+        self._worker.start()
+
+    def emit(self, event: JSONObject) -> None:
+        """Queue one event for publication to run-event subscribers."""
+        if self._closed:
+            raise RuntimeError("Agent event publisher is closed.")
+        event_type = event.get("type")
+        if not isinstance(event_type, str) or not event_type:
+            raise ValueError("Run event requires a non-empty string 'type' field.")
+        self._raise_worker_error()
+        task_event = TaskEvent(
+            event=event_type,
+            data=strict_json_dumps(event, compact=True),
+        )
+        self._queue.put(task_event)
+        self._raise_worker_error()
+
+    def close(self, timeout: float | None = None) -> None:
+        """Publish pending events and stop the background publisher."""
+        if self._closed:
+            self._raise_worker_error()
+            return
+
+        try:
+            self._queue.put_nowait(_EVENT_PUBLISH_STOP)
+        except Full:
+            pass  # The worker will still stop due to the `_closed` flag.
+        self._closed = True
+        self._worker.join(timeout)
+        if self._worker.is_alive():
+            raise TimeoutError("Timed out waiting for Agent event publisher to stop.")
+        self._raise_worker_error()
+
+    def _flush(self, batch: list[TaskEvent]) -> None:
+        """Publish one batch of task events."""
+        try:
+            self._stub.PushTaskEvents(PushTaskEventsRequest(events=batch))
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            with self._error_lock:
+                if self._error is None:
+                    self._error = err
+
+    def _run(self) -> None:
+        """Upload queued events in small batches."""
+        while not self._closed:
+            item = self._queue.get()
+            if item is _EVENT_PUBLISH_STOP:
+                return
+
+            batch = [cast(TaskEvent, item)]
+            deadline = time.monotonic() + _EVENT_PUBLISH_BATCH_WAIT
+            while len(batch) < _EVENT_PUBLISH_BATCH_SIZE:
+                try:
+                    item = self._queue.get(
+                        timeout=max(0.0, deadline - time.monotonic())
+                    )
+                except Empty:
+                    break
+
+                if item is _EVENT_PUBLISH_STOP:
+                    self._flush(batch)
+                    return
+
+                batch.append(cast(TaskEvent, item))
+
+            self._flush(batch)
+
+    def _raise_worker_error(self) -> None:
+        """Raise a background publication failure in the AgentApp thread."""
+        with self._error_lock:
+            error = self._error
+        if error is not None:
+            raise RuntimeError("Failed to publish AgentApp events.") from error
 
 
 class RuntimeAgentSession(AgentSession):
@@ -86,26 +183,8 @@ class RuntimeAgentSession(AgentSession):
 
     @property
     def events(self) -> AgentEvents:
-        """Structured run event API."""
+        """Frontend-visible structured run event API."""
         return self._events
-
-
-class RuntimeAgentEvents(AgentEvents):
-    """AgentEvents implementation backed by Runtime task events."""
-
-    def __init__(self, stub: RuntimeHttpClient) -> None:
-        self._stub = stub
-
-    def emit(self, event: JSONObject) -> None:
-        """Emit one structured run event."""
-        event_type = event.get("type")
-        if not isinstance(event_type, str) or not event_type:
-            raise ValueError("Run event requires a non-empty string 'type' field.")
-        task_event = TaskEvent(
-            event=event_type,
-            data=strict_json_dumps(event, compact=True),
-        )
-        self._stub.PushTaskEvents(PushTaskEventsRequest(events=[task_event]))
 
 
 class RuntimeAgentConnectors(AgentConnectors):
@@ -151,12 +230,14 @@ class RuntimeAgentResponses(AgentResponses):
         task_id: int,
         context: Context,
         start_run_request: StartRunRequest,
+        events: AgentEvents,
     ) -> None:
         self._stub = stub
         self._context = context
         self._run_id = run_id
         self._task_id = task_id
         self._start_run_request = start_run_request
+        self._events = events
 
     def create(self, request: JSONObject) -> JSONObject:
         """Create a model response through a child model task."""
@@ -356,17 +437,9 @@ class RuntimeAgentResponses(AgentResponses):
         return output_item
 
     def push_run_events(self, events: Sequence[JSONObject]) -> None:
-        """Push structured run events for `StreamRunEvents` clients."""
-        if not events:
-            return
-        task_events = [
-            TaskEvent(
-                event=cast(str, event["type"]),
-                data=strict_json_dumps(event, compact=True),
-            )
-            for event in events
-        ]
-        self._stub.PushTaskEvents(PushTaskEventsRequest(events=task_events))
+        """Queue structured run events for `StreamRunEvents` clients."""
+        for event in events:
+            self._events.emit(event)
 
     def append_and_push_run_events(self, events: list[JSONObject]) -> None:
         """Append run events to context and push them to `StreamRunEvents` clients."""
