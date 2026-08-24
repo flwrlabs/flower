@@ -14,11 +14,11 @@
 # ==============================================================================
 """Heartbeat sender."""
 
-
 import random
 import signal
 import threading
 from collections.abc import Callable
+from logging import DEBUG, ERROR
 
 import grpc
 
@@ -28,6 +28,7 @@ from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_RANDOM_RANGE,
 )
+from flwr.common.logger import log
 from flwr.common.retry_invoker import RetryInvoker, exponential
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 
@@ -35,6 +36,7 @@ from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.heartbeat_pb2 import SendAppHeartbeatRequest
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.proto.simulationio_pb2_grpc import SimulationIoStub
+from flwr.supercore.utils import mask_string
 
 # pylint: enable=E0611
 
@@ -145,6 +147,13 @@ def make_app_heartbeat_fn_grpc(
         try:
             res = stub.SendAppHeartbeat(req)
         except grpc.RpcError as e:
+            log(
+                ERROR,
+                "ClientApp heartbeat RPC failed: token=%s status=%s details=%s",
+                mask_string(token),
+                e.code(),
+                e.details(),
+            )
             status_code = e.code()
             if status_code == grpc.StatusCode.UNAVAILABLE:
                 return False
@@ -154,7 +163,14 @@ def make_app_heartbeat_fn_grpc(
 
         # Raise SIGINT to trigger graceful shutdown if heartbeat failed
         if not res.success:
+            log(
+                ERROR,
+                "ClientApp heartbeat rejected by server: token=%s",
+                mask_string(token),
+            )
             signal.raise_signal(signal.SIGINT)
+        else:
+            log(DEBUG, "ClientApp heartbeat acknowledged: token=%s", mask_string(token))
         return True
 
     return fn

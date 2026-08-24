@@ -14,10 +14,14 @@
 # ==============================================================================
 """Simple base Flower SuperExec plugin for app processes."""
 
-
 import os
+import shutil
 import subprocess
 from collections.abc import Sequence
+from logging import DEBUG
+
+from flwr.common.logger import log
+from flwr.supercore.utils import mask_string
 
 from .exec_plugin import ExecPlugin
 
@@ -40,7 +44,16 @@ class BaseExecPlugin(ExecPlugin):
 
     def launch_app(self, token: str, run_id: int) -> None:
         """Launch the application associated with a given run ID and token."""
-        cmds = [self.command, "--insecure"]
+        executable = shutil.which(self.command) or self.command
+        log(
+            DEBUG,
+            "SuperExec launching app: run_id=%s token=%s executable=%s parent_pid=%s",
+            run_id,
+            mask_string(token),
+            executable,
+            os.getpid(),
+        )
+        cmds = [executable, "--insecure"]
         cmds += [self.appio_api_address_arg, self.appio_api_address]
         cmds += ["--token", token]
         cmds += ["--parent-pid", str(os.getpid())]

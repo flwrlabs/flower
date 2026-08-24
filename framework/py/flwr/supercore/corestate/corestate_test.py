@@ -14,13 +14,15 @@
 # ==============================================================================
 """Tests all CoreState implementations have to conform to."""
 
-
 import unittest
 from datetime import timedelta
 from unittest.mock import patch
 
 from flwr.common import now
-from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL
+from flwr.common.constant import (
+    HEARTBEAT_DEFAULT_INTERVAL,
+    HEARTBEAT_INITIAL_GRACE_PERIOD,
+)
 
 from . import CoreState
 
@@ -127,10 +129,11 @@ class StateTest(unittest.TestCase):
         state.acknowledge_app_heartbeat(token2)
 
         # Mock datetime to simulate time passage
-        # token1 should expire in HEARTBEAT_DEFAULT_INTERVAL
+        # token1 should expire in HEARTBEAT_INITIAL_GRACE_PERIOD
         # token2 should expire in HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
         with patch("datetime.datetime") as mock_dt:
-            # Advance time just before token1 expiration
+            # The initial grace period should cover the time before the first
+            # heartbeat, while token2 has already been renewed once.
             mock_dt.now.return_value = created_at + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL - 1
             )
@@ -139,11 +142,10 @@ class StateTest(unittest.TestCase):
             self.assertTrue(state.verify_token(run_id1, token1))
             self.assertTrue(state.verify_token(run_id2, token2))
 
-            # Advance time past token1 expiration
+            # Advance time past the initial token grace period.
             mock_dt.now.return_value = created_at + timedelta(
-                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+                seconds=HEARTBEAT_INITIAL_GRACE_PERIOD + 1
             )
 
-            # Assert: token1 should be cleaned up, token2 should still be valid
+            # Assert: token1 should be cleaned up after its initial grace period.
             self.assertFalse(state.verify_token(run_id1, token1))
-            self.assertTrue(state.verify_token(run_id2, token2))

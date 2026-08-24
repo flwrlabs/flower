@@ -14,10 +14,9 @@
 # ==============================================================================
 """Contextmanager for a gRPC request-response channel to the Flower server."""
 
-
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
-from logging import ERROR
+from logging import DEBUG, ERROR
 from pathlib import Path
 
 import grpc
@@ -176,6 +175,13 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
             log(ERROR, "Node instance missing")
             return False
 
+        log(
+            DEBUG,
+            "SuperNode heartbeat sending: node_id=%s interval_s=%s",
+            node.node_id,
+            HEARTBEAT_DEFAULT_INTERVAL,
+        )
+
         # Construct the heartbeat request
         req = SendNodeHeartbeatRequest(
             node=node, heartbeat_interval=HEARTBEAT_DEFAULT_INTERVAL
@@ -187,19 +193,25 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
                 req, timeout=HEARTBEAT_CALL_TIMEOUT
             )
         except grpc.RpcError as e:
-            status_code = e.code()
-            if status_code == grpc.StatusCode.UNAVAILABLE:
-                return False
-            if status_code == grpc.StatusCode.DEADLINE_EXCEEDED:
-                return False
-            raise
+            log(
+                ERROR,
+                "SuperNode heartbeat RPC failed: node_id=%s status=%s details=%s",
+                node.node_id,
+                e.code(),
+                e.details(),
+            )
+            return False
 
         # Check if success
         if not res.success:
-            raise RuntimeError(
-                "Heartbeat failed unexpectedly. The SuperLink does not "
-                "recognize this SuperNode."
+            log(
+                ERROR,
+                "SuperNode heartbeat rejected: node_id=%s; "
+                "SuperLink does not recognize this SuperNode",
+                node.node_id,
             )
+            return False
+        log(DEBUG, "SuperNode heartbeat acknowledged: node_id=%s", node.node_id)
         return True
 
     heartbeat_sender = HeartbeatSender(send_node_heartbeat)

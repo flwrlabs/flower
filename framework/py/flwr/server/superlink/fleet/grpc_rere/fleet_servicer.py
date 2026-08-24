@@ -14,7 +14,6 @@
 # ==============================================================================
 """Fleet API gRPC request-response servicer."""
 
-
 import threading
 from logging import DEBUG, ERROR, INFO
 
@@ -189,10 +188,18 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         """."""
         log(DEBUG, "[Fleet.SendNodeHeartbeat] Request: %s", MessageToDict(request))
         try:
-            return message_handler.send_node_heartbeat(
+            response = message_handler.send_node_heartbeat(
                 request=request,
                 state=self.state_factory.state(),
             )
+            log(
+                DEBUG,
+                "[Fleet.SendNodeHeartbeat] node_id=%s interval_s=%s success=%s",
+                request.node.node_id,
+                request.heartbeat_interval,
+                response.success,
+            )
+            return response
         except message_handler.InvalidHeartbeatIntervalError:
             # Heartbeat interval is invalid
             log(ERROR, "[Fleet.SendNodeHeartbeat] Invalid heartbeat interval")

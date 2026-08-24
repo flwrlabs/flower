@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower constants."""
 
-
 from __future__ import annotations
 
 import os
@@ -66,6 +65,8 @@ HEARTBEAT_MIN_INTERVAL = 10
 HEARTBEAT_MAX_INTERVAL = 1800  # 30 minutes
 HEARTBEAT_INTERVAL_INF = 1e300  # Large value, disabling heartbeats
 HEARTBEAT_PATIENCE = 2
+# Allow time for a large ClientApp message to start before its first heartbeat.
+HEARTBEAT_INITIAL_GRACE_PERIOD = 120
 RUN_FAILURE_DETAILS_NO_HEARTBEAT = "No heartbeat received from the run."
 
 # IDs

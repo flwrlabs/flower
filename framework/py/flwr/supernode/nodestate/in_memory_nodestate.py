@@ -14,10 +14,9 @@
 # ==============================================================================
 """In-memory NodeState implementation."""
 
-
 from collections.abc import Sequence
 from dataclasses import dataclass
-from logging import ERROR
+from logging import ERROR, WARNING
 from threading import Lock, RLock
 
 from flwr.common import Context, Error, Message, now
@@ -32,6 +31,7 @@ from flwr.common.typing import Run
 from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.object_store import ObjectStore
+from flwr.supercore.utils import mask_string
 
 from .nodestate import NodeState
 
@@ -209,6 +209,13 @@ class InMemoryNodeState(
 
             # Create and store error replies for each message
             for msg in messages_to_reply:
+                log(
+                    WARNING,
+                    "ClientApp timed out: run_id=%s message_id=%s; "
+                    "creating error reply",
+                    msg.metadata.run_id,
+                    mask_string(msg.metadata.message_id),
+                )
                 error_reply = Message(CLIENT_APP_CRASHED_ERROR, reply_to=msg)
 
                 # Insert objects of the error reply into the object store

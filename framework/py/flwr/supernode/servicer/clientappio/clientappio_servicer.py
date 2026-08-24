@@ -14,7 +14,6 @@
 # ==============================================================================
 """ClientAppIo API servicer."""
 
-
 from collections.abc import Callable
 from logging import DEBUG, ERROR
 from typing import cast
@@ -64,6 +63,7 @@ from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
 # pylint: disable=E0601
 from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
+from flwr.supercore.utils import mask_string
 from flwr.supernode.nodestate import NodeStateFactory
 
 
@@ -101,6 +101,7 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
 
         # Get run IDs with pending messages
         run_ids = state.get_run_ids_with_pending_messages()
+        log(DEBUG, "ClientAppIo.ListAppsToLaunch: candidate_run_ids=%s", run_ids)
 
         # Return run IDs
         return ListAppsToLaunchResponse(run_ids=run_ids)
@@ -116,6 +117,13 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
 
         # Attempt to create a token for the provided run ID
         token = state.create_token(request.run_id)
+        log(
+            DEBUG,
+            "ClientAppIo.RequestToken: run_id=%s granted=%s token=%s",
+            request.run_id,
+            token is not None,
+            mask_string(token) if token is not None else "-",
+        )
 
         # Return the token
         return RequestTokenResponse(token=token or "")
@@ -150,11 +158,24 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         # Validate the token
         run_id = state.get_run_id_by_token(request.token)
         if run_id is None or not state.verify_token(run_id, request.token):
+            log(
+                ERROR,
+                "ClientAppIo.PullClientAppInputs rejected: token=%s resolved_run_id=%s",
+                mask_string(request.token),
+                run_id,
+            )
             context.abort(
                 grpc.StatusCode.PERMISSION_DENIED,
                 "Invalid token.",
             )
             raise RuntimeError("This line should never be reached.")
+
+        log(
+            DEBUG,
+            "ClientAppIo.PullClientAppInputs accepted: run_id=%s token=%s",
+            run_id,
+            mask_string(request.token),
+        )
 
         # Retrieve context, run and fab for this run
         context = cast(Context, state.get_context(run_id))
@@ -178,11 +199,19 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
             )
             raise RuntimeError("This line should never be reached.")
 
-        return PullAppInputsResponse(
+        response = PullAppInputsResponse(
             context=context_to_proto(context),
             run=run_to_proto(run),
             fab=fab_to_proto(fab),
         )
+        log(
+            DEBUG,
+            "ClientAppIo.PullClientAppInputs complete: run_id=%s token=%s fab_bytes=%s",
+            run_id,
+            mask_string(request.token),
+            len(content),
+        )
+        return response
 
     def PushClientAppOutputs(
         self, request: PushAppOutputsRequest, context: grpc.ServicerContext
@@ -196,11 +225,25 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         # Validate the token
         run_id = state.get_run_id_by_token(request.token)
         if run_id is None or not state.verify_token(run_id, request.token):
+            log(
+                ERROR,
+                "ClientAppIo.PushClientAppOutputs rejected: token=%s "
+                "resolved_run_id=%s",
+                mask_string(request.token),
+                run_id,
+            )
             context.abort(
                 grpc.StatusCode.PERMISSION_DENIED,
                 "Invalid token.",
             )
             raise RuntimeError("This line should never be reached.")
+
+        log(
+            DEBUG,
+            "ClientAppIo.PushClientAppOutputs accepted: run_id=%s token=%s",
+            run_id,
+            mask_string(request.token),
+        )
 
         # Save the context to the state
         state.store_context(context_from_proto(request.context))
@@ -208,6 +251,13 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         # Remove the token to make the run eligible for processing
         # A run associated with a token cannot be handled until its token is cleared
         state.delete_token(run_id)
+
+        log(
+            DEBUG,
+            "ClientAppIo.PushClientAppOutputs complete: run_id=%s token=%s",
+            run_id,
+            mask_string(request.token),
+        )
 
         return PushAppOutputsResponse()
 
@@ -222,6 +272,12 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         # Validate the token
         run_id = state.get_run_id_by_token(request.token)
         if run_id is None or not state.verify_token(run_id, request.token):
+            log(
+                ERROR,
+                "ClientAppIo.PullMessage rejected: token=%s resolved_run_id=%s",
+                mask_string(request.token),
+                run_id,
+            )
             context.abort(
                 grpc.StatusCode.PERMISSION_DENIED,
                 "Invalid token.",
@@ -230,6 +286,15 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
 
         # Retrieve message for this run
         message = state.get_messages(run_ids=[run_id], is_reply=False)[0]
+        log(
+            DEBUG,
+            "ClientAppIo.PullMessage accepted: run_id=%s token=%s "
+            "message_id=%s type=%s",
+            run_id,
+            mask_string(request.token),
+            mask_string(message.metadata.message_id),
+            message.metadata.message_type,
+        )
 
         # Record message processing start time
         state.record_message_processing_start(message_id=message.metadata.message_id)
@@ -242,6 +307,15 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
 
         # Retrieve the object tree for the message
         object_tree = store.get_object_tree(message.metadata.message_id)
+
+        log(
+            DEBUG,
+            "ClientAppIo.PullMessage complete: run_id=%s message_id=%s "
+            "root_object_id=%s",
+            run_id,
+            mask_string(message.metadata.message_id),
+            mask_string(object_tree.object_id),
+        )
 
         return PullAppMessagesResponse(
             messages_list=[message_to_proto(message)],
@@ -282,12 +356,22 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         self, request: SendAppHeartbeatRequest, context: grpc.ServicerContext
     ) -> SendAppHeartbeatResponse:
         """Handle a heartbeat from an app process."""
-        log(DEBUG, "ClientAppIoServicer.SendAppHeartbeat")
+        log(
+            DEBUG,
+            "ClientAppIo.SendAppHeartbeat received: token=%s",
+            mask_string(request.token),
+        )
         # Initialize state
         state = self.state_factory.state()
 
         # Acknowledge the heartbeat
         success = state.acknowledge_app_heartbeat(request.token)
+        log(
+            DEBUG,
+            "ClientAppIo.SendAppHeartbeat complete: token=%s success=%s",
+            mask_string(request.token),
+            success,
+        )
         return SendAppHeartbeatResponse(success=success)
 
     def PushObject(

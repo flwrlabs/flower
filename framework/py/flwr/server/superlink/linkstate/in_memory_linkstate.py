@@ -14,7 +14,6 @@
 # ==============================================================================
 """In-memory LinkState implementation."""
 
-
 import threading
 from bisect import bisect_right
 from collections import defaultdict
@@ -270,7 +269,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             enqueued_at_ms = now().timestamp() * 1000.0
             self.message_res_store[message_id] = message
             self.message_ins_id_to_message_res_id[msg_ins_id] = message_id
-            self.record_reply_enqueued(message_id=msg_ins_id, enqueued_at_ms=enqueued_at_ms)
+            self.record_reply_enqueued(
+                message_id=msg_ins_id, enqueued_at_ms=enqueued_at_ms
+            )
             # Anchor reply enqueue in SuperLink clock for upstream delivery metrics.
             message.metadata.created_at = enqueued_at_ms / 1000.0
 
@@ -362,9 +363,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     )
                     if metric_record is None:
                         metric_record = MetricRecord()
-                        message_res.content.metric_records[
-                            "_flwr_network_delivery"
-                        ] = metric_record
+                        message_res.content.metric_records["_flwr_network_delivery"] = (
+                            metric_record
+                        )
                     metric_record["downstream_ms"] = downstream_ms
 
         return list(ret.values())
@@ -561,6 +562,14 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         node.last_deactivated_at = datetime.fromtimestamp(
                             node.online_until, tz=timezone.utc
                         ).isoformat()
+                        log(
+                            WARNING,
+                            "SuperNode marked offline: node_id=%s "
+                            "heartbeat_deadline=%s current_time=%s",
+                            node_id,
+                            node.online_until,
+                            current_ts,
+                        )
 
     def get_node_public_key(self, node_id: int) -> bytes:
         """Get `public_key` for the specified `node_id`."""
@@ -849,7 +858,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 raise ValueError(f"Run {run_id} not found")
             self.run_ids[run_id].run.clientapp_runtime += runtime
 
-    def record_instruction_enqueued(self, message_id: str, enqueued_at_ms: float) -> None:
+    def record_instruction_enqueued(
+        self, message_id: str, enqueued_at_ms: float
+    ) -> None:
         """Record when a ServerApp instruction is enqueued at SuperLink."""
         with self.lock:
             timings = self.delivery_timings.setdefault(

@@ -14,8 +14,8 @@
 # ==============================================================================
 """`flwr-clientapp` command."""
 
-
 import argparse
+import os
 from logging import DEBUG, INFO
 
 from flwr.common.args import add_args_flwr_app_common
@@ -52,7 +52,13 @@ def flwr_clientapp() -> None:
         )
         return
 
-    log(INFO, "Start `flwr-clientapp` process")
+    log(
+        INFO,
+        "Start `flwr-clientapp` process: pid=%s parent_pid=%s token=%s",
+        os.getpid(),
+        args.parent_pid if args.parent_pid is not None else "-",
+        mask_string(args.token) if args.token else "-",
+    )
     log(
         DEBUG,
         "`flwr-clientapp` will attempt to connect to SuperNode's "

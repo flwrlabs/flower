@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Tests all LinkState implemenations have to conform to."""
+
 # pylint: disable=invalid-name, too-many-lines, R0904, R0913
 
 
@@ -37,7 +38,7 @@ from flwr.common import (
     now,
 )
 from flwr.common.constant import (
-    HEARTBEAT_DEFAULT_INTERVAL,
+    HEARTBEAT_INITIAL_GRACE_PERIOD,
     RUN_FAILURE_DETAILS_NO_HEARTBEAT,
     SUPERLINK_NODE_ID,
     ErrorCode,
@@ -218,8 +219,8 @@ class StateTest(CoreStateTest):
         state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
 
         # Execute
-        # The run should be marked as failed after HEARTBEAT_DEFAULT_INTERVAL
-        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        # The run should be marked as failed after the initial token grace period.
+        patched_dt = now() + timedelta(seconds=HEARTBEAT_INITIAL_GRACE_PERIOD + 1)
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt
@@ -457,9 +458,7 @@ class StateTest(CoreStateTest):
 
         _ = state.store_message_res(message=msg_res_0)
         state.record_instruction_enqueued(msg_ins_list[0].object_id, 1000.0)
-        state.record_clientapp_delivered(
-            run_id, msg_ins_list[0].object_id, 1100.0
-        )
+        state.record_clientapp_delivered(run_id, msg_ins_list[0].object_id, 1100.0)
         retrieved_msg_res_0 = state.get_message_res(
             message_ids={msg_res_0.metadata.reply_to_message_id}
         )[0]

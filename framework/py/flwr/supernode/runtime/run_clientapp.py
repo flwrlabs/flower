@@ -14,8 +14,8 @@
 # ==============================================================================
 """Flower ClientApp process."""
 
-
 from logging import DEBUG, ERROR, INFO
+from time import perf_counter
 
 import grpc
 
@@ -108,9 +108,22 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
         # Start app heartbeat
         heartbeat_sender = HeartbeatSender(make_app_heartbeat_fn_grpc(stub, token))
         heartbeat_sender.start()
+        log(
+            DEBUG,
+            "[flwr-clientapp] Heartbeat sender started for token %s",
+            mask_string(token),
+        )
 
         # Pull Message, Context, Run and (optional) FAB from SuperNode
+        inputs_start = perf_counter()
         message, context, run, fab = pull_clientappinputs(stub=stub, token=token)
+        log(
+            DEBUG,
+            "[flwr-clientapp] Inputs ready: token=%s message_id=%s elapsed_ms=%.1f",
+            mask_string(token),
+            mask_string(message.metadata.message_id),
+            (perf_counter() - inputs_start) * 1000.0,
+        )
 
         try:
 
@@ -133,7 +146,17 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
             )
 
             # Execute ClientApp
+            handler_start = perf_counter()
             reply_message = client_app(message=message, context=context)
+            log(
+                DEBUG,
+                "[flwr-clientapp] ClientApp handler complete: token=%s "
+                "message_id=%s elapsed_ms=%.1f error=%s",
+                mask_string(token),
+                mask_string(message.metadata.message_id),
+                (perf_counter() - handler_start) * 1000.0,
+                reply_message.has_error(),
+            )
 
         except Exception as ex:  # pylint: disable=broad-exception-caught
             # Don't update/change NodeState
@@ -152,8 +175,16 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
             reply_message = Message(Error(code=e_code, reason=reason), reply_to=message)
 
         # Push Message and Context to SuperNode
+        output_start = perf_counter()
         _ = push_clientappoutputs(
             stub=stub, token=token, message=reply_message, context=context
+        )
+        log(
+            DEBUG,
+            "[flwr-clientapp] Outputs complete: token=%s reply_to=%s elapsed_ms=%.1f",
+            mask_string(token),
+            mask_string(reply_message.metadata.reply_to_message_id),
+            (perf_counter() - output_start) * 1000.0,
         )
 
     except grpc.RpcError as e:
@@ -171,6 +202,7 @@ def pull_clientappinputs(
     """Pull ClientAppInputs from SuperNode."""
     masked_token = mask_string(token)
     log(INFO, "[flwr-clientapp] Pull `ClientAppInputs` for token %s", masked_token)
+    inputs_start = perf_counter()
     try:
         # Pull Context, Run and (optional) FAB
         res: PullAppInputsResponse = stub.PullClientAppInputs(
@@ -179,8 +211,18 @@ def pull_clientappinputs(
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab) if res.fab else None
+        log(
+            DEBUG,
+            "[flwr-clientapp] PullClientAppInputs complete: token=%s run_id=%s "
+            "fab_bytes=%s elapsed_ms=%.1f",
+            masked_token,
+            context.run_id,
+            len(fab.content) if fab else 0,
+            (perf_counter() - inputs_start) * 1000.0,
+        )
 
         # Pull and inflate the message
+        message_start = perf_counter()
         pull_msg_res: PullAppMessagesResponse = stub.PullMessage(
             PullAppMessagesRequest(token=token)
         )
@@ -194,6 +236,15 @@ def pull_clientappinputs(
                 stub.ConfirmMessageReceived, node, run_id
             ),
             return_type=Message,
+        )
+        log(
+            DEBUG,
+            "[flwr-clientapp] PullMessage and inflate complete: token=%s run_id=%s "
+            "message_id=%s elapsed_ms=%.1f",
+            masked_token,
+            run_id,
+            mask_string(object_tree.object_id),
+            (perf_counter() - message_start) * 1000.0,
         )
 
         # Set the message ID
@@ -211,6 +262,7 @@ def push_clientappoutputs(
     """Push ClientAppOutputs to SuperNode."""
     masked_token = mask_string(token)
     log(INFO, "[flwr-clientapp] Push `ClientAppOutputs` for token %s", masked_token)
+    output_start = perf_counter()
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
     proto_message = message_to_proto(remove_content_from_message(message))
@@ -232,6 +284,15 @@ def push_clientappoutputs(
                 )
             )
             del proto_message
+            log(
+                DEBUG,
+                "[flwr-clientapp] PushMessage complete: token=%s reply_to=%s "
+                "objects_to_push=%s elapsed_ms=%.1f",
+                masked_token,
+                mask_string(message.metadata.reply_to_message_id),
+                len(push_msg_res.objects_to_push),
+                (perf_counter() - output_start) * 1000.0,
+            )
 
             # Retrieve the object IDs to push
             object_ids_to_push = set(push_msg_res.objects_to_push)
@@ -252,6 +313,12 @@ def push_clientappoutputs(
         # Push Context
         res: PushAppOutputsResponse = stub.PushClientAppOutputs(
             PushAppOutputsRequest(token=token, context=proto_context)
+        )
+        log(
+            DEBUG,
+            "[flwr-clientapp] PushClientAppOutputs complete: token=%s elapsed_ms=%.1f",
+            masked_token,
+            (perf_counter() - output_start) * 1000.0,
         )
         return res
     except grpc.RpcError as e:

@@ -14,7 +14,6 @@
 # ==============================================================================
 """SQLite based implemenation of the link state."""
 
-
 # pylint: disable=too-many-lines
 
 import json
@@ -599,9 +598,9 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
                     )
                     if metric_record is None:
                         metric_record = MetricRecord()
-                        message_res.content.metric_records[
-                            "_flwr_network_delivery"
-                        ] = metric_record
+                        message_res.content.metric_records["_flwr_network_delivery"] = (
+                            metric_record
+                        )
                     metric_record["downstream_ms"] = downstream_ms
             message_res_ids = [
                 message_res.metadata.message_id for message_res in ret.values()
@@ -854,6 +853,27 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
 
     def _check_and_tag_offline_nodes(self, node_ids: list[int] | None = None) -> None:
         """Check and tag offline nodes."""
+        current_ts = now().timestamp()
+        select_query = """
+            SELECT node_id, online_until FROM node
+            WHERE online_until <= ? AND status == ?
+        """
+        select_params: list[Any] = [current_ts, NodeStatus.ONLINE]
+        if node_ids is not None:
+            placeholders = ",".join(["?"] * len(node_ids))
+            select_query += f" AND node_id IN ({placeholders})"
+            select_params.extend(uint64_to_int64(node_id) for node_id in node_ids)
+        offline_nodes = self.conn.execute(select_query, select_params).fetchall()
+        for row in offline_nodes:
+            log(
+                WARNING,
+                "SuperNode marked offline: node_id=%s "
+                "heartbeat_deadline=%s current_time=%s",
+                int64_to_uint64(row["node_id"]),
+                row["online_until"],
+                current_ts,
+            )
+
         # strftime will convert POSIX timestamp to ISO format
         query = """
             UPDATE node SET status = ?,
@@ -863,7 +883,7 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
         """
         params = [
             NodeStatus.OFFLINE,
-            now().timestamp(),
+            current_ts,
             NodeStatus.ONLINE,
         ]
         if node_ids is not None:
@@ -1377,7 +1397,9 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
             if not rows:
                 raise ValueError(f"Run {run_id} not found")
 
-    def record_instruction_enqueued(self, message_id: str, enqueued_at_ms: float) -> None:
+    def record_instruction_enqueued(
+        self, message_id: str, enqueued_at_ms: float
+    ) -> None:
         """Record when a ServerApp instruction is enqueued at SuperLink."""
         self._set_delivery_timing(message_id, "ins_enqueued_at_ms", enqueued_at_ms)
 
