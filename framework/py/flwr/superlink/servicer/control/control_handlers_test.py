@@ -216,6 +216,7 @@ class TestControlHandlers(unittest.TestCase):
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
             [("@flwr/demo", fab_hash, TaskType.AGENT_APP)],
         )
+        self.assertTrue(apps[0].is_hub_app)
         self.assertEqual(
             self.state.get_app(NOOP_FEDERATION_ID, "@flwr/demo", fab_hash),
             Fab(fab_hash, fab_content, verification_dict),

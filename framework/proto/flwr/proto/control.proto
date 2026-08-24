@@ -306,6 +306,7 @@ message AppInfo {
   string app_id = 1;
   string fab_hash = 2;
   string app_type = 3;
+  bool is_hub_app = 4;
 }
 message ListAppsRequest {
   string federation_id = 1;

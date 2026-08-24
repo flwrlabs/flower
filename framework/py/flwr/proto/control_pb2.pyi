@@ -875,17 +875,20 @@ class AppInfo(google.protobuf.message.Message):
     APP_ID_FIELD_NUMBER: builtins.int
     FAB_HASH_FIELD_NUMBER: builtins.int
     APP_TYPE_FIELD_NUMBER: builtins.int
+    IS_HUB_APP_FIELD_NUMBER: builtins.int
     app_id: builtins.str
     fab_hash: builtins.str
     app_type: builtins.str
+    is_hub_app: builtins.bool
     def __init__(
         self,
         *,
         app_id: builtins.str = ...,
         fab_hash: builtins.str = ...,
         app_type: builtins.str = ...,
+        is_hub_app: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["app_id", b"app_id", "app_type", b"app_type", "fab_hash", b"fab_hash"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["app_id", b"app_id", "app_type", b"app_type", "fab_hash", b"fab_hash", "is_hub_app", b"is_hub_app"]) -> None: ...
 
 global___AppInfo = AppInfo
 

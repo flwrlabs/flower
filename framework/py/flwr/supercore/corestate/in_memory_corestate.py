@@ -100,6 +100,7 @@ class FederationAppRecord:
     app_id: str
     fab_hash: str
     app_type: str
+    is_hub_app: bool
     added_by: str
     added_at: datetime
 
@@ -335,6 +336,7 @@ class InMemoryCoreState(
         app_id: str,
         app_type: str,
         added_by: str,
+        is_hub_app: bool = False,
     ) -> str:
         """Atomically store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
@@ -361,6 +363,7 @@ class InMemoryCoreState(
                 app_id=app_id,
                 fab_hash=fab_hash,
                 app_type=app_type,
+                is_hub_app=is_hub_app,
                 added_by=existing.added_by if existing else added_by,
                 added_at=existing.added_at if existing else now(),
             )
@@ -418,6 +421,7 @@ class InMemoryCoreState(
                     app_id=record.app_id,
                     fab_hash=record.fab_hash,
                     app_type=record.app_type,
+                    is_hub_app=record.is_hub_app,
                 )
                 for record in records
             ]
