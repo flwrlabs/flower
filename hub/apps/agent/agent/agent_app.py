@@ -31,6 +31,8 @@ def main(agent: AgentSession, context: Context) -> None:
     output_text = []
     for event in stream:
         agent.events.emit(event.to_dict())
+        if event.type in {"error", "response.failed"}:
+            raise RuntimeError(f"Model response failed: {event}")
         if event.type == "response.output_text.delta":
             output_text.append(event.delta)
 
