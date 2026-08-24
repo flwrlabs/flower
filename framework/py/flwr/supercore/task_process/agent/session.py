@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Sequence
-from queue import Empty, Queue
+from queue import Empty, Full, Queue
 from threading import Lock, Thread
 from typing import Literal, cast
 
@@ -106,8 +106,11 @@ class RuntimeAgentEvents(AgentEvents):
             self._raise_worker_error()
             return
 
+        try:
+            self._queue.put_nowait(_EVENT_PUBLISH_STOP)
+        except Full:
+            pass  # The worker will still stop due to the `_closed` flag.
         self._closed = True
-        self._queue.put_nowait(_EVENT_PUBLISH_STOP)
         self._worker.join(timeout)
         if self._worker.is_alive():
             raise TimeoutError("Timed out waiting for Agent event publisher to stop.")
@@ -124,7 +127,7 @@ class RuntimeAgentEvents(AgentEvents):
 
     def _run(self) -> None:
         """Upload queued events in small batches."""
-        while True:
+        while not self._closed:
             item = self._queue.get()
             if item is _EVENT_PUBLISH_STOP:
                 return
