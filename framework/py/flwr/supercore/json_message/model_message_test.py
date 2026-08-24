@@ -116,10 +116,9 @@ def test_model_messages_create_payloads() -> None:
 
 def test_model_request_accepts_string_input_and_default_stream() -> None:
     """Model requests should accept simple string prompts."""
-    request = ModelRequest(
+    request = ModelRequest.from_payload(
         dst_task_id=123,
-        input_="Hello",
-        model="gpt-5",
+        payload={"input": "Hello", "model": "gpt-5"},
     )
 
     assert request.payload == {
