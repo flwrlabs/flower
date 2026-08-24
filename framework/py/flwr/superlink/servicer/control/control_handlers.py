@@ -725,10 +725,12 @@ def stream_run_events(
         state, account.flwr_aid, run.federation_id
     )
 
-    primary_tasks = state.get_tasks(task_ids=[cast(int, run.primary_task_id)])
-    agentapp_controls_events = bool(
-        primary_tasks and primary_tasks[0].type == TaskType.AGENT_APP
-    )
+    agentapp_controls_events = False
+    if run.primary_task_id is not None:
+        primary_tasks = state.get_tasks(task_ids=[run.primary_task_id])
+        agentapp_controls_events = bool(
+            primary_tasks and primary_tasks[0].type == TaskType.AGENT_APP
+        )
 
     after_task_event_id = None
     if request.HasField("after_task_event_id"):

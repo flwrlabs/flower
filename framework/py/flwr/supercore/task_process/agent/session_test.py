@@ -15,7 +15,8 @@
 """Runtime AgentApp session tests."""
 
 
-from unittest.mock import Mock, patch
+from queue import Full
+from unittest.mock import Mock, call, patch
 
 import pytest
 
@@ -49,15 +50,24 @@ def test_emit_event_pushes_task_event() -> None:
     """Emit should translate a structured run event to the Runtime API."""
     stub = Mock()
     events = RuntimeAgentEvents(stub)
+    event: JSONObject = {
+        "type": "response.output_text.delta",
+        "content": {"delta": "Hello"},
+    }
 
-    events.emit({"type": "response.output_text.delta", "delta": "Hello"})
+    events.emit(event)
+    content = event["content"]
+    assert isinstance(content, dict)
+    content["delta"] = "Changed"
     events.close()
 
-    event = TaskEvent(
+    expected_event = TaskEvent(
         event="response.output_text.delta",
-        data=('{"type":"response.output_text.delta","delta":"Hello"}'),
+        data=('{"type":"response.output_text.delta","content":{"delta":"Hello"}}'),
     )
-    stub.PushTaskEvents.assert_called_once_with(PushTaskEventsRequest(events=[event]))
+    stub.PushTaskEvents.assert_called_once_with(
+        PushTaskEventsRequest(events=[expected_event])
+    )
 
 
 def test_emit_event_requires_type() -> None:
@@ -74,6 +84,49 @@ def test_emit_event_requires_type() -> None:
     stub.PushTaskEvents.assert_not_called()
 
 
+def test_emit_event_fails_when_publish_queue_is_full() -> None:
+    """Emit should fail instead of blocking when the publish queue is full."""
+    events = RuntimeAgentEvents(Mock())
+
+    with (
+        patch.object(
+            events._queue,  # pylint: disable=protected-access
+            "put_nowait",
+            side_effect=Full,
+        ),
+        pytest.raises(RuntimeError, match="Agent event publish queue is full"),
+    ):
+        events.emit({"type": "response.output_text.delta", "delta": "Hello"})
+    events.close()
+
+
+def test_agent_events_and_connector_events_use_same_publisher() -> None:
+    """Publish explicit and built-in AgentApp events through one publisher."""
+    stub = Mock()
+    events = Mock()
+    responses = RuntimeAgentResponses(
+        stub=stub,
+        run_id=123,
+        task_id=789,
+        context=Mock(),
+        start_run_request=StartRunRequest(),
+        events=events,
+    )
+    model_event: JSONObject = {
+        "type": "response.output_text.delta",
+        "delta": "Hello",
+    }
+    connector_event: JSONObject = {"type": "response.tool_call.started"}
+
+    events.emit(model_event)
+    responses.push_run_events([connector_event])
+
+    assert events.emit.call_args_list == [
+        call(model_event),
+        call(connector_event),
+    ]
+
+
 def test_pull_task_messages_filters_by_child_task() -> None:
     """Claim only messages sent by the expected child task."""
     stub = Mock()
@@ -84,6 +137,7 @@ def test_pull_task_messages_filters_by_child_task() -> None:
         task_id=789,
         context=Mock(),
         start_run_request=StartRunRequest(),
+        events=Mock(),
     )
 
     assert responses._pull_task_messages(456) == []  # pylint: disable=W0212
@@ -142,6 +196,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         task_id=789,
         context=Mock(),
         start_run_request=start_run_request,
+        events=Mock(),
     )
     arguments: JSONObject = {
         "input": "Do work",
@@ -184,6 +239,7 @@ def test_create_connector_response_resolves_canonical_name() -> None:
         task_id=789,
         context=Mock(),
         start_run_request=StartRunRequest(),
+        events=Mock(),
     )
     reply = ConnectorResponse(
         dst_task_id=789,
