@@ -14,19 +14,24 @@
 # ==============================================================================
 """SuperLink FastAPI extension hooks."""
 
-
 from collections.abc import Callable, Mapping
 from contextlib import AbstractAsyncContextManager
+from copy import deepcopy
 from importlib import import_module
+from logging import WARNING
 from types import ModuleType
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from fastapi import FastAPI
 from starlette.middleware import Middleware
 
+from flwr.common.logger import log
+from flwr.supercore.run import Run
+
 SuperLinkLifespanContext = Callable[
     [FastAPI], AbstractAsyncContextManager[Mapping[str, Any] | None]
 ]
+RunStartSource = Literal["cli", "web_ui", "automation", "unknown"]
 _SGXT_MODULE = "flwr.ee.superlink.extensions"
 
 
@@ -87,3 +92,32 @@ def get_lifespan_contexts() -> tuple[SuperLinkLifespanContext, ...]:
     if get_sgxt_lifespan_contexts is None:
         return ()
     return get_sgxt_lifespan_contexts()
+
+
+def notify_run_started(run: Run, source: RunStartSource) -> None:
+    """Notify an optional extension after a run has been persisted.
+
+    The callback is synchronous by design. Extensions must keep this hook
+    non-blocking and best effort; the Flower framework does not create a
+    background thread or event loop for it. The run snapshot is copied before
+    handing it to the extension so the callback cannot mutate the object used
+    to build the successful StartRun response.
+    """
+    try:
+        sgxt = _try_import_sgxt()
+        if sgxt is None:
+            return
+
+        on_run_started = cast(
+            Callable[[Run, RunStartSource], None] | None,
+            getattr(sgxt, "on_run_started", None),
+        )
+        if on_run_started is not None:
+            on_run_started(deepcopy(run), source)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        log(
+            WARNING,
+            "Run-start extension notification failed: %s.",
+            type(exc).__name__,
+            exc_info=exc,
+        )
