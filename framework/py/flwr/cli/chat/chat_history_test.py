@@ -127,5 +127,5 @@ def test_history_ignores_cancelled_selection() -> None:
         )
 
     assert chat.series_id is None
-    assert chat.transcript == []
+    assert not chat.transcript
     assert not chat.history_loading
