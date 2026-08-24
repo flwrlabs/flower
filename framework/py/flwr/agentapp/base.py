@@ -79,7 +79,7 @@ class AgentSession(ABC):
     @property
     @abstractmethod
     def events(self) -> AgentEvents:
-        """Structured run event API."""
+        """Frontend-visible structured run event API."""
 
 
 AgentAppCallable = Callable[[AgentSession, Context], None]
