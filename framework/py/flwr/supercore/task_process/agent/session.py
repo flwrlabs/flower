@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Sequence
-from queue import Empty, Full, Queue
+from queue import Empty, Queue
 from threading import Lock, Thread
 from typing import Literal, cast
 
@@ -68,7 +68,7 @@ _EVENT_PUBLISH_STOP = object()
 
 
 class RuntimeAgentEvents(AgentEvents):
-    """Publish AgentApp-selected events without blocking response iteration."""
+    """Publish AgentApp-selected events through a background worker."""
 
     def __init__(self, stub: RuntimeHttpClient) -> None:
         self._stub = stub
@@ -97,10 +97,7 @@ class RuntimeAgentEvents(AgentEvents):
             event=event_type,
             data=strict_json_dumps(event, compact=True),
         )
-        try:
-            self._queue.put_nowait(task_event)
-        except Full as exc:
-            raise RuntimeError("Agent event publish queue is full.") from exc
+        self._queue.put(task_event)
         self._raise_worker_error()
 
     def close(self, timeout: float | None = None) -> None:

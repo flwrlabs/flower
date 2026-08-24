@@ -15,7 +15,6 @@
 """Runtime AgentApp session tests."""
 
 
-from queue import Full
 from unittest.mock import Mock, call, patch
 
 import pytest
@@ -82,22 +81,6 @@ def test_emit_event_requires_type() -> None:
     events.close()
 
     stub.PushTaskEvents.assert_not_called()
-
-
-def test_emit_event_fails_when_publish_queue_is_full() -> None:
-    """Emit should fail instead of blocking when the publish queue is full."""
-    events = RuntimeAgentEvents(Mock())
-
-    with (
-        patch.object(
-            events._queue,  # pylint: disable=protected-access
-            "put_nowait",
-            side_effect=Full,
-        ),
-        pytest.raises(RuntimeError, match="Agent event publish queue is full"),
-    ):
-        events.emit({"type": "response.output_text.delta", "delta": "Hello"})
-    events.close()
 
 
 def test_agent_events_and_connector_events_use_same_publisher() -> None:
