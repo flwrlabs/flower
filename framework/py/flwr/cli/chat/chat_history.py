@@ -46,7 +46,10 @@ class HistoryBlock:
 def load_history(stub: ControlStub, federation: str) -> HistoryBlock | None:
     """Load chronological conversation history for a federation."""
     with flwr_cli_grpc_exc_handler():
-        response = stub.ListRunSeries(ListRunSeriesRequest(federation_id=federation))
+        response = stub.ListRunSeries(
+            ListRunSeriesRequest(federation_id=federation, is_agent=True)
+        )
+    # Reverse entries to list them from newest to oldest
     entries = list(reversed(response.entries))
     if not entries:
         return None

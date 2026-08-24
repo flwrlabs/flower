@@ -103,8 +103,8 @@ from flwr.supercore.typing import JSONObject
 
 from ..auth_plugin import CliAuthPlugin, OidcCliPlugin
 from ..utils import flwr_cli_grpc_exc_handler
-from .chat_commands import HistoryBlock, load_conversation, load_history, render_history
 from .chat_federation import complete_federations, select_federation
+from .chat_history import HistoryBlock, load_conversation, load_history, render_history
 from .chat_transcript import MarkdownBlock, render_markdown
 
 
@@ -279,7 +279,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         @key_bindings.add("enter")
         def _submit_prompt(event: KeyPressEvent) -> None:
             if self.history_block is not None:
-                self._confirm_history_selection()
+                event.app.create_background_task(self._confirm_history_selection())
                 return
             self._submit_prompt(event)
 
@@ -468,7 +468,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             self._clear_transcript()
             return True
         if command == CHAT_HISTORY_COMMAND:
-            self._show_history()
+            event.app.create_background_task(self._show_history())
             return True
         if command == CHAT_FEDERATION_COMMAND or command.startswith(
             f"{CHAT_FEDERATION_COMMAND} "
@@ -503,10 +503,10 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self._clear_transcript()
         return True
 
-    def _show_history(self) -> None:
+    async def _show_history(self) -> None:
         """Show conversation history for the active federation."""
         try:
-            block = load_history(self.stub, self.federation)
+            block = await asyncio.to_thread(load_history, self.stub, self.federation)
         except click.ClickException as exc:
             self._append_transcript("class:error", f"Error: {exc.format_message()}\n\n")
             return
@@ -532,13 +532,15 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.transcript_revision += 1
         self.application.invalidate()
 
-    def _confirm_history_selection(self) -> None:
-        """Restore and continue the highlighted conversation."""
+    async def _confirm_history_selection(self) -> None:
+        """Restore the conversation without changing the selected agent."""
         if self.history_block is None:
             return
         entry = self.history_block.entries[self.history_block.selected_index]
         try:
-            messages = load_conversation(self.stub, entry, self.federation)
+            messages = await asyncio.to_thread(
+                load_conversation, self.stub, entry, self.federation
+            )
         except click.ClickException as exc:
             self._close_history_selection()
             self._append_transcript("class:error", f"Error: {exc.format_message()}\n\n")
