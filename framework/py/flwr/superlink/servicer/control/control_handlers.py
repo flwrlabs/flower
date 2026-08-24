@@ -164,6 +164,7 @@ from flwr.supercore.utils import (
     resolve_account_ids,
     strict_json_dumps,
 )
+from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
@@ -466,6 +467,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     account: AccountInfo,
     state: LinkState,
     fleet_api_type: str | None,
+    source: extensions.RunStartSource = "unknown",
 ) -> StartRunResponse:
     """Create run ID."""
     log(INFO, "ControlServicer.StartRun")
@@ -651,9 +653,11 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
     log_msg = f"Created run {run_id} in federation {run.federation_id}"
     log(INFO, log_msg)
-    return StartRunResponse(
+    response = StartRunResponse(
         run_id=run_id, note=note, series_id=series_id, federation=run.federation_id
     )
+    extensions.notify_run_started(run, source)
+    return response
 
 
 def stream_logs(
@@ -901,6 +905,7 @@ def dispatch_automation(
             AccountInfo(flwr_aid=flwr_aid, account_name=""),
             state,
             None,
+            source="automation",
         )
     except Exception as exc:  # pylint: disable=broad-exception-caught
         state.finish_automation(
