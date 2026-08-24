@@ -119,7 +119,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
 
         if agent_events is not None:
             try:
-                agent_events.close()
+                agent_events.close(1)
             except Exception as err:  # pylint: disable=broad-exception-caught
                 log(ERROR, "Failed to close AgentApp event publisher", exc_info=err)
 
