@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from logging import ERROR
 from typing import Annotated, cast
 
+from anyio import CancelScope
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
@@ -65,7 +66,6 @@ _TERMINAL_EVENTS = frozenset(
     {"error", "response.completed", "response.failed", "response.incomplete"}
 )
 _POLL_INTERVAL = 0.25
-_TERMINAL_EVENT_GRACE = 1.0
 _DEFAULT_MODEL_RESPONSE_TIMEOUT = 300.0
 _DEFAULT_MODEL_TASK_LAUNCH_TIMEOUT = 300.0
 _MODEL_TASK_LAUNCH_TIMEOUT_ENV = "FLWR_MODEL_TASK_LAUNCH_TIMEOUT"
@@ -77,7 +77,6 @@ class _Exchange:
 
     agent_task_id: int
     model_task_id: int
-    run_id: int
 
 
 class _ResponsesError(Exception):
@@ -100,13 +99,13 @@ async def create_runtime_response(
         task = await run_in_threadpool(_authenticate, request, state)
         payload = await _read_request_payload(request)
         model_request = _model_request_from_payload(payload)
-        exchange = await run_in_threadpool(_start_exchange, state, task, model_request)
         if model_request.payload.get("stream") is True:
             return StreamingResponse(
-                _stream_response(state, exchange),
+                _stream_response(state, task, model_request),
                 media_type="text/event-stream",
                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
             )
+        exchange = await run_in_threadpool(_start_exchange, state, task, model_request)
         response = await _wait_for_response(request, state, exchange)
     except _ResponsesError as err:
         return _error_response(err)
@@ -208,7 +207,6 @@ def _start_exchange(
     return _Exchange(
         agent_task_id=task.task_id,
         model_task_id=model_task_id,
-        run_id=task.run_id,
     )
 
 
@@ -247,20 +245,30 @@ async def _wait_for_response(
             )
 
 
-async def _stream_response(state: LinkState, exchange: _Exchange) -> AsyncIterator[str]:
-    """Relay correlated child-task events as Server-Sent Events."""
-    started_at = time.monotonic()
-    launch_deadline = started_at + _model_task_launch_timeout()
-    response_deadline = started_at + _DEFAULT_MODEL_RESPONSE_TIMEOUT
+async def _stream_response(
+    state: LinkState, task: Task, model_request: ModelRequest
+) -> AsyncIterator[str]:
+    """Create an exchange and relay its events as Server-Sent Events."""
     cursor: int | None = None
     complete = False
-    response: JSONObject | None = None
-    terminal_event_deadline: float | None = None
+    sequence_number = 0
+    exchange: _Exchange | None = None
     try:
+        exchange = await run_in_threadpool(_start_exchange, state, task, model_request)
+        started_at = time.monotonic()
+        launch_deadline = started_at + _model_task_launch_timeout()
+        response_deadline = started_at + _DEFAULT_MODEL_RESPONSE_TIMEOUT
         while True:
+            # The model task stores all stream events before its final reply.
+            response = await run_in_threadpool(
+                _claim_response_or_raise_for_model_task_state,
+                state,
+                exchange,
+                launch_deadline,
+                response_deadline,
+            )
             events = await run_in_threadpool(
                 state.get_task_events,
-                run_id=exchange.run_id,
                 task_ids=[exchange.model_task_id],
                 after_task_event_id=cursor,
             )
@@ -278,26 +286,9 @@ async def _stream_response(state: LinkState, exchange: _Exchange) -> AsyncIterat
                     yield _sse_frame(event)
                     return
                 yield _sse_frame(event)
+                sequence_number += 1
 
-            if response is None:
-                response = await run_in_threadpool(
-                    _claim_response_or_raise_for_model_task_state,
-                    state,
-                    exchange,
-                    launch_deadline,
-                    response_deadline,
-                )
-                if response is not None:
-                    terminal_event_deadline = min(
-                        response_deadline,
-                        time.monotonic() + _TERMINAL_EVENT_GRACE,
-                    )
-
-            if (
-                response is not None
-                and terminal_event_deadline is not None
-                and time.monotonic() >= terminal_event_deadline
-            ):
+            if response is not None:
                 complete = True
                 yield _stream_error(
                     (
@@ -306,20 +297,22 @@ async def _stream_response(state: LinkState, exchange: _Exchange) -> AsyncIterat
                         else "Model stream ended before a terminal event."
                     ),
                     "model_stream_failed",
+                    sequence_number,
                 )
                 return
 
             await asyncio.sleep(_POLL_INTERVAL)
     except _ResponsesError as err:
-        yield _stream_error(err.message, err.code)
+        yield _stream_error(err.message, err.code, sequence_number)
     except Exception as err:  # pylint: disable=broad-exception-caught
         log(ERROR, "Runtime Responses stream failed unexpectedly", exc_info=err)
-        yield _stream_error("Internal server error.", "internal_error")
+        yield _stream_error("Internal server error.", "internal_error", sequence_number)
     finally:
-        if not complete:
-            await run_in_threadpool(
-                _stop_model_task, state, exchange, "Responses stream ended early."
-            )
+        if exchange is not None and not complete:
+            with CancelScope(shield=True):
+                await run_in_threadpool(
+                    _stop_model_task, state, exchange, "Responses stream ended early."
+                )
 
 
 async def _wait_for_terminal_reply(
@@ -444,14 +437,26 @@ def _stop_model_task(state: LinkState, exchange: _Exchange, details: str) -> Non
 
 def _sse_frame(event: TaskEvent) -> str:
     """Encode one stored task event as an SSE frame."""
-    return f"event: {event.event}\ndata: {event.data}\n\n"
+    if "\r" in event.event or "\n" in event.event:
+        raise _ResponsesError(
+            502,
+            "Model stream returned an invalid event name.",
+            "invalid_model_event",
+        )
+    data_fields = "".join(
+        f"data: {line}\n" for line in (event.data.splitlines() or [""])
+    )
+    return f"event: {event.event}\n{data_fields}\n"
 
 
-def _stream_error(message: str, code: str) -> str:
+def _stream_error(message: str, code: str, sequence_number: int) -> str:
     """Encode a terminal Responses error event."""
     data: JSONObject = {
         "type": "error",
-        "error": {"type": "server_error", "code": code, "message": message},
+        "code": code,
+        "message": message,
+        "param": None,
+        "sequence_number": sequence_number,
     }
     return f"event: error\ndata: {strict_json_dumps(data, compact=True)}\n\n"
 
