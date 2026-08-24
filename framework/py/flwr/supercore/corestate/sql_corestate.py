@@ -548,6 +548,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
                 for app in apps
             ]
+
     def delete_app(self, federation_id: str, app_id: str) -> bool:
         """Delete one federation-app association; its FAB remains in state."""
         if not federation_id or not app_id:
