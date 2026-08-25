@@ -10,6 +10,18 @@ Open the [Flower Hub app catalog](https://flower.ai/apps) and select
 **AgentApps** to browse agents. Open an AgentApp to review its description,
 source code, available versions, and app spec before running it.
 
+### Add an AgentApp to a federation
+
+Sign in, then select the **Add app to federation** button on an AgentApp card.
+Choose one of your active federations in the dialog and select **Confirm**.
+
+Open that federation from the Flower Agent sidebar and select **New chat**.
+The AgentApp is now available in the agent selector above the prompt. Review
+its description and source before confirming that you want to make it
+available in the federation.
+
+### Run an AgentApp from the terminal
+
 Use the publisher and project name from the app spec:
 
 ```console
