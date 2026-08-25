@@ -25,7 +25,7 @@ available in the federation.
 Use the publisher and project name from the app spec:
 
 ```console
-$ uvx --from flwr==1.34.0 flwr run @publisher/agent-name supergrid \
+$ uvx --from flwr==1.35.0 flwr run @publisher/agent-name supergrid \
     --run-config 'agent.input="What can you help me with?"' \
     --stream
 ```
@@ -37,7 +37,7 @@ inspect logs, and stop a run.
 
 Start with a working project from [Write your first
 AgentApp](../tutorials/write-your-first-agentapp.md). This guide targets Flower
-1.34.0.
+1.35.0.
 
 ### Prepare the project
 
@@ -53,7 +53,7 @@ license = "Apache-2.0"
 [tool.flwr.app]
 publisher = "your-username"
 display-name = "Hello Agent"
-flwr-version-target = "1.34.0"
+flwr-version-target = "1.35.0"
 
 [tool.flwr.app.components]
 agentapp = "hello_agent.agent_app:app"
