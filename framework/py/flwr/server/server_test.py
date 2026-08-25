@@ -15,6 +15,7 @@
 """Flower server tests."""
 
 
+from typing import cast
 from unittest.mock import Mock
 
 import numpy as np
@@ -52,6 +53,8 @@ from flwr.common.fl_event import (
 )
 from flwr.server.client_manager import SimpleClientManager
 from flwr.server.strategy import FedAvg
+from flwr.supercore.typing import JSONObject
+from flwr.supercore.utils import strict_json_loads
 
 from .client_proxy import ClientProxy
 from .server import Server, evaluate_clients, fit_clients
@@ -147,14 +150,6 @@ class EventClient(SuccessClient):
         )
 
 
-class FailingFitClient(EventClient):
-    """Client that fails during fit for event tests."""
-
-    def fit(self, ins: FitIns, timeout: float | None, group_id: int | None) -> FitRes:
-        """Raise an exception to simulate a fit failure."""
-        raise RuntimeError("fit failed")
-
-
 class FailingAggregateStrategy(FedAvg):
     """Strategy that raises during aggregation for event tests."""
 
@@ -166,6 +161,19 @@ class FailingAggregateStrategy(FedAvg):
     ) -> tuple[Parameters | None, dict[str, Scalar]]:
         """Raise an exception to simulate an aggregation failure."""
         raise RuntimeError("aggregate failed")
+
+
+class NumpyLossStrategy(FedAvg):
+    """Strategy that returns a NumPy scalar loss for event tests."""
+
+    def aggregate_evaluate(
+        self,
+        server_round: int,
+        results: list[tuple[ClientProxy, EvaluateRes]],
+        failures: list[tuple[ClientProxy, EvaluateRes] | BaseException],
+    ) -> tuple[float | None, dict[str, Scalar]]:
+        """Return a NumPy scalar loss."""
+        return np.float64(0.5), {}
 
 
 def test_fit_emits_lifecycle_events() -> None:
@@ -244,6 +252,27 @@ def test_fit_continues_when_event_delivery_fails() -> None:
     history, _ = server.fit(num_rounds=1, timeout=None)
 
     assert history is not None
+
+
+def test_evaluate_event_serializes_numpy_loss() -> None:
+    """Test a NumPy loss is converted before event JSON serialization."""
+    client_manager = SimpleClientManager()
+    client_manager.register(EventClient("1"))
+    callback = Mock()
+    server = Server(
+        client_manager=client_manager,
+        strategy=NumpyLossStrategy(
+            min_fit_clients=1, min_evaluate_clients=1, min_available_clients=1
+        ),
+        event_callback=callback,
+    )
+
+    server.evaluate_round(server_round=1, timeout=None)
+
+    event_data = cast(
+        JSONObject, strict_json_loads(callback.call_args_list[-1].args[0].data)
+    )
+    assert event_data["loss"] == 0.5
 
 
 def test_fit_clients() -> None:

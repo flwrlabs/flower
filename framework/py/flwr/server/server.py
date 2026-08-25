@@ -288,7 +288,7 @@ class Server:
                 "num_failures": len(failures),
             }
             if loss_aggregated is not None:
-                evaluate_metadata["loss"] = loss_aggregated
+                evaluate_metadata["loss"] = float(loss_aggregated)
             self._emit_event(
                 FL_ROUND_EVALUATE_COMPLETED,
                 server_round=server_round,
