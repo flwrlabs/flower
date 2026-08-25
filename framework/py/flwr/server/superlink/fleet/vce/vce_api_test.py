@@ -33,7 +33,7 @@ from flwr.clientapp.client_app import LoadClientAppError
 from flwr.common import Config, GetPropertiesIns, MessageTypeLegacy, Scalar
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.compat.common.recorddict_compat import getpropertiesins_to_recorddict
-from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.server.superlink.fleet.vce.vce_api import (
     NodeToPartitionMapping,
@@ -289,9 +289,11 @@ def test_worker_records_clientapp_runtime() -> None:
     node_info_store[1].retrieve_context.return_value = context
     backend = Mock()
 
-    def _process_message(msg: Message, ctx: Context) -> tuple[Message, Context]:
+    def _process_message(
+        msg: Message, ctx: Context
+    ) -> tuple[Message, Context, list[object]]:
         f_stop.set()
-        return Message(RecordDict(), reply_to=msg), ctx
+        return Message(RecordDict(), reply_to=msg), ctx, []
 
     backend.process_message.side_effect = _process_message
 
@@ -306,11 +308,47 @@ def test_worker_records_clientapp_runtime() -> None:
             backend=backend,
             f_stop=f_stop,
             metrics=metrics,
+            state=Mock(),
         )
 
     backend.process_message.assert_called_once_with(message, context)
     assert not messageres_queue.empty()
     assert metrics.clientapp_runtime == 2.0
+
+
+def test_worker_stores_clientapp_lifecycle_events() -> None:
+    """Simulation workers attach ClientApp events to the run primary task."""
+    f_stop = threading.Event()
+    messageins_queue: Queue[Message] = Queue()
+    messageres_queue: Queue[Message] = Queue()
+    message = _make_vce_test_message()
+    messageins_queue.put(message)
+    context = Context(1234, 1, {}, RecordDict(), {})
+    node_info_store = {1: Mock()}
+    node_info_store[1].retrieve_context.return_value = context
+    event = TaskEvent(event="fl.node.fit.completed", data='{"type":"event"}')
+    backend = Mock()
+    backend.process_message.side_effect = lambda msg, ctx: (
+        f_stop.set() or Message(RecordDict(), reply_to=msg),
+        ctx,
+        [event],
+    )
+    state = Mock()
+    state.get_run_info.return_value = [Mock(primary_task_id=4321)]
+
+    worker(
+        messageins_queue=messageins_queue,
+        messageres_queue=messageres_queue,
+        node_info_store=node_info_store,  # type: ignore
+        backend=backend,
+        f_stop=f_stop,
+        metrics=VceMetrics(),
+        state=state,
+    )
+
+    assert event.run_id == 1234
+    assert event.task_id == 4321
+    state.store_task_events.assert_called_once_with([event])
 
 
 class TestFleetSimulationEngineRayBackend(TestCase):

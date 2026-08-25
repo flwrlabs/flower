@@ -262,7 +262,10 @@ class ClientApp:
                 events[2],
                 node_id=node_id,
                 server_round=server_round,
-                metadata={"error": "execution_failed"},
+                metadata={
+                    "error": "execution_failed",
+                    "elapsed_time": time.perf_counter() - started_at,
+                },
             )
             return result
         try:

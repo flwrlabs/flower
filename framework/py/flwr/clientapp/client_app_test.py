@@ -21,7 +21,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from flwr.app import Context, Message, RecordDict
+from flwr.app import Context, Error, Message, RecordDict
 from flwr.common import (
     Code,
     EvaluateIns,
@@ -470,6 +470,26 @@ def test_client_app_emits_events_for_registered_train_handler() -> None:
         FL_NODE_FIT_STARTED,
         FL_NODE_FIT_COMPLETED,
     ]
+
+
+def test_client_app_emits_failed_event_for_error_reply() -> None:
+    """Error replies are terminal node failures, not completed executions."""
+    callback = Mock()
+    app = ClientApp(event_callback=callback)
+
+    @app.train()
+    def train(message: Message, _: Context) -> Message:
+        return Message(Error(code=1), reply_to=message)
+
+    app(_make_message("train"), Mock(spec=Context))
+
+    failed_event = strict_json_loads(callback.call_args_list[-1].args[0].data)
+    assert [call.args[0].event for call in callback.call_args_list] == [
+        FL_NODE_FIT_STARTED,
+        FL_NODE_FIT_FAILED,
+    ]
+    assert failed_event.pop("elapsed_time") >= 0
+    assert failed_event["error"] == "execution_failed"
 
 
 def test_client_app_failure_event_does_not_include_exception_details() -> None:

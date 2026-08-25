@@ -432,7 +432,12 @@ def test_push_messages_forwards_current_task_events() -> None:
     object_store.get.return_value = b"reply content"
     send = Mock(return_value=({"reply-id"}, "session-id"))
     push_object = Mock()
-    push_task_events = Mock(side_effect=RuntimeError("relay unavailable"))
+
+    def _push_task_events(_: int, __: list[TaskEvent]) -> None:
+        assert not send.called
+        raise RuntimeError("relay unavailable")
+
+    push_task_events = Mock(side_effect=_push_task_events)
 
     _push_messages(
         state=state,

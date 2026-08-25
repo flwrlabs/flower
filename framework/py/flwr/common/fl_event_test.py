@@ -128,6 +128,13 @@ def test_make_task_event_with_metadata() -> None:
     }
 
 
+@pytest.mark.parametrize("key", ["type", "node_id", "server_round"])
+def test_make_task_event_rejects_reserved_metadata_keys(key: str) -> None:
+    """Reserved payload fields must remain aligned with the event envelope."""
+    with pytest.raises(ValueError, match="reserved keys"):
+        make_task_event(FL_NODE_FIT_STARTED, metadata={key: "override"})
+
+
 def test_make_task_event_failure_metadata() -> None:
     """Create a failure event carrying `error` and `details`."""
     # Execute

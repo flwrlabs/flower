@@ -525,6 +525,18 @@ def _push_messages(
                 # therefore we can yield it after casting it to bytes
                 yield tree.object_id, cast(bytes, content)
 
+        # Relay lifecycle events before the reply becomes visible to the
+        # ServerApp. Otherwise a final reply can finish the run before its
+        # terminal node event reaches the SuperLink.
+        if task_id is not None:
+            try:
+                push_task_events(
+                    run_id,
+                    state.get_task_events(run_id=run_id, task_ids=[task_id]),
+                )
+            except Exception as err:  # pylint: disable=broad-except
+                log(ERROR, "Failed to relay lifecycle events: %s", err)
+
         # Send the message
         try:
             clientapp_runtime = state.get_message_processing_duration(
@@ -547,17 +559,6 @@ def _push_messages(
                 push_object_fn=partial(push_object, run_id, session_id),
             )
 
-            # Lifecycle events are observational. Relay them only after the reply
-            # and its objects are available at the SuperLink, and never let a
-            # relay failure affect the client result.
-            if task_id is not None:
-                try:
-                    push_task_events(
-                        run_id,
-                        state.get_task_events(run_id=run_id, task_ids=[task_id]),
-                    )
-                except Exception as err:  # pylint: disable=broad-except
-                    log(ERROR, "Failed to relay lifecycle events: %s", err)
             log(INFO, "Sent successfully")
         except RunNotRunningException:
             log(

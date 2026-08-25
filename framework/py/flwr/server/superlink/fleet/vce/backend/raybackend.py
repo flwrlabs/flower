@@ -26,6 +26,7 @@ import ray
 from flwr.app.message import Context, Message
 from flwr.clientapp.client_app import ClientApp
 from flwr.common.constant import PARTITION_ID_KEY
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.simulation.ray_transport.ray_actor import BasicActorPool, ClientAppActor
 from flwr.simulation.ray_transport.utils import enable_tf_gpu_growth
 from flwr.supercore import log
@@ -151,7 +152,7 @@ class RayBackend(Backend):
         self,
         message: Message,
         context: Context,
-    ) -> tuple[Message, Context]:
+    ) -> tuple[Message, Context, list[TaskEvent]]:
         """Run ClientApp that process a given message.
 
         Return output message and updated context.
@@ -179,9 +180,10 @@ class RayBackend(Backend):
             (
                 out_mssg,
                 updated_context,
+                events,
             ) = self.pool.fetch_result_and_return_actor_to_pool(future)
 
-            return out_mssg, updated_context
+            return out_mssg, updated_context, events
 
         except Exception as ex:
             log(

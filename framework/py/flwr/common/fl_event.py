@@ -89,5 +89,8 @@ def make_task_event(
     if server_round is not None:
         data["server_round"] = server_round
     if metadata:
+        reserved_keys = {"type", "node_id", "server_round"}
+        if reserved_keys.intersection(metadata):
+            raise ValueError("Lifecycle event metadata contains reserved keys")
         data.update(metadata)
     return TaskEvent(event=event, data=strict_json_dumps(data, compact=True))
