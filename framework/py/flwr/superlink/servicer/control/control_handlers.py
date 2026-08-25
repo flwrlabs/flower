@@ -507,6 +507,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 f"Invalid app specification: {request.app_spec}",
             ) from e
     is_stored_app = bool(request.fab.hash_str and not request.fab.content)
+    is_hub_app = False
 
     # Start a run using a stored app
     if is_stored_app:
@@ -532,6 +533,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         fab_file, verification_dict, note = _get_remote_fab(
             fleet_api_type, request.app_spec
         )
+        is_hub_app = True
     # Start a run using the provided app
     else:
         fab_file = request.fab.content
@@ -608,6 +610,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 app_id=app_id,
                 app_type=app_type,
                 added_by=flwr_aid,
+                is_hub_app=is_hub_app,
             )
 
         series_id = request.series_id if request.HasField("series_id") else None
@@ -1379,6 +1382,7 @@ def list_apps(
         agent = AppInfo(
             app_id=FLOWER_AGENT_APP_ID,
             app_type=TaskType.AGENT_APP,
+            is_hub_app=True,
         )
         if limit is not None:
             apps = apps[: limit - 1]
@@ -1414,6 +1418,7 @@ def add_app(
         app_id=request.app_id,
         app_type=app_type,
         added_by=account.flwr_aid,
+        is_hub_app=True,
     )
 
     return AddAppResponse()

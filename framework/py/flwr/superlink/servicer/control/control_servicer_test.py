@@ -700,6 +700,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
             [("@flwr/agent", runs[0].fab_hash, TaskType.AGENT_APP)],
         )
+        self.assertTrue(apps[0].HasField("is_hub_app"))
+        self.assertFalse(apps[0].is_hub_app)
 
     def test_start_run_raises_if_create_run_fails(self) -> None:
         """Test StartRun raises if the initial task cannot be created."""
@@ -771,6 +773,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 )
             ],
         )
+        self.assertTrue(apps[0].is_hub_app)
 
     def test_start_run_accepts_valid_nested_override_keys(self) -> None:
         """Test StartRun accepts valid dotted override keys from nested FAB config."""
