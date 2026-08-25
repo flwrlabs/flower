@@ -27,6 +27,9 @@ def main(grid: Grid, context: Context) -> None:
 
     # Read from config
     num_rounds = context.run_config["num-server-rounds"]
+    strategy_timeout = float(context.run_config.get("strategy.timeout", 3600))
+    if strategy_timeout <= 0:
+        raise ValueError("strategy.timeout must be greater than 0 seconds")
     cfg = DictConfig(replace_keys(unflatten_dict(context.run_config)))
 
     # Get initial model weights
@@ -56,6 +59,7 @@ def main(grid: Grid, context: Context) -> None:
         initial_arrays=arrays,
         train_config=ConfigRecord(train_cfg),
         num_rounds=num_rounds,
+        timeout=strategy_timeout,
         evaluate_fn=evaluate_fn,
     )
 

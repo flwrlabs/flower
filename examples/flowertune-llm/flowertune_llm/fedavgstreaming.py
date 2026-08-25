@@ -1176,6 +1176,7 @@ class FedAvgStreaming(FedAvg):
         log_strategy_start_info(
             num_rounds, initial_arrays, train_config, evaluate_config
         )
+        log(INFO, "Strategy operation timeout: %.1fs", timeout)
         self.summary()
         log(INFO, "")
 

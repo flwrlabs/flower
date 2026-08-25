@@ -106,6 +106,7 @@ client.hf-assets-path = ""
 client.train-steps = 0
 strategy.fraction-train = 0.1
 strategy.fraction-evaluate = 0.0
+strategy.timeout = 3600
 num-server-rounds = 10
 grid.pull-interval = 0.1
 
