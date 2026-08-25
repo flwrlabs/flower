@@ -139,7 +139,6 @@ class Server:
         self._emit_event(FL_RUN_STARTED, metadata={"num_rounds": num_rounds})
 
         history = History()
-        start_time = timeit.default_timer()
         try:
             # Initialize parameters
             log(INFO, "[INIT]")
@@ -160,6 +159,7 @@ class Server:
             else:
                 log(INFO, "Evaluation returned no results (`None`)")
 
+            start_time = timeit.default_timer()
             for current_round in range(1, num_rounds + 1):
                 log(INFO, "")
                 log(INFO, "[ROUND %s]", current_round)
