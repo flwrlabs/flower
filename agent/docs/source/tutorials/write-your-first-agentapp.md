@@ -5,7 +5,7 @@ it on SuperGrid. The example makes one model request so you can isolate project
 configuration from connector logic.
 
 Complete [Chat in your terminal](get-started-with-flower-agent.md) first. This
-tutorial targets Flower 1.34.0.
+tutorial targets Flower 1.35.0.
 
 ## Create the project
 
@@ -88,7 +88,7 @@ version = "0.1.0"
 description = "My first Flower AgentApp"
 license = "Apache-2.0"
 requires-python = ">=3.11"
-dependencies = ["flwr>=1.34.0,<2.0"]
+dependencies = ["flwr>=1.35.0,<2.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["hello_agent"]
@@ -96,7 +96,7 @@ packages = ["hello_agent"]
 [tool.flwr.app]
 publisher = "local"
 display-name = "Hello Agent"
-flwr-version-target = "1.34.0"
+flwr-version-target = "1.35.0"
 fab-include = ["hello_agent/**/*.py"]
 
 [tool.flwr.app.config.agent]
