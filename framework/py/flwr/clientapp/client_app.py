@@ -257,6 +257,14 @@ class ClientApp:
                 },
             )
             raise
+        if result.has_error():
+            self._emit_event(
+                events[2],
+                node_id=node_id,
+                server_round=server_round,
+                metadata={"error": "execution_failed"},
+            )
+            return result
         try:
             metrics = _extract_node_metrics(result)
         except Exception:  # pylint: disable=broad-exception-caught
