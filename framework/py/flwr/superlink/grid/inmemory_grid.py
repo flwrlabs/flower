@@ -178,7 +178,8 @@ class InMemoryGrid(Grid):
         event_list = list(events)
         if not event_list:
             return
-        run_id = cast(Run, self._run).run_id
+        run = cast(Run, self._run)
         for event in event_list:
-            event.run_id = run_id
+            event.run_id = run.run_id
+            event.task_id = cast(int, run.primary_task_id)
         self.state.store_task_events(event_list)

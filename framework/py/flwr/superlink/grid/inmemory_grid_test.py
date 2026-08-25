@@ -106,7 +106,7 @@ class TestInMemoryGrid(unittest.TestCase):
             status=RunStatus(status=Status.PENDING, sub_status="", details=""),
             flwr_aid="user123",
             federation_id="@me/fed",
-            primary_task_id=None,
+            primary_task_id=12345,
             bytes_sent=0,
             bytes_recv=0,
             clientapp_runtime=0.0,
@@ -145,8 +145,8 @@ class TestInMemoryGrid(unittest.TestCase):
         # Assert
         self.assertEqual(len(node_ids), self.num_nodes)
 
-    def test_push_task_events_sets_run_id_and_stores(self) -> None:
-        """Test pushing task events sets the run ID and stores them."""
+    def test_push_task_events_sets_run_and_task_ids_and_stores(self) -> None:
+        """Test pushing task events sets IDs needed for event streaming."""
         # Prepare
         events = [
             TaskEvent(event="fl.run.started", data='{"type":"fl.run.started"}'),
@@ -162,6 +162,8 @@ class TestInMemoryGrid(unittest.TestCase):
         self.assertEqual(len(stored_events), 2)
         self.assertEqual(stored_events[0].run_id, self.mock_run.run_id)
         self.assertEqual(stored_events[1].run_id, self.mock_run.run_id)
+        self.assertEqual(stored_events[0].task_id, self.mock_run.primary_task_id)
+        self.assertEqual(stored_events[1].task_id, self.mock_run.primary_task_id)
 
     def test_push_messages_valid(self) -> None:
         """Test pushing valid messages."""

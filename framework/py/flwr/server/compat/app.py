@@ -15,6 +15,7 @@
 """Flower grid app."""
 
 
+from collections.abc import Callable
 from logging import INFO
 
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -27,6 +28,26 @@ from flwr.serverapp.grid import Grid
 from flwr.supercore import log
 
 from .app_utils import start_update_client_manager_thread
+
+
+def _compose_event_callbacks(
+    existing_callback: Callable[[TaskEvent], None] | None,
+    delivery_callback: Callable[[TaskEvent], None],
+) -> Callable[[TaskEvent], None]:
+    """Compose callbacks without allowing one delivery to block another."""
+
+    def callback(event: TaskEvent) -> None:
+        if existing_callback is not None:
+            try:
+                existing_callback(event)
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
+        try:
+            delivery_callback(event)
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+
+    return callback
 
 
 def start_grid(  # pylint: disable=too-many-arguments, too-many-locals
@@ -75,7 +96,11 @@ def start_grid(  # pylint: disable=too-many-arguments, too-many-locals
     def _push_task_event(event: TaskEvent) -> None:
         grid.push_task_events([event])
 
-    initialized_server.set_event_callback(_push_task_event)
+    initialized_server.set_event_callback(
+        _compose_event_callbacks(
+            initialized_server.get_event_callback(), _push_task_event
+        )
+    )
 
     log(
         INFO,

@@ -125,6 +125,10 @@ class Server:
         """Set the callback used to deliver lifecycle events."""
         self._event_callback = callback
 
+    def get_event_callback(self) -> Callable[[TaskEvent], None] | None:
+        """Return the callback used to deliver lifecycle events."""
+        return self._event_callback
+
     def client_manager(self) -> ClientManager:
         """Return ClientManager."""
         return self._client_manager
