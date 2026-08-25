@@ -423,6 +423,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         app_id: str,
         app_type: str,
         added_by: str,
+        is_hub_app: bool = False,
     ) -> str:
         """Atomically store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
@@ -453,6 +454,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             app_id=app_id,
             fab_hash=fab_hash,
             app_type=app_type,
+            is_hub_app=is_hub_app,
             added_by=added_by,
             added_at=now(),
         )
@@ -464,6 +466,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             set_={
                 "fab_hash": app_stmt.excluded.fab_hash,
                 "app_type": app_stmt.excluded.app_type,
+                "is_hub_app": app_stmt.excluded.is_hub_app,
             },
         )
         with self.session() as session:
@@ -524,6 +527,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 FederationAppModel.app_id,
                 FederationAppModel.fab_hash,
                 FederationAppModel.app_type,
+                FederationAppModel.is_hub_app,
             )
             .where(FederationAppModel.federation_id == federation_id)
             .order_by(
@@ -540,6 +544,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     app_id=app.app_id,
                     fab_hash=app.fab_hash,
                     app_type=app.app_type,
+                    is_hub_app=app.is_hub_app,
                 )
                 for app in apps
             ]
