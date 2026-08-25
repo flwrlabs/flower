@@ -77,6 +77,31 @@ background_pids=()
 cleanup() {
   if [ "${#background_pids[@]}" -gt 0 ]; then
     kill "${background_pids[@]}" 2>/dev/null || true
+
+    # Give the services a short grace period to run their shutdown handlers. A
+    # stuck child must not hold the whole CI job until the workflow timeout.
+    cleanup_timeout=15
+    cleanup_deadline=$((SECONDS + cleanup_timeout))
+    while [ "$SECONDS" -lt "$cleanup_deadline" ]; do
+      running=false
+      for pid in "${background_pids[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+          running=true
+          break
+        fi
+      done
+
+      if [ "$running" = false ]; then
+        break
+      fi
+      sleep 1
+    done
+
+    if [ "$running" = true ]; then
+      echo "Timed out after ${cleanup_timeout}s; force-killing background services."
+      kill -KILL "${background_pids[@]}" 2>/dev/null || true
+    fi
+
     wait "${background_pids[@]}" 2>/dev/null || true
   fi
 }
