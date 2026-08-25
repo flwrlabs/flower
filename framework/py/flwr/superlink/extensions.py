@@ -32,6 +32,7 @@ SuperLinkLifespanContext = Callable[
     [FastAPI], AbstractAsyncContextManager[Mapping[str, Any] | None]
 ]
 RunStartSource = Literal["cli", "web_ui", "automation", "unknown"]
+ResultDeliveryChannel = Literal["logs", "chat"]
 RUN_SOURCE_METADATA_KEY = "x-flwr-run-source"
 _RUN_START_SOURCES = frozenset({"cli", "web_ui", "automation", "unknown"})
 _SGXT_MODULE = "flwr.ee.superlink.extensions"
@@ -143,6 +144,38 @@ def notify_run_started(run: Run, source: RunStartSource) -> None:
         log(
             WARNING,
             "Run-start extension notification failed: %s.",
+            type(exc).__name__,
+            exc_info=exc,
+        )
+
+
+def notify_result_delivered(
+    run: Run,
+    flwr_aid: str,
+    channel: ResultDeliveryChannel,
+) -> None:
+    """Notify an optional extension after a result request was accepted.
+
+    The callback is synchronous by design. Extensions must keep this hook
+    non-blocking and best effort; the Flower framework does not create a
+    background thread for it. The run snapshot is copied before handing it to
+    the extension so the callback cannot mutate SuperLink state.
+    """
+    try:
+        sgxt = _try_import_sgxt()
+        if sgxt is None:
+            return
+
+        on_result_delivered = cast(
+            Callable[[Run, str, ResultDeliveryChannel], None] | None,
+            getattr(sgxt, "on_result_delivered", None),
+        )
+        if on_result_delivered is not None:
+            on_result_delivered(deepcopy(run), flwr_aid, channel)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        log(
+            WARNING,
+            "Result-delivered extension notification failed: %s.",
             type(exc).__name__,
             exc_info=exc,
         )

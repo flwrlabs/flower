@@ -109,12 +109,19 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     heartbeat_sender = None
     context: Context | None = None
     runtime_env_dir: Path | None = None
+    agent_events: RuntimeAgentEvents | None = None
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
         log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
 
         grid._retry_invoker.max_tries = 1
+
+        if agent_events is not None:
+            try:
+                agent_events.close(1)
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to close AgentApp event publisher", exc_info=err)
 
         if log_uploader:
             flush_logs(log_queue)
@@ -232,6 +239,17 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             event_details={"run-id-hash": hash_run_id},
         )
 
+        _set_runtime_environment(
+            runtime_api_address, token, insecure, certificates_path
+        )
+
+        # Load and run the AgentApp
+        agent_app = load_app(agent_app_attr, LoadAgentAppError, app_path)
+        if not isinstance(agent_app, AgentApp):
+            raise LoadAgentAppError(
+                f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
+            ) from None
+        agent_events = RuntimeAgentEvents(grid._runtime_client)
         responses = RuntimeAgentResponses(
             stub=grid._runtime_client,
             run_id=context.run_id,
@@ -244,24 +262,15 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
                 federation=run.federation_id,
                 series_id=run.series_id,
             ),
+            events=agent_events,
         )
-        connectors = RuntimeAgentConnectors(responses)
-        events = RuntimeAgentEvents(grid._runtime_client)
         agent = RuntimeAgentSession(
-            responses=responses, connectors=connectors, events=events
+            responses=responses,
+            connectors=RuntimeAgentConnectors(responses),
+            events=agent_events,
         )
-
-        _set_runtime_environment(
-            runtime_api_address, token, insecure, certificates_path
-        )
-
-        # Load and run the AgentApp
-        agent_app = load_app(agent_app_attr, LoadAgentAppError, app_path)
-        if not isinstance(agent_app, AgentApp):
-            raise LoadAgentAppError(
-                f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
-            ) from None
         agent_app(agent=agent, context=context)
+        agent_events.close()
 
         # Set sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED
