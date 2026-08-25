@@ -78,8 +78,8 @@ def test_all_control_routes_have_protobuf_request_types() -> None:
     assert route_keys == control_request_types
 
 
-def test_start_run_defaults_to_best_effort_web_ui_source() -> None:
-    """Treat the HTTP control route as a Web UI producer by default."""
+def test_start_run_defaults_to_unknown_source_without_header() -> None:
+    """Avoid inferring a source from the HTTP transport."""
     request = StartRunRequest()
     linkstate = Mock()
     expected = StartRunResponse(run_id=1)
@@ -96,7 +96,7 @@ def test_start_run_defaults_to_best_effort_web_ui_source() -> None:
         _ACCOUNT,
         linkstate,
         "",
-        source="web_ui",
+        source="unknown",
     )
 
 
