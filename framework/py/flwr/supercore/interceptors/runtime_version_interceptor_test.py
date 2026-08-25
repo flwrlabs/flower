@@ -126,11 +126,13 @@ def _make_runtime_rpc_error(
     rpc_error = grpc.RpcError()
     rpc_error.trailing_metadata = Mock(return_value=())
     rpc_error.details = Mock(
-        return_value=FlowerError(
-            code,
-            "internal diagnostic message",
-            public_details="runtime mismatch",
-        ).to_json("Runtime version compatibility check failed.")
+        return_value=json.dumps(
+            FlowerError(
+                code,
+                "internal diagnostic message",
+                public_details="runtime mismatch",
+            ).to_json("Runtime version compatibility check failed.")
+        )
     )
     rpc_error.add_callback = Mock(return_value=False)
     return rpc_error

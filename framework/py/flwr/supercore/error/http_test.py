@@ -23,7 +23,6 @@ from starlette.datastructures import State
 
 from .base import ApiErrorCode, FlowerError
 from .catalog import API_ERROR_MAP
-from .exceptions import EntitlementError
 from .http import (
     INTERNAL_SERVER_ERROR_MESSAGE,
     BearerAuthenticationError,
@@ -51,25 +50,61 @@ def _assert_json_response(
 
 
 def test_http_error_translator_mapped_flower_error() -> None:
-    """Translate a mapped FlowerError into its configured HTTP contract."""
+    """Include the public message and numeric code for a mapped FlowerError."""
+    error_code = ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT
+    response = _run_translator(FlowerError(error_code, "internal diagnostic message"))
+
+    spec = API_ERROR_MAP[error_code]
+    _assert_json_response(
+        response,
+        spec.http_status_code,
+        {"detail": spec.public_message, "code": error_code.value},
+    )
+    assert b"internal diagnostic message" not in response.body
+
+
+def test_http_error_translator_includes_public_details() -> None:
+    """Expose public details separately from the catalog message."""
+    error_code = ApiErrorCode.INVALID_FEDERATION_NAME
+    public_details = "The requested federation name is invalid."
     response = _run_translator(
         FlowerError(
-            ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT,
+            error_code,
             "internal diagnostic message",
+            public_details=public_details,
         )
     )
 
-    spec = API_ERROR_MAP[ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT]
+    spec = API_ERROR_MAP[error_code]
     _assert_json_response(
         response,
         spec.http_status_code,
         {
-            "code": ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT,
-            "public_message": spec.public_message,
-            "public_details": None,
+            "detail": spec.public_message,
+            "code": error_code.value,
+            "extra": public_details,
         },
     )
     assert b"internal diagnostic message" not in response.body
+
+
+def test_http_error_translator_includes_empty_public_details() -> None:
+    """Include an empty public-details string in a FlowerError response."""
+    error_code = ApiErrorCode.INVALID_FEDERATION_NAME
+    response = _run_translator(
+        FlowerError(
+            error_code,
+            "internal diagnostic message",
+            public_details="",
+        )
+    )
+
+    spec = API_ERROR_MAP[error_code]
+    _assert_json_response(
+        response,
+        spec.http_status_code,
+        {"detail": spec.public_message, "code": error_code.value, "extra": ""},
+    )
 
 
 def test_http_error_translator_adds_bearer_authentication_challenge() -> None:
@@ -86,9 +121,8 @@ def test_http_error_translator_adds_bearer_authentication_challenge() -> None:
         response,
         spec.http_status_code,
         {
-            "code": ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
-            "public_message": spec.public_message,
-            "public_details": None,
+            "detail": spec.public_message,
+            "code": ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED.value,
         },
     )
     assert response.headers["www-authenticate"] == "Bearer"
@@ -102,38 +136,7 @@ def test_http_error_translator_unmapped_flower_error() -> None:
     _assert_json_response(
         response,
         status.HTTP_500_INTERNAL_SERVER_ERROR,
-        {
-            "code": 999,
-            "public_message": INTERNAL_SERVER_ERROR_MESSAGE,
-            "public_details": None,
-        },
-    )
-    assert b"internal diagnostic message" not in response.body
-
-
-def test_http_error_translator_entitlement_error_preserves_error_message() -> None:
-    """Keep entitlement details in the translated payload."""
-    error_message = "Entitlement check failed: plan does not allow this action."
-    entitlement_code = 101
-
-    response = _run_translator(
-        EntitlementError(
-            "internal diagnostic message",
-            public_details=error_message,
-            entitlement_code=entitlement_code,
-        )
-    )
-
-    spec = API_ERROR_MAP[ApiErrorCode.ENTITLEMENT_ERROR]
-    _assert_json_response(
-        response,
-        spec.http_status_code,
-        {
-            "code": ApiErrorCode.ENTITLEMENT_ERROR,
-            "public_message": spec.public_message,
-            "public_details": error_message,
-            "entitlement_code": entitlement_code,
-        },
+        {"detail": INTERNAL_SERVER_ERROR_MESSAGE},
     )
     assert b"internal diagnostic message" not in response.body
 

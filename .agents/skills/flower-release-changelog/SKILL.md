@@ -29,19 +29,20 @@ Treat the cache as the complete PR evidence source. Do not use `gh`, GitHub APIs
    - **Initial polish:** When the file contains only generated entries, classify and rewrite all PR entries.
    - **Incremental polish:** When polished items already exist, classify only unfinished entries. Preserve every existing item unless an unfinished PR is added to it.
 7. Read the JSON metadata for every PR being classified. Read its cached diff only when the title, body, and labels do not establish the user-visible or meaningful technical outcome.
-8. Group unfinished PRs into coherent release-level topics, place them into the final sections, and remove all generated headings and raw entries.
+8. Group unfinished PRs into coherent release-level topics and place them into the final sections. When the cached evidence does not support a confident grouping or summary, move the generated one-PR entry unchanged under `### UNGROUPED` instead of guessing. Remove all other generated headings and raw entries.
 9. Run the bundled inventory validator with the pre-edit inventories. Then manually review classification, wording, formatting, the complete file, and its diff before finishing.
 
 ## Classify PRs
 
 - Group by shared user-visible behavior or one meaningful technical outcome. Generated headings and labels are evidence, not mandatory final topic boundaries.
-- In incremental mode, prefer an existing item when the PR clearly advances that topic. Add the PR link to that item and update its summary only when the new behavior is not already represented.
-- Create a new item only when no existing item fits.
+- In incremental mode, first try to place each unfinished PR into an existing topic. Treat the existing topic structure as stable, and create a new topic only when the PR introduces a distinct release-level outcome that cannot reasonably fit any existing topic.
+- When adding a PR to an existing topic, add its PR link and leave the existing title and summary unchanged when they still represent the topic accurately. If the summary must change to cover the new PR, make only the smallest incremental edit needed; do not rewrite the summary for style or completeness.
 - Put a PR under `### Incompatible changes` when its cached title starts with `break(` or its generated entry was placed there. Keep all other PRs under `### What's new?`.
 - Use `General improvements` for minor maintenance, dependency, CI, test, and cleanup PRs that do not merit a distinct release-level topic.
 - Never omit, duplicate, or split one PR across items.
 - Keep `General improvements` last under `What's new?`.
 - Include `### Incompatible changes` only when it contains at least one PR.
+- Keep one uncertain PR per item under `### UNGROUPED`, preserve its generated title and link without adding a summary, and make `### UNGROUPED` the final section after `### Incompatible changes`. Omit the section when every PR was grouped confidently.
 
 ## Write topic items
 
@@ -66,11 +67,16 @@ Use this structure:
 
 ### Favor reader-facing wording
 
+- Write from the reader's perspective: describe what changes for users or deployers, not merely what the implementation did.
 - For user-facing topics, make the title describe the capability, action, or outcome readers gain rather than the underlying implementation. Prefer verbs such as `Run`, `Build`, `Use`, `Connect`, `Get`, or `Configure` when the evidence supports them.
+- For internal technical work that merits a release-level topic, frame it around the supported outcome, such as reliability, security, performance, consistency, or operability. Omit low-level implementation details when they have no meaningful reader-facing effect.
+- Preparatory or migration work may be worth calling out when it helps readers anticipate a larger user-visible change. Explain the direction of the change and, when relevant, what remains unchanged in this release for compatibility.
 - Lead the summary with what users can now do, observe, or need to change. Follow with implementation details only when they help readers understand configuration, compatibility, operation, or the scope of the change.
 - Prefer constructions such as “AgentApps can now ...” or “Run `flwr ...` to ...” over opening with an implementation inventory such as “Adds ... alongside ...” when both are equally accurate.
+- Prefer neutral, forward-looking language that describes the resulting improvement instead of evaluating or criticizing the previous implementation.
+- Preserve meaningful maturity qualifiers such as `(experimental)` or `(research preview)` when the evidence supports them.
 - Use `you` sparingly when it makes an action or upgrade requirement clearer. Continue to avoid unnecessary `we`.
-- Keep architecture and infrastructure topics technical when they are themselves the meaningful release outcome. Do not manufacture a user benefit for an internal change.
+- Keep architecture and infrastructure topics technical when the technical change itself is useful release context, but do not manufacture a user benefit that is not supported by the evidence.
 - For incompatible changes, state the observable impact and required migration action directly when the evidence establishes them.
 - Keep the tone restrained and professional. Do not add promotional language, unsupported benefits, or subjective claims such as “seamless,” “powerful,” or “easy.”
 
@@ -86,13 +92,13 @@ Use this exact General item, replacing the sample link with its complete sorted 
 
 When a mostly polished changelog contains only a few unfinished PRs:
 
-- Do not regroup, rename, reorder, or rewrite unrelated existing items.
-- Move each unfinished PR into the best existing topic when one fits.
-- Modify an existing summary only as much as needed to cover the added PR.
+- Preserve the existing topic structure by default. Do not regroup, rename, reorder, or rewrite existing items unless required to place a new PR correctly.
+- Assign each unfinished PR to the best existing topic whenever there is a reasonable semantic fit. Create a new topic only when no existing topic can represent the PR without becoming misleading and the PR merits its own release-level topic.
+- Do not update an existing summary merely to improve its wording or make it more comprehensive. If the new PR introduces information that the current summary needs to represent, update it incrementally while preserving the existing wording and structure as much as possible.
 - Leave the release heading and contributor section unchanged.
 - Do not edit `framework/docs/source/changelog/index.md` or another release file.
 
-If the cached metadata and diff still do not support a confident classification or summary, ask one specific wording question instead of guessing.
+If the cached metadata and diff still do not support a confident classification or summary, move the PR under `### UNGROUPED` instead of guessing. Entries under `### UNGROUPED` remain unfinished and can be reconsidered on later incremental runs.
 
 ## Validate
 
@@ -105,4 +111,4 @@ python3 .agents/skills/flower-release-changelog/scripts/validate_release_changel
   --expected-incompatible-prs <ALL_INCOMPATIBLE_PR_NUMBERS>
 ```
 
-Omit `--expected-incompatible-prs` when the final incompatible set is empty. Add to that set any unfinished PR classified as incompatible from a cached `break(...)` title. The validator checks only that PRs are complete and unique, each displayed PR number matches its link target, links within each item are in ascending PR-number order, incompatible PRs are in the right section, and generated headings are gone. Fix every validator error, then manually review the content and confirm the final diff changes only the intended release file.
+Omit `--expected-incompatible-prs` when the final incompatible set is empty. Add to that set any unfinished PR classified as incompatible from a cached `break(...)` title. The validator checks only that PRs are complete and unique, each displayed PR number matches its link target, links within each item are in ascending PR-number order, incompatible PRs are in the right section, and generated headings other than `### UNGROUPED` are gone. Fix every validator error, then manually review the content and confirm the final diff changes only the intended release file.
