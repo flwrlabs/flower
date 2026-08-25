@@ -36,8 +36,8 @@ _SGXT_MODULE = "flwr.ee.superlink.extensions"
 
 def _is_sgxt_import_error(exc: ImportError) -> bool:
     """Return whether an import error means that SGXT is unavailable."""
-    return exc.name is None or exc.name == _SGXT_MODULE or _SGXT_MODULE.startswith(
-        f"{exc.name}."
+    return exc.name == _SGXT_MODULE or (
+        exc.name is not None and _SGXT_MODULE.startswith(f"{exc.name}.")
     )
 
 
@@ -60,9 +60,7 @@ def get_middleware() -> tuple[Middleware, ...]:
     """Return extension middleware in request execution order."""
     try:
         # pylint: disable-next=import-outside-toplevel
-        from flwr.ee.superlink.extensions import (
-            get_middleware as _get_sgxt_middleware,
-        )
+        from flwr.ee.superlink.extensions import get_middleware as _get_sgxt_middleware
     except ImportError as exc:
         if _is_sgxt_import_error(exc):
             return ()
@@ -85,9 +83,7 @@ def get_lifespan_contexts() -> tuple[SuperLinkLifespanContext, ...]:
             return ()
         raise
 
-    get_sgxt_lifespan_contexts: Callable[
-        [], tuple[SuperLinkLifespanContext, ...]
-    ]
+    get_sgxt_lifespan_contexts: Callable[[], tuple[SuperLinkLifespanContext, ...]]
     get_sgxt_lifespan_contexts = _get_sgxt_lifespan_contexts
     return get_sgxt_lifespan_contexts()
 
@@ -104,9 +100,7 @@ def notify_run_started(run: Run, source: RunStartSource) -> None:
     try:
         try:
             # pylint: disable-next=import-outside-toplevel
-            from flwr.ee.superlink.extensions import (
-                on_run_started as _on_run_started,
-            )
+            from flwr.ee.superlink.extensions import on_run_started as _on_run_started
         except ImportError as exc:
             if _is_sgxt_import_error(exc):
                 return
