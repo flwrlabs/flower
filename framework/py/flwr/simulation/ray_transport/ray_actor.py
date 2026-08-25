@@ -52,10 +52,10 @@ class VirtualClientEngineActor(ABC):
         # Pass message through ClientApp and return a message
         # return also cid which is needed to ensure results
         # from the pool are correctly assigned to each ClientProxy
+        events: list[TaskEvent] = []
         try:
             # Load app
             app: ClientApp = client_app_fn()
-            events: list[TaskEvent] = []
             existing_callback = app.get_event_callback()
 
             def _capture_event(event: TaskEvent) -> None:
@@ -72,7 +72,7 @@ class VirtualClientEngineActor(ABC):
             raise load_ex
 
         except Exception as ex:
-            raise ClientAppException(str(ex)) from ex
+            raise ClientAppException(str(ex), task_events=events) from ex
 
         return cid, out_message, context, events
 
@@ -290,9 +290,11 @@ class VirtualClientEngineActorPool(ActorPool):
         """
         try:
             future: ObjectRef[Any] = self._cid_to_future[cid]["future"]  # type: ignore
-            res_cid, out_mssg, updated_context = ray.get(
-                future
-            )  # type: (str, Message, Context)
+            result: (
+                tuple[str, Message, Context]
+                | tuple[str, Message, Context, list[TaskEvent]]
+            ) = ray.get(future)
+            res_cid, out_mssg, updated_context = result[:3]
         except ray.exceptions.RayActorError as ex:
             log(ERROR, ex)
             if hasattr(ex, "actor_id"):

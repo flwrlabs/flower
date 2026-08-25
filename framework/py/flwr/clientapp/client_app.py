@@ -134,9 +134,12 @@ def _extract_node_metrics(message: Message) -> dict[str, JSONValue]:
 class ClientAppException(Exception):
     """Exception raised when an exception is raised while executing a ClientApp."""
 
-    def __init__(self, message: str):
+    def __init__(
+        self, message: str, task_events: list[TaskEvent] | None = None
+    ) -> None:
         ex_name = self.__class__.__name__
         self.message = f"\nException {ex_name} occurred. Message: " + message
+        self.task_events = task_events or []
         super().__init__(self.message)
 
 

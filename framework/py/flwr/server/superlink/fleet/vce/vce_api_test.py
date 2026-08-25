@@ -351,6 +351,40 @@ def test_worker_stores_clientapp_lifecycle_events() -> None:
     state.store_task_events.assert_called_once_with([event])
 
 
+def test_worker_keeps_client_reply_when_event_storage_fails() -> None:
+    """Lifecycle event storage must not replace a successful ClientApp reply."""
+    f_stop = threading.Event()
+    messageins_queue: Queue[Message] = Queue()
+    messageres_queue: Queue[Message] = Queue()
+    message = _make_vce_test_message()
+    messageins_queue.put(message)
+    context = Context(1234, 1, {}, RecordDict(), {})
+    node_info_store = {1: Mock()}
+    node_info_store[1].retrieve_context.return_value = context
+    backend = Mock()
+    backend.process_message.side_effect = lambda msg, ctx: (
+        f_stop.set() or Message(RecordDict(), reply_to=msg),
+        ctx,
+        [TaskEvent(event="fl.node.fit.completed", data='{"type":"event"}')],
+    )
+    state = Mock()
+    state.get_run_info.return_value = [Mock(primary_task_id=4321)]
+    state.store_task_events.side_effect = RuntimeError("database unavailable")
+
+    worker(
+        messageins_queue=messageins_queue,
+        messageres_queue=messageres_queue,
+        node_info_store=node_info_store,  # type: ignore
+        backend=backend,
+        f_stop=f_stop,
+        metrics=VceMetrics(),
+        state=state,
+    )
+
+    assert not messageres_queue.get_nowait().has_error()
+    state.store_task_events.assert_called_once()
+
+
 class TestFleetSimulationEngineRayBackend(TestCase):
     """A basic class that enables testing functionalities."""
 

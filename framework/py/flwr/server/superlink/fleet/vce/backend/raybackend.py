@@ -19,13 +19,14 @@ import os
 import sys
 from collections.abc import Callable
 from logging import DEBUG, ERROR
-from typing import Any
+from typing import Any, cast
 
 import ray
 
+from flwr.app.error import Error
 from flwr.app.message import Context, Message
-from flwr.clientapp.client_app import ClientApp
-from flwr.common.constant import PARTITION_ID_KEY
+from flwr.clientapp.client_app import ClientApp, ClientAppException
+from flwr.common.constant import PARTITION_ID_KEY, ErrorCode
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.simulation.ray_transport.ray_actor import BasicActorPool, ClientAppActor
 from flwr.simulation.ray_transport.utils import enable_tf_gpu_growth
@@ -194,6 +195,27 @@ class RayBackend(Backend):
             # add actor back into pool
             if future is not None:
                 self.pool.add_actor_back_to_pool(future)
+            cause = (
+                cast(
+                    Exception,
+                    ex.as_instanceof_cause(),  # type: ignore[no-untyped-call]
+                )
+                if isinstance(ex, ray.exceptions.RayTaskError)
+                else ex
+            )
+            if isinstance(cause, ClientAppException):
+                reason = str(type(cause)) + ":<'" + str(cause) + "'>"
+                return (
+                    Message(
+                        Error(
+                            code=ErrorCode.CLIENT_APP_RAISED_EXCEPTION,
+                            reason=reason,
+                        ),
+                        reply_to=message,
+                    ),
+                    context,
+                    cause.task_events,
+                )
             raise ex
 
     def terminate(self) -> None:
