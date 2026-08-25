@@ -21,6 +21,7 @@ def main(agent: AgentSession, context: Context) -> None:
     client = OpenAI(
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
         api_key=os.environ["FLWR_RUNTIME_API_KEY"],
+        max_retries=0,
     )
     stream = client.responses.create(
         model=MODEL,
