@@ -467,6 +467,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     account: AccountInfo,
     state: LinkState,
     fleet_api_type: str | None,
+    *,
     source: extensions.RunStartSource = "unknown",
 ) -> StartRunResponse:
     """Create run ID."""

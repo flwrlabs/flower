@@ -138,13 +138,19 @@ class TestControlHandlers(unittest.TestCase):
             request = StartRunRequest(federation=NOOP_FEDERATION_ID)
             request.app_spec = "@flwr/demo==0.0.1"
             request.fab.hash_str = fab_hash
-            response = start_run(request, self.account, self.state, None)
+            response = start_run(
+                request,
+                self.account,
+                self.state,
+                None,
+                source="web_ui",
+            )
 
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         notify_run_started.assert_called_once()
         notified_run, source = notify_run_started.call_args.args
         self.assertEqual(notified_run.run_id, run.run_id)
-        self.assertEqual(source, "unknown")
+        self.assertEqual(source, "web_ui")
 
     def test_start_run_rejects_unknown_fab_hash(self) -> None:
         """Test StartRun rejects an unknown FAB hash without an app spec."""

@@ -67,6 +67,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ShowFederationRequest,
     ShowFederationResponse,
     StartRunRequest,
+    StartRunResponse,
     StopRunRequest,
     StreamLogsRequest,
     StreamLogsResponse,
@@ -100,6 +101,7 @@ from flwr.supercore.typing import (
     RegisterSupernodeContext,
     StartRunContext,
 )
+from flwr.superlink import extensions
 from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.control.control_account_auth_interceptor import (
@@ -411,6 +413,37 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         assert run_context is not None
         self.assertEqual(run_context.run_id, response.run_id)
         self.assertEqual(run_context.series_id, response.series_id)
+
+    def test_start_run_forwards_best_effort_source_metadata(self) -> None:
+        """Forward caller-provided source metadata for analytics attribution."""
+        context = Mock()
+        context.invocation_metadata.return_value = (
+            (extensions.RUN_SOURCE_METADATA_KEY, "web_ui"),
+        )
+        expected = StartRunResponse(run_id=42)
+
+        with patch(
+            "flwr.superlink.servicer.control.control_servicer.control_handlers.start_run",
+            return_value=expected,
+        ) as start_run:
+            response = self.servicer.StartRun(StartRunRequest(), context)
+
+        self.assertIs(response, expected)
+        self.assertEqual(start_run.call_args.kwargs["source"], "web_ui")
+
+    def test_start_run_defaults_to_cli_source_without_metadata(self) -> None:
+        """Default direct gRPC callers to the CLI analytics source."""
+        context = Mock()
+        context.invocation_metadata.return_value = ()
+        expected = StartRunResponse(run_id=42)
+
+        with patch(
+            "flwr.superlink.servicer.control.control_servicer.control_handlers.start_run",
+            return_value=expected,
+        ) as start_run:
+            self.servicer.StartRun(StartRunRequest(), context)
+
+        self.assertEqual(start_run.call_args.kwargs["source"], "cli")
 
     def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
         """StartRun should bind canonical connected OAuth connector refs."""

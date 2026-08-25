@@ -16,7 +16,7 @@
 
 
 from datetime import datetime
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.routing import APIRoute
@@ -26,6 +26,8 @@ from flwr.common.constant import NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsRequest,
     ListRunsResponse,
+    StartRunRequest,
+    StartRunResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
@@ -41,6 +43,7 @@ from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
 from flwr.superlink.routers.control.router import router
+from flwr.superlink.routers.control.router import start_run as start_run_route
 
 _ACCOUNT = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
 
@@ -73,6 +76,43 @@ def test_all_control_routes_have_protobuf_request_types() -> None:
         if route_key[1].startswith("/v1/control/")
     }
     assert route_keys == control_request_types
+
+
+def test_start_run_defaults_to_best_effort_web_ui_source() -> None:
+    """Treat the HTTP control route as a Web UI producer by default."""
+    request = StartRunRequest()
+    linkstate = Mock()
+    expected = StartRunResponse(run_id=1)
+
+    with patch(
+        "flwr.superlink.routers.control.router.control_handlers.start_run",
+        return_value=expected,
+    ) as start_run:
+        response = start_run_route(request, linkstate, _ACCOUNT)
+
+    assert response is expected
+    start_run.assert_called_once_with(
+        request,
+        _ACCOUNT,
+        linkstate,
+        "",
+        source="web_ui",
+    )
+
+
+def test_start_run_accepts_best_effort_source_header() -> None:
+    """Forward a caller-provided analytics source without treating it as auth."""
+    request = StartRunRequest()
+    linkstate = Mock()
+    expected = StartRunResponse(run_id=1)
+
+    with patch(
+        "flwr.superlink.routers.control.router.control_handlers.start_run",
+        return_value=expected,
+    ) as start_run:
+        start_run_route(request, linkstate, _ACCOUNT, run_source="cli")
+
+    assert start_run.call_args.kwargs["source"] == "cli"
 
 
 def test_protobuf_request_without_handler_response_returns_internal_error() -> None:

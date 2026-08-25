@@ -97,6 +97,7 @@ from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
@@ -127,8 +128,28 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: StartRunRequest, context: grpc.ServicerContext
     ) -> StartRunResponse:
         """Create run ID."""
+        metadata = context.invocation_metadata()
+        # This is best-effort analytics attribution, not authentication. We
+        # trust callers to label their own requests and default direct gRPC
+        # callers to the CLI source when no label is provided.
+        run_source = (
+            next(
+                (
+                    value
+                    for key, value in metadata
+                    if key == extensions.RUN_SOURCE_METADATA_KEY
+                ),
+                None,
+            )
+            if isinstance(metadata, (tuple, list))
+            else None
+        )
         return control_handlers.start_run(
-            request, _get_account(), self.linkstate_factory.state(), self.fleet_api_type
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            self.fleet_api_type,
+            source=extensions.resolve_run_start_source(run_source, default="cli"),
         )
 
     def StreamLogs(  # pylint: disable=C0103

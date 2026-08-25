@@ -32,7 +32,31 @@ SuperLinkLifespanContext = Callable[
     [FastAPI], AbstractAsyncContextManager[Mapping[str, Any] | None]
 ]
 RunStartSource = Literal["cli", "web_ui", "automation", "unknown"]
+RUN_SOURCE_METADATA_KEY = "x-flwr-run-source"
+_RUN_START_SOURCES = frozenset({"cli", "web_ui", "automation", "unknown"})
 _SGXT_MODULE = "flwr.ee.superlink.extensions"
+
+
+def resolve_run_start_source(
+    value: str | bytes | None, *, default: RunStartSource
+) -> RunStartSource:
+    """Normalize a caller-provided source label for analytics.
+
+    Source attribution is intentionally best effort. Callers can only affect
+    the analytics label for their own request, so recognized values are
+    trusted and invalid values fall back to ``unknown``. This value is not a
+    security or authorization signal.
+    """
+    if value is None:
+        return default
+    if isinstance(value, bytes):
+        try:
+            value = value.decode("ascii")
+        except UnicodeDecodeError:
+            return "unknown"
+    if value not in _RUN_START_SOURCES:
+        return "unknown"
+    return cast(RunStartSource, value)
 
 
 def _try_import_sgxt() -> ModuleType | None:
@@ -101,7 +125,8 @@ def notify_run_started(run: Run, source: RunStartSource) -> None:
     non-blocking and best effort; the Flower framework does not create a
     background thread or event loop for it. The run snapshot is copied before
     handing it to the extension so the callback cannot mutate the object used
-    to build the successful StartRun response.
+    to build the successful StartRun response. The source is also best-effort
+    caller attribution and must not be used for authorization decisions.
     """
     try:
         sgxt = _try_import_sgxt()
