@@ -46,7 +46,7 @@ Provider credentials and connector implementations remain outside the FAB.
 ### Model responses
 
 `agent.responses.create(request)` accepts an Open Responses-compatible JSON
-object. The Flower 1.34.0 runtime recognizes:
+object. The Flower 1.35.0 runtime recognizes:
 
 - `model` and `input`
 - `stream`

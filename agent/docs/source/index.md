@@ -80,6 +80,5 @@ reference](https://flower.ai/docs/framework/ref-api/flwr.agentapp.html) remains
 in the Flower framework documentation.
 
 Design proposals and partially implemented paths aren't documented as current
-capabilities. Persistent federation Agent management, Hub publishing of
-first-class AgentApps, persistent CLI conversation history, and a public Open
-Responses-compatible runtime endpoint aren't available yet.
+capabilities. The documentation describes behavior available in the Flower
+framework and SuperGrid interfaces rather than planned product work.
