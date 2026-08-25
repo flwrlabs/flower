@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from queue import Empty, Full, Queue
 from threading import Lock, Thread
 from typing import Literal, cast
@@ -35,6 +35,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
+    PullTaskEventsRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskMessageRequest,
@@ -55,7 +56,7 @@ from flwr.supercore.task_process.connector.registry import (
 )
 from flwr.supercore.task_process.connector.web_fetch import WEB_FETCH_CONNECTOR_NAME
 from flwr.supercore.typing import JSONObject, JSONValue
-from flwr.supercore.utils import strict_json_dumps
+from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
 from .context_items import append_items
 
@@ -197,7 +198,12 @@ class RuntimeAgentConnectors(AgentConnectors):
         """Return model-facing tool schemas for the requested connectors."""
         return [tool for name in names for tool in get_connector_tools(name)]
 
-    def call(self, tool_call: JSONObject) -> JSONObject:
+    def call(
+        self,
+        tool_call: JSONObject,
+        *,
+        on_event: Callable[[JSONObject], None] | None = None,
+    ) -> JSONObject:
         """Execute one model function_call and return a function_call_output item."""
         arguments = tool_call["arguments"]
         if isinstance(arguments, str):
@@ -216,6 +222,7 @@ class RuntimeAgentConnectors(AgentConnectors):
             name=name,
             call_id=call_id,
             arguments=arguments_obj,
+            on_event=on_event,
         )
 
 
@@ -282,7 +289,12 @@ class RuntimeAgentResponses(AgentResponses):
         return response.payload
 
     def create_connector_response(
-        self, *, name: str, call_id: str, arguments: JSONObject
+        self,
+        *,
+        name: str,
+        call_id: str,
+        arguments: JSONObject,
+        on_event: Callable[[JSONObject], None] | None = None,
     ) -> JSONValue:
         """Create one connector response through a child connector task."""
         name = name.strip().lower()
@@ -301,7 +313,7 @@ class RuntimeAgentResponses(AgentResponses):
             call_id=call_id,
             arguments=arguments,
         )
-        response_message = self._send_and_receive(message)
+        response_message = self._send_and_receive(message, on_event=on_event)
         response = ConnectorResponse.from_message(response_message)
         response_payload = response.payload
 
@@ -314,7 +326,12 @@ class RuntimeAgentResponses(AgentResponses):
         return response_payload["output"]
 
     def call_connector_with_events(
-        self, *, name: str, call_id: str, arguments: JSONObject
+        self,
+        *,
+        name: str,
+        call_id: str,
+        arguments: JSONObject,
+        on_event: Callable[[JSONObject], None] | None = None,
     ) -> JSONObject:
         """Call a connector and emit/persist its activity events."""
 
@@ -356,6 +373,7 @@ class RuntimeAgentResponses(AgentResponses):
                 name=name,
                 call_id=call_id,
                 arguments=arguments,
+                on_event=on_event,
             )
         except Exception as exc:  # pylint: disable=broad-exception-caught
             self.append_and_push_run_events(connector_event("failed", message=str(exc)))
@@ -468,7 +486,34 @@ class RuntimeAgentResponses(AgentResponses):
         )
         return [message_from_proto(msg) for msg in res.messages]
 
-    def _send_and_receive(self, message: Message) -> Message:
+    def _pull_task_events(
+        self,
+        task_id: int,
+        after_task_event_id: int | None,
+    ) -> tuple[list[JSONObject], int | None]:
+        """Pull events emitted by one child task after the given cursor."""
+        request = PullTaskEventsRequest(task_id=task_id)
+        if after_task_event_id is not None:
+            request.after_task_event_id = after_task_event_id
+        res = self._stub.PullTaskEvents(request)
+
+        events = []
+        for task_event in res.events:
+            event = strict_json_loads(task_event.data)
+            if not isinstance(event, dict):
+                raise RuntimeError("Child task event data is not a JSON object.")
+            events.append(event)
+
+        if res.events:
+            after_task_event_id = res.events[-1].id
+        return events, after_task_event_id
+
+    def _send_and_receive(
+        self,
+        message: Message,
+        *,
+        on_event: Callable[[JSONObject], None] | None = None,
+    ) -> Message:
         """Send one message and wait for its destination child task's direct reply.
 
         For now, `flwr-agentapp` expects a strict one-request-one-reply exchange with
@@ -484,13 +529,29 @@ class RuntimeAgentResponses(AgentResponses):
 
         # Pull until a message arrives that replies to the pushed message, or timeout
         deadline = time.monotonic() + _DEFAULT_MODEL_REPLY_TIMEOUT
+        after_task_event_id: int | None = None
         while True:
+            if on_event is not None:
+                events, after_task_event_id = self._pull_task_events(
+                    child_task_id, after_task_event_id
+                )
+                for event in events:
+                    on_event(event)
+
             # The request destination becomes the source of its reply.
             for pulled_msg in self._pull_task_messages(src_task_id=child_task_id):
                 if pulled_msg.metadata.reply_to_message_id != message_id:
                     raise RuntimeError(
                         "Received a message that does not reply to the request."
                     )
+                if on_event is not None:
+                    # The child pushes its reply after its events, so one final pull
+                    # closes the race between the event and message polling calls.
+                    events, _ = self._pull_task_events(
+                        child_task_id, after_task_event_id
+                    )
+                    for event in events:
+                        on_event(event)
                 return pulled_msg
 
             remaining = deadline - time.monotonic()

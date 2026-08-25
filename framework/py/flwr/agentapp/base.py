@@ -51,8 +51,13 @@ class AgentConnectors(ABC):
         """Return model-facing tool schemas for built-in connectors."""
 
     @abstractmethod
-    def call(self, tool_call: JSONObject) -> JSONObject:
-        """Execute one model function_call and return a function_call_output item."""
+    def call(
+        self,
+        tool_call: JSONObject,
+        *,
+        on_event: Callable[[JSONObject], None] | None = None,
+    ) -> JSONObject:
+        """Execute one model function call and optionally handle connector events."""
 
 
 class AgentEvents(ABC):

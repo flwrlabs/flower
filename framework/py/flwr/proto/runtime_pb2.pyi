@@ -295,6 +295,44 @@ class PushTaskEventsResponse(google.protobuf.message.Message):
 global___PushTaskEventsResponse = PushTaskEventsResponse
 
 @typing.final
+class PullTaskEventsRequest(google.protobuf.message.Message):
+    """PullTaskEvents messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_ID_FIELD_NUMBER: builtins.int
+    AFTER_TASK_EVENT_ID_FIELD_NUMBER: builtins.int
+    task_id: builtins.int
+    after_task_event_id: builtins.int
+    def __init__(
+        self,
+        *,
+        task_id: builtins.int = ...,
+        after_task_event_id: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_after_task_event_id", b"_after_task_event_id", "after_task_event_id", b"after_task_event_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_after_task_event_id", b"_after_task_event_id", "after_task_event_id", b"after_task_event_id", "task_id", b"task_id"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_after_task_event_id", b"_after_task_event_id"]) -> typing.Literal["after_task_event_id"] | None: ...
+
+global___PullTaskEventsRequest = PullTaskEventsRequest
+
+@typing.final
+class PullTaskEventsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.TaskEvent]: ...
+    def __init__(
+        self,
+        *,
+        events: collections.abc.Iterable[flwr.proto.task_pb2.TaskEvent] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+
+global___PullTaskEventsResponse = PullTaskEventsResponse
+
+@typing.final
 class PullTaskMessageRequest(google.protobuf.message.Message):
     """PullTaskMessage messages"""
 

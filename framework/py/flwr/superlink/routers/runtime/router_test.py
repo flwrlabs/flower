@@ -119,7 +119,7 @@ def test_all_runtime_routes_have_protobuf_request_types() -> None:
         if route_key[1].startswith("/v1/runtime/")
     }
 
-    assert len(route_keys) == 19
+    assert len(route_keys) == 20
     assert route_keys == runtime_request_types
 
 

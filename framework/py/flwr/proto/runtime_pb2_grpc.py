@@ -97,6 +97,11 @@ class RuntimeStub(object):
                 request_serializer=flwr_dot_proto_dot_runtime__pb2.PushTaskEventsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_runtime__pb2.PushTaskEventsResponse.FromString,
                 _registered_method=True)
+        self.PullTaskEvents = channel.unary_unary(
+                '/flwr.proto.Runtime/PullTaskEvents',
+                request_serializer=flwr_dot_proto_dot_runtime__pb2.PullTaskEventsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_runtime__pb2.PullTaskEventsResponse.FromString,
+                _registered_method=True)
         self.PullTaskMessage = channel.unary_unary(
                 '/flwr.proto.Runtime/PullTaskMessage',
                 request_serializer=flwr_dot_proto_dot_runtime__pb2.PullTaskMessageRequest.SerializeToString,
@@ -233,6 +238,13 @@ class RuntimeServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def PullTaskEvents(self, request, context):
+        """Pull events emitted by a child task
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def PullTaskMessage(self, request, context):
         """Pull task messages
         """
@@ -348,6 +360,11 @@ def add_RuntimeServicer_to_server(servicer, server):
                     servicer.PushTaskEvents,
                     request_deserializer=flwr_dot_proto_dot_runtime__pb2.PushTaskEventsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_runtime__pb2.PushTaskEventsResponse.SerializeToString,
+            ),
+            'PullTaskEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.PullTaskEvents,
+                    request_deserializer=flwr_dot_proto_dot_runtime__pb2.PullTaskEventsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_runtime__pb2.PullTaskEventsResponse.SerializeToString,
             ),
             'PullTaskMessage': grpc.unary_unary_rpc_method_handler(
                     servicer.PullTaskMessage,
@@ -709,6 +726,33 @@ class Runtime(object):
             '/flwr.proto.Runtime/PushTaskEvents',
             flwr_dot_proto_dot_runtime__pb2.PushTaskEventsRequest.SerializeToString,
             flwr_dot_proto_dot_runtime__pb2.PushTaskEventsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PullTaskEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Runtime/PullTaskEvents',
+            flwr_dot_proto_dot_runtime__pb2.PullTaskEventsRequest.SerializeToString,
+            flwr_dot_proto_dot_runtime__pb2.PullTaskEventsResponse.FromString,
             options,
             channel_credentials,
             insecure,

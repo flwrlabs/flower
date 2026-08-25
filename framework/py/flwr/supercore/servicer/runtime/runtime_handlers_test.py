@@ -30,6 +30,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     CreateTaskResponse,
     PullPendingTasksRequest,
+    PullTaskEventsRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskEventsResponse,
@@ -452,6 +453,43 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             123,
             789,
         )
+
+    def test_pull_task_events_returns_connector_events_after_cursor(self) -> None:
+        """AgentApp tasks should pull same-run connector events after a cursor."""
+        event = TaskEvent(id=3, run_id=789, task_id=456, event="connector.progress")
+        self.state.get_tasks.return_value = [
+            Task(task_id=456, run_id=789, type=TaskType.CONNECTOR)
+        ]
+        self.state.get_task_events.return_value = [event]
+
+        response = runtime_handlers.pull_task_events(
+            PullTaskEventsRequest(task_id=456, after_task_event_id=2),
+            self.state,
+            Task(task_id=321, run_id=789, type=TaskType.AGENT_APP),
+        )
+
+        self.state.get_task_events.assert_called_once_with(
+            run_id=789,
+            task_ids=[456],
+            after_task_event_id=2,
+        )
+        self.assertEqual(list(response.events), [event])
+
+    def test_pull_task_events_rejects_non_agentapp_callers(self) -> None:
+        """Only AgentApp tasks should read connector task events."""
+        self.state.get_tasks.return_value = [
+            Task(task_id=456, run_id=789, type=TaskType.CONNECTOR)
+        ]
+
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.pull_task_events(
+                PullTaskEventsRequest(task_id=456),
+                self.state,
+                Task(task_id=321, run_id=789, type=TaskType.SERVER_APP),
+            )
+
+        self.assertEqual(error.exception.code, ApiErrorCode.NO_PERMISSIONS)
+        self.state.get_task_events.assert_not_called()
 
     def test_record_task_usage_stores_usage_for_authenticated_metered_task(
         self,

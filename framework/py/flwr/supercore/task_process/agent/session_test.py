@@ -19,7 +19,7 @@ from unittest.mock import Mock, call, patch
 
 import pytest
 
-from flwr.common.serde import user_config_to_proto
+from flwr.common.serde import message_to_proto, user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
     StartAutomationResponse,
@@ -28,6 +28,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     CreateTaskResponse,
+    PullTaskEventsRequest,
+    PullTaskEventsResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
     PushTaskEventsRequest,
@@ -232,6 +234,7 @@ def test_create_connector_response_resolves_canonical_name() -> None:
         error=None,
         reply_to_message_id="request-message-id",
     )
+    on_event = Mock()
 
     with (
         patch(
@@ -246,6 +249,7 @@ def test_create_connector_response_resolves_canonical_name() -> None:
             name=" NoTiOn_Search ",
             call_id="call-1",
             arguments={},
+            on_event=on_event,
         )
 
     get_connector_ref.assert_called_once_with("notion_search")
@@ -255,4 +259,71 @@ def test_create_connector_response_resolves_canonical_name() -> None:
     request = send_and_receive.call_args.args[0]
     assert isinstance(request, ConnectorRequest)
     assert request.payload["name"] == "notion_search"
+    assert send_and_receive.call_args.kwargs == {"on_event": on_event}
     assert output == "done"
+
+
+def test_send_and_receive_delivers_child_events_before_returning_reply() -> None:
+    """Deliver child events, including events found by the final race-closing pull."""
+    stub = Mock()
+    responses = RuntimeAgentResponses(
+        stub=stub,
+        run_id=123,
+        task_id=789,
+        context=Mock(),
+        start_run_request=StartRunRequest(),
+        events=Mock(),
+    )
+    request = ConnectorRequest(
+        dst_task_id=456,
+        name="notion_search",
+        call_id="call-1",
+        arguments={},
+    )
+    first_event = {"type": "connector.progress", "progress": 25}
+    final_event = {"type": "connector.progress", "progress": 100}
+    stub.PullTaskEvents.side_effect = [
+        PullTaskEventsResponse(
+            events=[
+                TaskEvent(
+                    id=1,
+                    event="connector.progress",
+                    data='{"type":"connector.progress","progress":25}',
+                )
+            ]
+        ),
+        PullTaskEventsResponse(
+            events=[
+                TaskEvent(
+                    id=2,
+                    event="connector.progress",
+                    data='{"type":"connector.progress","progress":100}',
+                )
+            ]
+        ),
+    ]
+    def pull_task_message(_: PullTaskMessageRequest) -> PullTaskMessageResponse:
+        reply = ConnectorResponse(
+            dst_task_id=789,
+            name="notion_search",
+            call_id="call-1",
+            output="done",
+            error=None,
+            reply_to_message_id=request.metadata.message_id,
+        )
+        return PullTaskMessageResponse(messages=[message_to_proto(reply)])
+
+    stub.PullTaskMessage.side_effect = pull_task_message
+    received_events: list[JSONObject] = []
+
+    response = responses._send_and_receive(  # pylint: disable=W0212
+        request,
+        on_event=received_events.append,
+    )
+
+    assert response.metadata.reply_to_message_id == request.metadata.message_id
+    assert received_events == [first_event, final_event]
+    assert stub.PullTaskEvents.call_args_list == [
+        call(PullTaskEventsRequest(task_id=456)),
+        call(PullTaskEventsRequest(task_id=456, after_task_event_id=1)),
+    ]

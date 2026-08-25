@@ -81,6 +81,9 @@ service Runtime {
   // Push task events
   rpc PushTaskEvents(PushTaskEventsRequest) returns (PushTaskEventsResponse) {}
 
+  // Pull events emitted by a child task
+  rpc PullTaskEvents(PullTaskEventsRequest) returns (PullTaskEventsResponse) {}
+
   // Pull task messages
   rpc PullTaskMessage(PullTaskMessageRequest)
       returns (PullTaskMessageResponse) {}
@@ -150,6 +153,13 @@ message PushTaskMessageResponse { string message_id = 1; }
 // PushTaskEvents messages
 message PushTaskEventsRequest { repeated TaskEvent events = 1; }
 message PushTaskEventsResponse {}
+
+// PullTaskEvents messages
+message PullTaskEventsRequest {
+  uint64 task_id = 1;
+  optional uint64 after_task_event_id = 2;
+}
+message PullTaskEventsResponse { repeated TaskEvent events = 1; }
 
 // PullTaskMessage messages
 message PullTaskMessageRequest {

@@ -50,6 +50,7 @@ _RUNTIME_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "StartAutomation": MethodTokenPolicy.token_required(),
     "PushTaskMessage": MethodTokenPolicy.token_required(),
     "PushTaskEvents": MethodTokenPolicy.token_required(),
+    "PullTaskEvents": MethodTokenPolicy.token_required(),
     "PullTaskMessage": MethodTokenPolicy.token_required(),
     "RecordTaskUsage": MethodTokenPolicy.token_required(),
     "GetConnector": MethodTokenPolicy.token_required(),

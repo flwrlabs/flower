@@ -123,6 +123,12 @@ class RuntimeStub:
     ]
     """Push task events"""
 
+    PullTaskEvents: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.runtime_pb2.PullTaskEventsRequest,
+        flwr.proto.runtime_pb2.PullTaskEventsResponse,
+    ]
+    """Pull events emitted by a child task"""
+
     PullTaskMessage: grpc.UnaryUnaryMultiCallable[
         flwr.proto.runtime_pb2.PullTaskMessageRequest,
         flwr.proto.runtime_pb2.PullTaskMessageResponse,
@@ -257,6 +263,12 @@ class RuntimeAsyncStub:
         flwr.proto.runtime_pb2.PushTaskEventsResponse,
     ]
     """Push task events"""
+
+    PullTaskEvents: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.runtime_pb2.PullTaskEventsRequest,
+        flwr.proto.runtime_pb2.PullTaskEventsResponse,
+    ]
+    """Pull events emitted by a child task"""
 
     PullTaskMessage: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.runtime_pb2.PullTaskMessageRequest,
@@ -416,6 +428,14 @@ class RuntimeServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.runtime_pb2.PushTaskEventsResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.PushTaskEventsResponse]]:
         """Push task events"""
+
+    @abc.abstractmethod
+    def PullTaskEvents(
+        self,
+        request: flwr.proto.runtime_pb2.PullTaskEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.runtime_pb2.PullTaskEventsResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.PullTaskEventsResponse]]:
+        """Pull events emitted by a child task"""
 
     @abc.abstractmethod
     def PullTaskMessage(

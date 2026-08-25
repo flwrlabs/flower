@@ -31,6 +31,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
+    PullTaskEventsRequest,
+    PullTaskEventsResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
     PushTaskEventsRequest,
@@ -167,6 +169,36 @@ def push_task_events(
         )
 
     return PushTaskEventsResponse()
+
+
+def pull_task_events(
+    request: PullTaskEventsRequest,
+    state: CoreState,
+    task: Task,
+) -> PullTaskEventsResponse:
+    """Pull events emitted by a same-run connector task."""
+    log(DEBUG, "Runtime.PullTaskEvents")
+
+    connector_tasks = state.get_tasks(task_ids=[request.task_id], run_ids=[task.run_id])
+    if (
+        task.type != TaskType.AGENT_APP
+        or len(connector_tasks) != 1
+        or connector_tasks[0].type != TaskType.CONNECTOR
+    ):
+        raise FlowerError(
+            ApiErrorCode.NO_PERMISSIONS,
+            "Only AgentApp tasks can pull events from same-run connector tasks.",
+        )
+
+    after_task_event_id = (
+        request.after_task_event_id if request.HasField("after_task_event_id") else None
+    )
+    events = state.get_task_events(
+        run_id=task.run_id,
+        task_ids=[request.task_id],
+        after_task_event_id=after_task_event_id,
+    )
+    return PullTaskEventsResponse(events=events)
 
 
 def record_task_usage(

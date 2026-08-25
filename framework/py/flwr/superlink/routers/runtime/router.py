@@ -47,6 +47,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullAppMessagesResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
+    PullTaskEventsRequest,
+    PullTaskEventsResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PullTaskMessageRequest,
@@ -228,6 +230,16 @@ def pull_task_message(
 ) -> PullTaskMessageResponse:
     """Pull task messages."""
     return core_runtime_handlers.pull_task_message(request, state, task)
+
+
+@router.post("/pull-task-events")
+def pull_task_events(
+    request: Annotated[PullTaskEventsRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: LinkStateDependency,
+    task: TaskDependency,
+) -> PullTaskEventsResponse:
+    """Pull events emitted by a child connector task."""
+    return core_runtime_handlers.pull_task_events(request, state, task)
 
 
 @router.post("/record-task-usage")

@@ -43,6 +43,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullAppMessagesResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
+    PullTaskEventsRequest,
+    PullTaskEventsResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PullTaskMessageRequest,
@@ -220,6 +222,15 @@ class RuntimeHttpClient(ProtobufClient):
             rpc_method="/flwr.proto.Runtime/PushTaskEvents",
             request=request,
             response_type=PushTaskEventsResponse,
+        )
+
+    def PullTaskEvents(self, request: PullTaskEventsRequest) -> PullTaskEventsResponse:
+        """Pull events emitted by a child task."""
+        return self._unary_unary(
+            path="/v1/runtime/pull-task-events",
+            rpc_method="/flwr.proto.Runtime/PullTaskEvents",
+            request=request,
+            response_type=PullTaskEventsResponse,
         )
 
     def PullTaskMessage(
