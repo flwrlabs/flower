@@ -17,6 +17,7 @@
 
 import inspect
 import math
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
@@ -242,6 +243,7 @@ class ClientApp:
         node_id = message.metadata.dst_node_id
         server_round = _parse_server_round(message.metadata.group_id)
         self._emit_event(events[0], node_id=node_id, server_round=server_round)
+        started_at = time.perf_counter()
         try:
             result = call(message, context)
         except Exception:
@@ -249,13 +251,17 @@ class ClientApp:
                 events[2],
                 node_id=node_id,
                 server_round=server_round,
-                metadata={"error": "execution_failed"},
+                metadata={
+                    "error": "execution_failed",
+                    "elapsed_time": time.perf_counter() - started_at,
+                },
             )
             raise
         try:
             metrics = _extract_node_metrics(result)
         except Exception:  # pylint: disable=broad-exception-caught
             metrics = {}
+        metrics["elapsed_time"] = time.perf_counter() - started_at
         self._emit_event(
             events[1],
             node_id=node_id,

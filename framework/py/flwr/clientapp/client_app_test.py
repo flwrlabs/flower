@@ -366,7 +366,9 @@ def test_client_app_emits_fit_events() -> None:
         started_event.data
         == '{"type":"fl.node.fit.started","node_id":123,"server_round":7}'
     )
-    assert strict_json_loads(callback.call_args_list[1].args[0].data) == {
+    completed_event = strict_json_loads(callback.call_args_list[1].args[0].data)
+    assert completed_event.pop("elapsed_time") >= 0
+    assert completed_event == {
         "type": FL_NODE_FIT_COMPLETED,
         "node_id": 123,
         "server_round": 7,
@@ -395,7 +397,9 @@ def test_client_app_emits_evaluate_events() -> None:
         FL_NODE_EVALUATE_STARTED,
         FL_NODE_EVALUATE_COMPLETED,
     ]
-    assert strict_json_loads(callback.call_args_list[1].args[0].data) == {
+    completed_event = strict_json_loads(callback.call_args_list[1].args[0].data)
+    assert completed_event.pop("elapsed_time") >= 0
+    assert completed_event == {
         "type": FL_NODE_EVALUATE_COMPLETED,
         "node_id": 123,
         "server_round": 7,
@@ -425,6 +429,8 @@ def test_client_app_emits_fit_failed_event() -> None:
         FL_NODE_FIT_STARTED,
         FL_NODE_FIT_FAILED,
     ]
+    failed_event = strict_json_loads(callback.call_args_list[-1].args[0].data)
+    assert failed_event["elapsed_time"] >= 0
 
 
 def test_client_app_emits_evaluate_failed_event() -> None:
@@ -478,7 +484,9 @@ def test_client_app_failure_event_does_not_include_exception_details() -> None:
     with pytest.raises(RuntimeError, match="secret-token-should-not-be-persisted"):
         app(_make_message("train"), Mock(spec=Context))
 
-    assert strict_json_loads(callback.call_args_list[-1].args[0].data) == {
+    failed_event = strict_json_loads(callback.call_args_list[-1].args[0].data)
+    assert failed_event.pop("elapsed_time") >= 0
+    assert failed_event == {
         "type": FL_NODE_FIT_FAILED,
         "node_id": 123,
         "server_round": 7,
