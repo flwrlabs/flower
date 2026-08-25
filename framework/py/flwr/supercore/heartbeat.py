@@ -18,11 +18,12 @@ import random
 import signal
 import threading
 from collections.abc import Callable
-from logging import DEBUG, ERROR
+from logging import DEBUG, ERROR, WARNING
 
 import grpc
 
 from flwr.common.constant import (
+    APP_HEARTBEAT_CALL_TIMEOUT,
     HEARTBEAT_BASE_MULTIPLIER,
     HEARTBEAT_CALL_TIMEOUT,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -145,19 +146,21 @@ def make_app_heartbeat_fn_grpc(
     def fn() -> bool:
         # Call ServerAppIo API
         try:
-            res = stub.SendAppHeartbeat(req, timeout=HEARTBEAT_CALL_TIMEOUT)
+            res = stub.SendAppHeartbeat(req, timeout=APP_HEARTBEAT_CALL_TIMEOUT)
         except grpc.RpcError as e:
+            status_code = e.code()
+            retryable = status_code in {
+                grpc.StatusCode.UNAVAILABLE,
+                grpc.StatusCode.DEADLINE_EXCEEDED,
+            }
             log(
-                ERROR,
+                WARNING if retryable else ERROR,
                 "ClientApp heartbeat RPC failed: token=%s status=%s details=%s",
                 mask_string(token),
-                e.code(),
+                status_code,
                 e.details(),
             )
-            status_code = e.code()
-            if status_code == grpc.StatusCode.UNAVAILABLE:
-                return False
-            if status_code == grpc.StatusCode.DEADLINE_EXCEEDED:
+            if retryable:
                 return False
             raise
 

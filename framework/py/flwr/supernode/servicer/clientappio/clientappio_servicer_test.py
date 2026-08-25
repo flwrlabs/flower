@@ -25,6 +25,7 @@ from flwr.common.inflatable import (
     get_all_nested_objects,
     get_object_tree,
     iterate_object_tree,
+    iterate_object_trees_breadth_first,
 )
 from flwr.common.message import make_message
 from flwr.common.serde import fab_to_proto, message_to_proto
@@ -42,6 +43,7 @@ from flwr.proto.heartbeat_pb2 import (  # pylint:disable=E0611
 )
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint:disable=E0611
 from flwr.proto.message_pb2 import (  # pylint:disable=E0611
+    ObjectTree,
     PullObjectRequest,
     PullObjectResponse,
     PushObjectRequest,
@@ -168,6 +170,30 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_stub.PushClientAppOutputs.assert_called_once()
         self.mock_stub.PushMessage.assert_called_once()
         self.assertSetEqual(pushed_obj_ids, set(all_obj_ids))
+
+    def test_reply_object_push_order_is_metadata_first(self) -> None:
+        """Parents must be available before streamed payload descendants."""
+        message = make_message(
+            metadata=self.maker.metadata(),
+            content=self.maker.recorddict(2, 2, 1),
+        )
+        object_tree = get_object_tree(message)
+
+        object_ids = [
+            tree.object_id for tree in iterate_object_trees_breadth_first([object_tree])
+        ]
+        positions = {
+            object_id: position for position, object_id in enumerate(object_ids)
+        }
+
+        self.assertEqual(object_ids[0], object_tree.object_id)
+
+        def assert_parent_first(tree: ObjectTree) -> None:
+            for child in tree.children:
+                self.assertLess(positions[tree.object_id], positions[child.object_id])
+                assert_parent_first(child)
+
+        assert_parent_first(object_tree)
 
     def test_push_message_records_end_before_publishing_reply(self) -> None:
         """The sender loop must not see a reply before its end timestamp."""

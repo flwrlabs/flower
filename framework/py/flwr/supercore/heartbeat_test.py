@@ -19,7 +19,7 @@ import time
 import unittest
 from unittest.mock import Mock
 
-from flwr.common.constant import HEARTBEAT_CALL_TIMEOUT
+from flwr.common.constant import APP_HEARTBEAT_CALL_TIMEOUT
 
 from .heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
 
@@ -105,5 +105,5 @@ class TestHeartbeatSender(unittest.TestCase):
         self.assertEqual(request.token, "test-token")
         self.assertEqual(
             stub.SendAppHeartbeat.call_args.kwargs["timeout"],
-            HEARTBEAT_CALL_TIMEOUT,
+            APP_HEARTBEAT_CALL_TIMEOUT,
         )

@@ -19,7 +19,8 @@ from __future__ import annotations
 
 import hashlib
 import threading
-from collections.abc import Iterator
+from collections import deque
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from typing import TypeVar, cast
 
@@ -288,3 +289,14 @@ def iterate_object_tree(
     for child in tree.children:
         yield from iterate_object_tree(child)
     yield tree
+
+
+def iterate_object_trees_breadth_first(
+    trees: Iterable[ObjectTree],
+) -> Iterator[ObjectTree]:
+    """Yield parent metadata before descendants across one or more object trees."""
+    pending = deque(trees)
+    while pending:
+        tree = pending.popleft()
+        yield tree
+        pending.extend(tree.children)

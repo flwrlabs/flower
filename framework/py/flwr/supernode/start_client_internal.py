@@ -53,6 +53,7 @@ from flwr.common.inflatable import (
     get_all_nested_objects,
     get_object_tree,
     iterate_object_tree,
+    iterate_object_trees_breadth_first,
     no_object_id_recompute,
 )
 from flwr.common.inflatable_utils import (
@@ -467,7 +468,7 @@ def _push_messages(
         def yield_object_contents(
             _obj_tree: ObjectTree, obj_id_set: set[str]
         ) -> Iterator[tuple[str, bytes]]:
-            for tree in iterate_object_tree(_obj_tree):
+            for tree in iterate_object_trees_breadth_first([_obj_tree]):
                 if tree.object_id not in obj_id_set:
                     continue
                 while (content := object_store.get(tree.object_id)) == b"":

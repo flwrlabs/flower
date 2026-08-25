@@ -175,6 +175,32 @@ def test_streamed_upload_accepts_downstream_profile_bytes() -> None:
     )
 
 
+def test_streamed_upload_timeout_rejects_partial_aggregation() -> None:
+    """A missing streamed reply must abort before applying any update."""
+    strategy = FedAvgStreaming(initial_state_dict={})
+    grid = MagicMock()
+    grid._run.run_id = 1  # pylint: disable=protected-access
+
+    with pytest.raises(TimeoutError, match="No partial client update was applied"):
+        strategy._aggregate_streamed_upload_replies(  # pylint: disable=protected-access
+            grid=grid,
+            msg_ids=["missing-reply"],
+            batch_idx=0,
+            batch_count=1,
+            batch_entries=[],
+            timeout=0.0,
+            process=MagicMock(),
+            state_dict={},
+            aggregated_layers={},
+            offload_enabled=False,
+            offload_dir="",
+            chunk_count_by_layer={},
+            layer_names=[],
+            downstream_bytes_by_id={},
+            client_names_by_node_id={},
+        )
+
+
 def test_apply_aggregated_upload_chunk_has_no_network_arguments() -> None:
     """Applying an aggregate remains independent of transport profiling."""
     strategy = FedAvgStreaming(initial_state_dict={"layer": torch.zeros(2)})

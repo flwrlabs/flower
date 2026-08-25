@@ -31,6 +31,7 @@ from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.inflatable import (
     get_all_nested_objects,
     get_object_tree,
+    iterate_object_trees_breadth_first,
     no_object_id_recompute,
 )
 from flwr.common.inflatable_protobuf_utils import (
@@ -87,11 +88,17 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
         root_certificates=certificates,
     )
     channel.subscribe(on_channel_state_change)
+    heartbeat_channel = create_channel(
+        server_address=clientappio_api_address,
+        insecure=(certificates is None),
+        root_certificates=certificates,
+    )
     heartbeat_sender = None
 
     def on_exit() -> None:
         if heartbeat_sender is not None and heartbeat_sender.is_running:
             heartbeat_sender.stop()
+        heartbeat_channel.close()
         channel.close()
 
     register_signal_handlers(
@@ -105,8 +112,13 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
         stub = ClientAppIoStub(channel)
         _wrap_stub(stub, _make_simple_grpc_retry_invoker())
 
-        # Start app heartbeat
-        heartbeat_sender = HeartbeatSender(make_app_heartbeat_fn_grpc(stub, token))
+        # Keep heartbeat traffic independent from large object transfers on the main
+        # AppIO channel so transport flow control cannot starve lease renewal.
+        heartbeat_stub = ClientAppIoStub(heartbeat_channel)
+        _wrap_stub(heartbeat_stub, _make_simple_grpc_retry_invoker())
+        heartbeat_sender = HeartbeatSender(
+            make_app_heartbeat_fn_grpc(heartbeat_stub, token)
+        )
         heartbeat_sender.start()
         log(
             DEBUG,
@@ -299,6 +311,13 @@ def push_clientappoutputs(
 
             # Push all objects
             all_objects = get_all_nested_objects(message)
+            object_push_order = [
+                tree.object_id
+                for tree in iterate_object_trees_breadth_first([object_tree])
+            ]
+            all_objects = {
+                object_id: all_objects[object_id] for object_id in object_push_order
+            }
             del message
             push_objects(
                 all_objects,
@@ -309,13 +328,21 @@ def push_clientappoutputs(
                 ),
                 object_ids_to_push=object_ids_to_push,
             )
+            log(
+                INFO,
+                "[flwr-clientapp] Reply objects pushed: token=%s objects=%s "
+                "elapsed_ms=%.1f",
+                masked_token,
+                len(object_ids_to_push),
+                (perf_counter() - output_start) * 1000.0,
+            )
 
         # Push Context
         res: PushAppOutputsResponse = stub.PushClientAppOutputs(
             PushAppOutputsRequest(token=token, context=proto_context)
         )
         log(
-            DEBUG,
+            INFO,
             "[flwr-clientapp] PushClientAppOutputs complete: token=%s elapsed_ms=%.1f",
             masked_token,
             (perf_counter() - output_start) * 1000.0,

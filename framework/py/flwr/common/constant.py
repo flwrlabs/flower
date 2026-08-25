@@ -59,6 +59,10 @@ SIMULATIONIO_API_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{SIMULATIONIO_PORT}"
 # Constants for heartbeat
 HEARTBEAT_DEFAULT_INTERVAL = 30
 HEARTBEAT_CALL_TIMEOUT = 5
+# App heartbeats use a local AppIO connection, but large object transfers can still
+# delay an RPC on a busy channel. Keep this separate from the remote node heartbeat
+# deadline so a slower app heartbeat does not weaken node-failure detection.
+APP_HEARTBEAT_CALL_TIMEOUT = 30
 HEARTBEAT_BASE_MULTIPLIER = 0.8
 HEARTBEAT_RANDOM_RANGE = (-0.1, 0.1)
 HEARTBEAT_MIN_INTERVAL = 10

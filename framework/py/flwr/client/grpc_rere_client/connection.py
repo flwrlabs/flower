@@ -156,11 +156,21 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         interceptors=interceptors,
     )
     channel.subscribe(on_channel_state_change)
+    heartbeat_channel = create_channel(
+        server_address=server_address,
+        insecure=insecure,
+        root_certificates=root_certificates,
+        max_message_length=max_message_length,
+        interceptors=interceptors,
+    )
 
     # Shared variables for inner functions
     if adapter_cls is None:
         adapter_cls = FleetStub
     stub = adapter_cls(channel)
+    # HeartbeatSender owns retry/backoff for this dedicated channel. Do not wrap
+    # this stub with the payload RPC retry invoker shared by the main connection.
+    heartbeat_stub = adapter_cls(heartbeat_channel)
     node: Node | None = None
 
     # Wrap stub
@@ -189,7 +199,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
 
         # Call FleetAPI
         try:
-            res: SendNodeHeartbeatResponse = stub.SendNodeHeartbeat(
+            res: SendNodeHeartbeatResponse = heartbeat_stub.SendNodeHeartbeat(
                 req, timeout=HEARTBEAT_CALL_TIMEOUT
             )
         except grpc.RpcError as e:
@@ -396,4 +406,5 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
                     unregister_node()
         except grpc.RpcError:
             pass
+        heartbeat_channel.close()
         channel.close()

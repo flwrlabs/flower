@@ -44,6 +44,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.common.grpc import create_channel
 from flwr.common.logger import (
     log,
     mirror_output_to_queue,
@@ -58,6 +59,7 @@ from flwr.common.profiling import (
     set_active_profiler,
     set_profile_publisher,
 )
+from flwr.common.retry_invoker import _make_simple_grpc_retry_invoker, _wrap_stub
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -171,6 +173,7 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     run = None
     run_status = None
     heartbeat_sender = None
+    heartbeat_channel = None
     grid = None
     context = None
     profile_recorder: ProfileRecorder | None = None
@@ -180,6 +183,8 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         # Stop heartbeat sender
         if heartbeat_sender and heartbeat_sender.is_running:
             heartbeat_sender.stop()
+        if heartbeat_channel:
+            heartbeat_channel.close()
 
         # Stop log uploader for this run and upload final logs
         if log_uploader:
@@ -305,8 +310,15 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
 
         # Set up heartbeat sender
+        heartbeat_channel = create_channel(
+            server_address=serverappio_api_address,
+            insecure=(certificates is None),
+            root_certificates=certificates,
+        )
+        heartbeat_stub = ServerAppIoStub(heartbeat_channel)
+        _wrap_stub(heartbeat_stub, _make_simple_grpc_retry_invoker())
         heartbeat_sender = HeartbeatSender(
-            make_app_heartbeat_fn_grpc(grid._stub, token)
+            make_app_heartbeat_fn_grpc(heartbeat_stub, token)
         )
         heartbeat_sender.start()
 

@@ -153,10 +153,13 @@ class _StreamedReply:
 class _StreamObjectReader:
     """Pull deflated reply objects and track the time spent doing it."""
 
-    def __init__(self, grid: Grid, run_id: int) -> None:
+    def __init__(
+        self, grid: Grid, run_id: int, *, deadline: float | None = None
+    ) -> None:
         self._stub = getattr(grid, "_stub")
         self._node = getattr(grid, "node")
         self._run_id = run_id
+        self._deadline = deadline
         self._pull_object = make_pull_object_fn_protobuf(
             self._stub.PullObject, self._node, run_id
         )
@@ -167,7 +170,21 @@ class _StreamObjectReader:
     def pull(self, object_id: str, *, owner_key: str | None = None) -> bytes:
         """Pull one deflated object through the Grid's private object RPC."""
         t0 = perf_counter()
-        content = pull_objects([object_id], self._pull_object)[object_id]
+        remaining = (
+            None
+            if self._deadline is None
+            else max(self._deadline - time.monotonic(), 0.0)
+        )
+        if remaining == 0.0:
+            raise TimeoutError(
+                "Layer upload timed out while waiting for streamed objects"
+            )
+        content = pull_objects(
+            [object_id],
+            self._pull_object,
+            max_time=remaining,
+            max_tries_per_object=None,
+        )[object_id]
         elapsed_ms = (perf_counter() - t0) * 1000.0
         self.pull_ms += elapsed_ms
         self._object_sizes[object_id] = len(content)
@@ -883,16 +900,16 @@ class FedAvgStreaming(FedAvg):
 
         run_id = getattr(getattr(grid, "_run"), "run_id")
         stub = getattr(grid, "_stub")
-        object_reader = _StreamObjectReader(grid, run_id)
+        deadline = None if timeout is None else time.monotonic() + timeout
+        object_reader = _StreamObjectReader(grid, run_id, deadline=deadline)
         pending = set(msg_ids)
         streamed_replies: list[_StreamedReply] = []
         error_replies: list[Message] = []
         pull_interval = float(getattr(grid, "pull_interval", 0.1))
-        end_time = None if timeout is None else time.time() + timeout
         upstream_pull_ms = 0.0
 
         while pending:
-            if end_time is not None and time.time() >= end_time:
+            if deadline is not None and time.monotonic() >= deadline:
                 log(
                     WARNING,
                     "Timed out waiting for streamed layer upload replies: %s pending",
@@ -927,11 +944,28 @@ class FedAvgStreaming(FedAvg):
                     continue
 
                 owner_key = str(msg_tree.object_id)
+                log(
+                    INFO,
+                    "[Layer upload] batch %s/%s reply tree received from "
+                    "node %s; pulling streamed metadata",
+                    batch_idx + 1,
+                    batch_count,
+                    light_msg.metadata.src_node_id,
+                )
                 object_ids = {
                     str(tree.object_id) for tree in iterate_object_tree(msg_tree)
                 }
                 array_refs, metrics, downstream_ms = object_reader.array_refs(
                     msg_tree.object_id, owner_key=owner_key
+                )
+                log(
+                    INFO,
+                    "[Layer upload] batch %s/%s metadata ready from node %s: "
+                    "%s chunks referenced",
+                    batch_idx + 1,
+                    batch_count,
+                    light_msg.metadata.src_node_id,
+                    len(array_refs),
                 )
                 # Streamed replies are pulled from the raw ServerAppIo response, so
                 # the delivery sidecar is inline in ``msg_proto`` rather than part of
@@ -971,8 +1005,48 @@ class FedAvgStreaming(FedAvg):
                 msg.metadata.src_node_id,
                 msg.error.reason,
             )
-        if not streamed_replies:
-            return
+
+        def release_streamed_replies() -> None:
+            for reply in streamed_replies:
+                object_reader.confirm(reply.object_id)
+
+        if pending:
+            release_streamed_replies()
+            raise TimeoutError(
+                "Layer upload timed out before aggregation: "
+                f"batch {batch_idx + 1}/{batch_count} has "
+                f"{len(pending)}/{len(msg_ids)} replies pending after "
+                f"{timeout}s. No partial client update was applied."
+            )
+        if error_replies or len(streamed_replies) != len(msg_ids):
+            release_streamed_replies()
+            raise RuntimeError(
+                "Layer upload did not receive a valid update from every client: "
+                f"batch {batch_idx + 1}/{batch_count}, "
+                f"valid={len(streamed_replies)}, errors={len(error_replies)}, "
+                f"expected={len(msg_ids)}. No partial client update was applied."
+            )
+
+        expected_chunk_keys = [
+            _chunk_key(str(entry["layer_name"]), int(entry["start"]), int(entry["end"]))
+            for entry in batch_entries
+        ]
+        missing_chunks = [
+            (reply.node_id, key)
+            for reply in streamed_replies
+            for key in expected_chunk_keys
+            if key not in reply.array_refs
+        ]
+        if missing_chunks:
+            release_streamed_replies()
+            first_node_id, first_key = missing_chunks[0]
+            raise RuntimeError(
+                "Layer upload reply is incomplete: "
+                f"batch {batch_idx + 1}/{batch_count} is missing "
+                f"{len(missing_chunks)} client chunk(s); first missing "
+                f"node_id={first_node_id} key={first_key!r}. "
+                "No partial client update was applied."
+            )
 
         weights = [
             float(reply.metrics.get(self.weighted_by_key, 1.0))

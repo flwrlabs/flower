@@ -50,6 +50,7 @@ from flwr.common.inflatable import (
     get_all_nested_objects,
     get_object_tree,
     iterate_object_tree,
+    iterate_object_trees_breadth_first,
     no_object_id_recompute,
 )
 from flwr.common.inflatable_protobuf_utils import (
@@ -281,6 +282,13 @@ class GrpcGrid(Grid):
                 message_object_trees=object_trees,
             )
         )
+
+        # Make message/record metadata available before large array payloads. This
+        # lets receivers begin streamed object pulls while payload objects arrive.
+        all_objects = {
+            tree.object_id: all_objects[tree.object_id]
+            for tree in iterate_object_trees_breadth_first(object_trees)
+        }
 
         # Push objects
         push_object_fn = make_push_object_fn_protobuf(
