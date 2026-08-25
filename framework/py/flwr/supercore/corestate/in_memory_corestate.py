@@ -1267,6 +1267,13 @@ class InMemoryCoreState(
             current = now().isoformat()
             for event in events:
                 task_events = self.task_event_store.setdefault(event.run_id, [])
+                if any(
+                    stored.task_id == event.task_id
+                    and stored.event == event.event
+                    and stored.data == event.data
+                    for stored in task_events
+                ):
+                    continue
                 event.id = self._next_task_event_id
                 event.timestamp = current
                 task_events.append(event)

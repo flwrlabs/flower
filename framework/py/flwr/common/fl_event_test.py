@@ -91,7 +91,9 @@ def test_make_task_event_minimal() -> None:
 
     # Assert
     assert event.event == FL_RUN_STARTED
-    assert strict_json_loads(event.data) == {"type": FL_RUN_STARTED}
+    payload = strict_json_loads(event.data)
+    assert isinstance(payload.pop("event_id"), str)
+    assert payload == {"type": FL_RUN_STARTED}
     validate_task_event_data(event.data)
 
 
@@ -102,7 +104,9 @@ def test_make_task_event_with_node_id_and_round() -> None:
 
     # Assert
     assert event.event == FL_NODE_FIT_STARTED
-    assert strict_json_loads(event.data) == {
+    payload = strict_json_loads(event.data)
+    assert isinstance(payload.pop("event_id"), str)
+    assert payload == {
         "type": FL_NODE_FIT_STARTED,
         "node_id": 123,
         "server_round": 2,
@@ -120,7 +124,9 @@ def test_make_task_event_with_metadata() -> None:
     )
 
     # Assert
-    assert strict_json_loads(event.data) == {
+    payload = strict_json_loads(event.data)
+    assert isinstance(payload.pop("event_id"), str)
+    assert payload == {
         "type": FL_ROUND_FIT_COMPLETED,
         "server_round": 1,
         "num_results": 3,
@@ -144,7 +150,9 @@ def test_make_task_event_failure_metadata() -> None:
     )
 
     # Assert
-    assert strict_json_loads(event.data) == {
+    payload = strict_json_loads(event.data)
+    assert isinstance(payload.pop("event_id"), str)
+    assert payload == {
         "type": FL_RUN_FAILED,
         "error": "RuntimeError",
         "details": "boom",

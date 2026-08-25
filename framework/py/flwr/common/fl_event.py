@@ -16,6 +16,8 @@
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.typing import JSONObject, JSONValue
 from flwr.supercore.utils import strict_json_dumps
@@ -83,13 +85,13 @@ def make_task_event(
         object payload. ``run_id`` and ``task_id`` are left unset; they are
         assigned by the SuperLink from the authenticated identity.
     """
-    data: JSONObject = {"type": event}
+    data: JSONObject = {"type": event, "event_id": uuid4().hex}
     if node_id is not None:
         data["node_id"] = node_id
     if server_round is not None:
         data["server_round"] = server_round
     if metadata:
-        reserved_keys = {"type", "node_id", "server_round"}
+        reserved_keys = {"type", "event_id", "node_id", "server_round"}
         if reserved_keys.intersection(metadata):
             raise ValueError("Lifecycle event metadata contains reserved keys")
         data.update(metadata)

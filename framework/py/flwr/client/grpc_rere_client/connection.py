@@ -37,15 +37,14 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
     ActivateNodeResponse,
     DeactivateNodeRequest,
+    FleetPushTaskEventsRequest,
     PullMessagesRequest,
     PullMessagesResponse,
-    FleetPushTaskEventsRequest,
     PushMessagesRequest,
     PushMessagesResponse,
     RegisterNodeFleetRequest,
     UnregisterNodeFleetRequest,
 )
-from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.proto.fleet_pb2_grpc import FleetStub  # pylint: disable=E0611
 from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
     SendNodeHeartbeatRequest,
@@ -54,6 +53,7 @@ from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.fab import Fab
 from flwr.supercore.grpc import (
@@ -87,6 +87,9 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         tuple[ec.EllipticCurvePrivateKey, ec.EllipticCurvePublicKey] | None
     ) = None,
     adapter_cls: type[FleetStub] | type[GrpcAdapter] | None = None,
+    on_task_events_ready: (
+        Callable[[Callable[[int, Sequence[TaskEvent]], None]], None] | None
+    ) = None,
 ) -> Iterator[
     tuple[
         int,
@@ -97,7 +100,6 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         Callable[[int, str], bytes],
         Callable[[int, str, str, bytes], None],
         Callable[[int, str], None],
-        Callable[[int, Sequence[TaskEvent]], None],
     ]
 ]:
     """Primitives for request/response-based interaction with a server.
@@ -143,7 +145,6 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
     pull_object : Callable[[int, str], bytes]
     push_object : Callable[[int, str, str, bytes], None]
     confirm_message_received : Callable[[int, str], None]
-    push_task_events : Callable[[int, Sequence[TaskEvent]], None]
     """
     if isinstance(root_certificates, str):
         root_certificates = Path(root_certificates).expanduser().read_bytes()
@@ -380,6 +381,9 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
             FleetPushTaskEventsRequest(node=node, run_id=run_id, events=events)
         )
 
+    if on_task_events_ready is not None:
+        on_task_events_ready(push_task_events)
+
     try:
         if self_registered:
             register_node()
@@ -394,7 +398,6 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
             pull_object,
             push_object,
             confirm_message_received,
-            push_task_events,
         )
     except Exception as exc:  # pylint: disable=broad-except
         log(ERROR, exc)

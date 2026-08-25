@@ -236,6 +236,7 @@ def start_client_internal(
         # pylint: disable-next=consider-using-with
         subprocess.Popen(command)
 
+    task_event_sender: list[Callable[[int, Sequence[TaskEvent]], None]] = []
     with _init_connection(
         transport=transport,
         server_address=server_address,
@@ -244,6 +245,9 @@ def start_client_internal(
         authentication_keys=authentication_keys,
         max_retries=max_retries,
         max_wait_time=max_wait_time,
+        on_task_events_ready=lambda callback: _set_task_event_sender(
+            callback, task_event_sender
+        ),
     ) as conn:
         (
             node_id,
@@ -254,7 +258,6 @@ def start_client_internal(
             pull_object,
             push_object,
             confirm_message_received,
-            push_task_events,
         ) = conn
         # Store node_id in state
         state.set_node_id(node_id)
@@ -287,7 +290,7 @@ def start_client_internal(
                 object_store=store,
                 send=send,
                 push_object=push_object,
-                push_task_events=push_task_events,
+                push_task_events=task_event_sender[0],
                 run_id=run_id,
                 task_id=task_id,
             )
@@ -600,6 +603,9 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
     ) = None,
     max_retries: int | None = None,
     max_wait_time: float | None = None,
+    on_task_events_ready: (
+        Callable[[Callable[[int, Sequence[TaskEvent]], None]], None] | None
+    ) = None,
 ) -> Iterator[
     tuple[
         int,
@@ -610,7 +616,6 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
         Callable[[int, str], bytes],
         Callable[[int, str, str, bytes], None],
         Callable[[int, str], None],
-        Callable[[int, Sequence[TaskEvent]], None],
     ]
 ]:
     """Establish a connection to the Fleet API server at SuperLink."""
@@ -649,8 +654,17 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
         GRPC_MAX_MESSAGE_LENGTH,
         root_certificates,
         authentication_keys,
+        on_task_events_ready=on_task_events_ready,
     ) as conn:
         yield conn
+
+
+def _set_task_event_sender(
+    callback: Callable[[int, Sequence[TaskEvent]], None],
+    target: list[Callable[[int, Sequence[TaskEvent]], None]],
+) -> None:
+    """Store the connection-scoped lifecycle-event sender."""
+    target[:] = [callback]
 
 
 def _make_fleet_connection_retry_invoker(
