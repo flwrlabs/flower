@@ -132,18 +132,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         # This is best-effort analytics attribution, not authentication. We
         # trust callers to label their own requests and default unlabeled
         # requests to unknown when no source is provided.
-        run_source = (
-            next(
-                (
-                    value
-                    for key, value in metadata
-                    if key == extensions.RUN_SOURCE_METADATA_KEY
-                ),
-                None,
-            )
-            if isinstance(metadata, (tuple, list))
-            else None
-        )
+        run_source = dict(metadata).get(extensions.RUN_SOURCE_METADATA_KEY)
         return control_handlers.start_run(
             request,
             _get_account(),
