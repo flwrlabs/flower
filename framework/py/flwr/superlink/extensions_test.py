@@ -61,3 +61,35 @@ def test_notify_run_started_isolates_extension_import_failure(
     monkeypatch.setattr(extensions, "_try_import_sgxt", fail_import)
 
     extensions.notify_run_started(Run.create_empty(123), "unknown")
+
+
+def test_notify_result_delivered_passes_a_snapshot_to_the_extension(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Pass a copy of the accepted run to the optional extension."""
+    callback = Mock()
+    module = ModuleType("flwr.ee.superlink.extensions")
+    module.on_result_delivered = callback  # type: ignore[attr-defined]
+    monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: module)
+    run = Run.create_empty(123)
+
+    extensions.notify_result_delivered(run, "account-123", "logs")
+
+    callback.assert_called_once()
+    notified_run, flwr_aid, channel = callback.call_args.args
+    assert notified_run == run
+    assert notified_run is not run
+    assert flwr_aid == "account-123"
+    assert channel == "logs"
+
+
+def test_notify_result_delivered_isolates_extension_failure(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Keep an accepted result request successful when the extension fails."""
+    callback = Mock(side_effect=RuntimeError("extension failed"))
+    module = ModuleType("flwr.ee.superlink.extensions")
+    module.on_result_delivered = callback  # type: ignore[attr-defined]
+    monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: module)
+
+    extensions.notify_result_delivered(Run.create_empty(123), "account-123", "chat")
