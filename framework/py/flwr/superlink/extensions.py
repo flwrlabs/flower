@@ -34,8 +34,8 @@ ResultDeliveryChannel = Literal["logs", "chat"]
 _SGXT_MODULE = "flwr.ee.superlink.extensions"
 
 
-def _is_sgxt_import_error(exc: ImportError) -> bool:
-    """Return whether an import error means that SGXT is unavailable."""
+def _is_sgxt_module_not_found(exc: ModuleNotFoundError) -> bool:
+    """Return whether a missing module means that SGXT is unavailable."""
     return exc.name == _SGXT_MODULE or (
         exc.name is not None and _SGXT_MODULE.startswith(f"{exc.name}.")
     )
@@ -46,8 +46,8 @@ def configure_app(app: FastAPI) -> None:
     try:
         # pylint: disable-next=import-outside-toplevel
         from flwr.ee.superlink.extensions import configure_app as _configure_sgxt_app
-    except ImportError as exc:
-        if _is_sgxt_import_error(exc):
+    except ModuleNotFoundError as exc:
+        if _is_sgxt_module_not_found(exc):
             return
         raise
 
@@ -61,8 +61,8 @@ def get_middleware() -> tuple[Middleware, ...]:
     try:
         # pylint: disable-next=import-outside-toplevel
         from flwr.ee.superlink.extensions import get_middleware as _get_sgxt_middleware
-    except ImportError as exc:
-        if _is_sgxt_import_error(exc):
+    except ModuleNotFoundError as exc:
+        if _is_sgxt_module_not_found(exc):
             return ()
         raise
 
@@ -78,8 +78,8 @@ def get_lifespan_contexts() -> tuple[SuperLinkLifespanContext, ...]:
         from flwr.ee.superlink.extensions import (
             get_lifespan_contexts as _get_sgxt_lifespan_contexts,
         )
-    except ImportError as exc:
-        if _is_sgxt_import_error(exc):
+    except ModuleNotFoundError as exc:
+        if _is_sgxt_module_not_found(exc):
             return ()
         raise
 
@@ -101,8 +101,8 @@ def notify_run_started(run: Run, source: RunStartSource) -> None:
         try:
             # pylint: disable-next=import-outside-toplevel
             from flwr.ee.superlink.extensions import on_run_started as _on_run_started
-        except ImportError as exc:
-            if _is_sgxt_import_error(exc):
+        except ModuleNotFoundError as exc:
+            if _is_sgxt_module_not_found(exc):
                 return
             raise
 
@@ -136,8 +136,8 @@ def notify_result_delivered(
             from flwr.ee.superlink.extensions import (
                 on_result_delivered as _on_result_delivered,
             )
-        except ImportError as exc:
-            if _is_sgxt_import_error(exc):
+        except ModuleNotFoundError as exc:
+            if _is_sgxt_module_not_found(exc):
                 return
             raise
 

@@ -20,7 +20,7 @@ from collections.abc import Mapping
 from types import ModuleType
 from unittest.mock import Mock
 
-from pytest import MonkeyPatch, raises
+from pytest import MonkeyPatch, mark, raises
 
 from flwr.supercore.run import Run
 
@@ -168,10 +168,12 @@ def test_optional_configuration_bridges_skip_missing_extension(
     assert extensions.get_lifespan_contexts() == ()
 
 
-def test_import_errors_without_a_module_name_are_not_ignored(
+@mark.parametrize("error_name", [None, "flwr.ee"])
+def test_unexpected_import_errors_are_not_ignored(
     monkeypatch: MonkeyPatch,
+    error_name: str | None,
 ) -> None:
-    """Do not hide import failures whose source cannot be identified."""
+    """Do not hide import failures from an installed extension package."""
     import_function = builtins.__import__
 
     def fail_sgxt_import(
@@ -182,10 +184,29 @@ def test_import_errors_without_a_module_name_are_not_ignored(
         level: int = 0,
     ) -> object:
         if name.startswith("flwr.ee"):
-            raise ImportError("Unexpected extension import failure", name=None)
+            raise ImportError("Unexpected extension import failure", name=error_name)
         return import_function(name, globals_, locals_, fromlist, level)
 
     monkeypatch.setattr(builtins, "__import__", fail_sgxt_import)
 
     with raises(ImportError, match="Unexpected extension import failure"):
         extensions.get_middleware()
+
+
+@mark.parametrize(
+    "bridge", ["configure_app", "get_middleware", "get_lifespan_contexts"]
+)
+def test_configuration_bridges_raise_when_sgxt_hook_is_missing(
+    monkeypatch: MonkeyPatch,
+    bridge: str,
+) -> None:
+    """Expose a missing hook instead of silently disabling an installed extension."""
+    _install_sgxt_module(monkeypatch)
+
+    with raises(ImportError):
+        if bridge == "configure_app":
+            extensions.configure_app(Mock())
+        elif bridge == "get_middleware":
+            extensions.get_middleware()
+        else:
+            extensions.get_lifespan_contexts()
