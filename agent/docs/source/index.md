@@ -62,6 +62,7 @@ how-to-guides/create-automations
 how-to-guides/run-on-supergrid
 how-to-guides/troubleshoot-agent-runs
 how-to-guides/run-with-local-superlink
+how-to-guides/run-with-ollama
 ```
 
 ```{toctree}
@@ -80,6 +81,5 @@ reference](https://flower.ai/docs/framework/ref-api/flwr.agentapp.html) remains
 in the Flower framework documentation.
 
 Design proposals and partially implemented paths aren't documented as current
-capabilities. Persistent federation Agent management, Hub publishing of
-first-class AgentApps, persistent CLI conversation history, and a public Open
-Responses-compatible runtime endpoint aren't available yet.
+capabilities. The documentation describes behavior available in the Flower
+framework and SuperGrid interfaces rather than planned product work.
