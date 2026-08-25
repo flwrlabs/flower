@@ -879,6 +879,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
+        src_task_ids: Sequence[int] | None = None,
         limit: int | None = None,
         order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
@@ -891,6 +892,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         dst_task_ids : Optional[Sequence[int]] (default: None)
             Sequence of destination task IDs to filter by.
+        src_task_ids : Optional[Sequence[int]] (default: None)
+            Sequence of source task IDs to filter by.
         limit : Optional[int] (default: None)
             Maximum number of messages to return. If `None`, no limit is applied.
         order_by : Optional[Literal["created_at"]] (default: None)
@@ -929,6 +932,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         run_id: int | None = None,
+        task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events matching the filters.
@@ -938,6 +942,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         run_id : Optional[int] (default: None)
             If set, return only events for this run. If set to `None`, return
             events for all runs.
+        task_ids : Optional[Sequence[int]] (default: None)
+            If set, return only events produced by these tasks.
         after_task_event_id : Optional[int] (default: None)
             Return only events with an ID greater than this cursor. If set to
             `None`, retrieve all events.

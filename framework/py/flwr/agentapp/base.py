@@ -55,6 +55,14 @@ class AgentConnectors(ABC):
         """Execute one model function_call and return a function_call_output item."""
 
 
+class AgentEvents(ABC):
+    """Abstract base class for AgentApp run events."""
+
+    @abstractmethod
+    def emit(self, event: JSONObject) -> None:
+        """Emit one structured run event."""
+
+
 class AgentSession(ABC):
     """Abstract base class for AgentApp runtime capabilities."""
 
@@ -67,6 +75,11 @@ class AgentSession(ABC):
     @abstractmethod
     def connectors(self) -> AgentConnectors:
         """Connector tool schema and execution API."""
+
+    @property
+    @abstractmethod
+    def events(self) -> AgentEvents:
+        """Frontend-visible structured run event API."""
 
 
 AgentAppCallable = Callable[[AgentSession, Context], None]

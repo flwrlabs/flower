@@ -49,34 +49,33 @@ async def http_error_translator(
     """Translate exceptions from downstream HTTP handling into safe responses.
 
     Let successful responses pass through unchanged. Convert ``FlowerError``
-    instances into their catalog-defined public JSON contract, preserve
-    FastAPI's response contract for ``HTTPException``, and translate every
-    unexpected exception into a generic JSON 500 response. Internal exception
-    details are logged for diagnostics but are never exposed to the client.
+    instances into their catalog-defined public JSON contract, including the
+    numeric error code and optional public details. Preserve FastAPI's response
+    contract for ``HTTPException``, and translate every unexpected exception
+    into a generic JSON 500 response. Internal exception details are logged for
+    diagnostics but are never exposed to the client.
     """
     try:
         return await call_next(request)
     except FlowerError as err:
         try:
             error_spec = API_ERROR_MAP[err.code]
-            http_status = error_spec.http_status_code
-            public_message = error_spec.public_message
-            http_headers = error_spec.http_headers
+            response = JSONResponse(
+                content=err.to_json(error_spec.public_message),
+                status_code=error_spec.http_status_code,
+                headers=error_spec.http_headers,
+            )
         except (ValueError, KeyError):
-            http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
-            public_message = INTERNAL_SERVER_ERROR_MESSAGE
-            http_headers = None
+            response = JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"detail": INTERNAL_SERVER_ERROR_MESSAGE},
+            )
 
         # Log error as is
         msg = f"[{request.url.path}][ApiError:{err.code}] {err.message}"
         log(ERROR, msg)
         # Return sanitized error to client
-        return Response(
-            status_code=http_status,
-            content=err.to_json(public_message),
-            headers=http_headers,
-            media_type="application/json",
-        )
+        return response
     except HTTPException as err:
         return await http_exception_handler(request, err)
     except Exception as err:  # pylint: disable=broad-exception-caught

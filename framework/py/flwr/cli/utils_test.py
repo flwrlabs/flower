@@ -36,7 +36,6 @@ from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
 from flwr.common.constant import FLWR_DIR
 from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 
@@ -56,29 +55,6 @@ from .utils import (
     validate_federation_name,
     wait_for_control_api_channel,
 )
-
-
-class _GrpcErrorWithDetails:
-    """Test helper object carrying a gRPC-like details string."""
-
-    def __init__(self, details: str) -> None:
-        self._details = details
-
-    def details(self) -> str:
-        """Return the stored gRPC details string."""
-        return self._details
-
-
-def _grpc_error_with_details(details: str) -> grpc.RpcError:
-    """Return a grpc.RpcError-compatible test helper with a details method."""
-    return cast(grpc.RpcError, _GrpcErrorWithDetails(details))
-
-
-def _flower_error_details(code: ApiErrorCode, public_details: str | None = None) -> str:
-    """Return serialized FlowerError details as sent through gRPC."""
-    return FlowerError(code, "internal details", public_details).to_json(
-        API_ERROR_MAP[code].public_message
-    )
 
 
 class TestGetSHA256Hash(unittest.TestCase):

@@ -40,8 +40,8 @@ Authenticate first, then ask SuperGrid for the federations visible to your
 account:
 
 ```console
-$ uvx --from flwr==1.34.0 flwr login supergrid
-$ uvx --from flwr==1.34.0 flwr federation list supergrid
+$ uvx --from flwr==1.35.0 flwr login supergrid
+$ uvx --from flwr==1.35.0 flwr federation list supergrid
 ```
 
 Use the full federation ID shown by this command, including its leading `@`, in
@@ -51,7 +51,7 @@ later commands.
 
 The following `uv run` examples use the Flower version installed in your local
 project environment. To stay consistent with the rest of this guide, ensure
-that environment has `flwr==1.34.0` installed.
+that environment has `flwr==1.35.0` installed.
 
 Flower selects the federation in this order:
 
@@ -76,7 +76,7 @@ $ uv run flwr run . supergrid \
 The app can also be a published app spec:
 
 ```console
-$ uvx --from flwr==1.34.0 flwr run @publisher/agent supergrid \
+$ uvx --from flwr==1.35.0 flwr run @publisher/agent supergrid \
     --federation @account/federation-name \
     --run-config 'agent.input="Summarize this federation task."'
 ```
@@ -86,23 +86,22 @@ AgentApp there.
 
 ## Choose the `flwr chat` federation
 
-`flwr chat` currently has no `--federation` option. It reads the optional
-`federation` value from the `supergrid` connection in `~/.flwr/config.toml`:
+`flwr chat` starts in your `@account/personal` federation. Enter
+`/federation` to open the completion menu, then select a federation visible to
+your account. You can also type its full name:
 
-```toml
-[superlink.supergrid]
-address = "supergrid.flower.ai"
-federation = "@account/federation-name"
+```text
+/federation @account/federation-name
 ```
 
-Omit `federation` to let SuperGrid use the account default. After changing the
-value, restart `flwr chat`. Use `flwr run --federation` when you need to switch
-targets frequently without editing configuration.
+Switching federations clears the transcript, resets the selected agent to
+Flower Agent, and starts a new conversation. Use `flwr run --federation` when
+you want to select the federation in a non-interactive command.
 
 ## Select an agent in Flower Chat
 
 At an empty `flwr chat` prompt, type `@`. The completion menu lists agents
-returned for the configured federation. Choose one and add your request:
+returned for the active federation. Choose one and add your request:
 
 ```text
 @publisher/agent Compare the two proposed approaches.
@@ -113,41 +112,35 @@ that agent for later messages. Selecting a different agent clears the current
 series ID, so the request starts a new run series. Use `/new` to start a new
 series without changing agents.
 
-```{note}
-The completion list is not a persistent federation Agent-management interface.
-Adding or removing the agents assigned to a federation remains planned.
-```
-
 ## Select an agent in SuperGrid
 
-Open [Flower Agent](https://flower.ai/app) and start a new chat. Use the agent
-selector above the prompt before submitting your first message. The page shows
-the federation used for the run in its header or breadcrumb.
+Open [Flower Agent](https://flower.ai/app). The sidebar pins your personal
+federation and lists the other federations visible to your account. Select a
+federation, open **New chat**, and choose one of its assigned agents above the
+prompt.
 
-The current browser Agent flow uses the account's Agent execution workspace.
-Federation navigation lets you inspect other federation activity, but it is not
-yet a complete persistent add/remove/select management workflow for arbitrary
-collaborative federations. Use `flwr run --federation` when you need an explicit
-CLI target.
+The selected federation owns the run and its conversation. Recent AgentApp
+conversations appear below that federation in the sidebar, where you can open
+them again. Flower excludes non-AgentApp run series from this chat history.
 
 ## Know when a new series starts
 
-| Action                                       | Result                               |
-| -------------------------------------------- | ------------------------------------ |
-| Send another message with the selected agent | Reuse the current run series         |
-| Enter `/new` in Flower Chat                  | The next message starts a new series |
-| Select a different leading `@agent`          | Start a new series with that agent   |
-| Select **New chat** in SuperGrid             | Start a new browser conversation     |
-| Run `flwr run` without a series ID           | Start an independent run or series   |
-
-The CLI does not currently offer interactive restoration of a previous chat
-series. Use the SuperGrid browser to inspect existing conversations.
+| Action                                       | Result                                |
+| -------------------------------------------- | ------------------------------------- |
+| Send another message with the selected agent | Reuse the current run series          |
+| Enter `/new` in Flower Chat                  | The next message starts a new series  |
+| Select a different leading `@agent`          | Start a new series with that agent    |
+| Enter `/history` in Flower Chat              | Select and continue an older series   |
+| Switch federations in Flower Chat            | Start a new series in that federation |
+| Select **New chat** in SuperGrid             | Start a new browser conversation      |
+| Select a browser conversation                | Continue its existing run series      |
+| Run `flwr run` without a series ID           | Start an independent run or series    |
 
 ## Use connectors in the right workspace
 
 Built-in tools such as `web_search` and `web_fetch` are chosen in AgentApp code.
 Slack, Notion, GitHub, and Attio are account connectors selected for a browser
-run. Flower 1.34.0 rejects account-connector references for a collaborative
+run. Flower 1.35.0 rejects account-connector references for a collaborative
 federation; run that task in your personal workspace instead.
 
 See [Connect accounts](connect-accounts.md) for setup and the exact read-only
