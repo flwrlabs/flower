@@ -17,7 +17,6 @@
 from collections.abc import Callable, Mapping
 from contextlib import AbstractAsyncContextManager
 from copy import deepcopy
-from importlib import import_module
 from logging import WARNING
 from types import ModuleType
 from typing import Any, Literal, cast
@@ -39,7 +38,8 @@ _SGXT_MODULE = "flwr.ee.superlink.extensions"
 def _try_import_sgxt() -> ModuleType | None:
     """Return the SuperGrid Extensions module when it is installed."""
     try:
-        return import_module(_SGXT_MODULE)
+        # pylint: disable=import-outside-toplevel
+        import flwr.ee.superlink.extensions as sgxt
     except ModuleNotFoundError as exc:
         # Ignore only an absent SuperGrid Extensions package or module. Missing
         # dependencies imported by an existing extension must still fail loudly.
@@ -48,6 +48,7 @@ def _try_import_sgxt() -> ModuleType | None:
         ):
             raise
         return None
+    return cast(ModuleType, sgxt)
 
 
 def configure_app(app: FastAPI) -> None:
