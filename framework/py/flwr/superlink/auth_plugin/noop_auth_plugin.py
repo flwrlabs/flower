@@ -12,12 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Concrete NoOp implementation for Servicer-side account authentication and
-authorization plugins."""
+"""Concrete NoOp implementation for Servicer-side account authentication."""
 
 
 from collections.abc import Sequence
-from pathlib import Path
 
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID, AuthnType
 from flwr.supercore.auth.typing import (
@@ -26,22 +24,21 @@ from flwr.supercore.auth.typing import (
     AccountInfo,
 )
 
-from .auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
+from .auth_plugin import ControlAuthnPlugin
 
-NOOP_ACCOUNT_INFO = AccountInfo(
-    flwr_aid=NOOP_FLWR_AID,
-    account_name=NOOP_ACCOUNT_NAME,
-)
+
+def _create_noop_account_info() -> AccountInfo:
+    """Create account information without sharing mutable state between calls."""
+    return AccountInfo(
+        flwr_aid=NOOP_FLWR_AID,
+        account_name=NOOP_ACCOUNT_NAME,
+    )
 
 
 class NoOpControlAuthnPlugin(ControlAuthnPlugin):
     """No-operation implementation of ControlAuthnPlugin."""
 
-    def __init__(
-        self,
-        account_auth_config_path: Path,
-        verify_tls_cert: bool,
-    ):
+    def __init__(self) -> None:
         pass
 
     def get_login_details(self) -> AccountAuthLoginDetails | None:
@@ -60,7 +57,7 @@ class NoOpControlAuthnPlugin(ControlAuthnPlugin):
         self, metadata: Sequence[tuple[str, str | bytes]]
     ) -> tuple[bool, AccountInfo | None]:
         """Return valid for no-op plugin."""
-        return True, NOOP_ACCOUNT_INFO
+        return True, _create_noop_account_info()
 
     def get_auth_tokens(self, device_code: str) -> AccountAuthCredentials | None:
         """Get authentication tokens."""
@@ -70,15 +67,4 @@ class NoOpControlAuthnPlugin(ControlAuthnPlugin):
         self, metadata: Sequence[tuple[str, str | bytes]]
     ) -> tuple[Sequence[tuple[str, str | bytes]] | None, AccountInfo | None]:
         """Refresh authentication tokens in the provided metadata."""
-        return metadata, NOOP_ACCOUNT_INFO
-
-
-class NoOpControlAuthzPlugin(ControlAuthzPlugin):
-    """No-operation implementation of ControlAuthzPlugin."""
-
-    def __init__(self, account_auth_config_path: Path, verify_tls_cert: bool):
-        pass
-
-    def authorize(self, account_info: AccountInfo) -> bool:
-        """Return True for no-op plugin."""
-        return True
+        return metadata, _create_noop_account_info()

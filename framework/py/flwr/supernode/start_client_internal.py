@@ -26,7 +26,6 @@ from functools import partial
 from logging import ERROR, INFO, WARN
 from typing import cast
 
-import grpc
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from cryptography.hazmat.primitives.serialization.ssh import load_ssh_public_key
 from grpc import RpcError
@@ -37,7 +36,6 @@ from flwr.client.grpc_adapter_client.connection import grpc_adapter
 from flwr.client.grpc_rere_client.connection import grpc_request_response
 from flwr.common.config import get_fused_config_from_fab
 from flwr.common.constant import (
-    CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
     ISOLATION_MODE_SUBPROCESS,
     RUNTIME_DEPENDENCY_INSTALL,
     TRANSPORT_TYPE_GRPC_ADAPTER,
@@ -47,14 +45,13 @@ from flwr.common.constant import (
     ExecPluginType,
     SubStatus,
 )
-from flwr.common.logger import log
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
-from flwr.proto.runtime_pb2_grpc import add_RuntimeServicer_to_server
+from flwr.supercore import log
 from flwr.supercore.address import parse_address, resolve_bind_address
-from flwr.supercore.constant import TaskType
+from flwr.supercore.constant import SUPERNODE_DEFAULT_SERVER_ADDRESS, TaskType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.fab import Fab
-from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
+from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -66,12 +63,7 @@ from flwr.supercore.inflatable.inflatable_utils import (
     pull_objects,
     push_object_contents_from_iterable,
 )
-from flwr.supercore.interceptors import (
-    create_clientappio_runtime_version_server_interceptor,
-    create_clientappio_superexec_auth_server_interceptor,
-    create_clientappio_token_auth_server_interceptor,
-)
-from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
+from flwr.supercore.object_store import ObjectStore
 from flwr.supercore.primitives.asymmetric_ed25519 import (
     create_message_to_sign,
     decode_base64url,
@@ -83,7 +75,6 @@ from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import get_client_tls_args
 from flwr.supercore.version import package_version
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
-from flwr.supernode.servicer.clientappio import ClientAppIoServicer
 
 FAB_VERIFICATION_ERROR = Error(ErrorCode.INVALID_FAB, "The FAB could not be verified.")
 
@@ -95,6 +86,7 @@ FAB_VERIFICATION_ERROR = Error(ErrorCode.INVALID_FAB, "The FAB could not be veri
 # pylint: disable=too-many-arguments
 def start_client_internal(
     *,
+    state_factory: NodeStateFactory,
     server_address: str,
     node_config: UserConfig,
     root_certificates: bytes | str | None = None,
@@ -106,9 +98,9 @@ def start_client_internal(
     max_retries: int | None = None,
     max_wait_time: float | None = None,
     isolation: str = ISOLATION_MODE_SUBPROCESS,
-    clientappio_api_address: str = CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
-    clientappio_certificates: tuple[bytes, bytes, bytes] | None = None,
-    clientappio_root_certificates_path: str | None = None,
+    runtime_api_address: str = SUPERNODE_DEFAULT_SERVER_ADDRESS,
+    runtime_certificates: tuple[bytes, bytes, bytes] | None = None,
+    runtime_root_certificates_path: str | None = None,
     health_server_address: str | None = None,
     trusted_entities: dict[str, str] | None = None,
     superexec_auth_secret: bytes | None = None,
@@ -118,6 +110,8 @@ def start_client_internal(
 
     Parameters
     ----------
+    state_factory : NodeStateFactory
+        Factory providing the state shared by the Fleet worker and Runtime API.
     server_address : str
         The IPv4 or IPv6 address of the server. If the Flower
         server runs on the same machine on port 8080, then `server_address`
@@ -151,17 +145,17 @@ def start_client_internal(
     isolation : str (default: ISOLATION_MODE_SUBPROCESS)
         Isolation mode for `ClientApp`. Possible values are `subprocess` and
         `process`. If `subprocess`, the `ClientApp` runs in a subprocess started
-        by the SueprNode and communicates using gRPC at the address
-        `clientappio_api_address`. If `process`, the `ClientApp` runs in a separate
-        isolated process and communicates using gRPC at the address
-        `clientappio_api_address`.
-    clientappio_api_address : str
-        (default: `CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS`)
-        The SuperNode gRPC server address.
-    clientappio_certificates : Optional[Tuple[bytes, bytes, bytes]] (default: None)
+        by the SuperNode and communicates using HTTP at the address
+        `runtime_api_address`. If `process`, the `ClientApp` runs in a separate
+        isolated process and communicates using HTTP at the address
+        `runtime_api_address`.
+    runtime_api_address : str
+        (default: `SUPERNODE_DEFAULT_SERVER_ADDRESS`)
+        The SuperNode Runtime HTTP API address.
+    runtime_certificates : Optional[Tuple[bytes, bytes, bytes]] (default: None)
         Tuple containing CA certificate, server certificate, and private key used to
-        start a secure Runtime API gRPC server.
-    clientappio_root_certificates_path : Optional[str] (default: None)
+        start a secure Runtime HTTP API server.
+    runtime_root_certificates_path : Optional[str] (default: None)
         Path to the CA certificate file passed to subprocess SuperExec instances so
         they can verify the Runtime API server certificate.
     health_server_address : Optional[str] (default: None)
@@ -192,9 +186,7 @@ def start_client_internal(
             f"to the Flower documentation for more information: {url_v}{page}",
         )
 
-    # Initialize factories
-    object_store_factory = ObjectStoreFactory()
-    state_factory = NodeStateFactory(objectstore_factory=object_store_factory)
+    object_store_factory = state_factory.objectstore_factory
 
     if isolation == ISOLATION_MODE_SUBPROCESS:
         if superexec_auth_secret is not None:
@@ -205,16 +197,8 @@ def start_client_internal(
             )
         superexec_auth_secret = None
 
-    # Launch Runtime API server
+    # Runtime API is served over HTTP by the SuperNode process.
     grpc_servers = []
-    clientappio_server = run_clientappio_api_grpc(
-        address=clientappio_api_address,
-        state_factory=state_factory,
-        objectstore_factory=object_store_factory,
-        certificates=clientappio_certificates,
-        superexec_auth_secret=superexec_auth_secret,
-    )
-    grpc_servers.append(clientappio_server)
 
     # Launch gRPC health server
     if health_server_address is not None:
@@ -234,17 +218,15 @@ def start_client_internal(
 
     # Launch the SuperExec if the isolation mode is `subprocess`
     if isolation == ISOLATION_MODE_SUBPROCESS:
-        # `bound_address` contains the actual address when the port is set to :0
-        # which means let the OS choose a free port.
-        appio_address = resolve_bind_address(clientappio_server.bound_address)
+        runtime_address = resolve_bind_address(runtime_api_address)
         command = ["flower-superexec"]
         command += get_client_tls_args(
-            insecure=clientappio_certificates is None,
-            root_certificates_path=clientappio_root_certificates_path,
+            insecure=runtime_certificates is None,
+            root_certificates_path=runtime_root_certificates_path,
         )
         command += [
             "--appio-api-address",
-            appio_address,
+            runtime_address,
         ]
         command += ["--plugin-type", ExecPluginType.CLIENT_APP]
         command += ["--parent-pid", str(os.getpid())]
@@ -661,54 +643,6 @@ def _make_fleet_connection_retry_invoker(
         retry_invoker.max_time = max_wait_time
 
     return retry_invoker
-
-
-def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
-    address: str,
-    state_factory: NodeStateFactory,
-    objectstore_factory: ObjectStoreFactory,
-    certificates: tuple[bytes, bytes, bytes] | None,
-    superexec_auth_secret: bytes | None,
-) -> grpc.Server:
-    """Run the Runtime API gRPC server."""
-    if certificates is None and superexec_auth_secret is not None:
-        log(
-            WARN,
-            "SuperExec auth is enabled on insecure Runtime API transport. "
-            "Request metadata confidentiality is not guaranteed without TLS.",
-        )
-
-    clientappio_servicer: ClientAppIoServicer = ClientAppIoServicer(
-        state_factory=state_factory,
-        objectstore_factory=objectstore_factory,
-    )
-    auth_interceptor = create_clientappio_token_auth_server_interceptor(
-        state_provider=state_factory.state
-    )
-    interceptors: list[grpc.ServerInterceptor] = [auth_interceptor]
-    if superexec_auth_secret is not None:
-        interceptors.append(
-            create_clientappio_superexec_auth_server_interceptor(
-                state_provider=state_factory.state,
-                master_secret=superexec_auth_secret,
-            )
-        )
-    interceptors.append(create_clientappio_runtime_version_server_interceptor())
-    clientappio_add_servicer_to_server_fn = add_RuntimeServicer_to_server
-    clientappio_grpc_server = generic_create_grpc_server(
-        servicer_and_add_fn=(
-            clientappio_servicer,
-            clientappio_add_servicer_to_server_fn,
-        ),
-        server_address=address,
-        max_message_length=GRPC_MAX_MESSAGE_LENGTH,
-        certificates=certificates,
-        interceptors=interceptors,
-    )
-    address = clientappio_grpc_server.bound_address
-    log(INFO, "Flower Deployment Runtime: Starting Runtime API on %s", address)
-    clientappio_grpc_server.start()
-    return clientappio_grpc_server
 
 
 def _verify_fab(fab: Fab, trusted_entities: dict[str, str]) -> bool:

@@ -22,8 +22,8 @@ from unittest.mock import Mock
 import pytest
 
 from flwr.common.constant import ExecPluginType
-from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.constant import ExecutorType
+from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.version import package_version
 
 from .flower_superexec import _parse_args
@@ -112,7 +112,7 @@ def test_flower_superexec_clientapp_allows_missing_secret(
         plugin_config=None,
         root_certificates=None,
         superexec_auth_secret_file=None,
-        appio_api_address="127.0.0.1:9091",
+        runtime_api_address="127.0.0.1:9091",
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
@@ -136,8 +136,8 @@ def test_flower_superexec_clientapp_allows_missing_secret(
     monkeypatch.setattr(flower_superexec_module, "_parse_args", _Parser)
     monkeypatch.setattr(
         flower_superexec_module,
-        "_get_plugin_and_stub_class",
-        lambda _plugin_type: (object, RuntimeStub),
+        "_get_plugin_and_client_class",
+        lambda _plugin_type: (object, RuntimeHttpClient),
     )
     monkeypatch.setattr(flower_superexec_module, "run_superexec", _run_superexec)
 
@@ -156,7 +156,7 @@ def test_flower_superexec_serverapp_allows_missing_secret(
         plugin_config=None,
         root_certificates=None,
         superexec_auth_secret_file=None,
-        appio_api_address="127.0.0.1:9091",
+        runtime_api_address="127.0.0.1:9091",
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
@@ -181,8 +181,8 @@ def test_flower_superexec_serverapp_allows_missing_secret(
     monkeypatch.setattr(flower_superexec_module, "_parse_args", _Parser)
     monkeypatch.setattr(
         flower_superexec_module,
-        "_get_plugin_and_stub_class",
-        lambda _plugin_type: (object, RuntimeStub),
+        "_get_plugin_and_client_class",
+        lambda _plugin_type: (object, RuntimeHttpClient),
     )
     monkeypatch.setattr(flower_superexec_module, "run_superexec", _run_superexec)
 
@@ -201,7 +201,7 @@ def test_flower_superexec_passes_executor_to_run_superexec(
         plugin_config=None,
         root_certificates=None,
         superexec_auth_secret_file=None,
-        appio_api_address="127.0.0.1:9091",
+        runtime_api_address="127.0.0.1:9091",
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
@@ -221,8 +221,8 @@ def test_flower_superexec_passes_executor_to_run_superexec(
     )
     monkeypatch.setattr(
         flower_superexec_module,
-        "_get_plugin_and_stub_class",
-        lambda _plugin_type: (object, RuntimeStub),
+        "_get_plugin_and_client_class",
+        lambda _plugin_type: (object, RuntimeHttpClient),
     )
     monkeypatch.setattr(flower_superexec_module, "run_superexec", run_superexec_mock)
 

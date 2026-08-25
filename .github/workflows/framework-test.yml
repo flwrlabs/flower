@@ -128,7 +128,7 @@ jobs:
           cd framework
           # Most tests are isolated well enough to run in parallel. The
           # process-wide Ray/VCE integration modules, fixed-port gRPC tests,
-          # and xdist-incompatible AppIO subtests run in a separate matrix job
+          # and xdist-incompatible Runtime API subtests run in a separate matrix job
           # below so every Python version keeps the complete test coverage.
           RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest \
             --cov=py/flwr \
@@ -137,8 +137,8 @@ jobs:
             --ignore=py/flwr/server/superlink/fleet/vce/vce_api_test.py \
             --ignore=py/flwr/server/superlink/fleet/vce/backend/raybackend_test.py \
             --ignore=py/flwr/server/superlink/fleet/grpc_rere \
-            --ignore=py/flwr/superlink/servicer/serverappio \
-            --ignore=py/flwr/supercore/servicer/appio/appio_servicer_test.py \
+            --ignore=py/flwr/superlink/servicer/runtime \
+            --ignore=py/flwr/supercore/servicer/runtime/runtime_handlers_test.py \
             -n 4 \
             --dist=loadscope \
             --durations=50
@@ -153,8 +153,8 @@ jobs:
             py/flwr/server/superlink/fleet/vce/vce_api_test.py \
             py/flwr/server/superlink/fleet/vce/backend/raybackend_test.py \
             py/flwr/server/superlink/fleet/grpc_rere \
-            py/flwr/superlink/servicer/serverappio \
-            py/flwr/supercore/servicer/appio/appio_servicer_test.py
+            py/flwr/superlink/servicer/runtime \
+            py/flwr/supercore/servicer/runtime/runtime_handlers_test.py
       - name: Prepare coverage artifact
         if: ${{ (matrix.task == 'pytest' || matrix.task == 'pytest_serial') && needs.changes.outputs.framework == 'true' }}
         run: |

@@ -18,8 +18,8 @@
 from logging import ERROR
 from typing import ClassVar
 
-from flwr.common.logger import log
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.constant import TaskType
 
 from .base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
@@ -28,7 +28,7 @@ from .base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 class ServerAppEphemeralExecPlugin(BaseEphemeralExecPlugin):
     """Simple ephemeral Flower SuperExec plugin for task processes."""
 
-    appio_api_address_arg = "--serverappio-api-address"
+    runtime_api_address_arg = "--serverappio-api-address"
     supported_task_types: ClassVar[frozenset[TaskType]] = frozenset(
         {
             TaskType.AGENT_APP,

@@ -19,8 +19,8 @@ import argparse
 from logging import DEBUG, INFO
 
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
-from flwr.common.constant import CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS
-from flwr.common.logger import log
+from flwr.supercore import log
+from flwr.supercore.constant import SUPERNODE_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.supercore.utils import mask_string
 from flwr.supernode.runtime.run_clientapp import run_clientapp
@@ -36,11 +36,11 @@ def flwr_clientapp() -> None:
         DEBUG,
         "`flwr-clientapp` will attempt to connect to SuperNode's "
         "Runtime API at %s with token %s",
-        args.clientappio_api_address,
+        args.runtime_api_address,
         mask_string(token),
     )
     run_clientapp(
-        clientappio_api_address=args.clientappio_api_address,
+        runtime_api_address=args.runtime_api_address,
         token=token,
         insecure=args.insecure,
         certificates=validate_and_resolve_root_certificates(
@@ -58,10 +58,11 @@ def _parse_args_run_flwr_clientapp() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--clientappio-api-address",
-        default=CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+        dest="runtime_api_address",
+        default=SUPERNODE_DEFAULT_CLIENT_ADDRESS,
         type=str,
         help="Address of SuperNode's Runtime API (IPv4, IPv6, or a domain name)."
-        f"By default, it is set to {CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS}.",
+        f"By default, it is set to {SUPERNODE_DEFAULT_CLIENT_ADDRESS}.",
     )
     add_args_flwr_app_common(parser=parser)
     return parser

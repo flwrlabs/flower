@@ -24,7 +24,7 @@ from collections.abc import Callable
 from logging import INFO
 
 from flwr.app import MetricRecord, RecordDict
-from flwr.common import log
+from flwr.supercore import log
 
 from .multikrum import MultiKrum
 

@@ -285,8 +285,10 @@ You can add more SuperNodes and ClientApps by uncommenting their definitions in 
           - --insecure
           - --superlink
           - superlink:9092
-          - --clientappio-api-address
-          - 0.0.0.0:9096
+          - --host
+          - 0.0.0.0
+          - --port
+          - "9096"
           - --isolation
           - process
           - --node-config
@@ -339,8 +341,10 @@ If you also want to enable TLS for the new SuperNode, uncomment the definition i
         command:
           - --superlink
           - superlink:9092
-          - --clientappio-api-address
-          - 0.0.0.0:9096
+          - --host
+          - 0.0.0.0
+          - --port
+          - "9096"
           - --isolation
           - process
           - --node-config

@@ -20,24 +20,25 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Sequence
+from queue import Empty, Full, Queue
+from threading import Lock, Thread
 from typing import Literal, cast
 
 from google.protobuf.json_format import ParseDict
 
-from flwr.agentapp import AgentConnectors, AgentResponses, AgentSession
+from flwr.agentapp import AgentConnectors, AgentEvents, AgentResponses, AgentSession
 from flwr.app import Context, Message
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartRunRequest,
+)
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskMessageRequest,
 )
-from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    StartAutomationRequest,
-    StartRunRequest,
-)
-from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (
@@ -45,6 +46,7 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorResponse,
 )
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
+from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
@@ -59,14 +61,115 @@ from .context_items import append_items
 
 _DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
 _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
+_EVENT_PUBLISH_BATCH_SIZE = 16
+_EVENT_PUBLISH_QUEUE_SIZE = 256
+_EVENT_PUBLISH_BATCH_WAIT = 0.05
+_EVENT_PUBLISH_STOP = object()
+
+
+class RuntimeAgentEvents(AgentEvents):
+    """Publish AgentApp-selected events through a background worker."""
+
+    def __init__(self, stub: RuntimeHttpClient) -> None:
+        self._stub = stub
+        self._queue: Queue[TaskEvent | object] = Queue(
+            maxsize=_EVENT_PUBLISH_QUEUE_SIZE
+        )
+        self._error_lock = Lock()
+        self._error: Exception | None = None
+        self._closed = False
+        self._worker = Thread(
+            target=self._run,
+            name="flwr-agent-event-publisher",
+            daemon=True,
+        )
+        self._worker.start()
+
+    def emit(self, event: JSONObject) -> None:
+        """Queue one event for publication to run-event subscribers."""
+        if self._closed:
+            raise RuntimeError("Agent event publisher is closed.")
+        event_type = event.get("type")
+        if not isinstance(event_type, str) or not event_type:
+            raise ValueError("Run event requires a non-empty string 'type' field.")
+        self._raise_worker_error()
+        task_event = TaskEvent(
+            event=event_type,
+            data=strict_json_dumps(event, compact=True),
+        )
+        self._queue.put(task_event)
+        self._raise_worker_error()
+
+    def close(self, timeout: float | None = None) -> None:
+        """Publish pending events and stop the background publisher."""
+        if self._closed:
+            self._raise_worker_error()
+            return
+
+        try:
+            self._queue.put_nowait(_EVENT_PUBLISH_STOP)
+        except Full:
+            pass  # The worker will still stop due to the `_closed` flag.
+        self._closed = True
+        self._worker.join(timeout)
+        if self._worker.is_alive():
+            raise TimeoutError("Timed out waiting for Agent event publisher to stop.")
+        self._raise_worker_error()
+
+    def _flush(self, batch: list[TaskEvent]) -> None:
+        """Publish one batch of task events."""
+        try:
+            self._stub.PushTaskEvents(PushTaskEventsRequest(events=batch))
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            with self._error_lock:
+                if self._error is None:
+                    self._error = err
+
+    def _run(self) -> None:
+        """Upload queued events in small batches."""
+        while not self._closed:
+            item = self._queue.get()
+            if item is _EVENT_PUBLISH_STOP:
+                return
+
+            batch = [cast(TaskEvent, item)]
+            deadline = time.monotonic() + _EVENT_PUBLISH_BATCH_WAIT
+            while len(batch) < _EVENT_PUBLISH_BATCH_SIZE:
+                try:
+                    item = self._queue.get(
+                        timeout=max(0.0, deadline - time.monotonic())
+                    )
+                except Empty:
+                    break
+
+                if item is _EVENT_PUBLISH_STOP:
+                    self._flush(batch)
+                    return
+
+                batch.append(cast(TaskEvent, item))
+
+            self._flush(batch)
+
+    def _raise_worker_error(self) -> None:
+        """Raise a background publication failure in the AgentApp thread."""
+        with self._error_lock:
+            error = self._error
+        if error is not None:
+            raise RuntimeError("Failed to publish AgentApp events.") from error
 
 
 class RuntimeAgentSession(AgentSession):
     """AgentSession bound to one AgentApp task."""
 
-    def __init__(self, responses: AgentResponses, connectors: AgentConnectors) -> None:
+    def __init__(
+        self,
+        responses: AgentResponses,
+        connectors: AgentConnectors,
+        events: AgentEvents,
+    ) -> None:
         self._responses = responses
         self._connectors = connectors
+        self._events = events
 
     @property
     def responses(self) -> AgentResponses:
@@ -77,6 +180,11 @@ class RuntimeAgentSession(AgentSession):
     def connectors(self) -> AgentConnectors:
         """Connector tool schema and execution API."""
         return self._connectors
+
+    @property
+    def events(self) -> AgentEvents:
+        """Frontend-visible structured run event API."""
+        return self._events
 
 
 class RuntimeAgentConnectors(AgentConnectors):
@@ -117,17 +225,19 @@ class RuntimeAgentResponses(AgentResponses):
     def __init__(  # pylint: disable=too-many-arguments
         self,
         *,
-        stub: RuntimeStub,
+        stub: RuntimeHttpClient,
         run_id: int,
         task_id: int,
         context: Context,
         start_run_request: StartRunRequest,
+        events: AgentEvents,
     ) -> None:
         self._stub = stub
         self._context = context
         self._run_id = run_id
         self._task_id = task_id
         self._start_run_request = start_run_request
+        self._events = events
 
     def create(self, request: JSONObject) -> JSONObject:
         """Create a model response through a child model task."""
@@ -327,17 +437,9 @@ class RuntimeAgentResponses(AgentResponses):
         return output_item
 
     def push_run_events(self, events: Sequence[JSONObject]) -> None:
-        """Push structured run events for `StreamRunEvents` clients."""
-        if not events:
-            return
-        task_events = [
-            TaskEvent(
-                event=cast(str, event["type"]),
-                data=strict_json_dumps(event, compact=True),
-            )
-            for event in events
-        ]
-        self._stub.PushTaskEvents(PushTaskEventsRequest(events=task_events))
+        """Queue structured run events for `StreamRunEvents` clients."""
+        for event in events:
+            self._events.emit(event)
 
     def append_and_push_run_events(self, events: list[JSONObject]) -> None:
         """Append run events to context and push them to `StreamRunEvents` clients."""
@@ -359,17 +461,23 @@ class RuntimeAgentResponses(AgentResponses):
             PushTaskMessageRequest(message=message_to_proto(message))
         )
 
-    def _pull_task_messages(self) -> list[Message]:
-        """Pull pending task messages."""
-        res = self._stub.PullTaskMessage(PullTaskMessageRequest(limit=1))
+    def _pull_task_messages(self, src_task_id: int) -> list[Message]:
+        """Pull pending task messages from one child task."""
+        res = self._stub.PullTaskMessage(
+            PullTaskMessageRequest(limit=1, src_task_id=src_task_id)
+        )
         return [message_from_proto(msg) for msg in res.messages]
 
     def _send_and_receive(self, message: Message) -> Message:
-        """Send one message and wait for its direct reply.
+        """Send one message and wait for its destination child task's direct reply.
 
         For now, `flwr-agentapp` expects a strict one-request-one-reply exchange with
         child tasks, so any non-matching pulled message is treated as an error.
         """
+        child_task_id = message.metadata.dst_task_id
+        if child_task_id is None:
+            raise ValueError("Task message requires a destination task ID.")
+
         # Push the message to the child task
         self._push_task_message(message)
         message_id = message.metadata.message_id
@@ -377,7 +485,8 @@ class RuntimeAgentResponses(AgentResponses):
         # Pull until a message arrives that replies to the pushed message, or timeout
         deadline = time.monotonic() + _DEFAULT_MODEL_REPLY_TIMEOUT
         while True:
-            for pulled_msg in self._pull_task_messages():
+            # The request destination becomes the source of its reply.
+            for pulled_msg in self._pull_task_messages(src_task_id=child_task_id):
                 if pulled_msg.metadata.reply_to_message_id != message_id:
                     raise RuntimeError(
                         "Received a message that does not reply to the request."

@@ -47,15 +47,20 @@ FEDERATION_CONFIG_HELP_MESSAGE = CONFIG_HELP_MESSAGE.format(
 )
 
 # Constants for `flwr chat`
-CHAT_FLOWER_AGENT_APP_SPEC = "@flwrlabs/flwr-agent"
+CHAT_DEFAULT_FEDERATION_NAME = "personal"
 CHAT_SUPERGRID_CONNECTION_NAME = "supergrid"
 CHAT_AGENT_INPUT_KEY = "agent.input"
+CHAT_AGENTS_API_PATH = "/user/agents"
 CHAT_HELP_COMMAND = "/help"
 CHAT_EXIT_COMMAND = "/quit"
 CHAT_NEW_COMMAND = "/new"
+CHAT_FEDERATION_COMMAND = "/federation"
+CHAT_HISTORY_COMMAND = "/history"
 CHAT_COMMANDS = {
     CHAT_HELP_COMMAND: "Show available commands.",
     CHAT_NEW_COMMAND: "Start a new conversation.",
+    CHAT_FEDERATION_COMMAND: "Select a federation.",
+    CHAT_HISTORY_COMMAND: "Show or continue conversation history.",
     CHAT_EXIT_COMMAND: "Exit Flower Chat.",
 }
 CHAT_REASONING_DELTA_EVENT = "response.reasoning_summary_text.delta"
@@ -76,6 +81,7 @@ CHAT_APP_STYLE = {
     "content": "noinherit",
     "details.header": "bold #dc8400 bg:#292929",
     "details.body": "#d1d5db",
+    "history.selected": "#ffffff bg:#dc8400",
     "status": "#dc8400",
     "completion-menu": "fg:#ffffff bg:#404040",
     "completion-menu.completion": "fg:#ffffff bg:#404040",
@@ -89,7 +95,6 @@ CHAT_AGENT_NAME = "Flower Agent"
 CHAT_EXPERIMENTAL_WARNING = "Note: `flwr chat` is experimental and subject to change."
 CHAT_WELCOME_MESSAGE = "Welcome to the Flower Chat"
 CHAT_EXIT_HINT = f"Type {CHAT_EXIT_COMMAND} or press Ctrl-C to leave."
-CHAT_NEW_CONVERSATION_MESSAGE = "Your next message will start a fresh conversation."
 CHAT_SPINNER_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
 CHAT_FLOWER_LOGO = r"""
 ███████╗██╗      ██████╗ ██╗    ██╗███████╗██████╗
@@ -150,6 +155,7 @@ class SimulationBackendConfigTomlKey:
 # Local SuperLink configuration
 LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE = ":local:"
 LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY = ":local-in-memory:"
+LOCAL_RUNTIME_API_PORT = os.environ.get("FLWR_LOCAL_RUNTIME_API_PORT", "39091")
 LOCAL_CONTROL_API_PORT = os.environ.get("FLWR_LOCAL_CONTROL_API_PORT", "39093")
 LOCAL_CONTROL_API_ADDRESS = f"127.0.0.1:{LOCAL_CONTROL_API_PORT}"
 LOCAL_SUPERLINK_STARTUP_TIMEOUT = 15.0

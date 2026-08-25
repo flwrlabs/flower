@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""TLS helpers for Runtime API gRPC connections."""
+"""TLS helpers for Runtime API connections."""
 
 
 import argparse
@@ -35,39 +35,43 @@ def get_client_tls_args(
     return ["--root-certificates", root_certificates_path]
 
 
-def try_obtain_optional_appio_server_certificates(
+def try_obtain_optional_runtime_server_certificates(
     args: argparse.Namespace,
 ) -> ServerCertificates | None:
-    """Load Runtime server certificates from `appio_ssl_*` args when provided."""
+    """Load optional Runtime API server certificates from parsed arguments."""
     if (
-        args.appio_ssl_certfile
-        and args.appio_ssl_keyfile
-        and args.appio_ssl_ca_certfile
+        args.runtime_ssl_certfile
+        and args.runtime_ssl_keyfile
+        and args.runtime_ssl_ca_certfile
     ):
-        appio_ssl_ca_certfile = Path(args.appio_ssl_ca_certfile).expanduser()
-        appio_ssl_certfile = Path(args.appio_ssl_certfile).expanduser()
-        appio_ssl_keyfile = Path(args.appio_ssl_keyfile).expanduser()
-        if not appio_ssl_ca_certfile.is_file():
+        runtime_ssl_ca_certfile = Path(args.runtime_ssl_ca_certfile).expanduser()
+        runtime_ssl_certfile = Path(args.runtime_ssl_certfile).expanduser()
+        runtime_ssl_keyfile = Path(args.runtime_ssl_keyfile).expanduser()
+        if not runtime_ssl_ca_certfile.is_file():
             flwr_exit(
                 ExitCode.COMMON_PATH_INVALID,
                 "Path argument `--appio-ssl-ca-certfile` does not point to a file.",
             )
-        if not appio_ssl_certfile.is_file():
+        if not runtime_ssl_certfile.is_file():
             flwr_exit(
                 ExitCode.COMMON_PATH_INVALID,
                 "Path argument `--appio-ssl-certfile` does not point to a file.",
             )
-        if not appio_ssl_keyfile.is_file():
+        if not runtime_ssl_keyfile.is_file():
             flwr_exit(
                 ExitCode.COMMON_PATH_INVALID,
                 "Path argument `--appio-ssl-keyfile` does not point to a file.",
             )
         return (
-            appio_ssl_ca_certfile.read_bytes(),
-            appio_ssl_certfile.read_bytes(),
-            appio_ssl_keyfile.read_bytes(),
+            runtime_ssl_ca_certfile.read_bytes(),
+            runtime_ssl_certfile.read_bytes(),
+            runtime_ssl_keyfile.read_bytes(),
         )
-    if args.appio_ssl_certfile or args.appio_ssl_keyfile or args.appio_ssl_ca_certfile:
+    if (
+        args.runtime_ssl_certfile
+        or args.runtime_ssl_keyfile
+        or args.runtime_ssl_ca_certfile
+    ):
         flwr_exit(
             ExitCode.COMMON_TLS_SERVER_CERTIFICATES_INVALID,
             "You need to provide valid file paths to `--appio-ssl-certfile`, "
@@ -81,7 +85,7 @@ def validate_and_resolve_root_certificates(
     root_cert_path: str | None,
     insecure: bool,
 ) -> bytes | None:
-    """Validate and return root certificate bytes for gRPC connections."""
+    """Validate and return root certificate bytes for Runtime API clients."""
     if insecure:
         if root_cert_path is not None:
             flwr_exit(
@@ -92,7 +96,7 @@ def validate_and_resolve_root_certificates(
         return None
 
     if root_cert_path is None:
-        return None  # None in gRPC means the default system root certificates
+        return None  # Use the default system root certificates
 
     if not Path(root_cert_path).expanduser().is_file():
         flwr_exit(

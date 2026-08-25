@@ -15,6 +15,7 @@
 """Runtime API router."""
 
 
+from .responses import router as responses_router
 from .router import router
 
-__all__ = ["router"]
+__all__ = ["responses_router", "router"]

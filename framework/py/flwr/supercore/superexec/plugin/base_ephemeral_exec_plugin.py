@@ -34,7 +34,7 @@ class BaseEphemeralExecPlugin(ExecPlugin):
 
     # Placeholders to be defined in subclasses
     command = ""
-    appio_api_address_arg = ""
+    runtime_api_address_arg = ""
     cleanup_before_launch: Callable[[], None] | None = None
 
     def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:
@@ -56,7 +56,7 @@ class BaseEphemeralExecPlugin(ExecPlugin):
             cmds += ["--insecure"]
         elif self.root_certificates_path:
             cmds += ["--root-certificates", self.root_certificates_path]
-        cmds += [self.appio_api_address_arg, self.appio_api_address]
+        cmds += [self.runtime_api_address_arg, self.runtime_api_address]
         cmds += ["--token", token]
         cmds += ["--parent-pid", str(os.getpid())]
         if self.runtime_dependency_install:

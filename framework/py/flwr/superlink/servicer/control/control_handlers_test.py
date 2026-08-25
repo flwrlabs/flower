@@ -21,7 +21,14 @@ from unittest.mock import Mock, patch
 
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AddAppRequest,
+    AddAppResponse,
+    AppInfo,
+    ListAppsRequest,
+    ListAppsResponse,
     ListAutomationsRequest,
+    RemoveAppRequest,
+    RemoveAppResponse,
     StartAutomationRequest,
     StartRunRequest,
     StopAutomationRequest,
@@ -29,16 +36,21 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
+    FLOWER_AGENT_APP_ID,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     AutomationStatus,
+    TaskType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.superlink.federation import NoOpFederationManager
 
 from .control_handlers import (
+    add_app,
+    list_apps,
     list_automations,
+    remove_app,
     start_automation,
     start_run,
     stop_automation,
@@ -64,7 +76,13 @@ class TestControlHandlers(unittest.TestCase):
         """Test StartRun reuses a stored FAB by hash."""
         fab_content = b"stored FAB"
         fab_hash = hashlib.sha256(fab_content).hexdigest()
-        self.state.store_fab(Fab(fab_hash, fab_content, {}))
+        self.state.store_app(
+            fab=Fab(fab_hash, fab_content, {}),
+            federation_id=NOOP_FEDERATION_ID,
+            app_id="@flwr/demo",
+            app_type=TaskType.SERVER_APP,
+            added_by=self.account.flwr_aid,
+        )
 
         with (
             patch(
@@ -76,17 +94,63 @@ class TestControlHandlers(unittest.TestCase):
                 ".get_metadata_from_config",
                 return_value=("flwr/demo", "v0.0.1"),
             ),
+            patch.object(self.state, "store_app") as mock_store_app,
         ):
             request = StartRunRequest(federation=NOOP_FEDERATION_ID)
+            request.app_spec = "@flwr/demo==0.0.1"
+            request.fab.hash_str = fab_hash
+            response = start_run(request, self.account, self.state, None)
+
+        mock_store_app.assert_not_called()
+        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        self.assertEqual(run.fab_hash, fab_hash)
+        apps = self.state.list_apps(NOOP_FEDERATION_ID)
+        self.assertEqual(
+            [(app.app_id, app.fab_hash, app.app_type) for app in apps],
+            [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
+        )
+
+    def test_start_run_notifies_extension_after_persisting_run(self) -> None:
+        """Notify the optional extension with the persisted run snapshot."""
+        fab_content = b"stored FAB"
+        fab_hash = hashlib.sha256(fab_content).hexdigest()
+        self.state.store_app(
+            fab=Fab(fab_hash, fab_content, {}),
+            federation_id=NOOP_FEDERATION_ID,
+            app_id="@flwr/demo",
+            app_type=TaskType.SERVER_APP,
+            added_by=self.account.flwr_aid,
+        )
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/demo", "v0.0.1"),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".extensions.notify_run_started"
+            ) as notify_run_started,
+        ):
+            request = StartRunRequest(federation=NOOP_FEDERATION_ID)
+            request.app_spec = "@flwr/demo==0.0.1"
             request.fab.hash_str = fab_hash
             response = start_run(request, self.account, self.state, None)
 
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
-        self.assertEqual(run.fab_hash, fab_hash)
+        notify_run_started.assert_called_once()
+        notified_run, source = notify_run_started.call_args.args
+        self.assertEqual(notified_run.run_id, run.run_id)
+        self.assertEqual(source, "unknown")
 
     def test_start_run_rejects_unknown_fab_hash(self) -> None:
-        """Test StartRun rejects an unknown FAB hash."""
-        request = StartRunRequest()
+        """Test StartRun rejects an unknown FAB hash without an app spec."""
+        request = StartRunRequest(federation=NOOP_FEDERATION_ID)
         request.fab.hash_str = "unknown"
 
         with self.assertRaises(FlowerError) as error:
@@ -94,8 +158,165 @@ class TestControlHandlers(unittest.TestCase):
 
         self.assertEqual(error.exception.code, ApiErrorCode.FAB_DOWNLOAD_FAILURE)
 
-    def test_start_automation_normalizes_start_at_to_utc(self) -> None:
-        """Normalize the automation start time to UTC."""
+    def test_start_run_does_not_fetch_unknown_stored_app_from_hub(self) -> None:
+        """StartRun rejects an unknown stored app without fetching from Hub."""
+        request = StartRunRequest(
+            app_spec="@flwr/demo",
+            federation=NOOP_FEDERATION_ID,
+        )
+        request.fab.hash_str = "stale-hash"
+
+        with patch(
+            "flwr.superlink.servicer.control.control_handlers._get_remote_fab"
+        ) as mock_get_remote_fab:
+            with self.assertRaises(FlowerError) as error:
+                start_run(request, self.account, self.state, None)
+
+        self.assertEqual(error.exception.code, ApiErrorCode.FAB_DOWNLOAD_FAILURE)
+        mock_get_remote_fab.assert_not_called()
+
+    def test_list_apps(self) -> None:
+        """List apps associated with the requested federation."""
+        fab_hash = self.state.store_app(
+            fab=Fab("", b"fab", {}),
+            federation_id=NOOP_FEDERATION_ID,
+            app_id="@flwr/demo",
+            app_type=TaskType.SERVER_APP,
+            added_by=self.account.flwr_aid,
+        )
+
+        response = list_apps(
+            ListAppsRequest(federation_id=NOOP_FEDERATION_ID),
+            self.account,
+            self.state,
+        )
+
+        self.assertEqual(
+            [(app.app_id, app.fab_hash, app.app_type) for app in response.apps],
+            [
+                ("@flwr/demo", fab_hash, TaskType.SERVER_APP),
+                (FLOWER_AGENT_APP_ID, "", TaskType.AGENT_APP),
+            ],
+        )
+
+    def test_list_apps_does_not_duplicate_stored_flower_agent(self) -> None:
+        """List apps uses the stored Flower Agent entry when available."""
+        fab_hash = self.state.store_app(
+            fab=Fab("", b"fab", {}),
+            federation_id=NOOP_FEDERATION_ID,
+            app_id=FLOWER_AGENT_APP_ID,
+            app_type=TaskType.AGENT_APP,
+            added_by=self.account.flwr_aid,
+        )
+
+        response = list_apps(
+            ListAppsRequest(federation_id=NOOP_FEDERATION_ID),
+            self.account,
+            self.state,
+        )
+
+        self.assertEqual(
+            [(app.app_id, app.fab_hash, app.app_type) for app in response.apps],
+            [(FLOWER_AGENT_APP_ID, fab_hash, TaskType.AGENT_APP)],
+        )
+
+    def test_list_apps_preserves_hub_flag_over_wire(self) -> None:
+        """ListApps preserves Hub provenance through protobuf serialization."""
+        fab_hash = self.state.store_app(
+            fab=Fab("", b"hub fab", {}),
+            federation_id=NOOP_FEDERATION_ID,
+            app_id="@flwr/demo",
+            app_type=TaskType.AGENT_APP,
+            added_by=self.account.flwr_aid,
+            is_hub_app=True,
+        )
+
+        response = list_apps(
+            ListAppsRequest(federation_id=NOOP_FEDERATION_ID),
+            self.account,
+            self.state,
+        )
+        round_tripped = ListAppsResponse.FromString(response.SerializeToString())
+
+        self.assertEqual(round_tripped.apps[0].fab_hash, fab_hash)
+        self.assertTrue(round_tripped.apps[0].is_hub_app)
+
+    def test_list_apps_preserves_unknown_hub_origin_over_wire(self) -> None:
+        """ListApps leaves unknown legacy provenance absent over the wire."""
+        app = AppInfo(
+            app_id="@flwr/demo",
+            fab_hash="legacy-hash",
+            app_type=TaskType.AGENT_APP,
+        )
+        with patch.object(self.state, "list_apps", return_value=[app]):
+            response = list_apps(
+                ListAppsRequest(federation_id=NOOP_FEDERATION_ID),
+                self.account,
+                self.state,
+            )
+
+        round_tripped = ListAppsResponse.FromString(response.SerializeToString())
+
+        self.assertFalse(round_tripped.apps[0].HasField("is_hub_app"))
+
+    def test_add_and_remove_app(self) -> None:
+        """AddApp stores the latest Hub FAB and RemoveApp removes the app."""
+        fab_content = b"hub FAB"
+        verification_dict = {"publisher-key": "verified"}
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
+                return_value=(fab_content, verification_dict, None),
+            ) as mock_get_remote_fab,
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={
+                    "tool": {
+                        "flwr": {"app": {"components": {"agentapp": "module:app"}}}
+                    }
+                },
+            ),
+        ):
+            response = add_app(
+                AddAppRequest(
+                    federation_id=NOOP_FEDERATION_ID,
+                    app_id="@flwr/demo",
+                ),
+                self.account,
+                self.state,
+                None,
+            )
+
+        self.assertEqual(response, AddAppResponse())
+        mock_get_remote_fab.assert_called_once_with(None, "@flwr/demo")
+        fab_hash = hashlib.sha256(fab_content).hexdigest()
+        apps = self.state.list_apps(NOOP_FEDERATION_ID)
+        self.assertEqual(
+            [(app.app_id, app.fab_hash, app.app_type) for app in apps],
+            [("@flwr/demo", fab_hash, TaskType.AGENT_APP)],
+        )
+        self.assertTrue(apps[0].is_hub_app)
+        self.assertEqual(
+            self.state.get_app(NOOP_FEDERATION_ID, "@flwr/demo", fab_hash),
+            Fab(fab_hash, fab_content, verification_dict),
+        )
+
+        remove_response = remove_app(
+            RemoveAppRequest(
+                federation_id=NOOP_FEDERATION_ID,
+                app_id="@flwr/demo",
+            ),
+            self.account,
+            self.state,
+        )
+
+        self.assertEqual(remove_response, RemoveAppResponse())
+        self.assertEqual(self.state.list_apps(NOOP_FEDERATION_ID), [])
+
+    def test_start_automation_preserves_recurrence_and_normalizes_start_at(
+        self,
+    ) -> None:
+        """Normalize the start time and preserve a recurring interval."""
         # Prepare
         request = StartAutomationRequest(
             start_at="2026-07-10T04:00:00-05:00",
@@ -124,6 +345,34 @@ class TestControlHandlers(unittest.TestCase):
             ),
             (response.series_id, "2026-07-10T09:00:00+00:00", 60, 3),
         )
+
+    def test_start_automation_omits_interval_for_one_run(self) -> None:
+        """Store and list one-run automations without a recurrence interval."""
+        # Prepare
+        request = StartAutomationRequest(
+            fixed_interval=60,
+            max_runs=1,
+            start_run_request=StartRunRequest(
+                federation=NOOP_FEDERATION_ID,
+                series_id=1,
+            ),
+        )
+
+        # Execute
+        response = start_automation(request, self.account, self.state)
+        stored_automation = self.state.list_automations(
+            automation_ids=[response.automation_id],
+            order_by="updated_at",
+        )[0]
+        listed_automation = list_automations(
+            ListAutomationsRequest(federation=NOOP_FEDERATION_ID),
+            self.account,
+            self.state,
+        ).automations[0]
+
+        # Assert
+        self.assertFalse(stored_automation.HasField("fixed_interval"))
+        self.assertFalse(listed_automation.HasField("fixed_interval"))
 
     def test_start_automation_rejects_start_at_without_timezone(self) -> None:
         """Reject a start time without timezone information."""

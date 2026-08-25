@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-import secrets
 from collections.abc import Callable, Collection
 from typing import Any, NoReturn, Protocol, cast
 
@@ -27,6 +26,7 @@ from google.protobuf.message import Message as GrpcMessage
 from flwr.supercore.auth import (
     compute_request_body_sha256,
     compute_superexec_signature,
+    create_superexec_auth_metadata,
     derive_auth_secret,
     verify_superexec_signature,
 )
@@ -41,9 +41,9 @@ from flwr.supercore.constant import (
 from flwr.supercore.date import now
 from flwr.supercore.utils import get_metadata_str
 
-from .appio_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
+from .runtime_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
 
-_SUPEREXEC_METHOD_NAMES = frozenset({"PullPendingTasks", "ClaimTask", "GetRun"})
+_SUPEREXEC_METHOD_NAMES = frozenset({"PullPendingTasks", "ClaimTask"})
 
 
 def _build_superexec_methods(service_name: str) -> frozenset[str]:
@@ -102,26 +102,14 @@ class SuperExecAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type:
         if method not in self._protected_methods:
             return continuation(client_call_details, request)
 
-        timestamp = int(now().timestamp())
-        nonce = secrets.token_hex(16)
-        body_sha256 = compute_request_body_sha256(request)
-        signature = compute_superexec_signature(
+        auth_metadata = create_superexec_auth_metadata(
             auth_secret=self._auth_secret,
             method=method,
-            timestamp=timestamp,
-            nonce=nonce,
-            body_sha256=body_sha256,
+            request=request,
         )
 
         metadata = list(client_call_details.metadata or [])
-        metadata.extend(
-            [
-                (SUPEREXEC_AUTH_TIMESTAMP_HEADER, str(timestamp)),
-                (SUPEREXEC_AUTH_NONCE_HEADER, nonce),
-                (SUPEREXEC_AUTH_BODY_SHA256_HEADER, body_sha256),
-                (SUPEREXEC_AUTH_SIGNATURE_HEADER, signature),
-            ]
-        )
+        metadata.extend(auth_metadata.items())
 
         details = client_call_details._replace(metadata=metadata)
         return continuation(details, request)
@@ -217,7 +205,7 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         )
 
 
-def create_serverappio_superexec_auth_server_interceptor(
+def create_superlink_runtime_superexec_auth_server_interceptor(
     *,
     state_provider: Callable[[], _NonceState],
     master_secret: bytes,
@@ -230,7 +218,7 @@ def create_serverappio_superexec_auth_server_interceptor(
     )
 
 
-def create_clientappio_superexec_auth_server_interceptor(
+def create_supernode_runtime_superexec_auth_server_interceptor(
     *,
     state_provider: Callable[[], _NonceState],
     master_secret: bytes,

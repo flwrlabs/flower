@@ -17,11 +17,14 @@ syntax = "proto3";
 
 package flwr.proto;
 
-import "flwr/proto/appio.proto";
 import "flwr/proto/control.proto";
+import "flwr/proto/fab.proto";
+import "flwr/proto/federation_config.proto";
 import "flwr/proto/log.proto";
 import "flwr/proto/message.proto";
+import "flwr/proto/node.proto";
 import "flwr/proto/run.proto";
+import "flwr/proto/task.proto";
 
 service Runtime {
 
@@ -39,9 +42,6 @@ service Runtime {
   /////////////////////////////////////////////////////////////////////////////
   // General Runtime endpoints for App Executor processes
   /////////////////////////////////////////////////////////////////////////////
-
-  // Get run details
-  rpc GetRun(GetRunRequest) returns (GetRunResponse) {}
 
   // Task heartbeat
   rpc SendTaskHeartbeat(SendTaskHeartbeatRequest)
@@ -108,3 +108,94 @@ service Runtime {
   // Return a set of nodes
   rpc GetNodes(GetNodesRequest) returns (GetNodesResponse) {}
 }
+
+// PullPendingTasks messages
+message PullPendingTasksRequest {}
+message PullPendingTasksResponse { repeated Task tasks = 1; }
+
+// ClaimTask messages
+message ClaimTaskRequest { uint64 task_id = 1; }
+message ClaimTaskResponse { optional string token = 1; }
+
+// SendTaskHeartbeat messages
+message SendTaskHeartbeatRequest {}
+message SendTaskHeartbeatResponse { bool success = 1; }
+
+// PushAppMessages messages
+message PushAppMessagesRequest {
+  repeated Message messages_list = 2;
+  repeated ObjectTree message_object_trees = 3;
+}
+message PushAppMessagesResponse {
+  repeated string message_ids = 1;
+  repeated string objects_to_push = 2;
+  string session_id = 3;
+}
+
+// PullAppMessages messages
+message PullAppMessagesRequest { repeated string message_ids = 2; }
+message PullAppMessagesResponse {
+  repeated Message messages_list = 1;
+  repeated ObjectTree message_object_trees = 2;
+}
+
+// GetNodes messages
+message GetNodesRequest {}
+message GetNodesResponse { repeated Node nodes = 1; }
+
+// PushTaskMessage messages
+message PushTaskMessageRequest { Message message = 1; }
+message PushTaskMessageResponse { string message_id = 1; }
+
+// PushTaskEvents messages
+message PushTaskEventsRequest { repeated TaskEvent events = 1; }
+message PushTaskEventsResponse {}
+
+// PullTaskMessage messages
+message PullTaskMessageRequest {
+  optional uint64 limit = 1;
+  // Filter concurrent exchanges by sender task ID.
+  optional uint64 src_task_id = 2;
+}
+message PullTaskMessageResponse { repeated Message messages = 1; }
+
+// RecordTaskUsage messages
+message RecordTaskUsageRequest { TaskUsage task_usage = 1; }
+message RecordTaskUsageResponse {}
+
+// GetConnector messages
+message GetConnectorRequest {}
+message GetConnectorResponse {
+  string connector_ref = 1;
+  string credentials_json = 2;
+  string config_json = 3;
+}
+
+// PullTaskInput messages
+message PullTaskInputRequest {}
+message PullTaskInputResponse {
+  Context context = 1;
+  Run run = 2;
+  Fab fab = 3;
+  SimulationConfig federation_config = 4;
+  uint64 task_id = 5;
+}
+
+// PushTaskOutput messages
+message PushTaskOutputRequest {
+  Context context = 1;
+  string sub_status = 2;
+  string details = 3;
+  // Simulation Runtime usage only.
+  optional double clientapp_runtime = 4;
+}
+message PushTaskOutputResponse {}
+
+// CreateTask messages
+message CreateTaskRequest {
+  string type = 1;
+  optional string fab_hash = 2;
+  optional string model_ref = 3;
+  optional string connector_ref = 4;
+}
+message CreateTaskResponse { optional uint64 task_id = 1; }

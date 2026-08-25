@@ -21,6 +21,8 @@ from fastapi import APIRouter, Depends
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
+    AddAppRequest,
+    AddAppResponse,
     AddNodeToFederationRequest,
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
@@ -31,12 +33,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
-    GetAuthTokensRequest,
-    GetAuthTokensResponse,
-    GetLoginDetailsRequest,
-    GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAppsRequest,
+    ListAppsResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
     ListFederationsRequest,
@@ -55,6 +55,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RejectInvitationResponse,
     RemoveAccountFromFederationRequest,
     RemoveAccountFromFederationResponse,
+    RemoveAppRequest,
+    RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
@@ -76,8 +78,7 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import get_protobuf_request
-from flwr.superlink.auth_plugin import ControlAuthnPlugin
-from flwr.superlink.dependencies.account import get_account, get_authn_plugin
+from flwr.superlink.dependencies.account import get_account
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.servicer.control import control_handlers
 
@@ -85,7 +86,6 @@ router = APIRouter(prefix="/v1/control", tags=["Control"], route_class=ProtobufR
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]
-AuthnPluginDependency = Annotated[ControlAuthnPlugin, Depends(get_authn_plugin)]
 
 
 @router.post("/start-run")
@@ -169,24 +169,6 @@ def stop_automation(
     return control_handlers.stop_automation(request, account, linkstate)
 
 
-@router.post("/get-login-details")
-def get_login_details(
-    request: Annotated[GetLoginDetailsRequest, Depends(get_protobuf_request)],
-    authn_plugin: AuthnPluginDependency,
-) -> GetLoginDetailsResponse:
-    """Get login details."""
-    return control_handlers.get_login_details(request, authn_plugin)
-
-
-@router.post("/get-auth-tokens")
-def get_auth_tokens(
-    request: Annotated[GetAuthTokensRequest, Depends(get_protobuf_request)],
-    authn_plugin: AuthnPluginDependency,
-) -> GetAuthTokensResponse:
-    """Get authentication tokens."""
-    return control_handlers.get_auth_tokens(request, authn_plugin)
-
-
 @router.post("/register-node")
 def register_node(
     request: Annotated[RegisterNodeRequest, Depends(get_protobuf_request)],
@@ -225,6 +207,37 @@ def list_federations(
 ) -> ListFederationsResponse:
     """List federations."""
     return control_handlers.list_federations(request, account, linkstate)
+
+
+@router.post("/list-apps")
+def list_apps(
+    request: Annotated[ListAppsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListAppsResponse:
+    """List apps associated with a federation."""
+    return control_handlers.list_apps(request, account, linkstate)
+
+
+@router.post("/add-app")
+def add_app(
+    request: Annotated[AddAppRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> AddAppResponse:
+    """Add an app to a federation."""
+    # Temporary: pass an empty Fleet API type
+    return control_handlers.add_app(request, account, linkstate, "")
+
+
+@router.post("/remove-app")
+def remove_app(
+    request: Annotated[RemoveAppRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> RemoveAppResponse:
+    """Remove an app from a federation."""
+    return control_handlers.remove_app(request, account, linkstate)
 
 
 @router.post("/show-federation")

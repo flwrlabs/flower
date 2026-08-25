@@ -21,7 +21,11 @@ from datetime import datetime
 from typing import Literal
 
 from flwr.app import Context, Message
-from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AppInfo,
+    Automation,
+    StartRunRequest,
+)
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
@@ -114,8 +118,59 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Store a FAB and return its canonical SHA-256 hash."""
 
     @abstractmethod
+    def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        fab: Fab,
+        federation_id: str,
+        app_id: str,
+        app_type: str,
+        added_by: str,
+        is_hub_app: bool = False,
+    ) -> str:
+        """Atomically store a FAB and associate its app with a federation.
+
+        A federation has at most one association for each app ID. Storing the app
+        again updates its FAB hash and type while preserving when and by whom it was
+        first added.
+
+        Parameters
+        ----------
+        fab : Fab
+            FAB content and verification metadata to store.
+        federation_id : str
+            ID of the federation to associate with the app.
+        app_id : str
+            App ID, unique within the federation.
+        app_type : str
+            Type of the app.
+        added_by : str
+            ID of the account adding the app to the federation.
+        is_hub_app : bool, default=False
+            Whether the app was fetched from Flower Hub.
+
+        Returns
+        -------
+        str
+            Canonical SHA-256 hash of the stored FAB.
+        """
+
+    @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return the FAB for the given hash, if present."""
+
+    @abstractmethod
+    def get_app(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
+        """Return a FAB only when it matches the federation-app association."""
+
+    @abstractmethod
+    def list_apps(
+        self, federation_id: str, limit: int | None = None
+    ) -> Sequence[AppInfo]:
+        """List apps associated with a federation, newest first."""
+
+    @abstractmethod
+    def delete_app(self, federation_id: str, app_id: str) -> bool:
+        """Delete one federation-app association; its FAB remains in state."""
 
     @abstractmethod
     def upsert_connector(
@@ -290,11 +345,12 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def get_run_series(
+    def get_run_series(  # pylint: disable=too-many-arguments
         self,
         *,
         series_ids: Sequence[int] | None = None,
         federation_ids: Sequence[str] | None = None,
+        is_agent: bool | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
@@ -310,6 +366,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Sequence of RunSeries IDs to filter by.
         federation_ids : Optional[Sequence[str]] (default: None)
             Sequence of federation IDs to filter by.
+        is_agent : bool | None (default: None)
+            If set, filter by whether the run series belongs to an AgentApp.
         updated_before : str | None (default: None)
             If set, return only RunSeries updated before this ISO timestamp.
         limit : int | None (default: None)
@@ -350,10 +408,11 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def store_run_in_series(
+    def store_run_in_series(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         run_id: int,
         federation_id: str,
+        is_agent: bool,
         series_id: int | None,
         description: str | None = None,
     ) -> int | None:
@@ -365,6 +424,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Run ID to associate with the run series.
         federation_id : str
             Federation ID the run series belongs to.
+        is_agent : bool
+            Whether a newly created run series belongs to an AgentApp.
         series_id : int | None
             Caller-provided series ID. If `None`, a new series ID is generated
             and creation is attempted. If set, the matching series must already
@@ -821,6 +882,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
+        src_task_ids: Sequence[int] | None = None,
         limit: int | None = None,
         order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
@@ -833,6 +895,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         dst_task_ids : Optional[Sequence[int]] (default: None)
             Sequence of destination task IDs to filter by.
+        src_task_ids : Optional[Sequence[int]] (default: None)
+            Sequence of source task IDs to filter by.
         limit : Optional[int] (default: None)
             Maximum number of messages to return. If `None`, no limit is applied.
         order_by : Optional[Literal["created_at"]] (default: None)
@@ -871,6 +935,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         run_id: int | None = None,
+        task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events matching the filters.
@@ -880,6 +945,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         run_id : Optional[int] (default: None)
             If set, return only events for this run. If set to `None`, return
             events for all runs.
+        task_ids : Optional[Sequence[int]] (default: None)
+            If set, return only events produced by these tasks.
         after_task_event_id : Optional[int] (default: None)
             Return only events with an ID greater than this cursor. If set to
             `None`, retrieve all events.

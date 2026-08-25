@@ -21,7 +21,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from flwr.common.constant import CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS
+from flwr.supercore.constant import SUPERNODE_DEFAULT_CLIENT_ADDRESS
 
 from .flwr_clientapp import _parse_args_run_flwr_clientapp
 
@@ -55,7 +55,7 @@ def test_parse_flwr_clientapp_parses_tokenized_invocation() -> None:
         ]
     )
 
-    assert args.clientappio_api_address == CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS
+    assert args.runtime_api_address == SUPERNODE_DEFAULT_CLIENT_ADDRESS
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
@@ -66,7 +66,7 @@ def test_flwr_clientapp_forwards_cli_args() -> None:
     """The ClientApp CLI should forward parsed args to the runtime."""
     args = SimpleNamespace(
         insecure=True,
-        clientappio_api_address="127.0.0.1:9094",
+        runtime_api_address="127.0.0.1:9094",
         token="test-token",
         root_certificates=None,
         parent_pid=321,
@@ -88,7 +88,7 @@ def test_flwr_clientapp_forwards_cli_args() -> None:
 
     run_clientapp.assert_called_once()
     kwargs = run_clientapp.call_args.kwargs
-    assert kwargs["clientappio_api_address"] == "127.0.0.1:9094"
+    assert kwargs["runtime_api_address"] == "127.0.0.1:9094"
     assert kwargs["token"] == "test-token"
     assert kwargs["certificates"] is None
     assert kwargs["parent_pid"] == 321

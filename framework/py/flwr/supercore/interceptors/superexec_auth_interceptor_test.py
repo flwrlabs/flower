@@ -23,7 +23,7 @@ from unittest.mock import Mock
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.proto.appio_pb2 import PullPendingTasksRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import PullPendingTasksRequest  # pylint: disable=E0611
 from flwr.supercore.auth import (
     RUNTIME_METHOD_AUTH_POLICY,
     compute_request_body_sha256,
@@ -41,8 +41,8 @@ from flwr.supercore.date import now
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
     SuperExecAuthClientInterceptor,
-    create_clientappio_superexec_auth_server_interceptor,
-    create_serverappio_superexec_auth_server_interceptor,
+    create_superlink_runtime_superexec_auth_server_interceptor,
+    create_supernode_runtime_superexec_auth_server_interceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
     RUNTIME_SUPEREXEC_METHODS,
@@ -129,7 +129,7 @@ class TestSuperExecAuthClientInterceptor(TestCase):
 class TestSuperExecMethodPolicies(TestCase):
     """Lock the SuperExec HMAC method policy for the Runtime service."""
 
-    _BOOTSTRAP_METHODS = {"PullPendingTasks", "ClaimTask", "GetRun"}
+    _BOOTSTRAP_METHODS = {"PullPendingTasks", "ClaimTask"}
 
     def test_service_method_paths(self) -> None:
         """Runtime should protect exactly the bootstrap methods."""
@@ -153,8 +153,8 @@ class TestSuperExecMethodPolicies(TestCase):
     def test_host_factories_protect_runtime_bootstrap_methods(self) -> None:
         """Both retained host factories should enforce the Runtime policy."""
         for factory in (
-            create_serverappio_superexec_auth_server_interceptor,
-            create_clientappio_superexec_auth_server_interceptor,
+            create_superlink_runtime_superexec_auth_server_interceptor,
+            create_supernode_runtime_superexec_auth_server_interceptor,
         ):
             with self.subTest(factory=factory.__name__):
                 context = Mock()
@@ -186,7 +186,7 @@ class TestSuperExecAuthServerInterceptor(TestCase):
         """Create the default server interceptor under test."""
         self._secret = b"secret"
         self._state = _NonceState()
-        self._interceptor = create_serverappio_superexec_auth_server_interceptor(
+        self._interceptor = create_superlink_runtime_superexec_auth_server_interceptor(
             state_provider=lambda: self._state,
             master_secret=self._secret,
         )
