@@ -82,7 +82,7 @@ reference](https://flower.ai/docs/framework/ref-api/flwr.agentapp.html) remains
 in the Flower framework documentation.
 
 Design proposals and partially implemented paths aren't documented as current
-capabilities. Persistent federation Agent management and persistent CLI
-conversation history aren't available yet. The Open Responses-compatible
-runtime endpoint is internal to AgentApp processes and isn't a public API for
-external clients.
+capabilities. The documentation describes behavior available in the Flower
+framework and SuperGrid interfaces rather than planned product work. The
+OpenAI-compatible runtime endpoint is internal to AgentApp processes and isn't
+a public API for external clients.

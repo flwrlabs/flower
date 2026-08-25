@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower Docs\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-08-21 00:06+0000\n"
+"POT-Creation-Date: 2026-08-23 00:05+0000\n"
 "PO-Revision-Date: 2026-05-23 06:55+0000\n"
 "Last-Translator: lco <Leandro.COLLIER@student.umons.ac.be>\n"
 "Language: fr\n"
@@ -19226,212 +19226,129 @@ msgstr "Publier Flower"
 
 #: ../../source/contributor-how-to-release-flower.rst:5
 msgid ""
-"This document describes the current release process. It may or may not "
-"change in the future."
+"Framework minor releases are mostly automated. The manual release process"
+" has two steps:"
 msgstr ""
-"Ce document décrit le processus de diffusion actuel, qui peut ou non "
-"changer à l'avenir."
+
+#: ../../source/contributor-how-to-release-flower.rst:7
+msgid "Trigger the release preparation workflow to create a release pull request."
+msgstr ""
+
+#: ../../source/contributor-how-to-release-flower.rst:8
+msgid "Review the generated changelog, then approve and merge the pull request."
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:10
-msgid "During the release"
-msgstr "Lors de la sortie"
-
-#: ../../source/contributor-how-to-release-flower.rst:12
 msgid ""
-"The version number of a release is stated in "
-"``./framework/pyproject.toml``. To release a new version of Flower, the "
-"following things need to happen (in that order):"
+"After the release pull request is merged, the remaining release steps are"
+" performed automatically by GitHub Actions."
 msgstr ""
-"Le numéro de version d'une release est indiqué dans "
-"``./framework/pyproject.toml``. Pour lancer une nouvelle version de "
-"Flower, les choses suivantes doivent se produire (dans cet ordre):"
 
 #: ../../source/contributor-how-to-release-flower.rst:15
+#, fuzzy
+msgid "Prepare the release PR"
+msgstr ""
+
+#: ../../source/contributor-how-to-release-flower.rst:17
+msgid "Trigger the release preparation workflow using the GitHub CLI:"
+msgstr ""
+
+#: ../../source/contributor-how-to-release-flower.rst:25
 msgid ""
-"Run ``python3 ./framework/dev/update_changelog.py <YOUR_GH_TOKEN>`` to "
-"add all new changes to the changelog. You can make manual edits to the "
-"changelog afterward to improve its formatting or wording. This script "
-"will also replace the ``## Unreleased`` header with the new version "
-"number and current date, and add a thank-you message for contributors. "
-"Open a pull request with these changes."
+"Alternatively, trigger the `Framework Prepare Minor Release workflow "
+"<https://github.com/flwrlabs/flower/actions/workflows/framework-release-"
+"prepare.yml>`_ from the GitHub web UI."
 msgstr ""
-"Exécutez ``python3 ./framework/dev/update_changelog.py <YOUR_GH_TOKEN>`` "
-"pour ajouter tous les nouveaux changements au journal de changelog. Vous "
-"pouvez faire des édits manuels au journal de changelog après coup pour "
-"améliorer sa mise en forme ou son vocabulaire. Ce script remplacera "
-"également l'en-tête ``## Unreleased`` par le nouveau numéro de version et"
-" la date actuelle, et ajoutera un message de remerciement pour les "
-"contributeurs. Ouvrez une demande de tirage avec ces changements."
 
-#: ../../source/contributor-how-to-release-flower.rst:20
+#: ../../source/contributor-how-to-release-flower.rst:29
+msgid "The version must use the ``X.Y.0`` format, for example ``1.34.0``."
+msgstr ""
+
+#: ../../source/contributor-how-to-release-flower.rst:31
 msgid ""
-"Once the pull request is merged, tag the release commit with the version "
-"number: ``git tag v<NEW_VERSION>`` (notice the ``v`` added before the "
-"version number), then ``git push --tags``. This will create a draft "
-"release on GitHub containing the correct artifacts and the relevant part "
-"of the changelog."
+"The workflow pins the current ``main`` commit as the release source and "
+"creates a draft release PR. It generates and polishes the changelog and "
+"updates the version bookkeeping needed for the release and the next "
+"development cycle."
 msgstr ""
-"Une fois que la demande de tirage est fusionnée, marquez le commit de "
-"version avec le numéro de version : ``git tag v<NEW_VERSION>`` (prenez "
-"note du ``v`` ajouté avant le numéro de version), puis ``git push "
-"--tags``. Cela créera une mise en ligne de brouillon sur GitHub contenant"
-" les artefacts corrects et la partie pertinente du changelog."
-
-#: ../../source/contributor-how-to-release-flower.rst:24
-msgid "Check the draft release on GitHub, and if everything is good, publish it."
-msgstr ""
-"Vérifiez la mise en ligne préliminaire sur GitHub, et si tout est bien, "
-"publiez-la."
-
-#: ../../source/contributor-how-to-release-flower.rst:28
-msgid "After the release"
-msgstr "Après la publication"
-
-#: ../../source/contributor-how-to-release-flower.rst:30
-msgid "Create a pull request which contains the following changes:"
-msgstr "Crée une demande de pull qui contient les modifications suivantes :"
-
-#: ../../source/contributor-how-to-release-flower.rst:32
-msgid ""
-"Increase the minor version in ``pyproject.toml`` by one and update all "
-"files which contain the current version number (if necessary) by running "
-"``./framework/dev/update_version.py``."
-msgstr ""
-"Augmentez la sous-version dans ``pyproject.toml`` d'une unité et mettez à"
-" jour tous les fichiers qui contiennent le numéro de version actuel (si "
-"nécessaire) en exécutant ``./framework/dev/update_version.py``. "
 
 #: ../../source/contributor-how-to-release-flower.rst:35
 msgid ""
-"Add a new ``## Unreleased`` section at the top of "
-"``./framework/docs/source/ref-changelog.md`` to prepare for future "
-"changes."
+"If more changes land on ``main`` before the release PR is merged, trigger"
+" the workflow again with the same version. The existing release PR is "
+"refreshed instead of creating a new one, and the release source is re-"
+"pinned to the current ``main`` HEAD."
 msgstr ""
-"Ajoutez une nouvelle section ``## Unreleased`` au début de "
-"``./framework/docs/source/ref-changelog.md`` pour se préparer à des "
-"futurs changements."
 
-#: ../../source/contributor-how-to-release-flower.rst:38
+#: ../../source/contributor-how-to-release-flower.rst:39
 msgid ""
-"Merge the pull request on the same day (i.e., before a new nightly "
-"release gets published to PyPI)."
+"The release PR is also checked automatically. These checks validate the "
+"generated version state and changelog and verify that the prebuilt "
+"release artifacts for the pinned source commit are available."
 msgstr ""
-"Fusionne la pull request le jour même (c'est-à-dire avant qu'une nouvelle"
-" version nightly ne soit publiée sur PyPI)."
 
-#: ../../source/contributor-how-to-release-flower.rst:43
-msgid "Publishing a pre-release"
-msgstr "Publier une pré-version"
+#: ../../source/contributor-how-to-release-flower.rst:45
+#, fuzzy
+msgid "Review and merge the PR"
+msgstr "**Révisez le PR**"
 
-#: ../../source/contributor-how-to-release-flower.rst:46
-msgid "Pre-release naming"
-msgstr "Nom de la pré-version"
-
-#: ../../source/contributor-how-to-release-flower.rst:48
+#: ../../source/contributor-how-to-release-flower.rst:47
 msgid ""
-"PyPI supports pre-releases (alpha, beta, release candidate). Pre-releases"
-" MUST use one of the following naming patterns:"
+"Review the generated changelog in "
+"``framework/docs/source/changelog/vX.Y.0.md`` and make any edits needed "
+"before the release. When the PR is ready, mark it ready for review if it "
+"is still a draft, approve it, and merge it into ``main``."
 msgstr ""
-"PyPI prend en charge les préversions (alpha, bêta, version candidate). "
-"Les préversions DOIVENT utiliser l'un des modèles de dénomination "
-"suivants :"
 
 #: ../../source/contributor-how-to-release-flower.rst:51
-msgid "Alpha: ``MAJOR.MINOR.PATCHaN``"
-msgstr "Alpha : ``MAJOR.MINOR.PATCHaN``"
+msgid ""
+"That is the end of the manual release process. Do not manually create "
+"release tags or publish Python packages, Docker images, or a GitHub "
+"Release."
+msgstr ""
 
-#: ../../source/contributor-how-to-release-flower.rst:52
-msgid "Beta: ``MAJOR.MINOR.PATCHbN``"
-msgstr "Bêta : ``MAJOR.MINOR.PATCHbN``"
-
-#: ../../source/contributor-how-to-release-flower.rst:53
-msgid "Release candidate (RC): ``MAJOR.MINOR.PATCHrcN``"
-msgstr "Candidat à la publication (RC) : ``MAJOR.MINOR.PATCHrcN``"
-
-#: ../../source/contributor-how-to-release-flower.rst:55
-msgid "Examples include:"
-msgstr "Voici quelques exemples :"
-
-#: ../../source/contributor-how-to-release-flower.rst:57
-msgid "``1.0.0a0``"
+#: ../../source/contributor-how-to-release-flower.rst:56
+msgid "What happens after the merge"
 msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:58
-msgid "``1.0.0b0``"
-msgstr ""
-
-#: ../../source/contributor-how-to-release-flower.rst:59
-msgid "``1.0.0rc0``"
-msgstr ""
-
-#: ../../source/contributor-how-to-release-flower.rst:60
-msgid "``1.0.0rc1``"
+msgid ""
+"Merging the release PR automatically triggers ``framework-release-"
+"finalize.yml``. The workflow uses the release source commit recorded by "
+"the latest release preparation run and:"
 msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:62
 msgid ""
-"This is in line with PEP-440 and the recommendations from the Python "
-"Packaging Authority (PyPA):"
+"creates the ``framework-X.Y.0`` tag and the ``release/framework-X.Y`` "
+"maintenance branch;"
 msgstr ""
-"Ceci est conforme au PEP-440 et aux recommandations de l'Autorité de "
-"l'emballage Python (PyPA) :"
+
+#: ../../source/contributor-how-to-release-flower.rst:64
+msgid "publishes the Python wheel and source distribution;"
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:65
-msgid "`PEP-440 <https://peps.python.org/pep-0440/>`_"
+msgid "promotes the prebuilt Docker images to their stable release tags;"
 msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:66
-msgid ""
-"`PyPA Choosing a versioning scheme "
-"<https://packaging.python.org/en/latest/guides/distributing-packages-"
-"using-setuptools/#choosing-a-versioning-scheme>`_"
+msgid "dispatches the Framework documentation build from the release branch; and"
 msgstr ""
-"`PyPA Choisir un schéma de version "
-"<https://packaging.python.org/en/latest/guides/distributing-packages-"
-"using-setuptools/#choosing-a-versioning-scheme>`_"
+
+#: ../../source/contributor-how-to-release-flower.rst:67
+msgid ""
+"publishes the GitHub Release using the release changelog as the release "
+"notes."
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:69
 msgid ""
-"Note that the approach defined by PyPA is not compatible with SemVer "
-"2.0.0 spec, for details consult the `Semantic Versioning Specification "
-"<https://semver.org/spec/v2.0.0.html#spec-item-11>`_ (specifically item "
-"11 on precedence)."
+"The release artifacts are built ahead of time for commits on ``main`` by "
+"``framework-commit-artifacts.yml``. The finalization workflow promotes "
+"the artifacts for the exact pinned release source instead of rebuilding "
+"them during the release."
 msgstr ""
-"Note que l'approche définie par PyPA n'est pas compatible avec la "
-"spécification SemVer 2.0.0, pour plus de détails, consulte la `Semantic "
-"Versioning Specification <https://semver.org/spec/v2.0.0.html#spec-"
-"item-11>`_ (en particulier le point 11 sur la préséance)."
-
-#: ../../source/contributor-how-to-release-flower.rst:75
-msgid "Pre-release classification"
-msgstr "Classification avant publication"
-
-#: ../../source/contributor-how-to-release-flower.rst:77
-msgid "Should the next pre-release be called alpha, beta, or release candidate?"
-msgstr ""
-"La prochaine préversion doit-elle être appelée alpha, bêta ou release "
-"candidate ?"
-
-#: ../../source/contributor-how-to-release-flower.rst:79
-msgid ""
-"RC: feature complete, no known issues (apart from issues that are "
-"classified as \"won't fix\" for the next stable release) - if no issues "
-"surface this will become the next stable release"
-msgstr ""
-"RC : fonctionnalités complètes, pas de problèmes connus (à l'exception "
-"des problèmes classés comme \"à ne pas corriger\" pour la prochaine "
-"version stable) - si aucun problème n'apparaît, cette version deviendra "
-"la prochaine version stable"
-
-#: ../../source/contributor-how-to-release-flower.rst:82
-msgid "Beta: feature complete, allowed to have known issues"
-msgstr "Bêta : fonctionnalité complète, autorisée à avoir des problèmes connus"
-
-#: ../../source/contributor-how-to-release-flower.rst:83
-msgid "Alpha: not feature complete, allowed to have known issues"
-msgstr ""
-"Alpha : les fonctionnalités ne sont pas complètes, les problèmes connus "
-"sont autorisés"
 
 #: ../../source/contributor-how-to-set-up-a-virtual-env.rst:3
 msgid "Set up a virtual env"
@@ -41068,55 +40985,66 @@ msgstr ""
 msgid "Classes"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 msgid ":py:obj:`AgentApp <flwr.agentapp.AgentApp>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.agent_app.AgentApp:1 of
 msgid "Flower AgentApp."
 msgstr "Agent Flower App."
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentConnectors <flwr.agentapp.AgentConnectors>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.base.AgentConnectors:1 of
 #, fuzzy
 msgid "Abstract base class for AgentApp connector execution."
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`AgentEvents <flwr.agentapp.AgentEvents>`\\ \\(\\)"
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
+#: flwr.agentapp.base.AgentEvents:1 of
+#, fuzzy
+msgid "Abstract base class for AgentApp run events."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 msgid ":py:obj:`AgentResponses <flwr.agentapp.AgentResponses>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.base.AgentResponses:1 of
 msgid "Abstract base class for AgentApp model response creation."
 msgstr "Classe abstraite de base pour la création de réponse du modèle AgentApp."
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 msgid ":py:obj:`AgentSession <flwr.agentapp.AgentSession>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.base.AgentSession:1 of
 msgid "Abstract base class for AgentApp runtime capabilities."
 msgstr ""
 "Classe abstraite de base pour les capacités d'exécution en temps réel de "
 "l'agent."
 
-#: ../../source/ref-api/flwr.agentapp.rst:32
+#: ../../source/ref-api/flwr.agentapp.rst:33
 msgid "Exceptions"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:36:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:37:<autosummary>:1
 msgid ":py:obj:`LoadAgentAppError <flwr.agentapp.LoadAgentAppError>`\\"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:36:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:37:<autosummary>:1
 #: flwr.agentapp.agent_app.LoadAgentAppError:1 of
 msgid "Error when trying to load `AgentApp`."
 msgstr ""
@@ -41154,7 +41082,7 @@ msgstr ""
 #: flwr.supercore.privacy_accounting.GaussianPrivacyEvent:1
 #: flwr.supercore.privacy_accounting.PrivacyConfig:1
 #: flwr.supercore.privacy_accounting.PrivacySpent:1
-#: flwr.supercore.rdp_accountant.RdpAccountant:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant:1 of
 msgid "Bases: :py:class:`object`"
 msgstr "Bases : :py:class:`object`"
 
@@ -41193,6 +41121,7 @@ msgstr "Définir un agent avec une seule fonction principale::"
 
 #: ../../source/ref-api/flwr.agentapp.AgentApp.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentConnectors.rst:15
+#: ../../source/ref-api/flwr.agentapp.AgentEvents.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentSession.rst:15
 #: ../../source/ref-api/flwr.app.Array.rst:15
@@ -41327,8 +41256,9 @@ msgstr ""
 msgid "AgentConnectors"
 msgstr ""
 
-#: flwr.agentapp.base.AgentConnectors:1 flwr.agentapp.base.AgentResponses:1
-#: flwr.agentapp.base.AgentSession:1 flwr.compat.client.client.Client:1
+#: flwr.agentapp.base.AgentConnectors:1 flwr.agentapp.base.AgentEvents:1
+#: flwr.agentapp.base.AgentResponses:1 flwr.agentapp.base.AgentSession:1
+#: flwr.compat.client.client.Client:1
 #: flwr.compat.client.numpy_client.NumPyClient:1
 #: flwr.server.client_manager.ClientManager:1
 #: flwr.server.strategy.strategy.Strategy:1 flwr.serverapp.grid.grid.Grid:1
@@ -41354,6 +41284,20 @@ msgstr ""
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentConnectors.tools:1 of
 msgid "Return model-facing tool schemas for built-in connectors."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.AgentEvents.rst:2
+msgid "AgentEvents"
+msgstr ""
+
+#: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`emit <flwr.agentapp.AgentEvents.emit>`\\ \\(event\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentEvents.emit:1
+#: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
+msgid "Emit one structured run event."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:2
@@ -41494,7 +41438,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.app.Array.rst:43
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:79
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:64
-#: ../../source/ref-api/flwr.app.Context.rst:25
+#: ../../source/ref-api/flwr.app.Context.rst:28
 #: ../../source/ref-api/flwr.app.Error.rst:25
 #: ../../source/ref-api/flwr.app.Message.rst:43
 #: ../../source/ref-api/flwr.app.MessageType.rst:25
@@ -41507,7 +41451,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.common.Code.rst:19
 #: ../../source/ref-api/flwr.common.ConfigRecord.rst:64
 #: ../../source/ref-api/flwr.common.ConfigsRecord.rst:64
-#: ../../source/ref-api/flwr.common.Context.rst:25
+#: ../../source/ref-api/flwr.common.Context.rst:28
 #: ../../source/ref-api/flwr.common.DisconnectRes.rst:25
 #: ../../source/ref-api/flwr.common.Error.rst:25
 #: ../../source/ref-api/flwr.common.EvaluateIns.rst:25
@@ -41534,7 +41478,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.common.Status.rst:25
 #: ../../source/ref-api/flwr.server.Driver.rst:43
 #: ../../source/ref-api/flwr.server.Grid.rst:43
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:25
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:28
 #: ../../source/ref-api/flwr.server.ServerAppComponents.rst:25
 #: ../../source/ref-api/flwr.server.ServerConfig.rst:25
 #: ../../source/ref-api/flwr.serverapp.GaussianPrivacyEvent.rst:25
@@ -41558,6 +41502,16 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 msgid "Connector tool schema and execution API."
+msgstr ""
+
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`events <flwr.agentapp.AgentSession.events>`\\"
+msgstr ""
+
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
+#: flwr.agentapp.AgentSession.events:1 of
+msgid "Structured run event API."
 msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
@@ -42720,27 +42674,39 @@ msgstr ""
 "L'ID qui identifie la série d'exécution, si cette exécution appartient à "
 "une."
 
-#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
+#: ../../source/ref-api/flwr.app.Context.rst:26:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`locked <flwr.app.Context.locked>`\\ \\(\\)"
+msgstr ""
+
+#: ../../source/ref-api/flwr.app.Context.rst:26:<autosummary>:1
+#: ../../source/ref-api/flwr.common.Context.rst:26:<autosummary>:1
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:26:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1 of
+msgid "Lock this context for an atomic in-process operation."
+msgstr ""
+
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 msgid ":py:obj:`run_id <flwr.app.Context.run_id>`\\"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 msgid ":py:obj:`node_id <flwr.app.Context.node_id>`\\"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 msgid ":py:obj:`node_config <flwr.app.Context.node_config>`\\"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 msgid ":py:obj:`state <flwr.app.Context.state>`\\"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 msgid ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 msgid ":py:obj:`series_id <flwr.app.Context.series_id>`\\"
 msgstr ""
 
@@ -45601,32 +45567,37 @@ msgstr ":py:obj:`is_dirty <flwr.app.ConfigRecord.is_dirty>`\\"
 msgid ":py:obj:`object_id <flwr.common.ConfigsRecord.object_id>`\\"
 msgstr ":py:obj:`object_id <flwr.app.ConfigRecord.object_id>`\\"
 
-#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
+#: ../../source/ref-api/flwr.common.Context.rst:26:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`locked <flwr.common.Context.locked>`\\ \\(\\)"
+msgstr ""
+
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`run_id <flwr.common.Context.run_id>`\\"
 msgstr ":py:obj:`run_id <flwr.app.Context.run_id>`\\"
 
-#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`node_id <flwr.common.Context.node_id>`\\"
 msgstr ":py:obj:`node_id <flwr.app.Context.node_id>`\\"
 
-#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`node_config <flwr.common.Context.node_config>`\\"
 msgstr ":py:obj:`node_config <flwr.app.Context.node_config>`\\"
 
-#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`state <flwr.common.Context.state>`\\"
 msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
 
-#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`run_config <flwr.common.Context.run_config>`\\"
 msgstr ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
 
-#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`series_id <flwr.common.Context.series_id>`\\"
 msgstr ":py:obj:`series_id <flwr.app.Context.series_id>`\\"
@@ -48546,52 +48517,57 @@ msgstr "Context"
 msgid "Bases: :py:class:`~flwr.app.message.context.Context`"
 msgstr "Bases : :py:class:`~flwr.serverapp.strategy.fedopt.FedOpt`"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:26:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`locked <flwr.server.LegacyContext.locked>`\\ \\(\\)"
+msgstr ""
+
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`config <flwr.server.LegacyContext.config>`\\"
 msgstr ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`strategy <flwr.server.LegacyContext.strategy>`\\"
 msgstr ":py:obj:`strategy <flwr.serverapp.strategy>`\\"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`client_manager <flwr.server.LegacyContext.client_manager>`\\"
 msgstr ":py:obj:`clientapp <flwr.clientapp>`\\"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`history <flwr.server.LegacyContext.history>`\\"
 msgstr ":py:obj:`strategy <flwr.serverapp.strategy>`\\"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`run_id <flwr.server.LegacyContext.run_id>`\\"
 msgstr ":py:obj:`run_id <flwr.app.Context.run_id>`\\"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`node_id <flwr.server.LegacyContext.node_id>`\\"
 msgstr ":py:obj:`node_id <flwr.app.Context.node_id>`\\"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`node_config <flwr.server.LegacyContext.node_config>`\\"
 msgstr ":py:obj:`node_config <flwr.app.Context.node_config>`\\"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`state <flwr.server.LegacyContext.state>`\\"
 msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`run_config <flwr.server.LegacyContext.run_config>`\\"
 msgstr ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
+#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`series_id <flwr.server.LegacyContext.series_id>`\\"
 msgstr ":py:obj:`series_id <flwr.app.Context.series_id>`\\"
@@ -52897,7 +52873,7 @@ msgstr ""
 "config\\, strategy\\, ...\\]\\)"
 
 #: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
-#: flwr.supercore.rdp_accountant.RdpAccountant:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant:1 of
 msgid "Track cumulative privacy loss using Renyi differential privacy."
 msgstr ""
 
@@ -53383,7 +53359,8 @@ msgstr ":py:obj:`get_node_ids <flwr.serverapp.Grid.get_node_ids>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
 #: flwr.supercore.privacy_accounting.PrivacyAccountant.get_delta:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.get_delta:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.get_delta:1
+#: of
 msgid "Return cumulative delta at the supplied epsilon."
 msgstr ""
 
@@ -53397,7 +53374,8 @@ msgstr ":py:obj:`set_run <flwr.serverapp.Grid.set_run>`\\ \\(run\\)"
 #: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
 #: flwr.supercore.privacy_accounting.PrivacyAccountant.get_epsilon:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.get_epsilon:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.get_epsilon:1
+#: of
 msgid "Return cumulative epsilon at the supplied delta."
 msgstr ""
 
@@ -53449,7 +53427,8 @@ msgstr ""
 #: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
 #: flwr.supercore.privacy_accounting.PrivacyAccountant.would_exceed:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.would_exceed:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.would_exceed:1
+#: of
 msgid "Return whether composing an event would exceed an epsilon limit."
 msgstr ""
 
@@ -53462,7 +53441,8 @@ msgstr ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
 #: flwr.serverapp.PrivacyAccountant.config:1
 #: flwr.serverapp.RdpAccountant.config:1
 #: flwr.supercore.privacy_accounting.PrivacyAccountant.compose:1:<autosummary>:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid "Return the privacy configuration."
 msgstr "Configurer les fédérations."
@@ -53476,7 +53456,8 @@ msgstr ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
 #: flwr.serverapp.PrivacyAccountant.num_releases:1
 #: flwr.serverapp.RdpAccountant.num_releases:1
 #: flwr.supercore.privacy_accounting.PrivacyAccountant.compose:1:<autosummary>:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1
+#: of
 msgid "Return the number of composed private releases."
 msgstr ""
 
@@ -53566,7 +53547,7 @@ msgstr ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
 msgid "RdpAccountant"
 msgstr ""
 
-#: flwr.supercore.rdp_accountant.RdpAccountant:3 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant:3 of
 msgid ""
 "This class wraps Google's ``dp-accounting`` package while exposing only "
 "Flower-owned configuration, event, result, and serialization types."
@@ -53582,7 +53563,7 @@ msgstr ""
 "config\\, strategy\\, ...\\]\\)"
 
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.compose:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1 of
 msgid "Compose one or more identical sampled Gaussian releases."
 msgstr ""
 
@@ -53608,7 +53589,8 @@ msgid ""
 msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.get_privacy_spent:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.get_privacy_spent:1
+#: of
 msgid "Return cumulative privacy expenditure at delta."
 msgstr ""
 
@@ -53620,7 +53602,8 @@ msgid ""
 msgstr ":py:obj:`Strategy <flwr.serverapp.strategy.Strategy>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.load_state_dict:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.load_state_dict:1
+#: of
 msgid "Restore state produced by :meth:`state_dict`."
 msgstr ""
 
@@ -53630,7 +53613,8 @@ msgid ":py:obj:`state_dict <flwr.serverapp.RdpAccountant.state_dict>`\\ \\(\\)"
 msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
 
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.state_dict:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.state_dict:1
+#: of
 msgid "Return JSON-serializable accountant state."
 msgstr ""
 
@@ -53643,23 +53627,27 @@ msgstr ""
 ":py:obj:`send_and_receive <flwr.serverapp.Grid.send_and_receive>`\\ "
 "\\(messages\\, \\*\\[\\, timeout\\]\\)"
 
-#: flwr.supercore.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`config <flwr.serverapp.RdpAccountant.config>`\\"
 msgstr ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
 
-#: flwr.supercore.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`num_releases <flwr.serverapp.RdpAccountant.num_releases>`\\"
 msgstr ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
 
-#: flwr.supercore.rdp_accountant.RdpAccountant.load_state_dict:3 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.load_state_dict:3
+#: of
 msgid ""
 "The restored state must use the same privacy configuration as this "
 "accountant. Backend numeric state is rebuilt from Flower's event ledger."
 msgstr ""
 
-#: flwr.supercore.rdp_accountant.RdpAccountant.would_exceed:3 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.would_exceed:3
+#: of
 msgid "This method does not mutate committed accountant state."
 msgstr ""
 
@@ -65598,3 +65586,241 @@ msgstr ""
 #~ " server certificate. If None, gRPC "
 #~ "default root certificates are used."
 #~ msgstr ""
+
+#~ msgid ""
+#~ "This document describes the current "
+#~ "release process. It may or may not"
+#~ " change in the future."
+#~ msgstr ""
+#~ "Ce document décrit le processus de "
+#~ "diffusion actuel, qui peut ou non "
+#~ "changer à l'avenir."
+
+#~ msgid "During the release"
+#~ msgstr "Lors de la sortie"
+
+#~ msgid ""
+#~ "The version number of a release is"
+#~ " stated in ``./framework/pyproject.toml``. To "
+#~ "release a new version of Flower, "
+#~ "the following things need to happen "
+#~ "(in that order):"
+#~ msgstr ""
+#~ "Le numéro de version d'une release "
+#~ "est indiqué dans ``./framework/pyproject.toml``. "
+#~ "Pour lancer une nouvelle version de "
+#~ "Flower, les choses suivantes doivent se"
+#~ " produire (dans cet ordre):"
+
+#~ msgid ""
+#~ "Run ``python3 ./framework/dev/update_changelog.py "
+#~ "<YOUR_GH_TOKEN>`` to add all new changes"
+#~ " to the changelog. You can make "
+#~ "manual edits to the changelog afterward"
+#~ " to improve its formatting or "
+#~ "wording. This script will also replace"
+#~ " the ``## Unreleased`` header with "
+#~ "the new version number and current "
+#~ "date, and add a thank-you message"
+#~ " for contributors. Open a pull "
+#~ "request with these changes."
+#~ msgstr ""
+#~ "Exécutez ``python3 ./framework/dev/update_changelog.py "
+#~ "<YOUR_GH_TOKEN>`` pour ajouter tous les "
+#~ "nouveaux changements au journal de "
+#~ "changelog. Vous pouvez faire des édits"
+#~ " manuels au journal de changelog "
+#~ "après coup pour améliorer sa mise "
+#~ "en forme ou son vocabulaire. Ce "
+#~ "script remplacera également l'en-tête "
+#~ "``## Unreleased`` par le nouveau numéro"
+#~ " de version et la date actuelle, "
+#~ "et ajoutera un message de remerciement"
+#~ " pour les contributeurs. Ouvrez une "
+#~ "demande de tirage avec ces changements."
+
+#~ msgid ""
+#~ "Once the pull request is merged, "
+#~ "tag the release commit with the "
+#~ "version number: ``git tag v<NEW_VERSION>`` "
+#~ "(notice the ``v`` added before the "
+#~ "version number), then ``git push "
+#~ "--tags``. This will create a draft "
+#~ "release on GitHub containing the correct"
+#~ " artifacts and the relevant part of"
+#~ " the changelog."
+#~ msgstr ""
+#~ "Une fois que la demande de tirage"
+#~ " est fusionnée, marquez le commit de"
+#~ " version avec le numéro de version"
+#~ " : ``git tag v<NEW_VERSION>`` (prenez "
+#~ "note du ``v`` ajouté avant le "
+#~ "numéro de version), puis ``git push "
+#~ "--tags``. Cela créera une mise en "
+#~ "ligne de brouillon sur GitHub contenant"
+#~ " les artefacts corrects et la partie"
+#~ " pertinente du changelog."
+
+#~ msgid ""
+#~ "Check the draft release on GitHub, "
+#~ "and if everything is good, publish "
+#~ "it."
+#~ msgstr ""
+#~ "Vérifiez la mise en ligne préliminaire"
+#~ " sur GitHub, et si tout est "
+#~ "bien, publiez-la."
+
+#~ msgid "Create a pull request which contains the following changes:"
+#~ msgstr "Crée une demande de pull qui contient les modifications suivantes :"
+
+#~ msgid ""
+#~ "Increase the minor version in "
+#~ "``pyproject.toml`` by one and update all"
+#~ " files which contain the current "
+#~ "version number (if necessary) by running"
+#~ " ``./framework/dev/update_version.py``."
+#~ msgstr ""
+#~ "Augmentez la sous-version dans "
+#~ "``pyproject.toml`` d'une unité et mettez "
+#~ "à jour tous les fichiers qui "
+#~ "contiennent le numéro de version actuel"
+#~ " (si nécessaire) en exécutant "
+#~ "``./framework/dev/update_version.py``. "
+
+#~ msgid ""
+#~ "Add a new ``## Unreleased`` section "
+#~ "at the top of ``./framework/docs/source"
+#~ "/ref-changelog.md`` to prepare for future"
+#~ " changes."
+#~ msgstr ""
+#~ "Ajoutez une nouvelle section ``## "
+#~ "Unreleased`` au début de "
+#~ "``./framework/docs/source/ref-changelog.md`` pour se"
+#~ " préparer à des futurs changements."
+
+#~ msgid ""
+#~ "Merge the pull request on the same"
+#~ " day (i.e., before a new nightly "
+#~ "release gets published to PyPI)."
+#~ msgstr ""
+#~ "Fusionne la pull request le jour "
+#~ "même (c'est-à-dire avant qu'une nouvelle "
+#~ "version nightly ne soit publiée sur "
+#~ "PyPI)."
+
+#~ msgid "Publishing a pre-release"
+#~ msgstr "Publier une pré-version"
+
+#~ msgid "Pre-release naming"
+#~ msgstr "Nom de la pré-version"
+
+#~ msgid ""
+#~ "PyPI supports pre-releases (alpha, beta,"
+#~ " release candidate). Pre-releases MUST "
+#~ "use one of the following naming "
+#~ "patterns:"
+#~ msgstr ""
+#~ "PyPI prend en charge les préversions "
+#~ "(alpha, bêta, version candidate). Les "
+#~ "préversions DOIVENT utiliser l'un des "
+#~ "modèles de dénomination suivants :"
+
+#~ msgid "Alpha: ``MAJOR.MINOR.PATCHaN``"
+#~ msgstr "Alpha : ``MAJOR.MINOR.PATCHaN``"
+
+#~ msgid "Beta: ``MAJOR.MINOR.PATCHbN``"
+#~ msgstr "Bêta : ``MAJOR.MINOR.PATCHbN``"
+
+#~ msgid "Release candidate (RC): ``MAJOR.MINOR.PATCHrcN``"
+#~ msgstr "Candidat à la publication (RC) : ``MAJOR.MINOR.PATCHrcN``"
+
+#~ msgid "Examples include:"
+#~ msgstr "Voici quelques exemples :"
+
+#~ msgid "``1.0.0a0``"
+#~ msgstr ""
+
+#~ msgid "``1.0.0b0``"
+#~ msgstr ""
+
+#~ msgid "``1.0.0rc0``"
+#~ msgstr ""
+
+#~ msgid "``1.0.0rc1``"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "This is in line with PEP-440 and"
+#~ " the recommendations from the Python "
+#~ "Packaging Authority (PyPA):"
+#~ msgstr ""
+#~ "Ceci est conforme au PEP-440 et "
+#~ "aux recommandations de l'Autorité de "
+#~ "l'emballage Python (PyPA) :"
+
+#~ msgid "`PEP-440 <https://peps.python.org/pep-0440/>`_"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "`PyPA Choosing a versioning scheme "
+#~ "<https://packaging.python.org/en/latest/guides/distributing-"
+#~ "packages-using-setuptools/#choosing-a-versioning-"
+#~ "scheme>`_"
+#~ msgstr ""
+#~ "`PyPA Choisir un schéma de version "
+#~ "<https://packaging.python.org/en/latest/guides/distributing-"
+#~ "packages-using-setuptools/#choosing-a-versioning-"
+#~ "scheme>`_"
+
+#~ msgid ""
+#~ "Note that the approach defined by "
+#~ "PyPA is not compatible with SemVer "
+#~ "2.0.0 spec, for details consult the "
+#~ "`Semantic Versioning Specification "
+#~ "<https://semver.org/spec/v2.0.0.html#spec-item-11>`_ "
+#~ "(specifically item 11 on precedence)."
+#~ msgstr ""
+#~ "Note que l'approche définie par PyPA "
+#~ "n'est pas compatible avec la "
+#~ "spécification SemVer 2.0.0, pour plus de"
+#~ " détails, consulte la `Semantic Versioning"
+#~ " Specification <https://semver.org/spec/v2.0.0.html#spec-"
+#~ "item-11>`_ (en particulier le point 11"
+#~ " sur la préséance)."
+
+#~ msgid "Pre-release classification"
+#~ msgstr "Classification avant publication"
+
+#~ msgid ""
+#~ "Should the next pre-release be "
+#~ "called alpha, beta, or release "
+#~ "candidate?"
+#~ msgstr ""
+#~ "La prochaine préversion doit-elle être"
+#~ " appelée alpha, bêta ou release "
+#~ "candidate ?"
+
+#~ msgid ""
+#~ "RC: feature complete, no known issues"
+#~ " (apart from issues that are "
+#~ "classified as \"won't fix\" for the "
+#~ "next stable release) - if no "
+#~ "issues surface this will become the "
+#~ "next stable release"
+#~ msgstr ""
+#~ "RC : fonctionnalités complètes, pas de"
+#~ " problèmes connus (à l'exception des "
+#~ "problèmes classés comme \"à ne pas "
+#~ "corriger\" pour la prochaine version "
+#~ "stable) - si aucun problème n'apparaît,"
+#~ " cette version deviendra la prochaine "
+#~ "version stable"
+
+#~ msgid "Beta: feature complete, allowed to have known issues"
+#~ msgstr "Bêta : fonctionnalité complète, autorisée à avoir des problèmes connus"
+
+#~ msgid "Alpha: not feature complete, allowed to have known issues"
+#~ msgstr ""
+#~ "Alpha : les fonctionnalités ne sont "
+#~ "pas complètes, les problèmes connus sont"
+#~ " autorisés"

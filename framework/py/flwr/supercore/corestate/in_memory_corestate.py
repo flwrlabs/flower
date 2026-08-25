@@ -1194,6 +1194,7 @@ class InMemoryCoreState(
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
+        src_task_ids: Sequence[int] | None = None,
         limit: int | None = None,
         order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
@@ -1206,19 +1207,28 @@ class InMemoryCoreState(
             return []
         if dst_task_ids is not None and not dst_task_ids:
             return []
+        if src_task_ids is not None and not src_task_ids:
+            return []
 
         with self.lock_task_store, self.lock_task_message_store:
             self._cleanup_expired_task_tokens_locked()
             current = now().timestamp()
             self._cleanup_invalid_task_messages_locked(current)
 
-            # Filter by dst_task_id
+            # Filter by task IDs
             dst_task_id_set = set(dst_task_ids) if dst_task_ids is not None else None
+            src_task_id_set = set(src_task_ids) if src_task_ids is not None else None
             selected_messages = [
                 msg
                 for msg in self.task_message_store.values()
-                if dst_task_id_set is None
-                or msg.metadata.dst_task_id in dst_task_id_set
+                if (
+                    dst_task_id_set is None
+                    or msg.metadata.dst_task_id in dst_task_id_set
+                )
+                and (
+                    src_task_id_set is None
+                    or msg.metadata.src_task_id in src_task_id_set
+                )
             ]
 
             # Apply requested sort order
@@ -1264,6 +1274,7 @@ class InMemoryCoreState(
         self,
         *,
         run_id: int | None = None,
+        task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
@@ -1277,10 +1288,12 @@ class InMemoryCoreState(
                 ]
             else:
                 events = list(self.task_event_store.get(run_id, []))
+            task_id_set = set(task_ids) if task_ids is not None else None
             return [
                 event
                 for event in sorted(events, key=lambda event: event.id)
                 if event.id > cursor
+                and (task_id_set is None or event.task_id in task_id_set)
             ]
 
     def _cleanup_expired_task_tokens_locked(self) -> None:

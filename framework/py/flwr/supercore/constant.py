@@ -207,6 +207,8 @@ class InvitationStatus(StrEnum):
 
 AUTOMATION_BATCH_LIMIT = 1
 
+FLOWER_AGENT_APP_ID = "@flwrlabs/flwr-agent"
+
 
 class AutomationStatus(StrEnum):
     """Status of an automation."""

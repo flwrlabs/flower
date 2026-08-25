@@ -1788,8 +1788,8 @@ class TestControlServicerAuth(unittest.TestCase):
         self.assertEqual(msgs, [])
         ctx.is_active.assert_called_once_with()
 
-    def test_streamrunevents_yields_events(self) -> None:
-        """Test StreamRunEvents streams task events for an accessible run."""
+    def test_streamrunevents_returns_only_primary_task_events(self) -> None:
+        """Return only events produced by the run's primary task."""
         # Prepare
         run_id = 789
         request = StreamRunEventsRequest(run_id=run_id, after_task_event_id=4)
@@ -1797,23 +1797,17 @@ class TestControlServicerAuth(unittest.TestCase):
         ctx.is_active.return_value = True
         mock_run = Mock(
             federation_id=NOOP_FEDERATION_ID,
+            primary_task_id=123,
             status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
         )
-        event_1 = TaskEvent(
-            id=5,
-            run_id=run_id,
-            task_id=123,
-            event="response.output_text.delta",
-            data='{"delta":"Hel"}',
-        )
-        event_2 = TaskEvent(
+        event = TaskEvent(
             id=6,
             run_id=run_id,
             task_id=123,
             event="response.completed",
             data='{"type":"response.completed"}',
         )
-        mock_get_task_events = Mock(return_value=[event_1, event_2])
+        mock_get_task_events = Mock(return_value=[event])
 
         # Execute
         with (
@@ -1831,16 +1825,14 @@ class TestControlServicerAuth(unittest.TestCase):
 
         # Assert
         mock_get_task_events.assert_called_once_with(
-            run_id=run_id, after_task_event_id=4
+            run_id=run_id,
+            task_ids=[123],
+            after_task_event_id=4,
         )
-        self.assertEqual(len(msgs), 2)
-        self.assertIsInstance(msgs[0], StreamRunEventsResponse)
-        self.assertEqual(msgs[0].task_event.id, 5)
-        self.assertEqual(msgs[0].task_event.task_id, 123)
-        self.assertEqual(msgs[0].task_event.event, "response.output_text.delta")
-        self.assertEqual(msgs[0].task_event.data, '{"delta":"Hel"}')
-        self.assertEqual(msgs[1].task_event.id, 6)
-        self.assertEqual(msgs[1].task_event.event, "response.completed")
+        self.assertEqual([message.task_event.id for message in msgs], [6])
+        self.assertTrue(
+            all(isinstance(message, StreamRunEventsResponse) for message in msgs)
+        )
 
     def test_streamrunevents_stops_when_grpc_context_is_inactive(self) -> None:
         """Test StreamRunEvents retains gRPC cancellation after delegation."""
@@ -1849,6 +1841,7 @@ class TestControlServicerAuth(unittest.TestCase):
         ctx = self.make_context()
         mock_run = Mock(
             federation_id=NOOP_FEDERATION_ID,
+            primary_task_id=123,
             status=RunStatus(Status.RUNNING, "", ""),
         )
 

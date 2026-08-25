@@ -15,6 +15,7 @@
 """Flower AgentApp process."""
 
 
+import os
 from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
@@ -59,13 +60,22 @@ from flwr.supercore.superexec.dependency_installer import (
     install_app_dependencies,
 )
 from flwr.supercore.telemetry import EventType, event
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.supercore.typing import JSONObject
 from flwr.superlink.grid import HttpGrid
 
 from .context_items import append_items
-from .session import RuntimeAgentConnectors, RuntimeAgentResponses, RuntimeAgentSession
+from .session import (
+    RuntimeAgentConnectors,
+    RuntimeAgentEvents,
+    RuntimeAgentResponses,
+    RuntimeAgentSession,
+)
 
 _AGENT_INPUT_KEY = "agent.input"
+_RUNTIME_API_KEY_ENV = "FLWR_RUNTIME_API_KEY"
+_RUNTIME_BASE_URL_ENV = "FLWR_RUNTIME_BASE_URL"
+_SSL_CERT_FILE_ENV = "SSL_CERT_FILE"
 
 
 def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
@@ -73,7 +83,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     log_queue: Queue[str | None],
     token: str,
     insecure: bool,
-    certificates: bytes | None = None,
+    certificates_path: str | None = None,
     parent_pid: int | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
@@ -86,7 +96,9 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     grid = HttpGrid(
         runtime_api_address=runtime_api_address,
         insecure=insecure,
-        root_certificates=certificates,
+        root_certificates=validate_and_resolve_root_certificates(
+            certificates_path, insecure
+        ),
         token=token,
     )
 
@@ -97,12 +109,19 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     heartbeat_sender = None
     context: Context | None = None
     runtime_env_dir: Path | None = None
+    agent_events: RuntimeAgentEvents | None = None
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
         log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
 
         grid._retry_invoker.max_tries = 1
+
+        if agent_events is not None:
+            try:
+                agent_events.close(1)
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to close AgentApp event publisher", exc_info=err)
 
         if log_uploader:
             flush_logs(log_queue)
@@ -220,6 +239,17 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             event_details={"run-id-hash": hash_run_id},
         )
 
+        _set_runtime_environment(
+            runtime_api_address, token, insecure, certificates_path
+        )
+
+        # Load and run the AgentApp
+        agent_app = load_app(agent_app_attr, LoadAgentAppError, app_path)
+        if not isinstance(agent_app, AgentApp):
+            raise LoadAgentAppError(
+                f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
+            ) from None
+        agent_events = RuntimeAgentEvents(grid._runtime_client)
         responses = RuntimeAgentResponses(
             stub=grid._runtime_client,
             run_id=context.run_id,
@@ -232,17 +262,15 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
                 federation=run.federation_id,
                 series_id=run.series_id,
             ),
+            events=agent_events,
         )
-        connectors = RuntimeAgentConnectors(responses)
-        agent = RuntimeAgentSession(responses=responses, connectors=connectors)
-
-        # Load and run the AgentApp
-        agent_app = load_app(agent_app_attr, LoadAgentAppError, app_path)
-        if not isinstance(agent_app, AgentApp):
-            raise LoadAgentAppError(
-                f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
-            ) from None
+        agent = RuntimeAgentSession(
+            responses=responses,
+            connectors=RuntimeAgentConnectors(responses),
+            events=agent_events,
+        )
         agent_app(agent=agent, context=context)
+        agent_events.close()
 
         # Set sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED
@@ -270,3 +298,18 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             "success": exit_code == ExitCode.SUCCESS,
         },
     )
+
+
+def _set_runtime_environment(
+    runtime_api_address: str,
+    token: str,
+    insecure: bool,
+    root_certificates_path: str | None,
+) -> None:
+    """Expose the Open Responses-compatible Runtime endpoint to the AgentApp."""
+    scheme = "http" if insecure else "https"
+    address = runtime_api_address.rstrip("/")
+    os.environ[_RUNTIME_BASE_URL_ENV] = f"{scheme}://{address}/v1/runtime"
+    os.environ[_RUNTIME_API_KEY_ENV] = token
+    if root_certificates_path is not None:
+        os.environ[_SSL_CERT_FILE_ENV] = root_certificates_path
