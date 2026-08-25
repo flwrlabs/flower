@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SuperLink FastAPI extension hooks."""
+"""SuperLink extension hooks."""
 
 from collections.abc import Callable, Mapping
 from contextlib import AbstractAsyncContextManager
