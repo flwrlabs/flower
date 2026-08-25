@@ -19,7 +19,6 @@
 from logging import DEBUG, ERROR
 
 from flwr.common.constant import Status
-from flwr.common.logger import log
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
@@ -44,6 +43,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.constant import (
     TASK_TYPES_ALLOWED_TO_CREATE_TASKS,
     TASK_TYPES_REQUIRING_CONNECTOR_REF,
@@ -190,8 +190,10 @@ def pull_task_message(
     log(DEBUG, "Runtime.PullTaskMessage")
 
     limit = request.limit if request.HasField("limit") else None
+    src_task_ids = [request.src_task_id] if request.HasField("src_task_id") else None
     messages = state.get_task_message(
         dst_task_ids=[task.task_id],
+        src_task_ids=src_task_ids,
         limit=limit,
         order_by="created_at",
     )

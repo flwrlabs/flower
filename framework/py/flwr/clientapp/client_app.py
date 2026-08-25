@@ -37,9 +37,9 @@ from flwr.common.fl_event import (
     FL_NODE_FIT_STARTED,
     make_task_event,
 )
-from flwr.common.logger import warn_deprecated_feature
 from flwr.compat.client.client import Client
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
+from flwr.supercore.logger import warn_deprecated_feature
 
 from .typing import ClientAppCallable, Mod
 

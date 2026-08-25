@@ -18,7 +18,6 @@
 
 from logging import DEBUG, ERROR
 
-from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -39,7 +38,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectRequest,
     PushObjectResponse,
 )
-from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorRequest,
     GetConnectorResponse,
@@ -55,21 +53,9 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supernode.nodestate import NodeState
-
-
-def get_run(request: GetRunRequest, state: NodeState) -> GetRunResponse:
-    """Get run information."""
-    log(DEBUG, "Runtime.GetRun")
-
-    # Retrieve run information
-    run = state.get_run(request.run_id)
-
-    if run is None:
-        return GetRunResponse()
-
-    return GetRunResponse(run=run_to_proto(run))
 
 
 def pull_task_input(

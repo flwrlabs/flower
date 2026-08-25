@@ -22,6 +22,8 @@ from flwr.proto import control_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
+    AddAppRequest,
+    AddAppResponse,
     AddNodeToFederationRequest,
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
@@ -68,6 +70,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RejectInvitationResponse,
     RemoveAccountFromFederationRequest,
     RemoveAccountFromFederationResponse,
+    RemoveAppRequest,
+    RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
@@ -295,10 +299,28 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: ListAppsRequest, context: grpc.ServicerContext
     ) -> ListAppsResponse:
         """List apps in a federation."""
-        _ = request
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details("ListApps is not implemented.")
-        raise NotImplementedError("ListApps is not implemented.")
+        return control_handlers.list_apps(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def AddApp(
+        self, request: AddAppRequest, context: grpc.ServicerContext
+    ) -> AddAppResponse:
+        """Add an app to a federation."""
+        return control_handlers.add_app(
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            self.fleet_api_type,
+        )
+
+    def RemoveApp(
+        self, request: RemoveAppRequest, context: grpc.ServicerContext
+    ) -> RemoveAppResponse:
+        """Remove an app from a federation."""
+        return control_handlers.remove_app(
+            request, _get_account(), self.linkstate_factory.state()
+        )
 
     def ShowFederation(
         self, request: ShowFederationRequest, context: grpc.ServicerContext

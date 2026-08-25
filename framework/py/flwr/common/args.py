@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import cast
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
-from flwr.common.logger import log
+from flwr.supercore import log
 
 
 def add_args_runtime_dependency_install(

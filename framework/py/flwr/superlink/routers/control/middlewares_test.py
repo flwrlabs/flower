@@ -124,10 +124,8 @@ def test_license_middleware_rejects_invalid_license(
 
     assert response.status_code == 403
     assert response.json() == {
-        "code": ApiErrorCode.LICENSE_CHECK_FAILED,
-        "public_message": "License check failed. Please contact the SuperLink "
-        "administrator.",
-        "public_details": None,
+        "detail": "License check failed. Please contact the SuperLink administrator.",
+        "code": ApiErrorCode.LICENSE_CHECK_FAILED.value,
     }
     license_plugin.check_license.assert_called_once_with()
 

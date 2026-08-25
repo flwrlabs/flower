@@ -17,7 +17,6 @@
 
 from logging import INFO
 
-from flwr.common.logger import log
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.client_manager import ClientManager
 from flwr.server.history import History
@@ -25,6 +24,7 @@ from flwr.server.server import Server, init_defaults, run_fl
 from flwr.server.server_config import ServerConfig
 from flwr.server.strategy import Strategy
 from flwr.serverapp.grid import Grid
+from flwr.supercore import log
 
 from .app_utils import start_update_client_manager_thread
 
