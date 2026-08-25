@@ -16,6 +16,7 @@
 
 
 import inspect
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
@@ -80,7 +81,7 @@ def _inspect_maybe_adapt_client_fn_signature(client_fn: ClientFnExt) -> ClientFn
             # if patition-id is defined, pass it. Else pass node_id that should
             # always be defined during Context init.
             cid = context.node_config.get("partition-id", context.node_id)
-            return client_fn(str(cid))  # type: ignore
+            return client_fn(str(cid))
 
         return adaptor_fn
 
@@ -212,6 +213,7 @@ class ClientApp:
         node_id = message.metadata.dst_node_id
         server_round = _parse_server_round(message.metadata.group_id)
         self._emit_event(events[0], node_id=node_id, server_round=server_round)
+        started_at = time.perf_counter()
         try:
             result = call(message, context)
         except Exception:
@@ -219,10 +221,18 @@ class ClientApp:
                 events[2],
                 node_id=node_id,
                 server_round=server_round,
-                metadata={"error": "execution_failed"},
+                metadata={
+                    "error": "execution_failed",
+                    "elapsed_time": time.perf_counter() - started_at,
+                },
             )
             raise
-        self._emit_event(events[1], node_id=node_id, server_round=server_round)
+        self._emit_event(
+            events[1],
+            node_id=node_id,
+            server_round=server_round,
+            metadata={"elapsed_time": time.perf_counter() - started_at},
+        )
         return result
 
     def _emit_event(
