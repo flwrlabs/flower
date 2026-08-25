@@ -17,6 +17,7 @@
 
 import concurrent.futures
 import io
+import math
 import timeit
 from collections.abc import Callable
 from logging import INFO, WARN
@@ -288,7 +289,9 @@ class Server:
                 "num_failures": len(failures),
             }
             if loss_aggregated is not None:
-                evaluate_metadata["loss"] = float(loss_aggregated)
+                loss = float(loss_aggregated)
+                if math.isfinite(loss):
+                    evaluate_metadata["loss"] = loss
             self._emit_event(
                 FL_ROUND_EVALUATE_COMPLETED,
                 server_round=server_round,

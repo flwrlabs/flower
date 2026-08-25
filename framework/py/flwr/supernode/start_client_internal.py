@@ -534,15 +534,6 @@ def _push_messages(
             # Get the IDs of objects to send
             ids_obj_to_send, session_id = send(message, object_tree, clientapp_runtime)
 
-            # Forward the ClientApp's local lifecycle events through the long-lived
-            # SuperNode connection. The SuperLink assigns their authoritative run,
-            # task, and node identity before making them streamable.
-            if task_id is not None:
-                push_task_events(
-                    run_id,
-                    state.get_task_events(run_id=run_id, task_ids=[task_id]),
-                )
-
             # Push object contents from the ObjectStore
             run_id = message.metadata.run_id
             push_object_contents_from_iterable(
@@ -555,6 +546,18 @@ def _push_messages(
                 # )
                 push_object_fn=partial(push_object, run_id, session_id),
             )
+
+            # Lifecycle events are observational. Relay them only after the reply
+            # and its objects are available at the SuperLink, and never let a
+            # relay failure affect the client result.
+            if task_id is not None:
+                try:
+                    push_task_events(
+                        run_id,
+                        state.get_task_events(run_id=run_id, task_ids=[task_id]),
+                    )
+                except Exception as err:  # pylint: disable=broad-except
+                    log(ERROR, "Failed to relay lifecycle events: %s", err)
             log(INFO, "Sent successfully")
         except RunNotRunningException:
             log(

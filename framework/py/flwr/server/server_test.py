@@ -176,6 +176,19 @@ class NumpyLossStrategy(FedAvg):
         return np.float64(0.5), {}
 
 
+class NonFiniteLossStrategy(FedAvg):
+    """Strategy that returns a non-finite loss for event tests."""
+
+    def aggregate_evaluate(
+        self,
+        server_round: int,
+        results: list[tuple[ClientProxy, EvaluateRes]],
+        failures: list[tuple[ClientProxy, EvaluateRes] | BaseException],
+    ) -> tuple[float | None, dict[str, Scalar]]:
+        """Return a NaN loss."""
+        return float("nan"), {}
+
+
 def test_fit_emits_lifecycle_events() -> None:
     """Test that ``Server.fit`` emits the expected lifecycle events."""
     # Prepare
@@ -273,6 +286,28 @@ def test_evaluate_event_serializes_numpy_loss() -> None:
         JSONObject, strict_json_loads(callback.call_args_list[-1].args[0].data)
     )
     assert event_data["loss"] == 0.5
+
+
+def test_evaluate_event_omits_non_finite_loss() -> None:
+    """Test a non-finite loss does not prevent the completion event."""
+    client_manager = SimpleClientManager()
+    client_manager.register(EventClient("1"))
+    callback = Mock()
+    server = Server(
+        client_manager=client_manager,
+        strategy=NonFiniteLossStrategy(
+            min_fit_clients=1, min_evaluate_clients=1, min_available_clients=1
+        ),
+        event_callback=callback,
+    )
+
+    server.evaluate_round(server_round=1, timeout=None)
+
+    event_data = cast(
+        JSONObject, strict_json_loads(callback.call_args_list[-1].args[0].data)
+    )
+    assert event_data["type"] == FL_ROUND_EVALUATE_COMPLETED
+    assert "loss" not in event_data
 
 
 def test_fit_clients() -> None:

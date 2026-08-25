@@ -429,9 +429,10 @@ def test_push_messages_forwards_current_task_events() -> None:
     state.get_task_events.return_value = [event]
     object_store = Mock()
     object_store.get_object_tree.return_value = ObjectTree(object_id="reply-id")
-    send = Mock(return_value=(set(), "session-id"))
+    object_store.get.return_value = b"reply content"
+    send = Mock(return_value=({"reply-id"}, "session-id"))
     push_object = Mock()
-    push_task_events = Mock()
+    push_task_events = Mock(side_effect=RuntimeError("relay unavailable"))
 
     _push_messages(
         state=state,
@@ -445,6 +446,9 @@ def test_push_messages_forwards_current_task_events() -> None:
 
     state.get_task_events.assert_called_once_with(run_id=run_id, task_ids=[task_id])
     push_task_events.assert_called_once_with(run_id, [event])
+    push_object.assert_called_once_with(
+        run_id, "session-id", "reply-id", b"reply content"
+    )
 
 
 class _StopAfterSuperExecLaunch(Exception):
