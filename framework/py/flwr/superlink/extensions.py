@@ -38,9 +38,7 @@ _RUN_START_SOURCES = frozenset(get_args(RunStartSource))
 _SGXT_MODULE = "flwr.ee.superlink.extensions"
 
 
-def resolve_run_start_source(
-    value: str | bytes | None, *, default: RunStartSource
-) -> RunStartSource:
+def resolve_run_start_source(value: str | bytes | None) -> RunStartSource:
     """Normalize a caller-provided source label for analytics.
 
     Source attribution is intentionally best effort. Callers can only affect
@@ -49,7 +47,7 @@ def resolve_run_start_source(
     security or authorization signal.
     """
     if value is None:
-        return default
+        return "unknown"
     if isinstance(value, bytes):
         try:
             value = value.decode("ascii")

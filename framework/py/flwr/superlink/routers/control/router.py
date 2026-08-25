@@ -105,7 +105,7 @@ def start_run(
         account,
         linkstate,
         "",
-        source=extensions.resolve_run_start_source(run_source, default="unknown"),
+        source=extensions.resolve_run_start_source(run_source),
     )
 
 

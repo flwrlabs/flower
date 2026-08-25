@@ -25,20 +25,20 @@ from . import extensions
 
 
 @mark.parametrize(
-    ("value", "default", "expected"),
+    ("value", "expected"),
     [
-        (None, "cli", "cli"),
-        ("web_ui", "cli", "web_ui"),
-        (b"automation", "cli", "automation"),
-        ("not-a-source", "cli", "unknown"),
-        (b"\\xff", "cli", "unknown"),
+        (None, "unknown"),
+        ("web_ui", "web_ui"),
+        (b"automation", "automation"),
+        ("not-a-source", "unknown"),
+        (b"\\xff", "unknown"),
     ],
 )
 def test_resolve_run_start_source(
-    value: str | bytes | None, default: extensions.RunStartSource, expected: str
+    value: str | bytes | None, expected: extensions.RunStartSource
 ) -> None:
     """Normalize best-effort caller attribution without treating it as auth."""
-    assert extensions.resolve_run_start_source(value, default=default) == expected
+    assert extensions.resolve_run_start_source(value) == expected
 
 
 def test_notify_run_started_passes_a_snapshot_to_the_extension(
