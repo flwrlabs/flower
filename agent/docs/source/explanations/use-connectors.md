@@ -1,7 +1,7 @@
 # Use connectors
 
-Connectors give an AgentApp runtime-provided tools without embedding provider
-implementations or credentials in the app.
+Connectors give an AgentApp tools supplied by the runtime without embedding
+provider implementations or credentials in the app.
 
 ## Distinguish built-in and account connectors
 
@@ -48,27 +48,25 @@ predictable.
 ## Give tools to the model
 
 ```python
-response = agent.responses.create(
-    {
-        "model": "openai/gpt-5.6-sol",
-        "input": "Find two public sources about federated AI.",
-        "tools": tools,
-        "tool_choice": "auto",
-        "stream": False,
-    }
+response = client.responses.create(
+    model="openai/gpt-5.6-sol",
+    input="Find two public sources about federated AI.",
+    tools=tools,
+    tool_choice="auto",
 )
 ```
 
-The model can return normal output, one function call, or several independent
-function calls in the `output` list.
+Here, `client` is the OpenAI client configured with Flower's injected runtime
+URL and credential. See [Use the OpenAI SDK in an
+AgentApp](../how-to-guides/use-openai-sdk.md). The model can return normal
+output, one function call, or several independent function calls.
 
 ## Execute requested calls
 
 ```python
+response_output = [item.to_dict() for item in response.output]
 tool_calls = [
-    dict(item)
-    for item in response.get("output", [])
-    if isinstance(item, dict) and item.get("type") == "function_call"
+    item for item in response_output if item.get("type") == "function_call"
 ]
 allowed_tool_names = {
     tool["name"] for tool in tools if isinstance(tool.get("name"), str)
@@ -94,60 +92,48 @@ The AgentApp decides whether to ask the model for more tool calls. Every loop
 must have a finite limit:
 
 ```python
-request = {
-    "model": "openai/gpt-5.6-sol",
-    "input": [
-        {
-            "role": "user",
-            "content": "Find two public sources about federated AI.",
-        }
-    ],
-    "tools": tools,
-    "tool_choice": "auto",
-    "stream": False,
-}
+model = "openai/gpt-5.6-sol"
+input_items = [
+    {
+        "role": "user",
+        "content": "Find two public sources about federated AI.",
+    }
+]
 allowed_tool_names = {
     tool["name"] for tool in tools if isinstance(tool.get("name"), str)
 }
-model_finished = False
 
 for _ in range(3):
-    response = agent.responses.create(request)
-    response_output = [
-        dict(item)
-        for item in response.get("output", [])
-        if isinstance(item, dict)
-    ]
+    response = client.responses.create(
+        model=model,
+        input=input_items,
+        tools=tools,
+        tool_choice="auto",
+    )
+    response_output = [item.to_dict() for item in response.output]
     tool_calls = [
         item for item in response_output if item.get("type") == "function_call"
     ]
     if not tool_calls:
-        model_finished = True
         break
     for tool_call in tool_calls:
         if tool_call.get("name") not in allowed_tool_names:
             raise RuntimeError(f"Tool {tool_call.get('name')!r} was not exposed")
     outputs = [agent.connectors.call(item) for item in tool_calls]
-    request["input"] = [*request["input"], *response_output, *outputs]
+    input_items.extend(response_output)
+    input_items.extend(outputs)
 
-if not model_finished:
-    agent.responses.create(
-        {
-            "model": request["model"],
-            "input": request["input"],
-            "stream": True,
-        }
-    )
+stream = client.responses.create(model=model, input=input_items, stream=True)
+for event in stream:
+    agent.events.emit(event.to_dict())
 ```
 
 The app checks every function name against the exposed tool schemas before
 calling a connector. It also keeps the complete model output next to the
-connector results, which preserves the context needed by the next model request.
-When the model stops requesting tools, its response already contains the final
-answer. The extra tool-free request runs only after all three tool turns are
-used, so the last connector outputs are consumed without producing a duplicate
-answer. This abbreviated loop omits recovery and conversation-state handling.
-Use the complete [collaborative research
+connector results, which preserves the context needed by the next model
+request. The final request omits tools, publishes its SDK stream, and ensures
+that the app always finishes with an answer. This abbreviated loop omits error
+recovery and conversation-state handling. Use the complete [collaborative research
 agent](../tutorials/build-a-collaborative-agent.md) for copy/pasteable code.
 
 ## Handle failure deliberately

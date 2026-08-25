@@ -101,8 +101,8 @@ in the sidebar and start a chat with one of the agents assigned to it.
 Each submitted message starts one **run** of the selected **AgentApp**. Flower
 groups related runs in a **run series**, which the browser presents as a
 conversation. The run series belongs to a **federation**. The runtime gives the
-AgentApp an `AgentSession` for model and connector calls and a `Context` for run
-configuration and state.
+AgentApp an OpenAI-compatible model endpoint, an `AgentSession` for connectors
+and frontend-visible events, and a `Context` for run configuration and state.
 
 See [Use agents and
 federations](../how-to-guides/use-agents-and-federations.md) to learn how these
