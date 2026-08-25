@@ -9,7 +9,7 @@ The current account connectors are Slack, Notion, GitHub, and Attio. Their
 implemented actions are read-only.
 
 ```{important}
-Flower 1.34.0 supports account connectors only for runs in your personal
+Flower 1.35.0 supports account connectors only for runs in your personal
 workspace. A run that selects account connectors is rejected in a collaborative
 federation. Built-in tools such as `web_search` do not require this connection
 flow.

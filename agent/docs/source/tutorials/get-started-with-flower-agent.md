@@ -7,7 +7,7 @@ groups messages into a conversation.
 Prefer the browser? Start with [Chat in your browser](quickstart.md).
 
 ```{note}
-This tutorial targets Flower 1.34.0. Flower Agent and `flwr chat` are
+This tutorial targets Flower 1.35.0. Flower Agent and `flwr chat` are
 experimental and may change between releases.
 ```
 
@@ -27,8 +27,8 @@ You don't need to provide model credentials for a SuperGrid run.
 Use `uvx` to run the documented version in an isolated environment:
 
 ```console
-$ uvx --from flwr==1.34.0 flwr --version
-flwr, version 1.34.0
+$ uvx --from flwr==1.35.0 flwr --version
+flwr, version 1.35.0
 ```
 
 Running an explicit version keeps every command in this tutorial on the same
@@ -48,7 +48,7 @@ address = "supergrid.flower.ai"
 If you maintain a custom file, ensure that section exists. Then log in:
 
 ```console
-$ uvx --from flwr==1.34.0 flwr login supergrid
+$ uvx --from flwr==1.35.0 flwr login supergrid
 ```
 
 Open the printed authentication link and complete sign-in. The CLI stores the
@@ -57,7 +57,7 @@ resulting account credentials for later SuperGrid commands.
 ## Start a chat
 
 ```console
-$ uvx --from flwr==1.34.0 flwr chat
+$ uvx --from flwr==1.35.0 flwr chat
 ```
 
 ```{figure} ../_static/screenshots/flwr-chat.png
