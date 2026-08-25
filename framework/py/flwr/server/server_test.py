@@ -15,9 +15,10 @@
 """Flower server tests."""
 
 
+from unittest.mock import Mock
+
 import numpy as np
 import pytest
-from unittest.mock import Mock
 
 from flwr.common import (
     Code,
@@ -226,6 +227,23 @@ def test_fit_emits_failed_events_on_exception() -> None:
         FL_ROUND_FAILED,
         FL_RUN_FAILED,
     ]
+
+
+def test_fit_continues_when_event_delivery_fails() -> None:
+    """Test lifecycle event delivery failures do not affect training."""
+    client_manager = SimpleClientManager()
+    client_manager.register(EventClient("1"))
+    server = Server(
+        client_manager=client_manager,
+        strategy=FedAvg(
+            min_fit_clients=1, min_evaluate_clients=1, min_available_clients=1
+        ),
+        event_callback=Mock(side_effect=RuntimeError("event delivery failed")),
+    )
+
+    history, _ = server.fit(num_rounds=1, timeout=None)
+
+    assert history is not None
 
 
 def test_fit_clients() -> None:

@@ -75,9 +75,7 @@ def start_grid(  # pylint: disable=too-many-arguments, too-many-locals
     def _push_task_event(event: TaskEvent) -> None:
         grid.push_task_events([event])
 
-    initialized_server._event_callback = (
-        _push_task_event  # pylint: disable=protected-access
-    )
+    initialized_server.set_event_callback(_push_task_event)
 
     log(
         INFO,

@@ -44,6 +44,7 @@ from flwr.compat.common.recorddict_compat import (
     evaluateins_to_recorddict,
     fitins_to_recorddict,
 )
+from flwr.supercore.utils import strict_json_loads
 
 from .client_app import ClientApp
 from .typing import ClientAppCallable
@@ -430,4 +431,74 @@ def test_client_app_emits_evaluate_failed_event() -> None:
     assert events == [
         FL_NODE_EVALUATE_STARTED,
         FL_NODE_EVALUATE_FAILED,
+    ]
+
+
+def test_client_app_emits_events_for_registered_train_handler() -> None:
+    """Test lifecycle events are emitted for registered train handlers."""
+    callback = Mock()
+    app = ClientApp(event_callback=callback)
+
+    @app.train()
+    def train(message: Message, _: Context) -> Message:
+        return Message(message.content, reply_to=message)
+
+    app(_make_message("train"), Mock(spec=Context))
+
+    assert [call.args[0].event for call in callback.call_args_list] == [
+        FL_NODE_FIT_STARTED,
+        FL_NODE_FIT_COMPLETED,
+    ]
+
+
+def test_client_app_failure_event_does_not_include_exception_details() -> None:
+    """Test failure events only contain a stable, safe error classification."""
+    callback = Mock()
+    app = ClientApp(event_callback=callback)
+
+    @app.train()
+    def train(_: Message, __: Context) -> Message:
+        raise RuntimeError("secret-token-should-not-be-persisted")
+
+    with pytest.raises(RuntimeError, match="secret-token-should-not-be-persisted"):
+        app(_make_message("train"), Mock(spec=Context))
+
+    assert strict_json_loads(callback.call_args_list[-1].args[0].data) == {
+        "type": FL_NODE_FIT_FAILED,
+        "node_id": 123,
+        "server_round": 7,
+        "error": "execution_failed",
+    }
+
+
+def test_client_app_continues_when_event_delivery_fails() -> None:
+    """Test lifecycle event delivery failures do not affect ClientApp execution."""
+    app = ClientApp(
+        client_fn=lambda _: _MockClient(),
+        event_callback=Mock(side_effect=RuntimeError("event delivery failed")),
+    )
+
+    app(_make_message("train"), Mock(spec=Context))
+
+
+def test_client_app_emits_failed_event_when_lifespan_teardown_fails() -> None:
+    """Test a lifespan teardown failure does not emit a completed event."""
+    callback = Mock()
+    app = ClientApp(event_callback=callback)
+
+    @app.lifespan()
+    def lifespan(_: Context) -> Iterator[None]:
+        yield
+        raise RuntimeError("lifespan teardown failed")
+
+    @app.train()
+    def train(message: Message, _: Context) -> Message:
+        return Message(message.content, reply_to=message)
+
+    with pytest.raises(RuntimeError, match="lifespan teardown failed"):
+        app(_make_message("train"), Mock(spec=Context))
+
+    assert [call.args[0].event for call in callback.call_args_list] == [
+        FL_NODE_FIT_STARTED,
+        FL_NODE_FIT_FAILED,
     ]

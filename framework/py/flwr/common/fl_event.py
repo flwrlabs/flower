@@ -62,8 +62,8 @@ def make_task_event(
 
     The event payload (``TaskEvent.data``) is a JSON object of the form
     ``{"type": <event>, ...}``, including ``node_id`` and ``server_round``
-    when provided, followed by any additional ``metadata`` entries (e.g.
-    ``error``/``details`` for failure events).
+    when provided, followed by any additional safe ``metadata`` entries (for
+    example aggregate counts or a stable error classification).
 
     Parameters
     ----------

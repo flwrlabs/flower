@@ -188,13 +188,20 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
             run.fab_id, run.fab_version, fab.hash_str
         )
 
-        def _push_event(event: TaskEvent) -> None:
+        app_event_callback = client_app.get_event_callback()
+
+        def _push_event(task_event: TaskEvent) -> None:
+            if app_event_callback is not None:
+                try:
+                    app_event_callback(task_event)
+                except Exception:  # pylint: disable=broad-exception-caught
+                    pass
             try:
-                client.PushTaskEvents(PushTaskEventsRequest(events=[event]))
+                client.PushTaskEvents(PushTaskEventsRequest(events=[task_event]))
             except httpx.HTTPError as err:
                 log(DEBUG, "Failed to push task event: %s", err)
 
-        client_app._event_callback = _push_event  # pylint: disable=protected-access
+        client_app.set_event_callback(_push_event)
 
         # Execute ClientApp
         reply_message = client_app(message=message, context=context)

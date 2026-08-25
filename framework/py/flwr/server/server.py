@@ -49,7 +49,7 @@ from flwr.common.fl_event import (
     FL_RUN_STARTED,
     make_task_event,
 )
-from flwr.proto.task_pb2 import TaskEvent
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.client_manager import ClientManager, SimpleClientManager
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.history import History
@@ -100,14 +100,18 @@ class Server:
     ) -> None:
         """Emit a lifecycle event through the configured callback."""
         if self._event_callback is not None:
-            self._event_callback(
-                make_task_event(
-                    event,
-                    node_id=node_id,
-                    server_round=server_round,
-                    metadata=metadata,
+            try:
+                self._event_callback(
+                    make_task_event(
+                        event,
+                        node_id=node_id,
+                        server_round=server_round,
+                        metadata=metadata,
+                    )
                 )
-            )
+            except Exception:  # pylint: disable=broad-exception-caught
+                # Lifecycle event delivery is observational and must be best-effort.
+                pass
 
     def set_max_workers(self, max_workers: int | None) -> None:
         """Set the max_workers used by ThreadPoolExecutor."""
@@ -116,6 +120,10 @@ class Server:
     def set_strategy(self, strategy: Strategy) -> None:
         """Replace server strategy."""
         self.strategy = strategy
+
+    def set_event_callback(self, callback: Callable[[TaskEvent], None] | None) -> None:
+        """Set the callback used to deliver lifecycle events."""
+        self._event_callback = callback
 
     def client_manager(self) -> ClientManager:
         """Return ClientManager."""
@@ -127,98 +135,95 @@ class Server:
         self._emit_event(FL_RUN_STARTED, metadata={"num_rounds": num_rounds})
 
         history = History()
-
-        # Initialize parameters
-        log(INFO, "[INIT]")
-        self.parameters = self._get_initial_parameters(server_round=0, timeout=timeout)
-        log(INFO, "Starting evaluation of initial global parameters")
-        res = self.strategy.evaluate(0, parameters=self.parameters)
-        if res is not None:
-            log(
-                INFO,
-                "initial parameters (loss, other metrics): %s, %s",
-                res[0],
-                res[1],
-            )
-            history.add_loss_centralized(server_round=0, loss=res[0])
-            history.add_metrics_centralized(server_round=0, metrics=res[1])
-        else:
-            log(INFO, "Evaluation returned no results (`None`)")
-
-        # Run federated learning for num_rounds
         start_time = timeit.default_timer()
-
-        for current_round in range(1, num_rounds + 1):
-            log(INFO, "")
-            log(INFO, "[ROUND %s]", current_round)
-
-            self._emit_event(FL_ROUND_STARTED, server_round=current_round)
-
-            try:
-                # Train model and replace previous global model
-                res_fit = self.fit_round(
-                    server_round=current_round,
-                    timeout=timeout,
+        try:
+            # Initialize parameters
+            log(INFO, "[INIT]")
+            self.parameters = self._get_initial_parameters(
+                server_round=0, timeout=timeout
+            )
+            log(INFO, "Starting evaluation of initial global parameters")
+            res = self.strategy.evaluate(0, parameters=self.parameters)
+            if res is not None:
+                log(
+                    INFO,
+                    "initial parameters (loss, other metrics): %s, %s",
+                    res[0],
+                    res[1],
                 )
-                if res_fit is not None:
-                    parameters_prime, fit_metrics, _ = res_fit  # fit_metrics_aggregated
-                    if parameters_prime:
-                        self.parameters = parameters_prime
-                    history.add_metrics_distributed_fit(
-                        server_round=current_round, metrics=fit_metrics
-                    )
+                history.add_loss_centralized(server_round=0, loss=res[0])
+                history.add_metrics_centralized(server_round=0, metrics=res[1])
+            else:
+                log(INFO, "Evaluation returned no results (`None`)")
 
-                # Evaluate model using strategy implementation
-                res_cen = self.strategy.evaluate(
-                    current_round, parameters=self.parameters
-                )
-                if res_cen is not None:
-                    loss_cen, metrics_cen = res_cen
-                    log(
-                        INFO,
-                        "fit progress: (%s, %s, %s, %s)",
-                        current_round,
-                        loss_cen,
-                        metrics_cen,
-                        timeit.default_timer() - start_time,
+            for current_round in range(1, num_rounds + 1):
+                log(INFO, "")
+                log(INFO, "[ROUND %s]", current_round)
+                self._emit_event(FL_ROUND_STARTED, server_round=current_round)
+                try:
+                    # Train model and replace previous global model
+                    res_fit = self.fit_round(
+                        server_round=current_round,
+                        timeout=timeout,
                     )
-                    history.add_loss_centralized(
-                        server_round=current_round, loss=loss_cen
-                    )
-                    history.add_metrics_centralized(
-                        server_round=current_round, metrics=metrics_cen
-                    )
-
-                # Evaluate model on a sample of available clients
-                res_fed = self.evaluate_round(
-                    server_round=current_round, timeout=timeout
-                )
-                if res_fed is not None:
-                    loss_fed, evaluate_metrics_fed, _ = res_fed
-                    if loss_fed is not None:
-                        history.add_loss_distributed(
-                            server_round=current_round, loss=loss_fed
+                    if res_fit is not None:
+                        parameters_prime, fit_metrics, _ = (
+                            res_fit  # fit_metrics_aggregated
                         )
-                        history.add_metrics_distributed(
-                            server_round=current_round, metrics=evaluate_metrics_fed
+                        if parameters_prime:
+                            self.parameters = parameters_prime
+                        history.add_metrics_distributed_fit(
+                            server_round=current_round, metrics=fit_metrics
                         )
 
-                self._emit_event(FL_ROUND_COMPLETED, server_round=current_round)
-            except Exception as exc:
-                self._emit_event(
-                    FL_ROUND_FAILED,
-                    server_round=current_round,
-                    metadata={"error": type(exc).__name__, "details": str(exc)},
-                )
-                self._emit_event(
-                    FL_RUN_FAILED,
-                    metadata={"error": type(exc).__name__, "details": str(exc)},
-                )
-                raise
+                    # Evaluate model using strategy implementation
+                    res_cen = self.strategy.evaluate(
+                        current_round, parameters=self.parameters
+                    )
+                    if res_cen is not None:
+                        loss_cen, metrics_cen = res_cen
+                        log(
+                            INFO,
+                            "fit progress: (%s, %s, %s, %s)",
+                            current_round,
+                            loss_cen,
+                            metrics_cen,
+                            timeit.default_timer() - start_time,
+                        )
+                        history.add_loss_centralized(
+                            server_round=current_round, loss=loss_cen
+                        )
+                        history.add_metrics_centralized(
+                            server_round=current_round, metrics=metrics_cen
+                        )
 
-        # Bookkeeping
-        end_time = timeit.default_timer()
-        elapsed = end_time - start_time
+                    # Evaluate model on a sample of available clients
+                    res_fed = self.evaluate_round(
+                        server_round=current_round, timeout=timeout
+                    )
+                    if res_fed is not None:
+                        loss_fed, evaluate_metrics_fed, _ = res_fed
+                        if loss_fed is not None:
+                            history.add_loss_distributed(
+                                server_round=current_round, loss=loss_fed
+                            )
+                            history.add_metrics_distributed(
+                                server_round=current_round,
+                                metrics=evaluate_metrics_fed,
+                            )
+                    self._emit_event(FL_ROUND_COMPLETED, server_round=current_round)
+                except Exception:
+                    self._emit_event(
+                        FL_ROUND_FAILED,
+                        server_round=current_round,
+                        metadata={"error": "execution_failed"},
+                    )
+                    raise
+        except Exception:
+            self._emit_event(FL_RUN_FAILED, metadata={"error": "execution_failed"})
+            raise
+
+        elapsed = timeit.default_timer() - start_time
         self._emit_event(FL_RUN_COMPLETED, metadata={"elapsed_time": elapsed})
         return history, elapsed
 
@@ -230,28 +235,29 @@ class Server:
         """Validate current global model on a number of clients."""
         self._emit_event(FL_ROUND_EVALUATE_STARTED, server_round=server_round)
 
-        # Get clients and their respective instructions from strategy
-        client_instructions = self.strategy.configure_evaluate(
-            server_round=server_round,
-            parameters=self.parameters,
-            client_manager=self._client_manager,
-        )
-        if not client_instructions:
-            log(INFO, "configure_evaluate: no clients selected, skipping evaluation")
-            self._emit_event(
-                FL_ROUND_EVALUATE_COMPLETED,
-                server_round=server_round,
-                metadata={"num_results": 0, "num_failures": 0},
-            )
-            return None
-        log(
-            INFO,
-            "configure_evaluate: strategy sampled %s clients (out of %s)",
-            len(client_instructions),
-            self._client_manager.num_available(),
-        )
-
         try:
+            # Get clients and their respective instructions from strategy
+            client_instructions = self.strategy.configure_evaluate(
+                server_round=server_round,
+                parameters=self.parameters,
+                client_manager=self._client_manager,
+            )
+            if not client_instructions:
+                log(
+                    INFO, "configure_evaluate: no clients selected, skipping evaluation"
+                )
+                self._emit_event(
+                    FL_ROUND_EVALUATE_COMPLETED,
+                    server_round=server_round,
+                    metadata={"num_results": 0, "num_failures": 0},
+                )
+                return None
+            log(
+                INFO,
+                "configure_evaluate: strategy sampled %s clients (out of %s)",
+                len(client_instructions),
+                self._client_manager.num_available(),
+            )
             # Collect `evaluate` results from all clients participating in this round
             results, failures = evaluate_clients(
                 client_instructions,
@@ -285,11 +291,11 @@ class Server:
                 metadata=evaluate_metadata,
             )
             return loss_aggregated, metrics_aggregated, (results, failures)
-        except Exception as exc:
+        except Exception:
             self._emit_event(
                 FL_ROUND_EVALUATE_FAILED,
                 server_round=server_round,
-                metadata={"error": type(exc).__name__, "details": str(exc)},
+                metadata={"error": "execution_failed"},
             )
             raise
 
@@ -301,29 +307,27 @@ class Server:
         """Perform a single round of federated averaging."""
         self._emit_event(FL_ROUND_FIT_STARTED, server_round=server_round)
 
-        # Get clients and their respective instructions from strategy
-        client_instructions = self.strategy.configure_fit(
-            server_round=server_round,
-            parameters=self.parameters,
-            client_manager=self._client_manager,
-        )
-
-        if not client_instructions:
-            log(INFO, "configure_fit: no clients selected, cancel")
-            self._emit_event(
-                FL_ROUND_FIT_COMPLETED,
-                server_round=server_round,
-                metadata={"num_results": 0, "num_failures": 0},
-            )
-            return None
-        log(
-            INFO,
-            "configure_fit: strategy sampled %s clients (out of %s)",
-            len(client_instructions),
-            self._client_manager.num_available(),
-        )
-
         try:
+            # Get clients and their respective instructions from strategy
+            client_instructions = self.strategy.configure_fit(
+                server_round=server_round,
+                parameters=self.parameters,
+                client_manager=self._client_manager,
+            )
+            if not client_instructions:
+                log(INFO, "configure_fit: no clients selected, cancel")
+                self._emit_event(
+                    FL_ROUND_FIT_COMPLETED,
+                    server_round=server_round,
+                    metadata={"num_results": 0, "num_failures": 0},
+                )
+                return None
+            log(
+                INFO,
+                "configure_fit: strategy sampled %s clients (out of %s)",
+                len(client_instructions),
+                self._client_manager.num_available(),
+            )
             # Collect `fit` results from all clients participating in this round
             results, failures = fit_clients(
                 client_instructions=client_instructions,
@@ -354,11 +358,11 @@ class Server:
                 },
             )
             return parameters_aggregated, metrics_aggregated, (results, failures)
-        except Exception as exc:
+        except Exception:
             self._emit_event(
                 FL_ROUND_FIT_FAILED,
                 server_round=server_round,
-                metadata={"error": type(exc).__name__, "details": str(exc)},
+                metadata={"error": "execution_failed"},
             )
             raise
 

@@ -29,8 +29,8 @@ from flwr.common.constant import (
     SUPERLINK_NODE_ID,
     Status,
 )
-from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.common.serde import message_from_proto
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import (
     InMemoryLinkState,
     LinkStateFactory,
