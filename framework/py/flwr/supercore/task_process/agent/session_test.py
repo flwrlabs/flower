@@ -69,6 +69,31 @@ def test_emit_event_pushes_task_event() -> None:
     )
 
 
+def test_close_drains_events_before_worker_stops() -> None:
+    """Close should publish queued events before stopping the worker."""
+    stub = Mock()
+    with patch("flwr.supercore.task_process.agent.session.Thread") as thread_cls:
+        thread_cls.return_value.is_alive.return_value = False
+        events = RuntimeAgentEvents(stub)
+        worker_target = thread_cls.call_args.kwargs["target"]
+        thread_cls.return_value.join.side_effect = lambda _timeout: worker_target()
+
+        event: JSONObject = {
+            "type": "response.output_text.delta",
+            "delta": "Hello",
+        }
+        events.emit(event)
+        events.close()
+
+    expected_event = TaskEvent(
+        event="response.output_text.delta",
+        data='{"type":"response.output_text.delta","delta":"Hello"}',
+    )
+    stub.PushTaskEvents.assert_called_once_with(
+        PushTaskEventsRequest(events=[expected_event])
+    )
+
+
 def test_emit_event_requires_type() -> None:
     """Emit should reject events without a valid type."""
     stub = Mock()
