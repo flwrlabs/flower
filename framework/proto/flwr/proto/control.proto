@@ -306,6 +306,8 @@ message AppInfo {
   string app_id = 1;
   string fab_hash = 2;
   string app_type = 3;
+  // True for Hub apps, false for local/custom apps, and absent for legacy apps
+  // whose provenance is unknown.
   optional bool is_hub_app = 4;
 }
 message ListAppsRequest {

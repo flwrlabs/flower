@@ -880,6 +880,9 @@ class AppInfo(google.protobuf.message.Message):
     fab_hash: builtins.str
     app_type: builtins.str
     is_hub_app: builtins.bool
+    """True for Hub apps, false for local/custom apps, and absent for legacy apps
+    whose provenance is unknown.
+    """
     def __init__(
         self,
         *,
