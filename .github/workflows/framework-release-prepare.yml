@@ -167,7 +167,7 @@ jobs:
             --source-sha "${RELEASE_SOURCE_SHA}"
 
       - name: Draft Framework changelog
-        uses: openai/codex-action@v1
+        uses: openai/codex-action@v1.11
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           model: gpt-5.6-sol

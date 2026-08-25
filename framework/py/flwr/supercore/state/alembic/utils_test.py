@@ -301,6 +301,56 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
+    def test_hub_origin_migration_preserves_unknown_legacy_rows(self) -> None:
+        """Ensure legacy federation apps retain unknown Hub provenance."""
+        engine = self.create_engine("federation_app_hub_origin.db")
+        try:
+            self.upgrade_to_revision(engine, "03f4cfe3ff15")
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO federation_app (
+                            federation_id, app_id, fab_hash, app_type,
+                            added_by, added_at
+                        ) VALUES (
+                            :federation_id, :app_id, :fab_hash, :app_type,
+                            :added_by, :added_at
+                        )
+                        """
+                    ),
+                    {
+                        "federation_id": "@alice/research",
+                        "app_id": "@flwragent/flwr-agent",
+                        "fab_hash": "legacy-hash",
+                        "app_type": TaskType.AGENT_APP,
+                        "added_by": "alice",
+                        "added_at": "2026-08-23 10:00:00+00:00",
+                    },
+                )
+
+            self.upgrade_to_revision(engine, "heads")
+
+            with engine.connect() as connection:
+                is_hub_app = connection.execute(
+                    text(
+                        """
+                        SELECT is_hub_app
+                        FROM federation_app
+                        WHERE federation_id = :federation_id
+                          AND app_id = :app_id
+                        """
+                    ),
+                    {
+                        "federation_id": "@alice/research",
+                        "app_id": "@flwragent/flwr-agent",
+                    },
+                ).scalar_one()
+
+            self.assertIsNone(is_hub_app)
+        finally:
+            engine.dispose()
+
     def test_automation_timestamp_migration_normalizes_sqlite_text(self) -> None:
         """Ensure legacy SQLite automation timestamps use ORM-compatible text."""
         engine = self.create_engine("automation_timestamp_normalization.db")

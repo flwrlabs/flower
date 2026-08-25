@@ -104,6 +104,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             app_id="@me/z-agent",
             app_type=TaskType.AGENT_APP,
             added_by="account-a",
+            is_hub_app=True,
         )
         state.store_app(
             fab=Fab("", b"other", {}),
@@ -115,10 +116,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         apps = state.list_apps("@me/fed-a")
         self.assertEqual(
-            [(app.app_id, app.fab_hash, app.app_type) for app in apps],
+            [(app.app_id, app.fab_hash, app.app_type, app.is_hub_app) for app in apps],
             [
-                ("@me/z-agent", agent_hash, TaskType.AGENT_APP),
-                ("@me/server", server_hash, TaskType.SERVER_APP),
+                ("@me/z-agent", agent_hash, TaskType.AGENT_APP, True),
+                ("@me/server", server_hash, TaskType.SERVER_APP, False),
             ],
         )
         self.assertEqual(
@@ -141,10 +142,12 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             app_id="@me/server",
             app_type=TaskType.SERVER_APP,
             added_by="account-c",
+            is_hub_app=True,
         )
         updated = state.list_apps("@me/fed-a")
         self.assertEqual(len(updated), 2)
         self.assertEqual(updated[1].fab_hash, updated_hash)
+        self.assertTrue(updated[1].is_hub_app)
         self.assertIsNone(state.get_app("@me/fed-a", "@me/server", server_hash))
         self.assertIsNotNone(state.get_app("@me/fed-a", "@me/server", updated_hash))
 
