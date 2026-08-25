@@ -130,8 +130,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         """Create run ID."""
         metadata = context.invocation_metadata()
         # This is best-effort analytics attribution, not authentication. We
-        # trust callers to label their own requests and default direct gRPC
-        # callers to the CLI source when no label is provided.
+        # trust callers to label their own requests and default unlabeled
+        # requests to unknown when no source is provided.
         run_source = (
             next(
                 (
@@ -149,7 +149,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             _get_account(),
             self.linkstate_factory.state(),
             self.fleet_api_type,
-            source=extensions.resolve_run_start_source(run_source, default="cli"),
+            source=extensions.resolve_run_start_source(run_source, default="unknown"),
         )
 
     def StreamLogs(  # pylint: disable=C0103

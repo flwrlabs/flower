@@ -431,8 +431,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertIs(response, expected)
         self.assertEqual(start_run.call_args.kwargs["source"], "web_ui")
 
-    def test_start_run_defaults_to_cli_source_without_metadata(self) -> None:
-        """Default direct gRPC callers to the CLI analytics source."""
+    def test_start_run_defaults_to_unknown_source_without_metadata(self) -> None:
+        """Do not infer a caller from the gRPC transport."""
         context = Mock()
         context.invocation_metadata.return_value = ()
         expected = StartRunResponse(run_id=42)
@@ -443,7 +443,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         ) as start_run:
             self.servicer.StartRun(StartRunRequest(), context)
 
-        self.assertEqual(start_run.call_args.kwargs["source"], "cli")
+        self.assertEqual(start_run.call_args.kwargs["source"], "unknown")
 
     def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
         """StartRun should bind canonical connected OAuth connector refs."""
