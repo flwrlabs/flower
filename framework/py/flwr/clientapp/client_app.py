@@ -16,7 +16,7 @@
 
 
 import inspect
-import time
+import math
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
@@ -45,6 +45,17 @@ from flwr.supercore.typing import JSONValue
 from .typing import ClientAppCallable, Mod
 
 DEFAULT_ACTION = "default"
+_NODE_METRIC_NAMES = frozenset(
+    {
+        "accuracy",
+        "loss",
+        "num_examples",
+        "train_accuracy",
+        "train_loss",
+        "val_accuracy",
+        "val_loss",
+    }
+)
 
 
 def _alert_erroneous_client_fn() -> None:
@@ -99,6 +110,24 @@ def _parse_server_round(group_id: str) -> int | None:
         return int(group_id)
     except (TypeError, ValueError):
         return None
+
+
+def _extract_node_metrics(message: Message) -> dict[str, JSONValue]:
+    """Return a safe, small subset of scalar metrics from a ClientApp reply."""
+    metrics: dict[str, JSONValue] = {}
+    records = (
+        *message.content.metric_records.values(),
+        *message.content.config_records.values(),
+    )
+    for record in records:
+        for name in _NODE_METRIC_NAMES:
+            if name in metrics or (value := record.get(name)) is None:
+                continue
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            if math.isfinite(value):
+                metrics[name] = value
+    return metrics
 
 
 class ClientAppException(Exception):
@@ -213,7 +242,6 @@ class ClientApp:
         node_id = message.metadata.dst_node_id
         server_round = _parse_server_round(message.metadata.group_id)
         self._emit_event(events[0], node_id=node_id, server_round=server_round)
-        started_at = time.perf_counter()
         try:
             result = call(message, context)
         except Exception:
@@ -221,17 +249,18 @@ class ClientApp:
                 events[2],
                 node_id=node_id,
                 server_round=server_round,
-                metadata={
-                    "error": "execution_failed",
-                    "elapsed_time": time.perf_counter() - started_at,
-                },
+                metadata={"error": "execution_failed"},
             )
             raise
+        try:
+            metrics = _extract_node_metrics(result)
+        except Exception:  # pylint: disable=broad-exception-caught
+            metrics = {}
         self._emit_event(
             events[1],
             node_id=node_id,
             server_round=server_round,
-            metadata={"elapsed_time": time.perf_counter() - started_at},
+            metadata=metrics,
         )
         return result
 
