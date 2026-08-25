@@ -62,6 +62,7 @@ how-to-guides/create-automations
 how-to-guides/run-on-supergrid
 how-to-guides/troubleshoot-agent-runs
 how-to-guides/run-with-local-superlink
+how-to-guides/run-with-ollama
 ```
 
 ```{toctree}
