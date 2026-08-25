@@ -20,7 +20,7 @@ from copy import deepcopy
 from importlib import import_module
 from logging import WARNING
 from types import ModuleType
-from typing import Any, Literal, cast
+from typing import Any, Literal, cast, get_args
 
 from fastapi import FastAPI
 from starlette.middleware import Middleware
@@ -34,7 +34,7 @@ SuperLinkLifespanContext = Callable[
 RunStartSource = Literal["cli", "web_ui", "automation", "unknown"]
 ResultDeliveryChannel = Literal["logs", "chat"]
 RUN_SOURCE_METADATA_KEY = "x-flwr-run-source"
-_RUN_START_SOURCES = frozenset({"cli", "web_ui", "automation", "unknown"})
+_RUN_START_SOURCES = frozenset(get_args(RunStartSource))
 _SGXT_MODULE = "flwr.ee.superlink.extensions"
 
 
