@@ -99,7 +99,7 @@ requested one and understands how to stop it.
 
 ## Understand automation scope
 
-The 1.34.0 runtime builds scheduled runs from the current run request. It keeps
+The 1.35.0 runtime builds scheduled runs from the current run request. It keeps
 the automation's runs in the current run series and federation and replaces
 `agent.input` with the scheduled `input`.
 
@@ -151,7 +151,7 @@ already started. Stop that run separately from its run details or with
 `flwr stop <run-id> supergrid`.
 
 There is no public CLI command for listing or stopping automations in Flower
-1.34.0. Use the automation list in SuperGrid.
+1.35.0. Use the automation list in SuperGrid.
 
 ## Recover from a failed schedule
 
