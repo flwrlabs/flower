@@ -20,7 +20,7 @@ import json
 import os
 import subprocess
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from functools import partial
 from logging import ERROR, INFO, WARN
@@ -46,6 +46,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.address import parse_address, resolve_bind_address
 from flwr.supercore.constant import SUPERNODE_DEFAULT_SERVER_ADDRESS, TaskType
@@ -253,6 +254,7 @@ def start_client_internal(
             pull_object,
             push_object,
             confirm_message_received,
+            push_task_events,
         ) = conn
         # Store node_id in state
         state.set_node_id(node_id)
@@ -260,7 +262,7 @@ def start_client_internal(
 
         # pylint: disable=too-many-nested-blocks
         while True:
-            run_id = _pull_and_store_message(
+            task = _pull_and_store_message(
                 state=state,
                 object_store=store,
                 node_config=node_config,
@@ -273,16 +275,21 @@ def start_client_internal(
             )
 
             # No message has been pulled therefore we can skip the push stage.
-            if run_id is None:
+            if task is None:
                 # If no message was received, wait for a while
                 time.sleep(3)
                 continue
+
+            run_id, task_id = task
 
             _push_messages(
                 state=state,
                 object_store=store,
                 send=send,
                 push_object=push_object,
+                push_task_events=push_task_events,
+                run_id=run_id,
+                task_id=task_id,
             )
 
 
@@ -312,10 +319,10 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
     pull_object: Callable[[int, str], bytes],
     confirm_message_received: Callable[[int, str], None],
     trusted_entities: dict[str, str] | None,
-) -> int | None:
+) -> tuple[int, int | None] | None:
     """Pull a message from the SuperLink and store it in the state.
 
-    Return None if no message is received, otherwise return the processed run_id.
+    Return None if no message is received, otherwise return its run and task IDs.
     """
     # pylint: disable=too-many-nested-blocks
     message = None
@@ -365,7 +372,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                     )
                     reply = Message(FAB_VERIFICATION_ERROR, reply_to=message)
                     _insert_message(reply, state, object_store)
-                    return run_id
+                    return run_id, None
 
                 fab_verified = _verify_fab(fab, trusted_entities)
                 if not fab_verified:
@@ -379,7 +386,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                     )
                     reply = Message(FAB_VERIFICATION_ERROR, reply_to=message)
                     _insert_message(reply, state, object_store)
-                    return run_id
+                    return run_id, None
 
             # Initialize or refresh the context
             run_cfg = get_fused_config_from_fab(fab.content, run_info)
@@ -463,7 +470,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             )
         return None
 
-    return run_id
+    return run_id, task_id
 
 
 def _push_messages(
@@ -471,6 +478,9 @@ def _push_messages(
     object_store: ObjectStore,
     send: Callable[[Message, ObjectTree, float], tuple[set[str], str]],
     push_object: Callable[[int, str, str, bytes], None],
+    push_task_events: Callable[[int, Sequence[TaskEvent]], None],
+    run_id: int,
+    task_id: int | None,
 ) -> None:
     """Push reply messages to the SuperLink."""
     # This is to ensure that only one message is processed at a time
@@ -523,6 +533,15 @@ def _push_messages(
             # Send the reply message with its ObjectTree and ClientApp runtime
             # Get the IDs of objects to send
             ids_obj_to_send, session_id = send(message, object_tree, clientapp_runtime)
+
+            # Forward the ClientApp's local lifecycle events through the long-lived
+            # SuperNode connection. The SuperLink assigns their authoritative run,
+            # task, and node identity before making them streamable.
+            if task_id is not None:
+                push_task_events(
+                    run_id,
+                    state.get_task_events(run_id=run_id, task_ids=[task_id]),
+                )
 
             # Push object contents from the ObjectStore
             run_id = message.metadata.run_id
@@ -587,6 +606,7 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
         Callable[[int, str], bytes],
         Callable[[int, str, str, bytes], None],
         Callable[[int, str], None],
+        Callable[[int, Sequence[TaskEvent]], None],
     ]
 ]:
     """Establish a connection to the Fleet API server at SuperLink."""
@@ -604,7 +624,7 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
     if transport == TRANSPORT_TYPE_GRPC_RERE:
         connection, error_type = grpc_request_response, RpcError
     elif transport == TRANSPORT_TYPE_GRPC_ADAPTER:
-        connection, error_type = grpc_adapter, RpcError  # type: ignore[assignment]
+        connection, error_type = grpc_adapter, RpcError
     else:
         raise ValueError(
             f"Unknown transport type: {transport} (possible: {TRANSPORT_TYPES})"

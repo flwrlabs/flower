@@ -28,6 +28,8 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeResponse,
     DeactivateNodeRequest,
     DeactivateNodeResponse,
+    FleetPushTaskEventsRequest,
+    FleetPushTaskEventsResponse,
     PullMessagesRequest,
     PullMessagesResponse,
     PushMessagesRequest,
@@ -230,6 +232,21 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
             ) from e
 
         return res
+
+    def PushTaskEvents(
+        self, request: FleetPushTaskEventsRequest, context: grpc.ServicerContext
+    ) -> FleetPushTaskEventsResponse:
+        """Store lifecycle events emitted by a SuperNode ClientApp task."""
+        try:
+            return message_handler.push_task_events(
+                request=request,
+                state=self.state_factory.state(),
+            )
+        except InvalidRunStatusException as e:
+            raise FlowerError(
+                ApiErrorCode.FLEET_RUN_STATUS_NOT_ALLOWED,
+                f"SuperNode {request.node.node_id}, exception: {e.message}",
+            ) from e
 
     def GetRun(
         self, request: GetRunRequest, context: grpc.ServicerContext

@@ -19,6 +19,7 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from logging import ERROR
 from pathlib import Path
+from typing import cast
 
 import grpc
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -38,11 +39,13 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     DeactivateNodeRequest,
     PullMessagesRequest,
     PullMessagesResponse,
+    FleetPushTaskEventsRequest,
     PushMessagesRequest,
     PushMessagesResponse,
     RegisterNodeFleetRequest,
     UnregisterNodeFleetRequest,
 )
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.proto.fleet_pb2_grpc import FleetStub  # pylint: disable=E0611
 from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
     SendNodeHeartbeatRequest,
@@ -94,6 +97,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         Callable[[int, str], bytes],
         Callable[[int, str, str, bytes], None],
         Callable[[int, str], None],
+        Callable[[int, Sequence[TaskEvent]], None],
     ]
 ]:
     """Primitives for request/response-based interaction with a server.
@@ -139,6 +143,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
     pull_object : Callable[[int, str], bytes]
     push_object : Callable[[int, str, str, bytes], None]
     confirm_message_received : Callable[[int, str], None]
+    push_task_events : Callable[[int, Sequence[TaskEvent]], None]
     """
     if isinstance(root_certificates, str):
         root_certificates = Path(root_certificates).expanduser().read_bytes()
@@ -334,7 +339,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
             node=node,
             run_id=run_id,
         )
-        return fn(object_id)
+        return cast(bytes, fn(object_id))
 
     def push_object(
         run_id: int, session_id: str, object_id: str, contents: bytes
@@ -365,6 +370,16 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         )
         fn(object_id)
 
+    def push_task_events(run_id: int, events: Sequence[TaskEvent]) -> None:
+        """Push lifecycle events produced by the current ClientApp task."""
+        if node is None:
+            raise RuntimeError("Node instance missing")
+        if not events:
+            return
+        stub.PushTaskEvents(
+            FleetPushTaskEventsRequest(node=node, run_id=run_id, events=events)
+        )
+
     try:
         if self_registered:
             register_node()
@@ -379,6 +394,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
             pull_object,
             push_object,
             confirm_message_received,
+            push_task_events,
         )
     except Exception as exc:  # pylint: disable=broad-except
         log(ERROR, exc)

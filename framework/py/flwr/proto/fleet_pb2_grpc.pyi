@@ -113,6 +113,12 @@ class FleetStub:
     ]
     """Confirm Message Received"""
 
+    PushTaskEvents: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.fleet_pb2.FleetPushTaskEventsRequest,
+        flwr.proto.fleet_pb2.FleetPushTaskEventsResponse,
+    ]
+    """Push lifecycle events produced by a SuperNode task."""
+
 class FleetAsyncStub:
     RegisterNode: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.fleet_pb2.RegisterNodeFleetRequest,
@@ -189,6 +195,12 @@ class FleetAsyncStub:
         flwr.proto.message_pb2.ConfirmMessageReceivedResponse,
     ]
     """Confirm Message Received"""
+
+    PushTaskEvents: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.fleet_pb2.FleetPushTaskEventsRequest,
+        flwr.proto.fleet_pb2.FleetPushTaskEventsResponse,
+    ]
+    """Push lifecycle events produced by a SuperNode task."""
 
 class FleetServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -290,5 +302,13 @@ class FleetServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.message_pb2.ConfirmMessageReceivedResponse, collections.abc.Awaitable[flwr.proto.message_pb2.ConfirmMessageReceivedResponse]]:
         """Confirm Message Received"""
+
+    @abc.abstractmethod
+    def PushTaskEvents(
+        self,
+        request: flwr.proto.fleet_pb2.FleetPushTaskEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.fleet_pb2.FleetPushTaskEventsResponse, collections.abc.Awaitable[flwr.proto.fleet_pb2.FleetPushTaskEventsResponse]]:
+        """Push lifecycle events produced by a SuperNode task."""
 
 def add_FleetServicer_to_server(servicer: FleetServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

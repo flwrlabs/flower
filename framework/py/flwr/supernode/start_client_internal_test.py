@@ -23,6 +23,8 @@ import pytest
 from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.app.message import remove_content_from_message
 from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE, SubStatus
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
@@ -33,6 +35,7 @@ from flwr.supercore.inflatable.inflatable_object import (
 from .start_client_internal import (
     FAB_VERIFICATION_ERROR,
     _pull_and_store_message,
+    _push_messages,
     start_client_internal,
 )
 
@@ -148,7 +151,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         )
 
         # Assert
-        assert res == self.run_id
+        assert res == (self.run_id, 123)
         self._assert_message_pulled_and_stored()
         self.mock_state.create_task.assert_called_once_with(
             task_type=TaskType.CLIENT_APP,
@@ -282,7 +285,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             )
 
         # Assert
-        assert res == self.run_id
+        assert res == (self.run_id, self.mock_state.create_task.return_value)
         self._assert_message_pulled_and_stored()
 
         # Assert: the Run and FAB should be fetched and stored if run_id is unknown
@@ -339,7 +342,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
                 trusted_entities={"trusted": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA"},
             )
 
-        assert res == self.run_id
+        assert res == (self.run_id, None)
         mock_verify_fab.assert_not_called()
         self.mock_get_run.assert_called_once_with(self.run_id)
         self.mock_get_fab.assert_called_once_with(fab.hash_str, self.run_id)
@@ -393,7 +396,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
                 trusted_entities={"trusted": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA"},
             )
 
-        assert res == self.run_id
+        assert res == (self.run_id, None)
         mock_verify_fab.assert_called_once_with(
             fab, {"trusted": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA"}
         )
@@ -405,6 +408,43 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         stored_message = self.mock_state.store_message.call_args.args[0]
         assert stored_message.has_error()
         assert stored_message.error == FAB_VERIFICATION_ERROR
+
+
+def test_push_messages_forwards_current_task_events() -> None:
+    """Forward local ClientApp events over the long-lived SuperNode connection."""
+    run_id = 123
+    task_id = 456
+    reply = Message(
+        content=RecordDict(),
+        dst_node_id=0,
+        message_type="train.fit",
+    )
+    reply.metadata.__dict__["_run_id"] = run_id
+    reply.metadata.__dict__["_message_id"] = "reply-id"
+    reply.metadata.__dict__["_reply_to_message_id"] = "request-id"
+    event = TaskEvent(event="fl.node.fit.completed", data='{"type":"event"}')
+    state = Mock()
+    state.get_messages.return_value = [reply]
+    state.get_message_processing_duration.return_value = 0.1
+    state.get_task_events.return_value = [event]
+    object_store = Mock()
+    object_store.get_object_tree.return_value = ObjectTree(object_id="reply-id")
+    send = Mock(return_value=(set(), "session-id"))
+    push_object = Mock()
+    push_task_events = Mock()
+
+    _push_messages(
+        state=state,
+        object_store=object_store,
+        send=send,
+        push_object=push_object,
+        push_task_events=push_task_events,
+        run_id=run_id,
+        task_id=task_id,
+    )
+
+    state.get_task_events.assert_called_once_with(run_id=run_id, task_ids=[task_id])
+    push_task_events.assert_called_once_with(run_id, [event])
 
 
 class _StopAfterSuperExecLaunch(Exception):
