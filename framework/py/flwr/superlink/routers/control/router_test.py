@@ -78,8 +78,8 @@ def test_all_control_routes_have_protobuf_request_types() -> None:
     assert route_keys == control_request_types
 
 
-def test_start_run_defaults_to_unknown_source_without_header() -> None:
-    """Avoid inferring a source from the HTTP transport."""
+def test_start_run_forwards_resolved_source() -> None:
+    """Forward the normalized source to the control handler."""
     request = StartRunRequest()
     linkstate = Mock()
     expected = StartRunResponse(run_id=1)
@@ -88,7 +88,7 @@ def test_start_run_defaults_to_unknown_source_without_header() -> None:
         "flwr.superlink.routers.control.router.control_handlers.start_run",
         return_value=expected,
     ) as start_run:
-        response = start_run_route(request, linkstate, _ACCOUNT)
+        response = start_run_route(request, linkstate, _ACCOUNT, "unknown")
 
     assert response is expected
     start_run.assert_called_once_with(
@@ -100,7 +100,7 @@ def test_start_run_defaults_to_unknown_source_without_header() -> None:
     )
 
 
-def test_start_run_accepts_best_effort_source_header() -> None:
+def test_start_run_forwards_caller_provided_source() -> None:
     """Forward a caller-provided analytics source without treating it as auth."""
     request = StartRunRequest()
     linkstate = Mock()

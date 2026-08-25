@@ -16,7 +16,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -78,9 +78,9 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import get_protobuf_request
-from flwr.superlink import extensions
 from flwr.superlink.dependencies.account import get_account
 from flwr.superlink.dependencies.linkstate import get_linkstate
+from flwr.superlink.dependencies.run_source import RunSourceDependency
 from flwr.superlink.servicer.control import control_handlers
 
 router = APIRouter(prefix="/v1/control", tags=["Control"], route_class=ProtobufRoute)
@@ -94,9 +94,7 @@ def start_run(
     request: Annotated[StartRunRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
-    run_source: Annotated[
-        str | None, Header(alias=extensions.RUN_SOURCE_METADATA_KEY)
-    ] = None,
+    run_source: RunSourceDependency,
 ) -> StartRunResponse:
     """Start a run."""
     # Temporary: pass an empty Fleet API type
@@ -105,7 +103,7 @@ def start_run(
         account,
         linkstate,
         "",
-        source=extensions.resolve_run_start_source(run_source),
+        source=run_source,
     )
 
 
