@@ -102,6 +102,7 @@ input_items = [
 allowed_tool_names = {
     tool["name"] for tool in tools if isinstance(tool.get("name"), str)
 }
+final_response = None
 
 for _ in range(3):
     response = client.responses.create(
@@ -115,6 +116,7 @@ for _ in range(3):
         item for item in response_output if item.get("type") == "function_call"
     ]
     if not tool_calls:
+        final_response = response
         break
     for tool_call in tool_calls:
         if tool_call.get("name") not in allowed_tool_names:
@@ -123,18 +125,19 @@ for _ in range(3):
     input_items.extend(response_output)
     input_items.extend(outputs)
 
-stream = client.responses.create(model=model, input=input_items, stream=True)
-for event in stream:
-    agent.events.emit(event.to_dict())
+if final_response is None:
+    final_response = client.responses.create(model=model, input=input_items)
 ```
 
 The app checks every function name against the exposed tool schemas before
 calling a connector. It also keeps the complete model output next to the
 connector results, which preserves the context needed by the next model
-request. The final request omits tools, publishes its SDK stream, and ensures
-that the app always finishes with an answer. This abbreviated loop omits error
-recovery and conversation-state handling. Use the complete [collaborative research
-agent](../tutorials/build-a-collaborative-agent.md) for copy/pasteable code.
+request. When the model answers before the limit, the app reuses that response.
+It makes a final request without tools only when all three rounds requested
+tools. In both cases, `final_response` contains the result. This abbreviated
+loop omits streaming, error recovery, and conversation-state handling. Use the
+complete [collaborative research agent](../tutorials/build-a-collaborative-agent.md)
+for copy/pasteable code.
 
 ## Handle failure deliberately
 
