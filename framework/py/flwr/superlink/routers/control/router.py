@@ -49,6 +49,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunSeriesResponse,
     ListRunsRequest,
     ListRunsResponse,
+    PullArtifactsRequest,
+    PullArtifactsResponse,
     RegisterNodeRequest,
     RegisterNodeResponse,
     RejectInvitationRequest,
@@ -78,7 +80,9 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import get_protobuf_request
+from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.dependencies.account import get_account
+from flwr.superlink.dependencies.artifact_provider import get_artifact_provider
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.dependencies.run_source import RunSourceDependency
 from flwr.superlink.servicer.control import control_handlers
@@ -87,6 +91,9 @@ router = APIRouter(prefix="/v1/control", tags=["Control"], route_class=ProtobufR
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]
+ArtifactProviderDependency = Annotated[
+    ArtifactProvider | None, Depends(get_artifact_provider)
+]
 
 
 @router.post("/start-run")
@@ -145,6 +152,22 @@ def stop_run(
 ) -> StopRunResponse:
     """Stop a run."""
     return control_handlers.stop_run(request, account, linkstate)
+
+
+@router.post("/pull-artifacts")
+def pull_artifacts(
+    request: Annotated[PullArtifactsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+    artifact_provider: ArtifactProviderDependency,
+) -> PullArtifactsResponse:
+    """Pull artifacts generated during a run."""
+    return control_handlers.pull_artifacts(
+        request,
+        account,
+        linkstate,
+        artifact_provider,
+    )
 
 
 @router.post("/start-automation")

@@ -22,10 +22,12 @@ from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
-from flwr.common.constant import NOOP_FLWR_AID
+from flwr.common.constant import NOOP_FLWR_AID, Status, SubStatus
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsRequest,
     ListRunsResponse,
+    PullArtifactsRequest,
+    PullArtifactsResponse,
     StartRunRequest,
     StartRunResponse,
 )
@@ -38,7 +40,8 @@ from flwr.supercore.protobuf.translation import (
     ProtobufTranslationMiddleware,
     get_protobuf_request,
 )
-from flwr.supercore.run import Run
+from flwr.supercore.run import Run, RunStatus
+from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
@@ -346,4 +349,56 @@ def test_list_runs_rejects_invalid_protobuf_bytes() -> None:
     assert response.json() == {
         "detail": "Invalid protobuf payload.",
         "code": ApiErrorCode.INVALID_PROTOBUF_PAYLOAD.value,
+    }
+
+
+def test_pull_artifacts_returns_provider_url() -> None:
+    """Return the configured provider's URL for a finished owned run."""
+    linkstate = Mock(spec=LinkState)
+    run = Run.create_empty(7)
+    run.flwr_aid = _ACCOUNT.flwr_aid
+    run.status = RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
+    linkstate.get_run_info.return_value = [run]
+    artifact_provider = Mock(spec=ArtifactProvider)
+    artifact_provider.get_url.return_value = "https://artifacts.example/run-7.zip"
+    app = _create_app()
+    app.state.artifact_provider = artifact_provider
+    app.dependency_overrides[get_linkstate] = lambda: linkstate
+
+    response = TestClient(app).post(
+        "/v1/control/pull-artifacts",
+        content=PullArtifactsRequest(run_id=7).SerializeToString(),
+        headers={
+            "authorization": "Bearer access-token",
+            "content-type": PROTOBUF_MEDIA_TYPE,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
+    assert PullArtifactsResponse.FromString(response.content) == PullArtifactsResponse(
+        url="https://artifacts.example/run-7.zip"
+    )
+    artifact_provider.get_url.assert_called_once_with(7)
+
+
+def test_pull_artifacts_returns_error_without_provider() -> None:
+    """Return the established error when no artifact provider is configured."""
+    app = _create_app()
+    app.dependency_overrides[get_linkstate] = lambda: Mock(spec=LinkState)
+
+    response = TestClient(app).post(
+        "/v1/control/pull-artifacts",
+        content=PullArtifactsRequest(run_id=7).SerializeToString(),
+        headers={
+            "authorization": "Bearer access-token",
+            "content-type": PROTOBUF_MEDIA_TYPE,
+        },
+    )
+
+    assert response.status_code == 501
+    assert response.headers["content-type"] == "application/json"
+    assert response.json() == {
+        "detail": "ControlServicer initialized without artifact provider.",
+        "code": ApiErrorCode.NO_ARTIFACT_PROVIDER.value,
     }
