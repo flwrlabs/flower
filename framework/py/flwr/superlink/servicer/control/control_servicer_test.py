@@ -1763,9 +1763,8 @@ class TestControlServicerAuth(unittest.TestCase):
                 self.state.federation_manager, "has_member", return_value=False
             ),
         ):
-            gen = self.servicer.StreamLogs(request, ctx)
             with self.assertRaises(FlowerError) as cm:
-                next(gen)
+                self.servicer.StreamLogs(request, ctx)
             self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
 
     def test_streamlogs_auth_successful(self) -> None:

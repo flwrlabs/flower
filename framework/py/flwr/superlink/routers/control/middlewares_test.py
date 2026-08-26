@@ -261,7 +261,7 @@ def test_event_log_middleware_writes_after_completed_stream(
     ]
     monkeypatch.setattr(
         control_handlers,
-        "prepare_stream_logs",
+        "stream_logs",
         lambda _request, _account, _linkstate, _is_active: iter(expected),
     )
     _, client = _create_app(
@@ -296,7 +296,7 @@ def test_event_log_middleware_writes_stream_failure(
 
     monkeypatch.setattr(
         control_handlers,
-        "prepare_stream_logs",
+        "stream_logs",
         lambda _request, _account, _linkstate, _is_active: failing_stream(),
     )
     _, client = _create_app(

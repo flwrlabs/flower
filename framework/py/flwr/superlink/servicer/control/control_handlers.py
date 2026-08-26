@@ -672,16 +672,6 @@ def stream_logs(
     is_active: Callable[[], bool] | None = None,
 ) -> Generator[StreamLogsResponse, None, None]:
     """Stream logs for a run."""
-    yield from prepare_stream_logs(request, account, state, is_active)
-
-
-def prepare_stream_logs(
-    request: StreamLogsRequest,
-    account: AccountInfo,
-    state: LinkState,
-    is_active: Callable[[], bool] | None = None,
-) -> Generator[StreamLogsResponse, None, None]:
-    """Validate a log stream eagerly and return its response generator."""
     log(INFO, "ControlServicer.StreamLogs")
 
     run_id = request.run_id
@@ -741,16 +731,6 @@ def stream_run_events(
     is_active: Callable[[], bool] | None = None,
 ) -> Generator[StreamRunEventsResponse, None, None]:
     """Stream task events for a run."""
-    yield from prepare_stream_run_events(request, account, state, is_active)
-
-
-def prepare_stream_run_events(
-    request: StreamRunEventsRequest,
-    account: AccountInfo,
-    state: LinkState,
-    is_active: Callable[[], bool] | None = None,
-) -> Generator[StreamRunEventsResponse, None, None]:
-    """Validate a run-event stream eagerly and return its response generator."""
     log(INFO, "ControlServicer.StreamRunEvents")
 
     run_id = request.run_id

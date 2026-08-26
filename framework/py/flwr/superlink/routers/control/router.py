@@ -174,7 +174,7 @@ def stream_logs(
     stream_context: ProtobufStreamContextDependency,
 ) -> Iterator[StreamLogsResponse]:
     """Stream logs for a run."""
-    return control_handlers.prepare_stream_logs(
+    return control_handlers.stream_logs(
         request,
         account,
         linkstate,
@@ -190,7 +190,7 @@ def stream_run_events(
     stream_context: ProtobufStreamContextDependency,
 ) -> Iterator[StreamRunEventsResponse]:
     """Stream task events for a run."""
-    return control_handlers.prepare_stream_run_events(
+    return control_handlers.stream_run_events(
         request,
         account,
         linkstate,

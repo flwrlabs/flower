@@ -20,7 +20,7 @@ from collections.abc import Iterable
 from typing import cast
 
 from fastapi import Depends, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response
 from google.protobuf.message import DecodeError, Message
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
@@ -86,6 +86,7 @@ from flwr.supercore.protobuf.constants import (
 from flwr.supercore.protobuf.framing import frame_message
 from flwr.supercore.protobuf.streaming import (
     CancellableProtobufStreamingResponse,
+    ProtobufStreamContext,
     peek_protobuf_stream_context,
 )
 
@@ -193,7 +194,9 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             )
 
         result = request.state.protobuf_response
-        protobuf_response = self._response_for(result, request)
+        protobuf_response = self._response_for(
+            result, peek_protobuf_stream_context(request)
+        )
         del request.state.protobuf_response
         # Preserve metadata set by inner middleware, but not placeholder body headers.
         protobuf_response.status_code = response.status_code
@@ -227,7 +230,9 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         return message
 
     @staticmethod
-    def _response_for(result: object, request: Request) -> Response:
+    def _response_for(
+        result: object, stream_context: ProtobufStreamContext | None
+    ) -> Response:
         """Return the HTTP response matching a protobuf handler result."""
         # ``Message`` is also the most specific contract and must be checked
         # first. Unary responses are not framed; framing is reserved for streams.
@@ -242,13 +247,11 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             content = (
                 frame_message(message) for message in cast(Iterable[Message], result)
             )
-            if stream_context := peek_protobuf_stream_context(request):
-                return CancellableProtobufStreamingResponse(
-                    content,
-                    stream_context,
-                    PROTOBUF_STREAM_MEDIA_TYPE,
-                )
-            return StreamingResponse(content, media_type=PROTOBUF_STREAM_MEDIA_TYPE)
+            return CancellableProtobufStreamingResponse(
+                content,
+                stream_context or ProtobufStreamContext(),
+                PROTOBUF_STREAM_MEDIA_TYPE,
+            )
 
         raise FlowerError(
             ApiErrorCode.INVALID_HANDLER_RESPONSE,

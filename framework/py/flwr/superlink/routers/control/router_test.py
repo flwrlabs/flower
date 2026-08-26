@@ -372,7 +372,7 @@ def test_stream_logs_returns_framed_protobuf_responses() -> None:
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
 
-    def prepare_stream(
+    def stream(
         request: StreamLogsRequest,
         account: AccountInfo,
         state: LinkState,
@@ -385,8 +385,8 @@ def test_stream_logs_returns_framed_protobuf_responses() -> None:
         return iter(expected)
 
     with patch(
-        "flwr.superlink.routers.control.router.control_handlers.prepare_stream_logs",
-        side_effect=prepare_stream,
+        "flwr.superlink.routers.control.router.control_handlers.stream_logs",
+        side_effect=stream,
     ):
         response = TestClient(app).post(
             "/v1/control/stream-logs",
@@ -415,10 +415,9 @@ def test_stream_run_events_returns_framed_protobuf_responses() -> None:
     app.dependency_overrides[get_linkstate] = lambda: linkstate
 
     with patch(
-        "flwr.superlink.routers.control.router.control_handlers."
-        "prepare_stream_run_events",
+        "flwr.superlink.routers.control.router.control_handlers.stream_run_events",
         return_value=iter(expected),
-    ) as prepare_stream:
+    ) as stream:
         response = TestClient(app).post(
             "/v1/control/stream-run-events",
             content=StreamRunEventsRequest(
@@ -433,7 +432,7 @@ def test_stream_run_events_returns_framed_protobuf_responses() -> None:
     assert response.status_code == 200
     assert response.headers["content-type"] == PROTOBUF_STREAM_MEDIA_TYPE
     assert response.content == b"".join(frame_message(message) for message in expected)
-    request, account, state, is_active = prepare_stream.call_args.args
+    request, account, state, is_active = stream.call_args.args
     assert request == StreamRunEventsRequest(run_id=7, after_task_event_id=4)
     assert account is _ACCOUNT
     assert state is linkstate
