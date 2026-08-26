@@ -60,6 +60,7 @@ how-to-guides/use-agents-and-federations
 how-to-guides/connect-accounts
 how-to-guides/create-automations
 how-to-guides/use-flower-hub
+how-to-guides/use-openai-sdk
 how-to-guides/run-on-supergrid
 how-to-guides/troubleshoot-agent-runs
 how-to-guides/run-with-local-superlink
@@ -83,4 +84,6 @@ in the Flower framework documentation.
 
 Design proposals and partially implemented paths aren't documented as current
 capabilities. The documentation describes behavior available in the Flower
-framework and SuperGrid interfaces rather than planned product work.
+framework and SuperGrid interfaces rather than planned product work. The
+OpenAI-compatible runtime endpoint is internal to AgentApp processes and isn't
+a public API for external clients.
