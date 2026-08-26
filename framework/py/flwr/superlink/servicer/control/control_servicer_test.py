@@ -749,7 +749,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.fab.content = fab_content
         request.federation = NOOP_FEDERATION_ID
-        context = Mock()
+        context = self._make_start_run_context()
 
         with (
             patch(
@@ -863,7 +863,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request.federation = NOOP_FEDERATION_ID
         for key, value in user_config_to_proto({"unknown.key": 10}).items():
             request.override_config[key].CopyFrom(value)
-        context = Mock()
+        context = self._make_start_run_context()
 
         # Execute/Assert
         with (
@@ -890,7 +890,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request.fab.content = b"test FAB content"
         request.federation = NOOP_FEDERATION_ID
 
-        context = Mock()
+        context = self._make_start_run_context()
 
         with (
             patch(
