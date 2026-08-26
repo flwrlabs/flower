@@ -129,22 +129,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: StartRunRequest, context: grpc.ServicerContext
     ) -> StartRunResponse:
         """Create run ID."""
+        # Best-effort analytics attribution only; 
+        # trust caller-provided labels and default missing sources to unknown.
         metadata = context.invocation_metadata()
-        # This is best-effort analytics attribution, not authentication. We
-        # trust callers to label their own requests and default unlabeled
-        # requests to unknown when no source is provided.
-        run_source = (
-            next(
-                (
-                    value
-                    for key, value in metadata
-                    if key == extensions.RUN_SOURCE_METADATA_KEY
-                ),
-                None,
-            )
-            if isinstance(metadata, (tuple, list))
-            else None
-        )
+        run_source = get_metadata_str(metadata, extensions.RUN_SOURCE_METADATA_KEY)
+
         return control_handlers.start_run(
             request,
             _get_account(),
