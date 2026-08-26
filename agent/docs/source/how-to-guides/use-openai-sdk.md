@@ -109,17 +109,14 @@ def main(agent: AgentSession, context: Context) -> None:
         agent.events.emit(event.to_dict())
         if event.type in {"error", "response.failed"}:
             raise RuntimeError(f"Model response failed: {event}")
-        if event.type in {
-            "response.output_text.delta",
-            "response.refusal.delta",
-        }:
+        if event.type == "response.output_text.delta":
             output_text.append(event.delta)
 
     print("".join(output_text))
 ```
 
 `event.to_dict()` converts the typed SDK event into the JSON object expected by
-Flower. The app also collects answer and refusal text so the result appears in
+Flower. The app also collects text deltas so the completed answer appears in
 its logs.
 
 ## Use the SDK with connectors

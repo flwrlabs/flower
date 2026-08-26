@@ -74,10 +74,7 @@ def main(agent: AgentSession, context: Context) -> None:
         agent.events.emit(event.to_dict())
         if event.type in {"error", "response.failed"}:
             raise RuntimeError(f"Model response failed: {event}")
-        if event.type in {
-            "response.output_text.delta",
-            "response.refusal.delta",
-        }:
+        if event.type == "response.output_text.delta":
             output_text.append(event.delta)
 
     print("".join(output_text))
@@ -94,7 +91,7 @@ Flower, so the project does not need a model-provider API key.
 
 The SDK yields typed streaming events. The loop republishes each event through
 `agent.events.emit` so Flower Chat and the browser can render the response. It
-also collects answer and refusal text and prints the result to the run logs.
+also collects text deltas and prints the completed answer to the run logs.
 
 ## Review the Flower configuration
 
