@@ -292,7 +292,10 @@ def main(agent: AgentSession, context: Context) -> None:
         agent.events.emit(event.to_dict())
         if event.type in {"error", "response.failed"}:
             raise RuntimeError(f"Model response failed: {event}")
-        if event.type == "response.output_text.delta":
+        if event.type in {
+            "response.output_text.delta",
+            "response.refusal.delta",
+        }:
             output_text.append(event.delta)
 
     final_text = "".join(output_text)
@@ -307,8 +310,8 @@ outputs so later turns retain function-call context.
 
 The allowed names come from the returned schemas because one connector
 reference can expose several tools. The final request omits `tools`, which
-forces an answer instead of another connector round. Only that final stream is
-published and persisted.
+forces an answer instead of another connector round. The stream collects both
+answer and refusal text, then publishes and persists that result.
 
 ```{note}
 Connector calls still record their outputs and activity for run inspection.
@@ -487,7 +490,10 @@ def main(agent: AgentSession, context: Context) -> None:
         agent.events.emit(event.to_dict())
         if event.type in {"error", "response.failed"}:
             raise RuntimeError(f"Model response failed: {event}")
-        if event.type == "response.output_text.delta":
+        if event.type in {
+            "response.output_text.delta",
+            "response.refusal.delta",
+        }:
             output_text.append(event.delta)
 
     final_text = "".join(output_text)
