@@ -50,6 +50,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunSeriesResponse,
     ListRunsRequest,
     ListRunsResponse,
+    PullArtifactsRequest,
+    PullArtifactsResponse,
     RegisterNodeRequest,
     RegisterNodeResponse,
     RejectInvitationRequest,
@@ -87,7 +89,9 @@ from flwr.supercore.protobuf.streaming import (
     get_protobuf_stream_context,
 )
 from flwr.supercore.protobuf.translation import get_protobuf_request
+from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.dependencies.account import get_account
+from flwr.superlink.dependencies.artifact_provider import get_artifact_provider
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.dependencies.run_source import RunSourceDependency
 from flwr.superlink.servicer.control import control_handlers
@@ -98,6 +102,9 @@ LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]
 ProtobufStreamContextDependency = Annotated[
     ProtobufStreamContext, Depends(get_protobuf_stream_context)
+]
+ArtifactProviderDependency = Annotated[
+    ArtifactProvider | None, Depends(get_artifact_provider)
 ]
 
 
@@ -188,6 +195,22 @@ def stream_run_events(
         account,
         linkstate,
         stream_context.is_active,
+    )
+
+
+@router.post("/pull-artifacts")
+def pull_artifacts(
+    request: Annotated[PullArtifactsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+    artifact_provider: ArtifactProviderDependency,
+) -> PullArtifactsResponse:
+    """Pull artifacts generated during a run."""
+    return control_handlers.pull_artifacts(
+        request,
+        account,
+        linkstate,
+        artifact_provider,
     )
 
 
