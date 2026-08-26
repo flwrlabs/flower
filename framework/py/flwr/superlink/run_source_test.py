@@ -28,8 +28,6 @@ from .run_source import RunStartSource, resolve_run_start_source
         ("not-a-source", "unknown"),
     ],
 )
-def test_resolve_run_start_source(
-    value: str | None, expected: RunStartSource
-) -> None:
+def test_resolve_run_start_source(value: str | None, expected: RunStartSource) -> None:
     """Normalize best-effort caller attribution without treating it as auth."""
     assert resolve_run_start_source(value) == expected
