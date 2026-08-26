@@ -37,6 +37,7 @@ from flwr.client.grpc_rere_client.connection import grpc_request_response
 from flwr.common.config import get_fused_config_from_fab
 from flwr.common.constant import (
     ISOLATION_MODE_SUBPROCESS,
+    MAX_RETRY_DELAY,
     RUNTIME_DEPENDENCY_INSTALL,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
@@ -60,6 +61,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     no_object_id_recompute,
 )
 from flwr.supercore.inflatable.inflatable_utils import (
+    ObjectPushError,
     pull_objects,
     push_object_contents_from_iterable,
 )
@@ -69,7 +71,11 @@ from flwr.supercore.primitives.asymmetric_ed25519 import (
     decode_base64url,
     verify_signature,
 )
-from flwr.supercore.retry import RetryInvoker, make_simple_grpc_retry_invoker
+from flwr.supercore.retry import (
+    RetryInvoker,
+    exponential,
+    make_simple_grpc_retry_invoker,
+)
 from flwr.supercore.run import Run, RunNotRunningException
 from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import get_client_tls_args
@@ -515,8 +521,11 @@ def _push_messages(
                 # therefore we can yield it after casting it to bytes
                 yield tree.object_id, cast(bytes, content)
 
-        # Send the message
-        try:
+        def send_message(
+            message: Message = message,
+            object_tree: ObjectTree = object_tree,
+        ) -> None:
+            """Send the message and all objects required by the SuperLink."""
             clientapp_runtime = state.get_message_processing_duration(
                 message_id=message.metadata.reply_to_message_id,
             )
@@ -536,7 +545,30 @@ def _push_messages(
                 # )
                 push_object_fn=partial(push_object, run_id, session_id),
             )
-            log(INFO, "Sent successfully")
+
+        # A PushMessages response can be lost after the SuperLink has accepted
+        # it, and a push session can be replaced while object uploads are in
+        # flight. Retrying the complete operation is safe because the message
+        # ID is stable and PushMessages is idempotent.
+        retry_invoker = RetryInvoker(
+            wait_gen_factory=lambda: exponential(max_delay=MAX_RETRY_DELAY),
+            recoverable_exceptions=(RpcError, ObjectPushError),
+            max_tries=None,
+            max_time=None,
+        )
+
+        def delete_local_message(message: Message = message) -> None:
+            """Delete a reply after success or a terminal stopped-run result."""
+            state.delete_messages(
+                message_ids=[
+                    message.metadata.message_id,
+                    message.metadata.reply_to_message_id,
+                ]
+            )
+            object_store.delete(message.metadata.message_id)
+
+        try:
+            retry_invoker.invoke(send_message)
         except RunNotRunningException:
             log(
                 INFO,
@@ -544,26 +576,20 @@ def _push_messages(
                 message.metadata.run_id,
                 message.metadata.message_id,
             )
+            delete_local_message()
         except Exception as err:  # pylint: disable=broad-except
             log(
                 ERROR,
-                "Failed to send message %s: %s",
+                "Failed to send message %s; retaining it for a later retry: %s",
                 message.metadata.message_id,
                 err,
             )
-        finally:
-            # Delete the message from the state
-            state.delete_messages(
-                message_ids=[
-                    message.metadata.message_id,
-                    message.metadata.reply_to_message_id,
-                ]
-            )
+        else:
+            log(INFO, "Sent successfully")
 
-            # Delete all its objects from the ObjectStore
-            # No need to delete objects of the message it replies to, as it is
-            # already deleted when the ClientApp calls `ConfirmMessageReceived`
-            object_store.delete(message.metadata.message_id)
+            # Delete local state only after the SuperLink has accepted the
+            # message and all required objects.
+            delete_local_message()
 
 
 @contextmanager
