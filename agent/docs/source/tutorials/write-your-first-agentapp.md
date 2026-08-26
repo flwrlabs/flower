@@ -184,4 +184,6 @@ The app makes one model request and exits. It does not:
 
 Those behaviors belong in AgentApp code rather than appearing automatically.
 Continue with [Build a collaborative research
-agent](build-a-collaborative-agent.md) for a complete, bounded connector loop.
+agent](build-a-collaborative-agent.md) for a complete, bounded connector loop,
+or [publish the AgentApp to Flower
+Hub](../how-to-guides/use-flower-hub.md) so others can run it.
