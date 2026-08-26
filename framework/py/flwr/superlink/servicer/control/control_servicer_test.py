@@ -197,6 +197,12 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         shared_account_info.set(account_info)
         self.state = self.servicer.linkstate_factory.state()
 
+    def _make_start_run_context(self) -> MagicMock:
+        """Create a gRPC context with empty invocation metadata."""
+        context = MagicMock(spec=grpc.ServicerContext)
+        context.invocation_metadata.return_value = ()
+        return context
+
     def _create_dummy_run(self, flwr_aid: str | None) -> int:
         return self.state.create_run(
             "flwr/demo",
@@ -394,7 +400,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ) as mock_get_metadata_from_config,
         ):
             mock_get_metadata_from_config.return_value = (fab_id, fab_version)
-            response = self.servicer.StartRun(request, Mock())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
         runs = self.state.get_run_info(run_ids=[response.run_id])
         run_info = runs[0] if runs else None
 
@@ -476,7 +482,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 return_value=("flwr/demo", "1.0.0"),
             ),
         ):
-            response = self.servicer.StartRun(request, Mock())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
 
         self.assertEqual(
             list(self.state.get_run_connector_refs(run_id=response.run_id)),
@@ -523,7 +529,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ),
             self.assertRaises(FlowerError) as error,
         ):
-            self.servicer.StartRun(request, Mock())
+            self.servicer.StartRun(request, self._make_start_run_context())
 
         self.assertEqual(error.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST)
         self.assertEqual(
@@ -564,7 +570,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ),
             self.assertRaises(FlowerError) as error,
         ):
-            self.servicer.StartRun(request, Mock())
+            self.servicer.StartRun(request, self._make_start_run_context())
 
         self.assertEqual(error.exception.code, expected_code)
         self.assertEqual(list(self.state.get_run_info()), [])
@@ -578,7 +584,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.servicer.linkstate_factory.state_instance = None
 
         with self.assertRaises(RuntimeError):
-            self.servicer.StartRun(StartRunRequest(), Mock())
+            self.servicer.StartRun(StartRunRequest(), self._make_start_run_context())
 
         federation_manager.exists.assert_called_once_with(expected_federation_id)
 
@@ -611,7 +617,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         ):
             mock_get_fab_config.return_value = {"tool": {"flwr": {"app": {}}}}
             mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
-            response = self.servicer.StartRun(request, Mock())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
 
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         run_context = self.state.get_run_series_context(series_id)
@@ -664,7 +670,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
             }
             mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
-            response = self.servicer.StartRun(request, Mock())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
 
         runs = self.state.get_run_info(run_ids=[response.run_id])
         tasks = self.state.get_tasks()
@@ -712,7 +718,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 }
             }
             mock_get_metadata_from_config.return_value = ("flwr/agent", "0.1.0")
-            response = self.servicer.StartRun(request, Mock())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
 
         runs = self.state.get_run_info(run_ids=[response.run_id])
         tasks = self.state.get_tasks()
@@ -792,7 +798,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 "anne-dev/simple-legacy-127",
                 "0.1.0",
             )
-            response = self.servicer.StartRun(request, Mock())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
 
         assert response.HasField("note")
         assert response.note
@@ -837,7 +843,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 }
             }
             mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
-            response = self.servicer.StartRun(request, Mock())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
         runs = self.state.get_run_info(run_ids=[response.run_id])
         run_info = runs[0] if runs else None
 
@@ -950,7 +956,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
             }
             mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
-            _ = self.servicer.StartRun(request, Mock())
+            _ = self.servicer.StartRun(request, self._make_start_run_context())
 
         mock_can_execute.assert_called_once_with(
             self.aid,
