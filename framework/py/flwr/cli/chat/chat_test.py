@@ -21,7 +21,10 @@ from unittest.mock import Mock, patch
 import click
 import pytest
 
-from flwr.cli.constant import CHAT_SUPERGRID_CONNECTION_NAME
+from flwr.cli.constant import (
+    CHAT_DEFAULT_FEDERATION_NAME,
+    CHAT_SUPERGRID_CONNECTION_NAME,
+)
 from flwr.cli.typing import SuperLinkConnection
 from flwr.proto.control_pb2 import ListFederationsResponse  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
@@ -71,7 +74,7 @@ def test_chat_runs_interactive_application() -> None:
     )
     channel = Mock()
     stub = Mock()
-    federations = [Federation(name="@flower/flower-agent-execution")]
+    federations = [Federation(name=f"@flower/{CHAT_DEFAULT_FEDERATION_NAME}")]
     stub.ListFederations.return_value = ListFederationsResponse(federations=federations)
     auth_plugin = Mock()
 

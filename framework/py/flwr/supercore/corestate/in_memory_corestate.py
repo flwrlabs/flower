@@ -100,6 +100,7 @@ class FederationAppRecord:
     app_id: str
     fab_hash: str
     app_type: str
+    is_hub_app: bool
     added_by: str
     added_at: datetime
 
@@ -335,6 +336,7 @@ class InMemoryCoreState(
         app_id: str,
         app_type: str,
         added_by: str,
+        is_hub_app: bool = False,
     ) -> str:
         """Atomically store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
@@ -361,6 +363,7 @@ class InMemoryCoreState(
                 app_id=app_id,
                 fab_hash=fab_hash,
                 app_type=app_type,
+                is_hub_app=is_hub_app,
                 added_by=existing.added_by if existing else added_by,
                 added_at=existing.added_at if existing else now(),
             )
@@ -418,6 +421,7 @@ class InMemoryCoreState(
                     app_id=record.app_id,
                     fab_hash=record.fab_hash,
                     app_type=record.app_type,
+                    is_hub_app=record.is_hub_app,
                 )
                 for record in records
             ]
@@ -1274,6 +1278,7 @@ class InMemoryCoreState(
         self,
         *,
         run_id: int | None = None,
+        task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
@@ -1287,10 +1292,12 @@ class InMemoryCoreState(
                 ]
             else:
                 events = list(self.task_event_store.get(run_id, []))
+            task_id_set = set(task_ids) if task_ids is not None else None
             return [
                 event
                 for event in sorted(events, key=lambda event: event.id)
                 if event.id > cursor
+                and (task_id_set is None or event.task_id in task_id_set)
             ]
 
     def _cleanup_expired_task_tokens_locked(self) -> None:

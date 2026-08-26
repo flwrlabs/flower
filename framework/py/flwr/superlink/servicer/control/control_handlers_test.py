@@ -23,7 +23,9 @@ from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddAppRequest,
     AddAppResponse,
+    AppInfo,
     ListAppsRequest,
+    ListAppsResponse,
     ListAutomationsRequest,
     RemoveAppRequest,
     RemoveAppResponse,
@@ -108,6 +110,44 @@ class TestControlHandlers(unittest.TestCase):
             [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
         )
 
+    def test_start_run_notifies_extension_after_persisting_run(self) -> None:
+        """Notify the optional extension with the persisted run snapshot."""
+        fab_content = b"stored FAB"
+        fab_hash = hashlib.sha256(fab_content).hexdigest()
+        self.state.store_app(
+            fab=Fab(fab_hash, fab_content, {}),
+            federation_id=NOOP_FEDERATION_ID,
+            app_id="@flwr/demo",
+            app_type=TaskType.SERVER_APP,
+            added_by=self.account.flwr_aid,
+        )
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/demo", "v0.0.1"),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".extensions.notify_run_started"
+            ) as notify_run_started,
+        ):
+            request = StartRunRequest(federation=NOOP_FEDERATION_ID)
+            request.app_spec = "@flwr/demo==0.0.1"
+            request.fab.hash_str = fab_hash
+            response = start_run(request, self.account, self.state, None)
+
+        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        notify_run_started.assert_called_once()
+        notified_run, source = notify_run_started.call_args.args
+        self.assertEqual(notified_run.run_id, run.run_id)
+        self.assertEqual(source, "unknown")
+
     def test_start_run_rejects_unknown_fab_hash(self) -> None:
         """Test StartRun rejects an unknown FAB hash without an app spec."""
         request = StartRunRequest(federation=NOOP_FEDERATION_ID)
@@ -180,6 +220,45 @@ class TestControlHandlers(unittest.TestCase):
             [(FLOWER_AGENT_APP_ID, fab_hash, TaskType.AGENT_APP)],
         )
 
+    def test_list_apps_preserves_hub_flag_over_wire(self) -> None:
+        """ListApps preserves Hub provenance through protobuf serialization."""
+        fab_hash = self.state.store_app(
+            fab=Fab("", b"hub fab", {}),
+            federation_id=NOOP_FEDERATION_ID,
+            app_id="@flwr/demo",
+            app_type=TaskType.AGENT_APP,
+            added_by=self.account.flwr_aid,
+            is_hub_app=True,
+        )
+
+        response = list_apps(
+            ListAppsRequest(federation_id=NOOP_FEDERATION_ID),
+            self.account,
+            self.state,
+        )
+        round_tripped = ListAppsResponse.FromString(response.SerializeToString())
+
+        self.assertEqual(round_tripped.apps[0].fab_hash, fab_hash)
+        self.assertTrue(round_tripped.apps[0].is_hub_app)
+
+    def test_list_apps_preserves_unknown_hub_origin_over_wire(self) -> None:
+        """ListApps leaves unknown legacy provenance absent over the wire."""
+        app = AppInfo(
+            app_id="@flwr/demo",
+            fab_hash="legacy-hash",
+            app_type=TaskType.AGENT_APP,
+        )
+        with patch.object(self.state, "list_apps", return_value=[app]):
+            response = list_apps(
+                ListAppsRequest(federation_id=NOOP_FEDERATION_ID),
+                self.account,
+                self.state,
+            )
+
+        round_tripped = ListAppsResponse.FromString(response.SerializeToString())
+
+        self.assertFalse(round_tripped.apps[0].HasField("is_hub_app"))
+
     def test_add_and_remove_app(self) -> None:
         """AddApp stores the latest Hub FAB and RemoveApp removes the app."""
         fab_content = b"hub FAB"
@@ -216,6 +295,7 @@ class TestControlHandlers(unittest.TestCase):
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
             [("@flwr/demo", fab_hash, TaskType.AGENT_APP)],
         )
+        self.assertTrue(apps[0].is_hub_app)
         self.assertEqual(
             self.state.get_app(NOOP_FEDERATION_ID, "@flwr/demo", fab_hash),
             Fab(fab_hash, fab_content, verification_dict),

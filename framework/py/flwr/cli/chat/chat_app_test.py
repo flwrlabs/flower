@@ -20,15 +20,17 @@ from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
 
 from flwr.cli.chat.chat_app import ChatApplication, _ChatCompleter
-from flwr.cli.constant import CHAT_AGENT_NAME
+from flwr.cli.constant import CHAT_AGENT_NAME, CHAT_DEFAULT_FEDERATION_NAME
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.supercore.constant import FLOWER_AGENT_APP_ID
+
+_CHAT_FED_ID = f"@flower/{CHAT_DEFAULT_FEDERATION_NAME}"
 
 
 def test_chat_selects_federation_from_dropdown() -> None:
     """The federation command should offer and apply federation selections."""
     federations = [
-        Federation(name="@flower/flower-agent-execution", description="Default"),
+        Federation(name=_CHAT_FED_ID, description="Default"),
         Federation(name="@flower/other", description="Other"),
     ]
     completer = _ChatCompleter(Mock(), federations[0].name, federations)
@@ -40,6 +42,7 @@ def test_chat_selects_federation_from_dropdown() -> None:
     application = Mock()
     with patch.object(ChatApplication, "_create_application", return_value=application):
         chat = ChatApplication(Mock(), federations, Mock())
+    assert chat.federation == _CHAT_FED_ID
     chat.input_buffer = Mock()
     event = Mock(app=application)
 

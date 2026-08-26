@@ -9,8 +9,8 @@ one controlled change makes the cause easier to identify.
 For a CLI-started run, record the run ID and inspect its status and logs:
 
 ```console
-$ uvx --from flwr==1.34.0 flwr list --run-id <run-id> supergrid
-$ uvx --from flwr==1.34.0 flwr log <run-id> supergrid --show
+$ uvx --from flwr==1.35.0 flwr list --run-id <run-id> supergrid
+$ uvx --from flwr==1.35.0 flwr log <run-id> supergrid --show
 ```
 
 In the browser, keep the conversation open and note the visible federation,
@@ -36,7 +36,7 @@ Preserve other connections and settings. Add only the missing section, then run
 **Symptom:** the CLI fails before opening Flower Chat, or SuperGrid asks you to
 sign in again.
 
-1. Complete `uvx --from flwr==1.34.0 flwr login supergrid` again.
+1. Complete `uvx --from flwr==1.35.0 flwr login supergrid` again.
 1. Ensure the browser flow uses the same Flower account that has Agent access.
 1. Retry one deterministic prompt in a new chat.
 
@@ -131,7 +131,7 @@ In Flower Chat, {kbd}`Ctrl+C` during a response requests a stop. Wait until the
 prompt is idle before submitting again. If the old run remains active, use:
 
 ```console
-$ uvx --from flwr==1.34.0 flwr stop <run-id> supergrid
+$ uvx --from flwr==1.35.0 flwr stop <run-id> supergrid
 ```
 
 Start a new conversation if the interrupted app left incomplete tool state that

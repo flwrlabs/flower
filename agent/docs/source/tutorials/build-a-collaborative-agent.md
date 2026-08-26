@@ -71,7 +71,7 @@ version = "0.1.0"
 description = "A bounded public-web research AgentApp"
 license = "Apache-2.0"
 requires-python = ">=3.11"
-dependencies = ["flwr==1.34.0"]
+dependencies = ["flwr==1.35.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["research_agent"]
@@ -79,7 +79,7 @@ packages = ["research_agent"]
 [tool.flwr.app]
 publisher = "local"
 display-name = "Research Agent"
-flwr-version-target = "1.34.0"
+flwr-version-target = "1.35.0"
 fab-include = ["research_agent/**/*.py"]
 
 [tool.flwr.app.config.agent]
