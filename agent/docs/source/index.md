@@ -64,6 +64,7 @@ how-to-guides/use-openai-sdk
 how-to-guides/run-on-supergrid
 how-to-guides/troubleshoot-agent-runs
 how-to-guides/run-with-local-superlink
+how-to-guides/run-with-ollama
 ```
 
 ```{toctree}

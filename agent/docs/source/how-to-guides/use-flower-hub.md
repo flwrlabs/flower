@@ -6,19 +6,18 @@ as `@publisher/agent-name`.
 
 ## Explore AgentApps
 
-Open the [Flower Hub app catalog](https://flower.ai/apps) and select
-**AgentApps** to browse agents. Open an AgentApp to review its description,
+Open the [Flower Hub app catalog](https://flower.ai/apps) and select type
+**Agent** to browse agents. Open an AgentApp to review its description,
 source code, available versions, and app spec before running it.
 
 ### Add an AgentApp to a federation
 
-Sign in, then select the **Add app to federation** button on an AgentApp card.
-Choose one of your active federations in the dialog and select **Confirm**.
+Sign in and open the AgentApp to review its description and source. If you want
+to make it available in a federation, select the **Add app to federation** plus
+button, choose one of your active federations, and select **Confirm**.
 
 Open that federation from the Flower Agent sidebar and select **New chat**.
-The AgentApp is now available in the agent selector above the prompt. Review
-its description and source before confirming that you want to make it
-available in the federation.
+The AgentApp is now available in the agent selector above the prompt.
 
 ### Run an AgentApp from the terminal
 
@@ -48,7 +47,8 @@ Check the public metadata in `pyproject.toml`:
 name = "hello-agent"
 version = "0.1.0"
 description = "Answer questions with a Flower AgentApp"
-license = "Apache-2.0"
+license = { file = "LICENSE" }
+dependencies = ["flwr>=1.35.0,<2.0"]
 
 [tool.flwr.app]
 publisher = "your-username"
@@ -58,6 +58,10 @@ flwr-version-target = "1.35.0"
 [tool.flwr.app.components]
 agentapp = "hello_agent.agent_app:app"
 ```
+
+Add a top-level `LICENSE` file containing the license text. FAB format v1
+requires this declared license file and a `flwr` dependency with an inclusive
+lower bound. The target version must satisfy that dependency constraint.
 
 The `publisher` must match your Flower account username. Flower identifies the
 project as an AgentApp from the `agentapp` component, so you do not need to add
@@ -94,17 +98,27 @@ $ uv run flwr login supergrid
 Complete authentication in the browser window. The signed-in account must
 match the `publisher` value in `pyproject.toml`.
 
-### Review the files and publish
+### Review the files, then publish
 
-Run the command from the project directory:
+Before running the publish command, inspect the project for source,
+configuration, documentation, and data files that must not become public. The
+publish filter considers supported files throughout the project, even when
+they are not tracked by Git. Remove any sensitive file or add it to the
+project's `.gitignore`, then review the project again.
+
+Do not use the `Attach:` output from the publish command as a review step. The
+command uploads the attached files immediately after printing their names and
+does not ask for confirmation.
+
+After you have reviewed the eligible files, publish from the project
+directory:
 
 ```console
 $ uv run flwr app publish .
 ```
 
-Flower applies its publish filters and `.gitignore`, prints skipped and
-attached files, validates the upload, and then sends it to Flower Hub. Review
-the printed file list carefully because the uploaded sources are public.
+Flower applies its publish filters and the project's `.gitignore`, validates
+the files, and sends them to Flower Hub. The uploaded sources are public.
 
 After a successful upload, open:
 
@@ -131,7 +145,7 @@ $ uv run flwr build
 $ uv run flwr app publish .
 ```
 
-An app ID cannot change between an AgentApp and a federated app. Use a new
+An app ID cannot change between an Agent and a Federated app. Use a new
 project name if you need to publish a different app type.
 
 ### Troubleshoot publishing
