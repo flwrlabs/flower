@@ -101,9 +101,9 @@ from flwr.supercore.typing import (
     RegisterSupernodeContext,
     StartRunContext,
 )
-from flwr.superlink import extensions
 from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
 from flwr.superlink.federation import NoOpFederationManager
+from flwr.superlink.run_source import RUN_SOURCE_METADATA_KEY
 from flwr.superlink.servicer.control.control_account_auth_interceptor import (
     shared_account_info,
 )
@@ -418,7 +418,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         """Forward caller-provided source metadata for analytics attribution."""
         context = Mock()
         context.invocation_metadata.return_value = (
-            (extensions.RUN_SOURCE_METADATA_KEY, "web_ui"),
+            (RUN_SOURCE_METADATA_KEY, "web_ui"),
         )
         expected = StartRunResponse(run_id=42)
 

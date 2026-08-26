@@ -12,24 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""FastAPI dependency for Control API run-source attribution."""
+"""Tests for run-start source attribution utilities."""
 
-from typing import Annotated
+from pytest import mark
 
-from fastapi import Depends, Header
+from .run_source import RunStartSource, resolve_run_start_source
 
-from flwr.superlink.run_source import (
-    RUN_SOURCE_METADATA_KEY,
-    RunStartSource,
-    resolve_run_start_source,
+
+@mark.parametrize(
+    ("value", "expected"),
+    [
+        (None, "unknown"),
+        ("web_ui", "web_ui"),
+        (b"automation", "automation"),
+        ("not-a-source", "unknown"),
+        (b"\\xff", "unknown"),
+    ],
 )
-
-
-def get_run_source(
-    run_source: Annotated[str | None, Header(alias=RUN_SOURCE_METADATA_KEY)] = None,
-) -> RunStartSource:
-    """Return the normalized run source from the request header."""
-    return resolve_run_start_source(run_source)
-
-
-RunSourceDependency = Annotated[RunStartSource, Depends(get_run_source)]
+def test_resolve_run_start_source(
+    value: str | bytes | None, expected: RunStartSource
+) -> None:
+    """Normalize best-effort caller attribution without treating it as auth."""
+    assert resolve_run_start_source(value) == expected

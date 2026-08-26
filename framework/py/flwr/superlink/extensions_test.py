@@ -17,28 +17,11 @@
 from types import ModuleType
 from unittest.mock import Mock
 
-from pytest import MonkeyPatch, mark
+from pytest import MonkeyPatch
 
 from flwr.supercore.run import Run
 
 from . import extensions
-
-
-@mark.parametrize(
-    ("value", "expected"),
-    [
-        (None, "unknown"),
-        ("web_ui", "web_ui"),
-        (b"automation", "automation"),
-        ("not-a-source", "unknown"),
-        (b"\\xff", "unknown"),
-    ],
-)
-def test_resolve_run_start_source(
-    value: str | bytes | None, expected: extensions.RunStartSource
-) -> None:
-    """Normalize best-effort caller attribution without treating it as auth."""
-    assert extensions.resolve_run_start_source(value) == expected
 
 
 def test_notify_run_started_passes_a_snapshot_to_the_extension(
