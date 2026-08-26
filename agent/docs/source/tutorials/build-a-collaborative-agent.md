@@ -290,8 +290,8 @@ def main(agent: AgentSession, context: Context) -> None:
     output_text = []
     for event in stream:
         agent.events.emit(event.to_dict())
-        if event.type in {"error", "response.failed"}:
-            raise RuntimeError(f"Model response failed: {event}")
+        if event.type in {"error", "response.failed", "response.incomplete"}:
+            raise RuntimeError(f"Model response did not complete: {event}")
         if event.type in {
             "response.output_text.delta",
             "response.refusal.delta",
@@ -311,7 +311,8 @@ outputs so later turns retain function-call context.
 The allowed names come from the returned schemas because one connector
 reference can expose several tools. The final request omits `tools`, which
 forces an answer instead of another connector round. The stream collects both
-answer and refusal text, then publishes and persists that result.
+answer and refusal text, then publishes and persists that result. If the stream
+is incomplete, the app raises an error before updating the conversation state.
 
 ```{note}
 Connector calls still record their outputs and activity for run inspection.
@@ -488,8 +489,8 @@ def main(agent: AgentSession, context: Context) -> None:
     output_text = []
     for event in stream:
         agent.events.emit(event.to_dict())
-        if event.type in {"error", "response.failed"}:
-            raise RuntimeError(f"Model response failed: {event}")
+        if event.type in {"error", "response.failed", "response.incomplete"}:
+            raise RuntimeError(f"Model response did not complete: {event}")
         if event.type in {
             "response.output_text.delta",
             "response.refusal.delta",
