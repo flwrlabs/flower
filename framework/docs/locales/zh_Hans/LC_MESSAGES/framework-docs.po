@@ -51,7 +51,7 @@ msgstr "更新日志"
 #: ../../source/changelog/v1.35.0.md:2
 #, fuzzy
 msgid "v1.35.0 (2026-08-25)"
-msgstr "v1.3.0 (2023-02-06)"
+msgstr ""
 
 #: ../../source/changelog/v1.0.0.md:11 ../../source/changelog/v1.1.0.md:4
 #: ../../source/changelog/v1.10.0.md:4 ../../source/changelog/v1.11.0.md:4
@@ -109,11 +109,6 @@ msgid ""
 " Stripelis`, `Heng Pan`, `Javier`, `Mohammad Naseri`, `Stephane Moroso`, "
 "`Taner Topal`"
 msgstr ""
-"`Adam Narozniak`, `Anass Anhari`, `Charles Beauville`, `Dana-Farber`, "
-"`Daniel J. Beutel`, `Daniel Nata Nugraha`, `Edoardo Gabrielli`, `Gustavo "
-"Bertoli`, `Heng Pan`, `Javier`, `Mahdi`, `Steven Hé (Sīchàng)`, `Taner "
-"Topal`, `achiverram28`, `danielnugraha`, `eunchung`, `ruthgal` <!---"
-"TOKEN_v1.5.0-->"
 
 #: ../../source/changelog/v0.13.0.md:4 ../../source/changelog/v0.14.0.md:4
 #: ../../source/changelog/v0.15.0.md:4 ../../source/changelog/v0.16.0.md:4
@@ -156,13 +151,6 @@ msgid ""
 "[#7960](https://github.com/flwrlabs/flower/pull/7960), "
 "[#7963](https://github.com/flwrlabs/flower/pull/7963))"
 msgstr ""
-"**移除对 Python 3.7 的支持** "
-"([#2280](https://github.com/adap/flower/pull/2280), "
-"[#2299](https://github.com/adap/flower/pull/2299), "
-"[#2304](https://github.com/adap/flower/pull/2304), "
-"[#2306](https://github.com/adap/flower/pull/2306), "
-"[#2355](https://github.com/adap/flower/pull/2355), "
-"[#2356](https://github.com/adap/flower/pull/2356))"
 
 #: ../../source/changelog/v1.35.0.md:14
 msgid ""
@@ -181,13 +169,6 @@ msgid ""
 "[#7983](https://github.com/flwrlabs/flower/pull/7983), "
 "[#7985](https://github.com/flwrlabs/flower/pull/7985))"
 msgstr ""
-"**移除对 Python 3.7 的支持** "
-"([#2280](https://github.com/adap/flower/pull/2280), "
-"[#2299](https://github.com/adap/flower/pull/2299), "
-"[#2304](https://github.com/adap/flower/pull/2304), "
-"[#2306](https://github.com/adap/flower/pull/2306), "
-"[#2355](https://github.com/adap/flower/pull/2355), "
-"[#2356](https://github.com/adap/flower/pull/2356))"
 
 #: ../../source/changelog/v1.35.0.md:18
 msgid ""
@@ -210,12 +191,6 @@ msgid ""
 "[#7972](https://github.com/flwrlabs/flower/pull/7972), "
 "[#7992](https://github.com/flwrlabs/flower/pull/7992))"
 msgstr ""
-"**普通改进**（[#1872](https://github.com/adap/flower/pull/1872), "
-"[#1866](https://github.com/adap/flower/pull/1866), "
-"[#1884](https://github.com/adap/flower/pull/1884), "
-"[#1837](https://github.com/adap/flower/pull/1837), "
-"[#1477](https://github.com/adap/flower/pull/1477), "
-"[#2171](https://github.com/adap/flower/pull/2171))"
 
 #: ../../source/changelog/v1.35.0.md:22
 msgid ""
@@ -235,11 +210,6 @@ msgid ""
 "[#7962](https://github.com/flwrlabs/flower/pull/7962), "
 "[#7987](https://github.com/flwrlabs/flower/pull/7987))"
 msgstr ""
-"** baselines的普通更新** ([#2301](https://github.com/adap/flower/pull/2301), "
-"[#2305](https://github.com/adap/flower/pull/2305), "
-"[#2307](https://github.com/adap/flower/pull/2307), "
-"[#2327](https://github.com/adap/flower/pull/2327), "
-"[#2435](https://github.com/adap/flower/pull/2435))"
 
 #: ../../source/changelog/v1.35.0.md:26
 msgid ""
@@ -252,7 +222,7 @@ msgstr ""
 msgid ""
 "**Create your first AgentApp with one command (experimental)** "
 "([#7947](https://github.com/flwrlabs/flower/pull/7947))"
-msgstr "**新的联邦医疗策略** ([#1461](https://github.com/adap/flower/pull/1461))"
+msgstr ""
 
 #: ../../source/changelog/v1.35.0.md:30
 msgid ""
@@ -269,10 +239,6 @@ msgid ""
 "[#7925](https://github.com/flwrlabs/flower/pull/7925), "
 "[#7927](https://github.com/flwrlabs/flower/pull/7927))"
 msgstr ""
-"** 更新 C++ SDK** ([#2537](https://github/com/adap/flower/pull/2537), "
-"[#2528](https://github/com/adap/flower/pull/2528), "
-"[#2523](https://github.com/adap/flower/pull/2523), "
-"[#2522](https://github.com/adap/flower/pull/2522))"
 
 #: ../../source/changelog/v1.35.0.md:34
 msgid ""
@@ -289,8 +255,6 @@ msgid ""
 "([#7934](https://github.com/flwrlabs/flower/pull/7934), "
 "[#7958](https://github.com/flwrlabs/flower/pull/7958))"
 msgstr ""
-"**新的内置策略**（[#828](https://github.com/adap/flower/pull/828) "
-"[#822](https://github.com/adap/flower/pull/822)"
 
 #: ../../source/changelog/v1.35.0.md:38
 msgid ""
@@ -307,9 +271,6 @@ msgid ""
 "([#7950](https://github.com/flwrlabs/flower/pull/7950), "
 "[#7969](https://github.com/flwrlabs/flower/pull/7969))"
 msgstr ""
-"**介绍 Flower Swift SDK** "
-"([#1858](https://github.com/adap/flower/pull/1858), "
-"[#1897](https://github.com/adap/flower/pull/1897))"
 
 #: ../../source/changelog/v1.35.0.md:42
 msgid ""
@@ -328,9 +289,6 @@ msgid ""
 "[#7940](https://github.com/flwrlabs/flower/pull/7940), "
 "[#7952](https://github.com/flwrlabs/flower/pull/7952))"
 msgstr ""
-"** 统一客户端应用程序接口** ([#2303](https://github.com/adap/flower/pull/2303), "
-"[#2390](https://github.com/adap/flower/pull/2390), "
-"[#2493](https://github.com/adap/flower/pull/2493))"
 
 #: ../../source/changelog/v1.35.0.md:46
 msgid ""
@@ -361,12 +319,6 @@ msgid ""
 "[#7989](https://github.com/flwrlabs/flower/pull/7989), "
 "[#7995](https://github.com/flwrlabs/flower/pull/7995))"
 msgstr ""
-"**改进教程** ([#1468](https://github.com/adap/flower/pull/1468), "
-"[#1470](https://github.com/adap/flower/pull/1470), "
-"[#1472](https://github.com/adap/flower/pull/1472), "
-"[#1473](https://github.com/adap/flower/pull/1473), "
-"[#1474](https://github.com/adap/flower/pull/1474), "
-"[#1475](https://github.com/adap/flower/pull/1475)))"
 
 #: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
 #: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
@@ -416,8 +368,6 @@ msgid ""
 "([#7936](https://github.com/flwrlabs/flower/pull/7936), "
 "[#7955](https://github.com/flwrlabs/flower/pull/7955))"
 msgstr ""
-"** 更新代码示例** ([#1344](https://github.com/adap/flower/pull/1344), "
-"[#1347](https://github.com/adap/flower/pull/1347))"
 
 #: ../../source/changelog/v1.35.0.md:56
 msgid ""
@@ -87737,4 +87687,3 @@ msgstr ""
 
 #~ msgid "Structured run event API."
 #~ msgstr ""
-
