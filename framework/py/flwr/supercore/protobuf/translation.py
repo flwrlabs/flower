@@ -86,7 +86,7 @@ from flwr.supercore.protobuf.framing import frame_message
 from flwr.supercore.protobuf.streaming import (
     CancellableProtobufStreamingResponse,
     ProtobufStreamContext,
-    peek_protobuf_stream_context,
+    get_protobuf_stream_context,
 )
 
 RouteKey = tuple[str, str]
@@ -193,7 +193,7 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
 
         result = request.state.protobuf_response
         protobuf_response = self._response_for(
-            result, peek_protobuf_stream_context(request)
+            result, get_protobuf_stream_context(request)
         )
         del request.state.protobuf_response
         # Preserve metadata set by inner middleware, but not placeholder body headers.
@@ -229,7 +229,7 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
 
     @staticmethod
     def _response_for(
-        result: object, stream_context: ProtobufStreamContext | None
+        result: object, stream_context: ProtobufStreamContext
     ) -> Response:
         """Return the HTTP response matching a protobuf handler result."""
         # ``Message`` is also the most specific contract and must be checked
@@ -247,7 +247,7 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             )
             return CancellableProtobufStreamingResponse(
                 content,
-                stream_context or ProtobufStreamContext(),
+                stream_context,
                 PROTOBUF_STREAM_MEDIA_TYPE,
             )
 

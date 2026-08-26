@@ -17,7 +17,9 @@
 import asyncio
 import time
 from collections.abc import Iterator
+from threading import Event
 
+import pytest
 from fastapi import Request
 from starlette.types import Message
 
@@ -25,7 +27,6 @@ from .streaming import (
     CancellableProtobufStreamingResponse,
     ProtobufStreamContext,
     get_protobuf_stream_context,
-    peek_protobuf_stream_context,
 )
 
 
@@ -53,7 +54,6 @@ def test_get_stream_context_reuses_request_scoped_instance() -> None:
     second = get_protobuf_stream_context(request)
 
     assert first is second
-    assert peek_protobuf_stream_context(request) is first
     assert first.is_active()
 
 
@@ -89,11 +89,16 @@ def test_response_cancels_context_after_normal_completion() -> None:
     }
 
 
-def test_disconnect_unblocks_synchronous_stream_iteration() -> None:
+@pytest.mark.parametrize("spec_version", ["2.0", "2.4"])
+def test_disconnect_unblocks_synchronous_stream_iteration(
+    spec_version: str,
+) -> None:
     """Signal a blocked synchronous iterator as soon as the client disconnects."""
     context = ProtobufStreamContext()
+    iteration_started = Event()
 
     def content() -> Iterator[bytes]:
+        iteration_started.set()
         while context.is_active():
             time.sleep(0.001)
         yield from ()
@@ -104,6 +109,8 @@ def test_disconnect_unblocks_synchronous_stream_iteration() -> None:
 
     async def run_response() -> None:
         async def receive() -> Message:
+            while not iteration_started.is_set():
+                await asyncio.sleep(0)
             return {"type": "http.disconnect"}
 
         async def send(_message: Message) -> None:
@@ -111,7 +118,7 @@ def test_disconnect_unblocks_synchronous_stream_iteration() -> None:
 
         await asyncio.wait_for(
             response(
-                {"type": "http", "asgi": {"spec_version": "2.0"}},
+                {"type": "http", "asgi": {"spec_version": spec_version}},
                 receive,
                 send,
             ),

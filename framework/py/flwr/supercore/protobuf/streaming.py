@@ -21,6 +21,7 @@ from threading import Event
 
 from fastapi import Request
 from fastapi.responses import StreamingResponse
+from starlette._utils import create_collapsing_task_group
 from starlette.types import Receive, Scope, Send
 
 _STREAM_CONTEXT_STATE_KEY = "protobuf_stream_context"
@@ -50,12 +51,6 @@ def get_protobuf_stream_context(request: Request) -> ProtobufStreamContext:
     return stream_context
 
 
-def peek_protobuf_stream_context(request: Request) -> ProtobufStreamContext | None:
-    """Return an existing request-scoped stream context, if one was created."""
-    stream_context = getattr(request.state, _STREAM_CONTEXT_STATE_KEY, None)
-    return stream_context if isinstance(stream_context, ProtobufStreamContext) else None
-
-
 class CancellableProtobufStreamingResponse(StreamingResponse):
     """Cancel the associated stream context when the response stops."""
 
@@ -78,6 +73,27 @@ class CancellableProtobufStreamingResponse(StreamingResponse):
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Serve the response and cancel the context during final cleanup."""
         try:
-            await super().__call__(scope, receive, send)
+            if scope["type"] == "websocket":
+                await super().__call__(scope, receive, send)
+                return
+
+            # Always monitor disconnects independently. For ASGI 2.4 and newer,
+            # Starlette relies on ``send`` raising after a disconnect. A synchronous
+            # iterator can block before its next yield and therefore never call
+            # ``send`` again.
+            async with create_collapsing_task_group() as task_group:
+
+                async def monitor_disconnect() -> None:
+                    await self.listen_for_disconnect(receive)
+                    task_group.cancel_scope.cancel()
+
+                task_group.start_soon(monitor_disconnect)
+                try:
+                    await self.stream_response(send)
+                finally:
+                    task_group.cancel_scope.cancel()
+
+            if self.background is not None:
+                await self.background()
         finally:
             self._stream_context.cancel()
