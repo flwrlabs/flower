@@ -21,23 +21,16 @@ RUN_SOURCE_METADATA_KEY = "x-flwr-run-source"
 _RUN_START_SOURCES = frozenset(get_args(RunStartSource))
 
 
-def resolve_run_start_source(value: str | bytes | None) -> RunStartSource:
+def resolve_run_start_source(value: str | None) -> RunStartSource:
     """Normalize a caller-provided source label for analytics.
 
     Source attribution is intentionally best effort. Callers can only affect
     the analytics label for their own request, so recognized values are
     trusted and invalid values fall back to ``unknown``. This value is not a
-    security or authorization signal. The bytes form keeps the normalizer
-    tolerant of callers passing raw gRPC metadata values; only ASCII labels
-    are accepted.
+    security or authorization signal.
     """
     if value is None:
         return "unknown"
-    if isinstance(value, bytes):
-        try:
-            value = value.decode("ascii")
-        except UnicodeDecodeError:
-            return "unknown"
     if value not in _RUN_START_SOURCES:
         return "unknown"
     return cast(RunStartSource, value)

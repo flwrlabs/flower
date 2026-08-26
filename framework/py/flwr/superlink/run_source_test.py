@@ -24,13 +24,12 @@ from .run_source import RunStartSource, resolve_run_start_source
     [
         (None, "unknown"),
         ("web_ui", "web_ui"),
-        (b"automation", "automation"),
+        ("automation", "automation"),
         ("not-a-source", "unknown"),
-        (b"\\xff", "unknown"),
     ],
 )
 def test_resolve_run_start_source(
-    value: str | bytes | None, expected: RunStartSource
+    value: str | None, expected: RunStartSource
 ) -> None:
     """Normalize best-effort caller attribution without treating it as auth."""
     assert resolve_run_start_source(value) == expected
