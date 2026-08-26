@@ -150,10 +150,10 @@ def test_create_app_places_extension_middleware_before_control_middleware(
     ]
 
 
-def test_create_app_exposes_configured_artifact_provider(
+def test_create_app_exposes_configured_control_dependencies(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    """Expose the lifespan artifact provider to Control HTTP dependencies."""
+    """Expose lifespan configuration to Control HTTP dependencies."""
     monkeypatch.setattr(extensions, "get_middleware", lambda: ())
     monkeypatch.setattr(extensions, "configure_app", lambda _: None)
     monkeypatch.setattr(
@@ -167,6 +167,7 @@ def test_create_app_exposes_configured_artifact_provider(
         database=FLWR_IN_MEMORY_DB_NAME,
         superexec_auth_secret=None,
         artifact_provider=artifact_provider,
+        fleet_api_type="grpc-rere",
         authn_plugin=Mock(),
         event_log_plugin=None,
     )
@@ -175,4 +176,5 @@ def test_create_app_exposes_configured_artifact_provider(
     app = main.create_app(config, lifespan_class)
 
     assert app.state.artifact_provider is artifact_provider
+    assert app.state.fleet_api_type == "grpc-rere"
     lifespan_class.assert_called_once()

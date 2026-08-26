@@ -111,6 +111,7 @@ def create_app(
         database = get_ee_linkstate_db()
         superexec_auth_secret = None
         artifact_provider = None
+        fleet_api_type = None
         authn_plugin = load_control_authn_plugin()
         event_log_plugin = (
             load_control_event_log_plugin()
@@ -122,6 +123,7 @@ def create_app(
         database = config.database
         superexec_auth_secret = config.superexec_auth_secret
         artifact_provider = config.artifact_provider
+        fleet_api_type = config.fleet_api_type
         authn_plugin = config.authn_plugin
         event_log_plugin = config.event_log_plugin
 
@@ -179,6 +181,7 @@ def create_app(
     fastapi_app.state.linkstate_factory = linkstate_factory
     fastapi_app.state.superexec_auth_secret = superexec_auth_secret
     fastapi_app.state.artifact_provider = artifact_provider
+    fastapi_app.state.fleet_api_type = fleet_api_type
     fastapi_app.state.account_access_dep = AccountAccessDependency(authn_plugin)
     fastapi_app.state.control_event_log_plugin = event_log_plugin
 
