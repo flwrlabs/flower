@@ -55,8 +55,12 @@ import the module without requiring a running Flower runtime:
 client = OpenAI(
     base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
     api_key=os.environ["FLWR_RUNTIME_API_KEY"],
+    max_retries=0,
 )
 ```
+
+Set `max_retries=0` because each Responses request creates a Flower model task.
+An automatic SDK retry could create the task more than once.
 
 ```{important}
 `FLWR_RUNTIME_BASE_URL` is not `FLWR_MODEL_API_ENDPOINT`. The first is available
@@ -92,6 +96,7 @@ def main(agent: AgentSession, context: Context) -> None:
     client = OpenAI(
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
         api_key=os.environ["FLWR_RUNTIME_API_KEY"],
+        max_retries=0,
     )
     stream = client.responses.create(
         model=MODEL,
