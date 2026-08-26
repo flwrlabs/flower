@@ -15,6 +15,7 @@
 """Tests for the Control API middlewares."""
 
 
+from collections.abc import Iterator
 from typing import cast
 from unittest.mock import Mock
 
@@ -30,11 +31,16 @@ from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsRequest,
     ListRunsResponse,
+    StreamLogsRequest,
+    StreamLogsResponse,
 )
 from flwr.supercore.error import ApiErrorCode
 from flwr.supercore.event_log.typing import LogEntry
 from flwr.supercore.license_plugin import LicensePlugin
-from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
+from flwr.supercore.protobuf.constants import (
+    PROTOBUF_MEDIA_TYPE,
+    PROTOBUF_STREAM_MEDIA_TYPE,
+)
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.superlink import main as superlink_main
 from flwr.superlink.servicer.control import control_handlers
@@ -241,4 +247,70 @@ def test_event_log_middleware_writes_handler_failure(
     after_result = event_log_plugin.compose_log_after_event.call_args.kwargs["response"]
     assert isinstance(after_result, RuntimeError)
     assert str(after_result) == "handler failed"
+    assert event_log_plugin.write_log.call_count == 2
+
+
+def test_event_log_middleware_writes_after_completed_stream(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Write one after-event containing the final streamed response."""
+    event_log_plugin = _create_event_log_plugin()
+    expected = [
+        StreamLogsResponse(log_output="first", latest_timestamp=1.0),
+        StreamLogsResponse(log_output="second", latest_timestamp=2.0),
+    ]
+    monkeypatch.setattr(
+        control_handlers,
+        "prepare_stream_logs",
+        lambda _request, _account, _linkstate, _is_active: iter(expected),
+    )
+    _, client = _create_app(
+        monkeypatch, None, cast(EventLogWriterPlugin, event_log_plugin)
+    )
+
+    response = client.post(
+        "/v1/control/stream-logs",
+        content=StreamLogsRequest(run_id=7).SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == PROTOBUF_STREAM_MEDIA_TYPE
+    before_kwargs = event_log_plugin.compose_log_before_event.call_args.kwargs
+    assert before_kwargs["request"] == StreamLogsRequest(run_id=7)
+    assert before_kwargs["method_name"] == "/v1/control/stream-logs"
+    after_kwargs = event_log_plugin.compose_log_after_event.call_args.kwargs
+    assert after_kwargs["response"] == expected[-1]
+    assert event_log_plugin.write_log.call_count == 2
+
+
+def test_event_log_middleware_writes_stream_failure(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Write the stream exception as the after-event response."""
+    event_log_plugin = _create_event_log_plugin()
+
+    def failing_stream() -> Iterator[StreamLogsResponse]:
+        yield StreamLogsResponse(log_output="first", latest_timestamp=1.0)
+        raise RuntimeError("stream failed")
+
+    monkeypatch.setattr(
+        control_handlers,
+        "prepare_stream_logs",
+        lambda _request, _account, _linkstate, _is_active: failing_stream(),
+    )
+    _, client = _create_app(
+        monkeypatch, None, cast(EventLogWriterPlugin, event_log_plugin)
+    )
+
+    with pytest.raises(RuntimeError, match="stream failed"):
+        client.post(
+            "/v1/control/stream-logs",
+            content=StreamLogsRequest(run_id=7).SerializeToString(),
+            headers={"content-type": PROTOBUF_MEDIA_TYPE},
+        )
+
+    after_result = event_log_plugin.compose_log_after_event.call_args.kwargs["response"]
+    assert isinstance(after_result, RuntimeError)
+    assert str(after_result) == "stream failed"
     assert event_log_plugin.write_log.call_count == 2

@@ -672,6 +672,16 @@ def stream_logs(
     is_active: Callable[[], bool] | None = None,
 ) -> Generator[StreamLogsResponse, None, None]:
     """Stream logs for a run."""
+    yield from prepare_stream_logs(request, account, state, is_active)
+
+
+def prepare_stream_logs(
+    request: StreamLogsRequest,
+    account: AccountInfo,
+    state: LinkState,
+    is_active: Callable[[], bool] | None = None,
+) -> Generator[StreamLogsResponse, None, None]:
+    """Validate a log stream eagerly and return its response generator."""
     log(INFO, "ControlServicer.StreamLogs")
 
     run_id = request.run_id
@@ -690,6 +700,17 @@ def stream_logs(
     extensions.notify_result_delivered(run, account.flwr_aid, "logs")
 
     after_timestamp = request.after_timestamp + 1e-6
+    return _stream_logs(run_id, task_id, after_timestamp, state, is_active)
+
+
+def _stream_logs(
+    run_id: int,
+    task_id: int,
+    after_timestamp: float,
+    state: LinkState,
+    is_active: Callable[[], bool] | None,
+) -> Generator[StreamLogsResponse, None, None]:
+    """Yield log responses until the run finishes or the stream is cancelled."""
     while is_active is None or is_active():
         log_msg, latest_timestamp = state.get_task_log(task_id, after_timestamp)
         if log_msg:
@@ -720,6 +741,16 @@ def stream_run_events(
     is_active: Callable[[], bool] | None = None,
 ) -> Generator[StreamRunEventsResponse, None, None]:
     """Stream task events for a run."""
+    yield from prepare_stream_run_events(request, account, state, is_active)
+
+
+def prepare_stream_run_events(
+    request: StreamRunEventsRequest,
+    account: AccountInfo,
+    state: LinkState,
+    is_active: Callable[[], bool] | None = None,
+) -> Generator[StreamRunEventsResponse, None, None]:
+    """Validate a run-event stream eagerly and return its response generator."""
     log(INFO, "ControlServicer.StreamRunEvents")
 
     run_id = request.run_id
@@ -730,8 +761,6 @@ def stream_run_events(
             f"Run {run_id} not found while streaming run events.",
         )
     run = runs[0]
-    # LinkState creates every run with a primary task, so casting is safe
-    primary_task_id = cast(int, run.primary_task_id)
 
     _validate_federation_membership_in_request(
         state, account.flwr_aid, run.federation_id
@@ -745,6 +774,25 @@ def stream_run_events(
     after_task_event_id = None
     if request.HasField("after_task_event_id"):
         after_task_event_id = request.after_task_event_id
+    return _stream_run_events(
+        run_id,
+        run,
+        after_task_event_id,
+        state,
+        is_active,
+    )
+
+
+def _stream_run_events(
+    run_id: int,
+    run: Run,
+    after_task_event_id: int | None,
+    state: LinkState,
+    is_active: Callable[[], bool] | None,
+) -> Generator[StreamRunEventsResponse, None, None]:
+    """Yield task events until the run finishes or the stream is cancelled."""
+    # LinkState creates every run with a primary task, so casting is safe
+    primary_task_id = cast(int, run.primary_task_id)
     while is_active is None or is_active():
         should_break = run.status.status == Status.FINISHED
 

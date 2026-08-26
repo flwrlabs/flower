@@ -15,6 +15,9 @@
 """Middleware for the Control API."""
 
 
+from collections.abc import Iterable, Iterator
+from typing import cast
+
 from fastapi import Request
 from fastapi.responses import Response
 from google.protobuf.message import Message
@@ -91,9 +94,23 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
         # iterable protocols, following ProtobufTranslationMiddleware's dispatch.
         if isinstance(result, Message):
             await run_in_threadpool(write_after_event, result)
-        else:
-            # Not yet implemented
-            pass
+        elif isinstance(result, Iterable):
+
+            def logged_stream() -> Iterator[Message]:
+                """Write the after-event once stream iteration terminates."""
+                stream_response: Message | None = None
+                error: BaseException | None = None
+                try:
+                    # pylint: disable=use-yield-from
+                    for stream_response in cast(Iterable[Message], result):
+                        yield stream_response
+                except BaseException as exc:
+                    error = exc
+                    raise
+                finally:
+                    write_after_event(error if error is not None else stream_response)
+
+            request.state.protobuf_response = logged_stream()
 
         return response
 
