@@ -28,18 +28,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
     ArchiveFederationResponse,
-    BeginConnectorOAuthRequest,
-    BeginConnectorOAuthResponse,
-    CompleteConnectorOAuthRequest,
-    CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
-    DisconnectConnectorRequest,
-    DisconnectConnectorResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
@@ -50,8 +44,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAppsResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
-    ListConnectorsRequest,
-    ListConnectorsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -286,46 +278,6 @@ def refresh_auth_tokens(
 ) -> RefreshAuthTokensResponse:
     """Refresh authentication tokens."""
     return control_handlers.refresh_auth_tokens(request, authn_plugin)
-
-
-@router.post("/list-connectors")
-def list_connectors(
-    request: Annotated[ListConnectorsRequest, Depends(get_protobuf_request)],
-    linkstate: LinkStateDependency,
-    account: AccountDependency,
-) -> ListConnectorsResponse:
-    """List OAuth connectors available to the authenticated account."""
-    return control_handlers.list_connectors(request, account, linkstate)
-
-
-@router.post("/disconnect-connector")
-def disconnect_connector(
-    request: Annotated[DisconnectConnectorRequest, Depends(get_protobuf_request)],
-    linkstate: LinkStateDependency,
-    account: AccountDependency,
-) -> DisconnectConnectorResponse:
-    """Disconnect connector credentials for the authenticated account."""
-    return control_handlers.disconnect_connector(request, account, linkstate)
-
-
-@router.post("/begin-connector-oauth")
-def begin_connector_oauth(
-    request: Annotated[BeginConnectorOAuthRequest, Depends(get_protobuf_request)],
-    linkstate: LinkStateDependency,
-    account: AccountDependency,
-) -> BeginConnectorOAuthResponse:
-    """Begin OAuth connector authorization flow."""
-    return control_handlers.begin_connector_oauth(request, account, linkstate)
-
-
-@router.post("/complete-connector-oauth")
-def complete_connector_oauth(
-    request: Annotated[CompleteConnectorOAuthRequest, Depends(get_protobuf_request)],
-    linkstate: LinkStateDependency,
-    account: AccountDependency,
-) -> CompleteConnectorOAuthResponse:
-    """Complete OAuth connector authorization flow."""
-    return control_handlers.complete_connector_oauth(request, account, linkstate)
 
 
 @router.post("/register-node")

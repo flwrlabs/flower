@@ -39,37 +39,21 @@ CONTROL_AUTH_ROUTE_KEYS = frozenset(
     }
 )
 
-CONTROL_CONNECTOR_OAUTH_ROUTE_KEYS = frozenset(
-    {
-        ("POST", "/v1/control/begin-connector-oauth"),
-        ("POST", "/v1/control/complete-connector-oauth"),
-    }
-)
-
-CONTROL_SENSITIVE_ROUTE_KEYS = (
-    CONTROL_AUTH_ROUTE_KEYS | CONTROL_CONNECTOR_OAUTH_ROUTE_KEYS
-)
-
 
 def _is_control_auth_route(request: Request) -> bool:
     """Return whether the request targets a Control authentication endpoint."""
     return (request.method, request.url.path) in CONTROL_AUTH_ROUTE_KEYS
 
 
-def _is_control_sensitive_route(request: Request) -> bool:
-    """Return whether the request targets a sensitive Control endpoint."""
-    return (request.method, request.url.path) in CONTROL_SENSITIVE_ROUTE_KEYS
-
-
-class ControlSensitiveResponseMiddleware(BaseHTTPMiddleware):
-    """Prevent caching of sensitive Control responses."""
+class ControlAuthResponseMiddleware(BaseHTTPMiddleware):
+    """Prevent caching of Control authentication responses."""
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        """Add no-cache headers to completed sensitive responses."""
+        """Add no-cache headers to completed authentication responses."""
         response = await call_next(request)
-        if _is_control_sensitive_route(request):
+        if _is_control_auth_route(request):
             response.headers["Cache-Control"] = "no-store"
             response.headers["Pragma"] = "no-cache"
         return response
@@ -82,7 +66,7 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         """Write events before and after a Control handler call."""
-        if _is_control_sensitive_route(request):
+        if _is_control_auth_route(request):
             return await call_next(request)
 
         # Event logging is optional and only applies after the translation middleware

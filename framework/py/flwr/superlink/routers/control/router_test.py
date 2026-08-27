@@ -15,16 +15,13 @@
 """Tests for the Control API router."""
 
 
-from collections import Counter
 from collections.abc import Callable
 from datetime import datetime
 from unittest.mock import Mock, patch
 
-import pytest
 from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
-from google.protobuf.message import Message
 
 from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
@@ -33,23 +30,13 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.proto import control_pb2
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddAppRequest,
     AddAppResponse,
-    BeginConnectorOAuthRequest,
-    BeginConnectorOAuthResponse,
-    CompleteConnectorOAuthRequest,
-    CompleteConnectorOAuthResponse,
-    Connector,
-    DisconnectConnectorRequest,
-    DisconnectConnectorResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
-    ListConnectorsRequest,
-    ListConnectorsResponse,
     ListRunsRequest,
     ListRunsResponse,
     PullArtifactsRequest,
@@ -89,7 +76,6 @@ from flwr.superlink.routers.control.middlewares import ControlAuthenticationMidd
 from flwr.superlink.routers.control.router import add_app as add_app_route
 from flwr.superlink.routers.control.router import router
 from flwr.superlink.routers.control.router import start_run as start_run_route
-from flwr.superlink.servicer.control import control_handlers
 
 _ACCOUNT = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
 
@@ -122,194 +108,6 @@ def test_all_control_routes_have_protobuf_request_types() -> None:
         if route_key[1].startswith("/v1/control/")
     }
     assert route_keys == control_request_types
-
-
-def test_control_http_routes_cover_all_grpc_methods() -> None:
-    """Expose every Control gRPC request type plus HTTP-only token refresh."""
-    grpc_request_types = Counter(
-        method.input_type.full_name
-        for method in control_pb2.DESCRIPTOR.services_by_name["Control"].methods
-    )
-    http_request_types = Counter(
-        request_type.DESCRIPTOR.full_name
-        for (method, path), request_type in PROTOBUF_REQUEST_TYPES.items()
-        if method == "POST" and path.startswith("/v1/control/")
-    )
-    grpc_request_types[RefreshAuthTokensRequest.DESCRIPTOR.full_name] += 1
-
-    assert http_request_types == grpc_request_types
-
-
-@pytest.mark.parametrize(
-    ("path", "protobuf_request", "parse_response", "expected", "handler_name"),
-    [
-        (
-            "/v1/control/list-connectors",
-            ListConnectorsRequest(federation="agent"),
-            ListConnectorsResponse.FromString,
-            ListConnectorsResponse(
-                connectors=[
-                    Connector(
-                        connector_ref="google-drive",
-                        display_name="Google Drive",
-                        description="Cloud storage",
-                        connected=True,
-                    )
-                ]
-            ),
-            "list_connectors",
-        ),
-        (
-            "/v1/control/disconnect-connector",
-            DisconnectConnectorRequest(connector_ref="google-drive"),
-            DisconnectConnectorResponse.FromString,
-            DisconnectConnectorResponse(),
-            "disconnect_connector",
-        ),
-        (
-            "/v1/control/begin-connector-oauth",
-            BeginConnectorOAuthRequest(
-                connector_ref="google-drive",
-                redirect_uri="https://example.test/oauth/callback",
-            ),
-            BeginConnectorOAuthResponse.FromString,
-            BeginConnectorOAuthResponse(
-                oauth_session_id="oauth-session",
-                authorization_url="https://provider.test/authorize",
-                connector_ref="google-drive",
-                expires_at="2026-08-27T12:00:00+00:00",
-            ),
-            "begin_connector_oauth",
-        ),
-        (
-            "/v1/control/complete-connector-oauth",
-            CompleteConnectorOAuthRequest(
-                oauth_session_id="oauth-session",
-                code="authorization-code",
-                state="oauth-state",
-            ),
-            CompleteConnectorOAuthResponse.FromString,
-            CompleteConnectorOAuthResponse(connector_ref="google-drive"),
-            "complete_connector_oauth",
-        ),
-    ],
-)
-def test_connector_routes_return_protobuf_responses(
-    path: str,
-    protobuf_request: Message,
-    parse_response: Callable[[bytes], Message],
-    expected: Message,
-    handler_name: str,
-) -> None:
-    """Forward authenticated connector requests and serialize their responses."""
-    linkstate = Mock(spec=LinkState)
-    app = _create_app()
-    app.dependency_overrides[get_linkstate] = lambda: linkstate
-
-    with patch.object(
-        control_handlers,
-        handler_name,
-        return_value=expected,
-    ) as handler:
-        response = TestClient(app).post(
-            path,
-            content=protobuf_request.SerializeToString(),
-            headers={
-                "authorization": "Bearer access-token",
-                "content-type": PROTOBUF_MEDIA_TYPE,
-            },
-        )
-
-    assert response.status_code == 200
-    assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
-    assert parse_response(response.content) == expected
-    handler.assert_called_once_with(protobuf_request, _ACCOUNT, linkstate)
-
-
-def test_connector_route_returns_existing_structured_error() -> None:
-    """Translate connector handler errors without changing their public contract."""
-    linkstate = Mock(spec=LinkState)
-    app = _create_app()
-    app.dependency_overrides[get_linkstate] = lambda: linkstate
-
-    response = TestClient(app).post(
-        "/v1/control/begin-connector-oauth",
-        content=BeginConnectorOAuthRequest().SerializeToString(),
-        headers={
-            "authorization": "Bearer access-token",
-            "content-type": PROTOBUF_MEDIA_TYPE,
-        },
-    )
-
-    assert response.status_code == 400
-    assert response.headers["content-type"] == "application/json"
-    assert response.json() == {
-        "detail": "Invalid connector request.",
-        "code": ApiErrorCode.INVALID_CONNECTOR_REQUEST.value,
-    }
-
-
-@pytest.mark.parametrize(
-    ("authorization", "expected_metadata"),
-    [
-        (None, []),
-        ("Bearer invalid-token", [(ACCESS_TOKEN_KEY, "invalid-token")]),
-    ],
-)
-@pytest.mark.parametrize(
-    ("path", "protobuf_request", "handler_name"),
-    [
-        (
-            "/v1/control/list-connectors",
-            ListConnectorsRequest(),
-            "list_connectors",
-        ),
-        (
-            "/v1/control/disconnect-connector",
-            DisconnectConnectorRequest(),
-            "disconnect_connector",
-        ),
-        (
-            "/v1/control/begin-connector-oauth",
-            BeginConnectorOAuthRequest(),
-            "begin_connector_oauth",
-        ),
-        (
-            "/v1/control/complete-connector-oauth",
-            CompleteConnectorOAuthRequest(),
-            "complete_connector_oauth",
-        ),
-    ],
-)
-def test_connector_routes_reject_invalid_access_tokens_without_refresh(
-    path: str,
-    protobuf_request: Message,
-    handler_name: str,
-    authorization: str | None,
-    expected_metadata: list[tuple[str, str]],
-) -> None:
-    """Require an access token without attempting a refresh-token flow."""
-    authn_plugin = Mock()
-    app = _create_app(authn_plugin)
-    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
-    app.dependency_overrides[get_linkstate] = lambda: Mock(spec=LinkState)
-    headers = {"content-type": PROTOBUF_MEDIA_TYPE}
-    if authorization is not None:
-        headers["authorization"] = authorization
-
-    with patch.object(control_handlers, handler_name) as handler:
-        response = TestClient(app).post(
-            path,
-            content=protobuf_request.SerializeToString(),
-            headers=headers,
-        )
-
-    assert response.status_code == 401
-    assert response.headers["www-authenticate"] == "Bearer"
-    assert response.json() == {"detail": "Not authenticated"}
-    authn_plugin.validate_tokens_in_metadata.assert_called_once_with(expected_metadata)
-    authn_plugin.refresh_tokens.assert_not_called()
-    handler.assert_not_called()
 
 
 def test_get_login_details_does_not_require_bearer_authentication() -> None:
