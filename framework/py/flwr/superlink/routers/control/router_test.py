@@ -23,26 +23,14 @@ from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
-from flwr.common.constant import (
-    ACCESS_TOKEN_KEY,
-    NOOP_FLWR_AID,
-    REFRESH_TOKEN_KEY,
-    Status,
-    SubStatus,
-)
+from flwr.common.constant import NOOP_FLWR_AID, Status, SubStatus
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddAppRequest,
     AddAppResponse,
-    GetAuthTokensRequest,
-    GetAuthTokensResponse,
-    GetLoginDetailsRequest,
-    GetLoginDetailsResponse,
     ListRunsRequest,
     ListRunsResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
-    RefreshAuthTokensRequest,
-    RefreshAuthTokensResponse,
     StartRunRequest,
     StartRunResponse,
     StreamLogsRequest,
@@ -52,11 +40,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
-from flwr.supercore.auth.typing import (
-    AccountAuthCredentials,
-    AccountAuthLoginDetails,
-    AccountInfo,
-)
+from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
@@ -108,136 +92,6 @@ def test_all_control_routes_have_protobuf_request_types() -> None:
         if route_key[1].startswith("/v1/control/")
     }
     assert route_keys == control_request_types
-
-
-def test_get_login_details_does_not_require_bearer_authentication() -> None:
-    """Return login details without validating an access token."""
-    authn_plugin = Mock()
-    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
-    authn_plugin.get_login_details.return_value = AccountAuthLoginDetails(
-        authn_type="oidc",
-        device_code="device-code",
-        verification_uri_complete="https://example.test/verify",
-        expires_in=600,
-        interval=5,
-    )
-
-    response = TestClient(_create_app(authn_plugin)).post(
-        "/v1/control/get-login-details",
-        content=GetLoginDetailsRequest().SerializeToString(),
-        headers={"content-type": PROTOBUF_MEDIA_TYPE},
-    )
-
-    assert response.status_code == 200
-    assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
-    assert GetLoginDetailsResponse.FromString(response.content) == (
-        GetLoginDetailsResponse(
-            authn_type="oidc",
-            device_code="device-code",
-            verification_uri_complete="https://example.test/verify",
-            expires_in=600,
-            interval=5,
-        )
-    )
-    authn_plugin.validate_tokens_in_metadata.assert_not_called()
-
-
-def test_get_auth_tokens_preserves_polling_semantics() -> None:
-    """Return an empty response while pending and tokens after authorization."""
-    authn_plugin = Mock()
-    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
-    authn_plugin.get_auth_tokens.side_effect = [
-        None,
-        AccountAuthCredentials(
-            access_token="access-token",
-            refresh_token="refresh-token",
-        ),
-    ]
-    client = TestClient(_create_app(authn_plugin))
-    request = GetAuthTokensRequest(device_code="device-code")
-
-    pending_response = client.post(
-        "/v1/control/get-auth-tokens",
-        content=request.SerializeToString(),
-        headers={"content-type": PROTOBUF_MEDIA_TYPE},
-    )
-    completed_response = client.post(
-        "/v1/control/get-auth-tokens",
-        content=request.SerializeToString(),
-        headers={"content-type": PROTOBUF_MEDIA_TYPE},
-    )
-
-    assert pending_response.status_code == 200
-    assert pending_response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
-    assert GetAuthTokensResponse.FromString(pending_response.content) == (
-        GetAuthTokensResponse()
-    )
-    assert completed_response.status_code == 200
-    assert completed_response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
-    assert GetAuthTokensResponse.FromString(completed_response.content) == (
-        GetAuthTokensResponse(
-            access_token="access-token",
-            refresh_token="refresh-token",
-        )
-    )
-    authn_plugin.validate_tokens_in_metadata.assert_not_called()
-
-
-def test_refresh_auth_tokens_does_not_require_bearer_authentication() -> None:
-    """Exchange a refresh token without first validating an access token."""
-    authn_plugin = Mock()
-    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
-    authn_plugin.refresh_tokens.return_value = (
-        [
-            (ACCESS_TOKEN_KEY, "new-access-token"),
-            (REFRESH_TOKEN_KEY, "new-refresh-token"),
-        ],
-        _ACCOUNT,
-    )
-
-    response = TestClient(_create_app(authn_plugin)).post(
-        "/v1/control/refresh-auth-tokens",
-        content=RefreshAuthTokensRequest(
-            refresh_token="old-refresh-token"
-        ).SerializeToString(),
-        headers={"content-type": PROTOBUF_MEDIA_TYPE},
-    )
-
-    assert response.status_code == 200
-    assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
-    assert RefreshAuthTokensResponse.FromString(response.content) == (
-        RefreshAuthTokensResponse(
-            access_token="new-access-token",
-            refresh_token="new-refresh-token",
-        )
-    )
-    authn_plugin.validate_tokens_in_metadata.assert_not_called()
-    authn_plugin.refresh_tokens.assert_called_once_with(
-        [(REFRESH_TOKEN_KEY, "old-refresh-token")]
-    )
-
-
-def test_refresh_auth_tokens_returns_sanitized_authentication_error() -> None:
-    """Return the established JSON error without exposing the refresh token."""
-    authn_plugin = Mock()
-    authn_plugin.refresh_tokens.return_value = (None, None)
-
-    response = TestClient(_create_app(authn_plugin)).post(
-        "/v1/control/refresh-auth-tokens",
-        content=RefreshAuthTokensRequest(
-            refresh_token="secret-refresh-token"
-        ).SerializeToString(),
-        headers={"content-type": PROTOBUF_MEDIA_TYPE},
-    )
-
-    assert response.status_code == 401
-    assert response.headers["content-type"] == "application/json"
-    assert response.headers["www-authenticate"] == "Bearer"
-    assert response.json() == {
-        "detail": "Authentication failed.",
-        "code": ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED.value,
-    }
-    assert b"secret-refresh-token" not in response.content
 
 
 def test_start_run_forwards_resolved_source() -> None:

@@ -31,7 +31,6 @@ from flwr.supercore.routers.health.router import health
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.routers.control.middlewares import (
     ControlAuthenticationMiddleware,
-    ControlAuthResponseMiddleware,
     ControlEventLogMiddleware,
     ControlLicenseMiddleware,
 )
@@ -62,7 +61,6 @@ def _create_app(
 def _control_middleware_classes() -> list[type[object]]:
     """Return Control middleware classes in request execution order."""
     return [
-        ControlAuthResponseMiddleware,
         BaseHTTPMiddleware,
         ControlAuthenticationMiddleware,
         ControlLicenseMiddleware,
@@ -134,7 +132,7 @@ def test_create_app_constructs_control_middleware_in_execution_order(
     app = _create_app(monkeypatch)
 
     assert _middleware_classes(app) == _control_middleware_classes()
-    assert app.user_middleware[1].kwargs["dispatch"] is http_error_translator
+    assert app.user_middleware[0].kwargs["dispatch"] is http_error_translator
 
 
 def test_create_app_places_extension_middleware_before_control_middleware(

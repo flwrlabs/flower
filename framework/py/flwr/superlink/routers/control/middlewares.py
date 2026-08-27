@@ -31,33 +31,6 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.superlink.config_loader import get_license_plugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
 
-CONTROL_AUTH_ROUTE_KEYS = frozenset(
-    {
-        ("POST", "/v1/control/get-login-details"),
-        ("POST", "/v1/control/get-auth-tokens"),
-        ("POST", "/v1/control/refresh-auth-tokens"),
-    }
-)
-
-
-def _is_control_auth_route(request: Request) -> bool:
-    """Return whether the request targets a Control authentication endpoint."""
-    return (request.method, request.url.path) in CONTROL_AUTH_ROUTE_KEYS
-
-
-class ControlAuthResponseMiddleware(BaseHTTPMiddleware):
-    """Prevent caching of Control authentication responses."""
-
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
-        """Add no-cache headers to completed authentication responses."""
-        response = await call_next(request)
-        if _is_control_auth_route(request):
-            response.headers["Cache-Control"] = "no-store"
-            response.headers["Pragma"] = "no-cache"
-        return response
-
 
 class ControlEventLogMiddleware(BaseHTTPMiddleware):
     """Write event logs around Control API handler calls."""
@@ -66,9 +39,6 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         """Write events before and after a Control handler call."""
-        if _is_control_auth_route(request):
-            return await call_next(request)
-
         # Event logging is optional and only applies after the translation middleware
         # has parsed a recognized Control API protobuf request.
         event_log_plugin: EventLogWriterPlugin | None = getattr(
@@ -180,7 +150,7 @@ class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         """Authenticate the request and store its account on the request state."""
-        if not _is_control_path(request.url.path) or _is_control_auth_route(request):
+        if not _is_control_path(request.url.path):
             return await call_next(request)
 
         account_access = getattr(request.app.state, "account_access_dep", None)

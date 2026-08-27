@@ -14,22 +14,9 @@
 # ==============================================================================
 """Test the no-op Control authentication plugin."""
 
-import pytest
-
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
-from flwr.supercore.error import ApiErrorCode, FlowerError
 
 from .noop_auth_plugin import NoOpControlAuthnPlugin
-
-
-def test_get_auth_tokens_reports_disabled_authentication() -> None:
-    """Return a structured error when token polling is unsupported."""
-    plugin = NoOpControlAuthnPlugin()
-
-    with pytest.raises(FlowerError) as exc_info:
-        plugin.get_auth_tokens("device-code")
-
-    assert exc_info.value.code == ApiErrorCode.NO_ACCOUNT_AUTH
 
 
 def test_validate_tokens_returns_fresh_account_info() -> None:
