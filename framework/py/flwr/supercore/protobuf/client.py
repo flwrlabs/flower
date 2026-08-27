@@ -266,7 +266,16 @@ class ProtobufClient:
 
         def send(current_context: ProtobufRequestContext) -> httpx.Response:
             if stream:
-                return self._client.send(current_context.request, stream=True)
+                response = self._client.send(current_context.request, stream=True)
+                if response.is_error:
+                    try:
+                        # Response-side interceptors can inspect error payloads, while
+                        # successful response bodies remain incrementally streamed.
+                        response.read()
+                    except BaseException:
+                        response.close()
+                        raise
+                return response
             return self._client.send(current_context.request)
 
         call_next: ProtobufCall = send

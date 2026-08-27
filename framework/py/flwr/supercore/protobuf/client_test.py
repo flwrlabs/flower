@@ -25,7 +25,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
 )
-from flwr.supercore.interceptors import RuntimeTokenHttpInterceptor
+from flwr.supercore.interceptors import (
+    RuntimeTokenHttpInterceptor,
+    RuntimeVersionHttpInterceptor,
+)
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
@@ -160,6 +163,7 @@ def test_unary_unary_uses_retry_invoker() -> None:
         result = _call(
             ProtobufClient(
                 "http://api.example",
+                interceptors=[RuntimeVersionHttpInterceptor("test")],
                 retry_invoker=retry_invoker,
             )
         )
