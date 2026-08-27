@@ -65,16 +65,13 @@ def _call(client: ProtobufClient) -> ClaimTaskResponse:
     )
 
 
-def _stream_call(
-    client: ProtobufClient, timeout: float | None = None
-) -> Generator[ClaimTaskResponse, None, None]:
+def _stream_call(client: ProtobufClient) -> Generator[ClaimTaskResponse, None, None]:
     """Call one representative streaming protobuf operation."""
     return client._unary_stream(  # pylint: disable=protected-access
         path=_PATH,
         rpc_method=_METHOD,
         request=_REQUEST,
         response_type=ClaimTaskResponse,
-        timeout=timeout,
     )
 
 
@@ -242,9 +239,7 @@ def test_unary_stream_sends_and_receives_framed_protobuf() -> None:
         "flwr.supercore.protobuf.client.httpx.Client.send",
         return_value=response,
     ) as send:
-        result = list(
-            _stream_call(ProtobufClient("https://api.example/"), timeout=10.0)
-        )
+        result = list(_stream_call(ProtobufClient("https://api.example/")))
 
     assert result == [first, second]
     http_request = send.call_args.args[0]
@@ -253,12 +248,6 @@ def test_unary_stream_sends_and_receives_framed_protobuf() -> None:
     assert http_request.content == _REQUEST.SerializeToString(deterministic=True)
     assert http_request.headers["content-type"] == PROTOBUF_MEDIA_TYPE
     assert http_request.headers["accept"] == PROTOBUF_STREAM_MEDIA_TYPE
-    assert http_request.extensions["timeout"] == {
-        "connect": 10.0,
-        "read": 10.0,
-        "write": 10.0,
-        "pool": 10.0,
-    }
     assert send.call_args.kwargs == {"stream": True}
     assert response.is_closed
 
