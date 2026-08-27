@@ -28,6 +28,7 @@ from fastapi.routing import APIRoute, iter_route_contexts
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE
 from flwr.supercore import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.error import http_error_translator
@@ -101,7 +102,7 @@ def _get_middleware() -> list[Middleware]:
     ]
 
 
-def create_app(
+def create_app(  # pylint: disable=too-many-statements
     config: SuperLinkLifespanConfig | None = None,
     superlink_lifespan_class: type[SuperLinkLifespan] | None = None,
 ) -> FastAPI:
@@ -111,7 +112,7 @@ def create_app(
         database = get_ee_linkstate_db()
         superexec_auth_secret = None
         artifact_provider = None
-        fleet_api_type = None
+        fleet_api_type = TRANSPORT_TYPE_GRPC_RERE
         authn_plugin = load_control_authn_plugin()
         event_log_plugin = (
             load_control_event_log_plugin()
