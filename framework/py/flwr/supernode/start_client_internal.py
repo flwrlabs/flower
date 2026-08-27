@@ -225,7 +225,7 @@ def start_client_internal(
             root_certificates_path=runtime_root_certificates_path,
         )
         command += [
-            "--appio-api-address",
+            "--runtime-api-address",
             runtime_address,
         ]
         command += ["--plugin-type", ExecPluginType.CLIENT_APP]
