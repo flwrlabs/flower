@@ -26,13 +26,26 @@ from google.protobuf.message import Message
 from httpx import Response as HTTPResponse
 from pytest import MonkeyPatch
 
-from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
+from flwr.common.constant import (
+    ACCESS_TOKEN_KEY,
+    NOOP_ACCOUNT_NAME,
+    NOOP_FLWR_AID,
+    REFRESH_TOKEN_KEY,
+)
 from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    GetAuthTokensRequest,
+    GetLoginDetailsRequest,
     ListRunsRequest,
     ListRunsResponse,
+    RefreshAuthTokensRequest,
     StreamLogsRequest,
     StreamLogsResponse,
+)
+from flwr.supercore.auth.typing import (
+    AccountAuthCredentials,
+    AccountAuthLoginDetails,
+    AccountInfo,
 )
 from flwr.supercore.error import ApiErrorCode
 from flwr.supercore.event_log.typing import LogEntry
@@ -43,6 +56,8 @@ from flwr.supercore.protobuf.constants import (
 )
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.superlink import main as superlink_main
+from flwr.superlink.auth_plugin import ControlAuthnPlugin, NoOpControlAuthnPlugin
+from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.servicer.control import control_handlers
 
 from . import middlewares
@@ -52,6 +67,7 @@ def _create_app(
     monkeypatch: MonkeyPatch,
     license_plugin: LicensePlugin | None,
     event_log_plugin: EventLogWriterPlugin | None = None,
+    authn_plugin: ControlAuthnPlugin | None = None,
 ) -> tuple[FastAPI, TestClient]:
     """Create an app containing the complete Control API middleware stack."""
     monkeypatch.delenv("FLWR_ACCOUNT_AUTH_CONFIG", raising=False)
@@ -59,6 +75,8 @@ def _create_app(
     monkeypatch.setattr(middlewares, "get_license_plugin", lambda: license_plugin)
     app = superlink_main.create_app()
     app.state.control_event_log_plugin = event_log_plugin
+    if authn_plugin is not None:
+        app.state.account_access_dep = AccountAccessDependency(authn_plugin)
 
     @app.get("/v1/control/test")
     def control_route() -> dict[str, bool]:
@@ -81,6 +99,31 @@ def _create_event_log_plugin() -> Mock:
     return plugin
 
 
+def _create_authn_plugin() -> Mock:
+    """Create a successful authentication plugin for the public auth routes."""
+    plugin = Mock(spec=ControlAuthnPlugin)
+    plugin.validate_tokens_in_metadata.return_value = (False, None)
+    plugin.get_login_details.return_value = AccountAuthLoginDetails(
+        authn_type="oidc",
+        device_code="device-code",
+        verification_uri_complete="https://example.test/verify",
+        expires_in=600,
+        interval=5,
+    )
+    plugin.get_auth_tokens.return_value = AccountAuthCredentials(
+        access_token="access-token",
+        refresh_token="refresh-token",
+    )
+    plugin.refresh_tokens.return_value = (
+        [
+            (ACCESS_TOKEN_KEY, "new-access-token"),
+            (REFRESH_TOKEN_KEY, "new-refresh-token"),
+        ],
+        AccountInfo(flwr_aid="aid", account_name="account"),
+    )
+    return plugin
+
+
 def _post_list_runs(client: TestClient) -> HTTPResponse:
     """Send a protobuf request to an authenticated Control endpoint."""
     return cast(
@@ -91,6 +134,163 @@ def _post_list_runs(client: TestClient) -> HTTPResponse:
             headers={"content-type": PROTOBUF_MEDIA_TYPE},
         ),
     )
+
+
+@pytest.mark.parametrize(
+    ("path", "protobuf_request"),
+    [
+        ("/v1/control/get-login-details", GetLoginDetailsRequest()),
+        (
+            "/v1/control/get-auth-tokens",
+            GetAuthTokensRequest(device_code="device-code"),
+        ),
+        (
+            "/v1/control/refresh-auth-tokens",
+            RefreshAuthTokensRequest(refresh_token="refresh-token"),
+        ),
+    ],
+)
+def test_auth_routes_disable_caching_and_skip_event_logging(
+    monkeypatch: MonkeyPatch,
+    path: str,
+    protobuf_request: Message,
+) -> None:
+    """Protect credential payloads from caches and event-log plugins."""
+    event_log_plugin = _create_event_log_plugin()
+    authn_plugin = _create_authn_plugin()
+    _, client = _create_app(
+        monkeypatch,
+        None,
+        cast(EventLogWriterPlugin, event_log_plugin),
+        cast(ControlAuthnPlugin, authn_plugin),
+    )
+
+    response = client.post(
+        path,
+        content=protobuf_request.SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+    event_log_plugin.compose_log_before_event.assert_not_called()
+    event_log_plugin.compose_log_after_event.assert_not_called()
+    event_log_plugin.write_log.assert_not_called()
+
+
+def test_auth_error_response_disables_caching(monkeypatch: MonkeyPatch) -> None:
+    """Apply no-cache headers after translating authentication errors."""
+    authn_plugin = _create_authn_plugin()
+    authn_plugin.refresh_tokens.return_value = (None, None)
+    _, client = _create_app(
+        monkeypatch,
+        None,
+        authn_plugin=cast(ControlAuthnPlugin, authn_plugin),
+    )
+
+    response = client.post(
+        "/v1/control/refresh-auth-tokens",
+        content=RefreshAuthTokensRequest(
+            refresh_token="refresh-token"
+        ).SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 401
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+
+
+def test_get_auth_tokens_returns_structured_error_for_noop_authentication(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Report unsupported token polling as a structured API error."""
+    _, client = _create_app(
+        monkeypatch,
+        None,
+        authn_plugin=NoOpControlAuthnPlugin(),
+    )
+
+    response = client.post(
+        "/v1/control/get-auth-tokens",
+        content=GetAuthTokensRequest(device_code="device-code").SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 501
+    assert response.headers["content-type"] == "application/json"
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+    assert response.json() == {
+        "detail": "ControlServicer initialized without account authentication.",
+        "code": ApiErrorCode.NO_ACCOUNT_AUTH.value,
+    }
+
+
+@pytest.mark.parametrize(
+    ("path", "protobuf_request"),
+    [
+        ("/v1/control/get-login-details", GetLoginDetailsRequest()),
+        (
+            "/v1/control/get-auth-tokens",
+            GetAuthTokensRequest(device_code="device-code"),
+        ),
+        (
+            "/v1/control/refresh-auth-tokens",
+            RefreshAuthTokensRequest(refresh_token="refresh-token"),
+        ),
+    ],
+)
+def test_auth_routes_remain_license_checked(
+    monkeypatch: MonkeyPatch,
+    path: str,
+    protobuf_request: Message,
+) -> None:
+    """Reject public authentication endpoints when the license is invalid."""
+    license_plugin = Mock(spec=LicensePlugin)
+    license_plugin.check_license.return_value = False
+    _, client = _create_app(
+        monkeypatch,
+        license_plugin,
+        authn_plugin=cast(ControlAuthnPlugin, _create_authn_plugin()),
+    )
+
+    response = client.post(
+        path,
+        content=protobuf_request.SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 403
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+    license_plugin.check_license.assert_called_once_with()
+
+
+def test_authentication_exemption_requires_exact_method_and_path(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Authenticate non-POST and similarly prefixed Control requests."""
+    authn_plugin = _create_authn_plugin()
+    _, client = _create_app(
+        monkeypatch,
+        None,
+        authn_plugin=cast(ControlAuthnPlugin, authn_plugin),
+    )
+
+    method_response = client.get("/v1/control/get-login-details")
+    path_response = client.post(
+        "/v1/control/get-login-details-extra",
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert method_response.status_code == 401
+    assert path_response.status_code == 401
+    assert "cache-control" not in method_response.headers
+    assert "cache-control" not in path_response.headers
+    assert authn_plugin.validate_tokens_in_metadata.call_count == 2
+    authn_plugin.refresh_tokens.assert_not_called()
 
 
 def test_license_middleware_passes_through_without_ee_plugin(
