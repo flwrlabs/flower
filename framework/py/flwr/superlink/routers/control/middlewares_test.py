@@ -56,7 +56,7 @@ from flwr.supercore.protobuf.constants import (
 )
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.superlink import main as superlink_main
-from flwr.superlink.auth_plugin import ControlAuthnPlugin
+from flwr.superlink.auth_plugin import ControlAuthnPlugin, NoOpControlAuthnPlugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.servicer.control import control_handlers
 
@@ -200,6 +200,32 @@ def test_auth_error_response_disables_caching(monkeypatch: MonkeyPatch) -> None:
     assert response.status_code == 401
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["pragma"] == "no-cache"
+
+
+def test_get_auth_tokens_returns_structured_error_for_noop_authentication(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Report unsupported token polling as a structured API error."""
+    _, client = _create_app(
+        monkeypatch,
+        None,
+        authn_plugin=NoOpControlAuthnPlugin(),
+    )
+
+    response = client.post(
+        "/v1/control/get-auth-tokens",
+        content=GetAuthTokensRequest(device_code="device-code").SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 501
+    assert response.headers["content-type"] == "application/json"
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+    assert response.json() == {
+        "detail": "ControlServicer initialized without account authentication.",
+        "code": ApiErrorCode.NO_ACCOUNT_AUTH.value,
+    }
 
 
 @pytest.mark.parametrize(
