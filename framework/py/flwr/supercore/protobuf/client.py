@@ -53,10 +53,10 @@ ProtobufCall = Callable[[ProtobufRequestContext], httpx.Response]
 
 
 def _buffer_error_response(response: httpx.Response) -> httpx.Response:
-    """Read a bounded error response body after content decoding."""
+    """Read a bounded error response body without content decoding."""
     content = bytearray()
     try:
-        for chunk in response.iter_bytes():
+        for chunk in response.iter_raw():
             remaining = _MAX_ERROR_RESPONSE_BODY_LENGTH - len(content)
             content.extend(chunk[:remaining])
             if len(content) == _MAX_ERROR_RESPONSE_BODY_LENGTH:
@@ -66,11 +66,15 @@ def _buffer_error_response(response: httpx.Response) -> httpx.Response:
 
     buffered_response = httpx.Response(
         response.status_code,
+        headers=[
+            (key, value)
+            for key, value in response.headers.multi_items()
+            if key not in {"content-encoding", "content-length"}
+        ],
         content=bytes(content),
         request=response.request,
         extensions=response.extensions,
     )
-    buffered_response.headers.update(response.headers)
     return buffered_response
 
 
@@ -225,6 +229,7 @@ class ProtobufClient:
                 headers={
                     "content-type": PROTOBUF_MEDIA_TYPE,
                     "accept": PROTOBUF_STREAM_MEDIA_TYPE,
+                    "accept-encoding": "identity",
                 },
                 timeout=stream_timeout,
             )

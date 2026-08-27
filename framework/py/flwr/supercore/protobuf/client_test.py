@@ -15,6 +15,7 @@
 """Tests for reusable protobuf-over-HTTP client infrastructure."""
 
 import gzip
+import random
 import ssl
 from collections.abc import Generator, Iterator
 from unittest.mock import Mock, patch
@@ -251,6 +252,7 @@ def test_unary_stream_sends_and_receives_framed_protobuf() -> None:
     assert http_request.content == _REQUEST.SerializeToString(deterministic=True)
     assert http_request.headers["content-type"] == PROTOBUF_MEDIA_TYPE
     assert http_request.headers["accept"] == PROTOBUF_STREAM_MEDIA_TYPE
+    assert http_request.headers["accept-encoding"] == "identity"
     assert http_request.extensions["timeout"] == {
         "connect": 10.0,
         "read": None,
@@ -369,10 +371,14 @@ def test_unary_stream_closes_response_for_http_error() -> None:
 def test_unary_stream_bounds_error_response_body() -> None:
     """Bound the time and size used to read a streaming error response."""
     max_len = 64 * 1024
+    compressed_content = gzip.compress(
+        b"x" * (4 * max_len) + random.Random(0).randbytes(max_len)
+    )
+    assert len(compressed_content) > max_len
     response = httpx.Response(
         500,
         headers={"content-encoding": "gzip"},
-        stream=_ChunkedByteStream([gzip.compress(b"x" * (max_len + 1))]),
+        stream=_ChunkedByteStream([compressed_content]),
         request=httpx.Request("POST", "http://api.example"),
     )
     captured_responses: list[httpx.Response] = []
@@ -406,6 +412,8 @@ def test_unary_stream_bounds_error_response_body() -> None:
     request = send.call_args.args[0]
     assert request.extensions["timeout"]["read"] == 10.0
     assert len(captured_responses[0].content) == max_len
+    assert captured_responses[0].content == compressed_content[:max_len]
+    assert "content-encoding" not in captured_responses[0].headers
     assert response.is_closed
 
 
