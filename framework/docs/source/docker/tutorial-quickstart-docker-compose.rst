@@ -319,7 +319,7 @@ You can add more SuperNodes and ClientApps by uncommenting their definitions in 
           - --insecure
           - --plugin-type
           - clientapp
-          - --appio-api-address
+          - --runtime-api-address
           - supernode-3:9096
         deploy:
           resources:

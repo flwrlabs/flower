@@ -456,7 +456,7 @@ def test_start_client_internal_launches_insecure_superexec_by_default() -> None:
     command = popen.call_args.args[0]
     assert command[:2] == ["flower-superexec", "--insecure"]
     assert "--root-certificates" not in command
-    assert command[command.index("--appio-api-address") + 1] == "127.0.0.1:9094"
+    assert command[command.index("--runtime-api-address") + 1] == "127.0.0.1:9094"
 
 
 def test_start_client_internal_launches_secure_superexec_with_root_certificates() -> (
@@ -484,4 +484,4 @@ def test_start_client_internal_launches_superexec_with_runtime_http_address() ->
     popen = _run_until_connection_start(runtime_api_address="localhost:54321")
 
     command = popen.call_args.args[0]
-    assert command[command.index("--appio-api-address") + 1] == "localhost:54321"
+    assert command[command.index("--runtime-api-address") + 1] == "localhost:54321"
