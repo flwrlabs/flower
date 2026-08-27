@@ -70,7 +70,7 @@ def _parse_args_run_flwr_agentapp() -> argparse.ArgumentParser:
         description="Run a Flower AgentApp",
     )
     parser.add_argument(
-        "--serverappio-api-address",
+        "--runtime-api-address",
         dest="runtime_api_address",
         default=SUPERLINK_DEFAULT_CLIENT_ADDRESS,
         type=str,
