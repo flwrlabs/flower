@@ -25,11 +25,13 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
 )
+from flwr.supercore.constant import MAX_PROTOBUF_STREAM_MESSAGE_LENGTH
 from flwr.supercore.interceptors import (
     RuntimeTokenHttpInterceptor,
     RuntimeVersionHttpInterceptor,
 )
 from flwr.supercore.protobuf.constants import (
+    FRAME_HEADER_SIZE,
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
 )
@@ -278,6 +280,24 @@ def test_unary_stream_rejects_truncated_frame(content: bytes) -> None:
             return_value=response,
         ),
         pytest.raises(ValueError, match="Truncated protobuf stream frame"),
+    ):
+        list(_stream_call(ProtobufClient("http://api.example")))
+
+    assert response.is_closed
+
+
+def test_unary_stream_rejects_oversized_frame() -> None:
+    """Reject an oversized frame before receiving its payload."""
+    content = (MAX_PROTOBUF_STREAM_MESSAGE_LENGTH + 1).to_bytes(
+        FRAME_HEADER_SIZE, "big"
+    )
+    response = _stream_response(200, [content])
+    with (
+        patch(
+            "flwr.supercore.protobuf.client.httpx.Client.send",
+            return_value=response,
+        ),
+        pytest.raises(ValueError, match="exceeds maximum"),
     ):
         list(_stream_call(ProtobufClient("http://api.example")))
 

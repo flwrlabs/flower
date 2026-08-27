@@ -24,6 +24,8 @@ from typing import TYPE_CHECKING, Protocol, Self, TypeVar
 import httpx
 from google.protobuf.message import DecodeError, Message
 
+from flwr.supercore.constant import MAX_PROTOBUF_STREAM_MESSAGE_LENGTH
+
 from .constants import (
     FRAME_HEADER_SIZE,
     PROTOBUF_MEDIA_TYPE,
@@ -236,6 +238,12 @@ class ProtobufClient:
                                 buffer[:FRAME_HEADER_SIZE], "big"
                             )
                             del buffer[:FRAME_HEADER_SIZE]
+                            if payload_size > MAX_PROTOBUF_STREAM_MESSAGE_LENGTH:
+                                raise ValueError(
+                                    "Protobuf stream frame size "
+                                    f"{payload_size} exceeds maximum "
+                                    f"{MAX_PROTOBUF_STREAM_MESSAGE_LENGTH}"
+                                )
 
                         if len(buffer) < payload_size:
                             break
