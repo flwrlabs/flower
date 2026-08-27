@@ -18,10 +18,20 @@ from typing import Annotated, cast
 
 from fastapi import Depends, Request
 
-
-def get_fleet_api_type(request: Request) -> str | None:
-    """Return the configured Fleet API transport type, if available."""
-    return cast(str | None, getattr(request.app.state, "fleet_api_type", None))
+from flwr.supercore.error import ApiErrorCode, FlowerError
 
 
-FleetApiTypeDependency = Annotated[str | None, Depends(get_fleet_api_type)]
+def get_fleet_api_type(request: Request) -> str:
+    """Return the configured Fleet API transport type."""
+    fleet_api_type = cast(
+        str | None, getattr(request.app.state, "fleet_api_type", None)
+    )
+    if not fleet_api_type:
+        raise FlowerError(
+            ApiErrorCode.FLEET_API_TYPE_NOT_INITIALIZED,
+            "SuperLink Fleet API type is not initialized.",
+        )
+    return fleet_api_type
+
+
+FleetApiTypeDependency = Annotated[str, Depends(get_fleet_api_type)]

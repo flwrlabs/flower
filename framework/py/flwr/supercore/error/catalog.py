@@ -300,6 +300,11 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         public_message="NodeState is not initialized.",
     ),
+    ApiErrorCode.FLEET_API_TYPE_NOT_INITIALIZED: ApiErrorSpec(
+        status_code=StatusCode.UNAVAILABLE,
+        http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        public_message="Fleet API type is not initialized.",
+    ),
     ApiErrorCode.FLEET_SUPERNODE_REGISTRATION_DISABLED: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,

@@ -14,7 +14,10 @@
 # ==============================================================================
 """Tests for the Fleet API transport type dependency."""
 
+import pytest
 from fastapi import FastAPI, Request
+
+from flwr.supercore.error import ApiErrorCode, FlowerError
 
 from .fleet_api import get_fleet_api_type
 
@@ -44,6 +47,16 @@ def test_get_fleet_api_type_returns_configured_value() -> None:
     assert get_fleet_api_type(_make_request(app)) == "grpc-rere"
 
 
-def test_get_fleet_api_type_returns_none_when_unconfigured() -> None:
-    """Return None when the application has no Fleet API configuration."""
-    assert get_fleet_api_type(_make_request(FastAPI())) is None
+@pytest.mark.parametrize("fleet_api_type", [None, ""])
+def test_get_fleet_api_type_raises_when_unconfigured(
+    fleet_api_type: str | None,
+) -> None:
+    """Raise when the application has no valid Fleet API configuration."""
+    app = FastAPI()
+    app.state.fleet_api_type = fleet_api_type
+
+    with pytest.raises(FlowerError) as exc_info:
+        get_fleet_api_type(_make_request(app))
+
+    assert exc_info.value.code == ApiErrorCode.FLEET_API_TYPE_NOT_INITIALIZED
+    assert exc_info.value.message == "SuperLink Fleet API type is not initialized."
