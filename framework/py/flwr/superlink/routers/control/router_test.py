@@ -25,6 +25,8 @@ from fastapi.testclient import TestClient
 
 from flwr.common.constant import NOOP_FLWR_AID, Status, SubStatus
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AddAppRequest,
+    AddAppResponse,
     ListRunsRequest,
     ListRunsResponse,
     PullArtifactsRequest,
@@ -55,6 +57,7 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
+from flwr.superlink.routers.control.router import add_app as add_app_route
 from flwr.superlink.routers.control.router import router
 from flwr.superlink.routers.control.router import start_run as start_run_route
 
@@ -101,14 +104,14 @@ def test_start_run_forwards_resolved_source() -> None:
         "flwr.superlink.routers.control.router.control_handlers.start_run",
         return_value=expected,
     ) as start_run:
-        response = start_run_route(request, linkstate, _ACCOUNT, "unknown")
+        response = start_run_route(request, linkstate, _ACCOUNT, "grpc-rere", "unknown")
 
     assert response is expected
     start_run.assert_called_once_with(
         request,
         _ACCOUNT,
         linkstate,
-        "",
+        "grpc-rere",
         source="unknown",
     )
 
@@ -123,9 +126,31 @@ def test_start_run_forwards_caller_provided_source() -> None:
         "flwr.superlink.routers.control.router.control_handlers.start_run",
         return_value=expected,
     ) as start_run:
-        start_run_route(request, linkstate, _ACCOUNT, run_source="cli")
+        start_run_route(
+            request,
+            linkstate,
+            _ACCOUNT,
+            fleet_api_type="grpc-rere",
+            run_source="cli",
+        )
 
     assert start_run.call_args.kwargs["source"] == "cli"
+
+
+def test_add_app_forwards_fleet_api_type() -> None:
+    """Forward the configured Fleet API transport type to the control handler."""
+    request = AddAppRequest()
+    linkstate = Mock()
+    expected = AddAppResponse()
+
+    with patch(
+        "flwr.superlink.routers.control.router.control_handlers.add_app",
+        return_value=expected,
+    ) as add_app:
+        response = add_app_route(request, linkstate, _ACCOUNT, "grpc-rere")
+
+    assert response is expected
+    add_app.assert_called_once_with(request, _ACCOUNT, linkstate, "grpc-rere")
 
 
 def test_protobuf_request_without_handler_response_returns_internal_error() -> None:

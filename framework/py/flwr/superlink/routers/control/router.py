@@ -92,6 +92,7 @@ from flwr.supercore.protobuf.translation import get_protobuf_request
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.dependencies.account import get_account
 from flwr.superlink.dependencies.artifact_provider import get_artifact_provider
+from flwr.superlink.dependencies.fleet_api import FleetApiTypeDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.dependencies.run_source import RunSourceDependency
 from flwr.superlink.servicer.control import control_handlers
@@ -113,15 +114,15 @@ def start_run(
     request: Annotated[StartRunRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
+    fleet_api_type: FleetApiTypeDependency,
     run_source: RunSourceDependency,
 ) -> StartRunResponse:
     """Start a run."""
-    # Temporary: pass an empty Fleet API type
     return control_handlers.start_run(
         request,
         account,
         linkstate,
-        "",
+        fleet_api_type,
         source=run_source,
     )
 
@@ -299,10 +300,10 @@ def add_app(
     request: Annotated[AddAppRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
+    fleet_api_type: FleetApiTypeDependency,
 ) -> AddAppResponse:
     """Add an app to a federation."""
-    # Temporary: pass an empty Fleet API type
-    return control_handlers.add_app(request, account, linkstate, "")
+    return control_handlers.add_app(request, account, linkstate, fleet_api_type)
 
 
 @router.post("/remove-app")
