@@ -246,7 +246,7 @@ class TaskType(StrEnum):
 
 TASK_TYPE_TO_APPIO_API_ADDRESS_ARG: dict[TaskType, str] = {
     TaskType.AGENT_APP: "--runtime-api-address",
-    TaskType.CLIENT_APP: "--clientappio-api-address",
+    TaskType.CLIENT_APP: "--runtime-api-address",
     TaskType.CONNECTOR: "--runtime-api-address",
     TaskType.MODEL: "--runtime-api-address",
     TaskType.SERVER_APP: "--runtime-api-address",

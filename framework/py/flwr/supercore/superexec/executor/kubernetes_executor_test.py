@@ -399,7 +399,7 @@ def test_build_taskexecutor_pod_supports_clientapp_insecure_args() -> None:
 
     assert pod["spec"]["containers"][0]["command"] == ["flwr-clientapp"]
     assert pod["spec"]["containers"][0]["args"] == [
-        "--clientappio-api-address",
+        "--runtime-api-address",
         "appio.example.com:9092",
         "--token-file",
         APPIO_TOKEN_FILE_PATH,

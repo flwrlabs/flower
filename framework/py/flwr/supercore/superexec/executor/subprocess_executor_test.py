@@ -51,7 +51,7 @@ def test_launch_renders_insecure_clientapp_args() -> None:
     popen_mock.assert_called_once_with(
         [
             "flwr-clientapp",
-            "--clientappio-api-address",
+            "--runtime-api-address",
             "127.0.0.1:9094",
             "--token",
             "token",
@@ -75,7 +75,7 @@ def test_launch_renders_root_certificates_args() -> None:
     popen_mock.assert_called_once_with(
         [
             "flwr-clientapp",
-            "--clientappio-api-address",
+            "--runtime-api-address",
             "127.0.0.1:9094",
             "--token",
             "token",
