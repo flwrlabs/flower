@@ -31,9 +31,9 @@ from flwr.supercore.routers.health.router import health
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.routers.control.middlewares import (
     ControlAuthenticationMiddleware,
-    ControlAuthResponseMiddleware,
     ControlEventLogMiddleware,
     ControlLicenseMiddleware,
+    ControlSensitiveResponseMiddleware,
 )
 
 from . import extensions, main
@@ -62,7 +62,7 @@ def _create_app(
 def _control_middleware_classes() -> list[type[object]]:
     """Return Control middleware classes in request execution order."""
     return [
-        ControlAuthResponseMiddleware,
+        ControlSensitiveResponseMiddleware,
         BaseHTTPMiddleware,
         ControlAuthenticationMiddleware,
         ControlLicenseMiddleware,

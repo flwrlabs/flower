@@ -34,8 +34,16 @@ from flwr.common.constant import (
 )
 from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    BeginConnectorOAuthRequest,
+    BeginConnectorOAuthResponse,
+    CompleteConnectorOAuthRequest,
+    CompleteConnectorOAuthResponse,
+    DisconnectConnectorRequest,
+    DisconnectConnectorResponse,
     GetAuthTokensRequest,
     GetLoginDetailsRequest,
+    ListConnectorsRequest,
+    ListConnectorsResponse,
     ListRunsRequest,
     ListRunsResponse,
     RefreshAuthTokensRequest,
@@ -179,6 +187,115 @@ def test_auth_routes_disable_caching_and_skip_event_logging(
     event_log_plugin.write_log.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    ("path", "protobuf_request", "protobuf_response", "handler_name"),
+    [
+        (
+            "/v1/control/begin-connector-oauth",
+            BeginConnectorOAuthRequest(
+                connector_ref="google-drive",
+                redirect_uri="https://example.test/oauth/callback",
+            ),
+            BeginConnectorOAuthResponse(
+                oauth_session_id="oauth-session",
+                authorization_url="https://provider.test/authorize",
+                connector_ref="google-drive",
+                expires_at="2026-08-27T12:00:00+00:00",
+            ),
+            "begin_connector_oauth",
+        ),
+        (
+            "/v1/control/complete-connector-oauth",
+            CompleteConnectorOAuthRequest(
+                oauth_session_id="oauth-session",
+                code="authorization-code",
+                state="oauth-state",
+            ),
+            CompleteConnectorOAuthResponse(connector_ref="google-drive"),
+            "complete_connector_oauth",
+        ),
+    ],
+)
+def test_connector_oauth_routes_disable_caching_and_skip_event_logging(
+    monkeypatch: MonkeyPatch,
+    path: str,
+    protobuf_request: Message,
+    protobuf_response: Message,
+    handler_name: str,
+) -> None:
+    """Keep connector OAuth payloads out of caches and event-log plugins."""
+    event_log_plugin = _create_event_log_plugin()
+    handler = Mock(return_value=protobuf_response)
+    monkeypatch.setattr(control_handlers, handler_name, handler)
+    _, client = _create_app(
+        monkeypatch, None, cast(EventLogWriterPlugin, event_log_plugin)
+    )
+
+    response = client.post(
+        path,
+        content=protobuf_request.SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+    handler.assert_called_once()
+    event_log_plugin.compose_log_before_event.assert_not_called()
+    event_log_plugin.compose_log_after_event.assert_not_called()
+    event_log_plugin.write_log.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("path", "protobuf_request", "protobuf_response", "handler_name"),
+    [
+        (
+            "/v1/control/list-connectors",
+            ListConnectorsRequest(federation="agent"),
+            ListConnectorsResponse(),
+            "list_connectors",
+        ),
+        (
+            "/v1/control/disconnect-connector",
+            DisconnectConnectorRequest(connector_ref="google-drive"),
+            DisconnectConnectorResponse(),
+            "disconnect_connector",
+        ),
+    ],
+)
+def test_non_oauth_connector_routes_remain_event_logged(
+    monkeypatch: MonkeyPatch,
+    path: str,
+    protobuf_request: Message,
+    protobuf_response: Message,
+    handler_name: str,
+) -> None:
+    """Retain normal auditing and caching policy for non-OAuth connector calls."""
+    event_log_plugin = _create_event_log_plugin()
+    monkeypatch.setattr(
+        control_handlers, handler_name, Mock(return_value=protobuf_response)
+    )
+    _, client = _create_app(
+        monkeypatch, None, cast(EventLogWriterPlugin, event_log_plugin)
+    )
+
+    response = client.post(
+        path,
+        content=protobuf_request.SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 200
+    assert "cache-control" not in response.headers
+    assert "pragma" not in response.headers
+    before_kwargs = event_log_plugin.compose_log_before_event.call_args.kwargs
+    assert before_kwargs["request"] == protobuf_request
+    assert before_kwargs["method_name"] == path
+    after_kwargs = event_log_plugin.compose_log_after_event.call_args.kwargs
+    assert after_kwargs["response"] == protobuf_response
+    assert event_log_plugin.write_log.call_count == 2
+
+
 def test_auth_error_response_disables_caching(monkeypatch: MonkeyPatch) -> None:
     """Apply no-cache headers after translating authentication errors."""
     authn_plugin = _create_authn_plugin()
@@ -198,6 +315,75 @@ def test_auth_error_response_disables_caching(monkeypatch: MonkeyPatch) -> None:
     )
 
     assert response.status_code == 401
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+
+
+def test_connector_oauth_handler_error_disables_caching(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Apply no-cache headers after translating connector handler errors."""
+    _, client = _create_app(monkeypatch, None)
+
+    response = client.post(
+        "/v1/control/begin-connector-oauth",
+        content=BeginConnectorOAuthRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Invalid connector request.",
+        "code": ApiErrorCode.INVALID_CONNECTOR_REQUEST.value,
+    }
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+
+
+def test_connector_oauth_authentication_error_disables_caching(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Apply no-cache headers to connector OAuth authentication failures."""
+    authn_plugin = _create_authn_plugin()
+    _, client = _create_app(
+        monkeypatch,
+        None,
+        authn_plugin=cast(ControlAuthnPlugin, authn_plugin),
+    )
+
+    response = client.post(
+        "/v1/control/begin-connector-oauth",
+        content=BeginConnectorOAuthRequest().SerializeToString(),
+        headers={
+            "authorization": "Bearer invalid-token",
+            "content-type": PROTOBUF_MEDIA_TYPE,
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+    authn_plugin.refresh_tokens.assert_not_called()
+
+
+def test_connector_oauth_malformed_protobuf_error_disables_caching(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Apply no-cache headers to malformed connector OAuth requests."""
+    _, client = _create_app(monkeypatch, None)
+
+    response = client.post(
+        "/v1/control/complete-connector-oauth",
+        content=b"\x80",
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Invalid protobuf payload.",
+        "code": ApiErrorCode.INVALID_PROTOBUF_PAYLOAD.value,
+    }
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["pragma"] == "no-cache"
 
@@ -268,6 +454,54 @@ def test_auth_routes_remain_license_checked(
     license_plugin.check_license.assert_called_once_with()
 
 
+@pytest.mark.parametrize(
+    ("path", "protobuf_request", "sensitive"),
+    [
+        ("/v1/control/list-connectors", ListConnectorsRequest(), False),
+        (
+            "/v1/control/disconnect-connector",
+            DisconnectConnectorRequest(),
+            False,
+        ),
+        ("/v1/control/begin-connector-oauth", BeginConnectorOAuthRequest(), True),
+        (
+            "/v1/control/complete-connector-oauth",
+            CompleteConnectorOAuthRequest(),
+            True,
+        ),
+    ],
+)
+def test_connector_routes_remain_license_checked(
+    monkeypatch: MonkeyPatch,
+    path: str,
+    protobuf_request: Message,
+    sensitive: bool,
+) -> None:
+    """Apply license checks to every authenticated connector endpoint."""
+    license_plugin = Mock(spec=LicensePlugin)
+    license_plugin.check_license.return_value = False
+    _, client = _create_app(monkeypatch, license_plugin)
+
+    response = client.post(
+        path,
+        content=protobuf_request.SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "License check failed. Please contact the SuperLink administrator.",
+        "code": ApiErrorCode.LICENSE_CHECK_FAILED.value,
+    }
+    if sensitive:
+        assert response.headers["cache-control"] == "no-store"
+        assert response.headers["pragma"] == "no-cache"
+    else:
+        assert "cache-control" not in response.headers
+        assert "pragma" not in response.headers
+    license_plugin.check_license.assert_called_once_with()
+
+
 def test_authentication_exemption_requires_exact_method_and_path(
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -291,6 +525,37 @@ def test_authentication_exemption_requires_exact_method_and_path(
     assert "cache-control" not in path_response.headers
     assert authn_plugin.validate_tokens_in_metadata.call_count == 2
     authn_plugin.refresh_tokens.assert_not_called()
+
+
+def test_sensitive_connector_route_requires_exact_method_and_path(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Apply sensitive response handling only to exact connector OAuth POSTs."""
+    authn_plugin = _create_authn_plugin()
+    _, client = _create_app(
+        monkeypatch,
+        None,
+        authn_plugin=cast(ControlAuthnPlugin, authn_plugin),
+    )
+
+    exact_response = client.post(
+        "/v1/control/begin-connector-oauth",
+        content=BeginConnectorOAuthRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+    method_response = client.get("/v1/control/begin-connector-oauth")
+    path_response = client.post(
+        "/v1/control/begin-connector-oauth-extra",
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert exact_response.status_code == 401
+    assert exact_response.headers["cache-control"] == "no-store"
+    assert exact_response.headers["pragma"] == "no-cache"
+    assert method_response.status_code == 401
+    assert path_response.status_code == 401
+    assert "cache-control" not in method_response.headers
+    assert "cache-control" not in path_response.headers
 
 
 def test_license_middleware_passes_through_without_ee_plugin(

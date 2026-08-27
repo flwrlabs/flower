@@ -48,9 +48,9 @@ from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.routers.control import router as control_router
 from flwr.superlink.routers.control.middlewares import (
     ControlAuthenticationMiddleware,
-    ControlAuthResponseMiddleware,
     ControlEventLogMiddleware,
     ControlLicenseMiddleware,
+    ControlSensitiveResponseMiddleware,
 )
 from flwr.superlink.routers.runtime import responses_router
 from flwr.superlink.routers.runtime import router as runtime_router
@@ -95,7 +95,7 @@ def _get_middleware() -> list[Middleware]:
     """Return middleware in request execution order, outermost first."""
     return [
         *extensions.get_middleware(),
-        Middleware(ControlAuthResponseMiddleware),
+        Middleware(ControlSensitiveResponseMiddleware),
         Middleware(BaseHTTPMiddleware, dispatch=http_error_translator),
         Middleware(ControlAuthenticationMiddleware),
         Middleware(ControlLicenseMiddleware),
