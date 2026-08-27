@@ -16,6 +16,7 @@
 
 
 import argparse
+import sys
 from logging import INFO, WARN
 from pathlib import Path
 from typing import Any
@@ -56,6 +57,14 @@ def flower_superexec() -> None:
     disable_process_dumping(strict=False)
     warn_if_flwr_update_available(process_name="flower-superexec")
     args = _parse_args().parse_args()
+
+    if "--appio-api-address" in sys.argv[1:]:
+        log(
+            WARN,
+            "The `--appio-api-address` argument has been renamed to "
+            "`--runtime-api-address`. Please update your command; the old name will "
+            "be removed in a future release.",
+        )
 
     # Log the first message after parsing arguments in case of `--help`
     log(INFO, "Starting Flower SuperExec")
@@ -151,12 +160,18 @@ def _parse_args() -> argparse.ArgumentParser:
         action="version",
         version=f"Flower version: {package_version}",
     )
-    parser.add_argument(
+    runtime_api_address_group = parser.add_mutually_exclusive_group(required=True)
+    runtime_api_address_group.add_argument(
+        "--runtime-api-address",
+        dest="runtime_api_address",
+        type=str,
+        help="Address of the Runtime API",
+    )
+    runtime_api_address_group.add_argument(
         "--appio-api-address",
         dest="runtime_api_address",
         type=str,
-        required=True,
-        help="Address of the Runtime API",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--plugin-type",

@@ -74,7 +74,7 @@ services:
       - --insecure
       - --plugin-type
       - clientapp
-      - --appio-api-address
+      - --runtime-api-address
       - supernode-1:9094
     deploy:
       resources:
@@ -100,7 +100,7 @@ services:
       - --insecure
       - --plugin-type
       - clientapp
-      - --appio-api-address
+      - --runtime-api-address
       - supernode-2:9095
     deploy:
       resources:
@@ -127,7 +127,7 @@ services:
   #     - --insecure
   #     - --plugin-type
   #     - clientapp
-  #     - --appio-api-address
+  #     - --runtime-api-address
   #     - supernode-3:9096
   #   deploy:
   #     resources:

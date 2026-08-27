@@ -41,7 +41,7 @@ services:
       - --insecure
       - --plugin-type
       - serverapp
-      - --appio-api-address
+      - --runtime-api-address
       - superlink:9091
     depends_on:
       - superlink

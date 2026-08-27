@@ -57,7 +57,7 @@ def _parse_args_run_flwr_clientapp() -> argparse.ArgumentParser:
         description="Run a Flower ClientApp",
     )
     parser.add_argument(
-        "--clientappio-api-address",
+        "--runtime-api-address",
         dest="runtime_api_address",
         default=SUPERNODE_DEFAULT_CLIENT_ADDRESS,
         type=str,

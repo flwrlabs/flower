@@ -173,8 +173,8 @@ as a base for building your own image. Use a **single** image and select the des
 behavior (ServerApps vs ClientApps) at runtime via the ``--plugin-type`` flag. SuperExec
 spawns the corresponding processes on demand.
 
-When using SuperExec with the *serverapp* plugin, pass ``--appio-api-address`` pointing
-to the SuperLink's **Runtime API** endpoint.
+When using SuperExec with the *serverapp* plugin, pass ``--runtime-api-address``
+pointing to the SuperLink's **Runtime API** endpoint.
 
 1. Create a Dockerfile called ``superexec.Dockerfile`` and paste the following:
 
@@ -236,7 +236,7 @@ to the SuperLink's **Runtime API** endpoint.
            flwr_superexec:0.0.1 \
            --insecure \
            --plugin-type serverapp \
-           --appio-api-address superlink:9091
+           --runtime-api-address superlink:9091
 
    .. dropdown:: Understand the command
 
@@ -251,7 +251,7 @@ to the SuperLink's **Runtime API** endpoint.
          unencrypted communication. Secure connections will be added in future releases.
        * ``--plugin-type serverapp``: Load the *serverapp* plugin. SuperExec will spawn
          ServerApp processes as needed.
-       * ``--appio-api-address superlink:9091``: Connect to the SuperLink's Runtime API
+       * ``--runtime-api-address superlink:9091``: Connect to the SuperLink's Runtime API
          at the address ``superlink:9091``.
 
 ***************************************************
@@ -259,7 +259,7 @@ to the SuperLink's **Runtime API** endpoint.
 ***************************************************
 
 For ClientApps, reuse the **same** image and change the plugin and API address. When
-using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the SuperNode's
+using the *clientapp* plugin, pass ``--runtime-api-address`` pointing to the SuperNode's
 **Runtime API** endpoint.
 
 1. (No new Dockerfile is needed; reuse ``flwr_superexec:0.0.1``.)
@@ -274,7 +274,7 @@ using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the Super
            flwr_superexec:0.0.1 \
            --insecure \
            --plugin-type clientapp \
-           --appio-api-address supernode-1:9094
+           --runtime-api-address supernode-1:9094
 
    .. dropdown:: Understand the command
 
@@ -289,7 +289,7 @@ using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the Super
          unencrypted communication. Secure connections will be added in future releases.
        * ``--plugin-type clientapp``: Load the *clientapp* plugin. SuperExec will spawn
          ClientApp processes as needed.
-       * ``--appio-api-address supernode-1:9094``: Connect to the SuperNode's Runtime API
+       * ``--runtime-api-address supernode-1:9094``: Connect to the SuperNode's Runtime API
          at the address ``supernode-1:9094``.
 
 3. Start the second **SuperExec for ClientApps** container:
@@ -303,7 +303,7 @@ using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the Super
            flwr_superexec:0.0.1 \
            --insecure \
            --plugin-type clientapp \
-           --appio-api-address supernode-2:9095
+           --runtime-api-address supernode-2:9095
 
 ************************************
  Step 6: Run the Quickstart Project
@@ -384,7 +384,7 @@ using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the Super
            flwr_superexec:0.0.1 \
            --insecure \
            --plugin-type serverapp \
-           --appio-api-address superlink:9091
+           --runtime-api-address superlink:9091
        $ docker run --rm \
            --network flwr-network \
             --name superexec-clientapp-1 \
@@ -392,7 +392,7 @@ using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the Super
            flwr_superexec:0.0.1 \
            --insecure \
            --plugin-type clientapp \
-           --appio-api-address supernode-1:9094
+           --runtime-api-address supernode-1:9094
        $ docker run --rm \
            --network flwr-network \
            --name superexec-clientapp-2 \
@@ -400,7 +400,7 @@ using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the Super
            flwr_superexec:0.0.1 \
            --insecure \
            --plugin-type clientapp \
-           --appio-api-address supernode-2:9095
+           --runtime-api-address supernode-2:9095
 
 5. Run the updated project:
 
