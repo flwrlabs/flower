@@ -48,7 +48,7 @@ def test_parse_superexec_accepts_kubernetes_executor_config() -> None:
     """SuperExec should accept Kubernetes executor selection and config path."""
     args = _parse_args().parse_args(
         [
-            "--appio-api-address",
+            "--runtime-api-address",
             "127.0.0.1:9091",
             "--plugin-type",
             ExecPluginType.CLIENT_APP,

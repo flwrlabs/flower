@@ -40,7 +40,7 @@ def run_superlink(database_path: str, secret_path: str) -> subprocess.Popen:
 def run_superexec(secret_path: str) -> subprocess.Popen:
     """Run the SuperExec."""
     cmd = ["flower-superexec", "--insecure"]
-    cmd += ["--appio-api-address", SUPERLINK_DEFAULT_CLIENT_ADDRESS]
+    cmd += ["--runtime-api-address", SUPERLINK_DEFAULT_CLIENT_ADDRESS]
     cmd += ["--plugin-type", plugin_type_arg]
     cmd += ["--superexec-auth-secret-file", secret_path]
     return subprocess.Popen(cmd)
