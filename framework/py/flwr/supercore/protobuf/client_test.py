@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for reusable protobuf-over-HTTP client infrastructure."""
 
+import gzip
 import ssl
 from collections.abc import Generator, Iterator
 from unittest.mock import Mock, patch
@@ -367,8 +368,24 @@ def test_unary_stream_closes_response_for_http_error() -> None:
 
 def test_unary_stream_bounds_error_response_body() -> None:
     """Bound the time and size used to read a streaming error response."""
-    content = b"x" * (64 * 1024 + 1)
-    response = _stream_response(500, [content])
+    max_len = 64 * 1024
+    response = httpx.Response(
+        500,
+        headers={"content-encoding": "gzip"},
+        stream=_ChunkedByteStream([gzip.compress(b"x" * (max_len + 1))]),
+        request=httpx.Request("POST", "http://api.example"),
+    )
+    captured_responses: list[httpx.Response] = []
+    interceptor = Mock()
+
+    def capture_response(
+        context: ProtobufRequestContext, call_next: ProtobufCall
+    ) -> httpx.Response:
+        buffered_response = call_next(context)
+        captured_responses.append(buffered_response)
+        return buffered_response
+
+    interceptor.intercept.side_effect = capture_response
     with (
         patch(
             "flwr.supercore.protobuf.client.httpx.Client.send",
@@ -376,11 +393,19 @@ def test_unary_stream_bounds_error_response_body() -> None:
         ) as send,
         pytest.raises(httpx.HTTPStatusError),
     ):
-        list(_stream_call(ProtobufClient("http://api.example", timeout=10.0)))
+        list(
+            _stream_call(
+                ProtobufClient(
+                    "http://api.example",
+                    interceptors=[interceptor],
+                    timeout=10.0,
+                )
+            )
+        )
 
     request = send.call_args.args[0]
     assert request.extensions["timeout"]["read"] == 10.0
-    assert len(response.content) == 64 * 1024
+    assert len(captured_responses[0].content) == max_len
     assert response.is_closed
 
 

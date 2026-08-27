@@ -52,23 +52,26 @@ class ProtobufRequestContext:
 ProtobufCall = Callable[[ProtobufRequestContext], httpx.Response]
 
 
-class _LimitedByteStream(httpx.SyncByteStream):
-    """Limit the number of bytes read from a response stream."""
+def _buffer_error_response(response: httpx.Response) -> httpx.Response:
+    """Read a bounded error response body after content decoding."""
+    content = bytearray()
+    try:
+        for chunk in response.iter_bytes():
+            remaining = _MAX_ERROR_RESPONSE_BODY_LENGTH - len(content)
+            content.extend(chunk[:remaining])
+            if len(content) == _MAX_ERROR_RESPONSE_BODY_LENGTH:
+                break
+    finally:
+        response.close()
 
-    def __init__(self, stream: httpx.SyncByteStream, limit: int) -> None:
-        self._stream = stream
-        self._limit = limit
-
-    def __iter__(self) -> Generator[bytes, None, None]:
-        remaining = self._limit
-        for chunk in self._stream:
-            yield chunk[:remaining]
-            remaining -= len(chunk)
-            if remaining <= 0:
-                return
-
-    def close(self) -> None:
-        self._stream.close()
+    buffered_response = httpx.Response(
+        response.status_code,
+        content=bytes(content),
+        request=response.request,
+        extensions=response.extensions,
+    )
+    buffered_response.headers.update(response.headers)
+    return buffered_response
 
 
 class ProtobufClientInterceptor(Protocol):
@@ -307,17 +310,8 @@ class ProtobufClient:
                 timeout["read"] = self._client.timeout.read
                 response = self._client.send(current_context.request, stream=True)
                 if response.is_error:
-                    try:
-                        # Response-side interceptors can inspect error payloads, while
-                        # successful response bodies remain incrementally streamed.
-                        assert isinstance(response.stream, httpx.SyncByteStream)
-                        response.stream = _LimitedByteStream(
-                            response.stream, _MAX_ERROR_RESPONSE_BODY_LENGTH
-                        )
-                        response.read()
-                    except BaseException:
-                        response.close()
-                        raise
+                    # Let response-side interceptors inspect a bounded error payload.
+                    response = _buffer_error_response(response)
                 else:
                     timeout["read"] = None
                 return response
