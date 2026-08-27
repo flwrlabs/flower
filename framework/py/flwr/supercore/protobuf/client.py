@@ -140,8 +140,6 @@ class ProtobufClient:
         content = request.SerializeToString(deterministic=True)
 
         def send() -> httpx.Response:
-            # Build a fresh request for every attempt so interceptors can safely
-            # mutate it without leaking state into a retry.
             http_request = self._client.build_request(
                 method="POST",
                 url=f"{self._base_url}{path}",
@@ -187,6 +185,8 @@ class ProtobufClient:
         content = request.SerializeToString(deterministic=True)
 
         def send() -> httpx.Response:
+            # Build a fresh request for every attempt so interceptors can safely
+            # mutate it without leaking state into a retry.
             http_request = self._client.build_request(
                 method="POST",
                 url=f"{self._base_url}{path}",

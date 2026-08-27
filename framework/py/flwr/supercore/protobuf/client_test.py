@@ -165,7 +165,6 @@ def test_unary_unary_uses_retry_invoker() -> None:
         result = _call(
             ProtobufClient(
                 "http://api.example",
-                interceptors=[RuntimeVersionHttpInterceptor("test")],
                 retry_invoker=retry_invoker,
             )
         )
@@ -391,6 +390,7 @@ def test_unary_stream_retries_only_before_returning_response() -> None:
         messages = _stream_call(
             ProtobufClient(
                 "http://api.example",
+                interceptors=[RuntimeVersionHttpInterceptor("test")],
                 retry_invoker=retry_invoker,
             )
         )
