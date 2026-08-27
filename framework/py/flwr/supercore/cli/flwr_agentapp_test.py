@@ -24,6 +24,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from flwr.supercore.cli.flwr_agentapp import _parse_args_run_flwr_agentapp
+from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 
 flwr_agentapp_module = importlib.import_module("flwr.supercore.cli.flwr_agentapp")
 
@@ -46,8 +47,6 @@ def test_parse_flwr_agentapp_parses_tokenized_invocation() -> None:
     """The AgentApp process CLI should still parse the supported flags."""
     args = _parse_args_run_flwr_agentapp().parse_args(
         [
-            "--runtime-api-address",
-            "127.0.0.1:9091",
             "--token",
             "test-token",
             "--insecure",
@@ -57,7 +56,7 @@ def test_parse_flwr_agentapp_parses_tokenized_invocation() -> None:
         ]
     )
 
-    assert args.runtime_api_address == "127.0.0.1:9091"
+    assert args.runtime_api_address == SUPERLINK_DEFAULT_CLIENT_ADDRESS
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
