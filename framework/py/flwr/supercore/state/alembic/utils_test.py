@@ -351,6 +351,29 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
+    def test_hub_origin_migration_handles_preexisting_column(self) -> None:
+        """Ensure forward-compatible schemas can apply the Hub origin migration."""
+        engine = self.create_engine("federation_app_hub_origin_preexisting.db")
+        try:
+            self.upgrade_to_revision(engine, "03f4cfe3ff15")
+            with engine.begin() as connection:
+                connection.exec_driver_sql(
+                    "ALTER TABLE federation_app ADD COLUMN is_hub_app BOOLEAN"
+                )
+
+            self.upgrade_to_revision(engine, "heads")
+
+            self.assertEqual(
+                get_current_revisions(engine),
+                set(
+                    ScriptDirectory.from_config(
+                        build_alembic_config(engine)
+                    ).get_heads()
+                ),
+            )
+        finally:
+            engine.dispose()
+
     def test_automation_timestamp_migration_normalizes_sqlite_text(self) -> None:
         """Ensure legacy SQLite automation timestamps use ORM-compatible text."""
         engine = self.create_engine("automation_timestamp_normalization.db")
