@@ -239,7 +239,9 @@ def test_unary_stream_sends_and_receives_framed_protobuf() -> None:
         "flwr.supercore.protobuf.client.httpx.Client.send",
         return_value=response,
     ) as send:
-        result = list(_stream_call(ProtobufClient("https://api.example/")))
+        result = list(
+            _stream_call(ProtobufClient("https://api.example/", timeout=10.0))
+        )
 
     assert result == [first, second]
     http_request = send.call_args.args[0]
@@ -248,6 +250,12 @@ def test_unary_stream_sends_and_receives_framed_protobuf() -> None:
     assert http_request.content == _REQUEST.SerializeToString(deterministic=True)
     assert http_request.headers["content-type"] == PROTOBUF_MEDIA_TYPE
     assert http_request.headers["accept"] == PROTOBUF_STREAM_MEDIA_TYPE
+    assert http_request.extensions["timeout"] == {
+        "connect": 10.0,
+        "read": None,
+        "write": 10.0,
+        "pool": 10.0,
+    }
     assert send.call_args.kwargs == {"stream": True}
     assert response.is_closed
 

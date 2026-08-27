@@ -183,11 +183,17 @@ class ProtobufClient:
         path = path if path.startswith("/") else f"/{path}"
         content = request.SerializeToString(deterministic=True)
 
-        # An overall stream deadline should be added for Control API callers; the
-        # HTTPX client timeout is not an end-to-end deadline.
+        # Streaming requests intentionally have no read timeout. Add an overall
+        # deadline when Control API deadline and cancellation semantics are introduced.
         def send() -> httpx.Response:
             # Build a fresh request for every attempt so interceptors can safely
             # mutate it without leaking state into a retry.
+            stream_timeout = httpx.Timeout(
+                connect=self._client.timeout.connect,
+                read=None,
+                write=self._client.timeout.write,
+                pool=self._client.timeout.pool,
+            )
             http_request = self._client.build_request(
                 method="POST",
                 url=f"{self._base_url}{path}",
@@ -196,6 +202,7 @@ class ProtobufClient:
                     "content-type": PROTOBUF_MEDIA_TYPE,
                     "accept": PROTOBUF_STREAM_MEDIA_TYPE,
                 },
+                timeout=stream_timeout,
             )
             context = ProtobufRequestContext(
                 rpc_method=rpc_method,
