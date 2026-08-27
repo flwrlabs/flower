@@ -537,6 +537,39 @@ class GetAuthTokensResponse(google.protobuf.message.Message):
 global___GetAuthTokensResponse = GetAuthTokensResponse
 
 @typing.final
+class RefreshAuthTokensRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    REFRESH_TOKEN_FIELD_NUMBER: builtins.int
+    refresh_token: builtins.str
+    def __init__(
+        self,
+        *,
+        refresh_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["refresh_token", b"refresh_token"]) -> None: ...
+
+global___RefreshAuthTokensRequest = RefreshAuthTokensRequest
+
+@typing.final
+class RefreshAuthTokensResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ACCESS_TOKEN_FIELD_NUMBER: builtins.int
+    REFRESH_TOKEN_FIELD_NUMBER: builtins.int
+    access_token: builtins.str
+    refresh_token: builtins.str
+    def __init__(
+        self,
+        *,
+        access_token: builtins.str = ...,
+        refresh_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["access_token", b"access_token", "refresh_token", b"refresh_token"]) -> None: ...
+
+global___RefreshAuthTokensResponse = RefreshAuthTokensResponse
+
+@typing.final
 class ListConnectorsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

@@ -34,6 +34,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    GetAuthTokensRequest,
+    GetAuthTokensResponse,
+    GetLoginDetailsRequest,
+    GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
     ListAppsRequest,
@@ -52,6 +56,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
+    RefreshAuthTokensRequest,
+    RefreshAuthTokensResponse,
     RegisterNodeRequest,
     RegisterNodeResponse,
     RejectInvitationRequest,
@@ -90,7 +96,8 @@ from flwr.supercore.protobuf.streaming import (
 )
 from flwr.supercore.protobuf.translation import get_protobuf_request
 from flwr.superlink.artifact_provider import ArtifactProvider
-from flwr.superlink.dependencies.account import get_account
+from flwr.superlink.auth_plugin import ControlAuthnPlugin
+from flwr.superlink.dependencies.account import get_account, get_authn_plugin
 from flwr.superlink.dependencies.artifact_provider import get_artifact_provider
 from flwr.superlink.dependencies.fleet_api import FleetApiTypeDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
@@ -101,6 +108,7 @@ router = APIRouter(prefix="/v1/control", tags=["Control"], route_class=ProtobufR
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]
+AuthnPluginDependency = Annotated[ControlAuthnPlugin, Depends(get_authn_plugin)]
 ProtobufStreamContextDependency = Annotated[
     ProtobufStreamContext, Depends(get_protobuf_stream_context)
 ]
@@ -243,6 +251,33 @@ def stop_automation(
 ) -> StopAutomationResponse:
     """Stop an automation."""
     return control_handlers.stop_automation(request, account, linkstate)
+
+
+@router.post("/get-login-details")
+def get_login_details(
+    request: Annotated[GetLoginDetailsRequest, Depends(get_protobuf_request)],
+    authn_plugin: AuthnPluginDependency,
+) -> GetLoginDetailsResponse:
+    """Get login details."""
+    return control_handlers.get_login_details(request, authn_plugin)
+
+
+@router.post("/get-auth-tokens")
+def get_auth_tokens(
+    request: Annotated[GetAuthTokensRequest, Depends(get_protobuf_request)],
+    authn_plugin: AuthnPluginDependency,
+) -> GetAuthTokensResponse:
+    """Get authentication tokens."""
+    return control_handlers.get_auth_tokens(request, authn_plugin)
+
+
+@router.post("/refresh-auth-tokens")
+def refresh_auth_tokens(
+    request: Annotated[RefreshAuthTokensRequest, Depends(get_protobuf_request)],
+    authn_plugin: AuthnPluginDependency,
+) -> RefreshAuthTokensResponse:
+    """Refresh authentication tokens."""
+    return control_handlers.refresh_auth_tokens(request, authn_plugin)
 
 
 @router.post("/register-node")

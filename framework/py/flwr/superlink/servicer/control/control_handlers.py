@@ -37,9 +37,11 @@ from flwr.common.config import (
     get_metadata_from_config,
 )
 from flwr.common.constant import (
+    ACCESS_TOKEN_KEY,
     FAB_MAX_SIZE,
     HEARTBEAT_DEFAULT_INTERVAL,
     LOG_STREAM_INTERVAL,
+    REFRESH_TOKEN_KEY,
     RUN_EVENTS_STREAM_INTERVAL,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     Status,
@@ -97,6 +99,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
+    RefreshAuthTokensRequest,
+    RefreshAuthTokensResponse,
     RegisterNodeRequest,
     RegisterNodeResponse,
     RejectInvitationRequest,
@@ -159,6 +163,7 @@ from flwr.supercore.typing import (
     StartRunContext,
 )
 from flwr.supercore.utils import (
+    get_metadata_str,
     parse_app_spec,
     request_download_link,
     resolve_account_ids,
@@ -1235,6 +1240,40 @@ def get_auth_tokens(
     return GetAuthTokensResponse(
         access_token=credentials.access_token,
         refresh_token=credentials.refresh_token,
+    )
+
+
+def refresh_auth_tokens(
+    request: RefreshAuthTokensRequest, authn_plugin: ControlAuthnPlugin | None
+) -> RefreshAuthTokensResponse:
+    """Refresh account authentication tokens."""
+    log(INFO, "ControlServicer.RefreshAuthTokens")
+    if authn_plugin is None:
+        raise FlowerError(
+            ApiErrorCode.NO_ACCOUNT_AUTH,
+            "ControlServicer initialized without account authentication.",
+        )
+
+    if not request.refresh_token:
+        raise FlowerError(
+            ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+            "Refresh token is missing.",
+        )
+
+    tokens, account = authn_plugin.refresh_tokens(
+        [(REFRESH_TOKEN_KEY, request.refresh_token)]
+    )
+    access_token = get_metadata_str(tokens, ACCESS_TOKEN_KEY)
+    refresh_token = get_metadata_str(tokens, REFRESH_TOKEN_KEY)
+    if access_token is None or refresh_token is None or account is None:
+        raise FlowerError(
+            ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+            "Authentication plugin failed to refresh account tokens.",
+        )
+
+    return RefreshAuthTokensResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
     )
 
 

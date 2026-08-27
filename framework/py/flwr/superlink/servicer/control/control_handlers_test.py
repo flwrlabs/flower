@@ -19,7 +19,12 @@ import hashlib
 import unittest
 from unittest.mock import Mock, patch
 
-from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
+from flwr.common.constant import (
+    ACCESS_TOKEN_KEY,
+    NOOP_ACCOUNT_NAME,
+    NOOP_FLWR_AID,
+    REFRESH_TOKEN_KEY,
+)
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddAppRequest,
     AddAppResponse,
@@ -29,6 +34,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAutomationsRequest,
     RemoveAppRequest,
     RemoveAppResponse,
+    RefreshAuthTokensRequest,
     StartAutomationRequest,
     StartRunRequest,
     StopAutomationRequest,
@@ -44,6 +50,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
+from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation import NoOpFederationManager
 
 from .control_handlers import (
@@ -51,6 +58,7 @@ from .control_handlers import (
     list_apps,
     list_automations,
     remove_app,
+    refresh_auth_tokens,
     start_automation,
     start_run,
     stop_automation,
@@ -71,6 +79,94 @@ class TestControlHandlers(unittest.TestCase):
             flwr_aid=NOOP_FLWR_AID,
             account_name=NOOP_ACCOUNT_NAME,
         )
+
+    def test_refresh_auth_tokens_returns_rotated_tokens(self) -> None:
+        """Return both tokens produced by the authentication plugin."""
+        authn_plugin = Mock(spec=ControlAuthnPlugin)
+        authn_plugin.refresh_tokens.return_value = (
+            [
+                (ACCESS_TOKEN_KEY, "new-access-token"),
+                (REFRESH_TOKEN_KEY, "new-refresh-token"),
+            ],
+            self.account,
+        )
+
+        response = refresh_auth_tokens(
+            RefreshAuthTokensRequest(refresh_token="old-refresh-token"),
+            authn_plugin,
+        )
+
+        self.assertEqual(response.access_token, "new-access-token")
+        self.assertEqual(response.refresh_token, "new-refresh-token")
+        authn_plugin.refresh_tokens.assert_called_once_with(
+            [(REFRESH_TOKEN_KEY, "old-refresh-token")]
+        )
+
+    def test_refresh_auth_tokens_rejects_missing_token(self) -> None:
+        """Reject an empty refresh token before invoking the plugin."""
+        authn_plugin = Mock(spec=ControlAuthnPlugin)
+
+        with self.assertRaises(FlowerError) as exc_context:
+            refresh_auth_tokens(RefreshAuthTokensRequest(), authn_plugin)
+
+        self.assertEqual(
+            exc_context.exception.code,
+            ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+        )
+        authn_plugin.refresh_tokens.assert_not_called()
+
+    def test_refresh_auth_tokens_rejects_invalid_plugin_results(self) -> None:
+        """Reject incomplete or malformed tokens and missing account information."""
+        valid_tokens: list[tuple[str, str | bytes]] = [
+            (ACCESS_TOKEN_KEY, "new-access-token"),
+            (REFRESH_TOKEN_KEY, "new-refresh-token"),
+        ]
+        invalid_results: list[
+            tuple[list[tuple[str, str | bytes]] | None, AccountInfo | None]
+        ] = [
+            (None, None),
+            (valid_tokens, None),
+            ([(ACCESS_TOKEN_KEY, "new-access-token")], self.account),
+            (
+                [
+                    (ACCESS_TOKEN_KEY, "first-access-token"),
+                    (ACCESS_TOKEN_KEY, "second-access-token"),
+                    (REFRESH_TOKEN_KEY, "new-refresh-token"),
+                ],
+                self.account,
+            ),
+            (
+                [
+                    (ACCESS_TOKEN_KEY, b"new-access-token"),
+                    (REFRESH_TOKEN_KEY, "new-refresh-token"),
+                ],
+                self.account,
+            ),
+        ]
+
+        for tokens, account in invalid_results:
+            with self.subTest(tokens=tokens, account=account):
+                authn_plugin = Mock(spec=ControlAuthnPlugin)
+                authn_plugin.refresh_tokens.return_value = (tokens, account)
+
+                with self.assertRaises(FlowerError) as exc_context:
+                    refresh_auth_tokens(
+                        RefreshAuthTokensRequest(refresh_token="secret-refresh-token"),
+                        authn_plugin,
+                    )
+
+                self.assertEqual(
+                    exc_context.exception.code,
+                    ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+                )
+                self.assertNotIn("secret-refresh-token", str(exc_context.exception))
+
+    def test_refresh_auth_tokens_requires_authentication_plugin(self) -> None:
+        """Return the established error when authentication is unavailable."""
+        with self.assertRaises(FlowerError) as exc_context:
+            refresh_auth_tokens(RefreshAuthTokensRequest(refresh_token="token"), None)
+
+        self.assertEqual(exc_context.exception.code, ApiErrorCode.NO_ACCOUNT_AUTH)
 
     def test_start_run_reuses_fab_by_hash(self) -> None:
         """Test StartRun reuses a stored FAB by hash."""
