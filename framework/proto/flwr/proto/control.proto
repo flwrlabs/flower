@@ -251,6 +251,12 @@ message GetAuthTokensResponse {
   string refresh_token = 2;
 }
 
+message RefreshAuthTokensRequest { string refresh_token = 1; }
+message RefreshAuthTokensResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
 message ListConnectorsRequest { string federation = 1; }
 message Connector {
   string connector_ref = 1;
