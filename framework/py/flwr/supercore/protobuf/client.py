@@ -37,6 +37,8 @@ if TYPE_CHECKING:
 
 ResponseT = TypeVar("ResponseT", bound=Message)
 
+_MAX_ERROR_RESPONSE_BODY_LENGTH = 64 * 1024
+
 
 @dataclass(frozen=True)
 class ProtobufRequestContext:
@@ -48,6 +50,25 @@ class ProtobufRequestContext:
 
 
 ProtobufCall = Callable[[ProtobufRequestContext], httpx.Response]
+
+
+class _LimitedByteStream(httpx.SyncByteStream):
+    """Limit the number of bytes read from a response stream."""
+
+    def __init__(self, stream: httpx.SyncByteStream, limit: int) -> None:
+        self._stream = stream
+        self._limit = limit
+
+    def __iter__(self) -> Generator[bytes, None, None]:
+        remaining = self._limit
+        for chunk in self._stream:
+            yield chunk[:remaining]
+            remaining -= len(chunk)
+            if remaining <= 0:
+                return
+
+    def close(self) -> None:
+        self._stream.close()
 
 
 class ProtobufClientInterceptor(Protocol):
@@ -281,15 +302,24 @@ class ProtobufClient:
 
         def send(current_context: ProtobufRequestContext) -> httpx.Response:
             if stream:
+                # Bound response establishment and error-body reads.
+                timeout = current_context.request.extensions["timeout"]
+                timeout["read"] = self._client.timeout.read
                 response = self._client.send(current_context.request, stream=True)
                 if response.is_error:
                     try:
                         # Response-side interceptors can inspect error payloads, while
                         # successful response bodies remain incrementally streamed.
+                        assert isinstance(response.stream, httpx.SyncByteStream)
+                        response.stream = _LimitedByteStream(
+                            response.stream, _MAX_ERROR_RESPONSE_BODY_LENGTH
+                        )
                         response.read()
                     except BaseException:
                         response.close()
                         raise
+                else:
+                    timeout["read"] = None
                 return response
             return self._client.send(current_context.request)
 

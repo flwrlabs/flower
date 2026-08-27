@@ -365,6 +365,25 @@ def test_unary_stream_closes_response_for_http_error() -> None:
     assert response.is_closed
 
 
+def test_unary_stream_bounds_error_response_body() -> None:
+    """Bound the time and size used to read a streaming error response."""
+    content = b"x" * (64 * 1024 + 1)
+    response = _stream_response(500, [content])
+    with (
+        patch(
+            "flwr.supercore.protobuf.client.httpx.Client.send",
+            return_value=response,
+        ) as send,
+        pytest.raises(httpx.HTTPStatusError),
+    ):
+        list(_stream_call(ProtobufClient("http://api.example", timeout=10.0)))
+
+    request = send.call_args.args[0]
+    assert request.extensions["timeout"]["read"] == 10.0
+    assert len(response.content) == 64 * 1024
+    assert response.is_closed
+
+
 def test_unary_stream_retries_only_before_returning_response() -> None:
     """Retry response establishment but not failures during stream iteration."""
     retry_invoker = make_simple_http_retry_invoker()
