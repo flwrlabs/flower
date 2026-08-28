@@ -261,22 +261,31 @@ def test_init_channel_from_connection_uses_resolved_connection() -> None:
     channel.subscribe.assert_called_once()
 
 
-def test_custom_grpc_err_handler() -> None:
-    """Test flwr_cli_exc_handler with a custom error handler."""
+@pytest.mark.parametrize(
+    "transport_error",
+    [
+        grpc.RpcError(),
+        httpx.ConnectError(
+            "Connection refused",
+            request=httpx.Request("POST", "http://api.example"),
+        ),
+    ],
+)
+def test_custom_err_handler(transport_error: Exception) -> None:
+    """Call a custom handler for either transport error."""
 
     # Prepare
     class CustomError(Exception):
         """Custom error for testing."""
 
     mock_handler = Mock(side_effect=CustomError)
-    grpc_error = grpc.RpcError()
 
     # Execute & assert
     with pytest.raises(CustomError):
         with flwr_cli_exc_handler(mock_handler):
-            raise grpc_error
+            raise transport_error
 
-    mock_handler.assert_called_once_with(grpc_error)
+    mock_handler.assert_called_once_with(transport_error)
 
 
 @pytest.mark.parametrize(

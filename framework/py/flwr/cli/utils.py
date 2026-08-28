@@ -421,7 +421,7 @@ def wait_for_control_api_channel(
 
 @contextmanager  # docsig: disable=SIG503
 def flwr_cli_exc_handler(
-    custom_handler: Callable[[grpc.RpcError | httpx.HTTPError], None] | None = None,
+    custom_handler: Callable[[Exception], None] | None = None,
 ) -> Iterator[None]:
     """Handle Flower CLI errors from the Control API transports.
 
@@ -430,7 +430,7 @@ def flwr_cli_exc_handler(
 
     Parameters
     ----------
-    custom_handler : Callable[[grpc.RpcError | httpx.HTTPError], None] | None
+    custom_handler : Callable[[Exception], None] | None
         Optional handler called with the caught transport error before applying the
         default Flower CLI error handling.
 
