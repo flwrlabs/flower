@@ -102,7 +102,7 @@ from flwr.supercore.constant import (
 from flwr.supercore.typing import JSONObject
 
 from ..auth_plugin import CliAuthPlugin, OidcCliPlugin
-from ..utils import flwr_cli_grpc_exc_handler
+from ..utils import flwr_cli_exc_handler
 from .chat_federation import complete_federations, select_federation
 from .chat_history import HistoryBlock, load_conversation, load_history, render_history
 from .chat_transcript import MarkdownBlock, render_markdown
@@ -642,7 +642,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         web_search_blocks: dict[str, _DetailsBlock] = {}
         req_events = StreamRunEventsRequest(run_id=self.run_id)
         # Append streamed response content until the run reaches a terminal event.
-        with flwr_cli_grpc_exc_handler():
+        with flwr_cli_exc_handler():
             for res_events in self.stub.StreamRunEvents(req_events):
                 event_type, payload = parse_task_event(res_events.task_event)
                 if event_type == CHAT_TEXT_DELTA_EVENT:
@@ -748,7 +748,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
     def _stop_run(self, run_id: int) -> None:
         """Stop the active run and report failures in the transcript."""
         try:
-            with flwr_cli_grpc_exc_handler():
+            with flwr_cli_exc_handler():
                 response = self.stub.StopRun(request=StopRunRequest(run_id=run_id))
             if not response.success:
                 self._append_transcript(
@@ -990,7 +990,7 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
     if series_id is not None:
         req.series_id = series_id
 
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         res = stub.StartRun(req)
 
     if not res.HasField("run_id"):

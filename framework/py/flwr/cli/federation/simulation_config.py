@@ -22,7 +22,7 @@ import typer
 
 from flwr.cli.utils import (
     cli_output_control_stub,
-    flwr_cli_grpc_exc_handler,
+    flwr_cli_exc_handler,
     print_json_to_stdout,
 )
 from flwr.common.constant import CliOutputFormat
@@ -180,7 +180,7 @@ def _configure_federation_for_simulation(
     is_json: bool,
 ) -> None:
     """Send a request to configure a federation for simulation."""
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         response = stub.ConfigureSimulationFederation(request)
         federation_id = response.federation_name
 

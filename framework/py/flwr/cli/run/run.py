@@ -46,7 +46,7 @@ from ..log import start_stream
 from ..utils import (
     AppPathDepthError,
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
+    flwr_cli_exc_handler,
     init_channel_from_connection,
     print_json_to_stdout,
 )
@@ -204,7 +204,7 @@ def _run_with_control_api(
             ),
             app_spec=app_spec or "",
         )
-        with flwr_cli_grpc_exc_handler():
+        with flwr_cli_exc_handler():
             res = stub.StartRun(req)
 
         if res.HasField("note"):

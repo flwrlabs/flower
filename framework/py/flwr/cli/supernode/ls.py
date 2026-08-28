@@ -38,7 +38,7 @@ from flwr.supercore.utils import humanize_duration
 
 from ..utils import (
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
+    flwr_cli_exc_handler,
     init_channel_from_connection,
     print_json_to_stdout,
 )
@@ -96,7 +96,7 @@ def ls(  # pylint: disable=R0914, R0913, R0917
 
 def _list_nodes(stub: ControlStub) -> list[_NodeListType]:
     """List all nodes."""
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         res: ListNodesResponse = stub.ListNodes(ListNodesRequest())
 
     return _format_nodes(list(res.nodes_info), res.now)
