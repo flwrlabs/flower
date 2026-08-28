@@ -8,12 +8,19 @@ from flwr.serverapp import Grid, ServerApp
 from fedscs.model import Net
 from fedscs.strategy import FedSCS
 
+from fedscs.model import Net
+from fedscs.strategy import FedSCS
+from fedscs.utils import set_seed
+
+
 app = ServerApp()
 
 
 @app.main()
 def main(grid: Grid, context: Context) -> None:
     """Run FedSCS federated training."""
+    seed = int(context.run_config.get("seed", 42))
+    set_seed(seed)
 
     num_rounds = int(context.run_config.get("num-server-rounds", 2))
     batch_size = int(context.run_config.get("batch-size", 32))
@@ -73,12 +80,14 @@ def main(grid: Grid, context: Context) -> None:
             "batch-size": batch_size,
             "local-epochs": local_epochs,
             "learning-rate": learning_rate,
+            "seed": seed,
         }
     )
 
     evaluate_config = ConfigRecord(
         {
             "batch-size": batch_size,
+            "seed": seed,
         }
     )
 

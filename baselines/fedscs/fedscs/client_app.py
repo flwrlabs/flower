@@ -6,6 +6,7 @@ from flwr.clientapp import ClientApp
 
 from fedscs.dataset import load_data
 from fedscs.model import Net, test, train
+from fedscs.utils import set_seed
 
 app = ClientApp()
 
@@ -28,6 +29,9 @@ def train_client(msg: Message, context: Context) -> Message:
     """Train the global model on one client's local CIFAR-10 partition."""
     partition_id = int(context.node_config["partition-id"])
     num_partitions = int(context.node_config["num-partitions"])
+    
+    seed = int(context.run_config.get("seed", 42))
+    set_seed(seed)
 
     batch_size = int(context.run_config.get("batch-size", 32))
     local_epochs = int(context.run_config.get("local-epochs", 2))
@@ -93,6 +97,9 @@ def evaluate_client(msg: Message, context: Context) -> Message:
     """Evaluate the global model on the CIFAR-10 test set."""
     partition_id = int(context.node_config["partition-id"])
     num_partitions = int(context.node_config["num-partitions"])
+    
+    seed = int(context.run_config.get("seed", 42))
+    set_seed(seed)
 
     batch_size = int(context.run_config.get("batch-size", 32))
     alpha = float(context.run_config.get("dirichlet-alpha", 0.3))

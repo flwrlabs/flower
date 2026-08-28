@@ -148,3 +148,6 @@ local-epochs = 2
 batch-size = 32
 learning-rate = 0.01
 
+# Reproducibility
+seed = 42
+
