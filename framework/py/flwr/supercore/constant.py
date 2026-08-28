@@ -161,8 +161,10 @@ SUPEREXEC_AUTH_SECRET_CONTEXT = b"superexec-auth-v1"
 MIN_TIMESTAMP_DIFF_SECONDS = -SYSTEM_TIME_TOLERANCE
 MAX_TIMESTAMP_DIFF_SECONDS = TIMESTAMP_TOLERANCE + SYSTEM_TIME_TOLERANCE
 
-# Constants for Flower runtime version metadata
+# Client metadata
 FLWR_CLIENT_METADATA_KEY = "x-flwr-client"
+
+# Constants for Flower runtime version metadata
 FLWR_PACKAGE_NAME_METADATA_KEY = "flwr-package-name"
 FLWR_PACKAGE_VERSION_METADATA_KEY = "flwr-package-version"
 FLWR_COMPONENT_NAME_METADATA_KEY = "flwr-component-name"
