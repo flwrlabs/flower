@@ -37,6 +37,8 @@ if TYPE_CHECKING:
 
 ResponseT = TypeVar("ResponseT", bound=Message)
 
+_MAX_ERROR_RESPONSE_BODY_LENGTH = 64 * 1024
+
 
 @dataclass(frozen=True)
 class ProtobufRequestContext:
@@ -48,6 +50,32 @@ class ProtobufRequestContext:
 
 
 ProtobufCall = Callable[[ProtobufRequestContext], httpx.Response]
+
+
+def _buffer_error_response(response: httpx.Response) -> httpx.Response:
+    """Read a bounded error response body without content decoding."""
+    content = bytearray()
+    try:
+        for chunk in response.iter_raw():
+            remaining = _MAX_ERROR_RESPONSE_BODY_LENGTH - len(content)
+            content.extend(chunk[:remaining])
+            if len(content) == _MAX_ERROR_RESPONSE_BODY_LENGTH:
+                break
+    finally:
+        response.close()
+
+    buffered_response = httpx.Response(
+        response.status_code,
+        headers=[
+            (key, value)
+            for key, value in response.headers.multi_items()
+            if key not in {"content-encoding", "content-length"}
+        ],
+        content=bytes(content),
+        request=response.request,
+        extensions=response.extensions,
+    )
+    return buffered_response
 
 
 class ProtobufClientInterceptor(Protocol):
@@ -201,6 +229,7 @@ class ProtobufClient:
                 headers={
                     "content-type": PROTOBUF_MEDIA_TYPE,
                     "accept": PROTOBUF_STREAM_MEDIA_TYPE,
+                    "accept-encoding": "identity",
                 },
                 timeout=stream_timeout,
             )
@@ -281,15 +310,15 @@ class ProtobufClient:
 
         def send(current_context: ProtobufRequestContext) -> httpx.Response:
             if stream:
+                # Bound response establishment and error-body reads.
+                timeout = current_context.request.extensions["timeout"]
+                timeout["read"] = self._client.timeout.read
                 response = self._client.send(current_context.request, stream=True)
                 if response.is_error:
-                    try:
-                        # Response-side interceptors can inspect error payloads, while
-                        # successful response bodies remain incrementally streamed.
-                        response.read()
-                    except BaseException:
-                        response.close()
-                        raise
+                    # Let response-side interceptors inspect a bounded error payload.
+                    response = _buffer_error_response(response)
+                else:
+                    timeout["read"] = None
                 return response
             return self._client.send(current_context.request)
 
