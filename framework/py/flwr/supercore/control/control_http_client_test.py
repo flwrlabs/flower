@@ -30,6 +30,10 @@ _UNARY_UNARY_ENDPOINTS = (
     "list-runs",
     "list-run-series",
     "get-run-series",
+    "list-connectors",
+    "disconnect-connector",
+    "begin-connector-oauth",
+    "complete-connector-oauth",
     "pull-artifacts",
     "register-node",
     "unregister-node",
@@ -51,12 +55,18 @@ _UNARY_UNARY_ENDPOINTS = (
     "revoke-invitation",
     "configure-simulation-federation",
 )
+_METHOD_NAME_OVERRIDES = {
+    "begin-connector-oauth": "BeginConnectorOAuth",
+    "complete-connector-oauth": "CompleteConnectorOAuth",
+}
 
 
 @pytest.mark.parametrize("endpoint", _UNARY_UNARY_ENDPOINTS)
 def test_unary_unary_method(endpoint: str) -> None:
     """Delegate a Control unary-unary method to the shared HTTP client."""
-    method_name = endpoint.title().replace("-", "")
+    method_name = _METHOD_NAME_OVERRIDES.get(
+        endpoint, endpoint.title().replace("-", "")
+    )
     request = Mock()
     response = Mock()
     client = ControlHttpClient("http://control.example")

@@ -25,18 +25,26 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
     ArchiveFederationResponse,
+    BeginConnectorOAuthRequest,
+    BeginConnectorOAuthResponse,
+    CompleteConnectorOAuthRequest,
+    CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DisconnectConnectorRequest,
+    DisconnectConnectorResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
     ListAppsRequest,
     ListAppsResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
+    ListConnectorsRequest,
+    ListConnectorsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -171,6 +179,48 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/GetRunSeries",
             request=request,
             response_type=GetRunSeriesResponse,
+        )
+
+    def ListConnectors(self, request: ListConnectorsRequest) -> ListConnectorsResponse:
+        """List OAuth connectors available to the authenticated account."""
+        return self._unary_unary(
+            path="/v1/control/list-connectors",
+            rpc_method="/flwr.proto.Control/ListConnectors",
+            request=request,
+            response_type=ListConnectorsResponse,
+        )
+
+    def DisconnectConnector(
+        self, request: DisconnectConnectorRequest
+    ) -> DisconnectConnectorResponse:
+        """Disconnect connector credentials for the authenticated account."""
+        return self._unary_unary(
+            path="/v1/control/disconnect-connector",
+            rpc_method="/flwr.proto.Control/DisconnectConnector",
+            request=request,
+            response_type=DisconnectConnectorResponse,
+        )
+
+    def BeginConnectorOAuth(
+        self, request: BeginConnectorOAuthRequest
+    ) -> BeginConnectorOAuthResponse:
+        """Begin an OAuth connector authorization flow."""
+        return self._unary_unary(
+            path="/v1/control/begin-connector-oauth",
+            rpc_method="/flwr.proto.Control/BeginConnectorOAuth",
+            request=request,
+            response_type=BeginConnectorOAuthResponse,
+        )
+
+    def CompleteConnectorOAuth(
+        self, request: CompleteConnectorOAuthRequest
+    ) -> CompleteConnectorOAuthResponse:
+        """Complete an OAuth connector authorization flow."""
+        return self._unary_unary(
+            path="/v1/control/complete-connector-oauth",
+            rpc_method="/flwr.proto.Control/CompleteConnectorOAuth",
+            request=request,
+            response_type=CompleteConnectorOAuthResponse,
         )
 
     def PullArtifacts(self, request: PullArtifactsRequest) -> PullArtifactsResponse:
