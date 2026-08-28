@@ -25,6 +25,7 @@ from unittest.mock import Mock, patch
 
 import click
 import grpc
+import httpx
 import pytest
 from parameterized import parameterized
 
@@ -40,6 +41,8 @@ from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 
 from .utils import (
+    AUTHENTICATION_FAILED_MESSAGE,
+    SUPERLINK_UNAVAILABLE_MESSAGE,
     AppPathDepthError,
     _format_flower_error,
     build_pathspec,
@@ -47,7 +50,7 @@ from .utils import (
     collect_files,
     depth_of,
     filter_paths_for_publish,
-    flwr_cli_grpc_exc_handler,
+    flwr_cli_exc_handler,
     get_executed_command,
     get_sha256_hash,
     init_channel_from_connection,
@@ -259,7 +262,7 @@ def test_init_channel_from_connection_uses_resolved_connection() -> None:
 
 
 def test_custom_grpc_err_handler() -> None:
-    """Test flwr_cli_grpc_exc_handler with a custom error handler."""
+    """Test flwr_cli_exc_handler with a custom error handler."""
 
     # Prepare
     class CustomError(Exception):
@@ -270,10 +273,63 @@ def test_custom_grpc_err_handler() -> None:
 
     # Execute & assert
     with pytest.raises(CustomError):
-        with flwr_cli_grpc_exc_handler(mock_handler):
+        with flwr_cli_exc_handler(mock_handler):
             raise grpc_error
 
     mock_handler.assert_called_once_with(grpc_error)
+
+
+@pytest.mark.parametrize(
+    ("response", "expected"),
+    [
+        (
+            httpx.Response(
+                400,
+                json={
+                    "code": ApiErrorCode.INVALID_RUN_CONFIG,
+                    "detail": "Invalid run configuration.",
+                    "extra": "Unknown override key.",
+                },
+                request=httpx.Request("POST", "http://api.example"),
+            ),
+            "[code: 15] Invalid run configuration. Unknown override key.",
+        ),
+        (
+            httpx.Response(
+                401,
+                json={"detail": "Not authenticated"},
+                request=httpx.Request("POST", "http://api.example"),
+            ),
+            AUTHENTICATION_FAILED_MESSAGE,
+        ),
+        (
+            httpx.Response(
+                502,
+                json={"detail": "Upstream service unavailable."},
+                request=httpx.Request("POST", "http://api.example"),
+            ),
+            "Upstream service unavailable.",
+        ),
+    ],
+)
+def test_http_status_error(response: httpx.Response, expected: str) -> None:
+    """Translate HTTP error responses into concise CLI messages."""
+    with pytest.raises(click.ClickException) as exc_info:
+        with flwr_cli_exc_handler():
+            response.raise_for_status()
+
+    assert exc_info.value.message == expected
+
+
+def test_http_request_error() -> None:
+    """Translate HTTP connection failures into the unavailable message."""
+    request = httpx.Request("POST", "http://api.example")
+
+    with pytest.raises(click.ClickException) as exc_info:
+        with flwr_cli_exc_handler():
+            raise httpx.ConnectError("Connection refused", request=request)
+
+    assert exc_info.value.message == SUPERLINK_UNAVAILABLE_MESSAGE
 
 
 def test_format_flower_error() -> None:

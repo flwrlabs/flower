@@ -24,7 +24,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 
 from ..utils import (
-    flwr_cli_grpc_exc_handler,
+    flwr_cli_exc_handler,
     init_channel_from_connection,
     load_cli_auth_plugin_from_connection,
 )
@@ -42,7 +42,7 @@ def chat() -> None:
     stub = ControlStub(channel)
     try:
         # Verify stored credentials before showing the interactive prompt.
-        with flwr_cli_grpc_exc_handler():
+        with flwr_cli_exc_handler():
             response: ListFederationsResponse = stub.ListFederations(
                 ListFederationsRequest()
             )

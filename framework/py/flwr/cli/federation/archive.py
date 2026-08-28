@@ -29,7 +29,7 @@ from flwr.proto.control_pb2_grpc import ControlStub
 
 from ..utils import (
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
+    flwr_cli_exc_handler,
     init_channel_from_connection,
     print_json_to_stdout,
 )
@@ -87,7 +87,7 @@ def _archive_federation(  # pylint: disable=W0613
     is_json: bool,
 ) -> None:
     """Archive a federation."""
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         _: ArchiveFederationResponse = stub.ArchiveFederation(request)
 
     if is_json:
