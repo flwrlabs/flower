@@ -458,8 +458,21 @@ def flwr_cli_grpc_exc_handler(
         # of the FlowerError catalog.
         # pylint: disable-next=E1101
         if e.code() == grpc.StatusCode.UNAUTHENTICATED:
+            login_command = "flwr login"
+
+            # Include the connection name when this handler runs within a CLI command.
+            if ctx := click.get_current_context(silent=True):
+                try:
+                    # Resolve the default connection when no name was explicitly given.
+                    connection = read_superlink_connection(
+                        cast(str | None, ctx.params.get("superlink"))
+                    )
+                    login_command += f" {connection.name}"
+                except click.ClickException:
+                    # Preserve the authentication error if the config cannot be read.
+                    pass
             raise click.ClickException(
-                "Authentication failed. Please run `flwr login`"
+                f"Authentication failed. Please run `{login_command}`"
                 " to authenticate and try again."
             ) from None
         if e.code() == grpc.StatusCode.UNAVAILABLE:

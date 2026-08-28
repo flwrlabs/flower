@@ -276,6 +276,44 @@ def test_custom_grpc_err_handler() -> None:
     mock_handler.assert_called_once_with(grpc_error)
 
 
+@pytest.mark.parametrize(
+    ("superlink", "expected_name"),
+    [("prod", "prod"), (None, "default")],
+)
+def test_grpc_unauthenticated_error_includes_connection_name(
+    superlink: str | None, expected_name: str
+) -> None:
+    """Suggest logging in to the selected SuperLink connection."""
+    command = click.Command("ls")
+    grpc_error = grpc.RpcError()
+
+    with (
+        click.Context(command, info_name="ls") as ctx,
+        patch(
+            "flwr.cli.utils.read_superlink_connection",
+            return_value=SuperLinkConnection(
+                name=expected_name, address="localhost:9093"
+            ),
+        ),
+        patch.object(grpc_error, "details", return_value="Access denied", create=True),
+        patch.object(
+            grpc_error,
+            "code",
+            return_value=grpc.StatusCode.UNAUTHENTICATED,
+            create=True,
+        ),
+    ):
+        ctx.params["superlink"] = superlink
+        with pytest.raises(click.ClickException) as exc_info:
+            with flwr_cli_grpc_exc_handler():
+                raise grpc_error
+
+    assert exc_info.value.message == (
+        f"Authentication failed. Please run `flwr login {expected_name}` "
+        "to authenticate and try again."
+    )
+
+
 def test_format_flower_error() -> None:
     """Format FlowerError code, message, and public details."""
     err = FlowerError(
