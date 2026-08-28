@@ -37,6 +37,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateInvitationResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
+    GetAuthTokensRequest,
+    GetAuthTokensResponse,
+    GetLoginDetailsRequest,
+    GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
     ListAppsRequest,
@@ -57,6 +61,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
+    RefreshAuthTokensRequest,
+    RefreshAuthTokensResponse,
     RegisterNodeRequest,
     RegisterNodeResponse,
     RejectInvitationRequest,
@@ -89,7 +95,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.supercore.protobuf.client import ProtobufClient
 
 
-# Match the method names defined by the Control protobuf service.
+# Match the Control API method names, including HTTP-only token refresh.
 # pylint: disable=invalid-name
 class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-methods
     """Protobuf-over-HTTP client for the Control API."""
@@ -179,6 +185,37 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/GetRunSeries",
             request=request,
             response_type=GetRunSeriesResponse,
+        )
+
+    def GetLoginDetails(
+        self, request: GetLoginDetailsRequest
+    ) -> GetLoginDetailsResponse:
+        """Get account login details."""
+        return self._unary_unary(
+            path="/v1/control/get-login-details",
+            rpc_method="/flwr.proto.Control/GetLoginDetails",
+            request=request,
+            response_type=GetLoginDetailsResponse,
+        )
+
+    def GetAuthTokens(self, request: GetAuthTokensRequest) -> GetAuthTokensResponse:
+        """Get account authentication tokens."""
+        return self._unary_unary(
+            path="/v1/control/get-auth-tokens",
+            rpc_method="/flwr.proto.Control/GetAuthTokens",
+            request=request,
+            response_type=GetAuthTokensResponse,
+        )
+
+    def RefreshAuthTokens(
+        self, request: RefreshAuthTokensRequest
+    ) -> RefreshAuthTokensResponse:
+        """Refresh account authentication tokens."""
+        return self._unary_unary(
+            path="/v1/control/refresh-auth-tokens",
+            rpc_method="/flwr.proto.Control/RefreshAuthTokens",
+            request=request,
+            response_type=RefreshAuthTokensResponse,
         )
 
     def ListConnectors(self, request: ListConnectorsRequest) -> ListConnectorsResponse:
