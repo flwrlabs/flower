@@ -130,10 +130,11 @@ When the AgentApp already has final user-facing text that did not come from an
 SDK stream, publish an output delta followed by a completion event:
 
 ```python
+assistant_text = "Hello from the AgentApp!"
 agent.events.emit(
     {
         "type": "response.output_text.delta",
-        "delta": output_text,
+        "delta": assistant_text,
     }
 )
 agent.events.emit({"type": "response.completed"})
@@ -145,9 +146,8 @@ finished. For model-generated output, prefer republishing the original SDK
 events so clients receive the complete response event sequence.
 
 Publishing these events does not add an assistant message to the conversation
-state. Store the final message in `Context` as described in [Persist only the
-state you need](#persist-only-the-state-you-need) when later runs need to replay
-it.
+state. When later runs need to replay it, see
+{ref}`persist-final-assistant-message` for the complete `Context` update.
 
 ## Use the SDK with connectors
 
@@ -164,8 +164,6 @@ collaborative research
 agent](../tutorials/build-a-collaborative-agent.md) for a complete bounded tool
 loop.
 
-(persist-only-the-state-you-need)=
-
 ## Persist only the state you need
 
 The runtime records a non-empty `agent.input` as a user message before calling
@@ -174,8 +172,9 @@ to the Flower `Context`. Store the final assistant message yourself when later
 runs in the same series need to replay it.
 
 Publishing an event with `agent.events.emit` makes it visible to run-event
-clients but does not persist it in the conversation state. The collaborative
-research agent tutorial shows both streaming and explicit message persistence.
+clients but does not persist it in the conversation state. See
+{ref}`persist-final-assistant-message` for an implementation that stores the
+final assistant message safely.
 
 ## Build and run the AgentApp
 

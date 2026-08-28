@@ -127,11 +127,11 @@ separate frontend-visible progress from conversation state.
 
 These operations have distinct destinations:
 
-| Operation                               | Destination                                      |
-| --------------------------------------- | ------------------------------------------------ |
-| `print(...)`                            | AgentApp logs                                    |
-| `agent.events.emit(...)`                | Run-event stream consumed by Flower Chat clients |
-| Store an assistant message in `Context` | Persistent conversation state                    |
+| Operation                               | Destination                                                |
+| --------------------------------------- | ---------------------------------------------------------- |
+| `print(...)`                            | AgentApp logs                                              |
+| `agent.events.emit(...)`                | Run-event stream consumed by Flower Chat and other clients |
+| Store an assistant message in `Context` | Persistent conversation state                              |
 
 See {ref}`publish-agentapp-generated-text` for the event sequence used to
 present text that does not come from an SDK stream.
