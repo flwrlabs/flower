@@ -1,3 +1,4 @@
+
 """FedSCS server application."""
 
 import torch
@@ -14,102 +15,59 @@ app = ServerApp()
 def main(grid: Grid, context: Context) -> None:
     """Run FedSCS federated training."""
 
-    num_rounds = int(
-        context.run_config.get(
-            "num-server-rounds",
-            10,
-        )
-    )
+    num_rounds = int(context.run_config.get("num-server-rounds", 2))
+    batch_size = int(context.run_config.get("batch-size", 32))
+    local_epochs = int(context.run_config.get("local-epochs", 2))
+    learning_rate = float(context.run_config.get("learning-rate", 0.01))
+    fraction_train = float(context.run_config.get("fraction-train", 1.0))
+    fraction_evaluate = float(context.run_config.get("fraction-evaluate", 1.0))
 
-    batch_size = int(
-        context.run_config.get(
-            "batch-size",
-            128,
-        )
-    )
+    node_ids = list(grid.get_node_ids())
+    num_clients = len(node_ids)
 
-    local_epochs = int(
-        context.run_config.get(
-            "local-epochs",
-            2,
-        )
-    )
+    if num_clients == 0:
+        raise RuntimeError("No Flower nodes are available.")
 
-    learning_rate = float(
-        context.run_config.get(
-            "learning-rate",
-            0.01,
-        )
-    )
+    if not 0.0 < fraction_train <= 1.0:
+        raise ValueError("fraction-train must be in the range (0, 1].")
 
-    num_clients = int(
-        context.run_config.get(
-            "num-supernodes",
-            10,
-        )
-    )
+    if not 0.0 < fraction_evaluate <= 1.0:
+        raise ValueError("fraction-evaluate must be in the range (0, 1].")
 
-    # ---------------------------------------------------------------
-    # Initialize global model
-    # ---------------------------------------------------------------
+    min_train_nodes = max(1, int(num_clients * fraction_train))
+    min_evaluate_nodes = max(1, int(num_clients * fraction_evaluate))
+
+    # Initialize global model.
     global_model = Net()
+    initial_arrays = ArrayRecord(global_model.state_dict())
 
-    initial_arrays = ArrayRecord(
-        global_model.state_dict()
-    )
-
-    # ---------------------------------------------------------------
-    # FedSCS strategy
-    #
-    # ALL clients participate in training.
-    # ALL clients participate in evaluation.
-    # ---------------------------------------------------------------
+    # Initialize FedSCS strategy.
     strategy = FedSCS(
-        fraction_train=1.0,
-        fraction_evaluate=1.0,
-        min_train_nodes=num_clients,
-        min_evaluate_nodes=num_clients,
+        fraction_train=fraction_train,
+        fraction_evaluate=fraction_evaluate,
+        min_train_nodes=min_train_nodes,
+        min_evaluate_nodes=min_evaluate_nodes,
         min_available_nodes=num_clients,
         epsilon=1e-6,
     )
 
     strategy.summary()
 
-    print(
-        f"\nStarting FedSCS for {num_rounds} rounds..."
-    )
+    print(f"\nStarting FedSCS for {num_rounds} rounds...")
+    print("\nExperiment configuration:")
+    print(f"  Number of clients: {num_clients}")
+    print(f"  Training participation: {fraction_train:.0%}")
+    print(f"  Evaluation participation: {fraction_evaluate:.0%}")
+    print(f"  Minimum training clients: {min_train_nodes}")
+    print(f"  Minimum evaluation clients: {min_evaluate_nodes}")
+    print(f"  Local epochs: {local_epochs}")
+    print(f"  Batch size: {batch_size}")
+    print(f"  Learning rate: {learning_rate}")
+    print("  Training metrics: client-average")
+    print("  Test metrics: client-average on CIFAR-10 test set")
+    print("  Model aggregation: FedSCS")
 
-    print(
-        "\nExperiment configuration:"
-    )
-    print(
-        f"  Number of clients: {num_clients}"
-    )
-    print(
-        "  Client participation: 100%"
-    )
-    print(
-        f"  Local epochs: {local_epochs}"
-    )
-    print(
-        f"  Batch size: {batch_size}"
-    )
-    print(
-        f"  Learning rate: {learning_rate}"
-    )
-    print(
-        "  Training metrics: client-average"
-    )
-    print(
-        "  Test metrics: client-average on CIFAR-10 test set"
-    )
-    print(
-        "  Model aggregation: FedSCS"
-    )
-
-    # ---------------------------------------------------------------
-    # Send training configuration to clients
-    # ---------------------------------------------------------------
+    # Send training configuration to clients.
     train_config = ConfigRecord(
         {
             "batch-size": batch_size,
@@ -124,9 +82,7 @@ def main(grid: Grid, context: Context) -> None:
         }
     )
 
-    # ---------------------------------------------------------------
-    # Start federated learning
-    # ---------------------------------------------------------------
+    # Start federated learning.
     result = strategy.start(
         grid=grid,
         initial_arrays=initial_arrays,
@@ -135,21 +91,12 @@ def main(grid: Grid, context: Context) -> None:
         num_rounds=num_rounds,
     )
 
-    # ---------------------------------------------------------------
-    # Save final model
-    # ---------------------------------------------------------------
-    print(
-        "\nSaving final FedSCS model..."
-    )
+    # Save final model.
+    print("\nSaving final FedSCS model...")
 
     state_dict = result.arrays.to_torch_state_dict()
+    torch.save(state_dict, "final_model.pt")
 
-    torch.save(
-        state_dict,
-        "final_model.pt",
-    )
+    print("Final FedSCS model saved as: final_model.pt")
 
-    print(
-        "Final FedSCS model saved as: "
-        "final_model.pt"
-    )
+

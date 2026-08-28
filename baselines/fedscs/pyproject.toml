@@ -1,5 +1,6 @@
+
 # =====================================================================
-# FedSCS - Flower Baseline
+# FedSCS - Flower Application
 # =====================================================================
 
 [build-system]
@@ -16,8 +17,8 @@ requires-python = ">=3.11,<3.12"
 dependencies = [
     "flwr[simulation]>=1.35.0",
     "flwr-datasets[vision]>=0.5.0",
-    "torch==2.13.0",
-    "torchvision==0.28.0",
+    "torch==2.8.0",
+    "torchvision==0.23.0",
     "numpy>=2.0",
 ]
 
@@ -136,6 +137,9 @@ clientapp = "fedscs.client_app:app"
 
 # Federated training
 num-server-rounds = 2
+num-supernodes = 10
+
+# All available clients participate in each round
 fraction-train = 1.0
 fraction-evaluate = 1.0
 
@@ -143,3 +147,4 @@ fraction-evaluate = 1.0
 local-epochs = 2
 batch-size = 32
 learning-rate = 0.01
+

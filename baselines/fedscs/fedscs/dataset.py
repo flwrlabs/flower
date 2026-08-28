@@ -1,96 +1,158 @@
+"""CIFAR-10 data loading and non-IID partitioning for FedSCS."""
+
 import random
 from collections import Counter, defaultdict
+from typing import Any
 
 import numpy as np
-import torch
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 
 
-def split_dataset_dirichlet_fixed_size(dataset, num_clients, alpha, seed=42):
-    """Split CIFAR-10 using Dirichlet sampling with equal samples per client."""
-    random.seed(seed)
-    np.random.seed(seed)
+def split_dataset_dirichlet_fixed_size(
+    dataset: Any,
+    num_clients: int,
+    alpha: float,
+    seed: int = 42,
+) -> list[list[int]]:
+    """Split CIFAR-10 into equal-size non-IID client partitions.
 
-    data_by_class = defaultdict(list)
+    A Dirichlet distribution controls the class proportions for each class,
+    while client capacities are enforced so that every client receives the
+    same number of training samples.
+    """
+    if num_clients < 1:
+        raise ValueError("num_clients must be at least 1.")
+    if alpha <= 0:
+        raise ValueError("alpha must be greater than 0.")
+    if len(dataset) < num_clients:
+        raise ValueError("num_clients cannot exceed the dataset size.")
 
-    for idx in range(len(dataset)):
-        _, label = dataset[idx]
-        data_by_class[label].append(idx)
+    rng = random.Random(seed)
+    np_rng = np.random.default_rng(seed)
 
-    for cls in data_by_class:
-        random.shuffle(data_by_class[cls])
+    data_by_class: dict[int, list[int]] = defaultdict(list)
+    for idx, label in enumerate(dataset.targets):
+        data_by_class[int(label)].append(idx)
+
+    for indices in data_by_class.values():
+        rng.shuffle(indices)
 
     total_samples = len(dataset)
     samples_per_client = total_samples // num_clients
 
-    clients_indices = [[] for _ in range(num_clients)]
-    client_sample_counts = [0] * num_clients
+    clients_indices: list[list[int]] = [[] for _ in range(num_clients)]
+    remaining_capacity = [samples_per_client] * num_clients
 
-    # Generate Dirichlet proportions for each class
-    for cls in sorted(data_by_class.keys()):
+    for cls in sorted(data_by_class):
         cls_indices = data_by_class[cls]
         cls_total = len(cls_indices)
 
-        proportions = np.random.dirichlet([alpha] * num_clients)
-        allocations = (proportions * cls_total).astype(int)
+        available_clients = [
+            client_id
+            for client_id in range(num_clients)
+            if remaining_capacity[client_id] > 0
+        ]
 
-        # Make allocations sum exactly to the number of samples
-        while allocations.sum() < cls_total:
-            allocations[np.argmax(proportions)] += 1
+        if not available_clients:
+            break
 
-        while allocations.sum() > cls_total:
-            largest = np.argmax(allocations)
-            if allocations[largest] > 0:
-                allocations[largest] -= 1
+        proportions = np_rng.dirichlet(
+            [alpha] * len(available_clients)
+        )
+
+        capacity = np.array(
+            [remaining_capacity[i] for i in available_clients],
+            dtype=np.int64,
+        )
+
+        allocations = np.zeros(
+            len(available_clients),
+            dtype=np.int64,
+        )
+
+        unassigned = cls_total
+
+        while unassigned > 0 and capacity.sum() > 0:
+            active = capacity > 0
+
+            weights = proportions.copy()
+            weights[~active] = 0.0
+
+            if weights.sum() == 0:
+                weights = active.astype(np.float64)
+
+            weights /= weights.sum()
+
+            draw = np_rng.multinomial(
+                unassigned,
+                weights,
+            )
+
+            draw = np.minimum(draw, capacity)
+
+            assigned_now = int(draw.sum())
+
+            if assigned_now == 0:
+                break
+
+            allocations += draw
+            capacity -= draw
+            unassigned -= assigned_now
 
         start = 0
 
-        for client_id, allocation in enumerate(allocations):
-            remaining = samples_per_client - client_sample_counts[client_id]
+        for position, client_id in enumerate(available_clients):
+            count = int(allocations[position])
 
-            if remaining <= 0:
-                continue
+            if count > 0:
+                selected = cls_indices[start : start + count]
+                clients_indices[client_id].extend(selected)
+                remaining_capacity[client_id] -= count
+                start += count
 
-            take = min(allocation, remaining)
-
-            selected = cls_indices[start:start + take]
-            clients_indices[client_id].extend(selected)
-
-            client_sample_counts[client_id] += take
-            start += take
-
-    # Fill clients that are still under the target size
-    assigned = set()
-
-    for client_indices in clients_indices:
-        assigned.update(client_indices)
-
-    leftovers = [
+    # Assign any remaining samples while respecting equal client capacity.
+    remaining_indices = [
         idx
         for cls_indices in data_by_class.values()
         for idx in cls_indices
-        if idx not in assigned
+        if all(idx not in client for client in clients_indices)
     ]
 
-    random.shuffle(leftovers)
+    rng.shuffle(remaining_indices)
 
+    position = 0
     for client_id in range(num_clients):
-        while (
-            client_sample_counts[client_id] < samples_per_client
-            and leftovers
-        ):
-            idx = leftovers.pop()
-            clients_indices[client_id].append(idx)
-            client_sample_counts[client_id] += 1
+        needed = remaining_capacity[client_id]
+
+        if needed <= 0:
+            continue
+
+        selected = remaining_indices[position : position + needed]
+        clients_indices[client_id].extend(selected)
+        remaining_capacity[client_id] -= len(selected)
+        position += len(selected)
+
+    # CIFAR-10 (50,000 samples) is normally divisible by the number of
+    # clients used in the experiments. If it is not, the remainder is left
+    # unassigned rather than silently giving clients unequal sizes.
+    if any(count != 0 for count in remaining_capacity):
+        raise RuntimeError(
+            "Unable to construct equal-size client partitions."
+        )
 
     return clients_indices
 
 
-def print_data_distribution(dataset, clients_indices):
-    """Print class distribution for every client."""
+def print_data_distribution(
+    dataset: Any,
+    clients_indices: list[list[int]],
+) -> None:
+    """Print the class distribution for every client."""
+    targets = dataset.targets
+
     for client_id, indices in enumerate(clients_indices):
-        labels = [dataset.targets[idx] for idx in indices]
+        labels = [int(targets[idx]) for idx in indices]
         counts = Counter(labels)
 
         print(
@@ -101,13 +163,24 @@ def print_data_distribution(dataset, clients_indices):
 
 
 def load_data(
-    partition_id,
-    num_partitions,
-    batch_size=128,
-    alpha=0.3,
-    seed=42,
-):
-    """Load the CIFAR-10 partition assigned to one Flower client."""
+    partition_id: int,
+    num_partitions: int,
+    batch_size: int = 128,
+    alpha: float = 0.3,
+    seed: int = 42,
+) -> tuple[DataLoader, DataLoader]:
+    """Load the CIFAR-10 data assigned to one Flower client."""
+    if num_partitions < 1:
+        raise ValueError("num_partitions must be at least 1.")
+
+    if not 0 <= partition_id < num_partitions:
+        raise ValueError(
+            f"partition_id must be in [0, {num_partitions - 1}], "
+            f"got {partition_id}."
+        )
+
+    if batch_size < 1:
+        raise ValueError("batch_size must be at least 1.")
 
     transform = transforms.ToTensor()
 
@@ -126,17 +199,15 @@ def load_data(
     )
 
     clients_indices = split_dataset_dirichlet_fixed_size(
-        trainset,
+        dataset=trainset,
         num_clients=num_partitions,
         alpha=alpha,
         seed=seed,
     )
 
-    client_indices = clients_indices[partition_id]
-
-    train_subset = torch.utils.data.Subset(
+    train_subset = Subset(
         trainset,
-        client_indices,
+        clients_indices[partition_id],
     )
 
     trainloader = DataLoader(

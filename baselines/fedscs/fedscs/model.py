@@ -1,3 +1,4 @@
+
 """FedSCS CIFAR-10 model."""
 
 import torch
@@ -6,7 +7,9 @@ import torch.optim as optim
 
 
 class Net(nn.Module):
-    def __init__(self):
+    """Simple CNN for CIFAR-10 classification."""
+
+    def __init__(self) -> None:
         super().__init__()
 
         self.features = nn.Sequential(
@@ -28,11 +31,19 @@ class Net(nn.Module):
             nn.Linear(256, 10),
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Run a forward pass through the network."""
         return self.classifier(self.features(x))
 
 
-def train(model, trainloader, epochs, device, lr=0.01):
+def train(
+    model: nn.Module,
+    trainloader: torch.utils.data.DataLoader,
+    epochs: int,
+    device: torch.device,
+    lr: float = 0.01,
+) -> tuple[float, float]:
+    """Train the model and return average loss and accuracy."""
     model.to(device)
     model.train()
 
@@ -43,7 +54,7 @@ def train(model, trainloader, epochs, device, lr=0.01):
     correct = 0
     total = 0
 
-    for epoch in range(epochs):
+    for _ in range(epochs):
         for images, labels in trainloader:
             images = images.to(device)
             labels = labels.to(device)
@@ -66,13 +77,15 @@ def train(model, trainloader, epochs, device, lr=0.01):
     if total == 0:
         return 0.0, 0.0
 
-    train_loss = total_loss / total
-    train_accuracy = correct / total
-
-    return train_loss, train_accuracy
+    return total_loss / total, correct / total
 
 
-def test(model, testloader, device):
+def test(
+    model: nn.Module,
+    testloader: torch.utils.data.DataLoader,
+    device: torch.device,
+) -> tuple[float, float]:
+    """Evaluate the model and return average loss and accuracy."""
     model.to(device)
     model.eval()
 
@@ -100,7 +113,6 @@ def test(model, testloader, device):
     if total == 0:
         return 0.0, 0.0
 
-    test_loss = total_loss / total
-    test_accuracy = correct / total
+    return total_loss / total, correct / total
 
-    return test_loss, test_accuracy
+

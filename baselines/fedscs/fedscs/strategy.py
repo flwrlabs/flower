@@ -21,8 +21,29 @@ class FedSCS(Strategy):
         min_evaluate_nodes: int = 10,
         min_available_nodes: int = 10,
         epsilon: float = 1e-6,
+        beta: float = 0.9,
     ) -> None:
-        """Initialize FedSCS strategy."""
+        """Initialize the FedSCS strategy."""
+        if not 0.0 < fraction_train <= 1.0:
+            raise ValueError("fraction_train must be in (0, 1].")
+
+        if not 0.0 < fraction_evaluate <= 1.0:
+            raise ValueError("fraction_evaluate must be in (0, 1].")
+
+        if min_train_nodes < 1:
+            raise ValueError("min_train_nodes must be at least 1.")
+
+        if min_evaluate_nodes < 1:
+            raise ValueError("min_evaluate_nodes must be at least 1.")
+
+        if min_available_nodes < 1:
+            raise ValueError("min_available_nodes must be at least 1.")
+
+        if epsilon <= 0.0:
+            raise ValueError("epsilon must be greater than 0.")
+
+        if not 0.0 <= beta < 1.0:
+            raise ValueError("beta must be in [0, 1).")
 
         self.fraction_train = fraction_train
         self.fraction_evaluate = fraction_evaluate
@@ -30,9 +51,10 @@ class FedSCS(Strategy):
         self.min_evaluate_nodes = min_evaluate_nodes
         self.min_available_nodes = min_available_nodes
         self.epsilon = epsilon
+        self.beta = beta
 
-        # Used ONLY for Flower's node sampling/configuration.
-        # Model aggregation itself is implemented by FedSCS below.
+        # FedAvg is used only for Flower's node sampling and message
+        # configuration. FedSCS performs the actual model aggregation.
         self._sampling_strategy = FedAvg(
             fraction_train=fraction_train,
             fraction_evaluate=fraction_evaluate,
@@ -41,18 +63,17 @@ class FedSCS(Strategy):
             min_available_nodes=min_available_nodes,
         )
 
-        # Historical FedSCS state for each client.
+        # Per-client temporal history.
         self.client_histories: dict[int, dict[str, list[float]]] = {}
 
-        # Global model before local training.
+        # Global model immediately before the current local-training round.
         self._global_state: dict[str, torch.Tensor] | None = None
 
     @staticmethod
     def _flatten_update(
         update: dict[str, torch.Tensor],
     ) -> torch.Tensor:
-        """Flatten a model update into one vector."""
-
+        """Flatten a model update into a single vector."""
         return torch.cat(
             [
                 value.detach().float().flatten()
@@ -65,7 +86,12 @@ class FedSCS(Strategy):
         u: torch.Tensor,
         v: torch.Tensor,
     ) -> float:
-        """Compute non-negative cosine similarity."""
+        """Compute a non-negative cosine similarity."""
+        u = u.detach().float()
+        v = v.detach().float()
+
+        if not torch.isfinite(u).all() or not torch.isfinite(v).all():
+            return 0.0
 
         u_norm = torch.linalg.vector_norm(u)
         v_norm = torch.linalg.vector_norm(v)
@@ -79,6 +105,9 @@ class FedSCS(Strategy):
             dim=1,
         ).item()
 
+        if not torch.isfinite(torch.tensor(similarity)):
+            return 0.0
+
         return max(float(similarity), 0.0)
 
     def configure_train(
@@ -88,8 +117,7 @@ class FedSCS(Strategy):
         config: ConfigRecord,
         grid: Grid,
     ) -> Iterable[Message]:
-        """Configure all clients for local training."""
-
+        """Configure clients for local training."""
         self._global_state = {
             key: value.detach().cpu().clone()
             for key, value in arrays.to_torch_state_dict().items()
@@ -109,8 +137,7 @@ class FedSCS(Strategy):
         config: ConfigRecord,
         grid: Grid,
     ) -> Iterable[Message]:
-        """Configure all clients for evaluation."""
-
+        """Configure clients for evaluation."""
         return self._sampling_strategy.configure_evaluate(
             server_round,
             arrays,
@@ -126,42 +153,50 @@ class FedSCS(Strategy):
         server_round: int,
     ) -> tuple[dict[str, torch.Tensor], list[float]]:
         """Aggregate client models using FedSCS trust weights."""
-
         num_clients = len(client_states)
 
         if num_clients == 0:
             raise ValueError("FedSCS received no valid client updates.")
 
-        if num_clients == 1:
-            return client_states[0], [1.0]
+        if len(client_ids) != num_clients:
+            raise ValueError("Client IDs and client states have different sizes.")
 
         # ---------------------------------------------------------------
-        # Step 1: Compute client updates
+        # Step 1: Compute local model updates.
         #
-        # Delta_i = W_i - W_global
+        # Delta_i = W_i - W_t
         # ---------------------------------------------------------------
-        delta_states = []
+        delta_states: list[dict[str, torch.Tensor]] = []
 
         for client_state in client_states:
-            delta = {
-                key: (
-                    client_state[key].detach().cpu().float()
-                    - initial_state[key].detach().cpu().float()
+            if set(client_state) != set(initial_state):
+                raise ValueError(
+                    "Client model parameters do not match the global model."
                 )
-                for key in initial_state
-            }
-            delta_states.append(delta)
+
+            delta_states.append(
+                {
+                    key: (
+                        client_state[key].detach().cpu().float()
+                        - initial_state[key].detach().cpu().float()
+                    )
+                    for key in initial_state
+                }
+            )
 
         # ---------------------------------------------------------------
-        # Step 2: Flatten updates
+        # Step 2: Flatten updates.
         # ---------------------------------------------------------------
         flat_updates = [
             self._flatten_update(delta)
             for delta in delta_states
         ]
 
+        if num_clients == 1:
+            return client_states[0], [1.0]
+
         # ---------------------------------------------------------------
-        # Step 3: Leave-one-out peer reference
+        # Step 3: Construct leave-one-out peer references.
         #
         # P_i = sum_{j != i} Delta_j
         # ---------------------------------------------------------------
@@ -173,9 +208,9 @@ class FedSCS(Strategy):
         ]
 
         # ---------------------------------------------------------------
-        # Step 4: Stable cosine similarity
+        # Step 4: Compute stable cosine similarity.
         #
-        # rho_i = max(cosine(Delta_i, P_i), 0)
+        # rho_i = max(cos(Delta_i, P_i), 0)
         # ---------------------------------------------------------------
         rho = [
             self._cosine_similarity(
@@ -186,44 +221,53 @@ class FedSCS(Strategy):
         ]
 
         # ---------------------------------------------------------------
-        # Step 5: Temporal trust score
+        # Step 5: Temporal smoothing.
+        #
+        # s_i(t) = beta * s_i(t-1)
+        #          + (1-beta) * rho_i(t)
+        #
+        # A client's history is updated only when that client
+        # participates in a training round.
         # ---------------------------------------------------------------
-        trust_scores = []
+        trust_scores: list[float] = []
 
-        for i, client_id in enumerate(client_ids):
+        for client_id, rho_i in zip(client_ids, rho):
             history = self.client_histories.setdefault(
                 client_id,
                 {
-                    "s": [],
                     "rho": [],
+                    "s": [],
                     "nu": [],
                     "s_tilde": [],
                     "a": [],
+                    "rounds": [],
                 },
             )
 
-            previous_s = (
-                history["s"][-1]
-                if history["s"]
-                else 1.0
-            )
+            if history["s"]:
+                previous_s = history["s"][-1]
+                s_i = (
+                    self.beta * previous_s
+                    + (1.0 - self.beta) * rho_i
+                )
+            else:
+                s_i = rho_i
 
-            t = max(server_round, 1)
-
-            s_i = (
-                ((t - 1) / t) * previous_s
-                + (1.0 / t) * rho[i]
-            )
-
+            history["rho"].append(rho_i)
             history["s"].append(s_i)
-            history["rho"].append(rho[i])
+            history["rounds"].append(float(server_round))
 
             trust_scores.append(s_i)
 
         # ---------------------------------------------------------------
-        # Step 6: Temporal variation correction
+        # Step 6: Temporal variation correction.
+        #
+        # nu_i(t) =
+        #     |s_i(t) - s_i(t-1)| / (s_i(t-1) + epsilon)
+        #
+        # s_tilde_i(t) = s_i(t) / (1 + nu_i(t))
         # ---------------------------------------------------------------
-        corrected_scores = []
+        corrected_scores: list[float] = []
 
         for client_id, s_i in zip(client_ids, trust_scores):
             history = self.client_histories[client_id]
@@ -231,25 +275,28 @@ class FedSCS(Strategy):
             if len(history["s"]) > 1:
                 previous_s = history["s"][-2]
             else:
-                previous_s = 1.0
+                previous_s = s_i
 
-            nu_i = abs(s_i - previous_s) / (
+            variation = abs(s_i - previous_s) / (
                 previous_s + self.epsilon
             )
 
-            s_tilde_i = s_i / (1.0 + nu_i)
+            corrected_score = s_i / (1.0 + variation)
 
-            history["nu"].append(nu_i)
-            history["s_tilde"].append(s_tilde_i)
+            history["nu"].append(variation)
+            history["s_tilde"].append(corrected_score)
 
-            corrected_scores.append(s_tilde_i)
+            corrected_scores.append(corrected_score)
 
         # ---------------------------------------------------------------
-        # Step 7: Normalize FedSCS trust scores
+        # Step 7: Normalize trust scores into convex aggregation weights.
         # ---------------------------------------------------------------
         total_score = sum(corrected_scores)
 
-        if total_score <= self.epsilon:
+        if (
+            total_score <= self.epsilon
+            or not torch.isfinite(torch.tensor(total_score))
+        ):
             aggregation_weights = [
                 1.0 / num_clients
             ] * num_clients
@@ -266,65 +313,90 @@ class FedSCS(Strategy):
             self.client_histories[client_id]["a"].append(weight)
 
         # ---------------------------------------------------------------
-        # Step 8: FedSCS model aggregation
+        # Step 8: Weighted model aggregation.
         #
         # W_(t+1) = sum_i a_i W_i
         # ---------------------------------------------------------------
-        aggregated_state = {}
+        aggregated_state: dict[str, torch.Tensor] = {}
 
-        for key in initial_state:
-            aggregated_state[key] = sum(
+        for key, initial_value in initial_state.items():
+            aggregated_value = sum(
                 aggregation_weights[i]
                 * client_states[i][key].detach().cpu().float()
                 for i in range(num_clients)
             )
 
-        # Preserve integer/buffer dtypes.
-        for key, initial_value in initial_state.items():
-            if not torch.is_floating_point(initial_value):
-                aggregated_state[key] = aggregated_state[key].to(
+            if torch.is_floating_point(initial_value):
+                aggregated_state[key] = aggregated_value.to(
+                    dtype=initial_value.dtype
+                )
+            else:
+                aggregated_state[key] = aggregated_value.to(
                     dtype=initial_value.dtype
                 )
 
+        # ---------------------------------------------------------------
+        # Logging.
+        # ---------------------------------------------------------------
         print(f"\n[FedSCS] Round {server_round}")
         print(f"  Participating clients: {num_clients}")
+        print(f"  Beta: {self.beta:.4f}")
+        print(f"  Epsilon: {self.epsilon:.2e}")
 
-        for client_id, rho_i, weight in zip(
+        for client_id, rho_i, score, weight in zip(
             client_ids,
             rho,
+            corrected_scores,
             aggregation_weights,
         ):
             print(
                 f"  Client {client_id}: "
                 f"rho={rho_i:.4f}, "
+                f"corrected_score={score:.4f}, "
                 f"trust_weight={weight:.4f}"
             )
 
         return aggregated_state, aggregation_weights
+
+    @staticmethod
+    def _weighted_average(
+        values: list[float],
+        weights: list[int],
+    ) -> float:
+        """Compute a sample-weighted average."""
+        if not values or not weights:
+            return 0.0
+
+        total_weight = sum(weights)
+
+        if total_weight <= 0:
+            return sum(values) / len(values)
+
+        return sum(
+            value * weight
+            for value, weight in zip(values, weights)
+        ) / total_weight
 
     def aggregate_train(
         self,
         server_round: int,
         replies: Iterable[Message],
     ) -> tuple[ArrayRecord | None, MetricRecord | None]:
-        """Aggregate models with FedSCS and average training metrics."""
-
+        """Aggregate client models using FedSCS."""
         replies = list(replies)
 
         if not replies:
             return None, None
 
         if self._global_state is None:
-            raise RuntimeError(
-                "Global model state is unavailable."
-            )
+            raise RuntimeError("Global model state is unavailable.")
 
-        client_states = []
-        client_ids = []
+        client_states: list[dict[str, torch.Tensor]] = []
+        client_ids: list[int] = []
 
-        train_losses = []
-        train_accuracies = []
-        train_examples = []
+        train_losses: list[float] = []
+        train_accuracies: list[float] = []
+        train_examples: list[int] = []
 
         for reply in replies:
             if reply.has_error():
@@ -344,19 +416,12 @@ class FedSCS(Strategy):
                 }
             )
 
-            client_ids.append(
-                int(reply.metadata.src_node_id)
-            )
+            client_ids.append(int(reply.metadata.src_node_id))
 
-            # -----------------------------------------------------------
-            # Read client training metrics
-            # -----------------------------------------------------------
             metrics = reply.content.get("metrics")
 
             if metrics is not None:
-                train_losses.append(
-                    float(metrics["train-loss"])
-                )
+                train_losses.append(float(metrics["train-loss"]))
                 train_accuracies.append(
                     float(metrics["train-accuracy"])
                 )
@@ -367,9 +432,6 @@ class FedSCS(Strategy):
         if not client_states:
             return None, None
 
-        # ---------------------------------------------------------------
-        # ACTUAL FedSCS MODEL AGGREGATION
-        # ---------------------------------------------------------------
         aggregated_state, weights = self._fedscs_aggregation(
             initial_state=self._global_state,
             client_states=client_states,
@@ -377,19 +439,19 @@ class FedSCS(Strategy):
             server_round=server_round,
         )
 
-        # Store global model.
         self._global_state = {
             key: value.detach().cpu().clone()
             for key, value in aggregated_state.items()
         }
 
-        # ---------------------------------------------------------------
-        # Average client training metrics
-        # ---------------------------------------------------------------
         if train_losses:
-            avg_train_loss = sum(train_losses) / len(train_losses)
-            avg_train_accuracy = (
-                sum(train_accuracies) / len(train_accuracies)
+            avg_train_loss = self._weighted_average(
+                train_losses,
+                train_examples,
+            )
+            avg_train_accuracy = self._weighted_average(
+                train_accuracies,
+                train_examples,
             )
         else:
             avg_train_loss = 0.0
@@ -401,22 +463,14 @@ class FedSCS(Strategy):
                 "train-accuracy": float(avg_train_accuracy),
                 "train-num-clients": len(train_losses),
                 "fedscs-num-clients": len(client_states),
-                "fedscs-mean-trust": float(
-                    sum(weights) / len(weights)
-                ),
+                "fedscs-min-trust": float(min(weights)),
+                "fedscs-max-trust": float(max(weights)),
             }
         )
 
-        print(
-            f"\n[SERVER] Round {server_round} Training Results"
-        )
-        print(
-            f"  Clients: {len(train_losses)}"
-        )
-        print(
-            f"  Average client train loss: "
-            f"{avg_train_loss:.4f}"
-        )
+        print(f"\n[SERVER] Round {server_round} Training Results")
+        print(f"  Clients: {len(client_states)}")
+        print(f"  Average client train loss: {avg_train_loss:.4f}")
         print(
             f"  Average client train accuracy: "
             f"{avg_train_accuracy:.4f}"
@@ -429,12 +483,12 @@ class FedSCS(Strategy):
         server_round: int,
         replies: Iterable[Message],
     ) -> MetricRecord | None:
-        """Average test loss and accuracy across all clients."""
-
+        """Aggregate evaluation metrics across clients."""
         replies = list(replies)
 
-        test_losses = []
-        test_accuracies = []
+        test_losses: list[float] = []
+        test_accuracies: list[float] = []
+        test_examples: list[int] = []
 
         for reply in replies:
             if reply.has_error():
@@ -445,31 +499,29 @@ class FedSCS(Strategy):
             if metrics is None:
                 continue
 
-            test_losses.append(
-                float(metrics["test-loss"])
-            )
+            test_losses.append(float(metrics["test-loss"]))
             test_accuracies.append(
                 float(metrics["test-accuracy"])
+            )
+            test_examples.append(
+                int(metrics["num-examples"])
             )
 
         if not test_losses:
             return None
 
-        avg_test_loss = sum(test_losses) / len(test_losses)
-        avg_test_accuracy = (
-            sum(test_accuracies) / len(test_accuracies)
+        avg_test_loss = self._weighted_average(
+            test_losses,
+            test_examples,
+        )
+        avg_test_accuracy = self._weighted_average(
+            test_accuracies,
+            test_examples,
         )
 
-        print(
-            f"\n[SERVER] Round {server_round} Test Results"
-        )
-        print(
-            f"  Evaluated clients: {len(test_losses)}"
-        )
-        print(
-            f"  Average test loss: "
-            f"{avg_test_loss:.4f}"
-        )
+        print(f"\n[SERVER] Round {server_round} Test Results")
+        print(f"  Evaluated clients: {len(test_losses)}")
+        print(f"  Average test loss: {avg_test_loss:.4f}")
         print(
             f"  Average test accuracy: "
             f"{avg_test_accuracy:.4f}"
@@ -485,20 +537,10 @@ class FedSCS(Strategy):
 
     def summary(self) -> None:
         """Log the FedSCS strategy configuration."""
-
         print("FedSCS Strategy")
-        print(
-            f"  Fraction train: "
-            f"{self.fraction_train}"
-        )
-        print(
-            f"  Fraction evaluate: "
-            f"{self.fraction_evaluate}"
-        )
-        print(
-            f"  Minimum train nodes: "
-            f"{self.min_train_nodes}"
-        )
+        print(f"  Fraction train: {self.fraction_train}")
+        print(f"  Fraction evaluate: {self.fraction_evaluate}")
+        print(f"  Minimum train nodes: {self.min_train_nodes}")
         print(
             f"  Minimum evaluate nodes: "
             f"{self.min_evaluate_nodes}"
@@ -507,19 +549,10 @@ class FedSCS(Strategy):
             f"  Minimum available nodes: "
             f"{self.min_available_nodes}"
         )
-        print(
-            f"  Epsilon: {self.epsilon}"
-        )
+        print(f"  Epsilon: {self.epsilon}")
+        print(f"  Beta: {self.beta}")
         print("  Aggregation: FedSCS")
-        print(
-            "  Peer reference: Leave-one-out peer sum"
-        )
-        print(
-            "  Similarity: Non-negative cosine similarity"
-        )
-        print(
-            "  Temporal smoothing: Enabled"
-        )
-        print(
-            "  Temporal variation correction: Enabled"
-        )
+        print("  Peer reference: Leave-one-out peer sum")
+        print("  Similarity: Non-negative cosine similarity")
+        print("  Temporal smoothing: Enabled")
+        print("  Temporal variation correction: Enabled")
