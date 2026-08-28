@@ -492,18 +492,12 @@ def test_start_client_internal_launches_superexec_with_runtime_http_address() ->
 
 def test_push_messages_pushes_each_requested_object_once() -> None:
     """Shared objects in different branches should only be pushed once."""
-    instruction = Message(
-        content=RecordDict(), dst_node_id=1, message_type="query"
-    )
+    instruction = Message(content=RecordDict(), dst_node_id=1, message_type="query")
     reply = Message(
         content=RecordDict(
             {
-                "first": ArrayRecord(
-                    [np.array([1]), np.array([2]), np.array([3])]
-                ),
-                "second": ArrayRecord(
-                    [np.array([1]), np.array([4]), np.array([5])]
-                ),
+                "first": ArrayRecord([np.array([1]), np.array([2]), np.array([3])]),
+                "second": ArrayRecord([np.array([1]), np.array([4]), np.array([5])]),
             }
         ),
         reply_to=instruction,
