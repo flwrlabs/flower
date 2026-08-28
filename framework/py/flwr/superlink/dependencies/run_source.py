@@ -19,10 +19,7 @@ from typing import Annotated
 from fastapi import Depends, Header
 
 from flwr.supercore.constant import FLWR_CLIENT_METADATA_KEY
-from flwr.superlink.run_source import (
-    RunStartSource,
-    resolve_run_start_source,
-)
+from flwr.superlink.run_source import RunStartSource, resolve_run_start_source
 
 
 def get_run_source(

@@ -82,6 +82,7 @@ from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
+    FLWR_CLIENT_METADATA_KEY,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     ActionType,
@@ -101,7 +102,6 @@ from flwr.supercore.typing import (
     RegisterSupernodeContext,
     StartRunContext,
 )
-from flwr.supercore.constant import FLWR_CLIENT_METADATA_KEY
 from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.control.control_account_auth_interceptor import (
