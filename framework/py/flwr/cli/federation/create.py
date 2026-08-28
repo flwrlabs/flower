@@ -31,7 +31,7 @@ from flwr.proto.control_pb2_grpc import ControlStub
 
 from ..utils import (
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
+    flwr_cli_exc_handler,
     init_channel_from_connection,
     print_json_to_stdout,
 )
@@ -101,7 +101,7 @@ def _create_federation(  # pylint: disable=W0613
     stub: ControlStub, request: CreateFederationRequest, is_json: bool
 ) -> None:
     """Create a federation."""
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         response: CreateFederationResponse = stub.CreateFederation(request)
 
     if fed_id := response.federation.name:

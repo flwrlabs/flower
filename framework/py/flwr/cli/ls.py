@@ -38,7 +38,7 @@ from flwr.supercore.utils import humanize_bytes, humanize_duration
 from .run_utils import RunRow, format_runs
 from .utils import (
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
+    flwr_cli_exc_handler,
     init_channel_from_connection,
     print_json_to_stdout,
 )
@@ -338,7 +338,7 @@ def _list_runs(stub: ControlStub, limit: int | None = None) -> list[RunRow]:
     list[RunRow]
         List of formatted run information for all runs.
     """
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         res: ListRunsResponse = stub.ListRuns(ListRunsRequest(limit=limit))
     runs = [run_from_proto(proto) for proto in res.run_dict.values()]
 
@@ -365,7 +365,7 @@ def _display_one_run(stub: ControlStub, run_id: int) -> list[RunRow]:
     ValueError
         If the run_id is not found.
     """
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         res: ListRunsResponse = stub.ListRuns(ListRunsRequest(run_id=run_id))
     if not res.run_dict:
         # This won't be reached as an gRPC error is raised if run_id is invalid

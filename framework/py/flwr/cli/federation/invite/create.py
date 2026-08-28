@@ -21,7 +21,7 @@ import typer
 
 from flwr.cli.utils import (
     cli_output_control_stub,
-    flwr_cli_grpc_exc_handler,
+    flwr_cli_exc_handler,
     print_json_to_stdout,
 )
 from flwr.common.constant import CliOutputFormat
@@ -69,7 +69,7 @@ def _create_invitation(
     is_json: bool,
 ) -> None:
     """Send a create invitation request."""
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         _: CreateInvitationResponse = stub.CreateInvitation(request)
 
     if is_json:
