@@ -18,9 +18,10 @@
 import unittest
 from unittest.mock import Mock, patch
 
+import numpy as np
 import pytest
 
-from flwr.app import ConfigRecord, Context, Message, RecordDict
+from flwr.app import ArrayRecord, ConfigRecord, Context, Message, RecordDict
 from flwr.app.message import remove_content_from_message
 from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE, SubStatus
 from flwr.supercore.constant import TaskType
@@ -28,11 +29,13 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
+    iterate_object_tree,
 )
 
 from .start_client_internal import (
     FAB_VERIFICATION_ERROR,
     _pull_and_store_message,
+    _push_messages,
     start_client_internal,
 )
 
@@ -485,3 +488,47 @@ def test_start_client_internal_launches_superexec_with_runtime_http_address() ->
 
     command = popen.call_args.args[0]
     assert command[command.index("--runtime-api-address") + 1] == "localhost:54321"
+
+
+def test_push_messages_pushes_each_requested_object_once() -> None:
+    """Shared objects in different branches should only be pushed once."""
+    instruction = Message(
+        content=RecordDict(), dst_node_id=1, message_type="query"
+    )
+    reply = Message(
+        content=RecordDict(
+            {
+                "first": ArrayRecord(
+                    [np.array([1]), np.array([2]), np.array([3])]
+                ),
+                "second": ArrayRecord(
+                    [np.array([1]), np.array([4]), np.array([5])]
+                ),
+            }
+        ),
+        reply_to=instruction,
+    )
+    reply.metadata.__dict__["_run_id"] = 1
+    reply.metadata.__dict__["_message_id"] = reply.object_id
+    object_tree = get_object_tree(reply)
+    tree_object_ids = [tree.object_id for tree in iterate_object_tree(object_tree)]
+    assert len(tree_object_ids) > len(set(tree_object_ids))
+    object_contents = {
+        object_id: obj.deflate()
+        for object_id, obj in get_all_nested_objects(reply).items()
+    }
+
+    state = Mock()
+    state.get_messages.return_value = [reply]
+    state.get_message_processing_duration.return_value = 0.1
+    object_store = Mock()
+    object_store.get_object_tree.return_value = object_tree
+    object_store.get.side_effect = object_contents.get
+    send = Mock(return_value=(set(object_contents), "session-id"))
+    push_object = Mock()
+
+    _push_messages(state, object_store, send, push_object)
+
+    pushed_object_ids = [call.args[2] for call in push_object.call_args_list]
+    assert len(pushed_object_ids) == len(set(pushed_object_ids))
+    assert set(pushed_object_ids) == set(object_contents)
