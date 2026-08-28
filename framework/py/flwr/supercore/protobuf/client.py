@@ -17,14 +17,20 @@
 from __future__ import annotations
 
 import ssl
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Generator, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, Self, TypeVar
 
 import httpx
 from google.protobuf.message import DecodeError, Message
 
-from .constants import PROTOBUF_MEDIA_TYPE
+from flwr.supercore.constant import MAX_PROTOBUF_STREAM_MESSAGE_LENGTH
+
+from .constants import (
+    FRAME_HEADER_SIZE,
+    PROTOBUF_MEDIA_TYPE,
+    PROTOBUF_STREAM_MEDIA_TYPE,
+)
 
 if TYPE_CHECKING:
     from flwr.supercore.retry import RetryInvoker
@@ -165,10 +171,126 @@ class ProtobufClient:
             raise ValueError("Invalid protobuf response payload") from exc
         return result
 
-    def _send(self, context: ProtobufRequestContext) -> httpx.Response:
+    def _unary_stream(
+        self,
+        *,
+        path: str,
+        rpc_method: str,
+        request: Message,
+        response_type: type[ResponseT],
+    ) -> Generator[ResponseT, None, None]:
+        """Send a unary request and iterate over its streaming response."""
+        path = path if path.startswith("/") else f"/{path}"
+        content = request.SerializeToString(deterministic=True)
+
+        # Streaming requests intentionally have no read timeout. Add an overall
+        # deadline when Control API deadline and cancellation semantics are introduced.
+        def send() -> httpx.Response:
+            # Build a fresh request for every attempt so interceptors can safely
+            # mutate it without leaking state into a retry.
+            stream_timeout = httpx.Timeout(
+                connect=self._client.timeout.connect,
+                read=None,
+                write=self._client.timeout.write,
+                pool=self._client.timeout.pool,
+            )
+            http_request = self._client.build_request(
+                method="POST",
+                url=f"{self._base_url}{path}",
+                content=content,
+                headers={
+                    "content-type": PROTOBUF_MEDIA_TYPE,
+                    "accept": PROTOBUF_STREAM_MEDIA_TYPE,
+                },
+                timeout=stream_timeout,
+            )
+            context = ProtobufRequestContext(
+                rpc_method=rpc_method,
+                message=request,
+                request=http_request,
+            )
+            http_response = self._send(context, stream=True)
+            try:
+                # Validate only the response status here. The body remains open and
+                # is consumed incrementally by `iter_messages` below.
+                http_response.raise_for_status()
+            except BaseException:
+                # A failed attempt is never handed to the iterator, so release it
+                # here before the retry invoker starts another attempt.
+                http_response.close()
+                raise
+            return http_response
+
+        def iter_messages() -> Generator[ResponseT, None, None]:
+            # Open the response only when iteration starts so an unused stream does
+            # not acquire a connection that the unstarted generator cannot release.
+            response = (
+                self._retry_invoker.invoke(send)
+                if self._retry_invoker is not None
+                else send()
+            )
+            buffer = bytearray()
+            payload_size: int | None = None
+            try:
+                for chunk in response.iter_bytes():
+                    buffer.extend(chunk)
+                    while True:
+                        # HTTP chunks do not necessarily align with frame boundaries.
+                        # Wait until the four-byte payload size is available, then
+                        # wait again until the complete payload has arrived.
+                        if payload_size is None:
+                            if len(buffer) < FRAME_HEADER_SIZE:
+                                break
+                            payload_size = int.from_bytes(
+                                buffer[:FRAME_HEADER_SIZE], "big"
+                            )
+                            del buffer[:FRAME_HEADER_SIZE]
+                            if payload_size > MAX_PROTOBUF_STREAM_MESSAGE_LENGTH:
+                                raise ValueError(
+                                    "Protobuf stream frame size "
+                                    f"{payload_size} exceeds maximum "
+                                    f"{MAX_PROTOBUF_STREAM_MESSAGE_LENGTH}"
+                                )
+
+                        if len(buffer) < payload_size:
+                            break
+
+                        payload = bytes(buffer[:payload_size])
+                        del buffer[:payload_size]
+                        payload_size = None
+
+                        result = response_type()
+                        try:
+                            result.ParseFromString(payload)
+                        except DecodeError as exc:
+                            raise ValueError("Invalid protobuf stream payload") from exc
+                        yield result
+
+                if payload_size is not None or buffer:
+                    raise ValueError("Truncated protobuf stream frame")
+            finally:
+                # Closing the generator cancels the underlying HTTP stream too.
+                response.close()
+
+        return iter_messages()
+
+    def _send(
+        self, context: ProtobufRequestContext, *, stream: bool = False
+    ) -> httpx.Response:
         """Send a request through the configured interceptor chain."""
 
         def send(current_context: ProtobufRequestContext) -> httpx.Response:
+            if stream:
+                response = self._client.send(current_context.request, stream=True)
+                if response.is_error:
+                    try:
+                        # Response-side interceptors can inspect error payloads, while
+                        # successful response bodies remain incrementally streamed.
+                        response.read()
+                    except BaseException:
+                        response.close()
+                        raise
+                return response
             return self._client.send(current_context.request)
 
         call_next: ProtobufCall = send
