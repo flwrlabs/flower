@@ -7,9 +7,6 @@ from flwr.serverapp import Grid, ServerApp
 
 from fedscs.model import Net
 from fedscs.strategy import FedSCS
-
-from fedscs.model import Net
-from fedscs.strategy import FedSCS
 from fedscs.utils import set_seed
 
 

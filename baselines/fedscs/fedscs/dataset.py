@@ -43,6 +43,7 @@ def split_dataset_dirichlet_fixed_size(
 
     clients_indices: list[list[int]] = [[] for _ in range(num_clients)]
     remaining_capacity = [samples_per_client] * num_clients
+    assigned_indices: set[int] = set()
 
     for cls in sorted(data_by_class):
         cls_indices = data_by_class[cls]
@@ -90,7 +91,6 @@ def split_dataset_dirichlet_fixed_size(
             )
 
             draw = np.minimum(draw, capacity)
-
             assigned_now = int(draw.sum())
 
             if assigned_now == 0:
@@ -105,23 +105,29 @@ def split_dataset_dirichlet_fixed_size(
         for position, client_id in enumerate(available_clients):
             count = int(allocations[position])
 
-            if count > 0:
-                selected = cls_indices[start : start + count]
-                clients_indices[client_id].extend(selected)
-                remaining_capacity[client_id] -= count
-                start += count
+            if count <= 0:
+                continue
 
-    # Assign any remaining samples while respecting equal client capacity.
+            selected = cls_indices[start : start + count]
+
+            clients_indices[client_id].extend(selected)
+            assigned_indices.update(selected)
+
+            remaining_capacity[client_id] -= count
+            start += count
+
+    # Assign any unassigned samples while respecting client capacity.
     remaining_indices = [
         idx
         for cls_indices in data_by_class.values()
         for idx in cls_indices
-        if all(idx not in client for client in clients_indices)
+        if idx not in assigned_indices
     ]
 
     rng.shuffle(remaining_indices)
 
     position = 0
+
     for client_id in range(num_clients):
         needed = remaining_capacity[client_id]
 
@@ -129,16 +135,21 @@ def split_dataset_dirichlet_fixed_size(
             continue
 
         selected = remaining_indices[position : position + needed]
+
         clients_indices[client_id].extend(selected)
+        assigned_indices.update(selected)
+
         remaining_capacity[client_id] -= len(selected)
         position += len(selected)
 
-    # CIFAR-10 (50,000 samples) is normally divisible by the number of
-    # clients used in the experiments. If it is not, the remainder is left
-    # unassigned rather than silently giving clients unequal sizes.
     if any(count != 0 for count in remaining_capacity):
         raise RuntimeError(
             "Unable to construct equal-size client partitions."
+        )
+
+    if len(assigned_indices) != samples_per_client * num_clients:
+        raise RuntimeError(
+            "Some training samples were not assigned to a client."
         )
 
     return clients_indices

@@ -3,6 +3,8 @@
 import torch
 from flwr.app import ArrayRecord, Context, Message, MetricRecord, RecordDict
 from flwr.clientapp import ClientApp
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
 
 from fedscs.dataset import load_data
 from fedscs.model import Net, test, train
@@ -24,20 +26,45 @@ def get_device() -> torch.device:
     return torch.device("cpu")
 
 
+def load_test_data(batch_size: int = 32) -> DataLoader:
+    """Load the CIFAR-10 test set."""
+    transform = transforms.ToTensor()
+
+    testset = datasets.CIFAR10(
+        root="./data",
+        train=False,
+        download=True,
+        transform=transform,
+    )
+
+    return DataLoader(
+        testset,
+        batch_size=batch_size,
+        shuffle=False,
+    )
+
+
 @app.train()
 def train_client(msg: Message, context: Context) -> Message:
     """Train the global model on one client's local CIFAR-10 partition."""
     partition_id = int(context.node_config["partition-id"])
     num_partitions = int(context.node_config["num-partitions"])
-    
-    seed = int(context.run_config.get("seed", 42))
-    set_seed(seed)
+
+    run_seed = int(context.run_config.get("seed", 42))
+    partition_seed = int(
+        context.run_config.get("partition-seed", run_seed)
+    )
+
+    set_seed(run_seed)
 
     batch_size = int(context.run_config.get("batch-size", 32))
     local_epochs = int(context.run_config.get("local-epochs", 2))
-    learning_rate = float(context.run_config.get("learning-rate", 0.01))
-    alpha = float(context.run_config.get("dirichlet-alpha", 0.3))
-    seed = int(context.run_config.get("partition-seed", 42))
+    learning_rate = float(
+        context.run_config.get("learning-rate", 0.01)
+    )
+    alpha = float(
+        context.run_config.get("dirichlet-alpha", 0.3)
+    )
 
     device = get_device()
 
@@ -46,7 +73,7 @@ def train_client(msg: Message, context: Context) -> Message:
         num_partitions=num_partitions,
         batch_size=batch_size,
         alpha=alpha,
-        seed=seed,
+        seed=partition_seed,
     )
 
     print(
@@ -95,25 +122,14 @@ def train_client(msg: Message, context: Context) -> Message:
 @app.evaluate()
 def evaluate_client(msg: Message, context: Context) -> Message:
     """Evaluate the global model on the CIFAR-10 test set."""
-    partition_id = int(context.node_config["partition-id"])
-    num_partitions = int(context.node_config["num-partitions"])
-    
-    seed = int(context.run_config.get("seed", 42))
-    set_seed(seed)
+    run_seed = int(context.run_config.get("seed", 42))
+    set_seed(run_seed)
 
     batch_size = int(context.run_config.get("batch-size", 32))
-    alpha = float(context.run_config.get("dirichlet-alpha", 0.3))
-    seed = int(context.run_config.get("partition-seed", 42))
 
     device = get_device()
 
-    _, testloader = load_data(
-        partition_id=partition_id,
-        num_partitions=num_partitions,
-        batch_size=batch_size,
-        alpha=alpha,
-        seed=seed,
-    )
+    testloader = load_test_data(batch_size=batch_size)
 
     arrays = msg.content["arrays"]
 
@@ -128,7 +144,7 @@ def evaluate_client(msg: Message, context: Context) -> Message:
     )
 
     print(
-        f"Client {partition_id}: "
+        f"Test client: "
         f"test_loss={test_loss:.4f}, "
         f"test_accuracy={test_accuracy:.4f}"
     )

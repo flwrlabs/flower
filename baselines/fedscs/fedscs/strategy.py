@@ -82,6 +82,13 @@ class FedSCS(Strategy):
         )
 
     @staticmethod
+    def _is_finite_state(
+        state: dict[str, torch.Tensor],
+    ) -> bool:
+        """Check whether all model parameters contain finite values."""
+        return all(torch.isfinite(value).all().item() for value in state.values())
+
+    @staticmethod
     def _cosine_similarity(
         u: torch.Tensor,
         v: torch.Tensor,
@@ -162,18 +169,31 @@ class FedSCS(Strategy):
             raise ValueError("Client IDs and client states have different sizes.")
 
         # ---------------------------------------------------------------
-        # Step 1: Compute local model updates.
+        # Step 1: Validate client model states before computing updates.
+        #
+        # Non-finite parameters must never enter the aggregation because
+        # NaN/Inf values can contaminate the peer reference and global model.
+        # ---------------------------------------------------------------
+        for client_id, client_state in zip(client_ids, client_states):
+            if set(client_state) != set(initial_state):
+                raise ValueError(
+                    f"Client {client_id} model parameters do not match "
+                    "the global model."
+                )
+
+            if not self._is_finite_state(client_state):
+                raise ValueError(
+                    f"Client {client_id} returned non-finite model parameters."
+                )
+
+        # ---------------------------------------------------------------
+        # Step 2: Compute local model updates.
         #
         # Delta_i = W_i - W_t
         # ---------------------------------------------------------------
         delta_states: list[dict[str, torch.Tensor]] = []
 
         for client_state in client_states:
-            if set(client_state) != set(initial_state):
-                raise ValueError(
-                    "Client model parameters do not match the global model."
-                )
-
             delta_states.append(
                 {
                     key: (
@@ -184,8 +204,15 @@ class FedSCS(Strategy):
                 }
             )
 
+        # Validate updates after subtraction as well.
+        for client_id, delta in zip(client_ids, delta_states):
+            if not self._is_finite_state(delta):
+                raise ValueError(
+                    f"Client {client_id} produced a non-finite model update."
+                )
+
         # ---------------------------------------------------------------
-        # Step 2: Flatten updates.
+        # Step 3: Flatten updates.
         # ---------------------------------------------------------------
         flat_updates = [
             self._flatten_update(delta)
@@ -196,11 +223,16 @@ class FedSCS(Strategy):
             return client_states[0], [1.0]
 
         # ---------------------------------------------------------------
-        # Step 3: Construct leave-one-out peer references.
+        # Step 4: Construct leave-one-out peer references.
         #
         # P_i = sum_{j != i} Delta_j
         # ---------------------------------------------------------------
         total_update = torch.stack(flat_updates).sum(dim=0)
+
+        if not torch.isfinite(total_update).all():
+            raise ValueError(
+                "FedSCS peer reference contains non-finite values."
+            )
 
         peer_sums = [
             total_update - flat_updates[i]
@@ -208,7 +240,7 @@ class FedSCS(Strategy):
         ]
 
         # ---------------------------------------------------------------
-        # Step 4: Compute stable cosine similarity.
+        # Step 5: Compute stable cosine similarity.
         #
         # rho_i = max(cos(Delta_i, P_i), 0)
         # ---------------------------------------------------------------
@@ -221,7 +253,7 @@ class FedSCS(Strategy):
         ]
 
         # ---------------------------------------------------------------
-        # Step 5: Temporal smoothing.
+        # Step 6: Temporal smoothing.
         #
         # s_i(t) = beta * s_i(t-1)
         #          + (1-beta) * rho_i(t)
@@ -260,7 +292,7 @@ class FedSCS(Strategy):
             trust_scores.append(s_i)
 
         # ---------------------------------------------------------------
-        # Step 6: Temporal variation correction.
+        # Step 7: Temporal variation correction.
         #
         # nu_i(t) =
         #     |s_i(t) - s_i(t-1)| / (s_i(t-1) + epsilon)
@@ -283,13 +315,18 @@ class FedSCS(Strategy):
 
             corrected_score = s_i / (1.0 + variation)
 
+            if not torch.isfinite(
+                torch.tensor(corrected_score)
+            ):
+                corrected_score = 0.0
+
             history["nu"].append(variation)
             history["s_tilde"].append(corrected_score)
 
             corrected_scores.append(corrected_score)
 
         # ---------------------------------------------------------------
-        # Step 7: Normalize trust scores into convex aggregation weights.
+        # Step 8: Normalize trust scores into convex aggregation weights.
         # ---------------------------------------------------------------
         total_score = sum(corrected_scores)
 
@@ -306,6 +343,16 @@ class FedSCS(Strategy):
                 for score in corrected_scores
             ]
 
+        # Final weight validation.
+        if not all(
+            torch.isfinite(torch.tensor(weight))
+            and weight >= 0.0
+            for weight in aggregation_weights
+        ):
+            aggregation_weights = [
+                1.0 / num_clients
+            ] * num_clients
+
         for client_id, weight in zip(
             client_ids,
             aggregation_weights,
@@ -313,7 +360,7 @@ class FedSCS(Strategy):
             self.client_histories[client_id]["a"].append(weight)
 
         # ---------------------------------------------------------------
-        # Step 8: Weighted model aggregation.
+        # Step 9: Weighted model aggregation.
         #
         # W_(t+1) = sum_i a_i W_i
         # ---------------------------------------------------------------
@@ -326,14 +373,14 @@ class FedSCS(Strategy):
                 for i in range(num_clients)
             )
 
-            if torch.is_floating_point(initial_value):
-                aggregated_state[key] = aggregated_value.to(
-                    dtype=initial_value.dtype
+            if not torch.isfinite(aggregated_value).all():
+                raise ValueError(
+                    f"Non-finite aggregated parameter detected for '{key}'."
                 )
-            else:
-                aggregated_state[key] = aggregated_value.to(
-                    dtype=initial_value.dtype
-                )
+
+            aggregated_state[key] = aggregated_value.to(
+                dtype=initial_value.dtype
+            )
 
         # ---------------------------------------------------------------
         # Logging.
@@ -366,6 +413,11 @@ class FedSCS(Strategy):
         """Compute a sample-weighted average."""
         if not values or not weights:
             return 0.0
+
+        if len(values) != len(weights):
+            raise ValueError(
+                "Metric values and weights must have the same length."
+            )
 
         total_weight = sum(weights)
 
@@ -409,13 +461,21 @@ class FedSCS(Strategy):
 
             state_dict = arrays.to_torch_state_dict()
 
-            client_states.append(
-                {
-                    key: value.detach().cpu().clone()
-                    for key, value in state_dict.items()
-                }
-            )
+            client_state = {
+                key: value.detach().cpu().clone()
+                for key, value in state_dict.items()
+            }
 
+            # Reject invalid client updates before adding them to the
+            # aggregation set.
+            if not self._is_finite_state(client_state):
+                print(
+                    f"[FedSCS] Rejecting client {reply.metadata.src_node_id}: "
+                    "non-finite model parameters."
+                )
+                continue
+
+            client_states.append(client_state)
             client_ids.append(int(reply.metadata.src_node_id))
 
             metrics = reply.content.get("metrics")
@@ -444,7 +504,7 @@ class FedSCS(Strategy):
             for key, value in aggregated_state.items()
         }
 
-        if train_losses:
+        if train_losses and len(train_losses) == len(train_examples):
             avg_train_loss = self._weighted_average(
                 train_losses,
                 train_examples,

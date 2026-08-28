@@ -137,7 +137,6 @@ clientapp = "fedscs.client_app:app"
 
 # Federated training
 num-server-rounds = 2
-num-supernodes = 10
 
 # All available clients participate in each round
 fraction-train = 1.0
@@ -148,6 +147,7 @@ local-epochs = 2
 batch-size = 32
 learning-rate = 0.01
 
-# Reproducibility
+# Reproducibility and data partitioning
 seed = 42
-
+partition-seed = 42
+dirichlet-alpha = 0.3
