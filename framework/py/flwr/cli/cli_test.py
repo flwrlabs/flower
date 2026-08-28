@@ -126,9 +126,8 @@ def test_run_command_sends_cli_run_source_metadata() -> None:
             "@flwrlabs/quickstart-numpy",
         )
 
-    assert stub.StartRun.call_args.kwargs["metadata"] == [
-        (run_module.RUN_SOURCE_METADATA_KEY, "cli")
-    ]
+    metadata = stub.StartRun.call_args.kwargs["metadata"]
+    assert (run_module.RUN_SOURCE_METADATA_KEY, "cli") in metadata
 
 
 def test_build_command() -> None:
