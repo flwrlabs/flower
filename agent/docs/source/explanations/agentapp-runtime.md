@@ -113,9 +113,9 @@ connectors](use-connectors.md).
 
 ### Run events
 
-`agent.events.emit(event)` publishes one structured event to Flower Chat, the
-browser, and other run-event clients. An SDK stream stays private to the model
-task until the AgentApp republishes its events:
+`agent.events.emit(event)` publishes one structured event to the run-event
+stream consumed by Flower Chat and other clients. An SDK stream stays private
+to the model task until the AgentApp republishes its events:
 
 ```python
 for event in stream:
@@ -124,6 +124,17 @@ for event in stream:
 
 Publishing an event does not append it to `Context`. This lets the AgentApp
 separate frontend-visible progress from conversation state.
+
+These operations have distinct destinations:
+
+| Operation                               | Destination                                      |
+| --------------------------------------- | ------------------------------------------------ |
+| `print(...)`                            | AgentApp logs                                    |
+| `agent.events.emit(...)`                | Run-event stream consumed by Flower Chat clients |
+| Store an assistant message in `Context` | Persistent conversation state                    |
+
+See {ref}`publish-agentapp-generated-text` for the event sequence used to
+present text that does not come from an SDK stream.
 
 ## Context
 
