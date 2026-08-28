@@ -516,8 +516,6 @@ def _push_messages(
                 # At this point, content is guaranteed to be available
                 # therefore we can yield it after casting it to bytes
                 yield tree.object_id, cast(bytes, content)
-                if not remaining_obj_ids:
-                    return
 
         # Send the message
         try:
