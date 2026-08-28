@@ -83,6 +83,12 @@ the selected connector. The name check prevents the model from calling a tool
 that was not included in `tools`. The method returns a `function_call_output`
 with the same `call_id`. Pass calls and outputs to a later model request.
 
+A connector result is tool-loop data, not an assistant response, so calling
+`agent.connectors.call` does not display its output as assistant text in Flower
+Chat. Normally, pass the result to a final model request and publish that
+request's stream. If the AgentApp intentionally presents connector content
+directly, see {ref}`publish-agentapp-generated-text`.
+
 Account connector credentials are delivered to the runtime action, not returned
 to the AgentApp.
 

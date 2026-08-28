@@ -152,6 +152,8 @@ def conversation_messages(context: Context) -> list[dict[str, Any]]:
 `message_text` raises an error for an unexpected shape instead of silently
 sending incomplete history to the model.
 
+(persist-final-assistant-message)=
+
 ### Persist the final answer
 
 The runtime records a non-empty `agent.input` as a user message before calling

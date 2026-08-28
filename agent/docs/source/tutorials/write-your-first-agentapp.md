@@ -90,8 +90,9 @@ AgentApp process. The OpenAI client uses them to send the request through
 Flower, so the project does not need a model-provider API key.
 
 The SDK yields typed streaming events. The loop republishes each event through
-`agent.events.emit` so Flower Chat and the browser can render the response. It
-also collects text deltas and prints the completed answer to the run logs.
+`agent.events.emit` so Flower Chat and other run-event clients can render the
+response. Calling `print` does not publish an assistant response; it writes the
+completed answer only to the AgentApp logs.
 
 ## Review the Flower configuration
 
