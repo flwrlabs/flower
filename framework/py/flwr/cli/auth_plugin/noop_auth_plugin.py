@@ -19,6 +19,7 @@ from collections.abc import Sequence
 
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore.auth.typing import AccountAuthCredentials, AccountAuthLoginDetails
+from flwr.supercore.control import ControlHttpClient
 
 from .auth_plugin import CliAuthPlugin, LoginError
 
@@ -33,7 +34,7 @@ class NoOpCliAuthPlugin(CliAuthPlugin):
     @staticmethod
     def login(
         login_details: AccountAuthLoginDetails,
-        control_stub: ControlStub,
+        control_stub: ControlStub | ControlHttpClient,
     ) -> AccountAuthCredentials:
         """Raise LoginError as no-op plugin does not support login.
 
@@ -41,7 +42,7 @@ class NoOpCliAuthPlugin(CliAuthPlugin):
         ----------
         login_details : AccountAuthLoginDetails
             Login details (unused).
-        control_stub : ControlStub
+        control_stub : ControlStub | ControlHttpClient
             Control stub (unused).
 
         Returns

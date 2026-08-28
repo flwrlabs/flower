@@ -12,20 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower run interceptor."""
+"""CLI account authentication interceptors."""
 
 
 from collections.abc import Callable
 from typing import Any
 
 import grpc
+import httpx
 
+from flwr.common.constant import ACCESS_TOKEN_KEY
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartRunRequest,
     StopRunRequest,
     StreamLogsRequest,
     StreamRunEventsRequest,
 )
+from flwr.supercore.protobuf.client import ProtobufCall, ProtobufRequestContext
+from flwr.supercore.utils import get_metadata_str
 
 from .auth_plugin import CliAuthPlugin
 
@@ -108,3 +112,21 @@ class CliAccountAuthInterceptor(
         the required authentication tokens to the RPC metadata.
         """
         return self._authenticated_call(continuation, client_call_details, request)
+
+
+class CliAccountAuthHttpInterceptor:
+    """Add CLI account authentication to protobuf-over-HTTP requests."""
+
+    def __init__(self, auth_plugin: CliAuthPlugin):
+        self.auth_plugin = auth_plugin
+
+    def intercept(
+        self,
+        context: ProtobufRequestContext,
+        call_next: ProtobufCall,
+    ) -> httpx.Response:
+        """Add the stored access token as a bearer token."""
+        metadata = self.auth_plugin.write_tokens_to_metadata([])
+        if access_token := get_metadata_str(metadata, ACCESS_TOKEN_KEY):
+            context.request.headers["authorization"] = f"Bearer {access_token}"
+        return call_next(context)

@@ -34,6 +34,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore.auth.typing import AccountAuthCredentials, AccountAuthLoginDetails
+from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.credential_store import get_credential_store
 from flwr.supercore.utils import get_metadata_str
 
@@ -56,7 +57,7 @@ class OidcCliPlugin(CliAuthPlugin):
     @staticmethod
     def login(
         login_details: AccountAuthLoginDetails,
-        control_stub: ControlStub,
+        control_stub: ControlStub | ControlHttpClient,
     ) -> AccountAuthCredentials:
         """Authenticate the account and retrieve authentication credentials.
 
@@ -64,7 +65,7 @@ class OidcCliPlugin(CliAuthPlugin):
         ----------
         login_details : AccountAuthLoginDetails
             Login details containing device code and verification URI.
-        control_stub : ControlStub
+        control_stub : ControlStub | ControlHttpClient
             Control stub for making authentication requests.
 
         Returns
