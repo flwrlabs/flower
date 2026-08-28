@@ -119,6 +119,36 @@ def main(agent: AgentSession, context: Context) -> None:
 Flower. The app also collects text deltas so the completed answer appears in
 its logs.
 
+(publish-agentapp-generated-text)=
+
+## Publish AgentApp-generated text
+
+`print(...)` writes to the AgentApp logs. It does not publish an assistant
+response to Flower Chat.
+
+When the AgentApp already has final user-facing text that did not come from an
+SDK stream, publish an output delta followed by a completion event:
+
+```python
+assistant_text = "Hello from the AgentApp!"
+agent.events.emit(
+    {
+        "type": "response.output_text.delta",
+        "delta": assistant_text,
+    }
+)
+agent.events.emit({"type": "response.completed"})
+```
+
+The output delta adds assistant text to the run-event stream. The completion
+event tells Flower Chat and other run-event clients that the response has
+finished. For model-generated output, prefer republishing the original SDK
+events so clients receive the complete response event sequence.
+
+Publishing these events does not add an assistant message to the conversation
+state. When later runs need to replay it, see
+{ref}`persist-final-assistant-message` for the complete `Context` update.
+
 ## Use the SDK with connectors
 
 Model requests use `client.responses.create`. Connector discovery and
@@ -126,7 +156,7 @@ execution remain on the `AgentSession`:
 
 - `agent.connectors.tools(...)` returns tool schemas to pass to the SDK
 - `agent.connectors.call(...)` executes a model-requested function call
-- `agent.events.emit(...)` publishes the model events selected by the app
+- `agent.events.emit(...)` publishes events to the run-event stream
 
 The SDK returns typed output items. Convert a function-call item with
 `item.to_dict()` before passing it to `agent.connectors.call`. See [Build a
@@ -142,8 +172,9 @@ to the Flower `Context`. Store the final assistant message yourself when later
 runs in the same series need to replay it.
 
 Publishing an event with `agent.events.emit` makes it visible to run-event
-clients but does not persist it in the conversation state. The collaborative
-research agent tutorial shows both streaming and explicit message persistence.
+clients but does not persist it in the conversation state. See
+{ref}`persist-final-assistant-message` for an implementation that stores the
+final assistant message safely.
 
 ## Build and run the AgentApp
 
