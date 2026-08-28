@@ -240,7 +240,7 @@ def _run_with_control_api(
             print_json_to_stdout(payload)
 
         if stream:
-            start_stream(res.run_id, channel, CONN_REFRESH_PERIOD)
+            start_stream(res.run_id, stub, CONN_REFRESH_PERIOD)
     finally:
         if channel:
             channel.close()
