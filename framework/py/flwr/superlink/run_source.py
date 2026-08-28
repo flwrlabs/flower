@@ -17,7 +17,6 @@
 from typing import Literal, cast, get_args
 
 RunStartSource = Literal["cli", "web_ui", "automation", "unknown"]
-RUN_SOURCE_METADATA_KEY = "x-flwr-run-source"
 _RUN_START_SOURCES = frozenset(get_args(RunStartSource))
 
 

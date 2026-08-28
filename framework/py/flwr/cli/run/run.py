@@ -41,7 +41,6 @@ from flwr.supercore.utils import (
     parse_app_spec,
     simulation_config_from_json,
 )
-from flwr.superlink.run_source import RUN_SOURCE_METADATA_KEY
 
 from ..log import start_stream
 from ..utils import (
@@ -206,10 +205,7 @@ def _run_with_control_api(
             app_spec=app_spec or "",
         )
         with flwr_cli_grpc_exc_handler():
-            res = stub.StartRun(
-                req,
-                metadata=[(RUN_SOURCE_METADATA_KEY, "cli")],
-            )
+            res = stub.StartRun(req)
 
         if res.HasField("note"):
             typer.secho(f"Note: {res.note}", fg=typer.colors.YELLOW, err=True)

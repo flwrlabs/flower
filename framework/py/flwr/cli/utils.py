@@ -55,6 +55,7 @@ from flwr.supercore.utils import is_valid_name
 
 from .auth_plugin import CliAuthPlugin, get_cli_plugin_class
 from .cli_account_auth_interceptor import CliAccountAuthInterceptor
+from .cli_client_interceptor import CliClientInterceptor
 from .config_utils import load_certificate_in_connection
 from .constant import AUTHN_TYPE_STORE_KEY
 from .flower_config import read_superlink_connection
@@ -357,6 +358,7 @@ def init_channel_from_connection(
         root_certificates=root_certificates_bytes,
         max_message_length=GRPC_MAX_MESSAGE_LENGTH,
         interceptors=[
+            CliClientInterceptor(),
             RuntimeVersionClientInterceptor(component_name="flwr CLI"),
             CliAccountAuthInterceptor(auth_plugin),
         ],

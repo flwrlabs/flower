@@ -17,16 +17,13 @@
 
 import importlib
 import inspect
-from pathlib import Path
 from types import SimpleNamespace
 from typing import Annotated, Any, get_args, get_origin
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
 
-from flwr.cli.typing import SuperLinkConnection
-from flwr.proto.control_pb2 import StartRunResponse  # pylint: disable=E0611
 from flwr.supercore.version import package_version
 
 from . import app as app_module
@@ -100,34 +97,6 @@ def test_run_command_accepts_remote_app_spec() -> None:
     assert result.exit_code == 0
     assert mock_run_with_control_api.call_args is not None
     assert mock_run_with_control_api.call_args.args[-1] == "@flwrlabs/quickstart-numpy"
-
-
-def test_run_command_sends_cli_run_source_metadata() -> None:
-    """The CLI labels runs with the source used by product analytics."""
-    channel = Mock()
-    stub = Mock()
-    stub.StartRun.return_value = StartRunResponse(run_id=42)
-    connection = SuperLinkConnection(name="test", address="localhost:9093")
-
-    with (
-        patch.object(run_module, "init_channel_from_connection", return_value=channel),
-        patch.object(run_module, "ControlStub", return_value=stub),
-    ):
-        # pylint: disable=protected-access
-        run_module._run_with_control_api(
-            Path("."),
-            {},
-            None,
-            connection,
-            None,
-            None,
-            False,
-            False,
-            "@flwrlabs/quickstart-numpy",
-        )
-
-    metadata = stub.StartRun.call_args.kwargs["metadata"]
-    assert (run_module.RUN_SOURCE_METADATA_KEY, "cli") in metadata
 
 
 def test_build_command() -> None:
