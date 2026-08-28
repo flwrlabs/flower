@@ -32,7 +32,7 @@ from flwr.supercore.auth.typing import AccountAuthLoginDetails
 
 from ..config_migration import migrate, warn_if_federation_config_overrides
 from ..flower_config import read_superlink_connection
-from ..utils import flwr_cli_grpc_exc_handler, load_cli_auth_plugin_from_connection
+from ..utils import flwr_cli_exc_handler, load_cli_auth_plugin_from_connection
 
 
 def login(
@@ -72,7 +72,7 @@ def login(
     stub = ControlStub(channel)
 
     login_request = GetLoginDetailsRequest()
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         login_response: GetLoginDetailsResponse = stub.GetLoginDetails(login_request)
 
     # Get the auth plugin
@@ -89,7 +89,7 @@ def login(
         interval=login_response.interval,
     )
     try:
-        with flwr_cli_grpc_exc_handler():
+        with flwr_cli_exc_handler():
             credentials = authn_plugin.login(details, stub)
         typer.secho(
             "✅ Login successful.",
