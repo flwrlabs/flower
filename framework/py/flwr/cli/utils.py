@@ -29,6 +29,7 @@ from typing import Any, cast
 
 import click
 import grpc
+import httpx
 import pathspec
 import typer
 from rich.console import Console
@@ -64,6 +65,9 @@ from .local_superlink import ensure_local_superlink
 SUPERLINK_UNAVAILABLE_MESSAGE = (
     "Connection to the SuperLink is unavailable. Please check your network "
     "connection and 'address' in the SuperLink connection configuration."
+)
+AUTHENTICATION_FAILED_MESSAGE = (
+    "Authentication failed. Please run `flwr login` to authenticate and try again."
 )
 CONTROL_API_READY_TIMEOUT_SECONDS = 5
 CONTROL_API_READY_CHECK_INTERVAL_SECONDS = 1
@@ -418,19 +422,18 @@ def wait_for_control_api_channel(
 
 
 @contextmanager  # docsig: disable=SIG503
-def flwr_cli_grpc_exc_handler(
-    custom_handler: Callable[[grpc.RpcError], None] | None = None,
+def flwr_cli_exc_handler(
+    custom_handler: Callable[[Exception], None] | None = None,
 ) -> Iterator[None]:
-    """Context manager to handle Flower and gRPC CLI errors.
+    """Handle Flower CLI errors from the Control API transports.
 
-    Catches gRPC errors, translates serialized FlowerError details into click
-    exceptions with user-facing messages, and falls back to transport-specific
-    messages or raw gRPC details.
+    Translate structured Flower errors and transport failures into Click exceptions
+    with consistent user-facing messages.
 
     Parameters
     ----------
-    custom_handler : Callable[[grpc.RpcError], None] | None (default: None)
-        Optional custom handler called with the caught gRPC error before applying
+    custom_handler : Callable[[Exception], None] | None
+        Optional handler called with the caught transport error before applying the
         default Flower CLI error handling.
 
     Yields
@@ -441,34 +444,50 @@ def flwr_cli_grpc_exc_handler(
     Raises
     ------
     click.ClickException
-        For handled gRPC errors, with user-friendly messages. Or raw gRPC error details
-        will be shown.
+        For handled API and transport errors, with a user-friendly message.
     """
     try:
         yield
-    except grpc.RpcError as e:
+    except (grpc.RpcError, httpx.HTTPError) as err:
         if custom_handler is not None:
-            custom_handler(e)
+            custom_handler(err)
 
-        # Control API serializes FlowerError into gRPC details. If the payload is
-        # not a valid FlowerError, the raw gRPC fallback below handles it.
-        details = cast(str, e.details())  # pylint: disable=E1101
-        if flower_error := FlowerError.from_json(details):
-            raise click.ClickException(_format_flower_error(flower_error)) from None
+        if isinstance(err, grpc.RpcError):
+            # Control API serializes FlowerError into gRPC details. If the payload is
+            # not a valid FlowerError, the raw gRPC fallback below handles it.
+            details = cast(str, err.details())  # pylint: disable=E1101
+            if flower_error := FlowerError.from_json(details):
+                raise click.ClickException(_format_flower_error(flower_error)) from None
 
-        # Keep special handling only for transport-level errors that are not part
-        # of the FlowerError catalog.
-        # pylint: disable-next=E1101
-        if e.code() == grpc.StatusCode.UNAUTHENTICATED:
-            raise click.ClickException(
-                "Authentication failed. Please run `flwr login`"
-                " to authenticate and try again."
-            ) from None
-        if e.code() == grpc.StatusCode.UNAVAILABLE:
+            # Keep special handling only for transport-level errors that are not part
+            # of the FlowerError catalog.
+            # pylint: disable-next=E1101
+            if err.code() == grpc.StatusCode.UNAUTHENTICATED:
+                raise click.ClickException(AUTHENTICATION_FAILED_MESSAGE) from None
+            if err.code() == grpc.StatusCode.UNAVAILABLE:  # pylint: disable=E1101
+                raise click.ClickException(SUPERLINK_UNAVAILABLE_MESSAGE) from None
+
+            raise click.ClickException(details) from None
+
+        if isinstance(err, httpx.RequestError):
             raise click.ClickException(SUPERLINK_UNAVAILABLE_MESSAGE) from None
 
-        # Log details from grpc error directly
-        raise click.ClickException(details) from None
+        if isinstance(err, httpx.HTTPStatusError):
+            response = err.response
+            if flower_error := FlowerError.from_json(response.text):
+                raise click.ClickException(_format_flower_error(flower_error)) from None
+
+            if response.status_code == httpx.codes.UNAUTHORIZED:
+                raise click.ClickException(AUTHENTICATION_FAILED_MESSAGE) from None
+
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = None
+            if isinstance(payload, dict) and isinstance(payload.get("detail"), str):
+                raise click.ClickException(payload["detail"]) from None
+
+        raise click.ClickException(str(err)) from None
 
 
 def build_pathspec(
