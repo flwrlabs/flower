@@ -16,6 +16,8 @@
 
 
 import importlib
+import os
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -125,6 +127,42 @@ def test_flwr_agentapp_forwards_cli_args() -> None:
     assert kwargs["log_queue"] is mirror_output_to_queue.call_args.args[0]
     assert kwargs["token"] == "test-token"
     assert kwargs["insecure"] is True
-    assert kwargs["certificates"] is None
+    assert kwargs["certificates_path"] is None
     assert kwargs["parent_pid"] == 321
     assert kwargs["runtime_dependency_install"] is True
+
+
+def test_flwr_agentapp_forwards_explicit_root_certificates_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Forward the resolved Runtime root certificate path to the runtime."""
+    monkeypatch.setenv("SSL_CERT_FILE", "inherited-ca.pem")
+    certificate_path = tmp_path / "runtime-ca.pem"
+    certificate_path.write_bytes(b"root-certificates")
+    monkeypatch.chdir(tmp_path)
+    args = SimpleNamespace(
+        insecure=False,
+        runtime_api_address="runtime.example:9092",
+        token="test-token",
+        root_certificates=certificate_path.name,
+        parent_pid=None,
+        runtime_dependency_install=False,
+    )
+
+    class _Parser:
+        def parse_args(self) -> SimpleNamespace:
+            """Return a fixed namespace with explicit root certificates."""
+            return args
+
+    with (
+        patch.object(flwr_agentapp_module, "_parse_args_run_flwr_agentapp", _Parser),
+        patch.object(flwr_agentapp_module, "mirror_output_to_queue"),
+        patch.object(flwr_agentapp_module, "restore_output"),
+        patch.object(flwr_agentapp_module, "run_agentapp") as run_agentapp,
+    ):
+        flwr_agentapp_module.flwr_agentapp()
+
+    assert os.environ["SSL_CERT_FILE"] == "inherited-ca.pem"
+    assert run_agentapp.call_args.kwargs["certificates_path"] == str(
+        certificate_path.resolve()
+    )

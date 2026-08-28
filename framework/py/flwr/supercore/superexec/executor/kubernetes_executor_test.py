@@ -183,7 +183,7 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
     assert container["command"] == ["flwr-serverapp"]
     assert "env" not in container
     assert container["args"] == [
-        "--serverappio-api-address",
+        "--runtime-api-address",
         "appio.example.com:9092",
         "--token-file",
         APPIO_TOKEN_FILE_PATH,
@@ -399,7 +399,7 @@ def test_build_taskexecutor_pod_supports_clientapp_insecure_args() -> None:
 
     assert pod["spec"]["containers"][0]["command"] == ["flwr-clientapp"]
     assert pod["spec"]["containers"][0]["args"] == [
-        "--clientappio-api-address",
+        "--runtime-api-address",
         "appio.example.com:9092",
         "--token-file",
         APPIO_TOKEN_FILE_PATH,
@@ -426,7 +426,7 @@ def test_build_taskexecutor_pod_supports_secure_default_trust_store() -> None:
 
     assert secret["stringData"] == {"token": "task-token"}
     assert pod["spec"]["containers"][0]["args"] == [
-        "--serverappio-api-address",
+        "--runtime-api-address",
         "appio.example.com:9092",
         "--token-file",
         APPIO_TOKEN_FILE_PATH,
@@ -456,7 +456,7 @@ def test_build_taskexecutor_objects_use_execution_spec_root_certificates(
 
     assert secret["stringData"] == {"token": "task-token", "ca.crt": "spec-root-ca"}
     assert pod["spec"]["containers"][0]["args"] == [
-        "--serverappio-api-address",
+        "--runtime-api-address",
         "appio.example.com:9092",
         "--token-file",
         APPIO_TOKEN_FILE_PATH,
@@ -489,7 +489,7 @@ def test_build_taskexecutor_objects_expand_user_root_certificates_path(
 
     assert secret["stringData"] == {"token": "task-token", "ca.crt": "home-root-ca"}
     assert pod["spec"]["containers"][0]["args"] == [
-        "--serverappio-api-address",
+        "--runtime-api-address",
         "appio.example.com:9092",
         "--token-file",
         APPIO_TOKEN_FILE_PATH,
@@ -511,7 +511,7 @@ def test_build_taskexecutor_pod_supports_simulation_args() -> None:
 
     assert pod["spec"]["containers"][0]["command"] == ["flwr-simulation"]
     assert pod["spec"]["containers"][0]["args"] == [
-        "--serverappio-api-address",
+        "--runtime-api-address",
         "appio.example.com:9092",
         "--token-file",
         APPIO_TOKEN_FILE_PATH,

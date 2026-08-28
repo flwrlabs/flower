@@ -537,6 +537,39 @@ class GetAuthTokensResponse(google.protobuf.message.Message):
 global___GetAuthTokensResponse = GetAuthTokensResponse
 
 @typing.final
+class RefreshAuthTokensRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    REFRESH_TOKEN_FIELD_NUMBER: builtins.int
+    refresh_token: builtins.str
+    def __init__(
+        self,
+        *,
+        refresh_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["refresh_token", b"refresh_token"]) -> None: ...
+
+global___RefreshAuthTokensRequest = RefreshAuthTokensRequest
+
+@typing.final
+class RefreshAuthTokensResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ACCESS_TOKEN_FIELD_NUMBER: builtins.int
+    REFRESH_TOKEN_FIELD_NUMBER: builtins.int
+    access_token: builtins.str
+    refresh_token: builtins.str
+    def __init__(
+        self,
+        *,
+        access_token: builtins.str = ...,
+        refresh_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["access_token", b"access_token", "refresh_token", b"refresh_token"]) -> None: ...
+
+global___RefreshAuthTokensResponse = RefreshAuthTokensResponse
+
+@typing.final
 class ListConnectorsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -875,17 +908,25 @@ class AppInfo(google.protobuf.message.Message):
     APP_ID_FIELD_NUMBER: builtins.int
     FAB_HASH_FIELD_NUMBER: builtins.int
     APP_TYPE_FIELD_NUMBER: builtins.int
+    IS_HUB_APP_FIELD_NUMBER: builtins.int
     app_id: builtins.str
     fab_hash: builtins.str
     app_type: builtins.str
+    is_hub_app: builtins.bool
+    """True for Hub apps, false for local/custom apps, and absent for legacy apps
+    whose provenance is unknown.
+    """
     def __init__(
         self,
         *,
         app_id: builtins.str = ...,
         fab_hash: builtins.str = ...,
         app_type: builtins.str = ...,
+        is_hub_app: builtins.bool | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["app_id", b"app_id", "app_type", b"app_type", "fab_hash", b"fab_hash"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_is_hub_app", b"_is_hub_app", "is_hub_app", b"is_hub_app"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_is_hub_app", b"_is_hub_app", "app_id", b"app_id", "app_type", b"app_type", "fab_hash", b"fab_hash", "is_hub_app", b"is_hub_app"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_is_hub_app", b"_is_hub_app"]) -> typing.Literal["is_hub_app"] | None: ...
 
 global___AppInfo = AppInfo
 

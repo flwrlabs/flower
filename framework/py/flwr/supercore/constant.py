@@ -80,6 +80,9 @@ SUPERLINK_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{SUPERLINK_UVICORN_DEFAULT_P
 SUPERNODE_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{SUPERNODE_UVICORN_DEFAULT_PORT}"
 SUPERNODE_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{SUPERNODE_UVICORN_DEFAULT_PORT}"
 
+# Maximum serialized protobuf stream message size
+MAX_PROTOBUF_STREAM_MESSAGE_LENGTH = 2_147_483_647  # 2 GiB - 1 byte
+
 # SuperGrid constants
 SUPERGRID_ADDRESS = os.getenv("FLWR_SUPERGRID_ADDRESS", "supergrid.flower.ai")
 
@@ -245,12 +248,12 @@ class TaskType(StrEnum):
 
 
 TASK_TYPE_TO_APPIO_API_ADDRESS_ARG: dict[TaskType, str] = {
-    TaskType.AGENT_APP: "--serverappio-api-address",
-    TaskType.CLIENT_APP: "--clientappio-api-address",
-    TaskType.CONNECTOR: "--serverappio-api-address",
-    TaskType.MODEL: "--serverappio-api-address",
-    TaskType.SERVER_APP: "--serverappio-api-address",
-    TaskType.SIMULATION: "--serverappio-api-address",
+    TaskType.AGENT_APP: "--runtime-api-address",
+    TaskType.CLIENT_APP: "--runtime-api-address",
+    TaskType.CONNECTOR: "--runtime-api-address",
+    TaskType.MODEL: "--runtime-api-address",
+    TaskType.SERVER_APP: "--runtime-api-address",
+    TaskType.SIMULATION: "--runtime-api-address",
 }
 TASK_TYPE_TO_COMMAND: dict[TaskType, str] = {
     TaskType.AGENT_APP: "flwr-agentapp",

@@ -37,9 +37,11 @@ from flwr.common.config import (
     get_metadata_from_config,
 )
 from flwr.common.constant import (
+    ACCESS_TOKEN_KEY,
     FAB_MAX_SIZE,
     HEARTBEAT_DEFAULT_INTERVAL,
     LOG_STREAM_INTERVAL,
+    REFRESH_TOKEN_KEY,
     RUN_EVENTS_STREAM_INTERVAL,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     Status,
@@ -97,6 +99,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
+    RefreshAuthTokensRequest,
+    RefreshAuthTokensResponse,
     RegisterNodeRequest,
     RegisterNodeResponse,
     RejectInvitationRequest,
@@ -159,14 +163,17 @@ from flwr.supercore.typing import (
     StartRunContext,
 )
 from flwr.supercore.utils import (
+    get_metadata_str,
     parse_app_spec,
     request_download_link,
     resolve_account_ids,
     strict_json_dumps,
 )
+from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
+from flwr.superlink.run_source import RunStartSource
 
 
 class InvalidConnectorRequestError(FlowerError):
@@ -466,6 +473,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     account: AccountInfo,
     state: LinkState,
     fleet_api_type: str | None,
+    *,
+    source: RunStartSource = "unknown",
 ) -> StartRunResponse:
     """Create run ID."""
     log(INFO, "ControlServicer.StartRun")
@@ -505,6 +514,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 f"Invalid app specification: {request.app_spec}",
             ) from e
     is_stored_app = bool(request.fab.hash_str and not request.fab.content)
+    is_hub_app = False
 
     # Start a run using a stored app
     if is_stored_app:
@@ -530,6 +540,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         fab_file, verification_dict, note = _get_remote_fab(
             fleet_api_type, request.app_spec
         )
+        is_hub_app = True
     # Start a run using the provided app
     else:
         fab_file = request.fab.content
@@ -606,6 +617,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 app_id=app_id,
                 app_type=app_type,
                 added_by=flwr_aid,
+                is_hub_app=is_hub_app,
             )
 
         series_id = request.series_id if request.HasField("series_id") else None
@@ -651,9 +663,11 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
     log_msg = f"Created run {run_id} in federation {run.federation_id}"
     log(INFO, log_msg)
-    return StartRunResponse(
+    response = StartRunResponse(
         run_id=run_id, note=note, series_id=series_id, federation=run.federation_id
     )
+    extensions.notify_run_started(run, source)
+    return response
 
 
 def stream_logs(
@@ -678,8 +692,20 @@ def stream_logs(
     _validate_federation_membership_in_request(
         state, account.flwr_aid, run.federation_id
     )
+    extensions.notify_result_delivered(run, account.flwr_aid, "logs")
 
     after_timestamp = request.after_timestamp + 1e-6
+    return _stream_logs(run_id, task_id, after_timestamp, state, is_active)
+
+
+def _stream_logs(
+    run_id: int,
+    task_id: int,
+    after_timestamp: float,
+    state: LinkState,
+    is_active: Callable[[], bool] | None,
+) -> Generator[StreamLogsResponse, None, None]:
+    """Yield log responses until the run finishes or the stream is cancelled."""
     while is_active is None or is_active():
         log_msg, latest_timestamp = state.get_task_log(task_id, after_timestamp)
         if log_msg:
@@ -724,10 +750,34 @@ def stream_run_events(
     _validate_federation_membership_in_request(
         state, account.flwr_aid, run.federation_id
     )
+    # A chat/read receipt represents an AgentApp result. ServerApp and
+    # simulation runs can also expose task events, but those are not chat
+    # results and must not be classified as such.
+    if run.primary_task_type == TaskType.AGENT_APP:
+        extensions.notify_result_delivered(run, account.flwr_aid, "chat")
 
     after_task_event_id = None
     if request.HasField("after_task_event_id"):
         after_task_event_id = request.after_task_event_id
+    return _stream_run_events(
+        run_id,
+        run,
+        after_task_event_id,
+        state,
+        is_active,
+    )
+
+
+def _stream_run_events(
+    run_id: int,
+    run: Run,
+    after_task_event_id: int | None,
+    state: LinkState,
+    is_active: Callable[[], bool] | None,
+) -> Generator[StreamRunEventsResponse, None, None]:
+    """Yield task events until the run finishes or the stream is cancelled."""
+    # LinkState creates every run with a primary task, so casting is safe
+    primary_task_id = cast(int, run.primary_task_id)
     while is_active is None or is_active():
         should_break = run.status.status == Status.FINISHED
 
@@ -735,6 +785,7 @@ def stream_run_events(
         # streamed task event
         events = state.get_task_events(
             run_id=run_id,
+            task_ids=[primary_task_id],
             after_task_event_id=after_task_event_id,
         )
         for event in events:
@@ -901,6 +952,7 @@ def dispatch_automation(
             AccountInfo(flwr_aid=flwr_aid, account_name=""),
             state,
             None,
+            source="automation",
         )
     except Exception as exc:  # pylint: disable=broad-exception-caught
         state.finish_automation(
@@ -1191,6 +1243,40 @@ def get_auth_tokens(
     )
 
 
+def refresh_auth_tokens(
+    request: RefreshAuthTokensRequest, authn_plugin: ControlAuthnPlugin | None
+) -> RefreshAuthTokensResponse:
+    """Refresh account authentication tokens."""
+    log(INFO, "ControlServicer.RefreshAuthTokens")
+    if authn_plugin is None:
+        raise FlowerError(
+            ApiErrorCode.NO_ACCOUNT_AUTH,
+            "ControlServicer initialized without account authentication.",
+        )
+
+    if not request.refresh_token:
+        raise FlowerError(
+            ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+            "Refresh token is missing.",
+        )
+
+    tokens, account = authn_plugin.refresh_tokens(
+        [(REFRESH_TOKEN_KEY, request.refresh_token)]
+    )
+    access_token = get_metadata_str(tokens, ACCESS_TOKEN_KEY)
+    refresh_token = get_metadata_str(tokens, REFRESH_TOKEN_KEY)
+    if access_token is None or refresh_token is None or account is None:
+        raise FlowerError(
+            ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+            "Authentication plugin failed to refresh account tokens.",
+        )
+
+    return RefreshAuthTokensResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+    )
+
+
 def pull_artifacts(
     request: PullArtifactsRequest,
     account: AccountInfo,
@@ -1365,6 +1451,7 @@ def list_apps(
         agent = AppInfo(
             app_id=FLOWER_AGENT_APP_ID,
             app_type=TaskType.AGENT_APP,
+            is_hub_app=True,
         )
         if limit is not None:
             apps = apps[: limit - 1]
@@ -1400,6 +1487,7 @@ def add_app(
         app_id=request.app_id,
         app_type=app_type,
         added_by=account.flwr_aid,
+        is_hub_app=True,
     )
 
     return AddAppResponse()

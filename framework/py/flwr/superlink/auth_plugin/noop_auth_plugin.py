@@ -23,6 +23,7 @@ from flwr.supercore.auth.typing import (
     AccountAuthLoginDetails,
     AccountInfo,
 )
+from flwr.supercore.error import ApiErrorCode, FlowerError
 
 from .auth_plugin import ControlAuthnPlugin
 
@@ -61,7 +62,10 @@ class NoOpControlAuthnPlugin(ControlAuthnPlugin):
 
     def get_auth_tokens(self, device_code: str) -> AccountAuthCredentials | None:
         """Get authentication tokens."""
-        raise RuntimeError("NoOp plugin does not support getting auth tokens.")
+        raise FlowerError(
+            ApiErrorCode.NO_ACCOUNT_AUTH,
+            "Account authentication is not enabled on this SuperLink.",
+        )
 
     def refresh_tokens(
         self, metadata: Sequence[tuple[str, str | bytes]]

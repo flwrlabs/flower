@@ -24,7 +24,7 @@ from flwr.common.constant import ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, BearerAuthenticationError, FlowerError
 
-from .account import AccountAccessDependency, get_account
+from .account import AccountAccessDependency, get_account, get_authn_plugin
 
 
 def _make_request(
@@ -195,3 +195,20 @@ def test_get_account_raises_when_authentication_middleware_did_not_run() -> None
         == "SuperLink account authentication is not initialized: expected an "
         "authenticated account, got NoneType."
     )
+
+
+def test_get_authn_plugin_returns_configured_plugin() -> None:
+    """Return the authentication plugin owned by the account dependency."""
+    app = FastAPI()
+    authn_plugin = Mock()
+    app.state.account_access_dep = AccountAccessDependency(authn_plugin)
+
+    assert get_authn_plugin(_make_app_request(app)) is authn_plugin
+
+
+def test_get_authn_plugin_raises_when_authentication_is_not_initialized() -> None:
+    """Fail clearly when the application has no account dependency."""
+    with pytest.raises(FlowerError) as exc_info:
+        get_authn_plugin(_make_app_request(FastAPI()))
+
+    assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED

@@ -77,6 +77,9 @@ background_pids=()
 cleanup() {
   if [ "${#background_pids[@]}" -gt 0 ]; then
     kill "${background_pids[@]}" 2>/dev/null || true
+    sleep 1
+    # SuperNodes can keep retrying after the SuperLink exits.
+    kill -KILL "${background_pids[@]}" 2>/dev/null || true
     wait "${background_pids[@]}" 2>/dev/null || true
   fi
 }

@@ -20,7 +20,7 @@ from collections.abc import Iterable
 from typing import cast
 
 from fastapi import Depends, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response
 from google.protobuf.message import DecodeError, Message
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
@@ -29,17 +29,25 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddAppRequest,
     AddNodeToFederationRequest,
     ArchiveFederationRequest,
+    BeginConnectorOAuthRequest,
+    CompleteConnectorOAuthRequest,
     ConfigureSimulationFederationRequest,
     CreateFederationRequest,
     CreateInvitationRequest,
+    DisconnectConnectorRequest,
+    GetAuthTokensRequest,
+    GetLoginDetailsRequest,
     GetRunSeriesRequest,
     ListAppsRequest,
     ListAutomationsRequest,
+    ListConnectorsRequest,
     ListFederationsRequest,
     ListInvitationsRequest,
     ListNodesRequest,
     ListRunSeriesRequest,
     ListRunsRequest,
+    PullArtifactsRequest,
+    RefreshAuthTokensRequest,
     RegisterNodeRequest,
     RejectInvitationRequest,
     RemoveAccountFromFederationRequest,
@@ -51,6 +59,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartRunRequest,
     StopAutomationRequest,
     StopRunRequest,
+    StreamLogsRequest,
+    StreamRunEventsRequest,
     UnregisterNodeRequest,
 )
 from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
@@ -81,6 +91,11 @@ from flwr.supercore.protobuf.constants import (
     PROTOBUF_STREAM_MEDIA_TYPE,
 )
 from flwr.supercore.protobuf.framing import frame_message
+from flwr.supercore.protobuf.streaming import (
+    CancellableProtobufStreamingResponse,
+    ProtobufStreamContext,
+    get_protobuf_stream_context,
+)
 
 RouteKey = tuple[str, str]
 
@@ -93,6 +108,16 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/control/start-automation"): StartAutomationRequest,
     ("POST", "/v1/control/list-automations"): ListAutomationsRequest,
     ("POST", "/v1/control/stop-automation"): StopAutomationRequest,
+    ("POST", "/v1/control/get-login-details"): GetLoginDetailsRequest,
+    ("POST", "/v1/control/get-auth-tokens"): GetAuthTokensRequest,
+    ("POST", "/v1/control/refresh-auth-tokens"): RefreshAuthTokensRequest,
+    ("POST", "/v1/control/list-connectors"): ListConnectorsRequest,
+    ("POST", "/v1/control/disconnect-connector"): DisconnectConnectorRequest,
+    ("POST", "/v1/control/begin-connector-oauth"): BeginConnectorOAuthRequest,
+    ("POST", "/v1/control/complete-connector-oauth"): CompleteConnectorOAuthRequest,
+    ("POST", "/v1/control/stream-logs"): StreamLogsRequest,
+    ("POST", "/v1/control/stream-run-events"): StreamRunEventsRequest,
+    ("POST", "/v1/control/pull-artifacts"): PullArtifactsRequest,
     ("POST", "/v1/control/register-node"): RegisterNodeRequest,
     ("POST", "/v1/control/unregister-node"): UnregisterNodeRequest,
     ("POST", "/v1/control/list-nodes"): ListNodesRequest,
@@ -183,7 +208,9 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             )
 
         result = request.state.protobuf_response
-        protobuf_response = self._response_for(result)
+        protobuf_response = self._response_for(
+            result, get_protobuf_stream_context(request)
+        )
         del request.state.protobuf_response
         # Preserve metadata set by inner middleware, but not placeholder body headers.
         protobuf_response.status_code = response.status_code
@@ -217,7 +244,9 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         return message
 
     @staticmethod
-    def _response_for(result: object) -> Response:
+    def _response_for(
+        result: object, stream_context: ProtobufStreamContext
+    ) -> Response:
         """Return the HTTP response matching a protobuf handler result."""
         # ``Message`` is also the most specific contract and must be checked
         # first. Unary responses are not framed; framing is reserved for streams.
@@ -229,9 +258,13 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         # Synchronous generators and other iterables are streamed lazily too.
         # Starlette advances a synchronous iterator outside the event loop.
         if isinstance(result, Iterable):
-            return StreamingResponse(
-                (frame_message(message) for message in cast(Iterable[Message], result)),
-                media_type=PROTOBUF_STREAM_MEDIA_TYPE,
+            content = (
+                frame_message(message) for message in cast(Iterable[Message], result)
+            )
+            return CancellableProtobufStreamingResponse(
+                content,
+                stream_context,
+                PROTOBUF_STREAM_MEDIA_TYPE,
             )
 
         raise FlowerError(

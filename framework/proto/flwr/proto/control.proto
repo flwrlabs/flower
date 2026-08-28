@@ -251,6 +251,12 @@ message GetAuthTokensResponse {
   string refresh_token = 2;
 }
 
+message RefreshAuthTokensRequest { string refresh_token = 1; }
+message RefreshAuthTokensResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
 message ListConnectorsRequest { string federation = 1; }
 message Connector {
   string connector_ref = 1;
@@ -306,6 +312,9 @@ message AppInfo {
   string app_id = 1;
   string fab_hash = 2;
   string app_type = 3;
+  // True for Hub apps, false for local/custom apps, and absent for legacy apps
+  // whose provenance is unknown.
+  optional bool is_hub_app = 4;
 }
 message ListAppsRequest {
   string federation_id = 1;
