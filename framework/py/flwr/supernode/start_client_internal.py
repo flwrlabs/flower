@@ -505,9 +505,11 @@ def _push_messages(
         def yield_object_contents(
             _obj_tree: ObjectTree, obj_id_set: set[str]
         ) -> Iterator[tuple[str, bytes]]:
+            remaining_obj_ids = set(obj_id_set)
             for tree in iterate_object_tree(_obj_tree):
-                if tree.object_id not in obj_id_set:
+                if tree.object_id not in remaining_obj_ids:
                     continue
+                remaining_obj_ids.remove(tree.object_id)
                 while (content := object_store.get(tree.object_id)) == b"":
                     # Wait for the content to be available
                     time.sleep(0.5)
