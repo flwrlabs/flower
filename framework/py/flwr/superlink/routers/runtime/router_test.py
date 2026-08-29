@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for the Runtime API router."""
 
+import inspect
 from typing import cast
 from unittest.mock import Mock
 
@@ -121,6 +122,29 @@ def test_all_runtime_routes_have_protobuf_request_types() -> None:
 
     assert len(route_keys) == 19
     assert route_keys == runtime_request_types
+
+
+def test_all_runtime_routes_declare_protobuf_openapi_contracts() -> None:
+    """Document every Runtime route as protobuf-over-HTTP."""
+    schema = _create_app(Mock(spec=LinkState)).openapi()
+    runtime_routes = [route for route in router.routes if isinstance(route, APIRoute)]
+
+    assert len(runtime_routes) == 19
+    for route in runtime_routes:
+        operation = schema["paths"][route.path]["post"]
+        request_body = operation["requestBody"]
+        success_content = operation["responses"]["200"]["content"]
+
+        assert operation["description"] == inspect.getdoc(
+            inspect.unwrap(route.endpoint)
+        )
+        assert request_body["required"] is True
+        assert request_body["content"] == {
+            PROTOBUF_MEDIA_TYPE: {"schema": {"type": "string", "format": "binary"}}
+        }
+        assert success_content == {
+            PROTOBUF_MEDIA_TYPE: {"schema": {"type": "string", "format": "binary"}}
+        }
 
 
 def test_runtime_routes_declare_expected_security() -> None:
