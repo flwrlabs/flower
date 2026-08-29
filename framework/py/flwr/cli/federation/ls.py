@@ -42,7 +42,7 @@ from flwr.supercore.utils import humanize_duration, simulation_config_to_json
 from ..run_utils import RunRow, format_runs
 from ..utils import (
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
+    flwr_cli_exc_handler,
     init_channel_from_connection,
     print_json_to_stdout,
 )
@@ -144,7 +144,7 @@ def ls(  # pylint: disable=R0914, R0913, R0917, R0912
 
 def _list_federations(stub: ControlStub) -> list[Federation]:
     """List all federations."""
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         res: ListFederationsResponse = stub.ListFederations(ListFederationsRequest())
 
     return list(res.federations)
@@ -268,7 +268,7 @@ def _show_federation(
     tuple[list[Member], list[NodeInfo], list[RunRow], bool, bool, SimulationConfig]
         A tuple containing (members, nodes, runs, archived, simulation, config).
     """
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         res: ShowFederationResponse = stub.ShowFederation(
             ShowFederationRequest(federation_name=federation)
         )

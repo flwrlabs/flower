@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SuperLink FastAPI extension hooks."""
+"""SuperLink extension hooks."""
 
 from collections.abc import Callable, Mapping
 from contextlib import AbstractAsyncContextManager
@@ -27,11 +27,11 @@ from starlette.middleware import Middleware
 
 from flwr.common.logger import log
 from flwr.supercore.run import Run
+from flwr.superlink.run_source import RunStartSource
 
 SuperLinkLifespanContext = Callable[
     [FastAPI], AbstractAsyncContextManager[Mapping[str, Any] | None]
 ]
-RunStartSource = Literal["cli", "web_ui", "automation", "unknown"]
 ResultDeliveryChannel = Literal["logs", "chat"]
 _SGXT_MODULE = "flwr.ee.superlink.extensions"
 
@@ -102,7 +102,8 @@ def notify_run_started(run: Run, source: RunStartSource) -> None:
     non-blocking and best effort; the Flower framework does not create a
     background thread or event loop for it. The run snapshot is copied before
     handing it to the extension so the callback cannot mutate the object used
-    to build the successful StartRun response.
+    to build the successful StartRun response. The source is also best-effort
+    caller attribution and must not be used for authorization decisions.
     """
     try:
         sgxt = _try_import_sgxt()

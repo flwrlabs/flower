@@ -2,7 +2,8 @@
 
 An `AgentApp` contains the control flow for an agent: what the model should do,
 which tools it can use, and when its work is complete. Flower executes the app
-and provides model and connector access through an `AgentSession`.
+and provides an OpenAI-compatible endpoint for model access. Connectors and
+frontend-visible events are available through an `AgentSession`.
 
 ## Where your app meets the runtime
 
@@ -34,19 +35,41 @@ and logs.
 ## AgentSession
 
 Flower creates an `AgentSession` for each AgentApp run and passes it to your
-main function. It exposes two capabilities:
+main function. It exposes three capabilities:
 
-- `agent.responses` creates model responses
+- `agent.responses` provides a lower-level JSON model API
 - `agent.connectors` returns connector tools and executes function calls
+- `agent.events` publishes structured events selected by the AgentApp
 
-Calling either capability sends a request through the Flower runtime. The
-AgentApp waits for the response, then continues with the returned JSON object.
-Provider credentials and connector implementations remain outside the FAB.
+Provider credentials and connector implementations remain outside the FAB. New
+AgentApps normally make model requests with the OpenAI SDK and use
+`AgentSession` for connectors and frontend-visible events.
 
 ### Model responses
 
-`agent.responses.create(request)` accepts an Open Responses-compatible JSON
-object. The Flower 1.35.0 runtime recognizes:
+Flower 1.35.0 exposes an OpenAI-compatible Responses endpoint inside the
+AgentApp process. The runtime injects its URL and credential as
+`FLWR_RUNTIME_BASE_URL` and `FLWR_RUNTIME_API_KEY`. Pass them to the OpenAI
+client, then use its standard typed Responses API:
+
+```python
+import os
+
+from openai import OpenAI
+
+client = OpenAI(
+    base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
+    api_key=os.environ["FLWR_RUNTIME_API_KEY"],
+    max_retries=0,
+)
+stream = client.responses.create(
+    model="openai/gpt-5.6-sol",
+    input="Explain federated AI.",
+    stream=True,
+)
+```
+
+The runtime recognizes these request fields:
 
 - `model` and `input`
 - `stream`
@@ -55,12 +78,18 @@ object. The Flower 1.35.0 runtime recognizes:
 - `reasoning` and `max_output_tokens`
 - `metadata` and `text`
 
-`model` must be a non-empty string. `input` can be text or a sequence of JSON
-items. The call returns an Open Responses-compatible response object and appends
-model output items to the Flower `Context`.
+`model` must be a non-empty string. `input` can be text or a sequence of input
+items. Streaming calls yield typed SDK events. The AgentApp decides which of
+those events to publish and which output to persist in `Context`.
 
-“Open Responses-compatible” describes the request and response shape used by
-`agent.responses.create`.
+The endpoint is authenticated for the current AgentApp task. It is not a public
+model API for an external client. See [Use the OpenAI SDK in an
+AgentApp](../how-to-guides/use-openai-sdk.md) for a complete example.
+
+`agent.responses.create(request)` remains available as a lower-level interface
+for JSON-based workflows. It returns a JSON response object and automatically
+appends its model output items to the Flower `Context`. New AgentApps should
+prefer the OpenAI SDK when they need typed responses or streaming events.
 
 The default model provider at `api.flower.ai` does not currently support
 continuing with `previous_response_id`. Rebuild `input` from stored messages for
@@ -82,6 +111,31 @@ the next model request.
 The AgentApp owns the tool loop and must bound it. See [Use
 connectors](use-connectors.md).
 
+### Run events
+
+`agent.events.emit(event)` publishes one structured event to the run-event
+stream consumed by Flower Chat and other clients. An SDK stream stays private
+to the model task until the AgentApp republishes its events:
+
+```python
+for event in stream:
+    agent.events.emit(event.to_dict())
+```
+
+Publishing an event does not append it to `Context`. This lets the AgentApp
+separate frontend-visible progress from conversation state.
+
+These operations have distinct destinations:
+
+| Operation                               | Destination                                                |
+| --------------------------------------- | ---------------------------------------------------------- |
+| `print(...)`                            | AgentApp logs                                              |
+| `agent.events.emit(...)`                | Run-event stream consumed by Flower Chat and other clients |
+| Store an assistant message in `Context` | Persistent conversation state                              |
+
+See {ref}`publish-agentapp-generated-text` for the event sequence used to
+present text that does not come from an SDK stream.
+
 ## Context
 
 Alongside the `AgentSession`, your main function receives a Flower `Context`:
@@ -96,9 +150,10 @@ The runtime stores conversation items in a `ConfigRecord` named `items`. A
 as `get` when reading it through `context.state.config_records`.
 
 If `agent.input` is a non-empty string, the runtime records it as an Open
-Responses user-message item before calling the AgentApp. Model output items,
-connector outputs, and built-in connector activity are appended while the app
-runs.
+Responses user-message item before calling the AgentApp. Connector calls append
+their outputs and built-in activity. The lower-level `agent.responses` API also
+appends model output, while SDK responses and events emitted with `agent.events`
+are persisted only when the app stores them explicitly.
 
 Runs in the same series can receive the persisted context. The app chooses what
 to send to the model. A safe conversation loader selects only message items:
@@ -127,8 +182,9 @@ the runs share a series.
 
 A run belongs to one federation. A run series groups runs within that
 federation and carries their persisted context. Browser chat presents a series
-as a conversation. `flwr chat` reuses its current series ID until `/new` or an
-agent change.
+as a conversation. `flwr chat` reuses its current series ID until `/new`, an
+agent change, or a federation change. `/history` can restore an earlier series
+in the active federation.
 
 ## Run lifecycle
 
@@ -139,7 +195,7 @@ agent change.
 1. An executor starts the isolated AgentApp process and loads its FAB
 1. Flower initializes `AgentSession` and the persisted `Context`
 1. The main function sends model requests and calls connectors as needed
-1. Flower streams structured activity while model and connector operations run
+1. The AgentApp publishes the model and connector events clients should see
 1. During shutdown, Flower pushes the resulting `Context` once and records
    whether the run completed, failed, or stopped
 

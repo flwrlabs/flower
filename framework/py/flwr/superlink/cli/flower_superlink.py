@@ -567,7 +567,7 @@ def _get_superexec_command(
         insecure=runtime_certificates is None,
         root_certificates_path=runtime_root_certificates_path,
     )
-    command += ["--appio-api-address", runtime_address]
+    command += ["--runtime-api-address", runtime_address]
     command += ["--plugin-type", ExecPluginType.SERVER_APP]
     command += ["--parent-pid", str(parent_pid)]
     if runtime_dependency_install:

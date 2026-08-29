@@ -67,6 +67,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ShowFederationRequest,
     ShowFederationResponse,
     StartRunRequest,
+    StartRunResponse,
     StopRunRequest,
     StreamLogsRequest,
     StreamLogsResponse,
@@ -102,6 +103,7 @@ from flwr.supercore.typing import (
 )
 from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
 from flwr.superlink.federation import NoOpFederationManager
+from flwr.superlink.run_source import RUN_SOURCE_METADATA_KEY
 from flwr.superlink.servicer.control.control_account_auth_interceptor import (
     shared_account_info,
 )
@@ -194,6 +196,12 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.aid: str = account_info.flwr_aid
         shared_account_info.set(account_info)
         self.state = self.servicer.linkstate_factory.state()
+
+    def _make_start_run_context(self) -> MagicMock:
+        """Create a gRPC context with empty invocation metadata."""
+        context = MagicMock(spec=grpc.ServicerContext)
+        context.invocation_metadata.return_value = ()
+        return context
 
     def _create_dummy_run(self, flwr_aid: str | None) -> int:
         return self.state.create_run(
@@ -392,7 +400,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ) as mock_get_metadata_from_config,
         ):
             mock_get_metadata_from_config.return_value = (fab_id, fab_version)
-            response = self.servicer.StartRun(request, Mock())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
         runs = self.state.get_run_info(run_ids=[response.run_id])
         run_info = runs[0] if runs else None
 
@@ -411,6 +419,37 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         assert run_context is not None
         self.assertEqual(run_context.run_id, response.run_id)
         self.assertEqual(run_context.series_id, response.series_id)
+
+    def test_start_run_forwards_best_effort_source_metadata(self) -> None:
+        """Forward caller-provided source metadata for analytics attribution."""
+        context = Mock()
+        context.invocation_metadata.return_value = (
+            (RUN_SOURCE_METADATA_KEY, "web_ui"),
+        )
+        expected = StartRunResponse(run_id=42)
+
+        with patch(
+            "flwr.superlink.servicer.control.control_servicer.control_handlers.start_run",
+            return_value=expected,
+        ) as start_run:
+            response = self.servicer.StartRun(StartRunRequest(), context)
+
+        self.assertIs(response, expected)
+        self.assertEqual(start_run.call_args.kwargs["source"], "web_ui")
+
+    def test_start_run_defaults_to_unknown_source_without_metadata(self) -> None:
+        """Do not infer a caller from the gRPC transport."""
+        context = Mock()
+        context.invocation_metadata.return_value = ()
+        expected = StartRunResponse(run_id=42)
+
+        with patch(
+            "flwr.superlink.servicer.control.control_servicer.control_handlers.start_run",
+            return_value=expected,
+        ) as start_run:
+            self.servicer.StartRun(StartRunRequest(), context)
+
+        self.assertEqual(start_run.call_args.kwargs["source"], "unknown")
 
     def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
         """StartRun should bind canonical connected OAuth connector refs."""
@@ -443,7 +482,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 return_value=("flwr/demo", "1.0.0"),
             ),
         ):
-            response = self.servicer.StartRun(request, Mock())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
 
         self.assertEqual(
             list(self.state.get_run_connector_refs(run_id=response.run_id)),
@@ -490,7 +529,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ),
             self.assertRaises(FlowerError) as error,
         ):
-            self.servicer.StartRun(request, Mock())
+            self.servicer.StartRun(request, self._make_start_run_context())
 
         self.assertEqual(error.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST)
         self.assertEqual(
@@ -531,7 +570,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ),
             self.assertRaises(FlowerError) as error,
         ):
-            self.servicer.StartRun(request, Mock())
+            self.servicer.StartRun(request, self._make_start_run_context())
 
         self.assertEqual(error.exception.code, expected_code)
         self.assertEqual(list(self.state.get_run_info()), [])
@@ -545,7 +584,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.servicer.linkstate_factory.state_instance = None
 
         with self.assertRaises(RuntimeError):
-            self.servicer.StartRun(StartRunRequest(), Mock())
+            self.servicer.StartRun(StartRunRequest(), self._make_start_run_context())
 
         federation_manager.exists.assert_called_once_with(expected_federation_id)
 
@@ -578,7 +617,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         ):
             mock_get_fab_config.return_value = {"tool": {"flwr": {"app": {}}}}
             mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
-            response = self.servicer.StartRun(request, Mock())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
 
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         run_context = self.state.get_run_series_context(series_id)
@@ -631,7 +670,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
             }
             mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
-            response = self.servicer.StartRun(request, Mock())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
 
         runs = self.state.get_run_info(run_ids=[response.run_id])
         tasks = self.state.get_tasks()
@@ -679,7 +718,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 }
             }
             mock_get_metadata_from_config.return_value = ("flwr/agent", "0.1.0")
-            response = self.servicer.StartRun(request, Mock())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
 
         runs = self.state.get_run_info(run_ids=[response.run_id])
         tasks = self.state.get_tasks()
@@ -710,7 +749,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.fab.content = fab_content
         request.federation = NOOP_FEDERATION_ID
-        context = Mock()
+        context = self._make_start_run_context()
 
         with (
             patch(
@@ -759,7 +798,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 "anne-dev/simple-legacy-127",
                 "0.1.0",
             )
-            response = self.servicer.StartRun(request, Mock())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
 
         assert response.HasField("note")
         assert response.note
@@ -804,7 +843,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 }
             }
             mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
-            response = self.servicer.StartRun(request, Mock())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
         runs = self.state.get_run_info(run_ids=[response.run_id])
         run_info = runs[0] if runs else None
 
@@ -824,7 +863,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request.federation = NOOP_FEDERATION_ID
         for key, value in user_config_to_proto({"unknown.key": 10}).items():
             request.override_config[key].CopyFrom(value)
-        context = Mock()
+        context = self._make_start_run_context()
 
         # Execute/Assert
         with (
@@ -851,7 +890,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request.fab.content = b"test FAB content"
         request.federation = NOOP_FEDERATION_ID
 
-        context = Mock()
+        context = self._make_start_run_context()
 
         with (
             patch(
@@ -917,7 +956,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
             }
             mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
-            _ = self.servicer.StartRun(request, Mock())
+            _ = self.servicer.StartRun(request, self._make_start_run_context())
 
         mock_can_execute.assert_called_once_with(
             self.aid,
@@ -1724,9 +1763,8 @@ class TestControlServicerAuth(unittest.TestCase):
                 self.state.federation_manager, "has_member", return_value=False
             ),
         ):
-            gen = self.servicer.StreamLogs(request, ctx)
             with self.assertRaises(FlowerError) as cm:
-                next(gen)
+                self.servicer.StreamLogs(request, ctx)
             self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
 
     def test_streamlogs_auth_successful(self) -> None:

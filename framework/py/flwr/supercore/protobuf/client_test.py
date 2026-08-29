@@ -14,7 +14,10 @@
 # ==============================================================================
 """Tests for reusable protobuf-over-HTTP client infrastructure."""
 
+import gzip
+import random
 import ssl
+from collections.abc import Generator, Iterator
 from unittest.mock import Mock, patch
 
 import httpx
@@ -24,8 +27,17 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
 )
-from flwr.supercore.interceptors import RuntimeTokenHttpInterceptor
-from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
+from flwr.supercore.constant import MAX_PROTOBUF_STREAM_MESSAGE_LENGTH
+from flwr.supercore.interceptors import (
+    RuntimeTokenHttpInterceptor,
+    RuntimeVersionHttpInterceptor,
+)
+from flwr.supercore.protobuf.constants import (
+    FRAME_HEADER_SIZE,
+    PROTOBUF_MEDIA_TYPE,
+    PROTOBUF_STREAM_MEDIA_TYPE,
+)
+from flwr.supercore.protobuf.framing import frame_message
 from flwr.supercore.retry import make_simple_http_retry_invoker
 
 from .client import ProtobufCall, ProtobufClient, ProtobufRequestContext
@@ -48,6 +60,16 @@ def _response(status_code: int, content: bytes = b"") -> httpx.Response:
 def _call(client: ProtobufClient) -> ClaimTaskResponse:
     """Call one representative unary protobuf operation."""
     return client._unary_unary(  # pylint: disable=protected-access
+        path=_PATH,
+        rpc_method=_METHOD,
+        request=_REQUEST,
+        response_type=ClaimTaskResponse,
+    )
+
+
+def _stream_call(client: ProtobufClient) -> Generator[ClaimTaskResponse, None, None]:
+    """Call one representative streaming protobuf operation."""
+    return client._unary_stream(  # pylint: disable=protected-access
         path=_PATH,
         rpc_method=_METHOD,
         request=_REQUEST,
@@ -184,6 +206,250 @@ def test_unary_unary_rejects_invalid_protobuf_response() -> None:
         pytest.raises(ValueError, match="Invalid protobuf response payload"),
     ):
         _call(ProtobufClient("http://api.example"))
+
+
+class _ChunkedByteStream(httpx.SyncByteStream):
+    """Yield an HTTP response body using predefined chunk boundaries."""
+
+    def __init__(self, chunks: list[bytes]) -> None:
+        self._chunks = chunks
+
+    def __iter__(self) -> Iterator[bytes]:
+        yield from self._chunks
+
+
+def _stream_response(status_code: int, chunks: list[bytes]) -> httpx.Response:
+    """Create a streaming HTTP response."""
+    return httpx.Response(
+        status_code,
+        stream=_ChunkedByteStream(chunks),
+        request=httpx.Request("POST", "http://api.example"),
+    )
+
+
+def test_unary_stream_sends_and_receives_framed_protobuf() -> None:
+    """Decode messages split across arbitrary HTTP response chunks."""
+    first = ClaimTaskResponse(token="first")
+    second = ClaimTaskResponse(token="second")
+    content = frame_message(first) + frame_message(second)
+    response = _stream_response(
+        200,
+        [content[:2], content[2:7], content[7:-1], content[-1:]],
+    )
+
+    with patch(
+        "flwr.supercore.protobuf.client.httpx.Client.send",
+        return_value=response,
+    ) as send:
+        result = list(
+            _stream_call(ProtobufClient("https://api.example/", timeout=10.0))
+        )
+
+    assert result == [first, second]
+    http_request = send.call_args.args[0]
+    assert http_request.method == "POST"
+    assert str(http_request.url) == f"https://api.example{_PATH}"
+    assert http_request.content == _REQUEST.SerializeToString(deterministic=True)
+    assert http_request.headers["content-type"] == PROTOBUF_MEDIA_TYPE
+    assert http_request.headers["accept"] == PROTOBUF_STREAM_MEDIA_TYPE
+    assert http_request.headers["accept-encoding"] == "identity"
+    assert http_request.extensions["timeout"] == {
+        "connect": 10.0,
+        "read": None,
+        "write": 10.0,
+        "pool": 10.0,
+    }
+    assert send.call_args.kwargs == {"stream": True}
+    assert response.is_closed
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        b"\x00",
+        len(b"partial").to_bytes(4, "big") + b"part",
+    ],
+)
+def test_unary_stream_rejects_truncated_frame(content: bytes) -> None:
+    """Reject a stream ending within a frame header or payload."""
+    response = _stream_response(200, [content])
+    with (
+        patch(
+            "flwr.supercore.protobuf.client.httpx.Client.send",
+            return_value=response,
+        ),
+        pytest.raises(ValueError, match="Truncated protobuf stream frame"),
+    ):
+        list(_stream_call(ProtobufClient("http://api.example")))
+
+    assert response.is_closed
+
+
+def test_unary_stream_rejects_oversized_frame() -> None:
+    """Reject an oversized frame before receiving its payload."""
+    content = (MAX_PROTOBUF_STREAM_MESSAGE_LENGTH + 1).to_bytes(
+        FRAME_HEADER_SIZE, "big"
+    )
+    response = _stream_response(200, [content])
+    with (
+        patch(
+            "flwr.supercore.protobuf.client.httpx.Client.send",
+            return_value=response,
+        ),
+        pytest.raises(ValueError, match="exceeds maximum"),
+    ):
+        list(_stream_call(ProtobufClient("http://api.example")))
+
+    assert response.is_closed
+
+
+def test_unary_stream_rejects_invalid_protobuf_payload() -> None:
+    """Reject a complete frame containing an invalid protobuf message."""
+    response = _stream_response(200, [len(b"invalid").to_bytes(4, "big") + b"invalid"])
+    with (
+        patch(
+            "flwr.supercore.protobuf.client.httpx.Client.send",
+            return_value=response,
+        ),
+        pytest.raises(ValueError, match="Invalid protobuf stream payload"),
+    ):
+        list(_stream_call(ProtobufClient("http://api.example")))
+
+    assert response.is_closed
+
+
+def test_unary_stream_closes_response_when_iteration_stops() -> None:
+    """Close the HTTP response when a caller cancels stream iteration."""
+    response = _stream_response(
+        200,
+        [
+            frame_message(ClaimTaskResponse(token="first")),
+            frame_message(ClaimTaskResponse(token="second")),
+        ],
+    )
+    with patch(
+        "flwr.supercore.protobuf.client.httpx.Client.send",
+        return_value=response,
+    ):
+        messages = _stream_call(ProtobufClient("http://api.example"))
+        assert next(messages).token == "first"
+        messages.close()
+
+    assert response.is_closed
+
+
+def test_unary_stream_does_not_open_response_before_iteration() -> None:
+    """Avoid acquiring a response for a stream that is never started."""
+    response = _stream_response(200, [])
+    with patch(
+        "flwr.supercore.protobuf.client.httpx.Client.send",
+        return_value=response,
+    ) as send:
+        messages = _stream_call(ProtobufClient("http://api.example"))
+        messages.close()
+
+    send.assert_not_called()
+    assert not response.is_closed
+    response.close()
+
+
+def test_unary_stream_closes_response_for_http_error() -> None:
+    """Close a streaming response before propagating an HTTP status error."""
+    response = _stream_response(500, [])
+    with (
+        patch(
+            "flwr.supercore.protobuf.client.httpx.Client.send",
+            return_value=response,
+        ),
+        pytest.raises(httpx.HTTPStatusError),
+    ):
+        list(_stream_call(ProtobufClient("http://api.example")))
+
+    assert response.is_closed
+
+
+def test_unary_stream_bounds_error_response_body() -> None:
+    """Bound the time and size used to read a streaming error response."""
+    max_len = 64 * 1024
+    compressed_content = gzip.compress(
+        b"x" * (4 * max_len) + random.Random(0).randbytes(max_len)
+    )
+    assert len(compressed_content) > max_len
+    response = httpx.Response(
+        500,
+        headers={"content-encoding": "gzip"},
+        stream=_ChunkedByteStream([compressed_content]),
+        request=httpx.Request("POST", "http://api.example"),
+    )
+    captured_responses: list[httpx.Response] = []
+    interceptor = Mock()
+
+    def capture_response(
+        context: ProtobufRequestContext, call_next: ProtobufCall
+    ) -> httpx.Response:
+        buffered_response = call_next(context)
+        captured_responses.append(buffered_response)
+        return buffered_response
+
+    interceptor.intercept.side_effect = capture_response
+    with (
+        patch(
+            "flwr.supercore.protobuf.client.httpx.Client.send",
+            return_value=response,
+        ) as send,
+        pytest.raises(httpx.HTTPStatusError),
+    ):
+        list(
+            _stream_call(
+                ProtobufClient(
+                    "http://api.example",
+                    interceptors=[interceptor],
+                    timeout=10.0,
+                )
+            )
+        )
+
+    request = send.call_args.args[0]
+    assert request.extensions["timeout"]["read"] == 10.0
+    assert len(captured_responses[0].content) == max_len
+    assert captured_responses[0].content == compressed_content[:max_len]
+    assert "content-encoding" not in captured_responses[0].headers
+    assert response.is_closed
+
+
+def test_unary_stream_retries_only_before_returning_response() -> None:
+    """Retry response establishment but not failures during stream iteration."""
+    retry_invoker = make_simple_http_retry_invoker()
+    retry_invoker.max_tries = 2
+    retry_invoker.jitter = None
+    retry_invoker.wait_function = lambda _: None
+    unavailable = _stream_response(503, [])
+    invalid_stream = _stream_response(
+        200,
+        [
+            frame_message(ClaimTaskResponse(token="first")),
+            len(b"invalid").to_bytes(4, "big") + b"invalid",
+        ],
+    )
+
+    with patch(
+        "flwr.supercore.protobuf.client.httpx.Client.send",
+        side_effect=[unavailable, invalid_stream],
+    ) as send:
+        messages = _stream_call(
+            ProtobufClient(
+                "http://api.example",
+                interceptors=[RuntimeVersionHttpInterceptor("test")],
+                retry_invoker=retry_invoker,
+            )
+        )
+        assert next(messages).token == "first"
+        with pytest.raises(ValueError, match="Invalid protobuf stream payload"):
+            next(messages)
+
+    assert send.call_count == 2
+    assert unavailable.is_closed
+    assert invalid_stream.is_closed
 
 
 class _RecordingInterceptor:
