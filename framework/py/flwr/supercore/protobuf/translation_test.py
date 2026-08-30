@@ -18,6 +18,7 @@ import pytest
 
 from flwr.supercore.error import ApiErrorCode, FlowerError
 
+from .streaming import ProtobufStreamContext
 from .translation import ProtobufTranslationMiddleware
 
 
@@ -29,6 +30,6 @@ def test_response_for_rejects_scalar_iterables(result: object) -> None:
     """Reject scalar byte and text values instead of treating them as streams."""
     with pytest.raises(FlowerError) as exc_info:
         ProtobufTranslationMiddleware._response_for(  # pylint: disable=W0212
-            result
+            result, ProtobufStreamContext()
         )
     assert exc_info.value.code == ApiErrorCode.INVALID_HANDLER_RESPONSE
