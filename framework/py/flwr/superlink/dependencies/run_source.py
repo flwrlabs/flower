@@ -19,14 +19,14 @@ from typing import Annotated
 from fastapi import Depends, Header
 
 from flwr.supercore.constant import FLWR_CLIENT_METADATA_KEY
-from flwr.superlink.run_source import RunStartSource, resolve_run_start_source
+from flwr.superlink.run_source import RunSource, resolve_source
 
 
 def get_run_source(
     run_source: Annotated[str | None, Header(alias=FLWR_CLIENT_METADATA_KEY)] = None,
-) -> RunStartSource:
+) -> RunSource:
     """Return the normalized run source from the client metadata header."""
-    return resolve_run_start_source(run_source)
+    return resolve_source(run_source)
 
 
-RunSourceDependency = Annotated[RunStartSource, Depends(get_run_source)]
+RunSourceDependency = Annotated[RunSource, Depends(get_run_source)]

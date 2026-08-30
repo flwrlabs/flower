@@ -101,7 +101,7 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.utils import get_metadata_str
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
-from flwr.superlink.run_source import resolve_run_start_source
+from flwr.superlink.run_source import resolve_source
 
 from . import control_handlers
 from .control_account_auth_interceptor import get_current_account_info
@@ -140,7 +140,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             _get_account(),
             self.linkstate_factory.state(),
             self.fleet_api_type,
-            source=resolve_run_start_source(run_source),
+            source=resolve_source(run_source),
         )
 
     def StreamLogs(  # pylint: disable=C0103
