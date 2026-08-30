@@ -1847,7 +1847,7 @@ class TestControlServicerAuth(unittest.TestCase):
             federation_id=NOOP_FEDERATION_ID,
             primary_task_id=123,
             status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
-            primary_task_type=TaskType.AGENT_APP,
+            primary_task_type=TaskType.SERVER_APP,
         )
         event = TaskEvent(
             id=6,
