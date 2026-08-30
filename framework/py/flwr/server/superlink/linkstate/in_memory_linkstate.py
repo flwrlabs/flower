@@ -25,7 +25,6 @@ from typing import Literal, cast
 
 from flwr.app import Message
 from flwr.app.user_config import UserConfig
-from flwr.common import log
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
@@ -42,7 +41,8 @@ from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.utils import validate_message
-from flwr.supercore.constant import NodeStatus
+from flwr.supercore import log
+from flwr.supercore.constant import NodeStatus, TaskType
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
@@ -660,6 +660,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             resolved_series_id = self.store_run_in_series(
                 run_id=run_id,
                 federation_id=federation_id,
+                is_agent=primary_task_type == TaskType.AGENT_APP,
                 series_id=series_id,
                 description=series_description,
             )
@@ -722,51 +723,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             )
 
             return run_id
-
-    def dispatch_automation(
-        self,
-        automation_id: int,
-        *,
-        previous_next_run_at: str,
-        next_run_at: str | None,
-    ) -> int | None:
-        """Create a run from a due automation and advance the automation."""
-        with self.lock_automation_store:
-            record = self.automation_store.get(automation_id)
-            if record is None:
-                return None
-
-            fab_id = record.fab_id
-            fab_version = record.fab_version
-            fab_hash = record.fab_hash
-            override_config = dict(record.override_config)
-            federation_id = record.automation.federation
-            federation_config = record.federation_config
-            flwr_aid = record.automation.flwr_aid
-            primary_task_type = record.primary_task_type
-            series_id = record.automation.series_id
-
-        if not self.advance_automation(
-            automation_id,
-            previous_next_run_at=previous_next_run_at,
-            next_run_at=next_run_at,
-        ):
-            return None
-
-        run_id = self.create_run(
-            fab_id=fab_id,
-            fab_version=fab_version,
-            fab_hash=fab_hash,
-            override_config=override_config,
-            federation_id=federation_id,
-            federation_config=federation_config,
-            flwr_aid=flwr_aid,
-            primary_task_type=primary_task_type,
-            series_id=series_id,
-        )
-        if run_id == 0:
-            return None
-        return run_id
 
     def get_run_info(
         self,

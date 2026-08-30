@@ -1,0 +1,260 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+name: Framework Commit Artifacts
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: framework-main-artifact-publishing
+  cancel-in-progress: false
+  queue: max
+
+env:
+  FLWR_TELEMETRY_ENABLED: 0
+  ARTIFACT_BUCKET: artifact.flower.ai
+
+jobs:
+  package-distributions:
+    if: github.repository == 'flwrlabs/flower'
+    name: Build, test, and upload package distributions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      whl_path: ${{ steps.artifacts.outputs.WHL_PATH }}
+      docker-required: ${{ steps.docker-changes.outputs.required }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check Docker-relevant changes
+        id: docker-changes
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.ARTIFACT_AWS_DEFAULT_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.ARTIFACT_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ARTIFACT_AWS_SECRET_KEY_ID }}
+          ARTIFACT_BUCKET: ${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}
+        run: |
+          BEFORE_SHA="${{ github.event.before }}"
+
+          required=true
+          if git diff --quiet "${BEFORE_SHA}" "${GITHUB_SHA}" -- \
+              framework/py/ \
+              framework/pyproject.toml \
+              framework/docker/ \
+              framework/dev/build-docker-image-matrix.py \
+              framework/dev/release/resolve-docker-matrix.py &&
+            aws s3api head-object \
+              --bucket "${ARTIFACT_BUCKET}" \
+              --key "framework/commits/${BEFORE_SHA}/digests.json" \
+              > /dev/null 2>&1
+          then
+            required=false
+          fi
+
+          echo "required=${required}" >> "$GITHUB_OUTPUT"
+
+      - name: Bootstrap
+        uses: ./.github/actions/bootstrap
+
+      - name: Install dependencies
+        working-directory: framework
+        run: uv sync --locked --all-extras --all-groups
+
+      - name: Build wheel and sdist
+        working-directory: framework
+        run: uv run --no-sync ./dev/build.sh
+
+      - name: Test wheel and sdist
+        working-directory: framework
+        run: uv run --no-sync ./dev/test-wheel.sh
+
+      - name: Collect artifact metadata
+        id: artifacts
+        working-directory: framework/dist
+        run: echo "WHL_PATH=$(ls *.whl)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload commit artifacts
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.ARTIFACT_AWS_DEFAULT_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.ARTIFACT_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ARTIFACT_AWS_SECRET_KEY_ID }}
+        run: |
+          aws s3 cp \
+            --content-disposition "attachment" \
+            --cache-control "no-cache" \
+            framework/dist/ \
+            s3://${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}/framework/commits/${GITHUB_SHA}/ \
+            --recursive
+
+      - name: Reuse previous Docker artifact index
+        if: steps.docker-changes.outputs.required == 'false'
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.ARTIFACT_AWS_DEFAULT_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.ARTIFACT_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ARTIFACT_AWS_SECRET_KEY_ID }}
+        run: |
+          aws s3 cp \
+            s3://${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}/framework/commits/${{ github.event.before }}/digests.json \
+            digests.previous.json
+
+          jq \
+            --arg commit_sha "${GITHUB_SHA}" \
+            '.commit_sha = $commit_sha' \
+            digests.previous.json > digests.json
+
+          aws s3 cp \
+            --content-disposition "attachment" \
+            --cache-control "no-cache" \
+            digests.json \
+            s3://${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}/framework/commits/${GITHUB_SHA}/digests.json
+
+  prepare-docker-build-matrix:
+    if: needs.package-distributions.outputs.docker-required == 'true'
+    name: Collect Docker build parameters
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: package-distributions
+    outputs:
+      pip-version: ${{ steps.bootstrap.outputs.pip-version }}
+      setuptools-version: ${{ steps.bootstrap.outputs.setuptools-version }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Bootstrap
+        id: bootstrap
+        uses: ./.github/actions/bootstrap
+
+      - name: Validate Docker publishing configuration
+        run: |
+          if [ -z "${{ vars.DOCKER_IMAGE_REGISTRY }}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_REGISTRY" >&2
+            exit 1
+          fi
+          if [ -z "${{ vars.DOCKER_IMAGE_REGISTRY_USER }}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_REGISTRY_USER" >&2
+            exit 1
+          fi
+          if [ -z "${{ vars.DOCKER_IMAGE_NAMESPACE }}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_NAMESPACE" >&2
+            exit 1
+          fi
+
+      - name: Generate Docker build matrix
+        id: matrix
+        env:
+          WHEEL_PATH: ${{ needs.package-distributions.outputs.whl_path }}
+        run: |
+          WHEEL_URL="https://${ARTIFACT_BUCKET}/framework/commits/${GITHUB_SHA}/${WHEEL_PATH}"
+          python framework/dev/build-docker-image-matrix.py \
+            --flwr-version-ref "${WHEEL_URL}" \
+            --image-tag unstable \
+            > matrix.raw.json
+          python framework/dev/release/resolve-docker-matrix.py \
+            --input matrix.raw.json \
+            --output matrix.json \
+            --docker-image-namespace "${{ vars.DOCKER_IMAGE_NAMESPACE }}"
+          echo "matrix=$(cat matrix.json)" >> "$GITHUB_OUTPUT"
+
+  build-docker-base-images:
+    name: Build main base images
+    uses: ./.github/workflows/_docker-build.yml
+    needs: prepare-docker-build-matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-docker-build-matrix.outputs.matrix).base }}
+    with:
+      registry: ${{ vars.DOCKER_IMAGE_REGISTRY }}
+      image-repository: ${{ format('{0}/{1}', vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
+      file-dir: ${{ matrix.images.file_dir }}
+      build-args: |
+        PIP_VERSION=${{ needs.prepare-docker-build-matrix.outputs.pip-version }}
+        SETUPTOOLS_VERSION=${{ needs.prepare-docker-build-matrix.outputs.setuptools-version }}
+        ${{ matrix.images.build_args_encoded }}
+      tags: ${{ matrix.images.tags_encoded }}
+      docker-registry-user: ${{ vars.DOCKER_IMAGE_REGISTRY_USER }}
+      export-index-digest: true
+    secrets:
+      docker-registry-token: ${{ secrets.DOCKER_IMAGE_REGISTRY_PASSWORD }}
+
+  build-docker-binary-images:
+    name: Build main binary images
+    uses: ./.github/workflows/_docker-build.yml
+    needs: [prepare-docker-build-matrix, build-docker-base-images]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-docker-build-matrix.outputs.matrix).binary }}
+    with:
+      registry: ${{ vars.DOCKER_IMAGE_REGISTRY }}
+      image-repository: ${{ format('{0}/{1}', vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
+      file-dir: ${{ matrix.images.file_dir }}
+      build-args: |
+        BASE_REPOSITORY=${{ format('{0}/{1}/base', vars.DOCKER_IMAGE_REGISTRY, vars.DOCKER_IMAGE_NAMESPACE) }}
+        BASE_IMAGE=${{ matrix.images.base_image }}
+      tags: ${{ matrix.images.tags_encoded }}
+      docker-registry-user: ${{ vars.DOCKER_IMAGE_REGISTRY_USER }}
+      export-index-digest: true
+    secrets:
+      docker-registry-token: ${{ secrets.DOCKER_IMAGE_REGISTRY_PASSWORD }}
+
+  store-docker-artifact-index:
+    name: Store Docker artifact index
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs:
+      [
+        prepare-docker-build-matrix,
+        build-docker-base-images,
+        build-docker-binary-images,
+      ]
+    steps:
+      - name: Download OCI index digests
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: index-digest-*
+          path: index-digests
+          merge-multiple: true
+
+      - name: Build artifact index
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+          MATRIX: ${{ needs.prepare-docker-build-matrix.outputs.matrix }}
+        run: |
+          expected="$(jq '(.base.images | length) + (.binary.images | length)' <<< "${MATRIX}")"
+          digest_count="$(find index-digests -name '*.json' -type f | wc -l | tr -d ' ')"
+          if [[ "${digest_count}" != "${expected}" ]]; then
+            echo "::error::Expected ${expected} OCI index digests, found ${digest_count}."
+            exit 1
+          fi
+
+          jq -s \
+            --arg commit_sha "${COMMIT_SHA}" \
+            '{schema_version: 1, commit_sha: $commit_sha, images: sort_by(.repository, .tags[0])}' \
+            index-digests/*.json > digests.json
+          jq --exit-status \
+            --arg commit_sha "${COMMIT_SHA}" \
+            --argjson expected "${expected}" \
+            '.schema_version == 1
+              and .commit_sha == $commit_sha
+              and ($commit_sha | test("^[0-9a-f]{40}$"))
+              and (.images | length) == $expected
+              and all(.images[];
+                (.repository | length) > 0
+                and (.tags | length) > 0
+                and (.index_digest | test("^sha256:[0-9a-f]{64}$")))' \
+            digests.json > /dev/null
+
+      - name: Upload artifact index
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.ARTIFACT_AWS_DEFAULT_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.ARTIFACT_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ARTIFACT_AWS_SECRET_KEY_ID }}
+        run: |
+          aws s3 cp \
+            --content-disposition "attachment" \
+            --cache-control "no-cache" \
+            digests.json \
+            s3://${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}/framework/commits/${GITHUB_SHA}/digests.json

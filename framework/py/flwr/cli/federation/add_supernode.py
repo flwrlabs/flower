@@ -29,7 +29,7 @@ from flwr.proto.control_pb2_grpc import ControlStub
 
 from ..utils import (
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
+    flwr_cli_exc_handler,
     init_channel_from_connection,
     print_json_to_stdout,
 )
@@ -88,7 +88,7 @@ def _add_supernode(  # pylint: disable=W0613
     is_json: bool,
 ) -> None:
     """Add a SuperNode to a federation."""
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         _: AddNodeToFederationResponse = stub.AddNodeToFederation(request)
 
     if is_json:

@@ -19,7 +19,7 @@ env:
 
 jobs:
   changes:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       framework: ${{ steps.filter.outputs.framework }}
       ex_bench: ${{ steps.filter.outputs.ex_bench }}  # Examples and Benchmarks
@@ -44,7 +44,7 @@ jobs:
               - '.github/workflows/framework-test.yml'
 
   framework_checks:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: changes
     strategy:
       fail-fast: true
@@ -68,6 +68,15 @@ jobs:
           - task: pytest
             name: Pytest
             python: '3.13'
+          - task: pytest_serial
+            name: Pytest serial scopes
+            python: '3.11'
+          - task: pytest_serial
+            name: Pytest serial scopes
+            python: '3.12'
+          - task: pytest_serial
+            name: Pytest serial scopes
+            python: '3.13'
 
     name: ${{ matrix.name }} (Python ${{ matrix.python }})
 
@@ -76,12 +85,12 @@ jobs:
         with:
           fetch-depth: 0
       - name: Bootstrap
-        if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) }}
+        if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) || (matrix.task == 'pytest_serial' && needs.changes.outputs.framework == 'true') }}
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python }}
       - name: Prepare framework
-        if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) }}
+        if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) || (matrix.task == 'pytest_serial' && needs.changes.outputs.framework == 'true') }}
         run: ./framework/dev/prepare-framework.sh
       - name: Cache mypy
         if: ${{ matrix.task == 'quality' && needs.changes.outputs.framework == 'true' }}
@@ -92,7 +101,7 @@ jobs:
           restore-keys: |
             mypy-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('framework/pyproject.toml', 'framework/uv.lock') }}-
       - name: Install dependencies
-        if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) }}
+        if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) || (matrix.task == 'pytest_serial' && needs.changes.outputs.framework == 'true') }}
         run: |
           cd framework
           uv sync --python=${{ matrix.python }} --locked --all-extras --all-groups
@@ -117,9 +126,86 @@ jobs:
         if: ${{ matrix.task == 'pytest' && needs.changes.outputs.framework == 'true' }}
         run: |
           cd framework
-          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest --cov=py/flwr --durations=25 --durations-min=0.5
+          # Most tests are isolated well enough to run in parallel. The
+          # process-wide Ray/VCE integration modules, fixed-port gRPC tests,
+          # and xdist-incompatible Runtime API subtests run in a separate matrix job
+          # below so every Python version keeps the complete test coverage.
+          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest \
+            --cov=py/flwr \
+            --cov-report= \
+            --ignore=py/flwr/simulation/ray_transport/ray_client_proxy_test.py \
+            --ignore=py/flwr/server/superlink/fleet/vce/vce_api_test.py \
+            --ignore=py/flwr/server/superlink/fleet/vce/backend/raybackend_test.py \
+            --ignore=py/flwr/server/superlink/fleet/grpc_rere \
+            --ignore=py/flwr/superlink/servicer/runtime \
+            --ignore=py/flwr/supercore/servicer/runtime/runtime_handlers_test.py \
+            -n 4 \
+            --dist=loadscope \
+            --durations=50
+      - name: Test serial scopes
+        if: ${{ matrix.task == 'pytest_serial' && needs.changes.outputs.framework == 'true' }}
+        run: |
+          cd framework
+          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest \
+            --cov=py/flwr \
+            --cov-report= \
+            py/flwr/simulation/ray_transport/ray_client_proxy_test.py \
+            py/flwr/server/superlink/fleet/vce/vce_api_test.py \
+            py/flwr/server/superlink/fleet/vce/backend/raybackend_test.py \
+            py/flwr/server/superlink/fleet/grpc_rere \
+            py/flwr/superlink/servicer/runtime \
+            py/flwr/supercore/servicer/runtime/runtime_handlers_test.py
+      - name: Prepare coverage artifact
+        if: ${{ (matrix.task == 'pytest' || matrix.task == 'pytest_serial') && needs.changes.outputs.framework == 'true' }}
+        run: |
+          cd framework
+          mkdir -p coverage-data
+          cp .pytest_cache/.coverage coverage-data/coverage
+      - name: Upload coverage data
+        if: ${{ (matrix.task == 'pytest' || matrix.task == 'pytest_serial') && needs.changes.outputs.framework == 'true' }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: coverage-${{ matrix.task }}-${{ matrix.python }}
+          path: framework/coverage-data/
+          if-no-files-found: error
       - name: Check benchmarks and examples
         if: ${{ matrix.task == 'pytest' && needs.changes.outputs.ex_bench == 'true' }}
         run: |
           cd framework
           uv run --no-sync ../dev/test.sh
+
+  coverage_report:
+    name: Complete coverage report
+    if: ${{ needs.changes.outputs.framework == 'true' }}
+    runs-on: ubuntu-24.04
+    needs:
+      - changes
+      - framework_checks
+    steps:
+      - uses: actions/checkout@v5
+      - name: Bootstrap
+        uses: ./.github/actions/bootstrap
+        with:
+          python-version: '3.11'
+      - name: Prepare framework
+        run: ./framework/dev/prepare-framework.sh
+      - name: Install dependencies
+        run: |
+          cd framework
+          uv sync --python=3.11 --locked --all-extras --all-groups
+      - name: Download coverage data
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: coverage-*
+          path: framework/coverage-artifacts
+      - name: Combine coverage data and report
+        run: |
+          cd framework
+          mkdir -p .pytest_cache
+          find coverage-artifacts -type f -name 'coverage*' -print0 | while IFS= read -r -d '' file; do
+            artifact="$(basename "$(dirname "$file")")"
+            data_file="$(basename "$file")"
+            cp "$file" ".pytest_cache/.coverage.${artifact}.${data_file}"
+          done
+          uv run --no-sync coverage combine
+          uv run --no-sync coverage report

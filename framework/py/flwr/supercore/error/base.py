@@ -45,8 +45,8 @@ class FlowerError(Exception):
         self.message = message  # Sensitive message
         self.public_details = public_details
 
-    def to_json(self, public_message: str) -> str:
-        """Serialize the client-visible error payload as JSON.
+    def to_json(self, public_message: str) -> dict[str, int | str]:
+        """Return the client-visible HTTP error payload as a JSON dictionary.
 
         Parameters
         ----------
@@ -56,24 +56,25 @@ class FlowerError(Exception):
 
         Returns
         -------
-        str
-            A JSON string containing the error code, the client-visible message,
-            and any client-safe details attached to the error.
+        dict[str, int | str]
+            A JSON dictionary containing the error code and client-visible detail,
+            plus any client-safe extra information attached to the error.
         """
-        return json.dumps(
-            {
-                "code": self.code,
-                "public_message": public_message,
-                "public_details": self.public_details,
-            }
-        )
+        payload: dict[str, int | str] = {
+            "code": self.code,
+            "detail": public_message,
+        }
+        if self.public_details is not None:
+            payload["extra"] = self.public_details
+        return payload
 
     @staticmethod
     def from_json(value: str | None) -> FlowerError | None:
-        """Deserialize a client-visible error payload.
+        """Deserialize a client-visible gRPC or HTTP error payload.
 
         The internal diagnostic message is not transmitted over the wire. The returned
-        error therefore uses the public message as its ``message`` value.
+        error therefore uses the public message (``public_message`` for gRPC or
+        ``detail`` for HTTP) as its ``message`` value.
         """
         if value is None:
             return None
@@ -87,8 +88,12 @@ class FlowerError(Exception):
             return None
 
         code = payload.get("code")
-        public_message = payload.get("public_message")
-        public_details = payload.get("public_details")
+        if "public_message" in payload:
+            public_message = payload.get("public_message")
+            public_details = payload.get("public_details")
+        else:
+            public_message = payload.get("detail")
+            public_details = payload.get("extra")
 
         if (
             not isinstance(code, int)
@@ -151,6 +156,7 @@ class ApiErrorCode(IntEnum):
     CONNECTOR_NOT_FOUND = 39
     CONNECTOR_FAILURE = 40
     LICENSE_CHECK_FAILED = 41
+    INVALID_AUTOMATION_REQUEST = 42
 
     # Common API errors (1001-2000)
     RUNTIME_VERSION_INCOMPATIBLE = 1001
@@ -160,6 +166,9 @@ class ApiErrorCode(IntEnum):
     LINKSTATE_NOT_INITIALIZED = 1005
     INVALID_PROTOBUF_REQUEST = 1006
     INVALID_PROTOBUF_RESPONSE = 1007
+    RUNTIME_AUTHENTICATION_FAILED = 1008
+    NODESTATE_NOT_INITIALIZED = 1009
+    FLEET_API_TYPE_NOT_INITIALIZED = 1010
 
     # Fleet API errors (2001-3000)
     FLEET_SUPERNODE_REGISTRATION_DISABLED = 2001
@@ -172,3 +181,19 @@ class ApiErrorCode(IntEnum):
     FLEET_GET_RUN_FAILED = 2008
     FLEET_GET_FAB_FAILED = 2009
     # FLEET_OBJECT_CONTENT_INVALID = 2010 --- DELETED ---
+
+    # Runtime API errors (3001-4000)
+    RUNTIME_CONNECTOR_CREDENTIALS_NOT_AVAILABLE = 3001
+    RUNTIME_TASK_START_FAILED = 3002
+    RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED = 3003
+    RUNTIME_UNEXPECTED_NODE_ID = 3004
+    RUNTIME_ENDPOINT_UNAVAILABLE = 3005
+    RUNTIME_TASK_CREATION_FAILED = 3006
+    RUNTIME_TASK_CREATION_NOT_ALLOWED = 3007
+    RUNTIME_INVALID_TASK_CREATION_REQUEST = 3008
+    RUNTIME_INVALID_TASK_MESSAGE = 3009
+    RUNTIME_CONNECTOR_NOT_AVAILABLE = 3010
+    RUNTIME_RUN_SERIES_CONTEXT_NOT_FOUND = 3011
+    RUNTIME_FAB_NOT_FOUND = 3012
+    RUNTIME_INVALID_MESSAGE_COUNT = 3013
+    RUNTIME_MESSAGE_RUN_ID_MISMATCH = 3014

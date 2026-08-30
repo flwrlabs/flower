@@ -23,7 +23,6 @@ from unittest.mock import Mock
 import pytest
 
 from flwr.common.constant import (
-    CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     ISOLATION_MODE_SUBPROCESS,
     TRANSPORT_TYPE_GRPC_RERE,
@@ -52,7 +51,7 @@ def test_parse_supernode_version_flag(
 
 
 def test_parse_supernode_appio_tls_args() -> None:
-    """SuperNode should parse AppIO-specific TLS args for ClientAppIo."""
+    """SuperNode should parse AppIO-named TLS args for its Runtime API."""
     args = _parse_args_run_supernode().parse_args(
         [
             "--appio-ssl-certfile",
@@ -64,9 +63,9 @@ def test_parse_supernode_appio_tls_args() -> None:
         ]
     )
 
-    assert args.appio_ssl_certfile == "appio-cert.pem"
-    assert args.appio_ssl_keyfile == "appio-key.pem"
-    assert args.appio_ssl_ca_certfile == "appio-ca.pem"
+    assert args.runtime_ssl_certfile == "appio-cert.pem"
+    assert args.runtime_ssl_keyfile == "appio-key.pem"
+    assert args.runtime_ssl_ca_certfile == "appio-ca.pem"
 
 
 def test_parse_supernode_lifespan_config_returns_final_defaults(
@@ -86,9 +85,10 @@ def test_parse_supernode_lifespan_config_returns_final_defaults(
     assert config.max_wait_time is None
     assert not config.node_config
     assert config.isolation == ISOLATION_MODE_SUBPROCESS
-    assert config.clientappio_api_address == CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS
-    assert config.clientappio_certificates is None
-    assert config.clientappio_root_certificates_path is None
+    assert config.host == flower_supernode_module.UVICORN_DEFAULT_HOST
+    assert config.port == flower_supernode_module.SUPERNODE_UVICORN_DEFAULT_PORT
+    assert config.runtime_certificates is None
+    assert config.runtime_root_certificates_path is None
     assert config.health_server_address is None
     assert config.trusted_entities is None
     assert config.superexec_auth_secret is None
@@ -99,7 +99,7 @@ def test_parse_supernode_lifespan_config_preserves_appio_tls_args(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """SuperNode lifespan config should preserve AppIO-specific TLS args."""
-    clientappio_certificates = (b"appio-ca", b"appio-cert", b"appio-key")
+    runtime_certificates = (b"appio-ca", b"appio-cert", b"appio-key")
     monkeypatch.setattr(
         sys,
         "argv",
@@ -116,14 +116,14 @@ def test_parse_supernode_lifespan_config_preserves_appio_tls_args(
     )
     monkeypatch.setattr(
         flower_supernode_module,
-        "try_obtain_optional_appio_server_certificates",
-        Mock(return_value=clientappio_certificates),
+        "try_obtain_optional_runtime_server_certificates",
+        Mock(return_value=runtime_certificates),
     )
 
     config = _parse_supernode_lifespan_config()
 
-    assert config.clientappio_certificates == clientappio_certificates
-    assert config.clientappio_root_certificates_path == "appio-ca.pem"
+    assert config.runtime_certificates == runtime_certificates
+    assert config.runtime_root_certificates_path == "appio-ca.pem"
 
 
 def test_flower_supernode_checks_for_update(
@@ -165,3 +165,58 @@ def test_flower_supernode_checks_for_update(
         flower_supernode_module.flower_supernode()
 
     assert captured == ["update", "flower-supernode"]
+
+
+def test_flower_supernode_injects_state_factory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperNode should pass its state factory into the internal startup path."""
+    config = Mock()
+    config.host = "127.0.0.1"
+    config.port = 8000
+    objectstore_factory = Mock()
+    state_factory = Mock()
+    start_client_internal = Mock()
+    add_exit_handler = Mock()
+
+    monkeypatch.setattr(
+        flower_supernode_module, "warn_if_flwr_update_available", Mock()
+    )
+    monkeypatch.setattr(flower_supernode_module, "event", Mock())
+    monkeypatch.setattr(
+        flower_supernode_module,
+        "_parse_supernode_lifespan_config",
+        Mock(return_value=config),
+    )
+    monkeypatch.setattr(
+        flower_supernode_module,
+        "ObjectStoreFactory",
+        Mock(return_value=objectstore_factory),
+    )
+    node_state_factory = Mock(return_value=state_factory)
+    monkeypatch.setattr(flower_supernode_module, "NodeStateFactory", node_state_factory)
+    monkeypatch.setattr(
+        flower_supernode_module, "start_client_internal", start_client_internal
+    )
+    monkeypatch.setattr(flower_supernode_module, "add_exit_handler", add_exit_handler)
+    http_server = Mock()
+    http_thread = Mock()
+    http_thread.is_alive.return_value = True
+    monkeypatch.setattr(
+        flower_supernode_module,
+        "_start_supernode_http_api",
+        Mock(return_value=(http_server, http_thread)),
+    )
+
+    flower_supernode_module.flower_supernode()
+
+    node_state_factory.assert_called_once_with(objectstore_factory=objectstore_factory)
+    assert start_client_internal.call_args.kwargs["state_factory"] is state_factory
+    add_exit_handler.assert_called_once()
+    exit_handler = add_exit_handler.call_args.args[0]
+    exit_handler()
+    assert http_server.should_exit is True
+    http_thread.join.assert_called_once_with(
+        timeout=flower_supernode_module.HTTP_SERVER_SHUTDOWN_TIMEOUT
+    )
+    assert http_server.force_exit is True

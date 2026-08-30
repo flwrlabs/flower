@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "flwr"
-version = "1.33.0"
+version = "1.36.0"
 description = "Flower: A Friendly Federated AI Framework"
 license = "Apache-2.0"
 authors = [{ name = "The Flower Authors", email = "hello@flower.ai" }]
@@ -54,9 +54,11 @@ dependencies = [
     "tomli>=2.0.1,<3.0.0",
     "tomli-w>=1.0.0,<2.0.0",
     "pathspec>=1.0.4,<2.0.0",
+    "prompt-toolkit>=3.0.52,<4.0.0",
     "rich>=14.0.0,<15.0.0",
     "pyyaml>=6.0.2,<7.0.0",
     "requests>=2.33.0,<3.0.0",
+    "httpx>=0.28.1,<1.0.0",
     "click>=8.0.0,<9.0.0",
     "packaging>=24.0,<26.0",
     "SQLAlchemy[asyncio]>=2.0.45,<3.0.0",
@@ -72,6 +74,7 @@ simulation = [
     "ray==2.55.1; python_version >= '3.13' and python_version < '3.15' and sys_platform != 'win32'",
 ]
 agent = ["browser-use[core]>=0.13.1,<0.14.0", "trafilatura>=2.1.0,<3.0.0"]
+dp = ["dp-accounting>=0.6.0,<0.7.0"]
 
 [project.scripts]
 # `flwr` CLI
@@ -95,6 +98,7 @@ documentation = "https://flower.ai"
 
 [dependency-groups]
 dev = [
+    "dp-accounting>=0.6.0,<0.7.0",
     "types-dataclasses==0.6.6",
     "types-protobuf==5.29.1.20250403",
     "types-requests==2.33.0.20260518",
@@ -109,6 +113,7 @@ dev = [
     "parameterized==0.9.0",
     "pytest==9.0.3",
     "pytest-cov==4.1.0",
+    "pytest-xdist==3.8.0",
     "pytest-watcher==0.4.3",
     "jupyterlab==4.5.7",
     "rope==1.13.0",
@@ -138,7 +143,6 @@ dev = [
     "pyroma==4.2",
     "check-wheel-contents==0.6.3",
     "GitPython==3.1.50",
-    "PyGithub==2.1.1",
     "licensecheck==2025.1.0",
     "pre-commit==3.5.0",
     "sphinx-substitution-extensions==2022.2.16",
@@ -158,7 +162,7 @@ devtool = { path = "../dev", editable = true }
 [tool.uv.build-backend]
 module-name = "flwr"
 module-root = "py"
-source-exclude = ["py/**/*_test.py"]
+source-exclude = ["py/**/*_test.py", "py/**/*_test_utils.py"]
 
 [tool.devtool.protoc]
 proto_root = "proto"

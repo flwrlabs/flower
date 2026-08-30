@@ -41,7 +41,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message.
 
-        Usually, the ServerAppIo API calls this to schedule instructions.
+        Usually, the Runtime API calls this to schedule instructions.
 
         Stores the value of the `message` in the link state and, if successful,
         returns the `message_id` (str) of the `message`. If, for any reason,
@@ -91,7 +91,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
     def get_message_res(self, message_ids: set[str]) -> list[Message]:
         """Get reply Messages for the given Message IDs.
 
-        This method is typically called by the ServerAppIo API to obtain
+        This method is typically called by the Runtime API to obtain
         results (type Message) for previously scheduled instructions (type Message).
         For each message_id passed, this method returns one of the following responses:
 
@@ -317,34 +317,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         -----
         This method will not verify if the account has permission to create
         a run in the federation.
-        """
-
-    @abc.abstractmethod
-    def dispatch_automation(
-        self,
-        automation_id: int,
-        *,
-        previous_next_run_at: str,
-        next_run_at: str | None,
-    ) -> int | None:
-        """Create a run from a due automation and advance the automation.
-
-        Parameters
-        ----------
-        automation_id : int
-            Automation ID to dispatch.
-        previous_next_run_at : str
-            Previously observed due time timestamp string. Dispatch only succeeds
-            if the stored `next_run_at` still matches this value, preventing
-            multiple workers from executing the same scheduled run concurrently.
-        next_run_at : str | None
-            Next due time timestamp string. If `None`, the current occurrence is
-            treated as the last finite occurrence and no next due time is stored.
-
-        Returns
-        -------
-        int | None
-            The created run ID if dispatch succeeded, otherwise `None`.
         """
 
     @abc.abstractmethod

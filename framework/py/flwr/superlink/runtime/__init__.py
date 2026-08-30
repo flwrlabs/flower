@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower ServerApp runtime."""
+"""Flower SuperLink runtime."""
 
+
+from flwr.supercore.runtime import RuntimeHttpClient as RuntimeHttpClient
 
 from .run_serverapp import run_serverapp
 
 __all__ = [
+    "RuntimeHttpClient",
     "run_serverapp",
 ]

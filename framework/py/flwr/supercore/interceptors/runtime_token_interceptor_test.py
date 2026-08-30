@@ -1,0 +1,462 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Tests for short-term Runtime token interceptors."""
+
+
+import inspect
+from collections import namedtuple
+from typing import cast
+from unittest import TestCase
+from unittest.mock import Mock
+
+import grpc
+from google.protobuf.message import Message as GrpcMessage
+
+from flwr.proto.message_pb2 import PushObjectRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    GetNodesRequest,
+    PullPendingTasksRequest,
+    PushAppMessagesRequest,
+    PushTaskOutputRequest,
+)
+from flwr.proto.runtime_pb2_grpc import RuntimeServicer
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore.auth import RUNTIME_METHOD_AUTH_POLICY
+from flwr.supercore.interceptors import (
+    AUTHENTICATION_FAILED_MESSAGE,
+    TASK_TOKEN_HEADER,
+    RuntimeTokenClientInterceptor,
+    RuntimeTokenServerInterceptor,
+    create_superlink_runtime_token_auth_server_interceptor,
+    create_supernode_runtime_token_auth_server_interceptor,
+    get_authenticated_task,
+)
+
+_ClientCallDetails = namedtuple(
+    "_ClientCallDetails",
+    ["method", "timeout", "metadata", "credentials", "wait_for_ready", "compression"],
+)
+
+
+class _HandlerCallDetails:
+    def __init__(
+        self,
+        method: str,
+        invocation_metadata: tuple[tuple[str, str | bytes], ...],
+    ) -> None:
+        self.method = method
+        self.invocation_metadata = invocation_metadata
+
+
+class _TokenState:
+    def __init__(self, token_to_task: dict[str, Task]) -> None:
+        self._token_to_task = token_to_task
+
+    def get_task_by_token(self, token: str) -> Task | None:
+        """Return the task for a task token, if present."""
+        return self._token_to_task.get(token)
+
+
+def _make_unary_handler() -> grpc.RpcMethodHandler:
+    def _handler(_request: GrpcMessage, _context: grpc.ServicerContext) -> str:
+        return "ok"
+
+    return grpc.unary_unary_rpc_method_handler(_handler)
+
+
+def _make_non_unary_handler() -> grpc.RpcMethodHandler:
+    def _handler(
+        _request: GrpcMessage, _context: grpc.ServicerContext
+    ) -> list[GrpcMessage]:
+        return []
+
+    return grpc.unary_stream_rpc_method_handler(_handler)
+
+
+class TestRuntimeTokenClientInterceptor(TestCase):
+    """Unit tests for RuntimeTokenClientInterceptor."""
+
+    def test_attach_task_token_header(self) -> None:
+        """The interceptor should attach task-token metadata."""
+        interceptor = RuntimeTokenClientInterceptor(token="new-token")
+        details = _ClientCallDetails(
+            method="/flwr.proto.Runtime/GetNodes",
+            timeout=None,
+            metadata=(("x-test", "value"),),
+            credentials=None,
+            wait_for_ready=None,
+            compression=None,
+        )
+        captured: dict[str, list[tuple[str, str | bytes]]] = {}
+
+        def continuation(
+            client_call_details: grpc.ClientCallDetails,
+            _request: GrpcMessage,
+        ) -> str:
+            captured["metadata"] = list(client_call_details.metadata or [])
+            return "ok"
+
+        response = interceptor.intercept_unary_unary(
+            continuation=continuation,
+            client_call_details=details,
+            request=GetNodesRequest(),
+        )
+
+        self.assertEqual(response, "ok")
+        metadata = captured["metadata"]
+        self.assertIn(("x-test", "value"), metadata)
+        self.assertEqual(
+            [item for item in metadata if item[0] == TASK_TOKEN_HEADER],
+            [(TASK_TOKEN_HEADER, "new-token")],
+        )
+
+    def test_raise_if_task_token_header_already_present(self) -> None:
+        """The interceptor should reject duplicate task-token metadata."""
+        interceptor = RuntimeTokenClientInterceptor(token="new-token")
+        details = _ClientCallDetails(
+            method="/flwr.proto.Runtime/GetNodes",
+            timeout=None,
+            metadata=(("x-test", "value"), (TASK_TOKEN_HEADER, "old-token")),
+            credentials=None,
+            wait_for_ready=None,
+            compression=None,
+        )
+
+        with self.assertRaises(RuntimeError):
+            interceptor.intercept_unary_unary(
+                continuation=Mock(),
+                client_call_details=details,
+                request=GetNodesRequest(),
+            )
+
+
+class TestRuntimeTokenServerInterceptor(TestCase):
+    """Unit tests for RuntimeTokenServerInterceptor."""
+
+    def _new_interceptor(
+        self, token_to_task: dict[str, Task]
+    ) -> RuntimeTokenServerInterceptor:
+        state = _TokenState(token_to_task)
+        return create_superlink_runtime_token_auth_server_interceptor(lambda: state)
+
+    @staticmethod
+    def _find_runtime_method(*, requires_token: bool) -> str | None:
+        methods = [
+            method
+            for method, policy in RUNTIME_METHOD_AUTH_POLICY.items()
+            if policy.requires_token is requires_token
+        ]
+        return sorted(methods)[0] if methods else None
+
+    def test_no_auth_method_allows_call_without_token(self) -> None:
+        """No-auth methods should pass through without metadata token."""
+        interceptor = self._new_interceptor(token_to_task={})
+        method = self._find_runtime_method(requires_token=False)
+        if method is None:
+            self.skipTest("No no-auth Runtime method found in policy table.")
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                method,
+                invocation_metadata=(),
+            ),
+        )
+
+        response = cast(str, intercepted.unary_unary(PullPendingTasksRequest(), Mock()))
+        self.assertEqual(response, "ok")
+
+    def test_missing_token_denied_for_protected_method(self) -> None:
+        """Protected methods should deny requests without token input."""
+        interceptor = self._new_interceptor(
+            token_to_task={"valid": Task(task_id=1, run_id=7)}
+        )
+        method = self._find_runtime_method(requires_token=True)
+        if method is None:
+            self.skipTest("No token-required Runtime method found in policy table.")
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                method,
+                invocation_metadata=(),
+            ),
+        )
+
+        with self.assertRaises(grpc.RpcError):
+            intercepted.unary_unary(GetNodesRequest(), context)
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
+        )
+
+    def test_invalid_token_denied_for_protected_method(self) -> None:
+        """Protected methods should deny requests with invalid tokens."""
+        interceptor = self._new_interceptor(
+            token_to_task={"valid": Task(task_id=1, run_id=7)}
+        )
+        method = self._find_runtime_method(requires_token=True)
+        if method is None:
+            self.skipTest("No token-required Runtime method found in policy table.")
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                method,
+                invocation_metadata=((TASK_TOKEN_HEADER, "invalid"),),
+            ),
+        )
+
+        with self.assertRaises(grpc.RpcError):
+            intercepted.unary_unary(GetNodesRequest(), context)
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
+        )
+
+    def test_valid_token_passes_for_protected_method(self) -> None:
+        """Protected methods should pass with a valid task token."""
+        interceptor = self._new_interceptor(
+            token_to_task={"valid": Task(task_id=1, run_id=7)}
+        )
+        method = self._find_runtime_method(requires_token=True)
+        if method is None:
+            self.skipTest("No token-required Runtime method found in policy table.")
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                method,
+                invocation_metadata=((TASK_TOKEN_HEADER, "valid"),),
+            ),
+        )
+
+        response = cast(str, intercepted.unary_unary(GetNodesRequest(), Mock()))
+        self.assertEqual(response, "ok")
+
+    def test_valid_task_token_passes_and_sets_task_id(self) -> None:
+        """Protected methods should pass with a valid task token."""
+        state = Mock()
+        state.get_task_by_token.return_value = Task(task_id=123, run_id=7)
+        interceptor = create_superlink_runtime_token_auth_server_interceptor(
+            lambda: state
+        )
+        method = self._find_runtime_method(requires_token=True)
+        if method is None:
+            self.skipTest("No token-required Runtime method found in policy table.")
+        captured_task = None
+
+        def _handler(_request: GrpcMessage, _context: grpc.ServicerContext) -> str:
+            nonlocal captured_task
+            captured_task = get_authenticated_task()
+            return "ok"
+
+        intercepted = interceptor.intercept_service(
+            lambda _: grpc.unary_unary_rpc_method_handler(_handler),
+            _HandlerCallDetails(
+                method,
+                invocation_metadata=((TASK_TOKEN_HEADER, "task-token"),),
+            ),
+        )
+
+        response = intercepted.unary_unary(GetNodesRequest(), Mock())
+        self.assertEqual(response, "ok")
+        self.assertIsNotNone(captured_task)
+        self.assertEqual(cast(Task, captured_task).task_id, 123)
+        state.get_task_by_token.assert_called_once_with("task-token")
+
+    def test_metadata_token_used_for_task_output(self) -> None:
+        """Metadata token should authorize task output requests."""
+        interceptor = self._new_interceptor(
+            token_to_task={"metadata-token": Task(task_id=1, run_id=5)}
+        )
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                "/flwr.proto.Runtime/PushTaskOutput",
+                invocation_metadata=((TASK_TOKEN_HEADER, "metadata-token"),),
+            ),
+        )
+
+        response = intercepted.unary_unary(PushTaskOutputRequest(), Mock())
+        self.assertEqual(response, "ok")
+
+    def test_metadata_token_used_for_protected_method(self) -> None:
+        """Metadata token should be used for protected methods."""
+        interceptor = self._new_interceptor(
+            token_to_task={"metadata-token": Task(task_id=1, run_id=5)}
+        )
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                "/flwr.proto.Runtime/PushMessages",
+                invocation_metadata=((TASK_TOKEN_HEADER, "metadata-token"),),
+            ),
+        )
+
+        response = intercepted.unary_unary(PushAppMessagesRequest(), Mock())
+        self.assertEqual(response, "ok")
+
+    def test_missing_metadata_token_is_denied_for_task_output(self) -> None:
+        """Missing metadata token should not satisfy auth."""
+        interceptor = self._new_interceptor(
+            token_to_task={"request-token": Task(task_id=1, run_id=5)}
+        )
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                "/flwr.proto.Runtime/PushTaskOutput",
+                invocation_metadata=(),
+            ),
+        )
+
+        with self.assertRaises(grpc.RpcError):
+            intercepted.unary_unary(PushTaskOutputRequest(), context)
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
+        )
+
+    def test_unknown_method_fails_closed(self) -> None:
+        """Unknown methods should fail closed with UNAUTHENTICATED."""
+        interceptor = self._new_interceptor(
+            token_to_task={"valid": Task(task_id=1, run_id=7)}
+        )
+        continuation = Mock(return_value=_make_unary_handler())
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        intercepted = interceptor.intercept_service(
+            continuation,
+            _HandlerCallDetails(
+                "/flwr.proto.Runtime/UnknownMethod",
+                invocation_metadata=((TASK_TOKEN_HEADER, "valid"),),
+            ),
+        )
+
+        with self.assertRaises(grpc.RpcError):
+            intercepted.unary_unary(GetNodesRequest(), context)
+        continuation.assert_not_called()
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
+        )
+
+    def test_non_unary_handler_fails_closed_for_protected_method(self) -> None:
+        """Protected methods with non-unary handlers should fail closed."""
+        interceptor = self._new_interceptor(
+            token_to_task={"valid": Task(task_id=1, run_id=7)}
+        )
+        method = self._find_runtime_method(requires_token=True)
+        if method is None:
+            self.skipTest("No token-required Runtime method found in policy table.")
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_non_unary_handler(),
+            _HandlerCallDetails(
+                method,
+                invocation_metadata=((TASK_TOKEN_HEADER, "valid"),),
+            ),
+        )
+
+        with self.assertRaises(grpc.RpcError):
+            intercepted.unary_unary(GetNodesRequest(), context)
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
+        )
+
+
+class TestMethodPolicyMaps(TestCase):
+    """Validate method auth policy map coverage and values."""
+
+    NO_AUTH_BOOTSTRAP_METHODS = {
+        "PullPendingTasks",
+        "ClaimTask",
+    }
+
+    @staticmethod
+    def _runtime_rpc_methods() -> set[str]:
+        return {
+            f"/flwr.proto.Runtime/{name}"
+            for name, ref in inspect.getmembers(RuntimeServicer)
+            if inspect.isfunction(ref) and not name.startswith("_")
+        }
+
+    def test_runtime_policy_has_full_coverage(self) -> None:
+        """Runtime policy map should cover all RPC methods exactly."""
+        expected_methods = self._runtime_rpc_methods()
+        self.assertEqual(set(RUNTIME_METHOD_AUTH_POLICY), expected_methods)
+
+    def test_only_expected_no_auth_methods_exist(self) -> None:
+        """Only bootstrap methods should be marked no-auth in the policy table."""
+        no_auth_methods = {
+            method.rsplit("/", maxsplit=1)[-1]
+            for method, policy in RUNTIME_METHOD_AUTH_POLICY.items()
+            if not policy.requires_token
+        }
+        self.assertEqual(no_auth_methods, self.NO_AUTH_BOOTSTRAP_METHODS)
+
+
+class TestFactoryFunctions(TestCase):
+    """Validate interceptor factory behavior."""
+
+    def test_superlink_runtime_factory_uses_runtime_policy(self) -> None:
+        """SuperLink factory should enforce Runtime policy semantics."""
+        state = _TokenState({"valid-token": Task(task_id=1, run_id=1)})
+        interceptor = create_superlink_runtime_token_auth_server_interceptor(
+            lambda: state
+        )
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                "/flwr.proto.Runtime/GetNodes",
+                invocation_metadata=((TASK_TOKEN_HEADER, "valid-token"),),
+            ),
+        )
+
+        response = intercepted.unary_unary(GetNodesRequest(), Mock())
+        self.assertEqual(response, "ok")
+
+    def test_supernode_runtime_factory_uses_runtime_policy(self) -> None:
+        """SuperNode factory should enforce Runtime policy semantics."""
+        state = _TokenState({"valid-token": Task(task_id=1, run_id=1)})
+        interceptor = create_supernode_runtime_token_auth_server_interceptor(
+            lambda: state
+        )
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                "/flwr.proto.Runtime/PushObject",
+                invocation_metadata=((TASK_TOKEN_HEADER, "valid-token"),),
+            ),
+        )
+
+        response = cast(
+            str,
+            intercepted.unary_unary(
+                PushObjectRequest(object_id="obj", object_content=b"x"),
+                Mock(),
+            ),
+        )
+        self.assertEqual(response, "ok")

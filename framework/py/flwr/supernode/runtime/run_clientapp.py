@@ -17,7 +17,7 @@
 
 from logging import DEBUG, ERROR
 
-import grpc
+import httpx
 
 from flwr.app import Context, Message
 from flwr.app.error import Error
@@ -27,7 +27,6 @@ from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common.config import get_project_dir
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode, SubStatus
-from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -35,7 +34,8 @@ from flwr.common.serde import (
     message_to_proto,
     run_from_proto,
 )
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -43,13 +43,11 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesRequest,
     PushTaskOutputRequest,
 )
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.fab import Fab
-from flwr.supercore.grpc import create_channel, on_channel_state_change
-from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
+from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
@@ -65,11 +63,12 @@ from flwr.supercore.inflatable.inflatable_utils import (
     push_objects,
 )
 from flwr.supercore.interceptors import (
-    AppIoTokenClientInterceptor,
-    RuntimeVersionClientInterceptor,
+    RuntimeTokenHttpInterceptor,
+    RuntimeVersionHttpInterceptor,
 )
-from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
+from flwr.supercore.retry import make_simple_http_retry_invoker
 from flwr.supercore.run import Run
+from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
@@ -79,7 +78,7 @@ from flwr.supercore.telemetry import EventType, event
 
 
 def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
-    clientappio_api_address: str,
+    runtime_api_address: str,
     token: str,
     insecure: bool,
     certificates: bytes | None = None,
@@ -93,19 +92,17 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
     event(EventType.FLWR_CLIENTAPP_RUN_ENTER)
 
-    channel = create_channel(
-        server_address=clientappio_api_address,
+    retry_invoker = make_simple_http_retry_invoker()
+    client = RuntimeHttpClient.from_server_address(
+        server_address=runtime_api_address,
         insecure=insecure,
         root_certificates=certificates,
         interceptors=[
-            RuntimeVersionClientInterceptor(component_name="flwr-clientapp"),
-            AppIoTokenClientInterceptor(token),
+            RuntimeVersionHttpInterceptor(component_name="flwr-clientapp"),
+            RuntimeTokenHttpInterceptor(token),
         ],
+        retry_invoker=retry_invoker,
     )
-    channel.subscribe(on_channel_state_change)
-    stub = ClientAppIoStub(channel)
-    retry_invoker = make_simple_grpc_retry_invoker()
-    wrap_stub(stub, retry_invoker)
 
     # Initialize variables for exit handler
     heartbeat_sender = None
@@ -118,12 +115,12 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
-        # Set Grpc max retries to 1 to avoid blocking on exit
+        # Limit Runtime HTTP retries to avoid blocking on exit
         retry_invoker.max_tries = 1
 
         # Push final status and context (if available)
         push_task_output(
-            stub=stub,
+            client=client,
             context=context,
             sub_status=sub_status,
             details=details,
@@ -132,7 +129,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         # Stop heartbeat sender
         if heartbeat_sender is not None and heartbeat_sender.is_running:
             heartbeat_sender.stop()
-        channel.close()
+        client.close()
 
         cleanup_app_runtime_environment(runtime_env_dir)
 
@@ -144,11 +141,11 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
     try:
         # Start task heartbeat
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
+        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_http(client))
         heartbeat_sender.start()
 
         # Pull Message, Context, Run and FAB from SuperNode
-        message, context, run, fab = pull_task_input(stub)
+        message, context, run, fab = pull_task_input(client)
 
         # Install FAB
         log(DEBUG, "[flwr-clientapp] Start FAB installation.")
@@ -223,7 +220,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         # Push reply message to SuperNode
         if reply_message and context:
             try:
-                push_message(stub, reply_message, context)
+                push_message(client, reply_message, context)
             except Exception as ex:  # pylint: disable=broad-exception-caught
                 log(ERROR, "Failed to push reply message", exc_info=ex)
                 exit_code = ExitCode.CLIENTAPP_COMMUNICATION_ERROR
@@ -234,24 +231,28 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     )
 
 
-def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
+def pull_task_input(client: RuntimeHttpClient) -> tuple[Message, Context, Run, Fab]:
     """Pull TaskInput from SuperNode."""
     # Pull Context, Run and FAB
-    res: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
+    res: PullTaskInputResponse = client.PullTaskInput(PullTaskInputRequest())
     context = context_from_proto(res.context)
     run = run_from_proto(res.run)
     fab = fab_from_proto(res.fab)
 
     # Pull and inflate the message
-    pull_msg_res: PullAppMessagesResponse = stub.PullMessages(PullAppMessagesRequest())
+    pull_msg_res: PullAppMessagesResponse = client.PullMessages(
+        PullAppMessagesRequest()
+    )
+    if not pull_msg_res.messages_list:
+        raise RuntimeError("No messages received from Runtime API")
     run_id = context.run_id
     node = Node(node_id=context.node_id)
     object_tree = pull_msg_res.message_object_trees[0]
     message = pull_and_inflate_object_from_tree(
         object_tree,
-        make_pull_object_fn_protobuf(stub.PullObject, node, run_id),
+        make_pull_object_fn_protobuf(client.PullObject, node, run_id),
         make_confirm_message_received_fn_protobuf(
-            stub.ConfirmMessageReceived, node, run_id
+            client.ConfirmMessageReceived, node, run_id
         ),
         return_type=Message,
     )
@@ -262,7 +263,7 @@ def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
     return message, context, run, fab
 
 
-def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> None:
+def push_message(client: RuntimeHttpClient, message: Message, context: Context) -> None:
     """Push reply message to SuperNode."""
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
@@ -274,7 +275,7 @@ def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> N
 
         # Push Message
         # This is temporary. The message should not contain its content
-        push_msg_res = stub.PushMessages(
+        push_msg_res = client.PushMessages(
             PushAppMessagesRequest(
                 messages_list=[proto_message], message_object_trees=[object_tree]
             )
@@ -290,7 +291,7 @@ def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> N
         push_objects(
             all_objects,
             make_push_object_fn_protobuf(
-                stub.PushObject,
+                client.PushObject,
                 Node(node_id=context.node_id),
                 run_id=context.run_id,
                 session_id=push_msg_res.session_id,
@@ -300,7 +301,7 @@ def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> N
 
 
 def push_task_output(  # pylint: disable=R0913, R0917
-    stub: ClientAppIoStub,
+    client: RuntimeHttpClient,
     context: Context | None,
     sub_status: str,
     details: str,
@@ -308,12 +309,12 @@ def push_task_output(  # pylint: disable=R0913, R0917
     """Push TaskOutput to SuperNode."""
     try:
         # Push Context and final status
-        stub.PushTaskOutput(
+        client.PushTaskOutput(
             PushTaskOutputRequest(
                 context=context_to_proto(context) if context else None,
                 sub_status=sub_status,
                 details=details,
             )
         )
-    except grpc.RpcError as err:
+    except httpx.HTTPError as err:
         log(ERROR, "Failed to push task output: %s", str(err))

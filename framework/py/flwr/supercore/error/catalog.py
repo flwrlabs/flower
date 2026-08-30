@@ -15,6 +15,7 @@
 """Error catalog for translating internal API error codes to public responses."""
 
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Final
 
@@ -31,6 +32,7 @@ class ApiErrorSpec:
     status_code: StatusCode
     http_status_code: int
     public_message: str
+    http_headers: Mapping[str, str] | None = None
 
 
 API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
@@ -218,6 +220,9 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         status_code=StatusCode.UNAUTHENTICATED,
         http_status_code=status.HTTP_401_UNAUTHORIZED,
         public_message="Authentication failed.",
+        # A 401 response must advertise its authentication scheme so standards-based
+        # HTTP clients know that the API expects a Bearer access token.
+        http_headers={"WWW-Authenticate": "Bearer"},
     ),
     ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED: ApiErrorSpec(
         status_code=StatusCode.UNAVAILABLE,
@@ -244,6 +249,11 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_403_FORBIDDEN,
         public_message="License check failed. Please contact the SuperLink "
         "administrator.",
+    ),
+    ApiErrorCode.INVALID_AUTOMATION_REQUEST: ApiErrorSpec(
+        status_code=StatusCode.INVALID_ARGUMENT,
+        http_status_code=status.HTTP_400_BAD_REQUEST,
+        public_message="Invalid automation request.",
     ),
     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
@@ -279,6 +289,21 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         status_code=StatusCode.INTERNAL,
         http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         public_message="Invalid protobuf response.",
+    ),
+    ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED: ApiErrorSpec(
+        status_code=StatusCode.UNAUTHENTICATED,
+        http_status_code=status.HTTP_401_UNAUTHORIZED,
+        public_message="Authentication failed.",
+    ),
+    ApiErrorCode.NODESTATE_NOT_INITIALIZED: ApiErrorSpec(
+        status_code=StatusCode.UNAVAILABLE,
+        http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        public_message="NodeState is not initialized.",
+    ),
+    ApiErrorCode.FLEET_API_TYPE_NOT_INITIALIZED: ApiErrorSpec(
+        status_code=StatusCode.UNAVAILABLE,
+        http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        public_message="Fleet API type is not initialized.",
     ),
     ApiErrorCode.FLEET_SUPERNODE_REGISTRATION_DISABLED: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
@@ -327,5 +352,76 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         status_code=StatusCode.PERMISSION_DENIED,
         http_status_code=status.HTTP_403_FORBIDDEN,
         public_message="Failed to get FAB.",
+    ),
+    ApiErrorCode.RUNTIME_CONNECTOR_CREDENTIALS_NOT_AVAILABLE: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Connector credentials are not available to this task.",
+    ),
+    ApiErrorCode.RUNTIME_TASK_START_FAILED: ApiErrorSpec(
+        status_code=StatusCode.FAILED_PRECONDITION,
+        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
+        public_message="Failed to start task.",
+    ),
+    ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Only AgentApp and ServerApp tasks can create automations.",
+    ),
+    ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID: ApiErrorSpec(
+        status_code=StatusCode.FAILED_PRECONDITION,
+        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
+        public_message="Unexpected node ID.",
+    ),
+    ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Some Runtime API endpoints are only available for Deployment "
+        "Runtime runs.",
+    ),
+    ApiErrorCode.RUNTIME_TASK_CREATION_FAILED: ApiErrorSpec(
+        status_code=StatusCode.INTERNAL,
+        http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        public_message="Failed to create task.",
+    ),
+    ApiErrorCode.RUNTIME_TASK_CREATION_NOT_ALLOWED: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Task creation is not allowed.",
+    ),
+    ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST: ApiErrorSpec(
+        status_code=StatusCode.FAILED_PRECONDITION,
+        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
+        public_message="Invalid task creation request.",
+    ),
+    ApiErrorCode.RUNTIME_INVALID_TASK_MESSAGE: ApiErrorSpec(
+        status_code=StatusCode.FAILED_PRECONDITION,
+        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
+        public_message="Invalid task message.",
+    ),
+    ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Connector is not available to this run.",
+    ),
+    ApiErrorCode.RUNTIME_RUN_SERIES_CONTEXT_NOT_FOUND: ApiErrorSpec(
+        status_code=StatusCode.NOT_FOUND,
+        http_status_code=status.HTTP_404_NOT_FOUND,
+        public_message="Run series context not found.",
+    ),
+    ApiErrorCode.RUNTIME_FAB_NOT_FOUND: ApiErrorSpec(
+        status_code=StatusCode.NOT_FOUND,
+        http_status_code=status.HTTP_404_NOT_FOUND,
+        public_message="FAB not found.",
+    ),
+    ApiErrorCode.RUNTIME_INVALID_MESSAGE_COUNT: ApiErrorSpec(
+        status_code=StatusCode.INVALID_ARGUMENT,
+        http_status_code=status.HTTP_400_BAD_REQUEST,
+        public_message="Invalid number of messages or message object trees.",
+    ),
+    ApiErrorCode.RUNTIME_MESSAGE_RUN_ID_MISMATCH: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Message run ID does not match the authenticated task.",
     ),
 }

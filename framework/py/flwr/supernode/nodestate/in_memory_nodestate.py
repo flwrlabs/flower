@@ -22,9 +22,9 @@ from threading import Lock, RLock
 
 from flwr.app import Error, Message
 from flwr.common.constant import ErrorCode
-from flwr.common.logger import log
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS, TaskType
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.date import now
@@ -90,7 +90,7 @@ class InMemoryNodeState(
 
     def store_message(self, message: Message) -> str | None:
         """Store a message."""
-        # No need to check for expired task claims here. The ClientAppIo servicer
+        # No need to check for expired task claims here. The Runtime servicer
         # verifies the authenticated task token before storing messages.
         with self.lock_msg_store:
             msg_id = message.metadata.message_id

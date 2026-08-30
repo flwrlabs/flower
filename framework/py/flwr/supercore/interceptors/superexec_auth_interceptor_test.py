@@ -23,8 +23,9 @@ from unittest.mock import Mock
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.proto.appio_pb2 import PullPendingTasksRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import PullPendingTasksRequest  # pylint: disable=E0611
 from flwr.supercore.auth import (
+    RUNTIME_METHOD_AUTH_POLICY,
     compute_request_body_sha256,
     compute_superexec_signature,
     derive_auth_secret,
@@ -40,10 +41,11 @@ from flwr.supercore.date import now
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
     SuperExecAuthClientInterceptor,
-    create_serverappio_superexec_auth_server_interceptor,
+    create_superlink_runtime_superexec_auth_server_interceptor,
+    create_supernode_runtime_superexec_auth_server_interceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
-    SERVERAPPIO_SUPEREXEC_METHODS as _SERVERAPPIO_SUPEREXEC_METHODS,
+    RUNTIME_SUPEREXEC_METHODS,
 )
 
 _ClientCallDetails = namedtuple(
@@ -89,10 +91,10 @@ class TestSuperExecAuthClientInterceptor(TestCase):
         """Protected SuperExec methods should receive signed metadata."""
         interceptor = SuperExecAuthClientInterceptor(
             master_secret=b"secret",
-            protected_methods=_SERVERAPPIO_SUPEREXEC_METHODS,
+            protected_methods=RUNTIME_SUPEREXEC_METHODS,
         )
         details = _ClientCallDetails(
-            method="/flwr.proto.ServerAppIo/PullPendingTasks",
+            method="/flwr.proto.Runtime/PullPendingTasks",
             timeout=None,
             metadata=(),
             credentials=None,
@@ -124,6 +126,59 @@ class TestSuperExecAuthClientInterceptor(TestCase):
             self.assertIn(header, md)
 
 
+class TestSuperExecMethodPolicies(TestCase):
+    """Lock the SuperExec HMAC method policy for the Runtime service."""
+
+    _BOOTSTRAP_METHODS = {"PullPendingTasks", "ClaimTask"}
+
+    def test_service_method_paths(self) -> None:
+        """Runtime should protect exactly the bootstrap methods."""
+        self.assertEqual(
+            RUNTIME_SUPEREXEC_METHODS,
+            {f"/flwr.proto.Runtime/{method}" for method in self._BOOTSTRAP_METHODS},
+        )
+
+    def test_hmac_methods_match_task_token_exempt_methods(self) -> None:
+        """HMAC and task-token policies should partition methods consistently."""
+        hmac_method_names = {
+            method.rsplit("/", maxsplit=1)[-1] for method in RUNTIME_SUPEREXEC_METHODS
+        }
+        token_exempt_names = {
+            method.rsplit("/", maxsplit=1)[-1]
+            for method, policy in RUNTIME_METHOD_AUTH_POLICY.items()
+            if not policy.requires_token
+        }
+        self.assertEqual(hmac_method_names, token_exempt_names)
+
+    def test_host_factories_protect_runtime_bootstrap_methods(self) -> None:
+        """Both retained host factories should enforce the Runtime policy."""
+        for factory in (
+            create_superlink_runtime_superexec_auth_server_interceptor,
+            create_supernode_runtime_superexec_auth_server_interceptor,
+        ):
+            with self.subTest(factory=factory.__name__):
+                context = Mock()
+                context.abort.side_effect = grpc.RpcError()
+                interceptor = factory(
+                    state_provider=_NonceState,
+                    master_secret=b"secret",
+                )
+                intercepted = interceptor.intercept_service(
+                    lambda _: _make_unary_handler(),
+                    _HandlerCallDetails(
+                        method="/flwr.proto.Runtime/PullPendingTasks",
+                        invocation_metadata=(),
+                    ),
+                )
+
+                with self.assertRaises(grpc.RpcError):
+                    intercepted.unary_unary(PullPendingTasksRequest(), context)
+                context.abort.assert_called_once_with(
+                    grpc.StatusCode.UNAUTHENTICATED,
+                    AUTHENTICATION_FAILED_MESSAGE,
+                )
+
+
 class TestSuperExecAuthServerInterceptor(TestCase):
     """Unit tests for SuperExecAuthServerInterceptor."""
 
@@ -131,7 +186,7 @@ class TestSuperExecAuthServerInterceptor(TestCase):
         """Create the default server interceptor under test."""
         self._secret = b"secret"
         self._state = _NonceState()
-        self._interceptor = create_serverappio_superexec_auth_server_interceptor(
+        self._interceptor = create_superlink_runtime_superexec_auth_server_interceptor(
             state_provider=lambda: self._state,
             master_secret=self._secret,
         )
@@ -170,7 +225,7 @@ class TestSuperExecAuthServerInterceptor(TestCase):
 
     def test_valid_signed_request_is_allowed(self) -> None:
         """Valid metadata should allow a protected SuperExec RPC."""
-        method = "/flwr.proto.ServerAppIo/PullPendingTasks"
+        method = "/flwr.proto.Runtime/PullPendingTasks"
         request = PullPendingTasksRequest()
         intercepted = self._interceptor.intercept_service(
             lambda _: _make_unary_handler(),
@@ -187,7 +242,7 @@ class TestSuperExecAuthServerInterceptor(TestCase):
 
     def test_missing_metadata_is_denied(self) -> None:
         """Missing SuperExec metadata should be denied."""
-        method = "/flwr.proto.ServerAppIo/PullPendingTasks"
+        method = "/flwr.proto.Runtime/PullPendingTasks"
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
 
@@ -203,7 +258,7 @@ class TestSuperExecAuthServerInterceptor(TestCase):
 
     def test_replayed_nonce_is_denied(self) -> None:
         """Reusing a nonce within the active window should be denied."""
-        method = "/flwr.proto.ServerAppIo/PullPendingTasks"
+        method = "/flwr.proto.Runtime/PullPendingTasks"
         request = PullPendingTasksRequest()
         metadata = self._signed_metadata(
             method=method,
@@ -226,7 +281,7 @@ class TestSuperExecAuthServerInterceptor(TestCase):
 
     def test_invalid_body_hash_is_denied(self) -> None:
         """Body hash mismatch should be denied."""
-        method = "/flwr.proto.ServerAppIo/PullPendingTasks"
+        method = "/flwr.proto.Runtime/PullPendingTasks"
         request = PullPendingTasksRequest()
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
@@ -249,7 +304,7 @@ class TestSuperExecAuthServerInterceptor(TestCase):
 
     def test_stale_timestamp_is_denied(self) -> None:
         """Requests outside timestamp tolerance should be denied."""
-        method = "/flwr.proto.ServerAppIo/PullPendingTasks"
+        method = "/flwr.proto.Runtime/PullPendingTasks"
         request = PullPendingTasksRequest()
         old_ts = int(now().timestamp() - (MAX_TIMESTAMP_DIFF_SECONDS + 5))
         context = Mock()
@@ -273,7 +328,7 @@ class TestSuperExecAuthServerInterceptor(TestCase):
 
     def test_non_superexec_methods_passthrough(self) -> None:
         """Methods outside SuperExec policy should pass through unchanged."""
-        method = "/flwr.proto.ServerAppIo/GetNodes"
+        method = "/flwr.proto.Runtime/GetNodes"
         intercepted = self._interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(method=method, invocation_metadata=()),

@@ -178,7 +178,8 @@ flower-supernode \
     --auth-supernode-private-key keys/supernode_credentials_1 \
     --superlink "127.0.0.1:9092" \
     --node-config 'dataset-path="datasets/cifar10_part_1"' \
-    --clientappio-api-address="127.0.0.1:9094"
+    --host "127.0.0.1" \
+    --port 9094
 ```
 
 In yet another new terminal window, start the second long-running Flower client:
@@ -189,7 +190,8 @@ flower-supernode \
     --auth-supernode-private-key keys/supernode_credentials_2 \
     --superlink "127.0.0.1:9092" \
     --node-config 'dataset-path="datasets/cifar10_part_2"' \
-    --clientappio-api-address="127.0.0.1:9095"
+    --host "127.0.0.1" \
+    --port 9095
 ```
 
 Now that you have connected the `SuperNodes`, you should see them with status `online`:

@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SuperExec HMAC metadata interceptors for AppIo services."""
+"""SuperExec HMAC metadata interceptors for the Runtime service."""
 
 
 from __future__ import annotations
 
-import secrets
 from collections.abc import Callable, Collection
 from typing import Any, NoReturn, Protocol, cast
 
@@ -27,6 +26,7 @@ from google.protobuf.message import Message as GrpcMessage
 from flwr.supercore.auth import (
     compute_request_body_sha256,
     compute_superexec_signature,
+    create_superexec_auth_metadata,
     derive_auth_secret,
     verify_superexec_signature,
 )
@@ -41,27 +41,19 @@ from flwr.supercore.constant import (
 from flwr.supercore.date import now
 from flwr.supercore.utils import get_metadata_str
 
-from .appio_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
+from .runtime_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
 
-SERVERAPPIO_SUPEREXEC_METHODS: frozenset[str] = frozenset(
-    {
-        "/flwr.proto.ServerAppIo/ListAppsToLaunch",
-        "/flwr.proto.ServerAppIo/RequestToken",
-        "/flwr.proto.ServerAppIo/PullPendingTasks",
-        "/flwr.proto.ServerAppIo/ClaimTask",
-        "/flwr.proto.ServerAppIo/GetRun",
-    }
-)
+_SUPEREXEC_METHOD_NAMES = frozenset({"PullPendingTasks", "ClaimTask"})
 
-CLIENTAPPIO_SUPEREXEC_METHODS: frozenset[str] = frozenset(
-    {
-        "/flwr.proto.ClientAppIo/ListAppsToLaunch",
-        "/flwr.proto.ClientAppIo/RequestToken",
-        "/flwr.proto.ClientAppIo/PullPendingTasks",
-        "/flwr.proto.ClientAppIo/ClaimTask",
-        "/flwr.proto.ClientAppIo/GetRun",
-    }
-)
+
+def _build_superexec_methods(service_name: str) -> frozenset[str]:
+    """Build the SuperExec method paths for a Runtime service."""
+    return frozenset(
+        f"/flwr.proto.{service_name}/{method}" for method in _SUPEREXEC_METHOD_NAMES
+    )
+
+
+RUNTIME_SUPEREXEC_METHODS = _build_superexec_methods("Runtime")
 
 
 class _NonceState(Protocol):
@@ -110,33 +102,21 @@ class SuperExecAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type:
         if method not in self._protected_methods:
             return continuation(client_call_details, request)
 
-        timestamp = int(now().timestamp())
-        nonce = secrets.token_hex(16)
-        body_sha256 = compute_request_body_sha256(request)
-        signature = compute_superexec_signature(
+        auth_metadata = create_superexec_auth_metadata(
             auth_secret=self._auth_secret,
             method=method,
-            timestamp=timestamp,
-            nonce=nonce,
-            body_sha256=body_sha256,
+            request=request,
         )
 
         metadata = list(client_call_details.metadata or [])
-        metadata.extend(
-            [
-                (SUPEREXEC_AUTH_TIMESTAMP_HEADER, str(timestamp)),
-                (SUPEREXEC_AUTH_NONCE_HEADER, nonce),
-                (SUPEREXEC_AUTH_BODY_SHA256_HEADER, body_sha256),
-                (SUPEREXEC_AUTH_SIGNATURE_HEADER, signature),
-            ]
-        )
+        metadata.extend(auth_metadata.items())
 
         details = client_call_details._replace(metadata=metadata)
         return continuation(details, request)
 
 
 class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
-    """Verify SuperExec HMAC metadata on selected AppIo unary RPCs."""
+    """Verify SuperExec HMAC metadata on selected Runtime unary RPCs."""
 
     def __init__(
         self,
@@ -225,27 +205,27 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         )
 
 
-def create_serverappio_superexec_auth_server_interceptor(
+def create_superlink_runtime_superexec_auth_server_interceptor(
     *,
     state_provider: Callable[[], _NonceState],
     master_secret: bytes,
 ) -> SuperExecAuthServerInterceptor:
-    """Create SuperExec auth interceptor for ServerAppIo."""
+    """Create the SuperLink Runtime API SuperExec auth interceptor."""
     return SuperExecAuthServerInterceptor(
         state_provider=state_provider,
         master_secret=master_secret,
-        protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
+        protected_methods=RUNTIME_SUPEREXEC_METHODS,
     )
 
 
-def create_clientappio_superexec_auth_server_interceptor(
+def create_supernode_runtime_superexec_auth_server_interceptor(
     *,
     state_provider: Callable[[], _NonceState],
     master_secret: bytes,
 ) -> SuperExecAuthServerInterceptor:
-    """Create SuperExec auth interceptor for ClientAppIo."""
+    """Create the SuperNode Runtime API SuperExec auth interceptor."""
     return SuperExecAuthServerInterceptor(
         state_provider=state_provider,
         master_secret=master_secret,
-        protected_methods=CLIENTAPPIO_SUPEREXEC_METHODS,
+        protected_methods=RUNTIME_SUPEREXEC_METHODS,
     )

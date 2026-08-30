@@ -39,9 +39,9 @@ from flwr.common.constant import (
     PARTITION_ID_KEY,
     ErrorCode,
 )
-from flwr.common.logger import log
 from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
+from flwr.supercore import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.run import Run

@@ -30,7 +30,7 @@ env:
 
 jobs:
   build_and_deploy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Build and deploy framework docs
     steps:
       - uses: actions/checkout@v5
@@ -55,6 +55,7 @@ jobs:
             framework/docs/source/_static/docs-ui.js \
             framework/docs/source/_static/custom.css \
             framework/docs/source/conf_base.py \
+            framework/docs/source/ref-changelog.md \
             framework/docs/source/_templates/
       - name: Resolve docs version
         id: doc_version

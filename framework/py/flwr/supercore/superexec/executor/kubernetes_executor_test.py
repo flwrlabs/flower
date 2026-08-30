@@ -37,7 +37,7 @@ from .kubernetes_executor import (
     KubernetesExecutorConfig,
     _build_appio_credentials_secret,
     _build_taskexecutor_pod,
-    _get_appio_root_certificates,
+    _get_runtime_root_certificates,
 )
 from .types import ExecutionSpec, LaunchResultStatus
 
@@ -61,7 +61,7 @@ _NEXT_SECRET_NAME = f"{_NEXT_POD_NAME}-appio"
 def _execution_spec(**overrides: Any) -> ExecutionSpec:
     base: dict[str, Any] = {
         "task_type": TaskType.SERVER_APP,
-        "appio_api_address": "appio.example.com:9092",
+        "runtime_api_address": "appio.example.com:9092",
         "token": "task-token",
         "insecure": False,
         "root_certificates_path": None,
@@ -78,7 +78,7 @@ def _executor_config(**overrides: Any) -> KubernetesExecutorConfig:
     base: dict[str, Any] = {
         "namespace": "flower-system",
         "image": "ghcr.io/flwrlabs/taskexecutor:dev",
-        "appio_root_certificates": "root-ca",
+        "runtime_root_certificates": "root-ca",
     }
     base.update(overrides)
     return KubernetesExecutorConfig(**base)
@@ -93,7 +93,7 @@ def _appio_root_certificates(
     spec: ExecutionSpec, config: KubernetesExecutorConfig
 ) -> str | None:
     """Return AppIo root certificates for object-building tests."""
-    return _get_appio_root_certificates(spec, config)
+    return _get_runtime_root_certificates(spec, config)
 
 
 def _task_labels(task_id: int) -> dict[str, str]:
@@ -183,7 +183,7 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
     assert container["command"] == ["flwr-serverapp"]
     assert "env" not in container
     assert container["args"] == [
-        "--serverappio-api-address",
+        "--runtime-api-address",
         "appio.example.com:9092",
         "--token-file",
         APPIO_TOKEN_FILE_PATH,
@@ -391,7 +391,7 @@ def test_build_taskexecutor_pod_supports_clientapp_insecure_args() -> None:
     pod = _as_dict(
         _build_taskexecutor_pod(
             _execution_spec(task_type=TaskType.CLIENT_APP, insecure=True),
-            _executor_config(appio_root_certificates=None),
+            _executor_config(runtime_root_certificates=None),
             None,
             _LAUNCH_ATTEMPT_ID,
         )
@@ -399,7 +399,7 @@ def test_build_taskexecutor_pod_supports_clientapp_insecure_args() -> None:
 
     assert pod["spec"]["containers"][0]["command"] == ["flwr-clientapp"]
     assert pod["spec"]["containers"][0]["args"] == [
-        "--clientappio-api-address",
+        "--runtime-api-address",
         "appio.example.com:9092",
         "--token-file",
         APPIO_TOKEN_FILE_PATH,
@@ -410,23 +410,23 @@ def test_build_taskexecutor_pod_supports_clientapp_insecure_args() -> None:
 def test_build_taskexecutor_pod_supports_secure_default_trust_store() -> None:
     """Test secure Pod args can rely on container default trust store."""
     spec = _execution_spec()
-    config = _executor_config(appio_root_certificates=None)
-    appio_root_certificates = _appio_root_certificates(spec, config)
+    config = _executor_config(runtime_root_certificates=None)
+    runtime_root_certificates = _appio_root_certificates(spec, config)
 
     secret = _as_dict(
         _build_appio_credentials_secret(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+            spec, config, runtime_root_certificates, _LAUNCH_ATTEMPT_ID
         )
     )
     pod = _as_dict(
         _build_taskexecutor_pod(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+            spec, config, runtime_root_certificates, _LAUNCH_ATTEMPT_ID
         )
     )
 
     assert secret["stringData"] == {"token": "task-token"}
     assert pod["spec"]["containers"][0]["args"] == [
-        "--serverappio-api-address",
+        "--runtime-api-address",
         "appio.example.com:9092",
         "--token-file",
         APPIO_TOKEN_FILE_PATH,
@@ -440,23 +440,23 @@ def test_build_taskexecutor_objects_use_execution_spec_root_certificates(
     root_certificates_path = tmp_path / "appio-ca.pem"
     root_certificates_path.write_text("spec-root-ca", encoding="utf-8")
     spec = _execution_spec(root_certificates_path=str(root_certificates_path))
-    config = _executor_config(appio_root_certificates=None)
-    appio_root_certificates = _appio_root_certificates(spec, config)
+    config = _executor_config(runtime_root_certificates=None)
+    runtime_root_certificates = _appio_root_certificates(spec, config)
 
     secret = _as_dict(
         _build_appio_credentials_secret(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+            spec, config, runtime_root_certificates, _LAUNCH_ATTEMPT_ID
         )
     )
     pod = _as_dict(
         _build_taskexecutor_pod(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+            spec, config, runtime_root_certificates, _LAUNCH_ATTEMPT_ID
         )
     )
 
     assert secret["stringData"] == {"token": "task-token", "ca.crt": "spec-root-ca"}
     assert pod["spec"]["containers"][0]["args"] == [
-        "--serverappio-api-address",
+        "--runtime-api-address",
         "appio.example.com:9092",
         "--token-file",
         APPIO_TOKEN_FILE_PATH,
@@ -473,23 +473,23 @@ def test_build_taskexecutor_objects_expand_user_root_certificates_path(
     root_certificates_path.write_text("home-root-ca", encoding="utf-8")
     monkeypatch.setenv("HOME", str(tmp_path))
     spec = _execution_spec(root_certificates_path="~/appio-ca.pem")
-    config = _executor_config(appio_root_certificates=None)
-    appio_root_certificates = _appio_root_certificates(spec, config)
+    config = _executor_config(runtime_root_certificates=None)
+    runtime_root_certificates = _appio_root_certificates(spec, config)
 
     secret = _as_dict(
         _build_appio_credentials_secret(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+            spec, config, runtime_root_certificates, _LAUNCH_ATTEMPT_ID
         )
     )
     pod = _as_dict(
         _build_taskexecutor_pod(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+            spec, config, runtime_root_certificates, _LAUNCH_ATTEMPT_ID
         )
     )
 
     assert secret["stringData"] == {"token": "task-token", "ca.crt": "home-root-ca"}
     assert pod["spec"]["containers"][0]["args"] == [
-        "--serverappio-api-address",
+        "--runtime-api-address",
         "appio.example.com:9092",
         "--token-file",
         APPIO_TOKEN_FILE_PATH,
@@ -511,7 +511,7 @@ def test_build_taskexecutor_pod_supports_simulation_args() -> None:
 
     assert pod["spec"]["containers"][0]["command"] == ["flwr-simulation"]
     assert pod["spec"]["containers"][0]["args"] == [
-        "--serverappio-api-address",
+        "--runtime-api-address",
         "appio.example.com:9092",
         "--token-file",
         APPIO_TOKEN_FILE_PATH,
@@ -600,15 +600,15 @@ def test_build_taskexecutor_pod_supports_labels_annotations_and_security() -> No
     )
 
     spec = _execution_spec()
-    appio_root_certificates = _appio_root_certificates(spec, config)
+    runtime_root_certificates = _appio_root_certificates(spec, config)
     secret = _as_dict(
         _build_appio_credentials_secret(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+            spec, config, runtime_root_certificates, _LAUNCH_ATTEMPT_ID
         )
     )
     pod = _as_dict(
         _build_taskexecutor_pod(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+            spec, config, runtime_root_certificates, _LAUNCH_ATTEMPT_ID
         )
     )
 
@@ -1012,15 +1012,15 @@ def test_launch_submits_secret_before_pod_and_returns_accepted(
 
     result = KubernetesExecutor(client=client, config=config).launch(spec)
 
-    appio_root_certificates = _appio_root_certificates(spec, config)
+    runtime_root_certificates = _appio_root_certificates(spec, config)
     secret = _as_dict(
         _build_appio_credentials_secret(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+            spec, config, runtime_root_certificates, _LAUNCH_ATTEMPT_ID
         )
     )
     pod = _as_dict(
         _build_taskexecutor_pod(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+            spec, config, runtime_root_certificates, _LAUNCH_ATTEMPT_ID
         )
     )
     assert result.status == LaunchResultStatus.ACCEPTED
@@ -1180,7 +1180,7 @@ def test_launch_returns_failed_if_root_certificates_file_cannot_be_read() -> Non
     client = Mock()
 
     result = KubernetesExecutor(
-        client=client, config=_executor_config(appio_root_certificates=None)
+        client=client, config=_executor_config(runtime_root_certificates=None)
     ).launch(_execution_spec(root_certificates_path="/missing/appio-ca.pem"))
 
     assert result.status == LaunchResultStatus.FAILED
@@ -1199,7 +1199,7 @@ def test_execution_spec_rejects_invalid_task_id() -> None:
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
-        ("appio_api_address", "", "AppIo API address"),
+        ("runtime_api_address", "", "Runtime API address"),
         ("token", "", "task token"),
     ],
 )

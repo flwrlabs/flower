@@ -18,9 +18,10 @@
 import unittest
 from unittest.mock import Mock, patch
 
+import numpy as np
 import pytest
 
-from flwr.app import ConfigRecord, Context, Message, RecordDict
+from flwr.app import ArrayRecord, ConfigRecord, Context, Message, RecordDict
 from flwr.app.message import remove_content_from_message
 from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE, SubStatus
 from flwr.supercore.constant import TaskType
@@ -28,11 +29,13 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
+    iterate_object_tree,
 )
 
 from .start_client_internal import (
     FAB_VERIFICATION_ERROR,
     _pull_and_store_message,
+    _push_messages,
     start_client_internal,
 )
 
@@ -412,16 +415,14 @@ class _StopAfterSuperExecLaunch(Exception):
 
 
 def _run_until_connection_start(
-    clientappio_certificates: tuple[bytes, bytes, bytes] | None = None,
-    clientappio_root_certificates_path: str | None = None,
-    clientappio_api_address: str = "127.0.0.1:9094",
-    bound_address: str = "127.0.0.1:9094",
-) -> tuple[Mock, Mock]:
-    """Run startup only far enough to inspect ClientAppIo and SuperExec wiring."""
+    runtime_certificates: tuple[bytes, bytes, bytes] | None = None,
+    runtime_root_certificates_path: str | None = None,
+    runtime_api_address: str = "127.0.0.1:9094",
+) -> Mock:
+    """Run startup only far enough to inspect SuperExec HTTP wiring."""
+    objectstore_factory = Mock()
+    state_factory = Mock(objectstore_factory=objectstore_factory)
     with (
-        patch(
-            "flwr.supernode.start_client_internal.run_clientappio_api_grpc"
-        ) as run_clientappio,
         patch("flwr.supernode.start_client_internal.register_signal_handlers"),
         patch("flwr.supernode.start_client_internal.subprocess.Popen") as popen,
         patch(
@@ -429,66 +430,99 @@ def _run_until_connection_start(
             side_effect=_StopAfterSuperExecLaunch,
         ),
     ):
-        run_clientappio.return_value.bound_address = bound_address
         # `_init_connection` starts the long-running SuperNode/SuperLink connection.
         # Raising there keeps this test focused on the setup performed before it.
         with pytest.raises(_StopAfterSuperExecLaunch):
             start_client_internal(
+                state_factory=state_factory,
                 server_address="127.0.0.1:9092",
                 node_config={},
                 root_certificates=None,
                 insecure=True,
                 transport=TRANSPORT_TYPE_GRPC_RERE,
-                clientappio_api_address=clientappio_api_address,
-                clientappio_certificates=clientappio_certificates,
-                clientappio_root_certificates_path=clientappio_root_certificates_path,
+                runtime_api_address=runtime_api_address,
+                runtime_certificates=runtime_certificates,
+                runtime_root_certificates_path=runtime_root_certificates_path,
             )
 
-    return run_clientappio, popen
+    return popen
 
 
 def test_start_client_internal_launches_insecure_superexec_by_default() -> None:
-    """Subprocess SuperExec should use insecure AppIO when ClientAppIo has no TLS."""
+    """Subprocess SuperExec should use insecure Runtime API when TLS is off."""
     # This verifies the default subprocess-isolation path: when SuperNode starts
-    # ClientAppIo without server TLS, the spawned SuperExec must use plaintext too.
-    run_clientappio, popen = _run_until_connection_start()
+    # Runtime API without server TLS means the spawned SuperExec uses plaintext too.
+    popen = _run_until_connection_start()
 
-    # No ClientAppIo server certificates means the local AppIO server is plaintext,
+    # No Runtime API server certificates means the local server is plaintext,
     # so the child SuperExec must connect with `--insecure`.
-    assert run_clientappio.call_args.kwargs["certificates"] is None
     command = popen.call_args.args[0]
     assert command[:2] == ["flower-superexec", "--insecure"]
     assert "--root-certificates" not in command
-    assert command[command.index("--appio-api-address") + 1] == "127.0.0.1:9094"
+    assert command[command.index("--runtime-api-address") + 1] == "127.0.0.1:9094"
 
 
 def test_start_client_internal_launches_secure_superexec_with_root_certificates() -> (
     None
 ):
-    """Subprocess SuperExec should trust the secure ClientAppIo server CA."""
+    """Subprocess SuperExec should trust the secure Runtime API server CA."""
     # This verifies the TLS subprocess-isolation path: when SuperNode starts
-    # ClientAppIo with server TLS, the spawned SuperExec must receive trust roots.
+    # Runtime API with server TLS means the spawned SuperExec receives trust roots.
     certificates = (b"ca", b"cert", b"key")
 
-    run_clientappio, popen = _run_until_connection_start(
-        clientappio_certificates=certificates,
-        clientappio_root_certificates_path="/tmp/ca.pem",
+    popen = _run_until_connection_start(
+        runtime_certificates=certificates,
+        runtime_root_certificates_path="/tmp/ca.pem",
     )
 
-    # When ClientAppIo is started with TLS, SuperExec should verify that server
+    # When the Runtime API starts with TLS, SuperExec should verify that server
     # certificate with the same CA file instead of falling back to plaintext.
-    assert run_clientappio.call_args.kwargs["certificates"] == certificates
     command = popen.call_args.args[0]
     assert "--insecure" not in command
     assert command[:3] == ["flower-superexec", "--root-certificates", "/tmp/ca.pem"]
 
 
-def test_start_client_internal_launches_superexec_with_bound_appio_address() -> None:
-    """Subprocess SuperExec should use the actual port selected for AppIO."""
-    _, popen = _run_until_connection_start(
-        clientappio_api_address="localhost:0",
-        bound_address="localhost:54321",
-    )
+def test_start_client_internal_launches_superexec_with_runtime_http_address() -> None:
+    """Subprocess SuperExec should use the Runtime HTTP API address."""
+    popen = _run_until_connection_start(runtime_api_address="localhost:54321")
 
     command = popen.call_args.args[0]
-    assert command[command.index("--appio-api-address") + 1] == "localhost:54321"
+    assert command[command.index("--runtime-api-address") + 1] == "localhost:54321"
+
+
+def test_push_messages_pushes_each_requested_object_once() -> None:
+    """Shared objects in different branches should only be pushed once."""
+    instruction = Message(content=RecordDict(), dst_node_id=1, message_type="query")
+    reply = Message(
+        content=RecordDict(
+            {
+                "first": ArrayRecord([np.array([1]), np.array([2]), np.array([3])]),
+                "second": ArrayRecord([np.array([1]), np.array([4]), np.array([5])]),
+            }
+        ),
+        reply_to=instruction,
+    )
+    reply.metadata.__dict__["_run_id"] = 1
+    reply.metadata.__dict__["_message_id"] = reply.object_id
+    object_tree = get_object_tree(reply)
+    tree_object_ids = [tree.object_id for tree in iterate_object_tree(object_tree)]
+    assert len(tree_object_ids) > len(set(tree_object_ids))
+    object_contents = {
+        object_id: obj.deflate()
+        for object_id, obj in get_all_nested_objects(reply).items()
+    }
+
+    state = Mock()
+    state.get_messages.return_value = [reply]
+    state.get_message_processing_duration.return_value = 0.1
+    object_store = Mock()
+    object_store.get_object_tree.return_value = object_tree
+    object_store.get.side_effect = object_contents.get
+    send = Mock(return_value=(set(object_contents), "session-id"))
+    push_object = Mock()
+
+    _push_messages(state, object_store, send, push_object)
+
+    pushed_object_ids = [call.args[2] for call in push_object.call_args_list]
+    assert len(pushed_object_ids) == len(set(pushed_object_ids))
+    assert set(pushed_object_ids) == set(object_contents)

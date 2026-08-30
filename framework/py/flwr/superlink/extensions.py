@@ -12,43 +12,146 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SuperLink FastAPI extension hooks."""
-
+"""SuperLink extension hooks."""
 
 from collections.abc import Callable, Mapping
 from contextlib import AbstractAsyncContextManager
-from typing import Any
+from copy import deepcopy
+from importlib import import_module
+from logging import WARNING
+from types import ModuleType
+from typing import Any, Literal, cast
 
 from fastapi import FastAPI
+from starlette.middleware import Middleware
+
+from flwr.common.logger import log
+from flwr.supercore.run import Run
+from flwr.superlink.run_source import RunStartSource
 
 SuperLinkLifespanContext = Callable[
     [FastAPI], AbstractAsyncContextManager[Mapping[str, Any] | None]
 ]
+ResultDeliveryChannel = Literal["logs", "chat"]
+_SGXT_MODULE = "flwr.ee.superlink.extensions"
+
+
+def _try_import_sgxt() -> ModuleType | None:
+    """Return the SuperGrid Extensions module when it is installed."""
+    try:
+        return import_module(_SGXT_MODULE)
+    except ModuleNotFoundError as exc:
+        # Ignore only an absent SuperGrid Extensions package or module. Missing
+        # dependencies imported by an existing extension must still fail loudly.
+        if exc.name is None or not (
+            exc.name == _SGXT_MODULE or _SGXT_MODULE.startswith(f"{exc.name}.")
+        ):
+            raise
+        return None
 
 
 def configure_app(app: FastAPI) -> None:
     """Configure SuperLink FastAPI extensions."""
-    try:
-        # pylint: disable-next=import-outside-toplevel
-        from flwr.ee.superlink.extensions import configure_app as _configure_ee_app
-    except ModuleNotFoundError:
+    sgxt = _try_import_sgxt()
+    if sgxt is None:
         return
 
-    configure_ee_app: Callable[[FastAPI], None]
-    configure_ee_app = _configure_ee_app
-    configure_ee_app(app)
+    configure_sgxt_app = cast(
+        Callable[[FastAPI], None] | None,
+        getattr(sgxt, "configure_app", None),
+    )
+    if configure_sgxt_app is not None:
+        configure_sgxt_app(app)
+
+
+def get_middleware() -> tuple[Middleware, ...]:
+    """Return extension middleware in request execution order."""
+    sgxt = _try_import_sgxt()
+    if sgxt is None:
+        return ()
+
+    get_sgxt_middleware = cast(
+        Callable[[], tuple[Middleware, ...]] | None,
+        getattr(sgxt, "get_middleware", None),
+    )
+    if get_sgxt_middleware is None:
+        # Compatibility with SuperGrid Extensions versions predating this hook.
+        return ()
+    return get_sgxt_middleware()
 
 
 def get_lifespan_contexts() -> tuple[SuperLinkLifespanContext, ...]:
     """Return SuperLink FastAPI lifespan contexts."""
-    try:
-        # pylint: disable-next=import-outside-toplevel
-        from flwr.ee.superlink.extensions import (
-            get_lifespan_contexts as _get_ee_lifespan_contexts,
-        )
-    except ModuleNotFoundError:
+    sgxt = _try_import_sgxt()
+    if sgxt is None:
         return ()
 
-    get_ee_lifespan_contexts: Callable[[], tuple[SuperLinkLifespanContext, ...]]
-    get_ee_lifespan_contexts = _get_ee_lifespan_contexts
-    return get_ee_lifespan_contexts()
+    get_sgxt_lifespan_contexts = cast(
+        Callable[[], tuple[SuperLinkLifespanContext, ...]] | None,
+        getattr(sgxt, "get_lifespan_contexts", None),
+    )
+    if get_sgxt_lifespan_contexts is None:
+        return ()
+    return get_sgxt_lifespan_contexts()
+
+
+def notify_run_started(run: Run, source: RunStartSource) -> None:
+    """Notify an optional extension after a run has been persisted.
+
+    The callback is synchronous by design. Extensions must keep this hook
+    non-blocking and best effort; the Flower framework does not create a
+    background thread or event loop for it. The run snapshot is copied before
+    handing it to the extension so the callback cannot mutate the object used
+    to build the successful StartRun response. The source is also best-effort
+    caller attribution and must not be used for authorization decisions.
+    """
+    try:
+        sgxt = _try_import_sgxt()
+        if sgxt is None:
+            return
+
+        on_run_started = cast(
+            Callable[[Run, RunStartSource], None] | None,
+            getattr(sgxt, "on_run_started", None),
+        )
+        if on_run_started is not None:
+            on_run_started(deepcopy(run), source)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        log(
+            WARNING,
+            "Run-start extension notification failed: %s.",
+            type(exc).__name__,
+            exc_info=exc,
+        )
+
+
+def notify_result_delivered(
+    run: Run,
+    flwr_aid: str,
+    channel: ResultDeliveryChannel,
+) -> None:
+    """Notify an optional extension after a result request was accepted.
+
+    The callback is synchronous by design. Extensions must keep this hook
+    non-blocking and best effort; the Flower framework does not create a
+    background thread for it. The run snapshot is copied before handing it to
+    the extension so the callback cannot mutate SuperLink state.
+    """
+    try:
+        sgxt = _try_import_sgxt()
+        if sgxt is None:
+            return
+
+        on_result_delivered = cast(
+            Callable[[Run, str, ResultDeliveryChannel], None] | None,
+            getattr(sgxt, "on_result_delivered", None),
+        )
+        if on_result_delivered is not None:
+            on_result_delivered(deepcopy(run), flwr_aid, channel)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        log(
+            WARNING,
+            "Result-delivered extension notification failed: %s.",
+            type(exc).__name__,
+            exc_info=exc,
+        )

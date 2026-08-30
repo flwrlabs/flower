@@ -19,14 +19,8 @@ from unittest.mock import Mock, patch
 
 from flwr.supercore.constant import TaskType
 from flwr.supercore.exit import ExitCode
-from flwr.supercore.run import Run
 
 from .base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
-
-
-def _get_run(_: int) -> Run:
-    """Return a minimal dummy run."""
-    return Run.create_empty(run_id=1)
 
 
 def _get_task(*, task_id: int = 1, task_type: str = TaskType.SERVER_APP) -> Mock:
@@ -39,13 +33,12 @@ def _get_task(*, task_id: int = 1, task_type: str = TaskType.SERVER_APP) -> Mock
 
 class _EphemeralExecPlugin(BaseEphemeralExecPlugin):
     command = "flwr-serverapp"
-    appio_api_address_arg = "--serverappio-api-address"
+    runtime_api_address_arg = "--runtime-api-address"
 
 
 def _get_ephemeral_plugin() -> _EphemeralExecPlugin:
     return _EphemeralExecPlugin(
-        appio_api_address="127.0.0.1:9091",
-        get_run=_get_run,
+        runtime_api_address="127.0.0.1:9091",
         insecure=True,
         root_certificates_path=None,
     )
@@ -85,7 +78,7 @@ def test_launch_task_runs_expected_command_and_exits() -> None:
         [
             "flwr-serverapp",
             "--insecure",
-            "--serverappio-api-address",
+            "--runtime-api-address",
             "127.0.0.1:9091",
             "--token",
             "token-123",

@@ -1,0 +1,197 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+name: Finalize Framework Release
+
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  finalize-framework-release:
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'automation/release/framework-')
+    name: Finalize Framework release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout merged release bookkeeping
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          persist-credentials: false
+
+      - name: Bootstrap
+        uses: ./.github/actions/bootstrap
+
+      - name: Read release metadata
+        run: |
+          # Load immutable release metadata from the merged release PR.
+          version="$(jq -r '.version' .github/framework-release.json)"
+          release_source_sha="$(jq -r '.release_source_sha' .github/framework-release.json)"
+
+          # Export release metadata for subsequent workflow steps.
+          echo "VERSION=${version}" >> "${GITHUB_ENV}"
+          echo "RELEASE_SOURCE_SHA=${release_source_sha}" >> "${GITHUB_ENV}"
+          echo "RELEASE_SERIES=${version%.*}" >> "${GITHUB_ENV}"
+
+      - name: Download commit artifacts
+        run: |
+          # Download commit-addressed packages and container digest metadata.
+          mkdir -p release-artifacts
+          curl --fail --location --silent --show-error \
+            "https://artifact.flower.ai/framework/commits/${RELEASE_SOURCE_SHA}/flwr-${VERSION}-py3-none-any.whl" \
+            --output "release-artifacts/flwr-${VERSION}-py3-none-any.whl"
+          curl --fail --location --silent --show-error \
+            "https://artifact.flower.ai/framework/commits/${RELEASE_SOURCE_SHA}/flwr-${VERSION}.tar.gz" \
+            --output "release-artifacts/flwr-${VERSION}.tar.gz"
+          curl --fail --location --silent --show-error \
+            "https://artifact.flower.ai/framework/commits/${RELEASE_SOURCE_SHA}/digests.json" \
+            --output release-artifacts/digests.json
+
+      - name: Create release references
+        run: |
+          # Make retries safe by creating a missing ref or accepting a matching one.
+          create_or_verify_ref() {
+            local ref="$1"
+            local existing_sha
+
+            if existing_sha="$(
+              gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref#refs/}" \
+                --jq '.object.sha' 2>/dev/null
+            )"; then
+              if [[ "${existing_sha}" != "${RELEASE_SOURCE_SHA}" ]]; then
+                echo "${ref} points to ${existing_sha}, expected ${RELEASE_SOURCE_SHA}." >&2
+                exit 1
+              fi
+
+              echo "${ref} already points to ${RELEASE_SOURCE_SHA}; continuing."
+            else
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+                -f ref="${ref}" \
+                -f sha="${RELEASE_SOURCE_SHA}"
+            fi
+          }
+
+          # Create or verify the release tag and maintenance branch.
+          create_or_verify_ref "refs/tags/framework-${VERSION}"
+          create_or_verify_ref "refs/heads/release/framework-${RELEASE_SERIES}"
+
+      - name: Copy Python artifacts to the stable location
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.ARTIFACT_AWS_DEFAULT_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.ARTIFACT_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ARTIFACT_AWS_SECRET_KEY_ID }}
+        run: |
+          # Copy the wheel and source distribution to their stable release paths.
+          aws s3 cp \
+            --content-disposition "attachment" \
+            --cache-control "no-cache" \
+            "release-artifacts/flwr-${VERSION}-py3-none-any.whl" \
+            "s3://${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}/py/release/v${VERSION}/flwr-${VERSION}-py3-none-any.whl"
+          aws s3 cp \
+            --content-disposition "attachment" \
+            --cache-control "no-cache" \
+            "release-artifacts/flwr-${VERSION}.tar.gz" \
+            "s3://${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}/py/release/v${VERSION}/flwr-${VERSION}.tar.gz"
+
+      - name: Publish Python artifacts
+        env:
+          PYPI_REPOSITORY_PASSWORD: ${{ secrets.PYPI_REPOSITORY_PASSWORD }}
+          PYPI_REPOSITORY_CHECK_URL: ${{ vars.PYPI_REPOSITORY_CHECK_URL }}
+          PYPI_REPOSITORY_USERNAME: ${{ vars.PYPI_REPOSITORY_USERNAME }}
+          PYPI_REPOSITORY_URL: ${{ vars.PYPI_REPOSITORY_URL }}
+        run: |
+          # Configure PyPI credentials and an optional custom upload endpoint.
+          publish_args=(
+            --check-url "${PYPI_REPOSITORY_CHECK_URL}"
+            --username "${PYPI_REPOSITORY_USERNAME}"
+            --password "${PYPI_REPOSITORY_PASSWORD}"
+          )
+          if [[ -n "${PYPI_REPOSITORY_URL}" ]]; then
+            publish_args=(--publish-url "${PYPI_REPOSITORY_URL}" "${publish_args[@]}")
+          fi
+
+          # Publish the wheel and source distribution.
+          uv publish \
+            "${publish_args[@]}" \
+            "release-artifacts/flwr-${VERSION}-py3-none-any.whl" \
+            "release-artifacts/flwr-${VERSION}.tar.gz"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Login to Docker registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ vars.DOCKER_IMAGE_REGISTRY }}
+          username: ${{ vars.DOCKER_IMAGE_REGISTRY_USER }}
+          password: ${{ secrets.DOCKER_IMAGE_REGISTRY_PASSWORD }}
+
+      - name: Promote Docker images
+        run: |
+          # Process each built image recorded in the digest manifest.
+          while IFS= read -r image; do
+            repository="$(jq -r '.repository' <<< "${image}")"
+            repository_name="${repository##*/}"
+            index_digest="$(jq -r '.index_digest' <<< "${image}")"
+            tag_args=()
+
+            # Derive variant-specific stable tags from unstable variant tags.
+            while IFS= read -r unstable_tag; do
+              if [[ "${unstable_tag}" != "${repository}:unstable-"* ]]; then
+                continue
+              fi
+              tag_suffix="${unstable_tag#"${repository}:unstable"}"
+              tag_args+=(-t "${repository}:${VERSION}${tag_suffix}")
+
+              # Add stable aliases explicitly for the current release variants.
+              case "${repository_name}:${tag_suffix}" in
+                "superlink:-py3.13-alpine3.22"|"supernode:-py3.13-alpine3.22")
+                  tag_args+=(-t "${repository}:${VERSION}")
+                  ;;
+                "superlink:-py3.13-ubuntu24.04"|"supernode:-py3.13-ubuntu24.04")
+                  tag_args+=(-t "${repository}:latest")
+                  ;;
+                "superexec:-py3.13-ubuntu24.04")
+                  tag_args+=(-t "${repository}:${VERSION}" -t "${repository}:latest")
+                  ;;
+              esac
+            done < <(jq -r '.tags[]' <<< "${image}")
+
+            # Promote the immutable multi-platform image without rebuilding it.
+            docker buildx imagetools create \
+              "${tag_args[@]}" \
+              "${repository}@${index_digest}"
+          done < <(jq -c '.images[]' release-artifacts/digests.json)
+
+      - name: Dispatch Framework docs
+        run: |
+          # Build documentation from the newly created maintenance branch.
+          gh workflow run framework-docs.yml \
+            --repo "${GITHUB_REPOSITORY}" \
+            --ref "release/framework-${RELEASE_SERIES}"
+
+      - name: Generate release notes
+        run: |
+          # Remove the version heading and its following blank line.
+          sed '1,2d' \
+            "framework/docs/source/changelog/v${VERSION}.md" \
+            > release-body.md
+
+      - name: Publish GitHub Release
+        run: |
+          # Publish the packages and changelog under the Framework release tag.
+          gh release create "framework-${VERSION}" \
+            "release-artifacts/flwr-${VERSION}-py3-none-any.whl" \
+            "release-artifacts/flwr-${VERSION}.tar.gz" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "Flower ${VERSION}" \
+            --notes-file release-body.md

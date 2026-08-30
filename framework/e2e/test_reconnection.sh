@@ -45,13 +45,13 @@ echo "Starting SuperLink"
 sleep 3
 
 timeout 10m flower-supernode --insecure --superlink $server_address \
-  --clientappio-api-address="localhost:9094" &
+  --host localhost --port 9094 &
 cl1_pid=$!
 echo "Starting first client"
 sleep 3
 
 timeout 10m flower-supernode --insecure --superlink $server_address \
-  --clientappio-api-address="localhost:9095" &
+  --host localhost --port 9095 &
 cl2_pid=$!
 echo "Starting second client"
 sleep 3
@@ -75,7 +75,7 @@ sleep 5
 
 # Starting new client, this is so we have enough clients to execute `flwr run`
 timeout 10m flower-supernode --insecure --superlink $server_address \
-  --clientappio-api-address "localhost:9094" &
+  --host localhost --port 9094 &
 cl1_pid=$!
 echo "Starting new client"
 sleep 5
@@ -94,46 +94,57 @@ sleep 3
 
 # Restart first client so enough clients are connected to continue the FL rounds
 timeout 5m flower-supernode --insecure --superlink $server_address \
-  --clientappio-api-address "localhost:9094" &
+  --host localhost --port 9094 &
 cl1_pid=$!
 echo "Starting new client"
 sleep 5
 
-# Initialize a flag to track if training is successful
-found_success=false
-timeout=120  # Timeout after 120 seconds
-elapsed=0
+training_timeout=120
+deadline=$((SECONDS + training_timeout))
+status_query_timeout=10
 
 # Define a cleanup function
 cleanup_and_exit() {
-    kill $cl1_pid; kill $cl2_pid
+    local exit_code=$1
+    kill "$cl1_pid" "$cl2_pid" 2>/dev/null || true
     sleep 2  # Allow some time for SuperNodes to terminate
     check_and_kill "$sl_pids"
     sleep 2  # Allow some time for SuperLink to terminate
-    exit $1
+    exit "$exit_code"
 }
 
-# Check for "finished:completed" status in a loop with a timeout
-while [ "$found_success" = false ] && [ $elapsed -lt $timeout ]; do
+while [ "$SECONDS" -lt "$deadline" ]; do
     # Run the command and capture output
-    output=$(flwr ls . e2e --format=json)
+    if ! output=$(timeout "${status_query_timeout}s" flwr ls . e2e --format=json); then
+      echo "flwr ls failed or timed out after ${status_query_timeout} seconds."
+      cleanup_and_exit 1
+    fi
 
     # Extract status from the first run (or loop over all if needed)
     status=$(echo "$output" | jq -r '.runs[0].status')
 
     echo "Current status: $status"
 
-    if [ "$status" == "finished:completed" ]; then
-      found_success=true
-      echo "Training worked correctly!"
-      cleanup_and_exit 0
-    else
-      echo "⏳ Not completed yet, retrying in 2s..."
-      sleep 2
-    fi
+    case "$status" in
+      finished:completed)
+        echo "Training worked correctly!"
+        cleanup_and_exit 0
+        ;;
+      finished:*)
+        status_details=$(echo "$output" | jq -r '.runs[0]["status-details"] // empty')
+        if [ -n "$status_details" ]; then
+          echo "Training failed: ${status_details}"
+        else
+          echo "Training failed with status ${status}:"
+          echo "$output"
+        fi
+        cleanup_and_exit 1
+        ;;
+    esac
+
+    echo "⏳ Not completed yet, retrying in 2s..."
+    sleep 2
 done
 
-if [ "$found_success" = false ]; then
-    echo "Training had an issue and timed out."
-    cleanup_and_exit 1
-fi
+echo "Training did not complete within ${training_timeout} seconds."
+cleanup_and_exit 1

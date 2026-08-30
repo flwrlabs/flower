@@ -95,7 +95,7 @@ that the authentication feature can only be enabled in the presence of TLS.
 
 .. note::
 
-    To enable TLS also for the AppIo API on SuperLink, please refer to :ref:`Launching
+    To enable TLS also for the Runtime API on SuperLink, please refer to :ref:`Launching
     the SuperLink with TLS <launching-the-superlink-with-tls>`.
 
 .. code-block:: bash
@@ -198,8 +198,8 @@ the TLS certificate.
 
 .. note::
 
-    To enable TLS also for the AppIo API on SuperNodes, please refer to :ref:`Launching
-    the SuperNodes with TLS <connecting-the-supernodes-with-tls>`.
+    To enable TLS also for the Runtime API on SuperNodes, please refer to
+    :ref:`Launching the SuperNodes with TLS <connecting-the-supernodes-with-tls>`.
 
 .. code-block:: bash
     :emphasize-lines: 6
@@ -207,7 +207,8 @@ the TLS certificate.
     $ flower-supernode \
         --root-certificates certificates/ca.crt \
         --superlink 127.0.0.1:9092 \
-        --clientappio-api-address 127.0.0.1:9094 \
+        --host 127.0.0.1 \
+        --port 9094 \
         --node-config="partition-id=0 num-partitions=2" \
         --auth-supernode-private-key keys/supernode_credentials_1
 
@@ -224,7 +225,8 @@ private key:
     $ flower-supernode \
         --root-certificates certificates/ca.crt \
         --superlink 127.0.0.1:9092 \
-        --clientappio-api-address 127.0.0.1:9095 \
+        --host 127.0.0.1 \
+        --port 9095 \
         --node-config="partition-id=1 num-partitions=2" \
         --auth-supernode-private-key keys/supernode_credentials_2
 

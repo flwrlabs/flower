@@ -16,12 +16,11 @@
 
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Any
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
-from flwr.supercore.run import Run
 from flwr.supercore.superexec.executor import Executor, LaunchResult
 
 
@@ -30,17 +29,15 @@ class ExecPlugin(ABC):
 
     def __init__(  # pylint: disable=R0913, R0917
         self,
-        appio_api_address: str,
+        runtime_api_address: str,
         insecure: bool,
         root_certificates_path: str | None,
-        get_run: Callable[[int], Run],
         runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
         executor: Executor | None = None,
     ) -> None:
-        self.appio_api_address = appio_api_address
+        self.runtime_api_address = runtime_api_address
         self.insecure = insecure
         self.root_certificates_path = root_certificates_path
-        self.get_run = get_run
         self.runtime_dependency_install = runtime_dependency_install
         # Non-ephemeral plugins use the executor to start task processes.
         self.executor = executor

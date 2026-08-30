@@ -25,7 +25,7 @@ import numpy as np
 
 from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
 from flwr.common import NDArray
-from flwr.common.logger import log
+from flwr.supercore import log
 
 from ..exception import AggregationError
 from ..grid import Grid

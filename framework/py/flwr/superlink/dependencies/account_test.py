@@ -17,22 +17,29 @@
 from unittest.mock import Mock
 
 import pytest
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 
+from flwr.common.constant import ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY
 from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.error import ApiErrorCode, BearerAuthenticationError, FlowerError
 
 from .account import AccountAccessDependency, get_account, get_authn_plugin
 
 
-def _make_request() -> Request:
+def _make_request(
+    authorization_headers: tuple[str, ...] = ("Bearer access-token",),
+    extra_headers: tuple[tuple[bytes, bytes], ...] = (),
+) -> Request:
     """Return a minimal request with authentication metadata."""
     return Request(
         {
             "type": "http",
             "method": "GET",
             "path": "/",
-            "headers": [(b"authorization", b"Bearer access-token")],
+            "headers": [
+                (b"authorization", value.encode()) for value in authorization_headers
+            ]
+            + list(extra_headers),
             "query_string": b"",
             "server": ("testserver", 80),
             "client": ("testclient", 50000),
@@ -48,130 +55,111 @@ def _make_app_request(app: FastAPI) -> Request:
     return request
 
 
-def test_account_access_dependency_returns_authorized_account() -> None:
+@pytest.mark.parametrize("scheme", ["Bearer", "bearer", "BEARER"])
+def test_account_access_dependency_returns_authenticated_account(scheme: str) -> None:
     """AccountAccessDependency should return the account when tokens are valid."""
     authn_plugin = Mock()
-    authz_plugin = Mock()
     account = AccountInfo(flwr_aid="aid", account_name="account")
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
-    authz_plugin.authorize.return_value = True
 
-    result = AccountAccessDependency(authn_plugin, authz_plugin)(
-        _make_request(), Response()
+    request = _make_request(
+        (f"{scheme} access-token",),
+        (
+            (ACCESS_TOKEN_KEY.encode(), b"legacy-access-token"),
+            (REFRESH_TOKEN_KEY.encode(), b"legacy-refresh-token"),
+        ),
     )
+    result = AccountAccessDependency(authn_plugin)(request)
 
     assert result is account
     authn_plugin.validate_tokens_in_metadata.assert_called_once_with(
-        [("authorization", "Bearer access-token")]
+        [(ACCESS_TOKEN_KEY, "access-token")]
     )
     authn_plugin.refresh_tokens.assert_not_called()
-    authz_plugin.authorize.assert_called_once_with(account)
 
 
-def test_account_access_dependency_refreshes_tokens_and_sets_response_headers() -> None:
-    """AccountAccessDependency returns an authorized account after token refresh."""
+def test_account_access_dependency_allows_plugin_to_accept_missing_header() -> None:
+    """The authentication plugin can accept requests without credentials."""
     authn_plugin = Mock()
-    authz_plugin = Mock()
     account = AccountInfo(flwr_aid="aid", account_name="account")
-    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
-    authn_plugin.refresh_tokens.return_value = (
-        [("x-access-token", "new-token"), ("x-refresh-token", b"new-refresh")],
-        account,
-    )
-    authz_plugin.authorize.return_value = True
-    response = Response()
+    authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
 
-    result = AccountAccessDependency(authn_plugin, authz_plugin)(
-        _make_request(), response
-    )
+    result = AccountAccessDependency(authn_plugin)(_make_request(()))
 
     assert result is account
-    assert response.headers.get("x-access-token") == "new-token"
-    assert response.headers.get("x-refresh-token") == "new-refresh"
-    authz_plugin.authorize.assert_called_once_with(account)
+    authn_plugin.validate_tokens_in_metadata.assert_called_once_with([])
 
 
 @pytest.mark.parametrize(
-    ("valid_tokens", "tokens", "account", "detail"),
+    "authorization_headers",
     [
+        ("Basic access-token",),
+        ("Bearer",),
+        ("Bearer ",),
+        ("Bearer first-token", "Bearer second-token"),
+    ],
+)
+def test_account_access_dependency_rejects_invalid_authorization_header(
+    authorization_headers: tuple[str, ...],
+) -> None:
+    """AccountAccessDependency should reject malformed or duplicate credentials."""
+    authn_plugin = Mock()
+
+    with pytest.raises(BearerAuthenticationError) as exc_info:
+        AccountAccessDependency(authn_plugin)(_make_request(authorization_headers))
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "Not authenticated"
+    assert exc_info.value.headers == {"WWW-Authenticate": "Bearer"}
+    authn_plugin.validate_tokens_in_metadata.assert_not_called()
+    authn_plugin.refresh_tokens.assert_not_called()
+
+
+def test_account_access_dependency_rejects_legacy_headers_without_bearer() -> None:
+    """Legacy Control metadata headers are not an HTTP authentication contract."""
+    authn_plugin = Mock()
+    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
+    request = _make_request(
+        (),
         (
-            True,
-            None,
-            None,
-            "Tokens validated, but account info not found: authentication plugin "
-            "returned no account.",
+            (ACCESS_TOKEN_KEY.encode(), b"legacy-access-token"),
+            (REFRESH_TOKEN_KEY.encode(), b"legacy-refresh-token"),
         ),
-        (
-            False,
-            None,
-            None,
-            "Token refresh failed: authentication plugin returned no tokens.",
-        ),
-        (
-            False,
-            [("x-access-token", "new-token")],
-            None,
-            "Tokens refreshed, but account info not found: authentication plugin "
-            "returned no account.",
-        ),
+    )
+
+    with pytest.raises(BearerAuthenticationError) as exc_info:
+        AccountAccessDependency(authn_plugin)(request)
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "Not authenticated"
+    assert exc_info.value.headers == {"WWW-Authenticate": "Bearer"}
+    authn_plugin.validate_tokens_in_metadata.assert_called_once_with([])
+    authn_plugin.refresh_tokens.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("valid_token", "account"),
+    [
+        (False, None),
+        (True, None),
     ],
 )
 def test_account_access_dependency_rejects_unauthenticated_requests(
-    valid_tokens: bool,
-    tokens: list[tuple[str, str]] | None,
+    valid_token: bool,
     account: AccountInfo | None,
-    detail: str,
 ) -> None:
     """AccountAccessDependency should reject absent or incomplete authentication."""
     authn_plugin = Mock()
-    authz_plugin = Mock()
-    authn_plugin.validate_tokens_in_metadata.return_value = (valid_tokens, account)
-    authn_plugin.refresh_tokens.return_value = (tokens, account)
+    authn_plugin.validate_tokens_in_metadata.return_value = (valid_token, account)
 
-    with pytest.raises(FlowerError) as exc_info:
-        AccountAccessDependency(authn_plugin, authz_plugin)(_make_request(), Response())
+    with pytest.raises(BearerAuthenticationError) as exc_info:
+        AccountAccessDependency(authn_plugin)(_make_request())
 
-    assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED
-    assert exc_info.value.message == detail
-    authz_plugin.authorize.assert_not_called()
-
-
-def test_account_access_dependency_rejects_unauthorized_account() -> None:
-    """AccountAccessDependency should reject accounts denied by authorization."""
-    authn_plugin = Mock()
-    authz_plugin = Mock()
-    account = AccountInfo(flwr_aid="aid", account_name="account")
-    authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
-    authz_plugin.authorize.return_value = False
-
-    with pytest.raises(FlowerError) as exc_info:
-        AccountAccessDependency(authn_plugin, authz_plugin)(_make_request(), Response())
-
-    assert exc_info.value.code == ApiErrorCode.NO_PERMISSIONS
-    assert exc_info.value.message == (
-        "Account authorization failed for flwr_aid='aid', account_name='account'."
-    )
-
-
-def test_get_authn_plugin_returns_configured_plugin() -> None:
-    """get_authn_plugin should return the configured authentication plugin."""
-    app = FastAPI()
-    authn_plugin = Mock()
-    app.state.account_access_dep = AccountAccessDependency(authn_plugin, Mock())
-
-    assert get_authn_plugin(_make_app_request(app)) is authn_plugin
-
-
-def test_get_authn_plugin_raises_when_plugin_is_missing() -> None:
-    """get_authn_plugin should fail clearly when the app is not configured."""
-    with pytest.raises(FlowerError) as exc_info:
-        get_authn_plugin(_make_app_request(FastAPI()))
-
-    assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED
-    assert exc_info.value.message == (
-        "SuperLink authentication is not initialized: expected ControlAuthnPlugin, "
-        "got None."
-    )
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "Not authenticated"
+    assert exc_info.value.headers == {"WWW-Authenticate": "Bearer"}
+    assert "access-token" not in exc_info.value.detail
+    authn_plugin.refresh_tokens.assert_not_called()
 
 
 def test_get_account_raises_when_authentication_middleware_did_not_run() -> None:
@@ -185,3 +173,20 @@ def test_get_account_raises_when_authentication_middleware_did_not_run() -> None
         == "SuperLink account authentication is not initialized: expected an "
         "authenticated account, got NoneType."
     )
+
+
+def test_get_authn_plugin_returns_configured_plugin() -> None:
+    """Return the authentication plugin owned by the account dependency."""
+    app = FastAPI()
+    authn_plugin = Mock()
+    app.state.account_access_dep = AccountAccessDependency(authn_plugin)
+
+    assert get_authn_plugin(_make_app_request(app)) is authn_plugin
+
+
+def test_get_authn_plugin_raises_when_authentication_is_not_initialized() -> None:
+    """Fail clearly when the application has no account dependency."""
+    with pytest.raises(FlowerError) as exc_info:
+        get_authn_plugin(_make_app_request(FastAPI()))
+
+    assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED

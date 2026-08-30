@@ -19,48 +19,70 @@ from logging import ERROR
 
 from fastapi import HTTPException, Request, Response, status
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.responses import JSONResponse
 from starlette.datastructures import State
 from starlette.middleware.base import RequestResponseEndpoint
 
-from flwr.common.logger import log
+from flwr.supercore import log
 
 from .base import FlowerError
 from .catalog import API_ERROR_MAP
 
 INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error."
+NOT_AUTHENTICATED_DETAIL = "Not authenticated"
+
+
+class BearerAuthenticationError(HTTPException):
+    """Represent failed HTTP Bearer authentication."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=NOT_AUTHENTICATED_DETAIL,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 async def http_error_translator(
     request: Request[State], call_next: RequestResponseEndpoint
 ) -> Response:
-    """Translate FlowerError into a sanitized HTTP response."""
+    """Translate exceptions from downstream HTTP handling into safe responses.
+
+    Let successful responses pass through unchanged. Convert ``FlowerError``
+    instances into their catalog-defined public JSON contract, including the
+    numeric error code and optional public details. Preserve FastAPI's response
+    contract for ``HTTPException``, and translate every unexpected exception
+    into a generic JSON 500 response. Internal exception details are logged for
+    diagnostics but are never exposed to the client.
+    """
     try:
         return await call_next(request)
     except FlowerError as err:
         try:
             error_spec = API_ERROR_MAP[err.code]
-            http_status = error_spec.http_status_code
-            public_message = error_spec.public_message
+            response = JSONResponse(
+                content=err.to_json(error_spec.public_message),
+                status_code=error_spec.http_status_code,
+                headers=error_spec.http_headers,
+            )
         except (ValueError, KeyError):
-            http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
-            public_message = INTERNAL_SERVER_ERROR_MESSAGE
+            response = JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"detail": INTERNAL_SERVER_ERROR_MESSAGE},
+            )
 
         # Log error as is
         msg = f"[{request.url.path}][ApiError:{err.code}] {err.message}"
         log(ERROR, msg)
         # Return sanitized error to client
-        return Response(
-            status_code=http_status,
-            content=err.to_json(public_message),
-            media_type="application/json",
-        )
+        return response
     except HTTPException as err:
         return await http_exception_handler(request, err)
     except Exception as err:  # pylint: disable=broad-exception-caught
         # Log unexpected exceptions and translate into INTERNAL
         msg = f"[{request.url.path}][UnexpectedError:{type(err).__name__}] {err}"
         log(ERROR, msg)
-        return Response(
+        return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=INTERNAL_SERVER_ERROR_MESSAGE,
+            content={"detail": INTERNAL_SERVER_ERROR_MESSAGE},
         )

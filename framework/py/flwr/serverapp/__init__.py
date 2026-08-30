@@ -14,13 +14,53 @@
 # ==============================================================================
 """Public Flower ServerApp APIs."""
 
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
+
+from flwr.supercore.privacy_accounting import (
+    GaussianPrivacyEvent as GaussianPrivacyEvent,
+)
+from flwr.supercore.privacy_accounting import NeighboringRelation as NeighboringRelation
+from flwr.supercore.privacy_accounting import PrivacyAccountant as PrivacyAccountant
+from flwr.supercore.privacy_accounting import PrivacyConfig as PrivacyConfig
+from flwr.supercore.privacy_accounting import PrivacySpent as PrivacySpent
+from flwr.supercore.privacy_accounting import SamplingMethod as SamplingMethod
 
 from . import strategy
 from .grid import Grid
 from .server_app import ServerApp as ServerApp
 
+if TYPE_CHECKING:
+    from flwr.supercore.privacy_accounting.rdp_accountant import (
+        RdpAccountant as RdpAccountant,
+    )
+
+_LAZY_EXPORTS = {
+    "RdpAccountant": (
+        "flwr.supercore.privacy_accounting.rdp_accountant",
+        "RdpAccountant",
+    ),
+}
+
 __all__ = [
+    "GaussianPrivacyEvent",
     "Grid",
+    "NeighboringRelation",
+    "PrivacyAccountant",
+    "PrivacyConfig",
+    "PrivacySpent",
+    "RdpAccountant",
+    "SamplingMethod",
     "ServerApp",
     "strategy",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Lazily resolve privacy-accounting backend exports."""
+    if name in _LAZY_EXPORTS:
+        module_name, attr_name = _LAZY_EXPORTS[name]
+        value = getattr(import_module(module_name), attr_name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
