@@ -15,15 +15,14 @@
 """Simple base Flower SuperExec plugin for app processes."""
 
 import os
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from logging import ERROR
 from typing import ClassVar
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
-from flwr.common.logger import log
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.constant import TaskType
-from flwr.supercore.run import Run
 from flwr.supercore.superexec.executor import ExecutionSpec, Executor, LaunchResult
 
 from .exec_plugin import ExecPlugin
@@ -38,13 +37,13 @@ class BaseExecPlugin(ExecPlugin):
     # Placeholders to be defined in subclasses
     supported_task_types: ClassVar[frozenset[TaskType]]
     suppress_output = False
+    visible_output_task_types: ClassVar[frozenset[TaskType]] = frozenset()
 
     def __init__(  # pylint: disable=R0913, R0917
         self,
         runtime_api_address: str,
         insecure: bool,
         root_certificates_path: str | None,
-        get_run: Callable[[int], Run],
         runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
         *,
         executor: Executor,
@@ -53,7 +52,6 @@ class BaseExecPlugin(ExecPlugin):
             runtime_api_address=runtime_api_address,
             insecure=insecure,
             root_certificates_path=root_certificates_path,
-            get_run=get_run,
             runtime_dependency_install=runtime_dependency_install,
             executor=executor,
         )
@@ -98,7 +96,9 @@ class BaseExecPlugin(ExecPlugin):
             root_certificates_path=self.root_certificates_path,
             runtime_dependency_install=self.runtime_dependency_install,
             parent_pid=os.getpid(),
-            suppress_output=self.suppress_output,
+            suppress_output=(
+                self.suppress_output and task_type not in self.visible_output_task_types
+            ),
             task_id=task_id,
         )
 

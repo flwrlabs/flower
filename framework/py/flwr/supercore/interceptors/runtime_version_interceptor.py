@@ -24,7 +24,7 @@ from typing import Any
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.constant import VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
 from flwr.supercore.exit import ExitCode, flwr_exit

@@ -16,9 +16,9 @@
 
 from logging import WARN
 
-import requests
+import httpx
 
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.constant import VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.protobuf.client import ProtobufCall, ProtobufRequestContext
@@ -40,7 +40,7 @@ class RuntimeVersionHttpInterceptor:
         self,
         context: ProtobufRequestContext,
         call_next: ProtobufCall,
-    ) -> requests.Response:
+    ) -> httpx.Response:
         """Add local version headers and handle compatibility responses."""
         add_headers(context.request, dict(self._metadata.as_metadata()))
         response = call_next(context)
@@ -50,7 +50,7 @@ class RuntimeVersionHttpInterceptor:
         ):
             log(WARN, incompatibility_message)
 
-        if not response.ok and (
+        if response.is_error and (
             exit_message := get_runtime_version_incompatibility_exit_message(
                 response.text
             )

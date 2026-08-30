@@ -321,8 +321,10 @@ Copy and paste the following YAML definition for the SuperNode pod.
                   - "--insecure"
                   - "--superlink"
                   - "<listener-service-dns>:9092" # Use the listener service DNS
-                  - "--clientappio-api-address"
-                  - "0.0.0.0:9094"
+                  - "--host"
+                  - "0.0.0.0"
+                  - "--port"
+                  - "9094"
                 ports:
                 - containerPort: 9094
                 volumeMounts:

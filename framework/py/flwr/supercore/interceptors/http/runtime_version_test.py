@@ -14,10 +14,11 @@
 # ==============================================================================
 """Tests for the runtime-version protobuf-over-HTTP client interceptor."""
 
+import json
 from logging import WARN
 from unittest.mock import Mock, patch
 
-import requests
+import httpx
 
 from flwr.proto.runtime_pb2 import PullPendingTasksRequest  # pylint: disable=E0611
 from flwr.supercore.constant import (
@@ -26,7 +27,7 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_VERSION_METADATA_KEY,
     VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
 )
-from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.error import ApiErrorCode
 from flwr.supercore.exit import ExitCode
 from flwr.supercore.protobuf.client import ProtobufRequestContext
 
@@ -38,7 +39,7 @@ def _context() -> ProtobufRequestContext:
     return ProtobufRequestContext(
         rpc_method="/flwr.proto.Runtime/PullPendingTasks",
         message=PullPendingTasksRequest(),
-        request=requests.Request("POST", "http://runtime.example").prepare(),
+        request=httpx.Request("POST", "http://runtime.example"),
     )
 
 
@@ -46,13 +47,9 @@ def _response(
     status_code: int = 200,
     content: bytes = b"",
     headers: dict[str, str] | None = None,
-) -> requests.Response:
-    """Create a requests response with a readable body."""
-    response = requests.Response()
-    response.status_code = status_code
-    response._content = content  # pylint: disable=protected-access
-    response.headers.update(headers or {})
-    return response
+) -> httpx.Response:
+    """Create an HTTP response."""
+    return httpx.Response(status_code, content=content, headers=headers)
 
 
 def test_adds_headers() -> None:
@@ -82,11 +79,13 @@ def test_logs_warning() -> None:
 
 def test_exits_on_incompatibility() -> None:
     """Use the established exit path for HTTP version incompatibility errors."""
-    error = FlowerError(
-        ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
-        "internal",
-        public_details="version details",
-    ).to_json("Runtime version compatibility check failed.")
+    error = json.dumps(
+        {
+            "detail": "Runtime version compatibility check failed.",
+            "code": ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE.value,
+            "extra": "version details",
+        }
+    )
     interceptor = RuntimeVersionHttpInterceptor(component_name="SuperExec")
 
     with patch(

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""TLS helpers for Runtime API gRPC connections."""
+"""TLS helpers for Runtime API connections."""
 
 
 import argparse
@@ -85,7 +85,7 @@ def validate_and_resolve_root_certificates(
     root_cert_path: str | None,
     insecure: bool,
 ) -> bytes | None:
-    """Validate and return root certificate bytes for gRPC connections."""
+    """Validate and return root certificate bytes for Runtime API clients."""
     if insecure:
         if root_cert_path is not None:
             flwr_exit(
@@ -96,7 +96,7 @@ def validate_and_resolve_root_certificates(
         return None
 
     if root_cert_path is None:
-        return None  # None in gRPC means the default system root certificates
+        return None  # Use the default system root certificates
 
     if not Path(root_cert_path).expanduser().is_file():
         flwr_exit(

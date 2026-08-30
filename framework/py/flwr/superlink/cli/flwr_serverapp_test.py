@@ -21,7 +21,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from flwr.common.constant import SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
+from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 
 from .flwr_serverapp import _parse_args_run_flwr_serverapp
 
@@ -55,7 +55,7 @@ def test_parse_flwr_serverapp_parses_tokenized_invocation() -> None:
         ]
     )
 
-    assert args.runtime_api_address == SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
+    assert args.runtime_api_address == SUPERLINK_DEFAULT_CLIENT_ADDRESS
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234

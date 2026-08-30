@@ -23,6 +23,7 @@ import sys
 import threading
 from collections.abc import Sequence
 from logging import INFO, WARN
+from pathlib import Path
 from time import sleep
 from typing import cast
 
@@ -39,14 +40,12 @@ from flwr.common.constant import (
     FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
-    SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
     EventLogWriterType,
     ExecPluginType,
 )
 from flwr.common.event_log_plugin import EventLogWriterPlugin
-from flwr.common.logger import configure_superlink_log_file, log
 from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
     add_FleetServicer_to_server,
 )
@@ -60,6 +59,7 @@ from flwr.server.superlink.fleet.grpc_rere.node_auth_server_interceptor import (
     NodeAuthServerInterceptor,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.supercore import log
 from flwr.supercore.address import parse_address, resolve_bind_address
 from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
@@ -67,16 +67,18 @@ from flwr.supercore.auth import (
 )
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
+    SUPERLINK_UVICORN_DEFAULT_PORT,
     UVICORN_DEFAULT_HOST,
-    UVICORN_DEFAULT_PORT,
 )
-from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
+from flwr.supercore.http_logging import get_uvicorn_log_config
 from flwr.supercore.interceptors import (
     RpcErrorTranslationServerInterceptor,
     create_fleet_runtime_version_server_interceptor,
 )
+from flwr.supercore.logger import configure_superlink_log_file, console_handler
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import (
@@ -89,13 +91,10 @@ from flwr.supercore.version import package_version
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.config_loader import (
     SuperLinkLifespanConfig,
-    get_federation_manager,
-    get_objectstore_linkstate_factories,
     load_control_authn_plugin,
     load_control_event_log_plugin,
 )
 from flwr.superlink.servicer.control import run_control_api_grpc
-from flwr.superlink.servicer.runtime import run_runtime_api_grpc
 
 try:
     from flwr.ee import (
@@ -140,7 +139,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         self.superexec_process: subprocess.Popen[bytes] | None = None
         self.objectstore_factory = state_factory.objectstore_factory
         self.state_factory = state_factory
-        self._runtime_server: grpc.Server | None = None
         self._started = False
 
     def startup(self) -> None:
@@ -153,7 +151,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         self.state_factory.state()
 
         self._start_control_api()
-        self._start_runtime_api()
         self._start_fleet_api()
         self._start_superexec_if_needed()
         self._start_health_server_if_needed()
@@ -183,7 +180,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
         self.grpc_servers.clear()
         self.superexec_process = None
-        self._runtime_server = None
         self._started = False
 
     def wait_until_background_thread_exits(self) -> None:
@@ -209,18 +205,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
             fleet_api_type=config.fleet_api_type,
         )
         self.grpc_servers.append(control_server)
-
-    def _start_runtime_api(self) -> None:
-        config = self.config
-        runtime_server: grpc.Server = run_runtime_api_grpc(
-            address=config.runtime_address,
-            state_factory=self.state_factory,
-            objectstore_factory=self.objectstore_factory,
-            certificates=config.runtime_certificates,
-            superexec_auth_secret=config.superexec_auth_secret,
-        )
-        self._runtime_server = runtime_server
-        self.grpc_servers.append(runtime_server)
 
     def _start_fleet_api(self) -> None:
         config = self.config
@@ -277,10 +261,8 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         if config.isolation != ISOLATION_MODE_SUBPROCESS:
             return
 
-        if self._runtime_server is None:
-            raise RuntimeError("Runtime API server is not started.")
-
-        runtime_address = resolve_bind_address(self._runtime_server.bound_address)
+        runtime_host = f"[{config.host}]" if ":" in config.host else config.host
+        runtime_address = resolve_bind_address(f"{runtime_host}:{config.port}")
         command = _get_superexec_command(
             runtime_address=runtime_address,
             runtime_certificates=config.runtime_certificates,
@@ -310,8 +292,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
             interval_hours=args.log_rotation_interval_hours,
             backup_count=args.log_rotation_backup_count,
         )
-
-    _validate_http_api_args(args)
 
     # Detect if `--executor*` arguments were set
     if args.executor or args.executor_dir or args.executor_config:
@@ -360,7 +340,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         args.control_api_address = args.exec_api_address
 
     # Parse IP addresses
-    runtime_address, _, _ = _format_address(args.runtime_api_address)
     control_address, _, _ = _format_address(args.control_api_address)
     health_server_address = None
     if args.health_server_address is not None:
@@ -466,11 +445,8 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
             fleet_api_address = FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
 
     return SuperLinkLifespanConfig(
-        runtime_address=runtime_address,
         control_address=control_address,
         health_server_address=health_server_address,
-        enable_http_api=args.enable_http_api,
-        disable_grpc_api=args.disable_grpc_api,
         host=args.host,
         port=args.port,
         insecure=args.insecure,
@@ -490,6 +466,16 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         database=args.database,
         isolation=args.isolation,
         runtime_ssl_ca_certfile=args.runtime_ssl_ca_certfile,
+        runtime_ssl_certfile=(
+            str(Path(args.runtime_ssl_certfile).expanduser())
+            if runtime_certificates is not None
+            else None
+        ),
+        runtime_ssl_keyfile=(
+            str(Path(args.runtime_ssl_keyfile).expanduser())
+            if runtime_certificates is not None
+            else None
+        ),
         runtime_dependency_install=args.runtime_dependency_install,
     )
 
@@ -504,42 +490,9 @@ def flower_superlink() -> None:
 
     event(EventType.RUN_SUPERLINK_ENTER)
 
-    ###########################################################################
-    # Run SuperLink in Compatibility Mode (FastAPI + gRPC)
-    ###########################################################################
-
-    # Enable this mode by running `flower-superlink --enable-http-api`
-    if config.enable_http_api:
-        # Blocking: this will run uvicorn.run()
-        _run_superlink_http_api(lifespan_config=config)
-        return
-
-    ###########################################################################
-    # Run SuperLink in Legacy Mode (Only gRPC)
-    ###########################################################################
-
-    superlink_lifespan: SuperLinkLifespan | None = None
-    try:
-        federation_manager = get_federation_manager(is_simulation=config.simulation)
-        _, state_factory = get_objectstore_linkstate_factories(
-            config.database, federation_manager
-        )
-        superlink_lifespan = SuperLinkLifespan(config, state_factory)
-        superlink_lifespan.startup()
-    except Exception as err:  # pylint: disable=broad-except
-        if superlink_lifespan is not None:
-            superlink_lifespan.shutdown()
-        flwr_exit(ExitCode.SUPERLINK_INVALID_ARGS, str(err))
-
-    # Graceful shutdown
-    register_signal_handlers(
-        event_type=EventType.RUN_SUPERLINK_LEAVE,
-        exit_message="SuperLink terminated gracefully.",
-        grpc_servers=superlink_lifespan.grpc_servers,
-        exit_handlers=[superlink_lifespan.shutdown],
-    )
-
-    superlink_lifespan.wait_until_background_thread_exits()
+    # Blocking: FastAPI serves Runtime HTTP while its lifespan owns Control and
+    # Fleet gRPC servers.
+    _run_superlink_http_api(lifespan_config=config)
 
 
 def _format_address(address: str) -> tuple[str, str, int]:
@@ -554,31 +507,19 @@ def _format_address(address: str) -> tuple[str, str, int]:
 
 
 def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
-    """Run the experimental FastAPI-owned SuperLink service."""
-    start_legacy_grpc = not lifespan_config.disable_grpc_api
-
+    """Run the FastAPI-owned SuperLink service."""
     from flwr.superlink.main import (  # pylint: disable=import-outside-toplevel
         create_app,
     )
 
     fastapi_app = create_app(lifespan_config, SuperLinkLifespan)
 
-    if start_legacy_grpc:
-        log(
-            WARN,
-            "EXPERIMENTAL: Starting the combined SuperLink FastAPI service on %s:%s. "
-            "The legacy gRPC APIs are started from FastAPI lifespan.",
-            lifespan_config.host,
-            lifespan_config.port,
-        )
-    else:
-        log(
-            WARN,
-            "EXPERIMENTAL: Starting the SuperLink FastAPI service on %s:%s. "
-            "The legacy gRPC APIs are disabled.",
-            lifespan_config.host,
-            lifespan_config.port,
-        )
+    log(
+        INFO,
+        "Starting the SuperLink Runtime HTTP API on %s:%s.",
+        lifespan_config.host,
+        lifespan_config.port,
+    )
 
     # Uvicorn workers must stay at 1 while the lifespan starts gRPC servers. With
     # multiple workers, every worker process would try to bind the same Control,
@@ -589,20 +530,11 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
         port=lifespan_config.port,
         reload=False,
         access_log=True,
-        ssl_keyfile=None if lifespan_config.insecure else lifespan_config.ssl_keyfile,
-        ssl_certfile=None if lifespan_config.insecure else lifespan_config.ssl_certfile,
+        log_config=get_uvicorn_log_config(console_handler.level),
+        ssl_keyfile=lifespan_config.runtime_ssl_keyfile,
+        ssl_certfile=lifespan_config.runtime_ssl_certfile,
         workers=1,
     )
-
-
-def _validate_http_api_args(args: argparse.Namespace) -> None:
-    """Validate relationships between experimental HTTP API CLI flags."""
-    if args.disable_grpc_api and not args.enable_http_api:
-        flwr_exit(
-            ExitCode.SUPERLINK_INVALID_ARGS,
-            "`--disable-grpc-api` can only be used together with "
-            "`--enable-http-api`.",
-        )
 
 
 def _obtain_superlink_certificates(
@@ -635,7 +567,7 @@ def _get_superexec_command(
         insecure=runtime_certificates is None,
         root_certificates_path=runtime_root_certificates_path,
     )
-    command += ["--appio-api-address", runtime_address]
+    command += ["--runtime-api-address", runtime_address]
     command += ["--plugin-type", ExecPluginType.SERVER_APP]
     command += ["--parent-pid", str(parent_pid)]
     if runtime_dependency_install:
@@ -849,52 +781,30 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
 
 def _add_args_http_api(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
-        "--enable-http-api",
-        action="store_true",
-        default=False,
-        help=(
-            "EXPERIMENTAL: Start one FastAPI HTTP server and let its lifespan "
-            "start the legacy SuperLink gRPC APIs."
-        ),
-    )
-    parser.add_argument(
-        "--disable-grpc-api",
-        action="store_true",
-        default=False,
-        help=(
-            "EXPERIMENTAL: When used with `--enable-http-api`, start only the "
-            "HTTP API and do not start the legacy SuperLink gRPC APIs."
-        ),
+        "--serverappio-api-address",
+        type=_unsupported_runtime_api_address,
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--host",
         default=UVICORN_DEFAULT_HOST,
         help=(
-            "Host for the experimental FastAPI HTTP server. "
+            "Host for the Runtime HTTP API. "
             f"By default, it is set to {UVICORN_DEFAULT_HOST}."
         ),
     )
     parser.add_argument(
         "--port",
         type=_port_int,
-        default=UVICORN_DEFAULT_PORT,
+        default=SUPERLINK_UVICORN_DEFAULT_PORT,
         help=(
-            "Port for the experimental FastAPI HTTP server. "
-            f"By default, it is set to {UVICORN_DEFAULT_PORT}."
+            "Port for the Runtime HTTP API. "
+            f"By default, it is set to {SUPERLINK_UVICORN_DEFAULT_PORT}."
         ),
     )
 
 
 def _add_args_runtime_api(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "--serverappio-api-address",
-        "--simulationio-api-address",
-        dest="runtime_api_address",
-        default=SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
-        help="Runtime API (gRPC) server address (IPv4, IPv6, or a domain name). "
-        "`--simulationio-api-address` is accepted as a deprecated alias. "
-        f"By default, it is set to {SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS}.",
-    )
     parser.add_argument(
         "--appio-ssl-certfile",
         dest="runtime_ssl_certfile",
@@ -930,9 +840,16 @@ def _positive_int(value: str) -> int:
 
 def _port_int(value: str) -> int:
     parsed = int(value)
-    if parsed < 0 or parsed > 65535:
-        raise argparse.ArgumentTypeError("value must be between 0 and 65535")
+    if parsed < 1 or parsed > 65535:
+        raise argparse.ArgumentTypeError("value must be between 1 and 65535")
     return parsed
+
+
+def _unsupported_runtime_api_address(_value: str) -> str:
+    """Reject the removed combined Runtime API address option."""
+    raise argparse.ArgumentTypeError(
+        "this option is no longer supported; use `--host` and `--port` instead"
+    )
 
 
 def _add_args_fleet_api(parser: argparse.ArgumentParser) -> None:

@@ -32,7 +32,7 @@ from flwr.proto.control_pb2_grpc import ControlStub
 
 from .utils import (
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
+    flwr_cli_exc_handler,
     init_channel_from_connection,
     print_json_to_stdout,
 )
@@ -104,7 +104,7 @@ def _stop_run(stub: ControlStub, run_id: int, is_json: bool) -> None:
     is_json : bool
         Whether JSON output format is requested.
     """
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         response: StopRunResponse = stub.StopRun(request=StopRunRequest(run_id=run_id))
     if response.success:
         typer.secho(f"✅ Run {run_id} successfully stopped.", fg=typer.colors.GREEN)

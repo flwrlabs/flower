@@ -1,37 +1,26 @@
 # Understand the AgentApp runtime
 
 An `AgentApp` contains the control flow for an agent: what the model should do,
-which tools it can use, and when the task is complete. The Flower runtime
-executes that app and provides model and connector access through an
-`AgentSession`.
+which tools it can use, and when its work is complete. Flower executes the app
+and provides an OpenAI-compatible endpoint for model access. Connectors and
+frontend-visible events are available through an `AgentSession`.
 
 ## Where your app meets the runtime
 
-A small AgentApp project might look like this:
-
-```text
-flwr-agent/
-├── flwr_agent/
-│   ├── __init__.py
-│   └── agent_app.py
-└── pyproject.toml
-```
-
-The project declares its AgentApp component in `pyproject.toml`:
+For example, if your AgentApp is defined in `your_package/agent_app.py`, declare
+it in `pyproject.toml`:
 
 ```toml
 [tool.flwr.app.components]
-agentapp = "flwr_agent.agent_app:app"
+agentapp = "your_package.agent_app:app"
 ```
 
-The value follows the `<module>:<attribute>` format. In this example, Flower
-imports `app` from `flwr_agent/agent_app.py`. See [Configure
-`pyproject.toml`](https://flower.ai/docs/framework/how-to-configure-pyproject-toml.html)
-for more about Flower App components and the files included in a Flower App
-Bundle (FAB).
+The `<module>:<attribute>` value tells Flower where to import the `AgentApp`
+object. Flower packages the project as a Flower App Bundle (FAB). A run can
+resolve an app by app spec, local project, or specific FAB hash.
 
-When a run starts, Flower installs the FAB, imports the referenced object,
-verifies that it is an `AgentApp`, and calls its registered main function:
+When a run starts, Flower installs the FAB and its declared dependencies,
+loads the object, and calls the function registered with `AgentApp.main`:
 
 ```python
 @app.main()
@@ -39,113 +28,184 @@ def main(agent: AgentSession, context: Context) -> None:
     ...
 ```
 
-The function is synchronous. It returns when the app has completed its work. An
-unhandled exception marks the AgentApp task as failed and makes the exception
-message available in the run details and logs.
+The function is synchronous and returns when the app has completed its work. An
+unhandled exception marks the run as failed and records the error in its details
+and logs.
 
 ## AgentSession
 
-Flower creates an `AgentSession` for each AgentApp task and passes it to your
-main function. It exposes two capabilities:
+Flower creates an `AgentSession` for each AgentApp run and passes it to your
+main function. It exposes three capabilities:
 
-- `agent.responses` creates model responses;
-- `agent.connectors` exposes connector tool schemas and executes connector
-  calls.
+- `agent.responses` provides a lower-level JSON model API
+- `agent.connectors` returns connector tools and executes function calls
+- `agent.events` publishes structured events selected by the AgentApp
 
-Calling either capability creates a child task. The AgentApp waits for that
-child task's reply, then continues with the returned JSON object. This keeps
-provider credentials and connector implementation details outside the app.
+Provider credentials and connector implementations remain outside the FAB. New
+AgentApps normally make model requests with the OpenAI SDK and use
+`AgentSession` for connectors and frontend-visible events.
 
 ### Model responses
 
-`agent.responses.create(request)` accepts an Open Responses-compatible JSON
-object. The current runtime forwards these request fields when present:
+Flower 1.35.0 exposes an OpenAI-compatible Responses endpoint inside the
+AgentApp process. The runtime injects its URL and credential as
+`FLWR_RUNTIME_BASE_URL` and `FLWR_RUNTIME_API_KEY`. Pass them to the OpenAI
+client, then use its standard typed Responses API:
 
-- `model` and `input`;
-- `stream`;
-- `tools` and `tool_choice`;
-- `instructions` and `previous_response_id`;
-- `reasoning` and `max_output_tokens`;
-- `metadata` and `text`.
+```python
+import os
 
-`model` must be a non-empty string, and `input` must be a string or a sequence
-of JSON objects. The call returns an Open Responses-compatible response object.
-The app is responsible for deciding whether to make another model request.
+from openai import OpenAI
+
+client = OpenAI(
+    base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
+    api_key=os.environ["FLWR_RUNTIME_API_KEY"],
+    max_retries=0,
+)
+stream = client.responses.create(
+    model="openai/gpt-5.6-sol",
+    input="Explain federated AI.",
+    stream=True,
+)
+```
+
+The runtime recognizes these request fields:
+
+- `model` and `input`
+- `stream`
+- `tools` and `tool_choice`
+- `instructions` and `previous_response_id`
+- `reasoning` and `max_output_tokens`
+- `metadata` and `text`
+
+`model` must be a non-empty string. `input` can be text or a sequence of input
+items. Streaming calls yield typed SDK events. The AgentApp decides which of
+those events to publish and which output to persist in `Context`.
+
+The endpoint is authenticated for the current AgentApp task. It is not a public
+model API for an external client. See [Use the OpenAI SDK in an
+AgentApp](../how-to-guides/use-openai-sdk.md) for a complete example.
+
+`agent.responses.create(request)` remains available as a lower-level interface
+for JSON-based workflows. It returns a JSON response object and automatically
+appends its model output items to the Flower `Context`. New AgentApps should
+prefer the OpenAI SDK when they need typed responses or streaming events.
+
+The default model provider at `api.flower.ai` does not currently support
+continuing with `previous_response_id`. Rebuild `input` from stored messages for
+a follow-up request instead. See **Rebuild conversation input** in [Build a
+collaborative research agent](../tutorials/build-a-collaborative-agent.md) for a
+complete example.
 
 ### Connectors
 
-`agent.connectors.tools(names)` returns function-tool definitions for registered
-connectors. An app passes those definitions to a model request. If the model
-returns a `function_call`, the app passes that item to
-`agent.connectors.call(tool_call)`.
+`agent.connectors.tools(refs)` returns model-facing tool definitions. A built-in
+reference normally yields one tool. An account connector such as `slack` can
+yield several related action tools.
 
-The connector call returns a `function_call_output` item suitable for the next
-model request. Flower validates the connector name, executes it in a child
-task, and records connector activity. See [Using
-connectors](use-connectors.md) for a complete loop.
+When a model returns a `function_call`, pass that item to
+`agent.connectors.call(tool_call)`. Flower resolves the action, runs the
+connector, records its activity, and returns a `function_call_output` item for
+the next model request.
+
+The AgentApp owns the tool loop and must bound it. See [Use
+connectors](use-connectors.md).
+
+### Run events
+
+`agent.events.emit(event)` publishes one structured event to the run-event
+stream consumed by Flower Chat and other clients. An SDK stream stays private
+to the model task until the AgentApp republishes its events:
+
+```python
+for event in stream:
+    agent.events.emit(event.to_dict())
+```
+
+Publishing an event does not append it to `Context`. This lets the AgentApp
+separate frontend-visible progress from conversation state.
+
+These operations have distinct destinations:
+
+| Operation                               | Destination                                                |
+| --------------------------------------- | ---------------------------------------------------------- |
+| `print(...)`                            | AgentApp logs                                              |
+| `agent.events.emit(...)`                | Run-event stream consumed by Flower Chat and other clients |
+| Store an assistant message in `Context` | Persistent conversation state                              |
+
+See {ref}`publish-agentapp-generated-text` for the event sequence used to
+present text that does not come from an SDK stream.
 
 ## Context
 
-Alongside the `AgentSession`, your main function receives a Flower `Context`.
-It connects the AgentApp to its configuration and state:
+Alongside the `AgentSession`, your main function receives a Flower `Context`:
 
-- `context.run_config` contains the defaults from `pyproject.toml` fused with
-  per-run overrides;
-- `context.state` persists records produced during the run;
-- `context.run_id` identifies the run.
+- `context.run_config` contains defaults from `pyproject.toml` fused with
+  per-run overrides
+- `context.state` stores records persisted for the run series
+- `context.run_id` identifies the current run
 
-If `agent.input` is configured and non-empty, the runtime also records it as an
-Open Responses user-message item before calling the AgentApp.
+The runtime stores conversation items in a `ConfigRecord` named `items`. A
+`ConfigRecord` is a specialized Python dictionary, so you can use methods such
+as `get` when reading it through `context.state.config_records`.
 
-Model output items, connector output items, and built-in connector activity are
-appended to `context.state` by the runtime. This persistence supports run
-inspection and lets the app rebuild the input for its next model request.
+If `agent.input` is a non-empty string, the runtime records it as an Open
+Responses user-message item before calling the AgentApp. Connector calls append
+their outputs and built-in activity. The lower-level `agent.responses` API also
+appends model output, while SDK responses and events emitted with `agent.events`
+are persisted only when the app stores them explicitly.
 
-Connector activity events are useful for run inspection, but they aren't valid
-model input items. Filter them out when rebuilding model input. The items are
-stored as JSON strings:
+Runs in the same series can receive the persisted context. The app chooses what
+to send to the model. A safe conversation loader selects only message items:
 
 ```python
 import json
 
-items_record = context.state.get("items")
-stored_items = (
-    [] if items_record is None else [json.loads(item) for item in items_record["json"]]
-)
-context_items = [
-    item
-    for item in stored_items
-    if not str(item.get("type", "")).startswith("response.tool_call.")
-]
+messages = []
+items_record = context.state.config_records.get("items")
+items = items_record.get("json", []) if items_record is not None else []
+for item_json in items:
+    item = json.loads(item_json)
+    if item.get("type") == "message":
+        messages.append(item)
 ```
 
-The default model provider at `api.flower.ai` does not currently support
-continuing a conversation with `previous_response_id`. Pass `context_items` as
-the `input` of each follow-up request instead.
+Connector activity types such as `response.tool_call.started` are useful for
+inspection but are not valid model conversation messages.
+
+The current default Flower Agent converts stored user and assistant messages
+back into model input. A simple custom AgentApp that forwards only
+`context.run_config["agent.input"]` treats every run independently even when
+the runs share a series.
+
+## Run series and federations
+
+A run belongs to one federation. A run series groups runs within that
+federation and carries their persisted context. Browser chat presents a series
+as a conversation. `flwr chat` reuses its current series ID until `/new`, an
+agent change, or a federation change. `/history` can restore an earlier series
+in the active federation.
 
 ## Run lifecycle
 
-Now that we've met the main pieces, let's follow a complete AgentApp run:
-
-1. `flwr run` builds or resolves a FAB and submits it to the configured
-   SuperLink.
-1. SuperLink validates the app configuration and creates an AgentApp task.
-1. A Flower executor starts the isolated AgentApp process.
-1. The process installs the FAB and, when enabled, its declared dependencies.
-1. Flower fuses run configuration, creates `AgentSession` and `Context`, and
-   loads the configured `AgentApp`.
-1. The main function creates model or connector child tasks as needed.
-1. On return, Flower persists the final context and marks the task completed.
-1. On an unhandled exception or stop request, Flower records the corresponding
-   failed or stopped status.
+1. The CLI or browser resolves an AgentApp and submits a run to a federation
+1. SuperGrid validates account membership, app configuration, and selected
+   account connectors
+1. SuperGrid creates the run and a run series when needed
+1. An executor starts the isolated AgentApp process and loads its FAB
+1. Flower initializes `AgentSession` and the persisted `Context`
+1. The main function sends model requests and calls connectors as needed
+1. The AgentApp publishes the model and connector events clients should see
+1. During shutdown, Flower pushes the resulting `Context` once and records
+   whether the run completed, failed, or stopped
 
 ## AgentApp and other Flower Apps
 
-A Flower App Bundle currently supports either:
+A FAB currently supports either:
 
-- one `agentapp` component; or
-- a `serverapp` and a `clientapp`.
+- one `agentapp` component
+- a `serverapp` and a `clientapp`
 
-Don't combine an `agentapp` with a `serverapp` or `clientapp` in the same
-bundle. AgentApp runs are handled as agent tasks rather than federated-learning
+Do not combine an `agentapp` with a `serverapp` or `clientapp` in the same
+bundle. AgentApp runs execute agent logic rather than federated-learning
 simulations.

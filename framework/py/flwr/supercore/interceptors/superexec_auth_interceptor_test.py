@@ -129,7 +129,7 @@ class TestSuperExecAuthClientInterceptor(TestCase):
 class TestSuperExecMethodPolicies(TestCase):
     """Lock the SuperExec HMAC method policy for the Runtime service."""
 
-    _BOOTSTRAP_METHODS = {"PullPendingTasks", "ClaimTask", "GetRun"}
+    _BOOTSTRAP_METHODS = {"PullPendingTasks", "ClaimTask"}
 
     def test_service_method_paths(self) -> None:
         """Runtime should protect exactly the bootstrap methods."""

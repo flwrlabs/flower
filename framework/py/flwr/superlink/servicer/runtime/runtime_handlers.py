@@ -21,7 +21,6 @@ from logging import DEBUG, ERROR, INFO
 
 from flwr.app import Message
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
-from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -43,7 +42,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorRequest,
     GetConnectorResponse,
@@ -63,6 +61,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.utils.validator import validate_message
+from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -206,15 +205,6 @@ def pull_messages(  # pylint: disable=R0914
     return PullAppMessagesResponse(
         messages_list=messages_list, message_object_trees=trees
     )
-
-
-def get_run(request: GetRunRequest, state: LinkState) -> GetRunResponse:
-    """Get run information."""
-    log(DEBUG, "Runtime.GetRun")
-    runs = state.get_run_info(run_ids=[request.run_id])
-    if not runs:
-        return GetRunResponse()
-    return GetRunResponse(run=run_to_proto(runs[0]))
 
 
 def get_connector(

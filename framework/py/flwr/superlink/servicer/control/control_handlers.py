@@ -24,11 +24,10 @@ import time
 from collections.abc import Callable, Generator, Sequence
 from datetime import UTC, datetime, timedelta
 from logging import ERROR, INFO
-from typing import cast
+from typing import Any, cast
 
 import requests
 
-from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
 from flwr.app.user_config import UserConfig
 from flwr.cli.utils import validate_federation_name
 from flwr.common.config import (
@@ -38,14 +37,15 @@ from flwr.common.config import (
     get_metadata_from_config,
 )
 from flwr.common.constant import (
+    ACCESS_TOKEN_KEY,
     FAB_MAX_SIZE,
     HEARTBEAT_DEFAULT_INTERVAL,
     LOG_STREAM_INTERVAL,
+    REFRESH_TOKEN_KEY,
     RUN_EVENTS_STREAM_INTERVAL,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     Status,
 )
-from flwr.common.logger import log
 from flwr.common.serde import (
     context_to_proto,
     run_status_to_proto,
@@ -55,8 +55,11 @@ from flwr.common.serde import (
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
+    AddAppRequest,
+    AddAppResponse,
     AddNodeToFederationRequest,
     AddNodeToFederationResponse,
+    AppInfo,
     ArchiveFederationRequest,
     ArchiveFederationResponse,
     BeginConnectorOAuthRequest,
@@ -78,6 +81,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAppsRequest,
+    ListAppsResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
     ListConnectorsRequest,
@@ -94,12 +99,16 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
+    RefreshAuthTokensRequest,
+    RefreshAuthTokensResponse,
     RegisterNodeRequest,
     RegisterNodeResponse,
     RejectInvitationRequest,
     RejectInvitationResponse,
     RemoveAccountFromFederationRequest,
     RemoveAccountFromFederationResponse,
+    RemoveAppRequest,
+    RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
@@ -126,9 +135,11 @@ from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
+from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
+    FLOWER_AGENT_APP_ID,
     FLWR_SUPERGRID_API_URL,
     NOOP_FEDERATION_ID,
     OAUTH_SESSION_TTL,
@@ -152,23 +163,27 @@ from flwr.supercore.typing import (
     StartRunContext,
 )
 from flwr.supercore.utils import (
+    get_metadata_str,
     parse_app_spec,
     request_download_link,
     resolve_account_ids,
     strict_json_dumps,
 )
+from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
+from flwr.superlink.run_source import RunStartSource
 
 
 class InvalidConnectorRequestError(FlowerError):
     """Exception raised when a connector request is invalid."""
 
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: str, public_details: str | None = None) -> None:
         super().__init__(
             ApiErrorCode.INVALID_CONNECTOR_REQUEST,
             f"Invalid connector request: {reason}.",
+            public_details=public_details,
         )
 
 
@@ -186,9 +201,19 @@ def list_connectors(
     account: AccountInfo,
     state: LinkState,
 ) -> ListConnectorsResponse:
-    """List user-connectable OAuth connectors and account connection status."""
+    """List OAuth connectors available in the requested federation."""
     log(INFO, "ControlServicer.ListConnectors")
-    _ = request
+    if not request.federation:
+        return ListConnectorsResponse()
+
+    flwr_aid = account.flwr_aid
+    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+    _validate_federation_membership_in_request(state, flwr_aid, request.federation)
+    federation = state.federation_manager.get_details(request.federation)
+    # Until connectors are federation-scoped, expose account-scoped connectors only
+    # in the personal agent federation.
+    if federation.can_invite_members or federation.can_add_supernodes:
+        return ListConnectorsResponse()
 
     connectors: list[Connector] = []
     for flow in sorted(
@@ -197,7 +222,7 @@ def list_connectors(
     ):
         connector_ref = flow.connector_ref
         connected = (
-            state.get_connector(flwr_aid=account.flwr_aid, connector_ref=connector_ref)
+            state.get_connector(flwr_aid=flwr_aid, connector_ref=connector_ref)
             is not None
         )
         connectors.append(
@@ -448,46 +473,14 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     account: AccountInfo,
     state: LinkState,
     fleet_api_type: str | None,
+    *,
+    source: RunStartSource = "unknown",
 ) -> StartRunResponse:
     """Create run ID."""
     log(INFO, "ControlServicer.StartRun")
 
-    verification_dict: dict[str, str] = {}
-    note: str | None = None
-
-    if request.fab.hash_str and not request.fab.content:
-        stored_fab = state.get_fab(request.fab.hash_str)
-        if stored_fab is None:
-            raise FlowerError(
-                ApiErrorCode.FAB_DOWNLOAD_FAILURE,
-                f"FAB with hash {request.fab.hash_str} not found.",
-            )
-        fab_file = stored_fab.content
-        verification_dict = stored_fab.verifications
-    else:
-        builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
-        if builtin_agent_fab is not None:
-            fab_file, verification_dict = builtin_agent_fab
-        elif request.app_spec:
-            fab_file, verification_dict, note = _get_remote_fab(
-                fleet_api_type, request.app_spec
-            )
-        else:
-            fab_file = request.fab.content
-
-    if len(fab_file) > FAB_MAX_SIZE:
-        log(
-            ERROR,
-            "FAB size exceeds maximum allowed size of %d bytes.",
-            FAB_MAX_SIZE,
-        )
-        return StartRunResponse()
-
     flwr_aid = account.flwr_aid
     account_name = account.account_name
-    override_config = user_config_from_proto(request.override_config)
-    connector_refs = validate_run_connector_refs(request.connector_refs, account, state)
-
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
 
     # Check (1) federation exists and (2) the flwr_aid is a member
@@ -509,6 +502,71 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             f"federation '{federation_id}'.",
         )
 
+    verification_dict: dict[str, str] = {}
+    note: str | None = None
+    app_id = None
+    if request.app_spec:
+        try:
+            app_id, _ = parse_app_spec(request.app_spec)
+        except ValueError as e:
+            raise FlowerError(
+                ApiErrorCode.INVALID_APP_SPEC,
+                f"Invalid app specification: {request.app_spec}",
+            ) from e
+    is_stored_app = bool(request.fab.hash_str and not request.fab.content)
+    is_hub_app = False
+
+    # Start a run using a stored app
+    if is_stored_app:
+        if app_id is None:
+            raise FlowerError(
+                ApiErrorCode.FAB_DOWNLOAD_FAILURE,
+                "App or FAB not found in the requested federation.",
+            )
+        stored_fab = state.get_app(
+            federation_id,
+            app_id,
+            request.fab.hash_str,
+        )
+        if stored_fab is None:
+            raise FlowerError(
+                ApiErrorCode.FAB_DOWNLOAD_FAILURE,
+                "App or FAB not found in the requested federation.",
+            )
+        fab_file = stored_fab.content
+        verification_dict = stored_fab.verifications
+    # Start a run using a remote app
+    elif request.app_spec:
+        fab_file, verification_dict, note = _get_remote_fab(
+            fleet_api_type, request.app_spec
+        )
+        is_hub_app = True
+    # Start a run using the provided app
+    else:
+        fab_file = request.fab.content
+
+    if len(fab_file) > FAB_MAX_SIZE:
+        log(
+            ERROR,
+            "FAB size exceeds maximum allowed size of %d bytes.",
+            FAB_MAX_SIZE,
+        )
+        return StartRunResponse()
+
+    override_config = user_config_from_proto(request.override_config)
+    connector_refs = validate_run_connector_refs(request.connector_refs, account, state)
+
+    if connector_refs:
+        federation = state.federation_manager.get_details(federation_id)
+        if federation.can_invite_members or federation.can_add_supernodes:
+            raise InvalidConnectorRequestError(
+                "connector refs are not supported for this federation",
+                public_details=(
+                    "Connectors are currently available only in your personal "
+                    "workspace."
+                ),
+            )
+
     try:
         # Validate user config overrides matches keys in run config in FAB
         fab_config = get_fab_config(fab_file)
@@ -517,11 +575,9 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
         # Derive primary task type from the submitted FAB. AgentApp-only FABs can
         # be bundled locally and submitted through the regular `flwr run` path.
-        components = fab_config["tool"]["flwr"]["app"].get("components", {})
-        is_agentapp_bundle = "agentapp" in components
-        primary_task_type = (
-            TaskType.AGENT_APP if is_agentapp_bundle else TaskType.SERVER_APP
-        )
+        app_type = _get_app_type(fab_config)
+        is_agentapp_bundle = app_type == TaskType.AGENT_APP
+        primary_task_type = app_type
         resolved_federation_config = None
         runtime = RunTime.DEPLOYMENT
         sim_cfg = state.federation_manager.get_simulation_config(federation_id)
@@ -544,13 +600,26 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             fab_file,
             verification_dict,
         )
-        fab_hash = state.store_fab(fab)
-
-        if fab_hash != fab.hash_str:
-            raise ValueError(
-                f"FAB ({fab.hash_str}) hash from request doesn't match contents"
-            )
         fab_id, fab_version = get_metadata_from_config(fab_config)
+        fab_app_id = f"@{fab_id}"
+        if app_id is None:
+            app_id = fab_app_id
+        elif app_id != fab_app_id:
+            raise FlowerError(
+                ApiErrorCode.INVALID_APP_SPEC,
+                "Stored app ID does not match the request",
+            )
+
+        if not is_stored_app:
+            state.store_app(
+                fab=fab,
+                federation_id=federation_id,
+                app_id=app_id,
+                app_type=app_type,
+                added_by=flwr_aid,
+                is_hub_app=is_hub_app,
+            )
+
         series_id = request.series_id if request.HasField("series_id") else None
         series_description: str | None = None
         if primary_task_type == TaskType.AGENT_APP and series_id is None:
@@ -561,7 +630,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         run_id = state.create_run(
             fab_id,
             fab_version,
-            fab_hash,
+            fab.hash_str,
             override_config,
             federation_id,
             resolved_federation_config,
@@ -578,7 +647,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 "Failed to create or initialize run for "
                 f"flwr_aid={flwr_aid}, federation_id={federation_id}, "
                 f"fab_id={fab_id}, fab_version={fab_version}, "
-                f"fab_hash={fab_hash}, primary_task_type={primary_task_type}.",
+                f"fab_hash={fab.hash_str}, primary_task_type={primary_task_type}.",
             )
 
         run = state.get_run_info(run_ids=[run_id])[0]
@@ -594,9 +663,11 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
     log_msg = f"Created run {run_id} in federation {run.federation_id}"
     log(INFO, log_msg)
-    return StartRunResponse(
+    response = StartRunResponse(
         run_id=run_id, note=note, series_id=series_id, federation=run.federation_id
     )
+    extensions.notify_run_started(run, source)
+    return response
 
 
 def stream_logs(
@@ -621,8 +692,20 @@ def stream_logs(
     _validate_federation_membership_in_request(
         state, account.flwr_aid, run.federation_id
     )
+    extensions.notify_result_delivered(run, account.flwr_aid, "logs")
 
     after_timestamp = request.after_timestamp + 1e-6
+    return _stream_logs(run_id, task_id, after_timestamp, state, is_active)
+
+
+def _stream_logs(
+    run_id: int,
+    task_id: int,
+    after_timestamp: float,
+    state: LinkState,
+    is_active: Callable[[], bool] | None,
+) -> Generator[StreamLogsResponse, None, None]:
+    """Yield log responses until the run finishes or the stream is cancelled."""
     while is_active is None or is_active():
         log_msg, latest_timestamp = state.get_task_log(task_id, after_timestamp)
         if log_msg:
@@ -667,10 +750,34 @@ def stream_run_events(
     _validate_federation_membership_in_request(
         state, account.flwr_aid, run.federation_id
     )
+    # A chat/read receipt represents an AgentApp result. ServerApp and
+    # simulation runs can also expose task events, but those are not chat
+    # results and must not be classified as such.
+    if run.primary_task_type == TaskType.AGENT_APP:
+        extensions.notify_result_delivered(run, account.flwr_aid, "chat")
 
     after_task_event_id = None
     if request.HasField("after_task_event_id"):
         after_task_event_id = request.after_task_event_id
+    return _stream_run_events(
+        run_id,
+        run,
+        after_task_event_id,
+        state,
+        is_active,
+    )
+
+
+def _stream_run_events(
+    run_id: int,
+    run: Run,
+    after_task_event_id: int | None,
+    state: LinkState,
+    is_active: Callable[[], bool] | None,
+) -> Generator[StreamRunEventsResponse, None, None]:
+    """Yield task events until the run finishes or the stream is cancelled."""
+    # LinkState creates every run with a primary task, so casting is safe
+    primary_task_id = cast(int, run.primary_task_id)
     while is_active is None or is_active():
         should_break = run.status.status == Status.FINISHED
 
@@ -678,6 +785,7 @@ def stream_run_events(
         # streamed task event
         events = state.get_task_events(
             run_id=run_id,
+            task_ids=[primary_task_id],
             after_task_event_id=after_task_event_id,
         )
         for event in events:
@@ -781,6 +889,10 @@ def start_automation(  # pylint: disable=too-many-locals
             ),
         )
 
+    # One-run automations do not recur, so an interval is not meaningful.
+    if max_runs == 1:
+        fixed_interval = None
+
     # Resolve the account-scoped federation and run configuration.
     flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
@@ -840,6 +952,7 @@ def dispatch_automation(
             AccountInfo(flwr_aid=flwr_aid, account_name=""),
             state,
             None,
+            source="automation",
         )
     except Exception as exc:  # pylint: disable=broad-exception-caught
         state.finish_automation(
@@ -999,6 +1112,7 @@ def list_run_series(
     )
     limit = request.limit if request.HasField("limit") else None
     federation_id = request.federation_id if request.HasField("federation_id") else None
+    is_agent = request.is_agent if request.HasField("is_agent") else None
 
     if federation_id is not None:
         _validate_federation_membership_in_request(state, flwr_aid, federation_id)
@@ -1008,6 +1122,7 @@ def list_run_series(
         federation_ids = [federation.id for federation in federations]
     entries = state.get_run_series(
         federation_ids=federation_ids,
+        is_agent=is_agent,
         updated_before=updated_before,
         limit=limit,
     )
@@ -1125,6 +1240,40 @@ def get_auth_tokens(
     return GetAuthTokensResponse(
         access_token=credentials.access_token,
         refresh_token=credentials.refresh_token,
+    )
+
+
+def refresh_auth_tokens(
+    request: RefreshAuthTokensRequest, authn_plugin: ControlAuthnPlugin | None
+) -> RefreshAuthTokensResponse:
+    """Refresh account authentication tokens."""
+    log(INFO, "ControlServicer.RefreshAuthTokens")
+    if authn_plugin is None:
+        raise FlowerError(
+            ApiErrorCode.NO_ACCOUNT_AUTH,
+            "ControlServicer initialized without account authentication.",
+        )
+
+    if not request.refresh_token:
+        raise FlowerError(
+            ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+            "Refresh token is missing.",
+        )
+
+    tokens, account = authn_plugin.refresh_tokens(
+        [(REFRESH_TOKEN_KEY, request.refresh_token)]
+    )
+    access_token = get_metadata_str(tokens, ACCESS_TOKEN_KEY)
+    refresh_token = get_metadata_str(tokens, REFRESH_TOKEN_KEY)
+    if access_token is None or refresh_token is None or account is None:
+        raise FlowerError(
+            ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+            "Authentication plugin failed to refresh account tokens.",
+        )
+
+    return RefreshAuthTokensResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
     )
 
 
@@ -1280,10 +1429,79 @@ def list_federations(
                 description=fed.description,
                 archived=fed.archived,
                 simulation=fed.simulation,
+                can_invite_members=fed.can_invite_members,
+                can_add_supernodes=fed.can_add_supernodes,
             )
             for fed in federations
         ]
     )
+
+
+def list_apps(
+    request: ListAppsRequest, account: AccountInfo, state: LinkState
+) -> ListAppsResponse:
+    """List apps associated with a federation."""
+    federation_id = request.federation_id
+    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    limit = request.limit if request.HasField("limit") else None
+    apps = list(state.list_apps(federation_id, limit))
+    if (limit is None or limit > 0) and not any(
+        app.app_id == FLOWER_AGENT_APP_ID for app in apps
+    ):
+        agent = AppInfo(
+            app_id=FLOWER_AGENT_APP_ID,
+            app_type=TaskType.AGENT_APP,
+            is_hub_app=True,
+        )
+        if limit is not None:
+            apps = apps[: limit - 1]
+        apps.append(agent)
+    return ListAppsResponse(apps=apps)
+
+
+def add_app(
+    request: AddAppRequest,
+    account: AccountInfo,
+    state: LinkState,
+    fleet_api_type: str | None,
+) -> AddAppResponse:
+    """Add a Hub app to a federation."""
+    federation_id = request.federation_id
+    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, request.app_id)
+    try:
+        app_type = _get_app_type(get_fab_config(fab_file))
+    except ValueError as e:
+        raise FlowerError(
+            ApiErrorCode.INVALID_APP_SPEC,
+            f"Failed to read app metadata: {e}",
+        ) from e
+
+    state.store_app(
+        fab=Fab(
+            hash_str=hashlib.sha256(fab_file).hexdigest(),
+            content=fab_file,
+            verifications=verification_dict,
+        ),
+        federation_id=federation_id,
+        app_id=request.app_id,
+        app_type=app_type,
+        added_by=account.flwr_aid,
+        is_hub_app=True,
+    )
+
+    return AddAppResponse()
+
+
+def remove_app(
+    request: RemoveAppRequest, account: AccountInfo, state: LinkState
+) -> RemoveAppResponse:
+    """Remove an app from a federation."""
+    _validate_federation_membership_in_request(
+        state, account.flwr_aid, request.federation_id
+    )
+    state.delete_app(request.federation_id, request.app_id)
+    return RemoveAppResponse()
 
 
 def show_federation(
@@ -1316,6 +1534,8 @@ def show_federation(
         archived=details.archived,
         simulation=details.simulation,
         config=details.config,
+        can_invite_members=details.can_invite_members,
+        can_add_supernodes=details.can_add_supernodes,
     )
     return ShowFederationResponse(federation=federation_proto, now=now().isoformat())
 
@@ -1370,6 +1590,8 @@ def create_federation(
             description=federation.description,
             members=federation.members,
             simulation=federation.simulation,
+            can_invite_members=federation.can_invite_members,
+            can_add_supernodes=federation.can_add_supernodes,
         )
     )
 
@@ -1727,6 +1949,12 @@ def _format_verification(verifications: list[dict[str, str]]) -> dict[str, str]:
     verification_dict.update({"valid_license": "Valid"})
 
     return verification_dict
+
+
+def _get_app_type(fab_config: dict[str, Any]) -> str:
+    """Derive the app type from FAB configuration."""
+    components = fab_config["tool"]["flwr"]["app"].get("components", {})
+    return TaskType.AGENT_APP if "agentapp" in components else TaskType.SERVER_APP
 
 
 def _get_remote_fab(

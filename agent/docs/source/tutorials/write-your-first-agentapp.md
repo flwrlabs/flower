@@ -1,191 +1,204 @@
 # Write your first AgentApp
 
-Welcome back!
+Create a small AgentApp from the Flower Hub template, customize its prompt, and
+run it on SuperGrid. The app makes one model request through the OpenAI SDK so
+you can focus on the AgentApp lifecycle before adding connectors.
 
-In the previous tutorial, you ran Flower's built-in AgentApp on SuperGrid. Now
-it's time to build one of your own. You'll create a small AgentApp, package it
-as a Flower App, and run it with a prompt you choose.
-
-If you haven't already, complete [Get started with Flower
-Agent](get-started-with-flower-agent.md) first. It will help you install `uv`
-and authenticate your CLI with SuperGrid.
+Complete [Chat in your terminal](get-started-with-flower-agent.md) first. This
+tutorial targets Flower 1.35.0.
 
 ## Create the project
 
-Start by creating a directory for your new app:
+Download the AgentApp template from Flower Hub:
 
 ```console
-$ mkdir hello-agent
-$ cd hello-agent
+$ uvx --from flwr==1.35.0 flwr new @flwrlabs/agent
+$ cd agent
 ```
 
-You'll create these files:
+The command creates a ready-to-build project:
 
 ```text
-hello-agent/
+agent/
 ├── .gitignore
-├── hello_agent/
+├── agent/
 │   ├── __init__.py
 │   └── agent_app.py
+├── LICENSE
+├── README.md
 └── pyproject.toml
 ```
 
-First, add the virtual environment to `.gitignore` so it isn't scanned when you
-build the Flower App Bundle:
+Rename the project and change its `publisher` before publishing it under your
+own account. You can keep the generated values while running it locally or on
+SuperGrid.
 
-```text
-.venv/
-```
+## Understand the AgentApp
 
-## Define the AgentApp
-
-Create an empty `hello_agent/__init__.py`, then add the agent logic Flower will
-run to `hello_agent/agent_app.py`:
+Open `agent/agent_app.py`:
 
 ```python
+"""A minimal Flower AgentApp."""
+
+import os
+
 from flwr.agentapp import AgentApp, AgentSession
 from flwr.app import Context
+from openai import OpenAI
 
-MODEL = "openai/gpt-5.5"
+MODEL = "openai/gpt-5.6-sol"
 
 app = AgentApp()
 
 
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
-    """Run the agent once for the configured prompt."""
+    """Send the configured input to the model."""
     prompt = context.run_config.get("agent.input")
     if not isinstance(prompt, str) or not prompt.strip():
         raise ValueError("agent.input must be a non-empty string")
 
-    agent.responses.create(
-        {
-            "model": MODEL,
-            "input": prompt,
-            "stream": True,
-        }
+    client = OpenAI(
+        base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
+        api_key=os.environ["FLWR_RUNTIME_API_KEY"],
+        max_retries=0,
     )
+    stream = client.responses.create(
+        model=MODEL,
+        input=prompt.strip(),
+        stream=True,
+    )
+
+    output_text = []
+    for event in stream:
+        agent.events.emit(event.to_dict())
+        if event.type in {"error", "response.failed"}:
+            raise RuntimeError(f"Model response failed: {event}")
+        if event.type == "response.output_text.delta":
+            output_text.append(event.delta)
+
+    print("".join(output_text))
 ```
 
-`AgentApp.main` registers the function Flower calls when the task starts. The
-runtime passes two arguments:
+`AgentApp.main` registers the function Flower calls. The runtime passes:
 
-- `agent` provides access to models and connectors;
-- `context` provides the run configuration and persistent run state.
+- `agent`, an `AgentSession` for connectors and frontend-visible events
+- `context`, which contains the fused run configuration and persistent state
 
-The call to `agent.responses.create` uses an Open Responses-compatible request
-and returns the corresponding response object.
+Flower also injects `FLWR_RUNTIME_BASE_URL` and `FLWR_RUNTIME_API_KEY` into the
+AgentApp process. The OpenAI client uses them to send the request through
+Flower, so the project does not need a model-provider API key.
 
-## Configure the Flower App
+The SDK yields typed streaming events. The loop republishes each event through
+`agent.events.emit` so Flower Chat and other run-event clients can render the
+response. Calling `print` does not publish an assistant response; it writes the
+completed answer only to the AgentApp logs.
 
-Next, create `pyproject.toml` to tell Flower how to package, configure, and load
-your AgentApp:
+## Review the Flower configuration
+
+The generated `pyproject.toml` includes the SDK and targets Flower 1.35.0:
 
 ```toml
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [project]
-name = "hello-agent"
-version = "0.1.0"
-description = "My first Flower AgentApp"
-license = "Apache-2.0"
-requires-python = ">=3.11"
-dependencies = ["flwr>=1.33.0,<2.0"]
-
-[tool.hatch.build.targets.wheel]
-packages = ["."]
+dependencies = ["flwr>=1.35.0,<2.0", "openai>=2.16.0,<3.0.0"]
 
 [tool.flwr.app]
-publisher = "local"
-fab-include = ["hello_agent/**/*.py"]
+flwr-version-target = "1.35.0"
 
 [tool.flwr.app.config.agent]
 input = "Explain why flowers turn toward light."
 
 [tool.flwr.app.components]
-agentapp = "hello_agent.agent_app:app"
+agentapp = "agent.agent_app:app"
 ```
 
-The `agentapp` component is an object reference in the form
-`<module>:<attribute>`. Here, Flower imports the `app` object from
-`hello_agent/agent_app.py`. The nested `config.agent.input` value becomes the
-flattened `context.run_config["agent.input"]` entry used by the app.
+The component value uses `<module>:<attribute>`. Flower imports `app` from
+`agent/agent_app.py`. The nested `config.agent.input` value becomes
+`context.run_config["agent.input"]`.
+
+Change the default prompt to something easy to recognize:
+
+```toml
+[tool.flwr.app.config.agent]
+input = "Explain Flower Agent in one sentence."
+```
 
 ## Create the environment
-
-Use `uv` to resolve the dependencies declared in `pyproject.toml`:
 
 ```console
 $ uv sync
 ```
 
-`uv` creates a virtual environment in `.venv` and writes a `uv.lock` file. You
-don't need to activate the environment: `uv run` executes commands inside it.
+`uv` creates `.venv` and a lock file. You do not need to activate the
+environment because the following commands use `uv run`.
 
-## Check the bundle
+```{admonition} Checkpoint
+:class: tip
 
-Before sending anything to SuperGrid, build the Flower App Bundle (FAB):
+`uv sync` should resolve Flower 1.35 and the OpenAI SDK without a dependency
+error.
+```
+
+## Validate the bundle
 
 ```console
 $ uv run flwr build
 ```
 
-This validates the configuration and component reference before writing a
-`.fab` file. The FAB contains the app code and metadata that SuperGrid needs to
-start the run.
+The command should report the created `.fab` path. It validates the project
+configuration and component reference before submission.
 
-## Run the AgentApp
+If Flower cannot load the component, check:
 
-Submit the project directory through the `supergrid` connection:
+1. the `agent` package directory
+1. the `agent_app.py` module
+1. the `:app` object referenced in `pyproject.toml`
+
+## Run on SuperGrid
+
+Log in, then submit the project and stream its logs:
 
 ```console
-$ uv run flwr run . supergrid
+$ uv run flwr login supergrid
+$ uv run flwr run . supergrid --stream
 ```
 
-The default prompt comes from `pyproject.toml`. Override it for one run with
-`--run-config`:
+Override the configured prompt for one run:
 
 ```console
 $ uv run flwr run . supergrid \
-    --run-config 'agent.input="Describe photosynthesis for a five-year-old."'
+    --run-config 'agent.input="Describe photosynthesis for a five-year-old."' \
+    --stream
 ```
 
-Open the printed run ID in the SuperGrid dashboard to inspect the response and
-run activity.
+```{admonition} Success checkpoint
+:class: tip
 
-## Make it your own
+The command prints a run ID, the run reaches a finished state, and the streamed
+model response appears in the run activity and logs.
+```
 
-The app currently makes one model request and then exits. Try changing:
+If the run fails, use the printed ID with:
 
-- `MODEL` to another model available to your SuperGrid account;
-- `instructions`, `reasoning`, or `max_output_tokens` in the response request;
-  or
-- the app flow to make several model requests or use the connector loop
-  described in [Use connectors](../explanations/use-connectors.md).
+```console
+$ uv run flwr list --run-id <run-id> supergrid
+$ uv run flwr log <run-id> supergrid --show
+```
 
-Each invocation of `uv run flwr run . supergrid` builds and submits the current
-local project, so saved changes are included in the next run.
+## Understand this app's limits
 
-## Final remarks
+The app makes one model request and exits. It does not:
 
-Congratulations, you've written and run your first custom AgentApp! 🎉
+- replay prior messages from a run series
+- persist the assistant response for a later run
+- expose connectors
+- handle model-requested function calls
+- create automations
 
-You now have all the pieces of a Flower Agent project:
-
-- an `AgentApp` with a registered main function;
-- an `AgentSession` for calling runtime-provided capabilities;
-- a `Context` for reading run configuration; and
-- a `pyproject.toml` that makes the app discoverable and configurable.
-
-This example deliberately keeps the agent logic small. From here, you can add
-instructions, make multiple model calls, or give the model a connector that
-lets it search the web.
-
-Continue with [Use connectors](../explanations/use-connectors.md) to build
-your first tool-calling loop. To learn how to configure, observe, and stop a
-run, see [Run an AgentApp on
-SuperGrid](../how-to-guides/run-on-supergrid.md). For local development, see
-[Run an AgentApp with a local
-SuperLink](../how-to-guides/run-with-local-superlink.md).
+Those behaviors belong in AgentApp code rather than appearing automatically.
+Continue with [Build a collaborative research
+agent](build-a-collaborative-agent.md) for a bounded connector loop with
+conversation state, read [Use the OpenAI SDK in an
+AgentApp](../how-to-guides/use-openai-sdk.md) for the runtime details, or
+[publish the AgentApp to Flower
+Hub](../how-to-guides/use-flower-hub.md) so others can run it.

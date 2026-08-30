@@ -218,6 +218,29 @@ class StateTest(CoreStateTest):
         runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
         self.assertEqual({run.series_id for run in runs}, {first_run.series_id})
 
+    @parameterized.expand(  # type: ignore[untyped-decorator]
+        [
+            (TaskType.AGENT_APP, True),
+            (TaskType.SERVER_APP, False),
+            (TaskType.SIMULATION, False),
+        ]
+    )
+    def test_create_run_stores_series_agent_status(
+        self, primary_task_type: str, expected_is_agent: bool
+    ) -> None:
+        """Test run series stores whether its first run is an AgentApp."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state, primary_task_type=primary_task_type)
+        run = state.get_run_info(run_ids=[run_id])[0]
+
+        matching_series = state.get_run_series(is_agent=expected_is_agent)
+        other_series = state.get_run_series(is_agent=not expected_is_agent)
+
+        self.assertEqual(
+            [entry.series_id for entry in matching_series], [run.series_id]
+        )
+        self.assertEqual(other_series, [])
+
     def test_claim_automation_returns_stored_run_request(self) -> None:
         """Claiming an automation should return its unresolved run request."""
         state = self.state_factory()
@@ -226,7 +249,7 @@ class StateTest(CoreStateTest):
         previous_next_run_at = (now() - timedelta(seconds=30)).isoformat()
         next_run_at = (now() + timedelta(seconds=30)).isoformat()
         start_run_request = StartRunRequest(
-            app_spec="@flwragent/flwr-agent",
+            app_spec="@flwr/demo",
             federation="@me/health",
             series_id=series_id,
         )
@@ -2294,20 +2317,44 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     )
 
 
-def _claim_running_in_separate_process(
+def _claim_running_in_separate_process(  # pylint: disable=too-many-positional-arguments
     database_path: str,
     task_id: int,
+    ready_event: Any,
     start_event: Any,
     result_queue: Any,
+    initialization_lock: Any,
     timeout: float,
 ) -> None:
     """Try to claim STARTING -> RUNNING in a dedicated process."""
+    # Deployments can install additional Alembic revisions in EE. Spawned
+    # children do not inherit the parent process's registration, so load the
+    # optional module before SqlLinkState.initialize() builds its migration
+    # configuration.
+    try:
+        # pylint: disable=import-outside-toplevel
+        import flwr.ee.state.alembic  # noqa: F401  # pylint: disable=unused-import
+
+        # pylint: enable=import-outside-toplevel
+    except ImportError:
+        pass
+
     state = SqlLinkState(
         database_path=database_path,
         federation_manager=NoOpFederationManager(),
         object_store=ObjectStoreFactory().store(),
     )
-    state.initialize()
+    # SQLite cannot safely migrate the shared database from both spawned
+    # processes at once. Serialize only initialization; the claim itself still
+    # starts concurrently after both processes signal readiness.
+    with initialization_lock:
+        try:
+            state.initialize()
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            result_queue.put((False, f"initialization failed: {ex!r}"))
+            ready_event.set()
+            return
+    ready_event.set()
     if not start_event.wait(timeout=timeout):
         result_queue.put((False, "start-event-timeout"))
         return
@@ -2571,9 +2618,22 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
     def test_run_series_distinguishes_missing_and_empty_descriptions(self) -> None:
         """Missing and explicitly empty descriptions remain distinct in SQL."""
         state = self.state_factory()
-        self.assertIsNotNone(state.store_run_in_series(1, "@me/fed-a", series_id=None))
         self.assertIsNotNone(
-            state.store_run_in_series(2, "@me/fed-a", series_id=None, description="")
+            state.store_run_in_series(
+                1,
+                "@me/fed-a",
+                is_agent=False,
+                series_id=None,
+            )
+        )
+        self.assertIsNotNone(
+            state.store_run_in_series(
+                2,
+                "@me/fed-a",
+                is_agent=False,
+                series_id=None,
+                description="",
+            )
         )
 
         rows = state.query("SELECT description FROM run_series")
@@ -2704,7 +2764,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
 
     def _claim_running_process_target(
         self,
-    ) -> Callable[[str, int, Any, Any, float], None]:
+    ) -> Callable[[str, int, Any, Any, Any, Any, float], None]:
         """Return process target for STARTING -> RUNNING claim tests."""
         return _claim_running_in_separate_process
 
@@ -2903,7 +2963,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
                 != claimed_messages[1][0].metadata.message_id
             )
 
-    # pylint: disable-next=too-many-locals
+    # pylint: disable-next=too-many-branches,too-many-locals
     def test_activate_task_running_claim_is_atomic_across_replicas(self) -> None:
         """Ensure only one replica can claim STARTING -> RUNNING transition."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2917,23 +2977,58 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             ctx = multiprocessing.get_context("spawn")
             start_event = ctx.Event()
             result_queue = ctx.Queue()
+            initialization_lock = ctx.Lock()
             timeout = self._CONCURRENT_TEST_TIMEOUT
+            ready_events = [ctx.Event(), ctx.Event()]
 
             # Execute
             claim_target = self._claim_running_process_target()
             processes = [
                 ctx.Process(
                     target=claim_target,
-                    args=(db_path, task_id, start_event, result_queue, timeout),
+                    args=(
+                        db_path,
+                        task_id,
+                        ready_events[0],
+                        start_event,
+                        result_queue,
+                        initialization_lock,
+                        timeout,
+                    ),
                 ),
                 ctx.Process(
                     target=claim_target,
-                    args=(db_path, task_id, start_event, result_queue, timeout),
+                    args=(
+                        db_path,
+                        task_id,
+                        ready_events[1],
+                        start_event,
+                        result_queue,
+                        initialization_lock,
+                        timeout,
+                    ),
                 ),
             ]
             for proc in processes:
                 proc.start()
-            # Release both processes to claim at (roughly) the same time.
+
+            # Wait until both replicas have initialized before releasing them to
+            # claim at (roughly) the same time. This keeps SQLite migration startup
+            # contention out of the atomic claim assertion.
+            ready_deadline = time.monotonic() + timeout
+            for ready_event in ready_events:
+                remaining = ready_deadline - time.monotonic()
+                if remaining <= 0 or not ready_event.wait(timeout=remaining):
+                    for proc in processes:
+                        if proc.is_alive():
+                            proc.terminate()
+                    for proc in processes:
+                        proc.join(timeout=1.0)
+                    self.fail(
+                        "Concurrent run-claim test timed out waiting for replicas "
+                        f"to initialize after {timeout} seconds."
+                    )
+
             start_event.set()
             for proc in processes:
                 proc.join(timeout=timeout)

@@ -30,8 +30,8 @@ from flwr.app import (
     MetricRecord,
 )
 from flwr.clientapp.typing import ClientAppCallable
-from flwr.common import log
 from flwr.common.constant import ErrorCode
+from flwr.supercore import log
 from flwr.supercore.differential_privacy import (
     KEY_CLIPPING_NORM,
     KEY_NORM_BIT,

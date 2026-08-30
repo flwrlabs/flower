@@ -34,7 +34,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectRequest,
     PushObjectResponse,
 )
-from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
@@ -66,8 +65,9 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
+from flwr.supercore.dependencies.runtime_version import RuntimeVersionDependency
 from flwr.supercore.protobuf.routing import ProtobufRoute
-from flwr.supercore.protobuf.translation import get_protobuf_request
+from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_DEPENDENCY
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.dependencies.superexec import SuperExecAuthDependency
@@ -78,10 +78,17 @@ router = APIRouter(
     prefix="/v1/runtime",
     tags=["Runtime"],
     route_class=ProtobufRoute,
+    dependencies=[
+        Depends(
+            RuntimeVersionDependency(
+                component_name="SuperLink",
+                connection_name="Caller <-> SuperLink Runtime API",
+            )
+        )
+    ],
 )
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
-PROTOBUF_REQUEST = Depends(get_protobuf_request)
 
 PullPendingTasksAuthDependency = Annotated[
     None,
@@ -91,15 +98,11 @@ ClaimTaskAuthDependency = Annotated[
     None,
     Depends(SuperExecAuthDependency("/flwr.proto.Runtime/ClaimTask")),
 ]
-GetRunAuthDependency = Annotated[
-    None,
-    Depends(SuperExecAuthDependency("/flwr.proto.Runtime/GetRun")),
-]
 
 
 @router.post("/pull-pending-tasks")
 def pull_pending_tasks(
-    request: Annotated[PullPendingTasksRequest, PROTOBUF_REQUEST],
+    request: Annotated[PullPendingTasksRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     _auth: PullPendingTasksAuthDependency,
 ) -> PullPendingTasksResponse:
@@ -109,7 +112,7 @@ def pull_pending_tasks(
 
 @router.post("/claim-task")
 def claim_task(
-    request: Annotated[ClaimTaskRequest, PROTOBUF_REQUEST],
+    request: Annotated[ClaimTaskRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     _auth: ClaimTaskAuthDependency,
 ) -> ClaimTaskResponse:
@@ -117,19 +120,9 @@ def claim_task(
     return core_runtime_handlers.claim_task(request, state)
 
 
-@router.post("/get-run")
-def get_run(
-    request: Annotated[GetRunRequest, PROTOBUF_REQUEST],
-    state: LinkStateDependency,
-    _auth: GetRunAuthDependency,
-) -> GetRunResponse:
-    """Get run information."""
-    return runtime_handlers.get_run(request, state)
-
-
 @router.post("/send-task-heartbeat")
 def send_task_heartbeat(
-    request: Annotated[SendTaskHeartbeatRequest, PROTOBUF_REQUEST],
+    request: Annotated[SendTaskHeartbeatRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> SendTaskHeartbeatResponse:
@@ -139,7 +132,7 @@ def send_task_heartbeat(
 
 @router.post("/pull-task-input")
 def pull_task_input(
-    request: Annotated[PullTaskInputRequest, PROTOBUF_REQUEST],
+    request: Annotated[PullTaskInputRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> PullTaskInputResponse:
@@ -149,7 +142,7 @@ def pull_task_input(
 
 @router.post("/push-task-output")
 def push_task_output(
-    request: Annotated[PushTaskOutputRequest, PROTOBUF_REQUEST],
+    request: Annotated[PushTaskOutputRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> PushTaskOutputResponse:
@@ -159,7 +152,7 @@ def push_task_output(
 
 @router.post("/push-object")
 def push_object(
-    request: Annotated[PushObjectRequest, PROTOBUF_REQUEST],
+    request: Annotated[PushObjectRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> PushObjectResponse:
@@ -169,7 +162,7 @@ def push_object(
 
 @router.post("/pull-object")
 def pull_object(
-    request: Annotated[PullObjectRequest, PROTOBUF_REQUEST],
+    request: Annotated[PullObjectRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> PullObjectResponse:
@@ -179,7 +172,7 @@ def pull_object(
 
 @router.post("/confirm-message-received")
 def confirm_message_received(
-    request: Annotated[ConfirmMessageReceivedRequest, PROTOBUF_REQUEST],
+    request: Annotated[ConfirmMessageReceivedRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> ConfirmMessageReceivedResponse:
@@ -189,7 +182,7 @@ def confirm_message_received(
 
 @router.post("/create-task")
 def create_task(
-    request: Annotated[CreateTaskRequest, PROTOBUF_REQUEST],
+    request: Annotated[CreateTaskRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> CreateTaskResponse:
@@ -199,7 +192,7 @@ def create_task(
 
 @router.post("/start-automation")
 def runtime_start_automation(
-    request: Annotated[StartAutomationRequest, PROTOBUF_REQUEST],
+    request: Annotated[StartAutomationRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> StartAutomationResponse:
@@ -209,7 +202,7 @@ def runtime_start_automation(
 
 @router.post("/push-task-message")
 def push_task_message(
-    request: Annotated[PushTaskMessageRequest, PROTOBUF_REQUEST],
+    request: Annotated[PushTaskMessageRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> PushTaskMessageResponse:
@@ -219,7 +212,7 @@ def push_task_message(
 
 @router.post("/push-task-events")
 def push_task_events(
-    request: Annotated[PushTaskEventsRequest, PROTOBUF_REQUEST],
+    request: Annotated[PushTaskEventsRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> PushTaskEventsResponse:
@@ -229,7 +222,7 @@ def push_task_events(
 
 @router.post("/pull-task-message")
 def pull_task_message(
-    request: Annotated[PullTaskMessageRequest, PROTOBUF_REQUEST],
+    request: Annotated[PullTaskMessageRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> PullTaskMessageResponse:
@@ -239,7 +232,7 @@ def pull_task_message(
 
 @router.post("/record-task-usage")
 def record_task_usage(
-    request: Annotated[RecordTaskUsageRequest, PROTOBUF_REQUEST],
+    request: Annotated[RecordTaskUsageRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> RecordTaskUsageResponse:
@@ -249,7 +242,7 @@ def record_task_usage(
 
 @router.post("/get-connector")
 def get_connector(
-    request: Annotated[GetConnectorRequest, PROTOBUF_REQUEST],
+    request: Annotated[GetConnectorRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> GetConnectorResponse:
@@ -259,7 +252,7 @@ def get_connector(
 
 @router.post("/push-logs")
 def push_logs(
-    request: Annotated[PushLogsRequest, PROTOBUF_REQUEST],
+    request: Annotated[PushLogsRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> PushLogsResponse:
@@ -269,7 +262,7 @@ def push_logs(
 
 @router.post("/push-messages")
 def push_messages(
-    request: Annotated[PushAppMessagesRequest, PROTOBUF_REQUEST],
+    request: Annotated[PushAppMessagesRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> PushAppMessagesResponse:
@@ -279,7 +272,7 @@ def push_messages(
 
 @router.post("/pull-messages")
 def pull_messages(
-    request: Annotated[PullAppMessagesRequest, PROTOBUF_REQUEST],
+    request: Annotated[PullAppMessagesRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> PullAppMessagesResponse:
@@ -289,7 +282,7 @@ def pull_messages(
 
 @router.post("/get-nodes")
 def get_nodes(
-    request: Annotated[GetNodesRequest, PROTOBUF_REQUEST],
+    request: Annotated[GetNodesRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: LinkStateDependency,
     task: TaskDependency,
 ) -> GetNodesResponse:

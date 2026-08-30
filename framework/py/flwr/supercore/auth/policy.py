@@ -40,7 +40,6 @@ class MethodTokenPolicy:
 _RUNTIME_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "PullPendingTasks": MethodTokenPolicy.no_auth(),
     "ClaimTask": MethodTokenPolicy.no_auth(),
-    "GetRun": MethodTokenPolicy.no_auth(),
     "SendTaskHeartbeat": MethodTokenPolicy.token_required(),
     "PullTaskInput": MethodTokenPolicy.token_required(),
     "PushTaskOutput": MethodTokenPolicy.token_required(),

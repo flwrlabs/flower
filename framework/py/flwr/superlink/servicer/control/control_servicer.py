@@ -22,6 +22,8 @@ from flwr.proto import control_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
+    AddAppRequest,
+    AddAppResponse,
     AddNodeToFederationRequest,
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
@@ -44,6 +46,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAppsRequest,
+    ListAppsResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
     ListConnectorsRequest,
@@ -66,6 +70,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RejectInvitationResponse,
     RemoveAccountFromFederationRequest,
     RemoveAccountFromFederationResponse,
+    RemoveAppRequest,
+    RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
@@ -91,8 +97,10 @@ from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.utils import get_metadata_str
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
+from flwr.superlink.run_source import RUN_SOURCE_METADATA_KEY, resolve_run_start_source
 
 from . import control_handlers
 from .control_account_auth_interceptor import get_current_account_info
@@ -121,8 +129,17 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: StartRunRequest, context: grpc.ServicerContext
     ) -> StartRunResponse:
         """Create run ID."""
+        # Best-effort analytics attribution only;
+        # trust caller-provided labels and default missing sources to unknown.
+        metadata = context.invocation_metadata()
+        run_source = get_metadata_str(metadata, RUN_SOURCE_METADATA_KEY)
+
         return control_handlers.start_run(
-            request, _get_account(), self.linkstate_factory.state(), self.fleet_api_type
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            self.fleet_api_type,
+            source=resolve_run_start_source(run_source),
         )
 
     def StreamLogs(  # pylint: disable=C0103
@@ -286,6 +303,33 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     ) -> ListFederationsResponse:
         """List all SuperNodes."""
         return control_handlers.list_federations(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def ListApps(
+        self, request: ListAppsRequest, context: grpc.ServicerContext
+    ) -> ListAppsResponse:
+        """List apps in a federation."""
+        return control_handlers.list_apps(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def AddApp(
+        self, request: AddAppRequest, context: grpc.ServicerContext
+    ) -> AddAppResponse:
+        """Add an app to a federation."""
+        return control_handlers.add_app(
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            self.fleet_api_type,
+        )
+
+    def RemoveApp(
+        self, request: RemoveAppRequest, context: grpc.ServicerContext
+    ) -> RemoveAppResponse:
+        """Remove an app from a federation."""
+        return control_handlers.remove_app(
             request, _get_account(), self.linkstate_factory.state()
         )
 

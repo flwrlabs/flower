@@ -18,6 +18,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Column,
     Float,
     ForeignKey,
@@ -69,6 +70,7 @@ class RunSeries(FlwrBase):
 
     series_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
     federation_id: Mapped[str] = mapped_column(String, nullable=False)
+    is_agent: Mapped[bool] = mapped_column(Boolean, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
@@ -122,6 +124,27 @@ class Automation(FlwrBase):
     fixed_interval: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     remaining_runs: Mapped[int | None] = mapped_column(Integer, nullable=True)
     stopped_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+
+class FederationApp(FlwrBase):
+    """Represent an app associated with a federation."""
+
+    __tablename__ = "federation_app"
+    __table_args__ = (
+        Index(
+            "idx_federation_app_federation_id_added_at",
+            "federation_id",
+            "added_at",
+        ),
+    )
+
+    federation_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    app_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    fab_hash: Mapped[str] = mapped_column(String, nullable=False)
+    app_type: Mapped[str] = mapped_column(String, nullable=False)
+    is_hub_app: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    added_by: Mapped[str] = mapped_column(String, nullable=False)
+    added_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
 class Connector(FlwrBase):

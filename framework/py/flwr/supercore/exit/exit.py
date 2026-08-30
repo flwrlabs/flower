@@ -23,7 +23,7 @@ import time
 from logging import ERROR, INFO
 from typing import Any, NoReturn
 
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.constant import (
     FORCE_EXIT_TIMEOUT_SECONDS,
     TELEMETRY_TIMEOUT_SECONDS,
@@ -96,8 +96,8 @@ def flwr_exit(
     # Log the exit message
     log(log_level, exit_message)
 
-    # Trigger exit handlers
-    trigger_exit_handlers()
+    # Trigger handlers which need to run before the force-exit timer starts
+    trigger_exit_handlers(run_before_force_exit=True)
 
     # Start a daemon thread to force exit if graceful exit fails
     def force_exit() -> None:
@@ -105,6 +105,9 @@ def flwr_exit(
         os._exit(sys_exit_code)
 
     threading.Thread(target=force_exit, daemon=True).start()
+
+    # Trigger the remaining exit handlers
+    trigger_exit_handlers(run_before_force_exit=False)
 
     # Wait for telemetry event to be sent before exiting
     if event_future:
