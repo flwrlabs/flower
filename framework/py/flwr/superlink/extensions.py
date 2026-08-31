@@ -17,10 +17,8 @@
 from collections.abc import Callable, Mapping
 from contextlib import AbstractAsyncContextManager
 from copy import deepcopy
-from importlib import import_module
 from logging import WARNING
-from types import ModuleType
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 from fastapi import FastAPI
 from starlette.middleware import Middleware
@@ -36,62 +34,57 @@ ResultDeliveryChannel = Literal["logs", "chat"]
 _SGXT_MODULE = "flwr.ee.superlink.extensions"
 
 
-def _try_import_sgxt() -> ModuleType | None:
-    """Return the SuperGrid Extensions module when it is installed."""
-    try:
-        return import_module(_SGXT_MODULE)
-    except ModuleNotFoundError as exc:
-        # Ignore only an absent SuperGrid Extensions package or module. Missing
-        # dependencies imported by an existing extension must still fail loudly.
-        if exc.name is None or not (
-            exc.name == _SGXT_MODULE or _SGXT_MODULE.startswith(f"{exc.name}.")
-        ):
-            raise
-        return None
+def _is_sgxt_module_not_found(exc: ModuleNotFoundError) -> bool:
+    """Return whether a missing module means that SGXT is unavailable."""
+    return exc.name == _SGXT_MODULE or (
+        exc.name is not None and _SGXT_MODULE.startswith(f"{exc.name}.")
+    )
 
 
 def configure_app(app: FastAPI) -> None:
     """Configure SuperLink FastAPI extensions."""
-    sgxt = _try_import_sgxt()
-    if sgxt is None:
-        return
+    try:
+        # pylint: disable-next=import-outside-toplevel
+        from flwr.ee.superlink.extensions import configure_app as _configure_sgxt_app
+    except ModuleNotFoundError as exc:
+        if _is_sgxt_module_not_found(exc):
+            return
+        raise
 
-    configure_sgxt_app = cast(
-        Callable[[FastAPI], None] | None,
-        getattr(sgxt, "configure_app", None),
-    )
-    if configure_sgxt_app is not None:
-        configure_sgxt_app(app)
+    configure_sgxt_app: Callable[[FastAPI], None]
+    configure_sgxt_app = _configure_sgxt_app
+    configure_sgxt_app(app)
 
 
 def get_middleware() -> tuple[Middleware, ...]:
     """Return extension middleware in request execution order."""
-    sgxt = _try_import_sgxt()
-    if sgxt is None:
-        return ()
+    try:
+        # pylint: disable-next=import-outside-toplevel
+        from flwr.ee.superlink.extensions import get_middleware as _get_sgxt_middleware
+    except ModuleNotFoundError as exc:
+        if _is_sgxt_module_not_found(exc):
+            return ()
+        raise
 
-    get_sgxt_middleware = cast(
-        Callable[[], tuple[Middleware, ...]] | None,
-        getattr(sgxt, "get_middleware", None),
-    )
-    if get_sgxt_middleware is None:
-        # Compatibility with SuperGrid Extensions versions predating this hook.
-        return ()
+    get_sgxt_middleware: Callable[[], tuple[Middleware, ...]]
+    get_sgxt_middleware = _get_sgxt_middleware
     return get_sgxt_middleware()
 
 
 def get_lifespan_contexts() -> tuple[SuperLinkLifespanContext, ...]:
     """Return SuperLink FastAPI lifespan contexts."""
-    sgxt = _try_import_sgxt()
-    if sgxt is None:
-        return ()
+    try:
+        # pylint: disable-next=import-outside-toplevel
+        from flwr.ee.superlink.extensions import (
+            get_lifespan_contexts as _get_sgxt_lifespan_contexts,
+        )
+    except ModuleNotFoundError as exc:
+        if _is_sgxt_module_not_found(exc):
+            return ()
+        raise
 
-    get_sgxt_lifespan_contexts = cast(
-        Callable[[], tuple[SuperLinkLifespanContext, ...]] | None,
-        getattr(sgxt, "get_lifespan_contexts", None),
-    )
-    if get_sgxt_lifespan_contexts is None:
-        return ()
+    get_sgxt_lifespan_contexts: Callable[[], tuple[SuperLinkLifespanContext, ...]]
+    get_sgxt_lifespan_contexts = _get_sgxt_lifespan_contexts
     return get_sgxt_lifespan_contexts()
 
 
@@ -106,16 +99,17 @@ def notify_run_started(run: Run, source: RunStartSource) -> None:
     caller attribution and must not be used for authorization decisions.
     """
     try:
-        sgxt = _try_import_sgxt()
-        if sgxt is None:
-            return
+        try:
+            # pylint: disable-next=import-outside-toplevel
+            from flwr.ee.superlink.extensions import on_run_started as _on_run_started
+        except ModuleNotFoundError as exc:
+            if _is_sgxt_module_not_found(exc):
+                return
+            raise
 
-        on_run_started = cast(
-            Callable[[Run, RunStartSource], None] | None,
-            getattr(sgxt, "on_run_started", None),
-        )
-        if on_run_started is not None:
-            on_run_started(deepcopy(run), source)
+        on_run_started: Callable[[Run, RunStartSource], None]
+        on_run_started = _on_run_started
+        on_run_started(deepcopy(run), source)
     except Exception as exc:  # pylint: disable=broad-exception-caught
         log(
             WARNING,
@@ -138,16 +132,19 @@ def notify_result_delivered(
     the extension so the callback cannot mutate SuperLink state.
     """
     try:
-        sgxt = _try_import_sgxt()
-        if sgxt is None:
-            return
+        try:
+            # pylint: disable-next=import-outside-toplevel
+            from flwr.ee.superlink.extensions import (
+                on_result_delivered as _on_result_delivered,
+            )
+        except ModuleNotFoundError as exc:
+            if _is_sgxt_module_not_found(exc):
+                return
+            raise
 
-        on_result_delivered = cast(
-            Callable[[Run, str, ResultDeliveryChannel], None] | None,
-            getattr(sgxt, "on_result_delivered", None),
-        )
-        if on_result_delivered is not None:
-            on_result_delivered(deepcopy(run), flwr_aid, channel)
+        on_result_delivered: Callable[[Run, str, ResultDeliveryChannel], None]
+        on_result_delivered = _on_result_delivered
+        on_result_delivered(deepcopy(run), flwr_aid, channel)
     except Exception as exc:  # pylint: disable=broad-exception-caught
         log(
             WARNING,
