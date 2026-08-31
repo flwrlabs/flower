@@ -51,6 +51,8 @@ from .plugin import ExecPlugin
 from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 
 _TASK_POLL_INTERVAL_ENV = "FLWR_SUPEREXEC_TASK_POLL_INTERVAL"
+_MIN_TASK_POLL_INTERVAL_SECONDS = 0.01
+_MAX_TASK_POLL_INTERVAL_SECONDS = 60.0
 _DEFAULT_TASK_POLL_INTERVAL_SECONDS = 0.1
 
 
@@ -64,14 +66,20 @@ def _get_task_poll_interval() -> float:
         interval = float(raw_interval)
     except ValueError as err:
         raise ValueError(
-            f"Environment variable {_TASK_POLL_INTERVAL_ENV} must be a positive "
-            f"finite number of seconds, got {raw_interval!r}."
+            f"Environment variable {_TASK_POLL_INTERVAL_ENV} must be a finite "
+            f"number of seconds between {_MIN_TASK_POLL_INTERVAL_SECONDS} and "
+            f"{_MAX_TASK_POLL_INTERVAL_SECONDS}, got {raw_interval!r}."
         ) from err
 
-    if not math.isfinite(interval) or interval <= 0:
+    if (
+        not math.isfinite(interval)
+        or interval < _MIN_TASK_POLL_INTERVAL_SECONDS
+        or interval > _MAX_TASK_POLL_INTERVAL_SECONDS
+    ):
         raise ValueError(
-            f"Environment variable {_TASK_POLL_INTERVAL_ENV} must be a positive "
-            f"finite number of seconds, got {raw_interval!r}."
+            f"Environment variable {_TASK_POLL_INTERVAL_ENV} must be a finite "
+            f"number of seconds between {_MIN_TASK_POLL_INTERVAL_SECONDS} and "
+            f"{_MAX_TASK_POLL_INTERVAL_SECONDS}, got {raw_interval!r}."
         )
 
     return interval

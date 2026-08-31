@@ -39,12 +39,14 @@ superexec:
 
 SuperExec polls the Runtime API for pending tasks every 100 milliseconds by default.
 To use a different interval, set `FLWR_SUPEREXEC_TASK_POLL_INTERVAL` in the SuperExec
-environment. The value must be a positive, finite number of seconds.
+environment. The value must be between 0.01 and 60 seconds.
 
+```yaml
 superexec:
   env:
     - name: FLWR_SUPEREXEC_TASK_POLL_INTERVAL
       value: "0.25"
+```
 
 ## Run simulations in Kubernetes using the Simulation Plugin
 
@@ -116,7 +118,7 @@ You can configure the license key in the `global.license` section of your `value
 of two ways:
 
 1. Directly — by setting `global.license.key` to your license key.
-2. From an existing Kubernetes Secret — by setting `global.license.existingSecret` to the name of
+1. From an existing Kubernetes Secret — by setting `global.license.existingSecret` to the name of
    a secret that contains your key.
 
 ```{note}
