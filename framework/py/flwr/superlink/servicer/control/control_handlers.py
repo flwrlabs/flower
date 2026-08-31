@@ -692,7 +692,9 @@ def stream_logs(
     _validate_federation_membership_in_request(
         state, account.flwr_aid, run.federation_id
     )
-    extensions.notify_result_delivered(run, account.flwr_aid, "logs")
+    extensions.notify_result_delivered(
+        run, account.flwr_aid, extensions.RESULT_DELIVERY_CHANNEL_LOGS
+    )
 
     after_timestamp = request.after_timestamp + 1e-6
     return _stream_logs(run_id, task_id, after_timestamp, state, is_active)
@@ -751,7 +753,9 @@ def stream_run_events(
         state, account.flwr_aid, run.federation_id
     )
     # Record every accepted result request, regardless of the primary task type.
-    extensions.notify_result_delivered(run, account.flwr_aid, "chat")
+    extensions.notify_result_delivered(
+        run, account.flwr_aid, extensions.RESULT_DELIVERY_CHANNEL_CHAT
+    )
 
     after_task_event_id = None
     if request.HasField("after_task_event_id"):
