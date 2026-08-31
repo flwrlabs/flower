@@ -41,12 +41,10 @@ SuperExec polls the Runtime API for pending tasks every 100 milliseconds by defa
 To use a different interval, set `FLWR_SUPEREXEC_TASK_POLL_INTERVAL` in the SuperExec
 environment. The value must be a positive, finite number of seconds.
 
-```yaml
 superexec:
   env:
     - name: FLWR_SUPEREXEC_TASK_POLL_INTERVAL
-      value: "0.1"
-```
+      value: "0.25"
 
 ## Run simulations in Kubernetes using the Simulation Plugin
 
