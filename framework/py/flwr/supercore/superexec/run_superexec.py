@@ -53,7 +53,7 @@ from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 _TASK_POLL_INTERVAL_ENV = "FLWR_SUPEREXEC_TASK_POLL_INTERVAL"
 _MIN_TASK_POLL_INTERVAL_SECONDS = 0.01
 _MAX_TASK_POLL_INTERVAL_SECONDS = 60.0
-_DEFAULT_TASK_POLL_INTERVAL_SECONDS = 0.1
+_DEFAULT_TASK_POLL_INTERVAL_SECONDS = 1.0
 
 
 def _get_task_poll_interval() -> float:
