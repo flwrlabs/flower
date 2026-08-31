@@ -750,11 +750,8 @@ def stream_run_events(
     _validate_federation_membership_in_request(
         state, account.flwr_aid, run.federation_id
     )
-    # A chat/read receipt represents an AgentApp result. ServerApp and
-    # simulation runs can also expose task events, but those are not chat
-    # results and must not be classified as such.
-    if run.primary_task_type == TaskType.AGENT_APP:
-        extensions.notify_result_delivered(run, account.flwr_aid, "chat")
+    # Record every accepted result request, regardless of the primary task type.
+    extensions.notify_result_delivered(run, account.flwr_aid, "chat")
 
     after_task_event_id = None
     if request.HasField("after_task_event_id"):
