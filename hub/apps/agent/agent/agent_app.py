@@ -4,7 +4,7 @@ import json
 import os
 
 from flwr.agentapp import AgentApp, AgentSession
-from flwr.app import Context
+from flwr.app import ConfigRecord, Context
 from openai import OpenAI
 
 MODEL = "openai/gpt-5.6-sol"
@@ -40,6 +40,12 @@ def main(agent: AgentSession, context: Context) -> None:
 
     final_text = "".join(output_text)
     message = {"type": "message", "role": "assistant", "content": final_text}
-    items = context.state.config_records["items"]["json"]
-    items.append(json.dumps(message))
+    with context.locked():
+        items_record = context.state.config_records.setdefault(
+            "items", ConfigRecord({"json": []})
+        )
+        items = items_record.get("json")
+        if not isinstance(items, list):
+            raise TypeError("Context items must be a list")
+        items.append(json.dumps(message))
     print(final_text)
