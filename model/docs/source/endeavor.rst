@@ -101,7 +101,7 @@ that foundation.
   patterns from leading open-weight models, so Endeavor 1.0 builds on what the
   wider ecosystem already does well rather than recreating it from the
   ground up.
-- Flower-specific capabilities
+- **Flower-specific capabilities**.
   UK-specialist knowledge and reasoning carried over from Lizzy, together
   with new model behaviors, specialist capabilities, and training advances
   developed for Endeavor 1.0.
