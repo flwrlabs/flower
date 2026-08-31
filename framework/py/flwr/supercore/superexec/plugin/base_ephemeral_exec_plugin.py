@@ -20,7 +20,9 @@ import subprocess
 from collections.abc import Callable, Sequence
 
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore.constant import TaskType
 from flwr.supercore.exit import ExitCode, flwr_exit
+from flwr.supercore.superexec.environment import task_process_env
 
 from .exec_plugin import ExecPlugin
 
@@ -65,5 +67,5 @@ class BaseEphemeralExecPlugin(ExecPlugin):
         if self.cleanup_before_launch is not None:
             self.cleanup_before_launch()
         # Launch the app process and wait for it to finish
-        subprocess.run(cmds, check=False)
+        subprocess.run(cmds, check=False, env=task_process_env(TaskType(task.type)))
         flwr_exit(ExitCode.SUCCESS, "App process finished, exiting SuperExec.")
