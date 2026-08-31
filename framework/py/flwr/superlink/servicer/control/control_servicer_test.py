@@ -103,6 +103,10 @@ from flwr.supercore.typing import (
 )
 from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
 from flwr.superlink.federation import NoOpFederationManager
+from flwr.superlink.extensions import (
+    RESULT_DELIVERY_CHANNEL_CHAT,
+    RESULT_DELIVERY_CHANNEL_LOGS,
+)
 from flwr.superlink.run_source import RUN_SOURCE_METADATA_KEY
 from flwr.superlink.servicer.control.control_account_auth_interceptor import (
     shared_account_info,
@@ -1803,7 +1807,7 @@ class TestControlServicerAuth(unittest.TestCase):
             mock_get_run_info.assert_called_with(run_ids=[run_id])
             mock_get_task_log.assert_called_once_with(456, 1e-06)
             notify_result_delivered.assert_called_once_with(
-                mock_run, "user-123", "logs"
+                mock_run, "user-123", RESULT_DELIVERY_CHANNEL_LOGS
             )
             self.assertEqual(len(msgs), 1)
             self.assertIsInstance(msgs[0], StreamLogsResponse)
@@ -1877,7 +1881,9 @@ class TestControlServicerAuth(unittest.TestCase):
             msgs = list(self.servicer.StreamRunEvents(request, ctx))
 
         # Assert
-        notify_result_delivered.assert_called_once_with(mock_run, "user-123", "chat")
+        notify_result_delivered.assert_called_once_with(
+            mock_run, "user-123", RESULT_DELIVERY_CHANNEL_CHAT
+        )
         mock_get_task_events.assert_called_once_with(
             run_id=run_id,
             task_ids=[123],

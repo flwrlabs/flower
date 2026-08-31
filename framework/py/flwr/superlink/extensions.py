@@ -20,7 +20,7 @@ from copy import deepcopy
 from importlib import import_module
 from logging import WARNING
 from types import ModuleType
-from typing import Any, Literal, cast
+from typing import Any, Final, Literal, cast
 
 from fastapi import FastAPI
 from starlette.middleware import Middleware
@@ -32,6 +32,8 @@ from flwr.superlink.run_source import RunStartSource
 SuperLinkLifespanContext = Callable[
     [FastAPI], AbstractAsyncContextManager[Mapping[str, Any] | None]
 ]
+RESULT_DELIVERY_CHANNEL_LOGS: Final = "logs"
+RESULT_DELIVERY_CHANNEL_CHAT: Final = "chat"
 ResultDeliveryChannel = Literal["logs", "chat"]
 _SGXT_MODULE = "flwr.ee.superlink.extensions"
 
