@@ -32,9 +32,16 @@ from . import run_superexec as run_superexec_module
 
 
 def _run_superexec_one_launch(
-    monkeypatch: pytest.MonkeyPatch, launch_result: LaunchResult | None
+    monkeypatch: pytest.MonkeyPatch,
+    launch_result: LaunchResult | None,
+    task_poll_interval: str | None = None,
 ) -> tuple[Mock, Mock, Mock, Mock]:
     """Run one SuperExec launch loop and stop at the loop sleep."""
+    if task_poll_interval is None:
+        monkeypatch.delenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", raising=False)
+    else:
+        monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", task_poll_interval)
+
     task = Mock()
     task.task_id = 123
     client = Mock()
@@ -204,9 +211,8 @@ def test_run_superexec_uses_configured_task_poll_interval(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """SuperExec should use the task polling interval from the environment."""
-    monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", "0.25")
     _, _, _, sleep_mock = _run_superexec_one_launch(
-        monkeypatch, LaunchResult.accepted()
+        monkeypatch, LaunchResult.accepted(), task_poll_interval="0.25"
     )
 
     sleep_mock.assert_called_once_with(0.25)
