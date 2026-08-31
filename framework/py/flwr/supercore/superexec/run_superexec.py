@@ -15,6 +15,8 @@
 """Flower SuperExec."""
 
 
+import math
+import os
 import time
 from logging import ERROR, WARNING
 from typing import Any
@@ -47,6 +49,40 @@ from .executor import LaunchResult, LaunchResultStatus, get_executor
 from .executor.config import ExecutorConfig
 from .plugin import ExecPlugin
 from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
+
+_TASK_POLL_INTERVAL_ENV = "FLWR_SUPEREXEC_TASK_POLL_INTERVAL"
+_MIN_TASK_POLL_INTERVAL_SECONDS = 0.01
+_MAX_TASK_POLL_INTERVAL_SECONDS = 60.0
+_DEFAULT_TASK_POLL_INTERVAL_SECONDS = 1.0
+
+
+def _get_task_poll_interval() -> float:
+    """Read and validate the SuperExec task polling interval."""
+    raw_interval = os.getenv(_TASK_POLL_INTERVAL_ENV)
+    if raw_interval is None:
+        return _DEFAULT_TASK_POLL_INTERVAL_SECONDS
+
+    try:
+        interval = float(raw_interval)
+    except ValueError as err:
+        raise ValueError(
+            f"Environment variable {_TASK_POLL_INTERVAL_ENV} must be a finite "
+            f"number of seconds between {_MIN_TASK_POLL_INTERVAL_SECONDS} and "
+            f"{_MAX_TASK_POLL_INTERVAL_SECONDS}, got {raw_interval!r}."
+        ) from err
+
+    if (
+        not math.isfinite(interval)
+        or interval < _MIN_TASK_POLL_INTERVAL_SECONDS
+        or interval > _MAX_TASK_POLL_INTERVAL_SECONDS
+    ):
+        raise ValueError(
+            f"Environment variable {_TASK_POLL_INTERVAL_ENV} must be a finite "
+            f"number of seconds between {_MIN_TASK_POLL_INTERVAL_SECONDS} and "
+            f"{_MAX_TASK_POLL_INTERVAL_SECONDS}, got {raw_interval!r}."
+        )
+
+    return interval
 
 
 def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
@@ -143,6 +179,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     executor_config : Optional[ExecutorConfig] (default: None)
         Parsed executor configuration.
     """
+    task_poll_interval = _get_task_poll_interval()
+
     try:
         executor = get_executor(executor_type, executor_config=executor_config)
     except ValueError as err:
@@ -245,6 +283,6 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                     _handle_launch_result(launch_result, task)
 
             # Sleep for a while before checking again
-            time.sleep(1)
+            time.sleep(task_poll_interval)
     finally:
         client.close()
