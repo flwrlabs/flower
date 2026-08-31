@@ -102,11 +102,11 @@ from flwr.supercore.typing import (
     StartRunContext,
 )
 from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
-from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.extensions import (
     RESULT_DELIVERY_CHANNEL_CHAT,
     RESULT_DELIVERY_CHANNEL_LOGS,
 )
+from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.run_source import RUN_SOURCE_METADATA_KEY
 from flwr.superlink.servicer.control.control_account_auth_interceptor import (
     shared_account_info,
