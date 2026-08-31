@@ -96,7 +96,7 @@ widely available capabilities from leading open-weight models, and adds
 the capabilities developed through the Flower model program on top of
 that foundation.
 
-- Mature foundation
+- **Mature foundation**.
   General language understanding, public knowledge, and common coding
   patterns from leading open-weight models, so Endeavor 1.0 builds on what the
   wider ecosystem already does well rather than recreating it from the
