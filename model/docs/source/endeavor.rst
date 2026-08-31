@@ -105,7 +105,7 @@ that foundation.
   UK-specialist knowledge and reasoning carried over from Lizzy, together
   with new model behaviors, specialist capabilities, and training advances
   developed for Endeavor 1.0.
-- Continual pre-training, targeted post-training, and model integration
+- **Continual pre-training, targeted post-training, and model integration**.
   These stages bring the two sets of strengths together and allow Endeavor 1.0 to
   be refined over time.
 - **Signals from real enterprise work**.
