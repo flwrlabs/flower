@@ -55,7 +55,7 @@ Getting access
 
 During the Endeavor 1.0 preview, access is available by request as we
 onboard a limited number of organizations and partners. To request access,
-use the `Endeavor 1.0 access form <https://form.typeform.com/to/KmUCC8xu>`_.
+use the `Endeavor 1.0 access form <https://flowerlabs.typeform.com/to/jlniHsuy>`_.
 
 Preview interface and support
 -----------------------------

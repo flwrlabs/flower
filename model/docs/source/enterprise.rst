@@ -48,5 +48,5 @@ Useful links
 
 - `Endeavor 1.0 model page <https://flower.ai/models/endeavor/>`_
 - `Lizzy model page <https://flower.ai/models/lizzy/>`_
-- `Request access to Endeavor 1.0 <https://form.typeform.com/to/KmUCC8xu>`_
+- `Request access to Endeavor 1.0 <https://flowerlabs.typeform.com/to/jlniHsuy>`_
 - `Flower Research <https://flower.ai/research/>`_
