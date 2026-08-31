@@ -118,7 +118,7 @@ You can configure the license key in the `global.license` section of your `value
 of two ways:
 
 1. Directly — by setting `global.license.key` to your license key.
-1. From an existing Kubernetes Secret — by setting `global.license.existingSecret` to the name of
+2. From an existing Kubernetes Secret — by setting `global.license.existingSecret` to the name of
    a secret that contains your key.
 
 ```{note}
