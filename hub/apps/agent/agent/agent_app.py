@@ -1,5 +1,6 @@
 """A minimal Flower AgentApp."""
 
+import json
 import os
 
 from flwr.agentapp import AgentApp, AgentSession
@@ -37,4 +38,8 @@ def main(agent: AgentSession, context: Context) -> None:
         if event.type == "response.output_text.delta":
             output_text.append(event.delta)
 
-    print("".join(output_text))
+    final_text = "".join(output_text)
+    message = {"type": "message", "role": "assistant", "content": final_text}
+    items = context.state.config_records["items"]["json"]
+    items.append(json.dumps(message))
+    print(final_text)
