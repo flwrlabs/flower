@@ -390,8 +390,10 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                   - "--insecure"
                   - "--superlink"
                   - "superlink-service:9092"
-                  - "--clientappio-api-address"
-                  - "0.0.0.0:9094"
+                  - "--host"
+                  - "0.0.0.0"
+                  - "--port"
+                  - "9094"
                   - "--isolation"
                   - "process"
                 ports:
@@ -435,8 +437,10 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                   - "--insecure"
                   - "--superlink"
                   - "superlink-service:9092"
-                  - "--clientappio-api-address"
-                  - "0.0.0.0:9094"
+                  - "--host"
+                  - "0.0.0.0"
+                  - "--port"
+                  - "9094"
                   - "--isolation"
                   - "process"
                 ports:
@@ -478,7 +482,7 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                 image: us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/quickstart_numpy_superexec:0.0.1
                 args:
                   - "--insecure"
-                  - "--appio-api-address"
+                  - "--runtime-api-address"
                   - "superlink-service:9091"
                   - "--plugin-type"
                   - "serverapp"
@@ -507,7 +511,7 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                 image: us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/quickstart_numpy_superexec:0.0.1
                 args:
                   - "--insecure"
-                  - "--appio-api-address"
+                  - "--runtime-api-address"
                   - "supernode-1-service:9094"
                   - "--plugin-type"
                   - "clientapp"
@@ -536,7 +540,7 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                 image: us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/quickstart_numpy_superexec:0.0.1
                 args:
                   - "--insecure"
-                  - "--appio-api-address"
+                  - "--runtime-api-address"
                   - "supernode-2-service:9094"
                   - "--plugin-type"
                   - "clientapp"

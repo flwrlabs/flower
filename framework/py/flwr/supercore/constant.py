@@ -22,8 +22,10 @@ from datetime import timedelta
 from enum import StrEnum
 
 from flwr.common.constant import (
+    CLIENT_OCTET,
     FLWR_DIR,
     NOOP_ACCOUNT_NAME,
+    SERVER_OCTET,
     SYSTEM_TIME_TOLERANCE,
     TIMESTAMP_TOLERANCE,
 )
@@ -71,7 +73,15 @@ FLWR_UPDATE_CHECK_SHOW_INTERVAL_SECONDS = 12 * 60 * 60
 
 # Constants for Uvicorn-backed API servers
 UVICORN_DEFAULT_HOST = "127.0.0.1"
-UVICORN_DEFAULT_PORT = 8000
+SUPERLINK_UVICORN_DEFAULT_PORT = 8000
+SUPERNODE_UVICORN_DEFAULT_PORT = 9094
+SUPERLINK_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{SUPERLINK_UVICORN_DEFAULT_PORT}"
+SUPERLINK_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{SUPERLINK_UVICORN_DEFAULT_PORT}"
+SUPERNODE_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{SUPERNODE_UVICORN_DEFAULT_PORT}"
+SUPERNODE_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{SUPERNODE_UVICORN_DEFAULT_PORT}"
+
+# Maximum serialized protobuf stream message size
+MAX_PROTOBUF_STREAM_MESSAGE_LENGTH = 2_147_483_647  # 2 GiB - 1 byte
 
 # SuperGrid constants
 SUPERGRID_ADDRESS = os.getenv("FLWR_SUPERGRID_ADDRESS", "supergrid.flower.ai")
@@ -97,6 +107,7 @@ APP_PUBLISH_INCLUDE_PATTERNS = (
 )
 APP_PUBLISH_EXCLUDE_PATTERNS = (
     f"{FLWR_DIR}/**",  # Exclude the .flwr directory
+    ".venv/**",
     "**/__pycache__/**",
 )
 MAX_TOTAL_BYTES = 10 * 1024 * 1024  # 10 MB
@@ -132,6 +143,7 @@ DEFAULT_FEDERATION_SIMULATION = "workspace"
 
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
+HTTP_SERVER_SHUTDOWN_TIMEOUT = 3
 TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exit
 
 # Constants for message processing timing
@@ -198,6 +210,8 @@ class InvitationStatus(StrEnum):
 
 AUTOMATION_BATCH_LIMIT = 1
 
+FLOWER_AGENT_APP_ID = "@flwrlabs/flwr-agent"
+
 
 class AutomationStatus(StrEnum):
     """Status of an automation."""
@@ -234,12 +248,12 @@ class TaskType(StrEnum):
 
 
 TASK_TYPE_TO_APPIO_API_ADDRESS_ARG: dict[TaskType, str] = {
-    TaskType.AGENT_APP: "--serverappio-api-address",
-    TaskType.CLIENT_APP: "--clientappio-api-address",
-    TaskType.CONNECTOR: "--serverappio-api-address",
-    TaskType.MODEL: "--serverappio-api-address",
-    TaskType.SERVER_APP: "--serverappio-api-address",
-    TaskType.SIMULATION: "--serverappio-api-address",
+    TaskType.AGENT_APP: "--runtime-api-address",
+    TaskType.CLIENT_APP: "--runtime-api-address",
+    TaskType.CONNECTOR: "--runtime-api-address",
+    TaskType.MODEL: "--runtime-api-address",
+    TaskType.SERVER_APP: "--runtime-api-address",
+    TaskType.SIMULATION: "--runtime-api-address",
 }
 TASK_TYPE_TO_COMMAND: dict[TaskType, str] = {
     TaskType.AGENT_APP: "flwr-agentapp",

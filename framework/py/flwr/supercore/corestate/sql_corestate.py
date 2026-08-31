@@ -423,6 +423,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         app_id: str,
         app_type: str,
         added_by: str,
+        is_hub_app: bool = False,
     ) -> str:
         """Atomically store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
@@ -453,6 +454,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             app_id=app_id,
             fab_hash=fab_hash,
             app_type=app_type,
+            is_hub_app=is_hub_app,
             added_by=added_by,
             added_at=now(),
         )
@@ -464,6 +466,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             set_={
                 "fab_hash": app_stmt.excluded.fab_hash,
                 "app_type": app_stmt.excluded.app_type,
+                "is_hub_app": app_stmt.excluded.is_hub_app,
             },
         )
         with self.session() as session:
@@ -485,6 +488,32 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 verifications=json.loads(row.verifications),
             )
 
+    def get_app(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
+        """Return a FAB only when it matches the federation-app association."""
+        if not all((federation_id, app_id, fab_hash)):
+            return None
+        query = (
+            select(FabModel)
+            .join(
+                FederationAppModel,
+                FederationAppModel.fab_hash == FabModel.fab_hash,
+            )
+            .where(
+                FederationAppModel.federation_id == federation_id,
+                FederationAppModel.app_id == app_id,
+                FederationAppModel.fab_hash == fab_hash,
+            )
+        )
+        with self.session() as session:
+            row = session.scalar(query.execution_options(populate_existing=True))
+            if row is None:
+                return None
+            return Fab(
+                hash_str=row.fab_hash,
+                content=row.content,
+                verifications=json.loads(row.verifications),
+            )
+
     def list_apps(
         self, federation_id: str, limit: int | None = None
     ) -> Sequence[AppInfo]:
@@ -498,6 +527,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 FederationAppModel.app_id,
                 FederationAppModel.fab_hash,
                 FederationAppModel.app_type,
+                FederationAppModel.is_hub_app,
             )
             .where(FederationAppModel.federation_id == federation_id)
             .order_by(
@@ -514,6 +544,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     app_id=app.app_id,
                     fab_hash=app.fab_hash,
                     app_type=app.app_type,
+                    is_hub_app=app.is_hub_app,
                 )
                 for app in apps
             ]
@@ -1510,6 +1541,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
+        src_task_ids: Sequence[int] | None = None,
         limit: int | None = None,
         order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
@@ -1522,11 +1554,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return []
         if dst_task_ids is not None and not dst_task_ids:
             return []
+        if src_task_ids is not None and not src_task_ids:
+            return []
 
         with self.session():
             self._cleanup_expired_task_tokens()
             self._cleanup_invalid_task_messages()
-            rows = self._claim_task_message_models(dst_task_ids, order_by, limit)
+            rows = self._claim_task_message_models(
+                dst_task_ids, src_task_ids, order_by, limit
+            )
             snapshots = [_task_message_snapshot_from_model(row) for row in rows]
         return [_task_message_from_snapshot(row) for row in snapshots]
 
@@ -1565,6 +1601,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         *,
         run_id: int | None = None,
+        task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
@@ -1576,7 +1613,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         if run_id is not None:
             query = query.where(TaskEventModel.run_id == uint64_to_int64(run_id))
-
+        if task_ids is not None:
+            if not task_ids:
+                return []
+            sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
+            query = query.where(TaskEventModel.task_id.in_(sint64_task_ids))
         with self.session() as session:
             rows = session.scalars(query).all()
             return [_task_event_from_model(row) for row in rows]
@@ -1584,6 +1625,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def _claim_task_message_models(
         self,
         dst_task_ids: Sequence[int] | None,
+        src_task_ids: Sequence[int] | None,
         order_by: Literal["created_at"] | None,
         limit: int | None,
     ) -> list[TaskMessageModel]:
@@ -1594,6 +1636,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if dst_task_ids is not None:
             sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
             query = query.where(TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids))
+        if src_task_ids is not None:
+            sint64_src_task_ids = [uint64_to_int64(t) for t in src_task_ids]
+            query = query.where(TaskMessageModel.src_task_id.in_(sint64_src_task_ids))
         if order_by is not None:
             query = query.order_by(TaskMessageModel.created_at.asc())
         if limit is not None:
@@ -1619,6 +1664,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
                 delete_query = delete_query.where(
                     TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids)
+                )
+            if src_task_ids is not None:
+                sint64_src_task_ids = [uint64_to_int64(t) for t in src_task_ids]
+                delete_query = delete_query.where(
+                    TaskMessageModel.src_task_id.in_(sint64_src_task_ids)
                 )
 
         returning_query = delete_query.returning(TaskMessageModel)

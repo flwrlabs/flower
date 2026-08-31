@@ -34,7 +34,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectRequest,
     PushObjectResponse,
 )
-from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
@@ -66,6 +65,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
+from flwr.supercore.dependencies.runtime_version import RuntimeVersionDependency
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_DEPENDENCY
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
@@ -78,6 +78,14 @@ router = APIRouter(
     prefix="/v1/runtime",
     tags=["Runtime"],
     route_class=ProtobufRoute,
+    dependencies=[
+        Depends(
+            RuntimeVersionDependency(
+                component_name="SuperLink",
+                connection_name="Caller <-> SuperLink Runtime API",
+            )
+        )
+    ],
 )
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
@@ -89,10 +97,6 @@ PullPendingTasksAuthDependency = Annotated[
 ClaimTaskAuthDependency = Annotated[
     None,
     Depends(SuperExecAuthDependency("/flwr.proto.Runtime/ClaimTask")),
-]
-GetRunAuthDependency = Annotated[
-    None,
-    Depends(SuperExecAuthDependency("/flwr.proto.Runtime/GetRun")),
 ]
 
 
@@ -114,16 +118,6 @@ def claim_task(
 ) -> ClaimTaskResponse:
     """Claim a pending task."""
     return core_runtime_handlers.claim_task(request, state)
-
-
-@router.post("/get-run")
-def get_run(
-    request: Annotated[GetRunRequest, PROTOBUF_REQUEST_DEPENDENCY],
-    state: LinkStateDependency,
-    _auth: GetRunAuthDependency,
-) -> GetRunResponse:
-    """Get run information."""
-    return runtime_handlers.get_run(request, state)
 
 
 @router.post("/send-task-heartbeat")

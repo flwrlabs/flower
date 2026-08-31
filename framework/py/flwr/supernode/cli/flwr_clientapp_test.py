@@ -21,7 +21,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from flwr.common.constant import SUPERNODE_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
+from flwr.supercore.constant import SUPERNODE_DEFAULT_CLIENT_ADDRESS
 
 from .flwr_clientapp import _parse_args_run_flwr_clientapp
 
@@ -55,11 +55,28 @@ def test_parse_flwr_clientapp_parses_tokenized_invocation() -> None:
         ]
     )
 
-    assert args.runtime_api_address == SUPERNODE_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
+    assert args.runtime_api_address == SUPERNODE_DEFAULT_CLIENT_ADDRESS
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
     assert args.runtime_dependency_install is True
+
+
+def test_parse_flwr_clientapp_accepts_runtime_api_address() -> None:
+    """The ClientApp process CLI should accept the Runtime API address."""
+    args = _parse_args_run_flwr_clientapp().parse_args(
+        ["--runtime-api-address", "127.0.0.1:9094", "--token", "test-token"]
+    )
+
+    assert args.runtime_api_address == "127.0.0.1:9094"
+
+
+def test_parse_flwr_clientapp_rejects_clientappio_api_address() -> None:
+    """The ClientApp process CLI should reject the removed address flag."""
+    with pytest.raises(SystemExit):
+        _parse_args_run_flwr_clientapp().parse_args(
+            ["--clientappio-api-address", "127.0.0.1:9094", "--token", "test-token"]
+        )
 
 
 def test_flwr_clientapp_forwards_cli_args() -> None:

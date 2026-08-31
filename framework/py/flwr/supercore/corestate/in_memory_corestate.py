@@ -100,6 +100,7 @@ class FederationAppRecord:
     app_id: str
     fab_hash: str
     app_type: str
+    is_hub_app: bool
     added_by: str
     added_at: datetime
 
@@ -335,6 +336,7 @@ class InMemoryCoreState(
         app_id: str,
         app_type: str,
         added_by: str,
+        is_hub_app: bool = False,
     ) -> str:
         """Atomically store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
@@ -361,6 +363,7 @@ class InMemoryCoreState(
                 app_id=app_id,
                 fab_hash=fab_hash,
                 app_type=app_type,
+                is_hub_app=is_hub_app,
                 added_by=existing.added_by if existing else added_by,
                 added_at=existing.added_at if existing else now(),
             )
@@ -373,6 +376,21 @@ class InMemoryCoreState(
                 return None
             # Launch tradeoff: do not recompute content hash on reads; rely on
             # write-time validation and hash-addressed lookup.
+            return Fab(
+                hash_str=fab.hash_str,
+                content=fab.content,
+                verifications=dict(fab.verifications),
+            )
+
+    def get_app(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
+        """Return a FAB only when it matches the federation-app association."""
+        if not all((federation_id, app_id, fab_hash)):
+            return None
+        with self.lock_fab_store, self.lock_federation_app_store:
+            app = self.federation_app_store.get((federation_id, app_id))
+            fab = self.fab_store.get(fab_hash)
+            if app is None or app.fab_hash != fab_hash or fab is None:
+                return None
             return Fab(
                 hash_str=fab.hash_str,
                 content=fab.content,
@@ -403,6 +421,7 @@ class InMemoryCoreState(
                     app_id=record.app_id,
                     fab_hash=record.fab_hash,
                     app_type=record.app_type,
+                    is_hub_app=record.is_hub_app,
                 )
                 for record in records
             ]
@@ -1179,6 +1198,7 @@ class InMemoryCoreState(
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
+        src_task_ids: Sequence[int] | None = None,
         limit: int | None = None,
         order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
@@ -1191,19 +1211,28 @@ class InMemoryCoreState(
             return []
         if dst_task_ids is not None and not dst_task_ids:
             return []
+        if src_task_ids is not None and not src_task_ids:
+            return []
 
         with self.lock_task_store, self.lock_task_message_store:
             self._cleanup_expired_task_tokens_locked()
             current = now().timestamp()
             self._cleanup_invalid_task_messages_locked(current)
 
-            # Filter by dst_task_id
+            # Filter by task IDs
             dst_task_id_set = set(dst_task_ids) if dst_task_ids is not None else None
+            src_task_id_set = set(src_task_ids) if src_task_ids is not None else None
             selected_messages = [
                 msg
                 for msg in self.task_message_store.values()
-                if dst_task_id_set is None
-                or msg.metadata.dst_task_id in dst_task_id_set
+                if (
+                    dst_task_id_set is None
+                    or msg.metadata.dst_task_id in dst_task_id_set
+                )
+                and (
+                    src_task_id_set is None
+                    or msg.metadata.src_task_id in src_task_id_set
+                )
             ]
 
             # Apply requested sort order
@@ -1249,6 +1278,7 @@ class InMemoryCoreState(
         self,
         *,
         run_id: int | None = None,
+        task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
@@ -1262,10 +1292,12 @@ class InMemoryCoreState(
                 ]
             else:
                 events = list(self.task_event_store.get(run_id, []))
+            task_id_set = set(task_ids) if task_ids is not None else None
             return [
                 event
                 for event in sorted(events, key=lambda event: event.id)
                 if event.id > cursor
+                and (task_id_set is None or event.task_id in task_id_set)
             ]
 
     def _cleanup_expired_task_tokens_locked(self) -> None:

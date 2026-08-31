@@ -1,140 +1,150 @@
 # Run an AgentApp on SuperGrid
 
-Use SuperGrid to submit an AgentApp, follow its progress, inspect its logs, and
-stop it when necessary.
+Submit an AgentApp, choose its federation, follow progress, inspect logs, and
+stop the run when necessary.
 
-If you haven't created an AgentApp yet, start with [Write your first
-AgentApp](../tutorials/write-your-first-agentapp.md).
+Start with [Write your first
+AgentApp](../tutorials/write-your-first-agentapp.md) if you do not have a valid
+AgentApp project. This guide targets Flower 1.35.0.
 
 To run the same app without SuperGrid, see [Run an AgentApp with a local
 SuperLink](run-with-local-superlink.md).
 
 ## Prepare the CLI
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if you
-haven't already, then authenticate with SuperGrid:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and log in:
 
 ```console
-$ uvx flwr login supergrid
+$ uvx --from flwr==1.35.0 flwr login supergrid
 ```
 
-Your SuperGrid account must have access to the Flower Agent runtime. The
-`supergrid` connection is included in Flower's default CLI configuration.
+Use `uvx --from flwr==1.35.0` for standalone commands. Use `uv run flwr` for
+commands that must load the local project environment.
 
-This guide uses `uvx flwr` for standalone CLI commands and `uv run flwr` for
-commands that need a local project's environment.
+## Validate before submission
 
-If this is your first Flower Agent run, follow [Chat in your
-terminal](../tutorials/get-started-with-flower-agent.md) first. That tutorial
-uses the built-in AgentApp to check your account and CLI setup without a local
-project.
-
-## Run a local AgentApp
-
-To run your own AgentApp, open a terminal in a project whose `pyproject.toml`
-declares an `agentapp` component:
+From the project directory:
 
 ```console
-$ uv run flwr run . supergrid
+$ uv sync
+$ uv run flwr build
 ```
 
-Flower validates the project, builds a Flower App Bundle, and submits it with
-the run request. Override configured values for one run with `--run-config`:
+Fix configuration, dependency, and component-reference errors locally before
+starting a remote run.
 
-```console
-$ uv run flwr run . supergrid \
-    --run-config 'agent.input="Compare federated learning and centralized learning."'
-```
-
-An override key must already exist in the app's
-`[tool.flwr.app.config]` configuration.
-
-For a longer set of overrides, put them in a TOML file:
-
-```toml
-# run-config.toml
-[agent]
-input = "Compare federated learning and centralized learning."
-```
-
-Then pass the file to `--run-config`:
-
-```console
-$ uv run flwr run . supergrid --run-config run-config.toml
-```
-
-Don't combine a TOML file with inline `--run-config` values in the same command.
-
-## Run in another federation
-
-Every SuperGrid account has a default federation, and the commands above use it
-automatically. To run in another federation, pass its full ID:
-
-```console
-$ uv run flwr run . supergrid \
-    --federation @<account>/<federation-name> \
-    --run-config 'agent.input="Hello from this federation."'
-```
-
-The account must be a member of the target federation and entitled to start an
-AgentApp run there.
-
-## Observe the run
-
-Once SuperGrid accepts the request, `flwr run` prints a run ID. Keep it handy:
-you can use it to inspect the status and process logs:
-
-```console
-$ uvx flwr list --run-id <run-id> supergrid
-$ uvx flwr log <run-id> supergrid
-```
-
-Add `--stream` to the original run command to follow logs immediately:
+## Run a local AgentApp project
 
 ```console
 $ uv run flwr run . supergrid --stream
 ```
 
-Process logs show app output and exceptions. Open the run in the SuperGrid
-dashboard to inspect structured model responses, connector activity, and the
-persisted agent context.
+Flower builds the project, submits the FAB, prints a run ID, and streams process
+logs. Override a declared configuration value for one run:
+
+```console
+$ uv run flwr run . supergrid \
+    --run-config 'agent.input="Compare federated and centralized AI."' \
+    --stream
+```
+
+An override key must already exist under `[tool.flwr.app.config]`.
+
+For longer overrides, create `run-config.toml`:
+
+```toml
+[agent]
+input = "Compare federated and centralized AI."
+```
+
+Then run:
+
+```console
+$ uv run flwr run . supergrid --run-config run-config.toml --stream
+```
+
+Do not combine a TOML run-config file and inline run-config values.
+
+## Run a published agent
+
+After you [find or publish an AgentApp on Flower Hub](use-flower-hub.md), use
+its app spec instead of a local directory:
+
+```console
+$ uvx --from flwr==1.35.0 flwr run @publisher/agent supergrid \
+    --run-config 'agent.input="Explain your task."'
+```
+
+SuperGrid resolves the app spec to an available version of the app. Availability
+can depend on the target federation.
+
+## Choose a federation
+
+List the federations visible to your account:
+
+```console
+$ uvx --from flwr==1.35.0 flwr federation list supergrid
+```
+
+Without `--federation`, SuperGrid uses the account default. To choose another
+federation, use its full ID:
+
+```console
+$ uv run flwr run . supergrid \
+    --federation @account/federation-name \
+    --run-config 'agent.input="Hello from this federation."'
+```
+
+The account must be a member and entitled to execute AgentApps there.
+
+```{important}
+Slack, Notion, GitHub, and Attio connector references are currently accepted
+only for personal-workspace runs. Built-in tools selected by the AgentApp do not
+use the account-connector selection flow.
+```
+
+## Observe the run
+
+Use the printed run ID:
+
+```console
+$ uvx --from flwr==1.35.0 flwr list --run-id <run-id> supergrid
+$ uvx --from flwr==1.35.0 flwr log <run-id> supergrid --show
+```
+
+`flwr log` streams by default. Use `--show` to print the available logs once.
+Open the run in SuperGrid to inspect structured model output, connector
+activity, federation, and persisted context.
+
+Process logs are useful for app output and exceptions. Connector activity is a
+better signal than a general **Working** label when diagnosing which child task
+is active.
 
 ## Stop a run
 
-Stop an active run with:
-
 ```console
-$ uvx flwr stop <run-id> supergrid
+$ uvx --from flwr==1.35.0 flwr stop <run-id> supergrid
 ```
 
-Flower sends a stop request to SuperGrid and records the stopped run status.
+Wait for the run to reach a stopped terminal state before submitting a
+replacement that could duplicate external work.
 
-## Troubleshoot a failed run
+Stopping a run does not stop future automation executions. Stop the automation
+separately under **Settings** > **Automations**.
 
-Start with the detailed status and logs:
+## Recover from failure
 
-```console
-$ uvx flwr list --run-id <run-id> supergrid
-$ uvx flwr log <run-id> supergrid --stream
-```
+Use [Troubleshoot AgentApp runs](troubleshoot-agent-runs.md) for authentication,
+agent catalog, connector, heartbeat, interruption, and stuck-run recovery.
 
-Common failures include:
-
-- **Invalid component reference:** confirm that
-  `[tool.flwr.app.components].agentapp` uses `<module>:<attribute>` and resolves
-  to an `AgentApp`.
-- **Invalid run configuration:** define the key under
-  `[tool.flwr.app.config]` before overriding it.
-- **Missing dependency:** add every imported third-party package to
-  `[project].dependencies`.
-- **Unsupported model or connector:** use a model and connector available to
-  the account. Account-backed connectors must be connected and included by the
-  person starting the run.
-- **Federation or entitlement error:** verify the federation ID, membership,
-  and Flower Agent access for the account.
-
-To catch configuration and component-reference errors before submission, run:
+For a custom app, start with:
 
 ```console
 $ uv run flwr build
+$ uvx --from flwr==1.35.0 flwr list --run-id <run-id> supergrid
+$ uvx --from flwr==1.35.0 flwr log <run-id> supergrid --show
 ```
+
+Keep the run ID, series ID when visible, federation ID, app spec, Flower
+version, and exact public error. Never include credentials or private connector
+content in a support report.

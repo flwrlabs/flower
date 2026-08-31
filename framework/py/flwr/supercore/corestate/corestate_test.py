@@ -104,6 +104,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             app_id="@me/z-agent",
             app_type=TaskType.AGENT_APP,
             added_by="account-a",
+            is_hub_app=True,
         )
         state.store_app(
             fab=Fab("", b"other", {}),
@@ -115,12 +116,18 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         apps = state.list_apps("@me/fed-a")
         self.assertEqual(
-            [(app.app_id, app.fab_hash, app.app_type) for app in apps],
+            [(app.app_id, app.fab_hash, app.app_type, app.is_hub_app) for app in apps],
             [
-                ("@me/z-agent", agent_hash, TaskType.AGENT_APP),
-                ("@me/server", server_hash, TaskType.SERVER_APP),
+                ("@me/z-agent", agent_hash, TaskType.AGENT_APP, True),
+                ("@me/server", server_hash, TaskType.SERVER_APP, False),
             ],
         )
+        self.assertEqual(
+            state.get_app("@me/fed-a", "@me/server", server_hash),
+            Fab(server_hash, b"server", {}),
+        )
+        self.assertIsNone(state.get_app("@me/fed-b", "@me/server", server_hash))
+        self.assertIsNone(state.get_app("@me/fed-a", "@me/z-agent", server_hash))
         self.assertEqual(
             [app.app_id for app in state.list_apps("@me/fed-a", limit=1)],
             ["@me/z-agent"],
@@ -135,10 +142,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             app_id="@me/server",
             app_type=TaskType.SERVER_APP,
             added_by="account-c",
+            is_hub_app=True,
         )
         updated = state.list_apps("@me/fed-a")
         self.assertEqual(len(updated), 2)
         self.assertEqual(updated[1].fab_hash, updated_hash)
+        self.assertTrue(updated[1].is_hub_app)
+        self.assertIsNone(state.get_app("@me/fed-a", "@me/server", server_hash))
+        self.assertIsNotNone(state.get_app("@me/fed-a", "@me/server", updated_hash))
 
         self.assertTrue(state.delete_app("@me/fed-a", "@me/server"))
         self.assertFalse(state.delete_app("@me/fed-a", "@me/server"))
@@ -1712,6 +1723,39 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(pulled[0].metadata.message_id, msg_1.metadata.message_id)
         self.assertEqual(pulled_next[0].metadata.message_id, msg_2.metadata.message_id)
 
+    def test_get_task_message_filters_by_source_task(self) -> None:
+        """A source-specific claim should not consume another task's message."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        src_task_id_1 = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        src_task_id_2 = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert (
+            src_task_id_1 is not None
+            and src_task_id_2 is not None
+            and dst_task_id is not None
+        )
+        reply_1 = create_task_message(src_task_id_1, dst_task_id, run_id)
+        reply_2 = create_task_message(src_task_id_2, dst_task_id, run_id)
+        self.assertTrue(state.store_task_message(reply_1))
+        self.assertTrue(state.store_task_message(reply_2))
+
+        pulled_2 = state.get_task_message(
+            dst_task_ids=[dst_task_id],
+            src_task_ids=[src_task_id_2],
+            limit=1,
+            order_by="created_at",
+        )
+        pulled_1 = state.get_task_message(
+            dst_task_ids=[dst_task_id],
+            src_task_ids=[src_task_id_1],
+            limit=1,
+            order_by="created_at",
+        )
+
+        self.assertEqual(pulled_2[0].metadata.message_id, reply_2.metadata.message_id)
+        self.assertEqual(pulled_1[0].metadata.message_id, reply_1.metadata.message_id)
+
     def test_store_and_get_task_events(self) -> None:
         """Task events should round-trip in assigned ID order."""
         # Prepare: Create one run with a task and two valid task events.
@@ -1741,6 +1785,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             run_id=run_id, after_task_event_id=events[0].id
         )
         no_new = state.get_task_events(run_id=run_id, after_task_event_id=latest_id)
+        filtered = state.get_task_events(run_id=run_id, task_ids=[task_id])
+        excluded = state.get_task_events(run_id=run_id, task_ids=[task_id + 1])
 
         # Assert: Events keep assigned ID order and cursor filtering works.
         self.assertEqual(len(events), 2)
@@ -1761,6 +1807,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(latest_id, events[1].id)
         self.assertEqual(after_first, [events[1]])
         self.assertEqual(no_new, [])
+        self.assertEqual(filtered, events)
+        self.assertEqual(excluded, [])
 
     @parameterized.expand(  # type: ignore
         [

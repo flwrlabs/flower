@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import cast
 
 from flwr.app.constants import DEFAULT_TTL
 from flwr.supercore.json_message.base import JSONMessage
@@ -63,6 +64,24 @@ class ModelRequest(JSONMessage):
             dst_task_id=dst_task_id,
             payload=payload,
             ttl=ttl,
+        )
+
+    @classmethod
+    def from_payload(cls, *, dst_task_id: int, payload: JSONObject) -> ModelRequest:
+        """Create a model request from a Responses request payload."""
+        return cls(
+            dst_task_id=dst_task_id,
+            input_=cast(str | Sequence[JSONObject], payload.get("input")),
+            model=cast(str, payload.get("model")),
+            stream=cast(bool, payload.get("stream", False)),
+            tools=cast(Sequence[JSONObject] | None, payload.get("tools")),
+            tool_choice=payload.get("tool_choice"),
+            reasoning=cast(JSONObject | None, payload.get("reasoning")),
+            previous_response_id=cast(str | None, payload.get("previous_response_id")),
+            instructions=cast(str | None, payload.get("instructions")),
+            max_output_tokens=cast(int | None, payload.get("max_output_tokens")),
+            metadata=cast(JSONObject | None, payload.get("metadata")),
+            text=cast(JSONObject | None, payload.get("text")),
         )
 
     @classmethod

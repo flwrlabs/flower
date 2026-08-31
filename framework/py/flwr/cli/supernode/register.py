@@ -37,7 +37,7 @@ from flwr.supercore.primitives.asymmetric import public_key_to_bytes, uses_nist_
 
 from ..utils import (
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
+    flwr_cli_exc_handler,
     init_channel_from_connection,
     print_json_to_stdout,
 )
@@ -93,7 +93,7 @@ def register(  # pylint: disable=R0914
 
 def _register_node(stub: ControlStub, public_key: bytes, is_json: bool) -> None:
     """Register a node."""
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         response: RegisterNodeResponse = stub.RegisterNode(
             request=RegisterNodeRequest(public_key=public_key)
         )

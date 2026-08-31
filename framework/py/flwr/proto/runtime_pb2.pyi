@@ -301,15 +301,22 @@ class PullTaskMessageRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     LIMIT_FIELD_NUMBER: builtins.int
+    SRC_TASK_ID_FIELD_NUMBER: builtins.int
     limit: builtins.int
+    src_task_id: builtins.int
+    """Filter concurrent exchanges by sender task ID."""
     def __init__(
         self,
         *,
         limit: builtins.int | None = ...,
+        src_task_id: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_limit", b"_limit", "limit", b"limit"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_limit", b"_limit", "limit", b"limit"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_limit", b"_limit", "_src_task_id", b"_src_task_id", "limit", b"limit", "src_task_id", b"src_task_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_limit", b"_limit", "_src_task_id", b"_src_task_id", "limit", b"limit", "src_task_id", b"src_task_id"]) -> None: ...
+    @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_src_task_id", b"_src_task_id"]) -> typing.Literal["src_task_id"] | None: ...
 
 global___PullTaskMessageRequest = PullTaskMessageRequest
 

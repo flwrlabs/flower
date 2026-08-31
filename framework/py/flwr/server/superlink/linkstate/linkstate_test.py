@@ -249,7 +249,7 @@ class StateTest(CoreStateTest):
         previous_next_run_at = (now() - timedelta(seconds=30)).isoformat()
         next_run_at = (now() + timedelta(seconds=30)).isoformat()
         start_run_request = StartRunRequest(
-            app_spec="@flwragent/flwr-agent",
+            app_spec="@flwr/demo",
             federation="@me/health",
             series_id=series_id,
         )
@@ -2323,15 +2323,37 @@ def _claim_running_in_separate_process(  # pylint: disable=too-many-positional-a
     ready_event: Any,
     start_event: Any,
     result_queue: Any,
+    initialization_lock: Any,
     timeout: float,
 ) -> None:
     """Try to claim STARTING -> RUNNING in a dedicated process."""
+    # Deployments can install additional Alembic revisions in EE. Spawned
+    # children do not inherit the parent process's registration, so load the
+    # optional module before SqlLinkState.initialize() builds its migration
+    # configuration.
+    try:
+        # pylint: disable=import-outside-toplevel
+        import flwr.ee.state.alembic  # noqa: F401  # pylint: disable=unused-import
+
+        # pylint: enable=import-outside-toplevel
+    except ImportError:
+        pass
+
     state = SqlLinkState(
         database_path=database_path,
         federation_manager=NoOpFederationManager(),
         object_store=ObjectStoreFactory().store(),
     )
-    state.initialize()
+    # SQLite cannot safely migrate the shared database from both spawned
+    # processes at once. Serialize only initialization; the claim itself still
+    # starts concurrently after both processes signal readiness.
+    with initialization_lock:
+        try:
+            state.initialize()
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            result_queue.put((False, f"initialization failed: {ex!r}"))
+            ready_event.set()
+            return
     ready_event.set()
     if not start_event.wait(timeout=timeout):
         result_queue.put((False, "start-event-timeout"))
@@ -2742,7 +2764,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
 
     def _claim_running_process_target(
         self,
-    ) -> Callable[[str, int, Any, Any, Any, float], None]:
+    ) -> Callable[[str, int, Any, Any, Any, Any, float], None]:
         """Return process target for STARTING -> RUNNING claim tests."""
         return _claim_running_in_separate_process
 
@@ -2955,6 +2977,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             ctx = multiprocessing.get_context("spawn")
             start_event = ctx.Event()
             result_queue = ctx.Queue()
+            initialization_lock = ctx.Lock()
             timeout = self._CONCURRENT_TEST_TIMEOUT
             ready_events = [ctx.Event(), ctx.Event()]
 
@@ -2969,6 +2992,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
                         ready_events[0],
                         start_event,
                         result_queue,
+                        initialization_lock,
                         timeout,
                     ),
                 ),
@@ -2980,6 +3004,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
                         ready_events[1],
                         start_event,
                         result_queue,
+                        initialization_lock,
                         timeout,
                     ),
                 ),

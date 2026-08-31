@@ -138,7 +138,7 @@ jobs:
             --ignore=py/flwr/server/superlink/fleet/vce/backend/raybackend_test.py \
             --ignore=py/flwr/server/superlink/fleet/grpc_rere \
             --ignore=py/flwr/superlink/servicer/runtime \
-            --ignore=py/flwr/supercore/servicer/runtime/runtime_servicer_test.py \
+            --ignore=py/flwr/supercore/servicer/runtime/runtime_handlers_test.py \
             -n 4 \
             --dist=loadscope \
             --durations=50
@@ -154,7 +154,7 @@ jobs:
             py/flwr/server/superlink/fleet/vce/backend/raybackend_test.py \
             py/flwr/server/superlink/fleet/grpc_rere \
             py/flwr/superlink/servicer/runtime \
-            py/flwr/supercore/servicer/runtime/runtime_servicer_test.py
+            py/flwr/supercore/servicer/runtime/runtime_handlers_test.py
       - name: Prepare coverage artifact
         if: ${{ (matrix.task == 'pytest' || matrix.task == 'pytest_serial') && needs.changes.outputs.framework == 'true' }}
         run: |
@@ -163,7 +163,7 @@ jobs:
           cp .pytest_cache/.coverage coverage-data/coverage
       - name: Upload coverage data
         if: ${{ (matrix.task == 'pytest' || matrix.task == 'pytest_serial') && needs.changes.outputs.framework == 'true' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: coverage-${{ matrix.task }}-${{ matrix.python }}
           path: framework/coverage-data/
@@ -194,7 +194,7 @@ jobs:
           cd framework
           uv sync --python=3.11 --locked --all-extras --all-groups
       - name: Download coverage data
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           pattern: coverage-*
           path: framework/coverage-artifacts

@@ -125,6 +125,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         app_id: str,
         app_type: str,
         added_by: str,
+        is_hub_app: bool = False,
     ) -> str:
         """Atomically store a FAB and associate its app with a federation.
 
@@ -144,6 +145,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Type of the app.
         added_by : str
             ID of the account adding the app to the federation.
+        is_hub_app : bool, default=False
+            Whether the app was fetched from Flower Hub.
 
         Returns
         -------
@@ -154,6 +157,10 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return the FAB for the given hash, if present."""
+
+    @abstractmethod
+    def get_app(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
+        """Return a FAB only when it matches the federation-app association."""
 
     @abstractmethod
     def list_apps(
@@ -875,6 +882,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
+        src_task_ids: Sequence[int] | None = None,
         limit: int | None = None,
         order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
@@ -887,6 +895,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         dst_task_ids : Optional[Sequence[int]] (default: None)
             Sequence of destination task IDs to filter by.
+        src_task_ids : Optional[Sequence[int]] (default: None)
+            Sequence of source task IDs to filter by.
         limit : Optional[int] (default: None)
             Maximum number of messages to return. If `None`, no limit is applied.
         order_by : Optional[Literal["created_at"]] (default: None)
@@ -925,6 +935,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         run_id: int | None = None,
+        task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events matching the filters.
@@ -934,6 +945,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         run_id : Optional[int] (default: None)
             If set, return only events for this run. If set to `None`, return
             events for all runs.
+        task_ids : Optional[Sequence[int]] (default: None)
+            If set, return only events produced by these tasks.
         after_task_event_id : Optional[int] (default: None)
             Return only events with an ID greater than this cursor. If set to
             `None`, retrieve all events.

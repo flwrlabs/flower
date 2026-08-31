@@ -94,7 +94,7 @@ installation on ``flower-superexec`` instead:
     :emphasize-lines: 4
 
     $ flower-superexec \
-        --appio-api-address <appio-api-address> \
+        --runtime-api-address <runtime-api-address> \
         --plugin-type <choice-of-plugin> \
         --allow-runtime-dependency-installation
 

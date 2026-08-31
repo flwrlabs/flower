@@ -57,6 +57,7 @@ erDiagram
     VARCHAR added_by
     VARCHAR app_type
     VARCHAR fab_hash
+    BOOLEAN is_hub_app "nullable"
   }
 
   message_ins {

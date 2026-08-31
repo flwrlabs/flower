@@ -15,6 +15,9 @@
 """Middleware for the Control API."""
 
 
+from collections.abc import Iterable, Iterator
+from typing import cast
+
 from fastapi import Request
 from fastapi.responses import Response
 from google.protobuf.message import Message
@@ -28,6 +31,49 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.superlink.config_loader import get_license_plugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
 
+CONTROL_AUTH_ROUTE_KEYS = frozenset(
+    {
+        ("POST", "/v1/control/get-login-details"),
+        ("POST", "/v1/control/get-auth-tokens"),
+        ("POST", "/v1/control/refresh-auth-tokens"),
+    }
+)
+
+CONTROL_CONNECTOR_OAUTH_ROUTE_KEYS = frozenset(
+    {
+        ("POST", "/v1/control/begin-connector-oauth"),
+        ("POST", "/v1/control/complete-connector-oauth"),
+    }
+)
+
+CONTROL_SENSITIVE_ROUTE_KEYS = (
+    CONTROL_AUTH_ROUTE_KEYS | CONTROL_CONNECTOR_OAUTH_ROUTE_KEYS
+)
+
+
+def _is_control_auth_route(request: Request) -> bool:
+    """Return whether the request targets a Control authentication endpoint."""
+    return (request.method, request.url.path) in CONTROL_AUTH_ROUTE_KEYS
+
+
+def _is_control_sensitive_route(request: Request) -> bool:
+    """Return whether the request targets a sensitive Control endpoint."""
+    return (request.method, request.url.path) in CONTROL_SENSITIVE_ROUTE_KEYS
+
+
+class ControlSensitiveResponseMiddleware(BaseHTTPMiddleware):
+    """Prevent caching of sensitive Control responses."""
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        """Add no-cache headers to completed sensitive responses."""
+        response = await call_next(request)
+        if _is_control_sensitive_route(request):
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Pragma"] = "no-cache"
+        return response
+
 
 class ControlEventLogMiddleware(BaseHTTPMiddleware):
     """Write event logs around Control API handler calls."""
@@ -36,6 +82,9 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         """Write events before and after a Control handler call."""
+        if _is_control_sensitive_route(request):
+            return await call_next(request)
+
         # Event logging is optional and only applies after the translation middleware
         # has parsed a recognized Control API protobuf request.
         event_log_plugin: EventLogWriterPlugin | None = getattr(
@@ -91,9 +140,23 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
         # iterable protocols, following ProtobufTranslationMiddleware's dispatch.
         if isinstance(result, Message):
             await run_in_threadpool(write_after_event, result)
-        else:
-            # Not yet implemented
-            pass
+        elif isinstance(result, Iterable):
+
+            def logged_stream() -> Iterator[Message]:
+                """Write the after-event once stream iteration terminates."""
+                stream_response: Message | None = None
+                error: BaseException | None = None
+                try:
+                    # pylint: disable=use-yield-from
+                    for stream_response in cast(Iterable[Message], result):
+                        yield stream_response
+                except BaseException as exc:
+                    error = exc
+                    raise
+                finally:
+                    write_after_event(error if error is not None else stream_response)
+
+            request.state.protobuf_response = logged_stream()
 
         return response
 
@@ -133,7 +196,7 @@ class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         """Authenticate the request and store its account on the request state."""
-        if not _is_control_path(request.url.path):
+        if not _is_control_path(request.url.path) or _is_control_auth_route(request):
             return await call_next(request)
 
         account_access = getattr(request.app.state, "account_access_dep", None)

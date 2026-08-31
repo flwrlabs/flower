@@ -24,13 +24,16 @@ from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.error import http_error_translator
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers.health.router import health
+from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.routers.control.middlewares import (
     ControlAuthenticationMiddleware,
     ControlEventLogMiddleware,
     ControlLicenseMiddleware,
+    ControlSensitiveResponseMiddleware,
 )
 
 from . import extensions, main
@@ -59,6 +62,7 @@ def _create_app(
 def _control_middleware_classes() -> list[type[object]]:
     """Return Control middleware classes in request execution order."""
     return [
+        ControlSensitiveResponseMiddleware,
         BaseHTTPMiddleware,
         ControlAuthenticationMiddleware,
         ControlLicenseMiddleware,
@@ -130,7 +134,7 @@ def test_create_app_constructs_control_middleware_in_execution_order(
     app = _create_app(monkeypatch)
 
     assert _middleware_classes(app) == _control_middleware_classes()
-    assert app.user_middleware[0].kwargs["dispatch"] is http_error_translator
+    assert app.user_middleware[1].kwargs["dispatch"] is http_error_translator
 
 
 def test_create_app_places_extension_middleware_before_control_middleware(
@@ -146,3 +150,33 @@ def test_create_app_places_extension_middleware_before_control_middleware(
         _ExtensionMiddleware,
         *_control_middleware_classes(),
     ]
+
+
+def test_create_app_exposes_configured_control_dependencies(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Expose lifespan configuration to Control HTTP dependencies."""
+    monkeypatch.setattr(extensions, "get_middleware", lambda: ())
+    monkeypatch.setattr(extensions, "configure_app", lambda _: None)
+    monkeypatch.setattr(
+        main,
+        "get_federation_manager",
+        lambda is_simulation: NoOpFederationManager(),
+    )
+    artifact_provider = Mock()
+    config = Mock(
+        simulation=False,
+        database=FLWR_IN_MEMORY_DB_NAME,
+        superexec_auth_secret=None,
+        artifact_provider=artifact_provider,
+        fleet_api_type="grpc-rere",
+        authn_plugin=Mock(),
+        event_log_plugin=None,
+    )
+    lifespan_class = Mock()
+
+    app = main.create_app(config, lifespan_class)
+
+    assert app.state.artifact_provider is artifact_provider
+    assert app.state.fleet_api_type == "grpc-rere"
+    lifespan_class.assert_called_once()
