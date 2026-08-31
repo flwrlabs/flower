@@ -108,7 +108,7 @@ that foundation.
 - Continual pre-training, targeted post-training, and model integration
   These stages bring the two sets of strengths together and allow Endeavor 1.0 to
   be refined over time.
-- Signals from real enterprise work
+- **Signals from real enterprise work**.
   FlowerBench enables repeatable evaluation on real, high-value enterprise
   workflows without moving the underlying proprietary data. Tasks are
   contributed by organizations in the opt-in Flower Enterprise Evaluation
