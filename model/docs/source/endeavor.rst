@@ -119,9 +119,9 @@ that foundation.
 Evaluation highlights
 ---------------------
 
-Endeavor 1.0 is evaluated directly against leading closed models from OpenAI and
-Anthropic, as well as the strongest open-weight alternatives including
-Kimi K3 and Nemotron 3 Ultra. The table below shows four core evaluations.
+The table below places Endeavor 1.0's results on four core evaluations alongside
+separately reported scores for leading closed and open-weight models, including
+GPT-5.6 Sol, Claude Fable 5, Kimi K3, and Nemotron 3 Ultra.
 
 .. list-table::
    :header-rows: 1
@@ -157,11 +157,13 @@ Kimi K3 and Nemotron 3 Ultra. The table below shows four core evaluations.
      - 96.7
      - 94.2
 
-Endeavor 1.0 records the highest HumanEval score in the comparison set, matches
-GPT-5.6 Sol and Claude Fable 5 on AIME 2026, leads Kimi K3 on three of the
-four benchmarks (HumanEval, IFEval, AIME 2026), and leads Nemotron 3 Ultra
-on all four. On GPQA, GPT-5.6 Sol, Claude Fable 5, and Kimi K3 score above
-Endeavor 1.0; on IFEval, GPT-5.6 Sol scores above Endeavor 1.0.
+Within this cross-source comparison, Endeavor 1.0's reported HumanEval score is
+the highest. Its reported AIME 2026 score equals those reported for GPT-5.6 Sol
+and Claude Fable 5; its scores exceed the reported Kimi K3 scores on three of
+four benchmarks (HumanEval, IFEval, AIME 2026) and the reported Nemotron 3 Ultra
+scores on all four. The reported GPQA scores for GPT-5.6 Sol, Claude Fable 5,
+and Kimi K3 exceed Endeavor 1.0's; the reported IFEval score for GPT-5.6 Sol
+also exceeds Endeavor 1.0's.
 
 Scores for the comparison models are as reported by the respective vendors
 and third-party evaluations (Artificial Analysis, Moonshot AI, NVIDIA, and
