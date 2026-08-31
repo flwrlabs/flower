@@ -37,7 +37,7 @@ superexec:
 
 ## Configure SuperExec task polling
 
-SuperExec polls the Runtime API for pending tasks every 100 milliseconds by default.
+SuperExec polls the Runtime API for pending tasks every 1 second by default.
 To use a different interval, set `FLWR_SUPEREXEC_TASK_POLL_INTERVAL` in the SuperExec
 environment. The value must be between 0.01 and 60 seconds.
 

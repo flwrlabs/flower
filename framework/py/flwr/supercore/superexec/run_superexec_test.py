@@ -156,7 +156,7 @@ def test_run_superexec_preserves_accepted_launch_behavior(
     stub.ClaimTask.assert_called_once()
     plugin.launch_task.assert_called_once()
     log.assert_not_called()
-    sleep_mock.assert_called_once_with(0.1)
+    sleep_mock.assert_called_once_with(1.0)
 
 
 @pytest.mark.parametrize(
