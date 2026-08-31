@@ -35,6 +35,19 @@ superexec:
   enabled: true
 ```
 
+## Configure SuperExec task polling
+
+SuperExec polls the Runtime API for pending tasks every 100 milliseconds by default.
+To use a different interval, set `FLWR_SUPEREXEC_TASK_POLL_INTERVAL` in the SuperExec
+environment. The value must be a positive, finite number of seconds.
+
+```yaml
+superexec:
+  env:
+    - name: FLWR_SUPEREXEC_TASK_POLL_INTERVAL
+      value: "0.1"
+```
+
 ## Run simulations in Kubernetes using the Simulation Plugin
 
 For more details, visit the [Run simulations](../how-to-run-simulations.rst) guide.
