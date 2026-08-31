@@ -18,6 +18,7 @@ Problem-oriented how-to guides show step-by-step how to achieve a specific goal.
     how-to-run-flower-with-deployment-engine
     how-to-enable-tls-connections
     how-to-authenticate-supernodes
+    how-to-register-supernodes-on-supergrid
     how-to-configure-logging
     how-to-run-flower-on-gcp
     how-to-run-flower-on-azure
