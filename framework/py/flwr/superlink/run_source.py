@@ -16,12 +16,11 @@
 
 from typing import Literal, cast, get_args
 
-RunStartSource = Literal["cli", "web_ui", "automation", "unknown"]
-RUN_SOURCE_METADATA_KEY = "x-flwr-run-source"
-_RUN_START_SOURCES = frozenset(get_args(RunStartSource))
+RunSource = Literal["cli", "web_ui", "automation", "unknown"]
+_RUN_SOURCES = frozenset(get_args(RunSource))
 
 
-def resolve_run_start_source(value: str | None) -> RunStartSource:
+def resolve_source(value: str | None) -> RunSource:
     """Normalize a caller-provided source label for analytics.
 
     Source attribution is intentionally best effort. Callers can only affect
@@ -31,6 +30,6 @@ def resolve_run_start_source(value: str | None) -> RunStartSource:
     """
     if value is None:
         return "unknown"
-    if value not in _RUN_START_SOURCES:
+    if value not in _RUN_SOURCES:
         return "unknown"
-    return cast(RunStartSource, value)
+    return cast(RunSource, value)

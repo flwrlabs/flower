@@ -54,6 +54,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.exit import ExitCode, add_exit_handler, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.logger import console_handler
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import try_obtain_optional_runtime_server_certificates
@@ -235,7 +236,7 @@ def _start_supernode_http_api(
             host=config.host,
             port=config.port,
             reload=False,
-            access_log=True,
+            access_log=console_handler.level <= DEBUG,
             ssl_certfile=config.runtime_ssl_certfile,
             ssl_keyfile=config.runtime_ssl_keyfile,
             workers=1,
