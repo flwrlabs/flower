@@ -1602,7 +1602,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def get_task_events(
         self,
         *,
-        run_id: int | None = None,
         run_ids: Sequence[int] | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
@@ -1614,8 +1613,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .where(TaskEventModel.id > cursor)
             .order_by(TaskEventModel.id.asc())
         )
-        if run_id is not None:
-            query = query.where(TaskEventModel.run_id == uint64_to_int64(run_id))
         if run_ids is not None:
             if not run_ids:
                 return []

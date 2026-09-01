@@ -787,7 +787,7 @@ def _stream_run_events(
         # Retrieve and yield all task events generated after the latest
         # streamed task event
         events = state.get_task_events(
-            run_id=run_id,
+            run_ids=[run_id],
             task_ids=[primary_task_id],
             after_task_event_id=after_task_event_id,
         )

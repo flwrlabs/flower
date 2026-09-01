@@ -1885,7 +1885,7 @@ class TestControlServicerAuth(unittest.TestCase):
             mock_run, "user-123", RESULT_DELIVERY_CHANNEL_CHAT
         )
         mock_get_task_events.assert_called_once_with(
-            run_id=run_id,
+            run_ids=[run_id],
             task_ids=[123],
             after_task_event_id=4,
         )

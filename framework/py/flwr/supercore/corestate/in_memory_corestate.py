@@ -1277,7 +1277,6 @@ class InMemoryCoreState(
     def get_task_events(
         self,
         *,
-        run_id: int | None = None,
         run_ids: Sequence[int] | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
@@ -1289,9 +1288,7 @@ class InMemoryCoreState(
                 return []
 
             run_id_set = set(run_ids) if run_ids is not None else None
-            if run_id is not None:
-                events = list(self.task_event_store.get(run_id, []))
-            elif run_id_set is not None:
+            if run_id_set is not None:
                 events = [
                     event
                     for requested_run_id in run_id_set
