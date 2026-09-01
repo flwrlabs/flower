@@ -108,8 +108,8 @@ def test_emit_event_requires_type() -> None:
     stub.PushTaskEvents.assert_not_called()
 
 
-def test_agent_events_and_connector_events_use_same_publisher() -> None:
-    """Publish explicit and built-in AgentApp events through one publisher."""
+def test_agent_events_and_connector_items_use_same_publisher() -> None:
+    """Publish explicit AgentApp events and connector items through one publisher."""
     stub = Mock()
     events = Mock()
     responses = RuntimeAgentResponses(
@@ -124,7 +124,12 @@ def test_agent_events_and_connector_events_use_same_publisher() -> None:
         "type": "response.output_text.delta",
         "delta": "Hello",
     }
-    connector_event: JSONObject = {"type": "response.tool_call.started"}
+    connector_event: JSONObject = {
+        "type": "function_call",
+        "call_id": "call-1",
+        "name": "web_search",
+        "arguments": '{"query":"Flower"}',
+    }
 
     events.emit(model_event)
     responses.push_run_events([connector_event])
@@ -214,10 +219,9 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     }
 
     # Execute
-    with (
-        patch.object(responses, "append_and_push_run_events"),
-        patch.object(responses, "append_context_items"),
-    ):
+    with patch.object(
+        responses, "append_and_push_run_events"
+    ) as append_and_push_run_events:
         responses.call_automation_with_events(call_id="call-1", arguments=arguments)
 
     # Assert
@@ -235,6 +239,156 @@ def test_call_automation_embeds_input_in_control_request() -> None:
             series_id=2,
         ),
     )
+    assert append_and_push_run_events.call_args_list == [
+        call(
+            [
+                {
+                    "type": "function_call",
+                    "call_id": "call-1",
+                    "name": START_AUTOMATION_TOOL_NAME,
+                    "arguments": (
+                        '{"input":"Do work","start_at":"2026-07-28T12:00:00Z",'
+                        '"fixed_interval":60,"max_runs":3}'
+                    ),
+                }
+            ]
+        ),
+        call(
+            [
+                {
+                    "type": "function_call_output",
+                    "call_id": "call-1",
+                    "output": (
+                        '{"automation_id":0,"series_id":0,"next_run_at":""}'
+                    ),
+                }
+            ]
+        ),
+    ]
+
+
+def test_automation_failure_emits_secret_safe_output() -> None:
+    """Persist a terminal, secret-safe output when automation creation fails."""
+    stub = Mock()
+    stub.StartAutomation.side_effect = RuntimeError("scheduler leaked secret-token")
+    responses = RuntimeAgentResponses(
+        stub=stub,
+        run_id=123,
+        task_id=789,
+        context=Mock(),
+        start_run_request=StartRunRequest(),
+        events=Mock(),
+    )
+
+    with (
+        patch.object(
+            responses, "append_and_push_run_events"
+        ) as append_and_push_run_events,
+        pytest.raises(RuntimeError, match="secret-token"),
+    ):
+        responses.call_automation_with_events(
+            call_id="call-1",
+            arguments={
+                "input": "Do work",
+                "start_at": "2026-07-28T12:00:00Z",
+            },
+        )
+
+    terminal_item = append_and_push_run_events.call_args_list[-1].args[0][0]
+    assert terminal_item == {
+        "type": "function_call_output",
+        "call_id": "call-1",
+        "output": (
+            '{"error":{"code":"automation_error",'
+            '"message":"Automation execution failed."}}'
+        ),
+    }
+    assert "secret-token" not in terminal_item["output"]
+
+
+@pytest.mark.parametrize("name", ["web_search", "notion_search"])
+def test_connector_call_emits_standard_items(name: str) -> None:
+    """Emit standard function items for built-in and OAuth connectors."""
+    responses = RuntimeAgentResponses(
+        stub=Mock(),
+        run_id=123,
+        task_id=789,
+        context=Mock(),
+        start_run_request=StartRunRequest(),
+        events=Mock(),
+    )
+    arguments: JSONObject = {"query": "Flower"}
+
+    with (
+        patch.object(
+            responses, "create_connector_response", return_value={"results": []}
+        ),
+        patch.object(
+            responses, "append_and_push_run_events"
+        ) as append_and_push_run_events,
+    ):
+        output = responses.call_connector_with_events(
+            name=name, call_id="call-1", arguments=arguments
+        )
+
+    assert output == {
+        "type": "function_call_output",
+        "call_id": "call-1",
+        "output": '{"results":[]}',
+    }
+    assert append_and_push_run_events.call_args_list == [
+        call(
+            [
+                {
+                    "type": "function_call",
+                    "call_id": "call-1",
+                    "name": name,
+                    "arguments": '{"query":"Flower"}',
+                }
+            ]
+        ),
+        call([output]),
+    ]
+
+
+def test_connector_failure_emits_secret_safe_output() -> None:
+    """Persist a terminal, secret-safe output before propagating a failure."""
+    responses = RuntimeAgentResponses(
+        stub=Mock(),
+        run_id=123,
+        task_id=789,
+        context=Mock(),
+        start_run_request=StartRunRequest(),
+        events=Mock(),
+    )
+
+    with (
+        patch.object(
+            responses,
+            "create_connector_response",
+            side_effect=RuntimeError("provider leaked secret-token"),
+        ),
+        patch.object(
+            responses, "append_and_push_run_events"
+        ) as append_and_push_run_events,
+        pytest.raises(RuntimeError, match="secret-token"),
+    ):
+        responses.call_connector_with_events(
+            name="notion_search",
+            call_id="call-1",
+            arguments={"query": "Flower"},
+        )
+
+    terminal_item = append_and_push_run_events.call_args_list[-1].args[0][0]
+    assert terminal_item == {
+        "type": "function_call_output",
+        "call_id": "call-1",
+        "output": (
+            '{"error":{"code":"connector_error",'
+            '"message":"Connector execution failed."}}'
+        ),
+    }
+    assert "secret-token" not in terminal_item["output"]
 
 
 def test_create_connector_response_resolves_canonical_name() -> None:

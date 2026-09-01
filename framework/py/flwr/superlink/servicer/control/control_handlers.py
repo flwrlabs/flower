@@ -136,6 +136,7 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
@@ -161,6 +162,7 @@ from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
     CreateInvitationContext,
+    JSONObject,
     RegisterSupernodeContext,
     StartRunContext,
 )
@@ -654,6 +656,27 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
         run = state.get_run_info(run_ids=[run_id])[0]
         series_id = run.series_id
+
+        if primary_task_type == TaskType.AGENT_APP:
+            agent_input = fused_run_config.get("agent.input")
+            if isinstance(agent_input, str) and agent_input:
+                primary_task_id = cast(int, run.primary_task_id)
+                input_item: JSONObject = {
+                    "type": "message",
+                    "role": "user",
+                    "content": agent_input,
+                }
+                if not state.store_task_events(
+                    [
+                        TaskEvent(
+                            run_id=run_id,
+                            task_id=primary_task_id,
+                            event="message",
+                            data=strict_json_dumps(input_item, compact=True),
+                        )
+                    ]
+                ):
+                    raise RuntimeError("Failed to store the AgentApp input event.")
 
     except ValueError as e:
         log(ERROR, "Could not start run: %s", str(e))
