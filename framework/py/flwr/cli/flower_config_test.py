@@ -24,6 +24,7 @@ from unittest.mock import Mock, patch
 
 import click
 import tomli
+import typer
 from parameterized import parameterized
 
 from flwr.cli.constant import (
@@ -84,9 +85,7 @@ class TestInitFlwrConfig(unittest.TestCase):
         # 3. Check [superlink.supergrid]
         self.assertIn("supergrid", superlink)
         supergrid = superlink["supergrid"]
-        self.assertEqual(
-            supergrid[SuperLinkConnectionTomlKey.ADDRESS], "supergrid.flower.ai"
-        )
+        self.assertEqual(supergrid[SuperLinkConnectionTomlKey.ADDRESS], "api.flower.ai")
 
         # 4. Check [superlink.local]
         self.assertIn("local", superlink)
@@ -112,6 +111,43 @@ class TestInitFlwrConfig(unittest.TestCase):
                 self.assertEqual(
                     config_path.read_text(encoding="utf-8"), "existing_content"
                 )
+
+    @parameterized.expand(
+        [
+            ("Darwin", "sed -i.bak"),
+            ("Linux", "sed -i.bak"),
+            ("Windows", "[System.IO.File]::WriteAllText"),
+        ]
+    )
+    def test_init_flwr_config_warns_about_deprecated_supergrid_address(
+        self, operating_system: str, expected_command: str
+    ) -> None:
+        """Warn existing users how to replace the deprecated SuperGrid address."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_path = Path(tmp_dir) / "config.toml"
+            config_path.write_text(
+                '[superlink.supergrid]\naddress = "supergrid.flower.ai"\n',
+                encoding="utf-8",
+            )
+
+            with (
+                patch.dict(os.environ, {FLWR_HOME: tmp_dir}),
+                patch(
+                    "flwr.cli.flower_config.platform.system",
+                    return_value=operating_system,
+                ),
+                patch("flwr.cli.flower_config.typer.secho") as secho,
+            ):
+                init_flwr_config()
+                init_flwr_config()
+
+            secho.assert_called_once()
+            message = secho.call_args.args[0]
+            self.assertIn("supergrid.flower.ai", message)
+            self.assertIn("api.flower.ai", message)
+            self.assertIn(expected_command, message)
+            self.assertIn(str(config_path), message)
+            self.assertEqual(secho.call_args.kwargs["fg"], typer.colors.YELLOW)
 
 
 class TestSuperLinkConnection(unittest.TestCase):
