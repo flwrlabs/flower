@@ -42,9 +42,7 @@ def _fresh_modules(script: str) -> list[str]:
     python_path = [str(source_root)]
     if existing_python_path := os.environ.get("PYTHONPATH"):
         python_path.append(existing_python_path)
-    environment = os.environ | {
-        "PYTHONPATH": os.pathsep.join(python_path)
-    }
+    environment = os.environ | {"PYTHONPATH": os.pathsep.join(python_path)}
     result = subprocess.run(
         [sys.executable, "-c", script],
         check=True,
