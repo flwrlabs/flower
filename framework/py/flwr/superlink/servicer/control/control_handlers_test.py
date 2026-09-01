@@ -71,7 +71,7 @@ from .control_handlers import (
 )
 
 
-class TestControlHandlers(unittest.TestCase):
+class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
     """Test Control API handlers."""
 
     def setUp(self) -> None:
