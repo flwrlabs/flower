@@ -62,6 +62,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsRequest,
     StreamRunEventsRequest,
     UnregisterNodeRequest,
+    UpdateAppRequest,
 )
 from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
@@ -123,6 +124,7 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/control/list-nodes"): ListNodesRequest,
     ("POST", "/v1/control/list-apps"): ListAppsRequest,
     ("POST", "/v1/control/add-app"): AddAppRequest,
+    ("POST", "/v1/control/update-app"): UpdateAppRequest,
     ("POST", "/v1/control/remove-app"): RemoveAppRequest,
     ("POST", "/v1/control/list-federations"): ListFederationsRequest,
     ("POST", "/v1/control/show-federation"): ShowFederationRequest,

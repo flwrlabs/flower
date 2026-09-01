@@ -101,6 +101,9 @@ service Control {
   // Add App to a Federation
   rpc AddApp(AddAppRequest) returns (AddAppResponse) {}
 
+  // Update App in a Federation to the latest Hub version
+  rpc UpdateApp(UpdateAppRequest) returns (UpdateAppResponse) {}
+
   // Remove App from a Federation
   rpc RemoveApp(RemoveAppRequest) returns (RemoveAppResponse) {}
 
@@ -308,13 +311,20 @@ message ListNodesResponse {
 message ListFederationsRequest {}
 message ListFederationsResponse { repeated Federation federations = 1; }
 
+enum AppUpdatePolicy {
+  APP_UPDATE_POLICY_UNSPECIFIED = 0;
+  APP_UPDATE_POLICY_PINNED = 1;
+  APP_UPDATE_POLICY_TRACK_LATEST = 2;
+}
+
 message AppInfo {
   string app_id = 1;
-  string fab_hash = 2;
+  optional string fab_hash = 2;
   string app_type = 3;
   // True for Hub apps, false for local/custom apps, and absent for legacy apps
   // whose provenance is unknown.
   optional bool is_hub_app = 4;
+  AppUpdatePolicy update_policy = 5;
 }
 message ListAppsRequest {
   string federation_id = 1;
@@ -325,8 +335,16 @@ message ListAppsResponse { repeated AppInfo apps = 1; }
 message AddAppRequest {
   string federation_id = 1;
   string app_id = 2;
+  optional AppUpdatePolicy update_policy = 3;
 }
 message AddAppResponse {}
+
+message UpdateAppRequest {
+  string federation_id = 1;
+  string app_id = 2;
+  AppUpdatePolicy update_policy = 3;
+}
+message UpdateAppResponse {}
 
 message RemoveAppRequest {
   string federation_id = 1;

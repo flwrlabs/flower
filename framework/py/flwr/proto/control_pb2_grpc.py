@@ -144,6 +144,11 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.AddAppRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.AddAppResponse.FromString,
                 _registered_method=True)
+        self.UpdateApp = channel.unary_unary(
+                '/flwr.proto.Control/UpdateApp',
+                request_serializer=flwr_dot_proto_dot_control__pb2.UpdateAppRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.UpdateAppResponse.FromString,
+                _registered_method=True)
         self.RemoveApp = channel.unary_unary(
                 '/flwr.proto.Control/RemoveApp',
                 request_serializer=flwr_dot_proto_dot_control__pb2.RemoveAppRequest.SerializeToString,
@@ -373,6 +378,13 @@ class ControlServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def UpdateApp(self, request, context):
+        """Update App in a Federation to the latest Hub version
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def RemoveApp(self, request, context):
         """Remove App from a Federation
         """
@@ -587,6 +599,11 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.AddApp,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.AddAppRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.AddAppResponse.SerializeToString,
+            ),
+            'UpdateApp': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateApp,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.UpdateAppRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.UpdateAppResponse.SerializeToString,
             ),
             'RemoveApp': grpc.unary_unary_rpc_method_handler(
                     servicer.RemoveApp,
@@ -1253,6 +1270,33 @@ class Control(object):
             '/flwr.proto.Control/AddApp',
             flwr_dot_proto_dot_control__pb2.AddAppRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.AddAppResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateApp(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/UpdateApp',
+            flwr_dot_proto_dot_control__pb2.UpdateAppRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.UpdateAppResponse.FromString,
             options,
             channel_credentials,
             insecure,

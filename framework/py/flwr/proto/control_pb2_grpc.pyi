@@ -165,6 +165,12 @@ class ControlStub:
     ]
     """Add App to a Federation"""
 
+    UpdateApp: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.UpdateAppRequest,
+        flwr.proto.control_pb2.UpdateAppResponse,
+    ]
+    """Update App in a Federation to the latest Hub version"""
+
     RemoveApp: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.RemoveAppRequest,
         flwr.proto.control_pb2.RemoveAppResponse,
@@ -386,6 +392,12 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.AddAppResponse,
     ]
     """Add App to a Federation"""
+
+    UpdateApp: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.UpdateAppRequest,
+        flwr.proto.control_pb2.UpdateAppResponse,
+    ]
+    """Update App in a Federation to the latest Hub version"""
 
     RemoveApp: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.RemoveAppRequest,
@@ -652,6 +664,14 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.AddAppResponse, collections.abc.Awaitable[flwr.proto.control_pb2.AddAppResponse]]:
         """Add App to a Federation"""
+
+    @abc.abstractmethod
+    def UpdateApp(
+        self,
+        request: flwr.proto.control_pb2.UpdateAppRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.UpdateAppResponse, collections.abc.Awaitable[flwr.proto.control_pb2.UpdateAppResponse]]:
+        """Update App in a Federation to the latest Hub version"""
 
     @abc.abstractmethod
     def RemoveApp(

@@ -32,7 +32,11 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    APP_UPDATE_POLICY_TRACK_LATEST,
+    Automation,
+    StartRunRequest,
+)
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskEvent,
@@ -41,6 +45,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore.constant import (
     OBJECT_PUSH_SESSION_TTL_SECONDS,
+    AppUpdatePolicy,
     AutomationStatus,
     TaskType,
 )
@@ -106,6 +111,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             added_by="account-a",
             is_hub_app=True,
         )
+        assert server_hash is not None
+        assert agent_hash is not None
         state.store_app(
             fab=Fab("", b"other", {}),
             federation_id="@me/fed-b",
@@ -144,6 +151,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             added_by="account-c",
             is_hub_app=True,
         )
+        assert updated_hash is not None
         updated = state.list_apps("@me/fed-a")
         self.assertEqual(len(updated), 2)
         self.assertEqual(updated[1].fab_hash, updated_hash)
@@ -162,6 +170,25 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             ["@me/server"],
         )
         self.assertIsNotNone(state.get_fab(updated_hash))
+
+    def test_store_app_tracking_latest_has_no_pinned_hash(self) -> None:
+        """An app tracking Hub latest has an association but no pinned FAB."""
+        state = self.state_factory()
+
+        result = state.store_app(
+            fab=None,
+            federation_id="@me/fed-a",
+            app_id="@me/latest",
+            app_type=TaskType.AGENT_APP,
+            added_by="account-a",
+            is_hub_app=True,
+            update_policy=AppUpdatePolicy.TRACK_LATEST,
+        )
+
+        self.assertIsNone(result)
+        app = state.list_apps("@me/fed-a")[0]
+        self.assertFalse(app.HasField("fab_hash"))
+        self.assertEqual(app.update_policy, APP_UPDATE_POLICY_TRACK_LATEST)
 
     def test_connector_upsert_get_and_delete(self) -> None:
         """A connector can be created, updated, retrieved, and deleted."""

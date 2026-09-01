@@ -94,6 +94,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateAppRequest,
+    UpdateAppResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
@@ -387,6 +389,17 @@ def add_app(
 ) -> AddAppResponse:
     """Add an app to a federation."""
     return control_handlers.add_app(request, account, linkstate, fleet_api_type)
+
+
+@router.post("/update-app")
+def update_app(
+    request: Annotated[UpdateAppRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+    fleet_api_type: FleetApiTypeDependency,
+) -> UpdateAppResponse:
+    """Update an app to the latest Hub version."""
+    return control_handlers.update_app(request, account, linkstate, fleet_api_type)
 
 
 @router.post("/remove-app")

@@ -62,6 +62,14 @@ APP_ID_PATTERN = r"^@[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
 APP_VERSION_PATTERN = r"^\d+\.\d+\.\d+$"
 FLWR_SUPERGRID_API_URL = os.getenv("FLWR_SUPERGRID_API_URL", "https://api.flower.ai/v1")
 
+
+class AppUpdatePolicy(StrEnum):
+    """Control how a federation app selects its FAB version."""
+
+    PINNED = "pinned"
+    TRACK_LATEST = "track-latest"
+
+
 # Constants for Flower CLI update check
 FLWR_DISABLE_UPDATE_CHECK = "FLWR_DISABLE_UPDATE_CHECK"
 FLWR_UPDATE_CHECK_URL = f"{FLWR_SUPERGRID_API_URL}/update-check/flwr"
