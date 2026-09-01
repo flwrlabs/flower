@@ -631,6 +631,20 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 _derive_run_series_description(fused_run_config) or None
             )
 
+        initial_task_event = None
+        if primary_task_type == TaskType.AGENT_APP:
+            agent_input = fused_run_config.get("agent.input")
+            if isinstance(agent_input, str) and agent_input:
+                input_item: JSONObject = {
+                    "type": "message",
+                    "role": "user",
+                    "content": agent_input,
+                }
+                initial_task_event = TaskEvent(
+                    event="message",
+                    data=strict_json_dumps(input_item, compact=True),
+                )
+
         run_id = state.create_run(
             fab_id,
             fab_version,
@@ -643,6 +657,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             series_id=series_id,
             series_description=series_description,
             connector_refs=connector_refs,
+            initial_task_event=initial_task_event,
         )
 
         if run_id == 0:
@@ -656,27 +671,6 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
         run = state.get_run_info(run_ids=[run_id])[0]
         series_id = run.series_id
-
-        if primary_task_type == TaskType.AGENT_APP:
-            agent_input = fused_run_config.get("agent.input")
-            if isinstance(agent_input, str) and agent_input:
-                primary_task_id = cast(int, run.primary_task_id)
-                input_item: JSONObject = {
-                    "type": "message",
-                    "role": "user",
-                    "content": agent_input,
-                }
-                if not state.store_task_events(
-                    [
-                        TaskEvent(
-                            run_id=run_id,
-                            task_id=primary_task_id,
-                            event="message",
-                            data=strict_json_dumps(input_item, compact=True),
-                        )
-                    ]
-                ):
-                    raise RuntimeError("Failed to store the AgentApp input event.")
 
     except ValueError as e:
         log(ERROR, "Could not start run: %s", str(e))
