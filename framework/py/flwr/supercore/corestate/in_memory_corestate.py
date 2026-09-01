@@ -1279,7 +1279,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=R0904,too-many-instance-a
         run_ids: Sequence[int] | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
-        limit: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
         cursor = after_task_event_id if after_task_event_id is not None else 0
@@ -1294,14 +1293,13 @@ class InMemoryCoreState(CoreState):  # pylint: disable=R0904,too-many-instance-a
                 events = list(self.task_event_store.get(run_id, []))
             run_id_set = set(run_ids) if run_ids is not None else None
             task_id_set = set(task_ids) if task_ids is not None else None
-            matching_events = [
+            return [
                 event
                 for event in sorted(events, key=lambda event: event.id)
                 if event.id > cursor
                 and (run_id_set is None or event.run_id in run_id_set)
                 and (task_id_set is None or event.task_id in task_id_set)
             ]
-            return matching_events[:limit] if limit is not None else matching_events
 
     def _cleanup_expired_task_tokens_locked(self) -> None:
         """Remove expired task tokens.

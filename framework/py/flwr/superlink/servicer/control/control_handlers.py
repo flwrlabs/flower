@@ -1181,15 +1181,7 @@ def list_run_series_events(
             f"Run series {series_id} not found for {account.flwr_aid}.",
         )
 
-    after_task_event_id = (
-        request.after_task_event_id if request.HasField("after_task_event_id") else None
-    )
-    limit = request.limit if request.HasField("limit") else None
-    events = state.get_task_events(
-        run_ids=series_matches[0].run_ids,
-        after_task_event_id=after_task_event_id,
-        limit=limit,
-    )
+    events = state.get_task_events(run_ids=series_matches[0].run_ids)
     return ListRunSeriesEventsResponse(events=events)
 
 

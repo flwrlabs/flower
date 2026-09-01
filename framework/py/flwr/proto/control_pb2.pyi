@@ -471,24 +471,13 @@ class ListRunSeriesEventsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SERIES_ID_FIELD_NUMBER: builtins.int
-    AFTER_TASK_EVENT_ID_FIELD_NUMBER: builtins.int
-    LIMIT_FIELD_NUMBER: builtins.int
     series_id: builtins.int
-    after_task_event_id: builtins.int
-    limit: builtins.int
     def __init__(
         self,
         *,
         series_id: builtins.int = ...,
-        after_task_event_id: builtins.int | None = ...,
-        limit: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_after_task_event_id", b"_after_task_event_id", "_limit", b"_limit", "after_task_event_id", b"after_task_event_id", "limit", b"limit"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_after_task_event_id", b"_after_task_event_id", "_limit", b"_limit", "after_task_event_id", b"after_task_event_id", "limit", b"limit", "series_id", b"series_id"]) -> None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_after_task_event_id", b"_after_task_event_id"]) -> typing.Literal["after_task_event_id"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+    def ClearField(self, field_name: typing.Literal["series_id", b"series_id"]) -> None: ...
 
 global___ListRunSeriesEventsRequest = ListRunSeriesEventsRequest
 

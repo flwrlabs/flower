@@ -242,8 +242,6 @@ message GetRunSeriesResponse {
 
 message ListRunSeriesEventsRequest {
   uint64 series_id = 1;
-  optional uint64 after_task_event_id = 2;
-  optional uint32 limit = 3;
 }
 message ListRunSeriesEventsResponse { repeated TaskEvent events = 1; }
 
