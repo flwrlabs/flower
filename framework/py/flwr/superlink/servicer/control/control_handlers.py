@@ -1181,7 +1181,10 @@ def list_run_series_events(
             f"Run series {series_id} not found for {account.flwr_aid}.",
         )
 
-    events = state.get_task_events(run_ids=series_matches[0].run_ids)
+    run_ids = series_matches[0].run_ids
+    runs = state.get_run_info(run_ids=run_ids)
+    primary_task_ids = [cast(int, run.primary_task_id) for run in runs]
+    events = state.get_task_events(run_ids=run_ids, task_ids=primary_task_ids)
     return ListRunSeriesEventsResponse(events=events)
 
 

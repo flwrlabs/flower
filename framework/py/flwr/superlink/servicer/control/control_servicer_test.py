@@ -1079,6 +1079,49 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(cm.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND)
 
+    def test_list_run_series_events_returns_only_primary_task_events(self) -> None:
+        """Return primary-task events from every run in the series."""
+        run_ids = [self._create_dummy_run(self.aid) for _ in range(2)]
+        primary_task_ids = [
+            cast(int, self.state.get_run_info(run_ids=[run_id])[0].primary_task_id)
+            for run_id in run_ids
+        ]
+        child_task_id = self.state.create_task(
+            task_type=TaskType.MODEL, run_id=run_ids[0]
+        )
+        assert child_task_id is not None
+        self._create_dummy_run_series(10, run_ids=run_ids)
+        self.assertTrue(
+            self.state.store_task_events(
+                [
+                    TaskEvent(
+                        run_id=run_ids[0],
+                        task_id=primary_task_ids[0],
+                        event="response.created",
+                        data='{"type":"response.created"}',
+                    ),
+                    TaskEvent(
+                        run_id=run_ids[0],
+                        task_id=child_task_id,
+                        event="response.output_text.delta",
+                        data='{"type":"response.output_text.delta","delta":"child"}',
+                    ),
+                    TaskEvent(
+                        run_id=run_ids[1],
+                        task_id=primary_task_ids[1],
+                        event="response.completed",
+                        data='{"type":"response.completed"}',
+                    ),
+                ]
+            )
+        )
+
+        response = self.servicer.ListRunSeriesEvents(
+            ListRunSeriesEventsRequest(series_id=10), Mock()
+        )
+
+        self.assertEqual([event.task_id for event in response.events], primary_task_ids)
+
     def test_list_run_series_events_hides_unauthorized_series(self) -> None:
         """Reject event history access outside the caller's federations."""
         self._create_dummy_run_series(10)
