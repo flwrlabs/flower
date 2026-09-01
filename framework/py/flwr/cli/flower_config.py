@@ -30,12 +30,12 @@ from flwr.cli.constant import (
     DEFAULT_FLOWER_CONFIG_TOML,
     FLOWER_CONFIG_FILE,
     LEGACY_SUPERGRID_ADDRESS,
+    SUPERGRID_HTTP_ADDRESS,
     SimulationBackendConfigTomlKey,
     SimulationClientResourcesTomlKey,
     SimulationInitArgsTomlKey,
     SuperLinkConnectionTomlKey,
     SuperLinkSimulationOptionsTomlKey,
-    SUPERGRID_HTTP_ADDRESS,
 )
 from flwr.cli.typing import (
     SimulationBackendConfig,
