@@ -42,7 +42,7 @@ class CliAuthPlugin(ABC):
     @abstractmethod
     def login(
         login_details: AccountAuthLoginDetails,
-        control_stub: ControlStub | ControlHttpClient,
+        control_client: ControlStub | ControlHttpClient,
     ) -> AccountAuthCredentials:
         """Authenticate the account and retrieve authentication credentials.
 
@@ -50,8 +50,8 @@ class CliAuthPlugin(ABC):
         ----------
         login_details : AccountAuthLoginDetails
             An object containing the account's login details.
-        control_stub : ControlStub | ControlHttpClient
-            A stub for executing RPC calls to the server.
+        control_client : ControlStub | ControlHttpClient
+            A client for making authentication requests.
 
         Returns
         -------

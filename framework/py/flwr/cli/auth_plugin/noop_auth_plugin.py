@@ -33,7 +33,7 @@ class NoOpCliAuthPlugin(CliAuthPlugin):
     @staticmethod
     def login(
         login_details: AccountAuthLoginDetails,
-        control_stub: ControlStub | ControlHttpClient,
+        control_client: ControlStub | ControlHttpClient,
     ) -> AccountAuthCredentials:
         """Raise LoginError as no-op plugin does not support login.
 
@@ -41,8 +41,8 @@ class NoOpCliAuthPlugin(CliAuthPlugin):
         ----------
         login_details : AccountAuthLoginDetails
             Login details (unused).
-        control_stub : ControlStub | ControlHttpClient
-            Control stub (unused).
+        control_client : ControlStub | ControlHttpClient
+            Control client (unused).
 
         Returns
         -------

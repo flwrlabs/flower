@@ -56,7 +56,7 @@ class OidcCliPlugin(CliAuthPlugin):
     @staticmethod
     def login(
         login_details: AccountAuthLoginDetails,
-        control_stub: ControlStub | ControlHttpClient,
+        control_client: ControlStub | ControlHttpClient,
     ) -> AccountAuthCredentials:
         """Authenticate the account and retrieve authentication credentials.
 
@@ -64,8 +64,8 @@ class OidcCliPlugin(CliAuthPlugin):
         ----------
         login_details : AccountAuthLoginDetails
             Login details containing device code and verification URI.
-        control_stub : ControlStub | ControlHttpClient
-            Control stub for making authentication requests.
+        control_client : ControlStub | ControlHttpClient
+            Control client for making authentication requests.
 
         Returns
         -------
@@ -92,7 +92,7 @@ class OidcCliPlugin(CliAuthPlugin):
         time.sleep(login_details.interval)
 
         while (time.time() - start_time) < login_details.expires_in:
-            res: GetAuthTokensResponse = control_stub.GetAuthTokens(
+            res: GetAuthTokensResponse = control_client.GetAuthTokens(
                 GetAuthTokensRequest(device_code=login_details.device_code)
             )
 
