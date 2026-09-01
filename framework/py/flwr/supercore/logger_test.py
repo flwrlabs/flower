@@ -15,6 +15,7 @@
 """Flower logger tests."""
 
 
+import logging
 import sys
 import threading
 import time
@@ -22,8 +23,11 @@ from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from queue import Queue
 
+import pytest
+
 from flwr.common import configure as common_configure
 from flwr.common import log as common_log
+from flwr.common.logger import logger as common_logger
 from flwr.supercore import log as supercore_log
 
 from .logger import (
@@ -32,6 +36,7 @@ from .logger import (
     configure_superlink_log_file,
     console_handler,
     flush_logs,
+    logger,
     mirror_output_to_queue,
     restore_output,
 )
@@ -41,6 +46,22 @@ def test_common_exports_are_backwards_compatible() -> None:
     """Verify the legacy package-level logger exports remain compatible."""
     assert common_log is supercore_log
     assert common_configure is configure
+    assert common_logger is logger
+    assert isinstance(common_logger, logging.Logger)
+
+
+def test_logger_propagates_records_for_open_telemetry(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Verify the public logger emits standard records to parent handlers."""
+    with caplog.at_level(logging.INFO, logger="flwr"):
+        logger.info("OpenTelemetry-compatible log record")
+
+    assert any(
+        record.name == "flwr"
+        and record.getMessage() == "OpenTelemetry-compatible log record"
+        for record in caplog.records
+    )
 
 
 def test_mirror_output_to_queue() -> None:

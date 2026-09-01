@@ -36,6 +36,35 @@ example, to launch your ``SuperLink`` with ``DEBUG`` logs, use:
     :doc:`how-to-run-flower-with-deployment-engine`) or using the `flwr CLI
     <ref-api-cli.html>`_.
 
+******************************
+ Integrate with OpenTelemetry
+******************************
+
+Flower exposes ``logger`` from ``flwr.common.logger`` as a standard Python
+``logging.Logger``. This makes Flower log records compatible with the OpenTelemetry
+Python logging bridge while keeping OpenTelemetry optional for Flower applications. The
+existing ``log`` function remains available for backwards compatibility.
+
+For example, an application can use the supported logger directly:
+
+.. code-block:: python
+
+    from flwr.common.logger import logger
+
+    logger.info("Starting the Flower application")
+
+To export Flower logs with the OpenTelemetry auto-instrumentation agent, install the
+OpenTelemetry distribution and an OTLP exporter, configure the exporter as described in
+the `OpenTelemetry Python logs documentation
+<https://opentelemetry.io/docs/languages/python/instrumentation/#logs>`_, and launch the
+Flower process through ``opentelemetry-instrument``:
+
+.. code-block:: shell
+
+    pip install opentelemetry-distro opentelemetry-exporter-otlp \
+        opentelemetry-instrumentation-logging
+    opentelemetry-instrument flower-superlink --insecure
+
 ************************
  Configure gRPC logging
 ************************

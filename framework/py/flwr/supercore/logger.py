@@ -50,6 +50,7 @@ __all__ = [
     "console_handler",
     "flush_logs",
     "log",
+    "logger",
     "mirror_output_to_queue",
     "print_json_error",
     "redirect_output",
@@ -68,6 +69,9 @@ __all__ = [
 LOGGER_NAME = "flwr"
 FLOWER_LOGGER = logging.getLogger(LOGGER_NAME)
 FLOWER_LOGGER.setLevel(logging.DEBUG)
+# Expose the standard-library logger so applications can configure it with
+# OpenTelemetry's Python logging bridge without depending on Flower internals.
+logger = FLOWER_LOGGER
 log = FLOWER_LOGGER.log  # pylint: disable=invalid-name
 
 LOG_COLORS = {

@@ -25,6 +25,7 @@ from flwr.supercore.logger import (
 from flwr.supercore.logger import console_handler as console_handler
 from flwr.supercore.logger import flush_logs as flush_logs
 from flwr.supercore.logger import log as log
+from flwr.supercore.logger import logger as logger
 from flwr.supercore.logger import mirror_output_to_queue as mirror_output_to_queue
 from flwr.supercore.logger import print_json_error as print_json_error
 from flwr.supercore.logger import redirect_output as redirect_output
@@ -50,6 +51,7 @@ __all__ = [
     "console_handler",
     "flush_logs",
     "log",
+    "logger",
     "mirror_output_to_queue",
     "print_json_error",
     "redirect_output",
