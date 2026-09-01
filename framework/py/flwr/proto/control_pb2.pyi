@@ -30,10 +30,34 @@ import flwr.proto.task_pb2
 import flwr.proto.transport_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
+import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
+import sys
 import typing
 
+if sys.version_info >= (3, 10):
+    import typing as typing_extensions
+else:
+    import typing_extensions
+
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
+
+class _AppUpdatePolicy:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _AppUpdatePolicyEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_AppUpdatePolicy.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    APP_UPDATE_POLICY_UNSPECIFIED: _AppUpdatePolicy.ValueType  # 0
+    APP_UPDATE_POLICY_PINNED: _AppUpdatePolicy.ValueType  # 1
+    APP_UPDATE_POLICY_TRACK_LATEST: _AppUpdatePolicy.ValueType  # 2
+
+class AppUpdatePolicy(_AppUpdatePolicy, metaclass=_AppUpdatePolicyEnumTypeWrapper): ...
+
+APP_UPDATE_POLICY_UNSPECIFIED: AppUpdatePolicy.ValueType  # 0
+APP_UPDATE_POLICY_PINNED: AppUpdatePolicy.ValueType  # 1
+APP_UPDATE_POLICY_TRACK_LATEST: AppUpdatePolicy.ValueType  # 2
+global___AppUpdatePolicy = AppUpdatePolicy
 
 @typing.final
 class StartRunRequest(google.protobuf.message.Message):
@@ -909,6 +933,7 @@ class AppInfo(google.protobuf.message.Message):
     FAB_HASH_FIELD_NUMBER: builtins.int
     APP_TYPE_FIELD_NUMBER: builtins.int
     IS_HUB_APP_FIELD_NUMBER: builtins.int
+    UPDATE_POLICY_FIELD_NUMBER: builtins.int
     app_id: builtins.str
     fab_hash: builtins.str
     app_type: builtins.str
@@ -916,16 +941,21 @@ class AppInfo(google.protobuf.message.Message):
     """True for Hub apps, false for local/custom apps, and absent for legacy apps
     whose provenance is unknown.
     """
+    update_policy: global___AppUpdatePolicy.ValueType
     def __init__(
         self,
         *,
         app_id: builtins.str = ...,
-        fab_hash: builtins.str = ...,
+        fab_hash: builtins.str | None = ...,
         app_type: builtins.str = ...,
         is_hub_app: builtins.bool | None = ...,
+        update_policy: global___AppUpdatePolicy.ValueType = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_is_hub_app", b"_is_hub_app", "is_hub_app", b"is_hub_app"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_is_hub_app", b"_is_hub_app", "app_id", b"app_id", "app_type", b"app_type", "fab_hash", b"fab_hash", "is_hub_app", b"is_hub_app"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_fab_hash", b"_fab_hash", "_is_hub_app", b"_is_hub_app", "fab_hash", b"fab_hash", "is_hub_app", b"is_hub_app"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_fab_hash", b"_fab_hash", "_is_hub_app", b"_is_hub_app", "app_id", b"app_id", "app_type", b"app_type", "fab_hash", b"fab_hash", "is_hub_app", b"is_hub_app", "update_policy", b"update_policy"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_fab_hash", b"_fab_hash"]) -> typing.Literal["fab_hash"] | None: ...
+    @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_is_hub_app", b"_is_hub_app"]) -> typing.Literal["is_hub_app"] | None: ...
 
 global___AppInfo = AppInfo
@@ -972,15 +1002,20 @@ class AddAppRequest(google.protobuf.message.Message):
 
     FEDERATION_ID_FIELD_NUMBER: builtins.int
     APP_ID_FIELD_NUMBER: builtins.int
+    UPDATE_POLICY_FIELD_NUMBER: builtins.int
     federation_id: builtins.str
     app_id: builtins.str
+    update_policy: global___AppUpdatePolicy.ValueType
     def __init__(
         self,
         *,
         federation_id: builtins.str = ...,
         app_id: builtins.str = ...,
+        update_policy: global___AppUpdatePolicy.ValueType | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["app_id", b"app_id", "federation_id", b"federation_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_update_policy", b"_update_policy", "update_policy", b"update_policy"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_update_policy", b"_update_policy", "app_id", b"app_id", "federation_id", b"federation_id", "update_policy", b"update_policy"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_update_policy", b"_update_policy"]) -> typing.Literal["update_policy"] | None: ...
 
 global___AddAppRequest = AddAppRequest
 
@@ -1000,15 +1035,18 @@ class UpdateAppRequest(google.protobuf.message.Message):
 
     FEDERATION_ID_FIELD_NUMBER: builtins.int
     APP_ID_FIELD_NUMBER: builtins.int
+    UPDATE_POLICY_FIELD_NUMBER: builtins.int
     federation_id: builtins.str
     app_id: builtins.str
+    update_policy: global___AppUpdatePolicy.ValueType
     def __init__(
         self,
         *,
         federation_id: builtins.str = ...,
         app_id: builtins.str = ...,
+        update_policy: global___AppUpdatePolicy.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["app_id", b"app_id", "federation_id", b"federation_id"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["app_id", b"app_id", "federation_id", b"federation_id", "update_policy", b"update_policy"]) -> None: ...
 
 global___UpdateAppRequest = UpdateAppRequest
 

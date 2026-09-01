@@ -53,6 +53,9 @@ from flwr.common.serde import (
     user_config_from_proto,
 )
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    APP_UPDATE_POLICY_PINNED,
+    APP_UPDATE_POLICY_TRACK_LATEST,
+    APP_UPDATE_POLICY_UNSPECIFIED,
     AcceptInvitationRequest,
     AcceptInvitationResponse,
     AddAppRequest,
@@ -147,6 +150,7 @@ from flwr.supercore.constant import (
     OAUTH_SESSION_TTL,
     RUN_SERIES_DESCRIPTION_MAX_LENGTH,
     ActionType,
+    AppUpdatePolicy,
     AutomationStatus,
     RunTime,
     TaskType,
@@ -519,6 +523,14 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             ) from e
     is_stored_app = bool(request.fab.hash_str and not request.fab.content)
     is_hub_app = False
+    tracks_latest = app_id in _DEFAULT_APP_TYPES
+    if app_id is not None and not is_stored_app:
+        stored_app = next(
+            (app for app in state.list_apps(federation_id) if app.app_id == app_id),
+            None,
+        )
+        if stored_app is not None:
+            tracks_latest = stored_app.update_policy == APP_UPDATE_POLICY_TRACK_LATEST
 
     # Start a run using a stored app
     if is_stored_app:
@@ -614,18 +626,17 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 "Stored app ID does not match the request",
             )
 
-        if not is_stored_app:
-            if app_id in _DEFAULT_APP_TYPES:
-                state.store_fab(fab)
-            else:
-                state.store_app(
-                    fab=fab,
-                    federation_id=federation_id,
-                    app_id=app_id,
-                    app_type=app_type,
-                    added_by=flwr_aid,
-                    is_hub_app=is_hub_app,
-                )
+        if not is_stored_app and tracks_latest:
+            state.store_fab(fab)
+        elif not is_stored_app:
+            state.store_app(
+                fab=fab,
+                federation_id=federation_id,
+                app_id=app_id,
+                app_type=app_type,
+                added_by=flwr_aid,
+                is_hub_app=is_hub_app,
+            )
 
         series_id = request.series_id if request.HasField("series_id") else None
         series_description: str | None = None
@@ -1455,7 +1466,12 @@ def list_apps(
     apps = list(state.list_apps(federation_id, limit))
     stored_app_ids = {app.app_id for app in apps}
     default_apps = [
-        AppInfo(app_id=app_id, app_type=app_type, is_hub_app=True)
+        AppInfo(
+            app_id=app_id,
+            app_type=app_type,
+            is_hub_app=True,
+            update_policy=APP_UPDATE_POLICY_TRACK_LATEST,
+        )
         for app_id, app_type in _DEFAULT_APP_TYPES.items()
         if app_id not in stored_app_ids
     ]
@@ -1470,11 +1486,12 @@ def _download_and_store_app(
     *,
     federation_id: str,
     app_id: str,
-    flwr_aid: str,
+    added_by: str,
     state: LinkState,
     fleet_api_type: str | None,
+    update_policy: AppUpdatePolicy,
 ) -> None:
-    """Download the latest Hub app and store its federation association."""
+    """Download the latest Hub FAB and store the requested association policy."""
     fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, app_id)
     try:
         app_type = _get_app_type(get_fab_config(fab_file))
@@ -1484,17 +1501,21 @@ def _download_and_store_app(
             f"Failed to read app metadata: {e}",
         ) from e
 
+    fab = Fab(
+        hash_str=hashlib.sha256(fab_file).hexdigest(),
+        content=fab_file,
+        verifications=verification_dict,
+    )
+    if update_policy == AppUpdatePolicy.TRACK_LATEST:
+        state.store_fab(fab)
     state.store_app(
-        fab=Fab(
-            hash_str=hashlib.sha256(fab_file).hexdigest(),
-            content=fab_file,
-            verifications=verification_dict,
-        ),
+        fab=fab if update_policy == AppUpdatePolicy.PINNED else None,
         federation_id=federation_id,
         app_id=app_id,
         app_type=app_type,
-        added_by=flwr_aid,
+        added_by=added_by,
         is_hub_app=True,
+        update_policy=update_policy,
     )
 
 
@@ -1507,12 +1528,18 @@ def add_app(
     """Add a Hub app to a federation."""
     federation_id = request.federation_id
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    update_policy = _parse_app_update_policy(
+        request.update_policy
+        if request.HasField("update_policy")
+        else APP_UPDATE_POLICY_PINNED
+    )
     _download_and_store_app(
         federation_id=federation_id,
         app_id=request.app_id,
-        flwr_aid=account.flwr_aid,
+        added_by=account.flwr_aid,
         state=state,
         fleet_api_type=fleet_api_type,
+        update_policy=update_policy,
     )
 
     return AddAppResponse()
@@ -1524,35 +1551,63 @@ def update_app(
     state: LinkState,
     fleet_api_type: str | None,
 ) -> UpdateAppResponse:
-    """Update a federation app to the latest Hub version."""
+    """Update a federation app's version policy or pinned FAB."""
     federation_id = request.federation_id
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    update_policy = _parse_app_update_policy(request.update_policy)
 
-    if request.app_id in _DEFAULT_APP_TYPES:
+    stored_apps = {app.app_id: app for app in state.list_apps(federation_id)}
+    stored_app = stored_apps.get(request.app_id)
+    if stored_app is None and request.app_id not in _DEFAULT_APP_TYPES:
+        raise FlowerError(
+            ApiErrorCode.INVALID_APP_SPEC,
+            f"App {request.app_id} is not associated with {federation_id}.",
+        )
+    if stored_app is not None and stored_app.is_hub_app is not True:
+        raise FlowerError(
+            ApiErrorCode.INVALID_APP_SPEC,
+            f"App {request.app_id} is not a Hub app.",
+        )
+
+    if (
+        request.app_id in _DEFAULT_APP_TYPES
+        and update_policy == AppUpdatePolicy.TRACK_LATEST
+    ):
         # Removing a stored override reveals the latest-tracking default entry.
         state.delete_app(federation_id, request.app_id)
+    elif update_policy == AppUpdatePolicy.TRACK_LATEST:
+        assert stored_app is not None
+        state.store_app(
+            fab=None,
+            federation_id=federation_id,
+            app_id=request.app_id,
+            app_type=stored_app.app_type,
+            added_by=account.flwr_aid,
+            is_hub_app=stored_app.is_hub_app,
+            update_policy=update_policy,
+        )
     else:
-        stored_apps = {app.app_id: app for app in state.list_apps(federation_id)}
-        stored_app = stored_apps.get(request.app_id)
-        if stored_app is None:
-            raise FlowerError(
-                ApiErrorCode.INVALID_APP_SPEC,
-                f"App {request.app_id} is not associated with {federation_id}.",
-            )
-        if not stored_app.HasField("is_hub_app") or not stored_app.is_hub_app:
-            raise FlowerError(
-                ApiErrorCode.INVALID_APP_SPEC,
-                f"App {request.app_id} is not a Hub app.",
-            )
         _download_and_store_app(
             federation_id=federation_id,
             app_id=request.app_id,
-            flwr_aid=account.flwr_aid,
+            added_by=account.flwr_aid,
             state=state,
             fleet_api_type=fleet_api_type,
+            update_policy=update_policy,
         )
 
     return UpdateAppResponse()
+
+
+def _parse_app_update_policy(value: int) -> AppUpdatePolicy:
+    """Convert a protobuf update policy to its state representation."""
+    if value == APP_UPDATE_POLICY_PINNED:
+        return AppUpdatePolicy.PINNED
+    if value == APP_UPDATE_POLICY_TRACK_LATEST:
+        return AppUpdatePolicy.TRACK_LATEST
+    if value == APP_UPDATE_POLICY_UNSPECIFIED:
+        raise FlowerError(ApiErrorCode.INVALID_APP_SPEC, "Update policy is required")
+    raise FlowerError(ApiErrorCode.INVALID_APP_SPEC, "Unknown update policy")
 
 
 def remove_app(

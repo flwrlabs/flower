@@ -57,6 +57,8 @@ from flwr.common.constant import (
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    APP_UPDATE_POLICY_PINNED,
+    APP_UPDATE_POLICY_TRACK_LATEST,
     AppInfo,
     Automation,
     StartRunRequest,
@@ -74,7 +76,11 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskUsage,
 )
 from flwr.supercore import log
-from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
+from flwr.supercore.constant import (
+    OBJECT_PUSH_SESSION_TTL_SECONDS,
+    AppUpdatePolicy,
+    AutomationStatus,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
@@ -418,43 +424,51 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab,
+        fab: Fab | None,
         federation_id: str,
         app_id: str,
         app_type: str,
         added_by: str,
-        is_hub_app: bool = False,
-    ) -> str:
+        is_hub_app: bool | None = False,
+        update_policy: AppUpdatePolicy = AppUpdatePolicy.PINNED,
+    ) -> str | None:
         """Atomically store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
             raise ValueError(
                 "Federation ID, app ID, app type, and added by are required"
             )
-        fab_hash = hashlib.sha256(fab.content).hexdigest()
-        if fab.hash_str and fab.hash_str != fab_hash:
-            raise ValueError(
-                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+        fab_stmt = None
+        if update_policy == AppUpdatePolicy.PINNED:
+            if fab is None:
+                raise ValueError("A FAB is required for a pinned app")
+            fab_hash = hashlib.sha256(fab.content).hexdigest()
+            if fab.hash_str and fab.hash_str != fab_hash:
+                raise ValueError(
+                    f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+                )
+            # Keep launch behavior: last write wins for metadata under the same
+            # content hash.
+            fab_stmt = self.dialect_insert(FabModel).values(
+                fab_hash=fab_hash,
+                content=fab.content,
+                verifications=json.dumps(fab.verifications),
             )
-        # Keep launch behavior: last write wins for metadata under the same
-        # content hash.
-        fab_stmt = self.dialect_insert(FabModel).values(
-            fab_hash=fab_hash,
-            content=fab.content,
-            verifications=json.dumps(fab.verifications),
-        )
-        fab_stmt = fab_stmt.on_conflict_do_update(
-            index_elements=[FabModel.fab_hash],
-            set_={
-                "content": fab_stmt.excluded.content,
-                "verifications": fab_stmt.excluded.verifications,
-            },
-        )
+            fab_stmt = fab_stmt.on_conflict_do_update(
+                index_elements=[FabModel.fab_hash],
+                set_={
+                    "content": fab_stmt.excluded.content,
+                    "verifications": fab_stmt.excluded.verifications,
+                },
+            )
+        else:
+            fab_hash = None
         app_stmt = self.dialect_insert(FederationAppModel).values(
             federation_id=federation_id,
             app_id=app_id,
             fab_hash=fab_hash,
             app_type=app_type,
             is_hub_app=is_hub_app,
+            update_policy=update_policy.value,
             added_by=added_by,
             added_at=now(),
         )
@@ -467,10 +481,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 "fab_hash": app_stmt.excluded.fab_hash,
                 "app_type": app_stmt.excluded.app_type,
                 "is_hub_app": app_stmt.excluded.is_hub_app,
+                "update_policy": app_stmt.excluded.update_policy,
             },
         )
         with self.session() as session:
-            session.execute(fab_stmt)
+            if fab_stmt is not None:
+                session.execute(fab_stmt)
             session.execute(app_stmt)
         return fab_hash
 
@@ -528,6 +544,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 FederationAppModel.fab_hash,
                 FederationAppModel.app_type,
                 FederationAppModel.is_hub_app,
+                FederationAppModel.update_policy,
             )
             .where(FederationAppModel.federation_id == federation_id)
             .order_by(
@@ -545,6 +562,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     fab_hash=app.fab_hash,
                     app_type=app.app_type,
                     is_hub_app=app.is_hub_app,
+                    update_policy=(
+                        APP_UPDATE_POLICY_TRACK_LATEST
+                        if app.update_policy == AppUpdatePolicy.TRACK_LATEST
+                        else APP_UPDATE_POLICY_PINNED
+                    ),
                 )
                 for app in apps
             ]

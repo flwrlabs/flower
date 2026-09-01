@@ -26,6 +26,8 @@ from flwr.common.constant import (
     REFRESH_TOKEN_KEY,
 )
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    APP_UPDATE_POLICY_PINNED,
+    APP_UPDATE_POLICY_TRACK_LATEST,
     AddAppRequest,
     AddAppResponse,
     AppInfo,
@@ -493,6 +495,7 @@ class TestControlHandlers(unittest.TestCase):
                 UpdateAppRequest(
                     federation_id=NOOP_FEDERATION_ID,
                     app_id="@flwr/demo",
+                    update_policy=APP_UPDATE_POLICY_PINNED,
                 ),
                 self.account,
                 self.state,
@@ -519,6 +522,7 @@ class TestControlHandlers(unittest.TestCase):
             UpdateAppRequest(
                 federation_id=NOOP_FEDERATION_ID,
                 app_id=FLOWER_AGENT_APP_ID,
+                update_policy=APP_UPDATE_POLICY_TRACK_LATEST,
             ),
             self.account,
             self.state,
@@ -533,6 +537,7 @@ class TestControlHandlers(unittest.TestCase):
         )
         self.assertEqual(len(listed.apps), 1)
         self.assertEqual(listed.apps[0].app_id, FLOWER_AGENT_APP_ID)
+        self.assertEqual(listed.apps[0].update_policy, APP_UPDATE_POLICY_TRACK_LATEST)
         self.assertEqual(listed.apps[0].fab_hash, "")
 
     def test_remove_app_rejects_default_app(self) -> None:

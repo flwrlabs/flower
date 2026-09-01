@@ -32,7 +32,7 @@ from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0
 from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
-from ..constant import AutomationStatus
+from ..constant import AppUpdatePolicy, AutomationStatus
 from ..object_store import ObjectStore
 
 
@@ -120,13 +120,14 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab,
+        fab: Fab | None,
         federation_id: str,
         app_id: str,
         app_type: str,
         added_by: str,
-        is_hub_app: bool = False,
-    ) -> str:
+        is_hub_app: bool | None = False,
+        update_policy: AppUpdatePolicy = AppUpdatePolicy.PINNED,
+    ) -> str | None:
         """Atomically store a FAB and associate its app with a federation.
 
         A federation has at most one association for each app ID. Storing the app
@@ -135,8 +136,9 @@ class CoreState(ABC):  # pylint: disable=R0904
 
         Parameters
         ----------
-        fab : Fab
-            FAB content and verification metadata to store.
+        fab : Fab | None
+            FAB content and verification metadata to store. Required for pinned
+            apps and omitted for apps that track the latest Hub version.
         federation_id : str
             ID of the federation to associate with the app.
         app_id : str
@@ -147,11 +149,13 @@ class CoreState(ABC):  # pylint: disable=R0904
             ID of the account adding the app to the federation.
         is_hub_app : bool, default=False
             Whether the app was fetched from Flower Hub.
+        update_policy : AppUpdatePolicy, default=AppUpdatePolicy.PINNED
+            Whether the association pins the stored FAB or tracks Hub latest.
 
         Returns
         -------
-        str
-            Canonical SHA-256 hash of the stored FAB.
+        str | None
+            Canonical SHA-256 hash for a pinned app, otherwise ``None``.
         """
 
     @abstractmethod
