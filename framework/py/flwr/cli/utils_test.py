@@ -40,6 +40,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 
+from .cli_client_interceptor import CliClientInterceptor
 from .utils import (
     AUTHENTICATION_FAILED_MESSAGE,
     SUPERLINK_UNAVAILABLE_MESSAGE,
@@ -254,10 +255,11 @@ def test_init_channel_from_connection_uses_resolved_connection() -> None:
     assert kwargs["insecure"] is True
     assert kwargs["root_certificates"] is None
     assert kwargs["max_message_length"] == GRPC_MAX_MESSAGE_LENGTH
-    assert len(kwargs["interceptors"]) == 2
-    assert isinstance(kwargs["interceptors"][0], RuntimeVersionClientInterceptor)
+    assert len(kwargs["interceptors"]) == 3
+    assert isinstance(kwargs["interceptors"][0], CliClientInterceptor)
+    assert isinstance(kwargs["interceptors"][1], RuntimeVersionClientInterceptor)
     # pylint: disable-next=protected-access
-    assert kwargs["interceptors"][0]._metadata.component_name == "flwr CLI"
+    assert kwargs["interceptors"][1]._metadata.component_name == "flwr CLI"
     channel.subscribe.assert_called_once()
 
 
