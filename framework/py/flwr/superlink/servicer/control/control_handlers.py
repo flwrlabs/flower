@@ -175,7 +175,7 @@ from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
-from flwr.superlink.run_source import RunStartSource
+from flwr.superlink.run_source import RunSource
 
 
 class InvalidConnectorRequestError(FlowerError):
@@ -476,7 +476,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     state: LinkState,
     fleet_api_type: str | None,
     *,
-    source: RunStartSource = "unknown",
+    source: RunSource = "unknown",
 ) -> StartRunResponse:
     """Create run ID."""
     log(INFO, "ControlServicer.StartRun")

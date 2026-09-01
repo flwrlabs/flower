@@ -27,7 +27,7 @@ from starlette.middleware import Middleware
 
 from flwr.common.logger import log
 from flwr.supercore.run import Run
-from flwr.superlink.run_source import RunStartSource
+from flwr.superlink.run_source import RunSource
 
 SuperLinkLifespanContext = Callable[
     [FastAPI], AbstractAsyncContextManager[Mapping[str, Any] | None]
@@ -97,7 +97,7 @@ def get_lifespan_contexts() -> tuple[SuperLinkLifespanContext, ...]:
     return get_sgxt_lifespan_contexts()
 
 
-def notify_run_started(run: Run, source: RunStartSource) -> None:
+def notify_run_started(run: Run, source: RunSource) -> None:
     """Notify an optional extension after a run has been persisted.
 
     The callback is synchronous by design. Extensions must keep this hook
@@ -113,7 +113,7 @@ def notify_run_started(run: Run, source: RunStartSource) -> None:
             return
 
         on_run_started = cast(
-            Callable[[Run, RunStartSource], None] | None,
+            Callable[[Run, RunSource], None] | None,
             getattr(sgxt, "on_run_started", None),
         )
         if on_run_started is not None:
