@@ -66,14 +66,9 @@ from .cli_account_auth_interceptor import (
     CliAccountAuthInterceptor,
 )
 from .config_utils import load_certificate_in_connection
-from .constant import (
-    AUTHN_TYPE_STORE_KEY,
-    LOCAL_RUNTIME_API_PORT,
-    LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
-    LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY,
-)
+from .constant import AUTHN_TYPE_STORE_KEY
 from .flower_config import read_superlink_connection
-from .local_superlink import ensure_local_superlink
+from .local_superlink import ensure_local_superlink, ensure_local_superlink_http
 
 SUPERLINK_UNAVAILABLE_MESSAGE = (
     "Connection to the SuperLink is unavailable. Please check your network "
@@ -404,15 +399,7 @@ def init_http_client_from_connection(
     ControlHttpClient
         Configured HTTP client with runtime-version and authentication interceptors.
     """
-    # `ensure_local_superlink` starts and probes the local gRPC Control API. HTTP
-    # callers use the FastAPI port exposed by that same SuperLink process instead.
-    is_local = connection.address in (
-        LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
-        LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY,
-    )
-    connection = ensure_local_superlink(connection)
-    if is_local:
-        connection.address = f"127.0.0.1:{LOCAL_RUNTIME_API_PORT}"
+    connection = ensure_local_superlink_http(connection)
 
     address = cast(str, connection.address)
     log_superlink_connection(connection)

@@ -280,7 +280,7 @@ def test_init_http_client_from_connection_uses_resolved_connection() -> None:
     )
     resolved = SuperLinkConnection(
         name="local",
-        address=LOCAL_CONTROL_API_ADDRESS,
+        address=f"127.0.0.1:{LOCAL_RUNTIME_API_PORT}",
         insecure=True,
         options=SuperLinkSimulationOptions(num_supernodes=2),
     )
@@ -292,7 +292,7 @@ def test_init_http_client_from_connection_uses_resolved_connection() -> None:
     )
 
     with (
-        patch("flwr.cli.utils.ensure_local_superlink", return_value=resolved),
+        patch("flwr.cli.utils.ensure_local_superlink_http", return_value=resolved),
         patch("flwr.cli.utils.load_certificate_in_connection", return_value=None),
         patch(
             "flwr.cli.utils.load_cli_auth_plugin_from_connection",
