@@ -32,9 +32,16 @@ from . import run_superexec as run_superexec_module
 
 
 def _run_superexec_one_launch(
-    monkeypatch: pytest.MonkeyPatch, launch_result: LaunchResult | None
-) -> tuple[Mock, Mock, Mock]:
+    monkeypatch: pytest.MonkeyPatch,
+    launch_result: LaunchResult | None,
+    task_poll_interval: str | None = None,
+) -> tuple[Mock, Mock, Mock, Mock]:
     """Run one SuperExec launch loop and stop at the loop sleep."""
+    if task_poll_interval is None:
+        monkeypatch.delenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", raising=False)
+    else:
+        monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", task_poll_interval)
+
     task = Mock()
     task.task_id = 123
     client = Mock()
@@ -50,10 +57,8 @@ def _run_superexec_one_launch(
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
     monkeypatch.setattr(run_superexec_module, "get_executor", Mock())
     monkeypatch.setattr(run_superexec_module, "log", log)
-    monkeypatch.setattr(
-        "flwr.supercore.superexec.run_superexec.time.sleep",
-        Mock(side_effect=KeyboardInterrupt()),
-    )
+    sleep_mock = Mock(side_effect=KeyboardInterrupt())
+    monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep_mock)
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
@@ -63,7 +68,7 @@ def _run_superexec_one_launch(
             insecure=True,
         )
 
-    return log, plugin, client
+    return log, plugin, client, sleep_mock
 
 
 @pytest.mark.parametrize(
@@ -144,11 +149,14 @@ def test_run_superexec_preserves_accepted_launch_behavior(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """SuperExec should launch and continue quietly when launch is accepted."""
-    log, plugin, stub = _run_superexec_one_launch(monkeypatch, LaunchResult.accepted())
+    log, plugin, stub, sleep_mock = _run_superexec_one_launch(
+        monkeypatch, LaunchResult.accepted()
+    )
 
     stub.ClaimTask.assert_called_once()
     plugin.launch_task.assert_called_once()
     log.assert_not_called()
+    sleep_mock.assert_called_once_with(1.0)
 
 
 @pytest.mark.parametrize(
@@ -178,7 +186,7 @@ def test_run_superexec_logs_non_accepted_launch_result(
     expected_message: str,
 ) -> None:
     """SuperExec should log non-accepted launch results and keep loop behavior."""
-    log, plugin, stub = _run_superexec_one_launch(monkeypatch, launch_result)
+    log, plugin, stub, _ = _run_superexec_one_launch(monkeypatch, launch_result)
 
     stub.ClaimTask.assert_called_once()
     plugin.launch_task.assert_called_once()
@@ -192,11 +200,52 @@ def test_run_superexec_continues_when_plugin_returns_no_launch_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """SuperExec should not crash if a plugin returns no launch result."""
-    log, plugin, stub = _run_superexec_one_launch(monkeypatch, None)
+    log, plugin, stub, _ = _run_superexec_one_launch(monkeypatch, None)
 
     stub.ClaimTask.assert_called_once()
     plugin.launch_task.assert_called_once()
     log.assert_not_called()
+
+
+def test_run_superexec_uses_configured_task_poll_interval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperExec should use the task polling interval from the environment."""
+    _, _, _, sleep_mock = _run_superexec_one_launch(
+        monkeypatch, LaunchResult.accepted(), task_poll_interval="0.25"
+    )
+
+    sleep_mock.assert_called_once_with(0.25)
+
+
+@pytest.mark.parametrize(
+    "value", ["", "0", "0.009", "-1", "60.001", "1e20", "nan", "inf", "not-a-number"]
+)
+def test_run_superexec_rejects_invalid_task_poll_interval(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    """SuperExec should reject invalid task polling intervals."""
+    monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", value)
+
+    with pytest.raises(ValueError, match="FLWR_SUPEREXEC_TASK_POLL_INTERVAL"):
+        run_superexec_module.run_superexec(
+            plugin_class=Mock(),
+            client_class=Mock(),
+            runtime_api_address="127.0.0.1:9091",
+            insecure=True,
+        )
+
+
+@pytest.mark.parametrize("value", ["0.01", "60"])
+def test_run_superexec_accepts_task_poll_interval_bounds(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    """SuperExec should accept the configured polling interval bounds."""
+    monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", value)
+
+    # pylint: disable-next=protected-access
+    get_task_poll_interval = run_superexec_module._get_task_poll_interval
+    assert get_task_poll_interval() == float(value)
 
 
 def test_handle_launch_result_handles_all_statuses() -> None:
