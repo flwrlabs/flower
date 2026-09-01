@@ -65,7 +65,7 @@ from .control_handlers import (
 )
 
 
-class TestControlHandlers(unittest.TestCase):
+class TestControlHandlers(unittest.TestCase):  # pylint: disable=too-many-public-methods
     """Test Control API handlers."""
 
     def setUp(self) -> None:
