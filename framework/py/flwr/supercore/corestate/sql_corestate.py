@@ -1258,7 +1258,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if run_ids is not None:
             if not run_ids:
                 return []
-            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
+            sint64_run_ids = [
+                uint64_to_int64(series_run_id) for series_run_id in run_ids
+            ]
             query = query.where(TaskModel.run_id.in_(sint64_run_ids))
 
         if statuses is not None:

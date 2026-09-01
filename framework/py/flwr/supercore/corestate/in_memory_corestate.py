@@ -1283,23 +1283,33 @@ class InMemoryCoreState(CoreState):  # pylint: disable=R0904,too-many-instance-a
         """Return task-produced run events after the cursor."""
         cursor = after_task_event_id if after_task_event_id is not None else 0
         with self.lock_task_event_store:
-            if run_id is None:
+            if run_ids is not None and not run_ids:
+                return []
+
+            run_id_set = set(run_ids) if run_ids is not None else None
+            if run_id is not None:
+                events = list(self.task_event_store.get(run_id, []))
+            elif run_id_set is not None:
+                events = [
+                    event
+                    for requested_run_id in run_id_set
+                    for event in self.task_event_store.get(requested_run_id, [])
+                ]
+            else:
                 events = [
                     event
                     for task_events in self.task_event_store.values()
                     for event in task_events
                 ]
-            else:
-                events = list(self.task_event_store.get(run_id, []))
-            run_id_set = set(run_ids) if run_ids is not None else None
-            task_id_set = set(task_ids) if task_ids is not None else None
-            return [
-                event
-                for event in sorted(events, key=lambda event: event.id)
-                if event.id > cursor
-                and (run_id_set is None or event.run_id in run_id_set)
-                and (task_id_set is None or event.task_id in task_id_set)
-            ]
+
+        task_id_set = set(task_ids) if task_ids is not None else None
+        return [
+            event
+            for event in sorted(events, key=lambda event: event.id)
+            if event.id > cursor
+            and (run_id_set is None or event.run_id in run_id_set)
+            and (task_id_set is None or event.task_id in task_id_set)
+        ]
 
     def _cleanup_expired_task_tokens_locked(self) -> None:
         """Remove expired task tokens.
