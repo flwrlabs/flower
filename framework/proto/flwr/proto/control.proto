@@ -240,9 +240,7 @@ message GetRunSeriesResponse {
   Context context = 2;
 }
 
-message ListRunSeriesEventsRequest {
-  uint64 series_id = 1;
-}
+message ListRunSeriesEventsRequest { uint64 series_id = 1; }
 message ListRunSeriesEventsResponse { repeated TaskEvent events = 1; }
 
 message GetLoginDetailsRequest {}
