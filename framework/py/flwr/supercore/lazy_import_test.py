@@ -172,6 +172,21 @@ def test_connector_metadata_does_not_import_connector_runner() -> None:
     assert loaded_modules == []
 
 
+def test_runner_exports_remain_callable_after_child_module_imports() -> None:
+    """Verify child module imports do not shadow package-level runner exports."""
+    callable_runners = _fresh_modules(
+        "import json\n"
+        "import flwr.supercore.task_process.connector.run_connector\n"
+        "import flwr.supercore.task_process.model.run_model\n"
+        "from flwr.supercore.task_process.connector import run_connector\n"
+        "from flwr.supercore.task_process.model import run_model\n"
+        "runners = [('run_connector', run_connector), ('run_model', run_model)]\n"
+        "print(json.dumps([name for name, runner in runners if callable(runner)]))\n"
+    )
+
+    assert callable_runners == ["run_connector", "run_model"]
+
+
 def test_browser_use_schema_does_not_import_optional_provider() -> None:
     """Verify Browser Use metadata does not load the optional SDK."""
     loaded_modules = _fresh_modules(

@@ -16,11 +16,20 @@
 
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from flwr.supercore.version import package_version as _package_version
 
 from . import app as app
+
+if TYPE_CHECKING:
+    from . import agentapp as agentapp
+    from . import client as client
+    from . import clientapp as clientapp
+    from . import common as common
+    from . import server as server
+    from . import serverapp as serverapp
+    from . import simulation as simulation
 
 __all__ = [
     "agentapp",

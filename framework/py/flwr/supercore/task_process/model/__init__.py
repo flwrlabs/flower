@@ -15,7 +15,9 @@
 """Private model task process helpers."""
 
 
+import sys
 from importlib import import_module
+from types import ModuleType
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -26,6 +28,21 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
 }
 
 __all__ = ["run_model"]
+
+
+class _ModelModule(ModuleType):
+    """Preserve callable exports when their implementation modules are imported."""
+
+    def __setattr__(self, name: str, value: object) -> None:
+        """Avoid child modules shadowing same-named callable exports."""
+        if name in _LAZY_EXPORTS:
+            module_name, _ = _LAZY_EXPORTS[name]
+            if isinstance(value, ModuleType) and value.__name__ == module_name:
+                return
+        super().__setattr__(name, value)
+
+
+sys.modules[__name__].__class__ = _ModelModule
 
 
 def __getattr__(name: str) -> Any:
