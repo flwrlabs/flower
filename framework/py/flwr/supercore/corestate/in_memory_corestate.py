@@ -115,7 +115,9 @@ class ObjectPushSession:
     pending_object_ids: set[str]
 
 
-class InMemoryCoreState(CoreState):  # pylint: disable=R0904,too-many-instance-attributes
+class InMemoryCoreState(
+    CoreState
+):  # pylint: disable=R0904,too-many-instance-attributes
     """In-memory CoreState implementation."""
 
     def __init__(self, object_store: ObjectStore) -> None:
