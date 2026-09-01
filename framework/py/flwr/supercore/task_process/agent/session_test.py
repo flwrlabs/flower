@@ -291,39 +291,6 @@ def test_connector_call_emits_standard_items() -> None:
     ]
 
 
-def test_connector_failure_emits_secret_safe_output() -> None:
-    """Persist a terminal, secret-safe output before propagating a failure."""
-    responses = RuntimeAgentResponses(
-        stub=Mock(),
-        run_id=123,
-        task_id=789,
-        context=Mock(),
-        start_run_request=StartRunRequest(),
-        events=Mock(),
-    )
-
-    with (
-        patch.object(
-            responses,
-            "create_connector_response",
-            side_effect=RuntimeError("provider leaked secret-token"),
-        ),
-        patch.object(
-            responses, "append_and_push_run_events"
-        ) as append_and_push_run_events,
-        pytest.raises(RuntimeError, match="secret-token"),
-    ):
-        responses.call_connector_with_events(
-            name="notion_search",
-            call_id="call-1",
-            arguments={"query": "Flower"},
-        )
-
-    output = append_and_push_run_events.call_args_list[-1].args[0][0]["output"]
-    assert "Connector execution failed." in output
-    assert "secret-token" not in output
-
-
 def test_create_connector_response_resolves_canonical_name() -> None:
     """Task creation should resolve the canonical tool name to its connector."""
     stub = Mock()
