@@ -175,6 +175,8 @@ from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
 from flwr.superlink.run_source import RunStartSource
 
+_DEFAULT_APP_TYPES = {FLOWER_AGENT_APP_ID: TaskType.AGENT_APP}
+
 
 class InvalidConnectorRequestError(FlowerError):
     """Exception raised when a connector request is invalid."""
@@ -610,7 +612,9 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 "Stored app ID does not match the request",
             )
 
-        if not is_stored_app:
+        if not is_stored_app and app_id in _DEFAULT_APP_TYPES:
+            state.store_fab(fab)
+        elif not is_stored_app:
             state.store_app(
                 fab=fab,
                 federation_id=federation_id,
@@ -1446,17 +1450,16 @@ def list_apps(
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
     limit = request.limit if request.HasField("limit") else None
     apps = list(state.list_apps(federation_id, limit))
-    if (limit is None or limit > 0) and not any(
-        app.app_id == FLOWER_AGENT_APP_ID for app in apps
-    ):
-        agent = AppInfo(
-            app_id=FLOWER_AGENT_APP_ID,
-            app_type=TaskType.AGENT_APP,
-            is_hub_app=True,
-        )
-        if limit is not None:
-            apps = apps[: limit - 1]
-        apps.append(agent)
+    stored_app_ids = {app.app_id for app in apps}
+    default_apps = [
+        AppInfo(app_id=app_id, app_type=app_type, is_hub_app=True)
+        for app_id, app_type in _DEFAULT_APP_TYPES.items()
+        if app_id not in stored_app_ids
+    ]
+    if limit is not None:
+        default_apps = default_apps[:limit]
+        apps = apps[: max(0, limit - len(default_apps))]
+    apps.extend(default_apps)
     return ListAppsResponse(apps=apps)
 
 
@@ -1501,6 +1504,11 @@ def remove_app(
     _validate_federation_membership_in_request(
         state, account.flwr_aid, request.federation_id
     )
+    if request.app_id in _DEFAULT_APP_TYPES:
+        raise FlowerError(
+            ApiErrorCode.INVALID_APP_SPEC,
+            f"Default app {request.app_id} cannot be removed.",
+        )
     state.delete_app(request.federation_id, request.app_id)
     return RemoveAppResponse()
 
