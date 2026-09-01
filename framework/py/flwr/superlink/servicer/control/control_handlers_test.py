@@ -461,19 +461,36 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=too-many-public
         self.assertEqual(remove_response, RemoveAppResponse())
         self.assertEqual(self.state.list_apps(NOOP_FEDERATION_ID), [])
 
-    def test_remove_app_rejects_default_app(self) -> None:
-        """Default apps remain present in ListApps."""
-        with self.assertRaises(FlowerError) as exc_context:
-            remove_app(
-                RemoveAppRequest(
-                    federation_id=NOOP_FEDERATION_ID,
-                    app_id=FLOWER_AGENT_APP_ID,
-                ),
-                self.account,
-                self.state,
-            )
+    def test_remove_app_restores_implicit_default_app(self) -> None:
+        """Removing a stored default override reveals the implicit default."""
+        self.state.store_app(
+            fab=Fab("", b"pinned Flower Agent FAB", {}),
+            federation_id=NOOP_FEDERATION_ID,
+            app_id=FLOWER_AGENT_APP_ID,
+            app_type=TaskType.AGENT_APP,
+            added_by=self.account.flwr_aid,
+            is_hub_app=True,
+        )
 
-        self.assertEqual(exc_context.exception.code, ApiErrorCode.INVALID_APP_SPEC)
+        response = remove_app(
+            RemoveAppRequest(
+                federation_id=NOOP_FEDERATION_ID,
+                app_id=FLOWER_AGENT_APP_ID,
+            ),
+            self.account,
+            self.state,
+        )
+
+        self.assertEqual(response, RemoveAppResponse())
+        self.assertEqual(self.state.list_apps(NOOP_FEDERATION_ID), [])
+        listed = list_apps(
+            ListAppsRequest(federation_id=NOOP_FEDERATION_ID),
+            self.account,
+            self.state,
+        )
+        self.assertEqual(len(listed.apps), 1)
+        self.assertEqual(listed.apps[0].app_id, FLOWER_AGENT_APP_ID)
+        self.assertEqual(listed.apps[0].fab_hash, "")
 
     def test_start_automation_preserves_recurrence_and_normalizes_start_at(
         self,

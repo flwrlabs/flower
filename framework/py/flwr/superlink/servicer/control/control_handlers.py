@@ -1504,11 +1504,6 @@ def remove_app(
     _validate_federation_membership_in_request(
         state, account.flwr_aid, request.federation_id
     )
-    if request.app_id in _DEFAULT_APP_TYPES:
-        raise FlowerError(
-            ApiErrorCode.INVALID_APP_SPEC,
-            f"Default app {request.app_id} cannot be removed.",
-        )
     state.delete_app(request.federation_id, request.app_id)
     return RemoveAppResponse()
 
