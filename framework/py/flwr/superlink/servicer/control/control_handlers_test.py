@@ -65,7 +65,7 @@ from .control_handlers import (
 )
 
 
-class TestControlHandlers(unittest.TestCase):
+class TestControlHandlers(unittest.TestCase):  # pylint: disable=too-many-public-methods
     """Test Control API handlers."""
 
     def setUp(self) -> None:
@@ -205,6 +205,52 @@ class TestControlHandlers(unittest.TestCase):
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
             [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
         )
+
+    def test_start_run_does_not_pin_default_app(self) -> None:
+        """Resolve a default app from Hub without storing an app override."""
+        fab_content = b"latest Flower Agent FAB"
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
+                return_value=(fab_content, {}, None),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={
+                    "tool": {
+                        "flwr": {"app": {"components": {"agentapp": "module:app"}}}
+                    }
+                },
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwrlabs/flwr-agent", "1.0.0"),
+            ),
+            patch.object(self.state, "store_app") as mock_store_app,
+        ):
+            response = start_run(
+                StartRunRequest(
+                    federation=NOOP_FEDERATION_ID,
+                    app_spec=FLOWER_AGENT_APP_ID,
+                ),
+                self.account,
+                self.state,
+                None,
+            )
+
+        mock_store_app.assert_not_called()
+        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        self.assertEqual(run.fab_hash, hashlib.sha256(fab_content).hexdigest())
+        self.assertIsNotNone(self.state.get_fab(run.fab_hash))
+        self.assertEqual(self.state.list_apps(NOOP_FEDERATION_ID), [])
+        listed = list_apps(
+            ListAppsRequest(federation_id=NOOP_FEDERATION_ID),
+            self.account,
+            self.state,
+        )
+        self.assertEqual(listed.apps[0].app_id, FLOWER_AGENT_APP_ID)
+        self.assertEqual(listed.apps[0].fab_hash, "")
 
     def test_start_run_notifies_extension_after_persisting_run(self) -> None:
         """Notify the optional extension with the persisted run snapshot."""
@@ -414,6 +460,37 @@ class TestControlHandlers(unittest.TestCase):
 
         self.assertEqual(remove_response, RemoveAppResponse())
         self.assertEqual(self.state.list_apps(NOOP_FEDERATION_ID), [])
+
+    def test_remove_app_restores_implicit_default_app(self) -> None:
+        """Removing a stored default override reveals the implicit default."""
+        self.state.store_app(
+            fab=Fab("", b"pinned Flower Agent FAB", {}),
+            federation_id=NOOP_FEDERATION_ID,
+            app_id=FLOWER_AGENT_APP_ID,
+            app_type=TaskType.AGENT_APP,
+            added_by=self.account.flwr_aid,
+            is_hub_app=True,
+        )
+
+        response = remove_app(
+            RemoveAppRequest(
+                federation_id=NOOP_FEDERATION_ID,
+                app_id=FLOWER_AGENT_APP_ID,
+            ),
+            self.account,
+            self.state,
+        )
+
+        self.assertEqual(response, RemoveAppResponse())
+        self.assertEqual(self.state.list_apps(NOOP_FEDERATION_ID), [])
+        listed = list_apps(
+            ListAppsRequest(federation_id=NOOP_FEDERATION_ID),
+            self.account,
+            self.state,
+        )
+        self.assertEqual(len(listed.apps), 1)
+        self.assertEqual(listed.apps[0].app_id, FLOWER_AGENT_APP_ID)
+        self.assertEqual(listed.apps[0].fab_hash, "")
 
     def test_start_automation_preserves_recurrence_and_normalizes_start_at(
         self,
