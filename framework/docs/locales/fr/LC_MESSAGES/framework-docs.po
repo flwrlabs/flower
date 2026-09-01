@@ -22850,8 +22850,8 @@ msgid ""
 "``--runtime-api-address superlink:9091``: Connect to the SuperLink's "
 "Runtime API at the address ``superlink:9091``."
 msgstr ""
-"``--appio-api-address superlink:9091``: Connectez-vous à l'API "
-"ServerAppIO de SuperLink à l'adresse ``superlink:9091``."
+"``--runtime-api-address superlink:9091``: Connectez-vous à l'API "
+"Runtime de SuperLink à l'adresse ``superlink:9091``."
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:259
 msgid "Step 5: Start the SuperExec to execute ClientApps"
@@ -22866,7 +22866,7 @@ msgid ""
 msgstr ""
 "Pour les ClientApps, réutilisez l'image **même** et modifiez le plugin et"
 " l'adresse API. Lorsque vous utilisez le plugin *clientapp*, passez "
-"``--appio-api-address`` pointant vers l'API **ClientAppIO** de SuperNode."
+"``--runtime-api-address`` pointant vers l'API **Runtime** de SuperNode."
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:265
 msgid "(No new Dockerfile is needed; reuse ``flwr_superexec:0.0.1``.)"
@@ -25210,7 +25210,7 @@ msgstr "Activez le composant SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:38
 #, fuzzy
 msgid "Configure SuperExec task polling"
-msgstr "Configurez la journalisation gRPC"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:40
 msgid ""
