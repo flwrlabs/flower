@@ -162,5 +162,7 @@ class CliAccountAuthHttpInterceptor:
 
         # Retry the original request once with the new access token. Returning the
         # retry directly ensures a second 401 is propagated without another refresh.
-        context.request.headers["Authorization"] = f"Bearer {credentials.access_token}"
+        context.request.headers["Authorization"] = (
+            f"Bearer {credentials.access_token}"
+        )
         return call_next(context)

@@ -81,9 +81,9 @@ def test_http_interceptor_refreshes_expired_credentials(retry_status: int) -> No
         status_code = 401 if len(authorization_headers) == 1 else retry_status
         return httpx.Response(status_code)
 
-    response = CliAccountAuthHttpInterceptor(auth_plugin, refresh_tokens).intercept(
-        context, call_next
-    )
+    response = CliAccountAuthHttpInterceptor(
+        auth_plugin, refresh_tokens
+    ).intercept(context, call_next)
 
     assert response.status_code == retry_status
     assert authorization_headers == [
@@ -108,9 +108,9 @@ def test_http_interceptor_does_not_refresh_the_refresh_request() -> None:
     )
     refresh_tokens = Mock()
 
-    response = CliAccountAuthHttpInterceptor(auth_plugin, refresh_tokens).intercept(
-        context, Mock(return_value=httpx.Response(401))
-    )
+    response = CliAccountAuthHttpInterceptor(
+        auth_plugin, refresh_tokens
+    ).intercept(context, Mock(return_value=httpx.Response(401)))
 
     assert response.status_code == 401
     refresh_tokens.assert_not_called()
