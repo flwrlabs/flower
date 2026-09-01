@@ -934,7 +934,7 @@ class CoreState(ABC):  # pylint: disable=R0904
     def get_task_events(
         self,
         *,
-        run_id: int | None = None,
+        run_ids: Sequence[int] | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
@@ -942,8 +942,8 @@ class CoreState(ABC):  # pylint: disable=R0904
 
         Parameters
         ----------
-        run_id : Optional[int] (default: None)
-            If set, return only events for this run. If set to `None`, return
+        run_ids : Optional[Sequence[int]] (default: None)
+            If set, return only events for these runs. If set to `None`, return
             events for all runs.
         task_ids : Optional[Sequence[int]] (default: None)
             If set, return only events produced by these tasks.

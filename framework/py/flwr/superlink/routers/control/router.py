@@ -58,6 +58,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListInvitationsResponse,
     ListNodesRequest,
     ListNodesResponse,
+    ListRunSeriesEventsRequest,
+    ListRunSeriesEventsResponse,
     ListRunSeriesRequest,
     ListRunSeriesResponse,
     ListRunsRequest,
@@ -171,6 +173,16 @@ def get_run_series(
 ) -> GetRunSeriesResponse:
     """Get a run series."""
     return control_handlers.get_run_series(request, account, linkstate)
+
+
+@router.post("/list-run-series-events")
+def list_run_series_events(
+    request: Annotated[ListRunSeriesEventsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListRunSeriesEventsResponse:
+    """List events for all runs in a run series."""
+    return control_handlers.list_run_series_events(request, account, linkstate)
 
 
 @router.post("/stop-run")

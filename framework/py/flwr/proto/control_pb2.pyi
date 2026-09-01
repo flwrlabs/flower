@@ -467,6 +467,37 @@ class GetRunSeriesResponse(google.protobuf.message.Message):
 global___GetRunSeriesResponse = GetRunSeriesResponse
 
 @typing.final
+class ListRunSeriesEventsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SERIES_ID_FIELD_NUMBER: builtins.int
+    series_id: builtins.int
+    def __init__(
+        self,
+        *,
+        series_id: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["series_id", b"series_id"]) -> None: ...
+
+global___ListRunSeriesEventsRequest = ListRunSeriesEventsRequest
+
+@typing.final
+class ListRunSeriesEventsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.TaskEvent]: ...
+    def __init__(
+        self,
+        *,
+        events: collections.abc.Iterable[flwr.proto.task_pb2.TaskEvent] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+
+global___ListRunSeriesEventsResponse = ListRunSeriesEventsResponse
+
+@typing.final
 class GetLoginDetailsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
