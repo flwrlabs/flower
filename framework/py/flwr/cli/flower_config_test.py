@@ -112,7 +112,7 @@ class TestInitFlwrConfig(unittest.TestCase):
                     config_path.read_text(encoding="utf-8"), "existing_content"
                 )
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[untyped-decorator]
         [
             ("Darwin", "sed -i.bak"),
             ("Linux", "sed -i.bak"),
