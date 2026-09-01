@@ -101,6 +101,9 @@ service Control {
   // Add App to a Federation
   rpc AddApp(AddAppRequest) returns (AddAppResponse) {}
 
+  // Update App in a Federation to the latest Hub version
+  rpc UpdateApp(UpdateAppRequest) returns (UpdateAppResponse) {}
+
   // Remove App from a Federation
   rpc RemoveApp(RemoveAppRequest) returns (RemoveAppResponse) {}
 
@@ -327,6 +330,12 @@ message AddAppRequest {
   string app_id = 2;
 }
 message AddAppResponse {}
+
+message UpdateAppRequest {
+  string federation_id = 1;
+  string app_id = 2;
+}
+message UpdateAppResponse {}
 
 message RemoveAppRequest {
   string federation_id = 1;

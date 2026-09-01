@@ -91,6 +91,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateAppRequest,
+    UpdateAppResponse,
 )
 from flwr.supercore.protobuf.client import ProtobufClient
 
@@ -323,6 +325,15 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/AddApp",
             request=request,
             response_type=AddAppResponse,
+        )
+
+    def UpdateApp(self, request: UpdateAppRequest) -> UpdateAppResponse:
+        """Update an app to the latest Hub version."""
+        return self._unary_unary(
+            path="/v1/control/update-app",
+            rpc_method="/flwr.proto.Control/UpdateApp",
+            request=request,
+            response_type=UpdateAppResponse,
         )
 
     def RemoveApp(self, request: RemoveAppRequest) -> RemoveAppResponse:

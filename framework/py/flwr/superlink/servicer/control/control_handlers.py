@@ -129,6 +129,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateAppRequest,
+    UpdateAppResponse,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
@@ -174,6 +176,8 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
 from flwr.superlink.run_source import RunStartSource
+
+_DEFAULT_APP_TYPES = {FLOWER_AGENT_APP_ID: TaskType.AGENT_APP}
 
 
 class InvalidConnectorRequestError(FlowerError):
@@ -611,14 +615,17 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             )
 
         if not is_stored_app:
-            state.store_app(
-                fab=fab,
-                federation_id=federation_id,
-                app_id=app_id,
-                app_type=app_type,
-                added_by=flwr_aid,
-                is_hub_app=is_hub_app,
-            )
+            if app_id in _DEFAULT_APP_TYPES:
+                state.store_fab(fab)
+            else:
+                state.store_app(
+                    fab=fab,
+                    federation_id=federation_id,
+                    app_id=app_id,
+                    app_type=app_type,
+                    added_by=flwr_aid,
+                    is_hub_app=is_hub_app,
+                )
 
         series_id = request.series_id if request.HasField("series_id") else None
         series_description: str | None = None
@@ -1446,30 +1453,29 @@ def list_apps(
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
     limit = request.limit if request.HasField("limit") else None
     apps = list(state.list_apps(federation_id, limit))
-    if (limit is None or limit > 0) and not any(
-        app.app_id == FLOWER_AGENT_APP_ID for app in apps
-    ):
-        agent = AppInfo(
-            app_id=FLOWER_AGENT_APP_ID,
-            app_type=TaskType.AGENT_APP,
-            is_hub_app=True,
-        )
-        if limit is not None:
-            apps = apps[: limit - 1]
-        apps.append(agent)
+    stored_app_ids = {app.app_id for app in apps}
+    default_apps = [
+        AppInfo(app_id=app_id, app_type=app_type, is_hub_app=True)
+        for app_id, app_type in _DEFAULT_APP_TYPES.items()
+        if app_id not in stored_app_ids
+    ]
+    if limit is not None:
+        default_apps = default_apps[:limit]
+        apps = apps[: max(0, limit - len(default_apps))]
+    apps.extend(default_apps)
     return ListAppsResponse(apps=apps)
 
 
-def add_app(
-    request: AddAppRequest,
-    account: AccountInfo,
+def _download_and_store_app(
+    *,
+    federation_id: str,
+    app_id: str,
+    flwr_aid: str,
     state: LinkState,
     fleet_api_type: str | None,
-) -> AddAppResponse:
-    """Add a Hub app to a federation."""
-    federation_id = request.federation_id
-    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
-    fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, request.app_id)
+) -> None:
+    """Download the latest Hub app and store its federation association."""
+    fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, app_id)
     try:
         app_type = _get_app_type(get_fab_config(fab_file))
     except ValueError as e:
@@ -1485,13 +1491,68 @@ def add_app(
             verifications=verification_dict,
         ),
         federation_id=federation_id,
-        app_id=request.app_id,
+        app_id=app_id,
         app_type=app_type,
-        added_by=account.flwr_aid,
+        added_by=flwr_aid,
         is_hub_app=True,
     )
 
+
+def add_app(
+    request: AddAppRequest,
+    account: AccountInfo,
+    state: LinkState,
+    fleet_api_type: str | None,
+) -> AddAppResponse:
+    """Add a Hub app to a federation."""
+    federation_id = request.federation_id
+    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    _download_and_store_app(
+        federation_id=federation_id,
+        app_id=request.app_id,
+        flwr_aid=account.flwr_aid,
+        state=state,
+        fleet_api_type=fleet_api_type,
+    )
+
     return AddAppResponse()
+
+
+def update_app(
+    request: UpdateAppRequest,
+    account: AccountInfo,
+    state: LinkState,
+    fleet_api_type: str | None,
+) -> UpdateAppResponse:
+    """Update a federation app to the latest Hub version."""
+    federation_id = request.federation_id
+    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+
+    if request.app_id in _DEFAULT_APP_TYPES:
+        # Removing a stored override reveals the latest-tracking default entry.
+        state.delete_app(federation_id, request.app_id)
+    else:
+        stored_apps = {app.app_id: app for app in state.list_apps(federation_id)}
+        stored_app = stored_apps.get(request.app_id)
+        if stored_app is None:
+            raise FlowerError(
+                ApiErrorCode.INVALID_APP_SPEC,
+                f"App {request.app_id} is not associated with {federation_id}.",
+            )
+        if not stored_app.HasField("is_hub_app") or not stored_app.is_hub_app:
+            raise FlowerError(
+                ApiErrorCode.INVALID_APP_SPEC,
+                f"App {request.app_id} is not a Hub app.",
+            )
+        _download_and_store_app(
+            federation_id=federation_id,
+            app_id=request.app_id,
+            flwr_aid=account.flwr_aid,
+            state=state,
+            fleet_api_type=fleet_api_type,
+        )
+
+    return UpdateAppResponse()
 
 
 def remove_app(
@@ -1501,6 +1562,11 @@ def remove_app(
     _validate_federation_membership_in_request(
         state, account.flwr_aid, request.federation_id
     )
+    if request.app_id in _DEFAULT_APP_TYPES:
+        raise FlowerError(
+            ApiErrorCode.INVALID_APP_SPEC,
+            f"Default app {request.app_id} cannot be removed.",
+        )
     state.delete_app(request.federation_id, request.app_id)
     return RemoveAppResponse()
 

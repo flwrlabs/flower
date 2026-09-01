@@ -92,6 +92,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateAppRequest,
+    UpdateAppResponse,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
@@ -319,6 +321,17 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     ) -> AddAppResponse:
         """Add an app to a federation."""
         return control_handlers.add_app(
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            self.fleet_api_type,
+        )
+
+    def UpdateApp(
+        self, request: UpdateAppRequest, context: grpc.ServicerContext
+    ) -> UpdateAppResponse:
+        """Update an app in a federation to the latest Hub version."""
+        return control_handlers.update_app(
             request,
             _get_account(),
             self.linkstate_factory.state(),

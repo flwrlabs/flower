@@ -995,6 +995,34 @@ class AddAppResponse(google.protobuf.message.Message):
 global___AddAppResponse = AddAppResponse
 
 @typing.final
+class UpdateAppRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_ID_FIELD_NUMBER: builtins.int
+    APP_ID_FIELD_NUMBER: builtins.int
+    federation_id: builtins.str
+    app_id: builtins.str
+    def __init__(
+        self,
+        *,
+        federation_id: builtins.str = ...,
+        app_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["app_id", b"app_id", "federation_id", b"federation_id"]) -> None: ...
+
+global___UpdateAppRequest = UpdateAppRequest
+
+@typing.final
+class UpdateAppResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___UpdateAppResponse = UpdateAppResponse
+
+@typing.final
 class RemoveAppRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
