@@ -39,10 +39,11 @@ _ROOT_IMPORT_SUBPACKAGES = ["flwr.app", "flwr.common"]
 def _fresh_modules(script: str) -> list[str]:
     """Run a fresh interpreter and return the selected loaded modules."""
     source_root = Path(__file__).parents[1]
+    python_path = [str(source_root)]
+    if existing_python_path := os.environ.get("PYTHONPATH"):
+        python_path.append(existing_python_path)
     environment = os.environ | {
-        "PYTHONPATH": os.pathsep.join(
-            [str(source_root), os.environ.get("PYTHONPATH", "")]
-        )
+        "PYTHONPATH": os.pathsep.join(python_path)
     }
     result = subprocess.run(
         [sys.executable, "-c", script],

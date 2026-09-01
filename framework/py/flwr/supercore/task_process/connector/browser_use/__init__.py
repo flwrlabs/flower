@@ -35,14 +35,16 @@ def invoke_browser_use_provider(
     try:
         # pylint: disable-next=import-outside-toplevel
         from .browser_use import invoke_browser_use_provider as invoke
-    except ImportError as error:
-        raise ImportError(
-            "Flower's built-in Browser Use connector requires the optional "
-            "'browser-use' dependency. To use this feature, add `flwr[agent]` "
-            "to `[project].dependencies` in your Flower App's `pyproject.toml`. "
-            "If runtime dependency installation is disabled or unavailable, "
-            "install `flwr[agent]` in the runtime environment instead."
-        ) from error
+    except ModuleNotFoundError as error:
+        if error.name == "browser_use":
+            raise ImportError(
+                "Flower's built-in Browser Use connector requires the optional "
+                "'browser-use' dependency. To use this feature, add `flwr[agent]` "
+                "to `[project].dependencies` in your Flower App's `pyproject.toml`. "
+                "If runtime dependency installation is disabled or unavailable, "
+                "install `flwr[agent]` in the runtime environment instead."
+            ) from error
+        raise
     return invoke(
         task,
         allowed_domains=allowed_domains,
