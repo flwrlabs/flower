@@ -22,7 +22,7 @@ import subprocess
 import sys
 import threading
 from collections.abc import Sequence
-from logging import INFO, WARN
+from logging import DEBUG, INFO, WARN
 from pathlib import Path
 from time import sleep
 from typing import cast
@@ -529,7 +529,7 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
         host=lifespan_config.host,
         port=lifespan_config.port,
         reload=False,
-        access_log=True,
+        access_log=console_handler.level <= DEBUG,
         log_config=get_uvicorn_log_config(console_handler.level),
         ssl_keyfile=lifespan_config.runtime_ssl_keyfile,
         ssl_certfile=lifespan_config.runtime_ssl_certfile,
