@@ -63,10 +63,13 @@ def _get_supergrid_address_update_command(config_path: Path) -> str:
         )
 
     config_arg = shlex.quote(str(config_path))
-    return (
-        f"sed -i.bak 's/supergrid\\.flower\\.ai/{SUPERGRID_HTTP_ADDRESS}/g' "
-        f"{config_arg}"
+    legacy_pattern = re.escape(LEGACY_SUPERGRID_ADDRESS).replace("/", r"\/")
+    http_replacement = (
+        SUPERGRID_HTTP_ADDRESS.replace("\\", r"\\")
+        .replace("/", r"\/")
+        .replace("&", r"\&")
     )
+    return f"sed -i.bak 's/{legacy_pattern}/{http_replacement}/g' {config_arg}"
 
 
 def _parse_simulation_options(options: dict[str, Any]) -> SuperLinkSimulationOptions:
