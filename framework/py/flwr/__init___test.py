@@ -15,7 +15,43 @@
 """Test for flwr __init__.py."""
 
 
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+from typing import cast
+
 import semver
+
+_PUBLIC_SUBPACKAGES = [
+    "flwr.agentapp",
+    "flwr.app",
+    "flwr.client",
+    "flwr.clientapp",
+    "flwr.common",
+    "flwr.server",
+    "flwr.serverapp",
+]
+_ROOT_IMPORT_SUBPACKAGES = ["flwr.app", "flwr.common"]
+
+
+def _fresh_modules(script: str) -> list[str]:
+    """Run a fresh interpreter and return the selected loaded modules."""
+    source_root = Path(__file__).parents[1]
+    environment = os.environ | {
+        "PYTHONPATH": os.pathsep.join(
+            [str(source_root), os.environ.get("PYTHONPATH", "")]
+        )
+    }
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+    return cast(list[str], json.loads(result.stdout))
 
 
 def test_version() -> None:
@@ -25,3 +61,41 @@ def test_version() -> None:
 
     # Assert
     semver.VersionInfo.parse(__version__)
+
+
+def test_unrelated_public_subpackages_are_lazily_imported() -> None:
+    """Verify importing flwr does not import unrelated public subpackages."""
+    loaded_modules = _fresh_modules(
+        "import json, sys\n"
+        "import flwr\n"
+        f"public = {json.dumps(_PUBLIC_SUBPACKAGES + _ROOT_IMPORT_SUBPACKAGES)}\n"
+        "print(json.dumps([name for name in public if name in sys.modules]))\n"
+    )
+
+    assert set(loaded_modules) == set(_ROOT_IMPORT_SUBPACKAGES)
+
+
+def test_public_subpackages_appear_in_dir() -> None:
+    """Verify interactive completion includes lazy public subpackages."""
+    public_names = [
+        module.rsplit(".", maxsplit=1)[-1] for module in _PUBLIC_SUBPACKAGES
+    ]
+    visible_names = _fresh_modules(
+        "import json, flwr\n"
+        f"names = {json.dumps(public_names)}\n"
+        "print(json.dumps([name for name in names if name in dir(flwr)]))\n"
+    )
+
+    assert visible_names == public_names
+
+
+def test_public_subpackages_remain_available() -> None:
+    """Verify lazily imported public subpackages retain their import paths."""
+    loaded_modules = _fresh_modules(
+        "import json, sys\n"
+        "from flwr import agentapp, app, client, clientapp, common, server, serverapp\n"
+        f"public = {json.dumps(_PUBLIC_SUBPACKAGES)}\n"
+        "print(json.dumps([name for name in public if name in sys.modules]))\n"
+    )
+
+    assert loaded_modules == _PUBLIC_SUBPACKAGES

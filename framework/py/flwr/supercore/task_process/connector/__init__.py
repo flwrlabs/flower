@@ -15,6 +15,32 @@
 """Flower connector task process."""
 
 
-from .run_connector import run_connector
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .run_connector import run_connector
+
+_LAZY_EXPORTS: dict[str, tuple[str, str]] = {
+    "run_connector": (
+        "flwr.supercore.task_process.connector.run_connector",
+        "run_connector",
+    ),
+}
 
 __all__ = ["run_connector"]
+
+
+def __getattr__(name: str) -> Any:
+    """Lazily resolve the connector-process entrypoint."""
+    if name in _LAZY_EXPORTS:
+        module_name, attr_name = _LAZY_EXPORTS[name]
+        value = getattr(import_module(module_name), attr_name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    """Return eager and lazy connector-process entrypoints for completion."""
+    return sorted(set(globals()) | set(_LAZY_EXPORTS))

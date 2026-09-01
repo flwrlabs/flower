@@ -15,12 +15,37 @@
 """Flower task process components."""
 
 
-from .agent import run_agentapp
-from .connector import run_connector
-from .model import run_model
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .agent.run_agentapp import run_agentapp
+    from .connector.run_connector import run_connector
+    from .model.run_model import run_model
+
+_LAZY_EXPORTS: dict[str, tuple[str, str]] = {
+    "run_agentapp": ("flwr.supercore.task_process.agent", "run_agentapp"),
+    "run_connector": ("flwr.supercore.task_process.connector", "run_connector"),
+    "run_model": ("flwr.supercore.task_process.model", "run_model"),
+}
 
 __all__ = [
     "run_agentapp",
     "run_connector",
     "run_model",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Lazily resolve task-process entrypoint functions."""
+    if name in _LAZY_EXPORTS:
+        module_name, attr_name = _LAZY_EXPORTS[name]
+        value = getattr(import_module(module_name), attr_name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    """Return eager and lazy task-process entrypoints for completion."""
+    return sorted(set(globals()) | set(_LAZY_EXPORTS))

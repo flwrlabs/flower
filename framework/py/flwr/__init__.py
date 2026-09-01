@@ -20,12 +20,7 @@ from typing import Any
 
 from flwr.supercore.version import package_version as _package_version
 
-from . import agentapp, app
-from . import client as client
-from . import clientapp
-from . import common as common
-from . import server as server
-from . import serverapp
+from . import app as app
 
 __all__ = [
     "agentapp",
@@ -38,12 +33,18 @@ __version__ = _package_version
 
 
 _LAZY_EXPORTS: dict[str, tuple[str, str | None]] = {
+    "agentapp": ("flwr.agentapp", None),
+    "client": ("flwr.client", None),
+    "clientapp": ("flwr.clientapp", None),
+    "common": ("flwr.common", None),
+    "server": ("flwr.server", None),
+    "serverapp": ("flwr.serverapp", None),
     "simulation": ("flwr.simulation", None),
 }
 
 
 def __getattr__(name: str) -> Any:
-    """Lazy import for legacy support."""
+    """Lazily resolve public subpackages and legacy exports."""
     if name in _LAZY_EXPORTS:
         module_name, attr_name = _LAZY_EXPORTS[name]
         module = import_module(module_name)
@@ -51,3 +52,8 @@ def __getattr__(name: str) -> Any:
         globals()[name] = value
         return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    """Return eager and lazy public exports for interactive completion."""
+    return sorted(set(globals()) | set(_LAZY_EXPORTS))

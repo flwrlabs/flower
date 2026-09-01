@@ -15,6 +15,29 @@
 """Private model task process helpers."""
 
 
-from .run_model import run_model
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .run_model import run_model
+
+_LAZY_EXPORTS: dict[str, tuple[str, str]] = {
+    "run_model": ("flwr.supercore.task_process.model.run_model", "run_model"),
+}
 
 __all__ = ["run_model"]
+
+
+def __getattr__(name: str) -> Any:
+    """Lazily resolve the model-process entrypoint."""
+    if name in _LAZY_EXPORTS:
+        module_name, attr_name = _LAZY_EXPORTS[name]
+        value = getattr(import_module(module_name), attr_name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    """Return eager and lazy Model-process entrypoints for completion."""
+    return sorted(set(globals()) | set(_LAZY_EXPORTS))
