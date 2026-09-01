@@ -24,7 +24,7 @@ import unittest
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
 import grpc
 from parameterized import parameterized
@@ -1116,11 +1116,21 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             )
         )
 
-        response = self.servicer.ListRunSeriesEvents(
-            ListRunSeriesEventsRequest(series_id=10), Mock()
-        )
+        with patch(
+            "flwr.superlink.servicer.control.control_handlers"
+            ".extensions.notify_result_delivered"
+        ) as notify_result_delivered:
+            response = self.servicer.ListRunSeriesEvents(
+                ListRunSeriesEventsRequest(series_id=10), Mock()
+            )
 
         self.assertEqual([event.task_id for event in response.events], primary_task_ids)
+        runs = self.state.get_run_info(run_ids=run_ids)
+        notify_result_delivered.assert_has_calls(
+            [call(run, self.aid, RESULT_DELIVERY_CHANNEL_CHAT) for run in runs],
+            any_order=True,
+        )
+        self.assertEqual(notify_result_delivered.call_count, len(runs))
 
     def test_list_run_series_events_hides_unauthorized_series(self) -> None:
         """Reject event history access outside the caller's federations."""

@@ -1183,6 +1183,10 @@ def list_run_series_events(
 
     run_ids = series_matches[0].run_ids
     runs = state.get_run_info(run_ids=run_ids)
+    for run in runs:
+        extensions.notify_result_delivered(
+            run, account.flwr_aid, extensions.RESULT_DELIVERY_CHANNEL_CHAT
+        )
     primary_task_ids = [cast(int, run.primary_task_id) for run in runs]
     events = state.get_task_events(run_ids=run_ids, task_ids=primary_task_ids)
     return ListRunSeriesEventsResponse(events=events)
