@@ -36,13 +36,16 @@ from rich.console import Console
 
 from flwr.cli.typing import SuperLinkConnection
 from flwr.common.constant import AuthnType, CliOutputFormat
+from flwr.proto.control_pb2 import RefreshAuthTokensRequest  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub  # pylint: disable=E0611
+from flwr.supercore.auth.typing import AccountAuthCredentials
 from flwr.supercore.constant import (
     APP_PUBLISH_EXCLUDE_PATTERNS,
     APP_PUBLISH_INCLUDE_PATTERNS,
     MAX_DIR_DEPTH,
     MAX_NAME_LENGTH,
 )
+from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.credential_store import get_credential_store
 from flwr.supercore.error import FlowerError
 from flwr.supercore.grpc import (
@@ -50,14 +53,25 @@ from flwr.supercore.grpc import (
     create_channel,
     on_channel_state_change,
 )
-from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
+from flwr.supercore.interceptors import (
+    RuntimeVersionClientInterceptor,
+    RuntimeVersionHttpInterceptor,
+)
 from flwr.supercore.logger import print_json_error, redirect_output, restore_output
 from flwr.supercore.utils import is_valid_name
 
 from .auth_plugin import CliAuthPlugin, get_cli_plugin_class
-from .cli_account_auth_interceptor import CliAccountAuthInterceptor
+from .cli_account_auth_interceptor import (
+    CliAccountAuthHttpInterceptor,
+    CliAccountAuthInterceptor,
+)
 from .config_utils import load_certificate_in_connection
-from .constant import AUTHN_TYPE_STORE_KEY
+from .constant import (
+    AUTHN_TYPE_STORE_KEY,
+    LOCAL_RUNTIME_API_PORT,
+    LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
+    LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY,
+)
 from .flower_config import read_superlink_connection
 from .local_superlink import ensure_local_superlink
 
@@ -370,6 +384,72 @@ def init_channel_from_connection(
     # Wait for the channel to be ready before returning it
     wait_for_control_api_channel(channel)
     return channel
+
+
+def init_http_client_from_connection(
+    connection: SuperLinkConnection,
+    auth_plugin: CliAuthPlugin | None = None,
+) -> ControlHttpClient:
+    """Initialize an HTTP client for the Control API.
+
+    Parameters
+    ----------
+    connection : SuperLinkConnection
+        SuperLink connection configuration.
+    auth_plugin : CliAuthPlugin | None (default: None)
+        Authentication plugin instance for handling credentials.
+
+    Returns
+    -------
+    ControlHttpClient
+        Configured HTTP client with runtime-version and authentication interceptors.
+    """
+    # `ensure_local_superlink` starts and probes the local gRPC Control API. HTTP
+    # callers use the FastAPI port exposed by that same SuperLink process instead.
+    is_local = connection.address in (
+        LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
+        LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY,
+    )
+    connection = ensure_local_superlink(connection)
+    if is_local:
+        connection.address = f"127.0.0.1:{LOCAL_RUNTIME_API_PORT}"
+
+    address = cast(str, connection.address)
+    log_superlink_connection(connection)
+    root_certificates = load_certificate_in_connection(connection)
+
+    if auth_plugin is None:
+        auth_plugin = load_cli_auth_plugin_from_connection(address)
+    auth_plugin.load_tokens()
+
+    # The callback runs only after the returned client has been fully initialized.
+    # Closing over the client lets refresh requests reuse its TLS and HTTP settings.
+    http_client: ControlHttpClient | None = None
+
+    def refresh_tokens(refresh_token: str) -> AccountAuthCredentials:
+        """Refresh and return the account credentials."""
+        if http_client is None:
+            raise RuntimeError("HTTP client is not initialized")
+        response = http_client.RefreshAuthTokens(
+            RefreshAuthTokensRequest(refresh_token=refresh_token)
+        )
+        return AccountAuthCredentials(
+            access_token=response.access_token,
+            refresh_token=response.refresh_token,
+        )
+
+    # Keep version compatibility and account authentication consistent for every
+    # Control API request made through this client.
+    http_client = ControlHttpClient.from_server_address(
+        server_address=address,
+        insecure=connection.insecure,
+        root_certificates=root_certificates,
+        interceptors=[
+            RuntimeVersionHttpInterceptor(component_name="flwr CLI"),
+            CliAccountAuthHttpInterceptor(auth_plugin, refresh_tokens),
+        ],
+    )
+    return http_client
 
 
 @contextmanager  # docsig: disable=SIG503
