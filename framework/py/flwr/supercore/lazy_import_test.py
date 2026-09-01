@@ -105,6 +105,24 @@ def test_console_entrypoint_import_does_not_load_siblings() -> None:
     assert loaded_modules == ["flwr.supercore.cli.flwr_agentapp"]
 
 
+def test_console_entrypoints_remain_callable_after_child_module_imports() -> None:
+    """Verify child module imports do not shadow package-level entrypoints."""
+    entrypoint_names = [
+        module.rsplit(".", maxsplit=1)[-1] for module in _ENTRYPOINT_MODULES
+    ]
+    callable_entrypoints = _fresh_modules(
+        "import importlib, json\n"
+        "import flwr.supercore.cli as cli\n"
+        f"entrypoints = {json.dumps(_ENTRYPOINT_MODULES)}\n"
+        "for module in entrypoints:\n"
+        "    importlib.import_module(module)\n"
+        f"names = {json.dumps(entrypoint_names)}\n"
+        "print(json.dumps([name for name in names if callable(getattr(cli, name))]))\n"
+    )
+
+    assert callable_entrypoints == entrypoint_names
+
+
 def test_task_process_entrypoints_are_lazily_imported() -> None:
     """Verify importing task_process does not import each process type."""
     loaded_modules = _fresh_modules(

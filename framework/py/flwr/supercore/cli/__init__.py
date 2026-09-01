@@ -15,7 +15,9 @@
 """Flower command line interface for shared infrastructure components."""
 
 
+import sys
 from importlib import import_module
+from types import ModuleType
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -37,6 +39,21 @@ __all__ = [
     "flwr_connector",
     "flwr_model",
 ]
+
+
+class _CliModule(ModuleType):
+    """Preserve callable exports when their implementation modules are imported."""
+
+    def __setattr__(self, name: str, value: object) -> None:
+        """Avoid child modules shadowing same-named callable exports."""
+        if name in _LAZY_EXPORTS:
+            module_name, _ = _LAZY_EXPORTS[name]
+            if isinstance(value, ModuleType) and value.__name__ == module_name:
+                return
+        super().__setattr__(name, value)
+
+
+sys.modules[__name__].__class__ = _CliModule
 
 
 def __getattr__(name: str) -> Any:
