@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests all CoreState implementations have to conform to."""
 
-
 # pylint: disable=too-many-lines
 import unittest
 from contextlib import ExitStack
@@ -1787,6 +1786,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         no_new = state.get_task_events(run_id=run_id, after_task_event_id=latest_id)
         filtered = state.get_task_events(run_id=run_id, task_ids=[task_id])
         excluded = state.get_task_events(run_id=run_id, task_ids=[task_id + 1])
+        limited = state.get_task_events(run_ids=[run_id], limit=1)
+        no_runs = state.get_task_events(run_ids=[])
 
         # Assert: Events keep assigned ID order and cursor filtering works.
         self.assertEqual(len(events), 2)
@@ -1809,6 +1810,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(no_new, [])
         self.assertEqual(filtered, events)
         self.assertEqual(excluded, [])
+        self.assertEqual(limited, [events[0]])
+        self.assertEqual(no_runs, [])
 
     @parameterized.expand(  # type: ignore
         [

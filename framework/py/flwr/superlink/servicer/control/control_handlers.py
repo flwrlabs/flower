@@ -93,6 +93,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListInvitationsResponse,
     ListNodesRequest,
     ListNodesResponse,
+    ListRunSeriesEventsRequest,
+    ListRunSeriesEventsResponse,
     ListRunSeriesRequest,
     ListRunSeriesResponse,
     ListRunsRequest,
@@ -861,7 +863,9 @@ def start_automation(  # pylint: disable=too-many-locals
     max_runs = (
         request.max_runs
         if request.HasField("max_runs")
-        else 1 if fixed_interval is None else None
+        else 1
+        if fixed_interval is None
+        else None
     )
     if max_runs is not None and max_runs < 1:
         raise FlowerError(
@@ -1159,6 +1163,34 @@ def get_run_series(
         context=context_to_proto(series_context) if series_context else None,
     )
     return response
+
+
+def list_run_series_events(
+    request: ListRunSeriesEventsRequest, account: AccountInfo, state: LinkState
+) -> ListRunSeriesEventsResponse:
+    """List task events for all runs in a run series."""
+    log(INFO, "ControlServicer.ListRunSeriesEvents")
+
+    series_id = request.series_id
+    series_matches = state.get_run_series(series_ids=[series_id])
+    if not series_matches or not state.federation_manager.has_member(
+        account.flwr_aid, series_matches[0].federation
+    ):
+        raise FlowerError(
+            ApiErrorCode.RUN_SERIES_ID_NOT_FOUND,
+            f"Run series {series_id} not found for {account.flwr_aid}.",
+        )
+
+    after_task_event_id = (
+        request.after_task_event_id if request.HasField("after_task_event_id") else None
+    )
+    limit = request.limit if request.HasField("limit") else None
+    events = state.get_task_events(
+        run_ids=series_matches[0].run_ids,
+        after_task_event_id=after_task_event_id,
+        limit=limit,
+    )
+    return ListRunSeriesEventsResponse(events=events)
 
 
 def stop_run(

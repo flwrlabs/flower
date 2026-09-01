@@ -58,6 +58,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListInvitationsResponse,
     ListNodesRequest,
     ListNodesResponse,
+    ListRunSeriesEventsRequest,
+    ListRunSeriesEventsResponse,
     ListRunSeriesRequest,
     ListRunSeriesResponse,
     ListRunsRequest,
@@ -176,6 +178,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     ) -> GetRunSeriesResponse:
         """Get run series."""
         return control_handlers.get_run_series(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def ListRunSeriesEvents(
+        self, request: ListRunSeriesEventsRequest, context: grpc.ServicerContext
+    ) -> ListRunSeriesEventsResponse:
+        """List events for all runs in a run series."""
+        return control_handlers.list_run_series_events(
             request, _get_account(), self.linkstate_factory.state()
         )
 

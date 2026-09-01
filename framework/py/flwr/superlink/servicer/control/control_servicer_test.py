@@ -53,6 +53,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListInvitationsResponse,
     ListNodesRequest,
     ListNodesResponse,
+    ListRunSeriesEventsRequest,
     ListRunSeriesRequest,
     ListRunsRequest,
     RegisterNodeRequest,
@@ -1075,6 +1076,70 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute/Assert
         with self.assertRaises(FlowerError) as cm:
             self.servicer.GetRunSeries(GetRunSeriesRequest(series_id=999), context)
+
+        self.assertEqual(cm.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND)
+
+    def test_list_run_series_events_paginates_across_runs(self) -> None:
+        """List series events in global ID order using the event ID cursor."""
+        run_ids = [self._create_dummy_run(self.aid) for _ in range(2)]
+        task_ids = [
+            cast(int, self.state.get_run_info(run_ids=[run_id])[0].primary_task_id)
+            for run_id in run_ids
+        ]
+        self._create_dummy_run_series(10, run_ids=run_ids)
+        self.assertTrue(
+            self.state.store_task_events(
+                [
+                    TaskEvent(
+                        run_id=run_ids[0],
+                        task_id=task_ids[0],
+                        event="response.created",
+                        data='{"type":"response.created"}',
+                    ),
+                    TaskEvent(
+                        run_id=run_ids[1],
+                        task_id=task_ids[1],
+                        event="response.created",
+                        data='{"type":"response.created"}',
+                    ),
+                    TaskEvent(
+                        run_id=run_ids[0],
+                        task_id=task_ids[0],
+                        event="response.completed",
+                        data='{"type":"response.completed"}',
+                    ),
+                ]
+            )
+        )
+
+        first_page = self.servicer.ListRunSeriesEvents(
+            ListRunSeriesEventsRequest(series_id=10, limit=2), Mock()
+        )
+        second_page = self.servicer.ListRunSeriesEvents(
+            ListRunSeriesEventsRequest(
+                series_id=10, after_task_event_id=first_page.events[-1].id, limit=2
+            ),
+            Mock(),
+        )
+
+        self.assertEqual([event.run_id for event in first_page.events], run_ids)
+        self.assertEqual([event.run_id for event in second_page.events], [run_ids[0]])
+        event_ids = [event.id for event in [*first_page.events, *second_page.events]]
+        self.assertEqual(event_ids, sorted(event_ids))
+
+    def test_list_run_series_events_hides_unauthorized_series(self) -> None:
+        """Reject event history access outside the caller's federations."""
+        self._create_dummy_run_series(10)
+
+        with (
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=False
+            ),
+            self.assertRaises(FlowerError) as cm,
+        ):
+            self.servicer.ListRunSeriesEvents(
+                ListRunSeriesEventsRequest(series_id=10), Mock()
+            )
 
         self.assertEqual(cm.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND)
 

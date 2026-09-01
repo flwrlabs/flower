@@ -55,6 +55,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListInvitationsResponse,
     ListNodesRequest,
     ListNodesResponse,
+    ListRunSeriesEventsRequest,
+    ListRunSeriesEventsResponse,
     ListRunSeriesRequest,
     ListRunSeriesResponse,
     ListRunsRequest,
@@ -185,6 +187,17 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/GetRunSeries",
             request=request,
             response_type=GetRunSeriesResponse,
+        )
+
+    def ListRunSeriesEvents(
+        self, request: ListRunSeriesEventsRequest
+    ) -> ListRunSeriesEventsResponse:
+        """List events for all runs in a run series."""
+        return self._unary_unary(
+            path="/v1/control/list-run-series-events",
+            rpc_method="/flwr.proto.Control/ListRunSeriesEvents",
+            request=request,
+            response_type=ListRunSeriesEventsResponse,
         )
 
     def GetLoginDetails(

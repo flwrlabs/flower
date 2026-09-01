@@ -467,6 +467,48 @@ class GetRunSeriesResponse(google.protobuf.message.Message):
 global___GetRunSeriesResponse = GetRunSeriesResponse
 
 @typing.final
+class ListRunSeriesEventsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SERIES_ID_FIELD_NUMBER: builtins.int
+    AFTER_TASK_EVENT_ID_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
+    series_id: builtins.int
+    after_task_event_id: builtins.int
+    limit: builtins.int
+    def __init__(
+        self,
+        *,
+        series_id: builtins.int = ...,
+        after_task_event_id: builtins.int | None = ...,
+        limit: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_after_task_event_id", b"_after_task_event_id", "_limit", b"_limit", "after_task_event_id", b"after_task_event_id", "limit", b"limit"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_after_task_event_id", b"_after_task_event_id", "_limit", b"_limit", "after_task_event_id", b"after_task_event_id", "limit", b"limit", "series_id", b"series_id"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_after_task_event_id", b"_after_task_event_id"]) -> typing.Literal["after_task_event_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+
+global___ListRunSeriesEventsRequest = ListRunSeriesEventsRequest
+
+@typing.final
+class ListRunSeriesEventsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.TaskEvent]: ...
+    def __init__(
+        self,
+        *,
+        events: collections.abc.Iterable[flwr.proto.task_pb2.TaskEvent] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+
+global___ListRunSeriesEventsResponse = ListRunSeriesEventsResponse
+
+@typing.final
 class GetLoginDetailsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
