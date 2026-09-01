@@ -14,7 +14,6 @@
 # ==============================================================================
 """`flower-superexec` command."""
 
-
 import argparse
 import sys
 from logging import INFO, WARN
@@ -58,7 +57,10 @@ def flower_superexec() -> None:
     warn_if_flwr_update_available(process_name="flower-superexec")
     args = _parse_args().parse_args()
 
-    if "--appio-api-address" in sys.argv[1:]:
+    if any(
+        arg == "--appio-api-address" or arg.startswith("--appio-api-address=")
+        for arg in sys.argv[1:]
+    ):
         log(
             WARN,
             "The `--appio-api-address` argument has been renamed to "
