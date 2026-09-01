@@ -82,6 +82,7 @@ from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
+    FLWR_CLIENT_METADATA_KEY,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     ActionType,
@@ -107,7 +108,6 @@ from flwr.superlink.extensions import (
     RESULT_DELIVERY_CHANNEL_LOGS,
 )
 from flwr.superlink.federation import NoOpFederationManager
-from flwr.superlink.run_source import RUN_SOURCE_METADATA_KEY
 from flwr.superlink.servicer.control.control_account_auth_interceptor import (
     shared_account_info,
 )
@@ -428,7 +428,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         """Forward caller-provided source metadata for analytics attribution."""
         context = Mock()
         context.invocation_metadata.return_value = (
-            (RUN_SOURCE_METADATA_KEY, "web_ui"),
+            (FLWR_CLIENT_METADATA_KEY, "web_ui"),
         )
         expected = StartRunResponse(run_id=42)
 
