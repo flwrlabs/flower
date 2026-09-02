@@ -38,12 +38,13 @@ from flwr.common.constant import (
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.utils import validate_message
 from flwr.supercore import log
 from flwr.supercore.constant import NodeStatus, TaskType
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
+from flwr.supercore.corestate.utils import validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
@@ -641,13 +642,19 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         series_id: int | None = None,
         series_description: str | None = None,
         connector_refs: Sequence[str] = (),
+        initial_task_event: TaskEvent | None = None,
     ) -> int:
         """Create a new run."""
         if isinstance(connector_refs, str) or any(
             not connector_ref for connector_ref in connector_refs
         ):
             return 0
-        with self.lock_task_store, self.lock:
+        if initial_task_event is not None:
+            try:
+                validate_task_event_data(initial_task_event.data)
+            except ValueError:
+                return 0
+        with self.lock_task_store, self.lock, self.lock_task_event_store:
             run_id = generate_rand_int_from_bytes(
                 RUN_ID_NUM_BYTES,
                 exclude=set(self.run_ids),
@@ -717,6 +724,13 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 model_ref=None,
                 connector_ref=None,
             )
+            if initial_task_event is not None:
+                initial_task_event.id = self._next_task_event_id
+                initial_task_event.timestamp = current
+                initial_task_event.run_id = run_id
+                initial_task_event.task_id = task_id
+                self.task_event_store.setdefault(run_id, []).append(initial_task_event)
+                self._next_task_event_id += 1
             self.bind_connectors_to_run(
                 run_id=run_id,
                 connector_refs=connector_refs,
