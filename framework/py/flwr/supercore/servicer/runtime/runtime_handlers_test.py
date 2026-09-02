@@ -121,6 +121,41 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.state.claim_task.assert_called_once_with(123)
         self.assertFalse(response.HasField("token"))
 
+    def test_claim_task_restores_durable_model_lineage(self) -> None:
+        """A claimed Model task must retain persisted Agent lineage."""
+        self.state.claim_task.return_value = "task-token"
+        self.state.get_tasks.return_value = [
+            Task(task_id=123, run_id=789, type=TaskType.MODEL)
+        ]
+        self.state.get_task_lineage.return_value = (11, 11)
+
+        with (
+            patch.object(
+                runtime_handlers,
+                "is_runtime_timing_logging_enabled",
+                return_value=True,
+            ),
+            patch.object(
+                runtime_handlers,
+                "get_runtime_task_lineage",
+                return_value=None,
+            ),
+            patch.object(runtime_handlers, "register_runtime_task_lineage"),
+            patch.object(runtime_handlers, "emit_runtime_timing") as emit_marker,
+        ):
+            runtime_handlers.claim_task(ClaimTaskRequest(task_id=123), self.state)
+
+        self.state.get_task_lineage.assert_called_once_with(123)
+        emit_marker.assert_called_once_with(
+            "runtime.task.claimed",
+            component="superlink",
+            run_id=789,
+            task_id=123,
+            parent_task_id=11,
+            root_task_id=11,
+            task_type=TaskType.MODEL,
+        )
+
     def test_send_task_heartbeat_acknowledges_authenticated_task(self) -> None:
         """SendTaskHeartbeat should use the authenticated task ID."""
         for success in (True, False):

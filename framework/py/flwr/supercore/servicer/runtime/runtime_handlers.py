@@ -93,14 +93,31 @@ def claim_task(request: ClaimTaskRequest, state: CoreState) -> ClaimTaskResponse
             tasks = []
         if tasks and is_runtime_timing_task(tasks[0].type):
             task = tasks[0]
+            lineage = get_runtime_task_lineage(run_id=task.run_id, task_id=task.task_id)
+            if lineage is None:
+                try:
+                    lineage = state.get_task_lineage(task.task_id)
+                except Exception:  # pylint: disable=broad-exception-caught
+                    lineage = None
+                if lineage is not None:
+                    register_runtime_task_lineage(
+                        run_id=task.run_id,
+                        task_id=task.task_id,
+                        parent_task_id=lineage[0],
+                        root_task_id=lineage[1],
+                    )
+            parent_task_id, root_task_id = (
+                lineage
+                if lineage is not None
+                else (None, task.task_id if task.type == TaskType.AGENT_APP else None)
+            )
             emit_runtime_timing(
                 "runtime.task.claimed",
                 component="superlink",
                 run_id=task.run_id,
                 task_id=task.task_id,
-                root_task_id=(
-                    task.task_id if task.type == TaskType.AGENT_APP else None
-                ),
+                parent_task_id=parent_task_id,
+                root_task_id=root_task_id,
                 task_type=task.type,
             )
     return ClaimTaskResponse(token=token)
