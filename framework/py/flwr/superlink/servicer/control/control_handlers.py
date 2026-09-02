@@ -558,23 +558,12 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             request.fab.hash_str,
         )
         if stored_fab is None:
-            # Hub associations intentionally do not retain a FAB hash. A legacy
-            # request (for example, an existing automation) can still contain the
-            # previously stored hash, so resolve the Hub app again instead.
-            if _is_hub_app(state, federation_id, app_id):
-                fab_file, verification_dict, note = _get_remote_fab(
-                    fleet_api_type, app_id
-                )
-                is_hub_app = True
-                is_stored_app = False
-            else:
-                raise FlowerError(
-                    ApiErrorCode.FAB_DOWNLOAD_FAILURE,
-                    "App or FAB not found in the requested federation.",
-                )
-        else:
-            fab_file = stored_fab.content
-            verification_dict = stored_fab.verifications
+            raise FlowerError(
+                ApiErrorCode.FAB_DOWNLOAD_FAILURE,
+                "App or FAB not found in the requested federation.",
+            )
+        fab_file = stored_fab.content
+        verification_dict = stored_fab.verifications
     # Start a run using a remote app
     elif request.app_spec:
         fab_file, verification_dict, note = _get_remote_fab(

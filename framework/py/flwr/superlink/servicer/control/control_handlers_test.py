@@ -60,7 +60,6 @@ from flwr.superlink.federation import NoOpFederationManager
 
 from .control_handlers import (
     add_app,
-    dispatch_automation,
     list_apps,
     list_automations,
     list_run_series_events,
@@ -310,49 +309,6 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
             [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
         )
-
-    def test_start_run_refetches_hub_app_for_legacy_stored_request(self) -> None:
-        """Resolve a stale hash-only Hub request through Hub again."""
-        old_content = b"old Hub FAB"
-        old_hash = hashlib.sha256(old_content).hexdigest()
-        self.state.store_app(
-            fab=Fab(old_hash, old_content, {}),
-            federation_id=NOOP_FEDERATION_ID,
-            app_id="@flwr/demo",
-            app_type=TaskType.SERVER_APP,
-            added_by=self.account.flwr_aid,
-            is_hub_app=True,
-        )
-        new_content = b"new Hub FAB"
-
-        with (
-            patch(
-                "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
-                return_value=(new_content, {}, None),
-            ) as get_remote_fab,
-            patch(
-                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
-                return_value={"tool": {"flwr": {"app": {}}}},
-            ),
-            patch(
-                "flwr.superlink.servicer.control.control_handlers"
-                ".get_metadata_from_config",
-                return_value=("flwr/demo", "2.0.0"),
-            ),
-        ):
-            request = StartRunRequest(
-                app_spec="@flwr/demo==1.0.0",
-                federation=NOOP_FEDERATION_ID,
-            )
-            request.fab.hash_str = old_hash
-            response = start_run(request, self.account, self.state, None)
-
-        get_remote_fab.assert_called_once_with(None, "@flwr/demo")
-        run = self.state.get_run_info(run_ids=[response.run_id])[0]
-        self.assertEqual(run.fab_hash, hashlib.sha256(new_content).hexdigest())
-        app = self.state.list_apps(NOOP_FEDERATION_ID)[0]
-        self.assertEqual(app.fab_hash, "")
-        self.assertTrue(app.is_hub_app)
 
     def test_start_run_persists_agent_input_event(self) -> None:
         """Persist agent input as a primary-task message item."""
@@ -702,64 +658,6 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         stored_request, _ = cast(tuple[StartRunRequest, str], claimed)
         self.assertEqual(stored_request.app_spec, "@flwr/agent")
         self.assertFalse(stored_request.HasField("fab"))
-
-    def test_dispatch_legacy_hub_automation_remains_active(self) -> None:
-        """Refetch a Hub FAB without failing an existing recurring automation."""
-        self.state.store_app(
-            fab=None,
-            federation_id=NOOP_FEDERATION_ID,
-            app_id="@flwr/agent",
-            app_type=TaskType.AGENT_APP,
-            added_by=self.account.flwr_aid,
-            is_hub_app=True,
-        )
-        start_run_request = StartRunRequest(
-            app_spec="@flwr/agent",
-            federation=NOOP_FEDERATION_ID,
-        )
-        start_run_request.fab.hash_str = "previous-hub-hash"
-        previous_next_run_at = "2026-09-02T10:00:00+00:00"
-        automation = self.state.store_automation(
-            federation_id=NOOP_FEDERATION_ID,
-            flwr_aid=self.account.flwr_aid,
-            start_run_request=start_run_request,
-            series_id=1,
-            next_run_at=previous_next_run_at,
-            fixed_interval=60,
-            max_runs=2,
-        )
-
-        with (
-            patch(
-                "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
-                return_value=(b"latest Hub FAB", {}, None),
-            ) as get_remote_fab,
-            patch(
-                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
-                return_value={"tool": {"flwr": {"app": {}}}},
-            ),
-            patch(
-                "flwr.superlink.servicer.control.control_handlers"
-                ".get_metadata_from_config",
-                return_value=("flwr/agent", "2.0.0"),
-            ),
-        ):
-            dispatch_automation(
-                self.state,
-                automation.automation_id,
-                previous_next_run_at=previous_next_run_at,
-                next_run_at="2026-09-02T10:01:00+00:00",
-            )
-
-        get_remote_fab.assert_called_once_with(None, "@flwr/agent")
-        active = self.state.list_automations(
-            automation_ids=[automation.automation_id],
-            statuses=[AutomationStatus.ACTIVE],
-            order_by="updated_at",
-        )
-        self.assertEqual(
-            [item.automation_id for item in active], [automation.automation_id]
-        )
 
     def test_start_automation_rejects_start_at_without_timezone(self) -> None:
         """Reject a start time without timezone information."""
