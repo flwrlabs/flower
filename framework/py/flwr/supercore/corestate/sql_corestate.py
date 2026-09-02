@@ -1788,7 +1788,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
             )
 
-    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> list[Task]:
         """Handle cleanup of expired task tokens.
 
         Override in subclasses to add custom cleanup logic.
@@ -1798,6 +1798,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         tasks : list[Task]
             Tasks whose claims expired and were marked FINISHED:FAILED.
         """
+        return tasks
 
     def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:
         """Atomically reserve a nonce in a namespace."""

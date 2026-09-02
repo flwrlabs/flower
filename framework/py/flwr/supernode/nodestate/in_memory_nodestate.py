@@ -212,12 +212,13 @@ class InMemoryNodeState(
                 self.record_message_processing_end(msg.metadata.message_id)
                 self.store_message(error_reply)
 
-    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> list[Task]:
         """Insert error replies for messages associated with expired task tokens."""
         run_ids = {task.run_id for task in tasks if task.type == TaskType.CLIENT_APP}
         if not run_ids:
-            return
+            return tasks
         self._store_error_replies(run_ids)
+        return tasks
 
     def record_message_processing_start(self, message_id: str) -> None:
         """Record the start time of message processing based on the message ID."""

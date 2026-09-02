@@ -1211,7 +1211,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 self.federation_manager.report_run_usage()
         return result
 
-    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> list[Task]:
         """Fail unfinished tasks for runs whose primary task expired and report usage.
 
         When an expired task is the primary task of a run, this hook marks all
@@ -1219,7 +1219,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         associated task tokens, and reports run usage.
         """
         if not tasks:
-            return
+            return []
 
         # Check if any of the expired tasks is referenced as a run's primary task.
         task_ids = [uint64_to_int64(task.task_id) for task in tasks]
@@ -1245,7 +1245,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             self.federation_manager.report_run_usage()
         else:
             cascade_finished_tasks = []
-        super()._on_task_tokens_expired([*tasks, *cascade_finished_tasks])
+        return super()._on_task_tokens_expired([*tasks, *cascade_finished_tasks])
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
