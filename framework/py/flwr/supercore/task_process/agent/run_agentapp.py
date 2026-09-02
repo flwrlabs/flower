@@ -54,6 +54,7 @@ from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
 from flwr.supercore.logger import flush_logs, start_log_uploader, stop_log_uploader
 from flwr.supercore.object_ref import load_app
+from flwr.supercore.runtime_timing import emit_runtime_timing
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
@@ -269,7 +270,21 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             connectors=RuntimeAgentConnectors(responses),
             events=agent_events,
         )
-        agent_app(agent=agent, context=context)
+        emit_runtime_timing(
+            "runtime.agent.execution.started",
+            run_id=run.run_id,
+            task_id=task_id,
+            root_task_id=task_id,
+        )
+        try:
+            agent_app(agent=agent, context=context)
+        finally:
+            emit_runtime_timing(
+                "runtime.agent.execution.finished",
+                run_id=run.run_id,
+                task_id=task_id,
+                root_task_id=task_id,
+            )
         agent_events.close()
 
         # Set sub_status and details for successful completion

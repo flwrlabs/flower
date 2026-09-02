@@ -47,6 +47,7 @@ from flwr.supercore.json_message.connector_message import (
 )
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.runtime_timing import emit_runtime_timing
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
@@ -251,6 +252,12 @@ class RuntimeAgentResponses(AgentResponses):
                 "AgentResponses request requires a non-empty string 'model' field."
             )
 
+        emit_runtime_timing(
+            "runtime.agent.model.dispatch.started",
+            run_id=self._run_id,
+            task_id=self._task_id,
+            root_task_id=self._task_id,
+        )
         create_res = self._stub.CreateTask(
             CreateTaskRequest(type=TaskType.MODEL, model_ref=model)
         )

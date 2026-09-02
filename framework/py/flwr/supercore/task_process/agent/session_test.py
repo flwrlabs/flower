@@ -38,10 +38,12 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
+from flwr.supercore.json_message.model_message import ModelResponse
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject
 
+from . import session
 from .session import RuntimeAgentConnectors, RuntimeAgentEvents, RuntimeAgentResponses
 
 
@@ -335,3 +337,38 @@ def test_create_connector_response_resolves_canonical_name() -> None:
     assert isinstance(request, ConnectorRequest)
     assert request.payload["name"] == "notion_search"
     assert output == "done"
+
+
+def test_create_model_response_marks_dispatch_start(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mark the start of the Agent-to-Model dispatch without request contents."""
+    stub = Mock()
+    stub.CreateTask.return_value = CreateTaskResponse(task_id=456)
+    timing = Mock()
+    monkeypatch.setattr(session, "emit_runtime_timing", timing)
+    responses = RuntimeAgentResponses(
+        stub=stub,
+        run_id=123,
+        task_id=789,
+        context=Mock(),
+        start_run_request=StartRunRequest(),
+        events=Mock(),
+    )
+    response = ModelResponse(
+        dst_task_id=789,
+        response={"object": "response", "status": "completed", "output": []},
+        reply_to_message_id="request-message-id",
+    )
+
+    with patch.object(responses, "_send_and_receive", return_value=response):
+        responses._create_model_response(  # pylint: disable=W0212
+            {"model": "model", "input": "ignored"}
+        )
+
+    timing.assert_called_once_with(
+        "runtime.agent.model.dispatch.started",
+        run_id=123,
+        task_id=789,
+        root_task_id=789,
+    )

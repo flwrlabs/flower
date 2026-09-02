@@ -55,6 +55,8 @@ def test_handle_task_flushes_first_text_event_eagerly(
 ) -> None:
     """The first text event is persisted without waiting for a full batch."""
     stub = Mock()
+    timing = Mock()
+    monkeypatch.setattr(task, "emit_runtime_timing", timing)
     monkeypatch.setattr(
         task, "_pull_model_request", Mock(return_value=_model_request())
     )
@@ -89,3 +91,10 @@ def test_handle_task_flushes_first_text_event_eagerly(
         "response.created",
         first_text_event,
     ]
+    assert [call.args[0] for call in timing.call_args_list] == [
+        "runtime.model.execution.started",
+        "runtime.model.provider.request.started",
+        "runtime.model.provider.first_event.received",
+        "runtime.model.provider.execution.finished",
+    ]
+    assert all(call.kwargs["root_task_id"] == 11 for call in timing.call_args_list)

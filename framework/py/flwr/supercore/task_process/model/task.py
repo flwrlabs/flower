@@ -29,6 +29,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.runtime_timing import emit_runtime_timing
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
@@ -47,6 +48,14 @@ def handle_task(client: RuntimeHttpClient, task_id: int, run_id: int) -> None:
     is_stream = request_message.payload.get("stream") is True
     if request_message.metadata.src_task_id is None:
         raise RuntimeError("Model request source task is not set.")
+    root_task_id = request_message.metadata.src_task_id
+
+    emit_runtime_timing(
+        "runtime.model.execution.started",
+        run_id=run_id,
+        task_id=task_id,
+        root_task_id=root_task_id,
+    )
 
     def _push_model_response(response: JSONObject) -> None:
         """Push a ModelResponse back to the requesting task."""
@@ -64,6 +73,7 @@ def handle_task(client: RuntimeHttpClient, task_id: int, run_id: int) -> None:
 
     # Stream events are exposed through Control.StreamRunEvents.
     events: list[TaskEvent] = []
+    first_provider_event_received = False
     first_text_event_flushed = False
 
     def _flush_events() -> None:
@@ -75,9 +85,17 @@ def handle_task(client: RuntimeHttpClient, task_id: int, run_id: int) -> None:
 
     def _buffer_event(event: JSONObject) -> None:
         """Buffer one Open Responses stream event."""
-        nonlocal first_text_event_flushed
+        nonlocal first_provider_event_received, first_text_event_flushed
         if not is_stream:
             return
+        if not first_provider_event_received:
+            first_provider_event_received = True
+            emit_runtime_timing(
+                "runtime.model.provider.first_event.received",
+                run_id=run_id,
+                task_id=task_id,
+                root_task_id=root_task_id,
+            )
         encoded = strict_json_dumps(event, compact=True)
         events.append(TaskEvent(event=cast(str, event["type"]), data=encoded))
         if event["type"] in _TEXT_DELTA_EVENTS and not first_text_event_flushed:
@@ -88,11 +106,25 @@ def handle_task(client: RuntimeHttpClient, task_id: int, run_id: int) -> None:
 
     response = None
     try:
-        response = invoke_model_provider(
-            request_message.payload,
-            on_stream_event=_buffer_event,
-            usage_recorder=TaskUsageRecorder(client),
+        emit_runtime_timing(
+            "runtime.model.provider.request.started",
+            run_id=run_id,
+            task_id=task_id,
+            root_task_id=root_task_id,
         )
+        try:
+            response = invoke_model_provider(
+                request_message.payload,
+                on_stream_event=_buffer_event,
+                usage_recorder=TaskUsageRecorder(client),
+            )
+        finally:
+            emit_runtime_timing(
+                "runtime.model.provider.execution.finished",
+                run_id=run_id,
+                task_id=task_id,
+                root_task_id=root_task_id,
+            )
     except Exception as ex:
         response = _make_error_response(ex)
         raise

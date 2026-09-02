@@ -340,6 +340,27 @@ def test_build_taskexecutor_pod_supports_explicit_env() -> None:
     ]
 
 
+@pytest.mark.parametrize("task_type", [TaskType.AGENT_APP, TaskType.MODEL])
+def test_build_taskexecutor_pod_forwards_enabled_timing_logging(
+    monkeypatch: pytest.MonkeyPatch, task_type: TaskType
+) -> None:
+    """Forward profiling opt-in only to Kubernetes Agent runtime task Pods."""
+    monkeypatch.setenv("FLWR_RUNTIME_TIMING_LOGGING", "1")
+
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            _execution_spec(task_type=task_type),
+            _executor_config(),
+            "root-ca",
+            _LAUNCH_ATTEMPT_ID,
+        )
+    )
+
+    assert pod["spec"]["containers"][0]["env"] == [
+        {"name": "FLWR_RUNTIME_TIMING_LOGGING", "value": "1"}
+    ]
+
+
 @pytest.mark.parametrize(
     "env_name",
     [

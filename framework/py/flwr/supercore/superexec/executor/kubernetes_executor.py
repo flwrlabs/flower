@@ -15,6 +15,7 @@
 """Kubernetes executor for SuperExec TaskExecutor processes."""
 
 import importlib
+import os
 import re
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -28,7 +29,9 @@ from flwr.supercore import log
 from flwr.supercore.constant import (
     TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
     TASK_TYPE_TO_COMMAND,
+    TaskType,
 )
+from flwr.supercore.runtime_timing import RUNTIME_TIMING_LOGGING_ENV
 from flwr.supercore.typing import JSONObject
 
 from .types import ExecutionSpec, LaunchResult
@@ -461,8 +464,9 @@ def _build_taskexecutor_pod(
         container["imagePullPolicy"] = config.image_pull_policy
     if config.resources is not None:
         container["resources"] = config.resources
-    if config.env is not None:
-        container["env"] = config.env
+    env = _taskexecutor_container_env(spec, config)
+    if env:
+        container["env"] = env
     if config.container_security_context is not None:
         container["securityContext"] = config.container_security_context
 
@@ -527,6 +531,20 @@ def _taskexecutor_args(
         args.append("--allow-runtime-dependency-installation")
 
     return args
+
+
+def _taskexecutor_container_env(
+    spec: ExecutionSpec, config: KubernetesExecutorConfig
+) -> list[JSONObject]:
+    """Return configured environment plus the opt-in timing flag for Agent Pods."""
+    env = list(config.env) if config.env is not None else []
+    if os.getenv(RUNTIME_TIMING_LOGGING_ENV) == "1" and spec.task_type in {
+        TaskType.AGENT_APP,
+        TaskType.MODEL,
+    }:
+        env = [entry for entry in env if entry["name"] != RUNTIME_TIMING_LOGGING_ENV]
+        env.append({"name": RUNTIME_TIMING_LOGGING_ENV, "value": "1"})
+    return env
 
 
 def _taskexecutor_env(env: list[JSONObject]) -> list[JSONObject]:

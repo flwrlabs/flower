@@ -70,6 +70,8 @@ FLOWER_LOGGER = logging.getLogger(LOGGER_NAME)
 FLOWER_LOGGER.setLevel(logging.DEBUG)
 log = FLOWER_LOGGER.log  # pylint: disable=invalid-name
 
+_output_mirroring = threading.local()
+
 LOG_COLORS = {
     "DEBUG": "\033[94m",  # Blue
     "INFO": "\033[92m",  # Green
@@ -108,6 +110,14 @@ class ConsoleHandler(StreamHandler):
             # Check if the message is empty
             if not record.message:
                 return
+
+        if getattr(record, "runtime_timing", False):
+            _output_mirroring.skip_task_log = True
+            try:
+                super().emit(record)
+            finally:
+                _output_mirroring.skip_task_log = False
+            return
 
         super().emit(record)
 
@@ -377,7 +387,8 @@ def mirror_output_to_queue(log_queue: Queue[str | None]) -> None:
             except UnicodeEncodeError:
                 ret = original_write(_remove_emojis(s))
             stream.flush()
-            log_queue.put(s)
+            if not getattr(_output_mirroring, "skip_task_log", False):
+                log_queue.put(s)
             return ret
 
         return fn
