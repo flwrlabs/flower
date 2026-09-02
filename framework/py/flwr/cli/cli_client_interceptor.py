@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===============================================================================
-"""gRPC client interceptor for Flower CLI metadata."""
+"""Client interceptors for Flower CLI metadata."""
 
 from collections.abc import Callable
 from typing import Any
 
 import grpc
+import httpx
 
 from flwr.supercore.constant import FLWR_CLIENT_METADATA_KEY
+from flwr.supercore.protobuf.client import ProtobufCall, ProtobufRequestContext
 
 
 class CliClientInterceptor(
@@ -61,3 +63,16 @@ class CliClientInterceptor(
     ) -> grpc.Call:
         """Add the CLI client identifier to a unary-stream call."""
         return self._intercept_call(continuation, client_call_details, request)
+
+
+class CliClientHttpInterceptor:
+    """Attach the CLI client identifier to protobuf-over-HTTP requests."""
+
+    def intercept(
+        self,
+        context: ProtobufRequestContext,
+        call_next: ProtobufCall,
+    ) -> httpx.Response:
+        """Add the CLI client identifier to an HTTP call."""
+        context.request.headers[FLWR_CLIENT_METADATA_KEY] = "cli"
+        return call_next(context)

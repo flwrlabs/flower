@@ -49,7 +49,7 @@ from flwr.supercore.interceptors import (
 )
 
 from .cli_account_auth_interceptor import CliAccountAuthHttpInterceptor
-from .cli_client_interceptor import CliClientInterceptor
+from .cli_client_interceptor import CliClientHttpInterceptor, CliClientInterceptor
 from .utils import (
     AUTHENTICATION_FAILED_MESSAGE,
     SUPERLINK_UNAVAILABLE_MESSAGE,
@@ -316,9 +316,10 @@ def test_init_http_client_from_connection_uses_resolved_connection() -> None:
     assert kwargs["server_address"] == address
     assert kwargs["insecure"] is True
     assert kwargs["root_certificates"] is None
-    assert len(kwargs["interceptors"]) == 2
-    assert isinstance(kwargs["interceptors"][0], RuntimeVersionHttpInterceptor)
-    auth_interceptor = kwargs["interceptors"][1]
+    assert len(kwargs["interceptors"]) == 3
+    assert isinstance(kwargs["interceptors"][0], CliClientHttpInterceptor)
+    assert isinstance(kwargs["interceptors"][1], RuntimeVersionHttpInterceptor)
+    auth_interceptor = kwargs["interceptors"][2]
     assert isinstance(auth_interceptor, CliAccountAuthHttpInterceptor)
 
     credentials = auth_interceptor.refresh_tokens("old-refresh-token")

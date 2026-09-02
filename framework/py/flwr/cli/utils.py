@@ -65,7 +65,7 @@ from .cli_account_auth_interceptor import (
     CliAccountAuthHttpInterceptor,
     CliAccountAuthInterceptor,
 )
-from .cli_client_interceptor import CliClientInterceptor
+from .cli_client_interceptor import CliClientHttpInterceptor, CliClientInterceptor
 from .config_utils import load_certificate_in_connection
 from .constant import AUTHN_TYPE_STORE_KEY
 from .flower_config import read_superlink_connection
@@ -434,6 +434,7 @@ def init_http_client_from_connection(
         insecure=connection.insecure,
         root_certificates=root_certificates,
         interceptors=[
+            CliClientHttpInterceptor(),
             RuntimeVersionHttpInterceptor(component_name="flwr CLI"),
             CliAccountAuthHttpInterceptor(auth_plugin, refresh_tokens),
         ],
