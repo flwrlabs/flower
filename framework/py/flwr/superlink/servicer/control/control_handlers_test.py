@@ -310,6 +310,42 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
         )
 
+    def test_start_run_persists_agent_input_event(self) -> None:
+        """Persist agent input as a primary-task message item."""
+        request = StartRunRequest(federation=NOOP_FEDERATION_ID)
+        request.fab.content = b"AgentApp FAB"
+        request.override_config["agent.input"].string = "Hello"
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={
+                    "tool": {"flwr": {"app": {"config": {"agent": {"input": ""}}}}}
+                },
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/agent", "v0.0.1"),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers._get_app_type",
+                return_value=TaskType.AGENT_APP,
+            ),
+        ):
+            response = start_run(request, self.account, self.state, None)
+
+        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        event = self.state.get_task_events(run_ids=[response.run_id])[0]
+        self.assertEqual(
+            (event.task_id, event.event, event.data),
+            (
+                run.primary_task_id,
+                "message",
+                '{"type":"message","role":"user","content":"Hello"}',
+            ),
+        )
+
     def test_start_run_notifies_extension_after_persisting_run(self) -> None:
         """Notify the optional extension with the persisted run snapshot."""
         fab_content = b"stored FAB"
