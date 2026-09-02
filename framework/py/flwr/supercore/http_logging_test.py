@@ -54,9 +54,7 @@ def _access_record(path: str, status_code: object) -> logging.LogRecord:
         ("//[", 200, True),
     ],
 )
-def test_routine_access_filter(
-    path: str, status_code: object, expected: bool
-) -> None:
+def test_routine_access_filter(path: str, status_code: object, expected: bool) -> None:
     """Filter only successful routine access records."""
     assert RoutineAccessFilter().filter(_access_record(path, status_code)) is expected
 
