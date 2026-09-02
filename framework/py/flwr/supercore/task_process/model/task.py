@@ -36,6 +36,7 @@ from flwr.supercore.utils import strict_json_dumps
 from .provider import ModelProviderError, invoke_model_provider
 
 _DEFAULT_TASK_EVENT_BATCH_SIZE = 16
+_TEXT_DELTA_EVENT = "response.output_text.delta"
 
 
 def handle_task(client: RuntimeHttpClient, task_id: int, run_id: int) -> None:
@@ -61,7 +62,7 @@ def handle_task(client: RuntimeHttpClient, task_id: int, run_id: int) -> None:
 
     # Stream events are exposed through Control.StreamRunEvents.
     events: list[TaskEvent] = []
-    first_stream_event_flushed = False
+    first_text_event_flushed = False
 
     def _flush_events() -> None:
         """Push buffered stream events."""
@@ -72,14 +73,14 @@ def handle_task(client: RuntimeHttpClient, task_id: int, run_id: int) -> None:
 
     def _buffer_event(event: JSONObject) -> None:
         """Buffer one Open Responses stream event."""
-        nonlocal first_stream_event_flushed
+        nonlocal first_text_event_flushed
         if not is_stream:
             return
         encoded = strict_json_dumps(event, compact=True)
         events.append(TaskEvent(event=cast(str, event["type"]), data=encoded))
-        if not first_stream_event_flushed:
+        if event["type"] == _TEXT_DELTA_EVENT and not first_text_event_flushed:
             _flush_events()
-            first_stream_event_flushed = True
+            first_text_event_flushed = True
         elif len(events) >= _DEFAULT_TASK_EVENT_BATCH_SIZE:
             _flush_events()
 

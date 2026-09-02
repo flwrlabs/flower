@@ -46,10 +46,10 @@ def _completed_response() -> JSONObject:
     return {"object": "response", "status": "completed", "output": []}
 
 
-def test_handle_task_flushes_first_event_eagerly(
+def test_handle_task_flushes_first_text_event_eagerly(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The first streamed event is persisted without waiting for a full batch."""
+    """The first text event is persisted without waiting for a full batch."""
     stub = Mock()
     monkeypatch.setattr(
         task, "_pull_model_request", Mock(return_value=_model_request())
@@ -63,6 +63,13 @@ def test_handle_task_flushes_first_event_eagerly(
     ) -> JSONObject:
         del usage_recorder
         on_stream_event(cast(JSONObject, {"type": "response.created"}))
+        assert stub.PushTaskEvents.call_count == 0
+        on_stream_event(
+            cast(
+                JSONObject,
+                {"type": "response.output_text.delta", "delta": "Hello"},
+            )
+        )
         assert stub.PushTaskEvents.call_count == 1
         for index in range(16):
             on_stream_event(cast(JSONObject, {"type": f"response.event-{index}"}))
@@ -73,4 +80,8 @@ def test_handle_task_flushes_first_event_eagerly(
     task.handle_task(client=stub, task_id=22, run_id=7)
 
     batches = [call.args[0].events for call in stub.PushTaskEvents.call_args_list]
-    assert [len(batch) for batch in batches] == [1, 16]
+    assert [len(batch) for batch in batches] == [2, 16]
+    assert [event.event for event in batches[0]] == [
+        "response.created",
+        "response.output_text.delta",
+    ]
