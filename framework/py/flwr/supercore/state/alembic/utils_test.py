@@ -414,6 +414,50 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
+    def test_hub_fab_hash_migration_downgrade_removes_hashless_apps(self) -> None:
+        """Ensure downgrade removes associations older schemas cannot represent."""
+        engine = self.create_engine("federation_app_hub_fab_hash_downgrade.db")
+        try:
+            self.upgrade_to_revision(engine, "heads")
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO federation_app (
+                            federation_id, app_id, fab_hash, app_type,
+                            is_hub_app, added_by, added_at
+                        ) VALUES (
+                            :federation_id, :app_id, NULL, :app_type,
+                            TRUE, :added_by, :added_at
+                        )
+                        """
+                    ),
+                    {
+                        "federation_id": "@alice/research",
+                        "app_id": "@flower/hub-agent",
+                        "app_type": TaskType.AGENT_APP,
+                        "added_by": "alice",
+                        "added_at": "2026-09-01 10:00:00+00:00",
+                    },
+                )
+
+            self.downgrade_to_revision(engine, "e4ecc602bd9a")
+
+            with engine.connect() as connection:
+                row_count = connection.execute(
+                    text("SELECT COUNT(*) FROM federation_app")
+                ).scalar_one()
+                fab_hash_nullable = next(
+                    column["nullable"]
+                    for column in inspect(engine).get_columns("federation_app")
+                    if column["name"] == "fab_hash"
+                )
+
+            self.assertEqual(row_count, 0)
+            self.assertFalse(fab_hash_nullable)
+        finally:
+            engine.dispose()
+
     def test_automation_timestamp_migration_normalizes_sqlite_text(self) -> None:
         """Ensure legacy SQLite automation timestamps use ORM-compatible text."""
         engine = self.create_engine("automation_timestamp_normalization.db")

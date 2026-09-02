@@ -472,6 +472,31 @@ def validate_run_connector_refs(
     return canonical_refs
 
 
+def _is_hub_app(state: LinkState, federation_id: str, app_id: str) -> bool:
+    """Return whether an app association explicitly identifies a Hub app."""
+    return any(
+        app.app_id == app_id and app.HasField("is_hub_app") and app.is_hub_app
+        for app in state.list_apps(federation_id)
+    )
+
+
+def _get_start_run_app_id(request: StartRunRequest) -> str | None:
+    """Return the app ID declared by a StartRun request, if identifiable."""
+    if request.app_spec:
+        try:
+            app_id, _ = parse_app_spec(request.app_spec)
+            return app_id
+        except ValueError:
+            return None
+    if request.fab.content:
+        try:
+            fab_id, _ = get_metadata_from_config(get_fab_config(request.fab.content))
+            return f"@{fab_id}"
+        except ValueError:
+            return None
+    return None
+
+
 def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
@@ -533,12 +558,23 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             request.fab.hash_str,
         )
         if stored_fab is None:
-            raise FlowerError(
-                ApiErrorCode.FAB_DOWNLOAD_FAILURE,
-                "App or FAB not found in the requested federation.",
-            )
-        fab_file = stored_fab.content
-        verification_dict = stored_fab.verifications
+            # Hub associations intentionally do not retain a FAB hash. A legacy
+            # request (for example, an existing automation) can still contain the
+            # previously stored hash, so resolve the Hub app again instead.
+            if _is_hub_app(state, federation_id, app_id):
+                fab_file, verification_dict, note = _get_remote_fab(
+                    fleet_api_type, app_id
+                )
+                is_hub_app = True
+                is_stored_app = False
+            else:
+                raise FlowerError(
+                    ApiErrorCode.FAB_DOWNLOAD_FAILURE,
+                    "App or FAB not found in the requested federation.",
+                )
+        else:
+            fab_file = stored_fab.content
+            verification_dict = stored_fab.verifications
     # Start a run using a remote app
     elif request.app_spec:
         fab_file, verification_dict, note = _get_remote_fab(
@@ -922,6 +958,12 @@ def start_automation(  # pylint: disable=too-many-locals
     stored_start_run_request = StartRunRequest()
     stored_start_run_request.CopyFrom(start_run_request)
     stored_start_run_request.federation = federation_id
+    app_id = _get_start_run_app_id(stored_start_run_request)
+    if app_id is not None and _is_hub_app(state, federation_id, app_id):
+        # Store Hub automations by unversioned app ID. Each dispatch then resolves
+        # the latest compatible version instead of pinning the current run's FAB.
+        stored_start_run_request.app_spec = app_id
+        stored_start_run_request.ClearField("fab")
 
     # Persist the unresolved run request so dispatch uses the StartRun workflow.
     try:
