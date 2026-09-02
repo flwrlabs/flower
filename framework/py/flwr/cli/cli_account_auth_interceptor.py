@@ -147,10 +147,12 @@ class CliAccountAuthHttpInterceptor:
         response = call_next(context)
         refresh_token = get_metadata_str(metadata, REFRESH_TOKEN_KEY)
 
-        # Refresh only after an authentication failure. Refresh requests themselves
-        # are excluded to prevent a failed refresh from starting a recursive loop.
+        # Refresh only when the server identifies a bearer authentication failure.
+        # Refresh requests themselves are excluded to prevent a failed refresh from
+        # starting a recursive loop.
         if (
             response.status_code != httpx.codes.UNAUTHORIZED
+            or response.headers.get("WWW-Authenticate") != "Bearer"
             or context.rpc_method == _REFRESH_AUTH_TOKENS_METHOD
             or refresh_token is None
         ):
@@ -162,7 +164,5 @@ class CliAccountAuthHttpInterceptor:
 
         # Retry the original request once with the new access token. Returning the
         # retry directly ensures a second 401 is propagated without another refresh.
-        context.request.headers["Authorization"] = (
-            f"Bearer {credentials.access_token}"
-        )
+        context.request.headers["Authorization"] = f"Bearer {credentials.access_token}"
         return call_next(context)

@@ -57,6 +57,10 @@ service Control {
   // Get run series
   rpc GetRunSeries(GetRunSeriesRequest) returns (GetRunSeriesResponse) {}
 
+  // List events for all runs in a run series
+  rpc ListRunSeriesEvents(ListRunSeriesEventsRequest)
+      returns (ListRunSeriesEventsResponse) {}
+
   // Get login details upon request
   rpc GetLoginDetails(GetLoginDetailsRequest)
       returns (GetLoginDetailsResponse) {}
@@ -235,6 +239,9 @@ message GetRunSeriesResponse {
   RunSeries series = 1;
   Context context = 2;
 }
+
+message ListRunSeriesEventsRequest { uint64 series_id = 1; }
+message ListRunSeriesEventsResponse { repeated TaskEvent events = 1; }
 
 message GetLoginDetailsRequest {}
 message GetLoginDetailsResponse {
