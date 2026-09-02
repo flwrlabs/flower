@@ -1286,9 +1286,17 @@ class InMemoryCoreState(
 
         return True
 
-    def has_task_events(self, *, task_id: int) -> bool:
-        """Return whether a task has at least one persisted event."""
+    def has_task_events(
+        self, *, task_id: int, excluded_event_types: frozenset[str] = frozenset()
+    ) -> bool:
+        """Return whether a task has a persisted event outside excluded types."""
         with self.lock_task_event_store:
+            if excluded_event_types:
+                return any(
+                    event.task_id == task_id and event.event not in excluded_event_types
+                    for events in self.task_event_store.values()
+                    for event in events
+                )
             return task_id in self.task_event_task_ids
 
     def get_task_events(

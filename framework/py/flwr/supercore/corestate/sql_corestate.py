@@ -1629,11 +1629,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         return True
 
-    def has_task_events(self, *, task_id: int) -> bool:
-        """Return whether a task has at least one persisted event."""
-        query = select(
-            exists().where(TaskEventModel.task_id == uint64_to_int64(task_id))
-        )
+    def has_task_events(
+        self, *, task_id: int, excluded_event_types: frozenset[str] = frozenset()
+    ) -> bool:
+        """Return whether a task has a persisted event outside excluded types."""
+        conditions = [TaskEventModel.task_id == uint64_to_int64(task_id)]
+        if excluded_event_types:
+            conditions.append(TaskEventModel.event.not_in(excluded_event_types))
+        query = select(exists().where(*conditions))
         with self.session() as session:
             return bool(session.scalar(query))
 

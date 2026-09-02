@@ -185,6 +185,10 @@ class StateTest(CoreStateTest):
         assert stored_event.event == initial_event.event
         assert stored_event.data == initial_event.data
         assert stored_event.task_id == run.primary_task_id
+        assert not state.has_task_events(
+            task_id=stored_event.task_id,
+            excluded_event_types=frozenset({"message"}),
+        )
 
     def test_create_run_uses_existing_series_id(self) -> None:
         """Test create_run links the run to an existing run series."""

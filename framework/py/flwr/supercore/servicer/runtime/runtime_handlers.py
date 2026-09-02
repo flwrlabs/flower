@@ -66,6 +66,7 @@ from flwr.supercore.task_process.connector import registry as connector_registry
 _FINAL_RUN_EVENT_TYPES = frozenset(
     {"response.completed", "response.failed", "response.incomplete"}
 )
+_INITIAL_AGENT_INPUT_EVENT_TYPE = "message"
 
 
 def pull_pending_tasks(
@@ -283,7 +284,14 @@ def push_task_events(
     has_persisted_events = True
     if timing_enabled:
         try:
-            has_persisted_events = state.has_task_events(task_id=task.task_id)
+            has_persisted_events = state.has_task_events(
+                task_id=task.task_id,
+                excluded_event_types=(
+                    frozenset({_INITIAL_AGENT_INPUT_EVENT_TYPE})
+                    if task.type == TaskType.AGENT_APP
+                    else frozenset()
+                ),
+            )
         except Exception:  # pylint: disable=broad-exception-caught
             # Timing must not change event persistence semantics.
             pass

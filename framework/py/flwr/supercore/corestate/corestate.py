@@ -941,12 +941,10 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def has_task_events(self, *, task_id: int) -> bool:
-        """Return whether a task has at least one persisted event.
-
-        Implementations should use an existence check rather than materializing
-        event payloads.
-        """
+    def has_task_events(
+        self, *, task_id: int, excluded_event_types: frozenset[str] = frozenset()
+    ) -> bool:
+        """Return whether a task has a persisted event outside excluded types."""
 
     @abstractmethod
     def get_task_events(
