@@ -18,6 +18,7 @@
 import sys
 import threading
 import time
+from logging import INFO, LogRecord
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from queue import Queue
@@ -52,12 +53,16 @@ def test_mirror_output_to_queue() -> None:
     mirror_output_to_queue(log_queue)
     print("Test message")
     sys.stderr.write("Error message\n")
+    record = LogRecord("flwr", INFO, __file__, 0, "runtime.timing {}", (), None)
+    record.runtime_timing = True
+    console_handler.emit(record)
 
     # Assert
     assert not log_queue.empty()
     assert log_queue.get() == "Test message"
     assert log_queue.get() == "\n"
     assert log_queue.get() == "Error message\n"
+    assert log_queue.empty()
 
 
 def test_restore_output() -> None:

@@ -197,7 +197,7 @@ def emit_runtime_timing(  # pylint: disable=too-many-arguments
             "%s %s",
             RUNTIME_TIMING_MESSAGE,
             serialized_attributes,
-            extra=attributes,
+            extra={"runtime_timing": True, **attributes},
         )
     except Exception:  # pylint: disable=broad-exception-caught
         # Runtime logging must remain observational, including with custom handlers.

@@ -109,7 +109,14 @@ class ConsoleHandler(StreamHandler):
             if not record.message:
                 return
 
-        super().emit(record)
+        if getattr(record, "runtime_timing", False):
+            _output_mirroring.skip_task_log = True
+            try:
+                super().emit(record)
+            finally:
+                _output_mirroring.skip_task_log = False
+        else:
+            super().emit(record)
 
     def format(self, record: LogRecord) -> str:
         """Format function that adds colors to log level."""
@@ -151,6 +158,8 @@ console_handler = ConsoleHandler(
 )
 console_handler.setLevel(logging.INFO)
 FLOWER_LOGGER.addHandler(console_handler)
+
+_output_mirroring = threading.local()
 
 # Set log level via env var (show timestamps for `DEBUG`)
 if log_level := os.getenv("FLWR_LOG_LEVEL"):
@@ -377,7 +386,8 @@ def mirror_output_to_queue(log_queue: Queue[str | None]) -> None:
             except UnicodeEncodeError:
                 ret = original_write(_remove_emojis(s))
             stream.flush()
-            log_queue.put(s)
+            if not getattr(_output_mirroring, "skip_task_log", False):
+                log_queue.put(s)
             return ret
 
         return fn
