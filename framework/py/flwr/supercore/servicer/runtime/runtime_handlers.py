@@ -64,7 +64,7 @@ from flwr.supercore.runtime_timing import (
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 _FINAL_RUN_EVENT_TYPES = frozenset(
-    {"response.completed", "response.failed", "response.incomplete"}
+    {"error", "response.completed", "response.failed", "response.incomplete"}
 )
 _INITIAL_AGENT_INPUT_EVENT_TYPE = "message"
 

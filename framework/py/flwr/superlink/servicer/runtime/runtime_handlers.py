@@ -256,14 +256,25 @@ def pull_task_input(
     """Pull ServerApp process inputs."""
     log(DEBUG, "Runtime.PullTaskInput")
     run_id = task.run_id
+    timing_enabled = is_runtime_timing_logging_enabled() and is_runtime_timing_task(
+        task.type
+    )
+    lineage: tuple[int, int] | None = None
 
-    if is_runtime_timing_task(task.type):
+    if timing_enabled:
+        lineage = _get_runtime_task_lineage(state, task)
+        parent_task_id, root_task_id = (
+            lineage
+            if lineage is not None
+            else (None, task.task_id if task.type == TaskType.AGENT_APP else None)
+        )
         emit_runtime_timing(
             "runtime.task.input.pull.received",
             component="superlink",
             run_id=run_id,
             task_id=task.task_id,
-            root_task_id=(task.task_id if task.type == TaskType.AGENT_APP else None),
+            parent_task_id=parent_task_id,
+            root_task_id=root_task_id,
             task_type=task.type,
         )
 
@@ -274,8 +285,7 @@ def pull_task_input(
     if run and run.series_id:
         series_context = state.get_run_series_context(run.series_id)
     if run and fab and series_context and state.activate_task(task.task_id):
-        if is_runtime_timing_task(task.type):
-            lineage = _get_runtime_task_lineage(state, task)
+        if timing_enabled:
             parent_task_id, root_task_id = (
                 lineage
                 if lineage is not None
