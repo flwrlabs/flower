@@ -852,7 +852,7 @@ def _stream_run_events(
         time.sleep(RUN_EVENTS_STREAM_INTERVAL)
 
 
-def start_automation(  # pylint: disable=too-many-locals
+def start_automation(  # pylint: disable=too-many-branches,too-many-locals
     request: StartAutomationRequest,
     account: AccountInfo,
     state: LinkState,
