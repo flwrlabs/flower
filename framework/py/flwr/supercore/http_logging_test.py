@@ -22,7 +22,7 @@ from uvicorn.logging import AccessFormatter, DefaultFormatter
 
 from .http_logging import (
     LOG_FORMAT,
-    HealthCheckAccessFilter,
+    RoutineAccessFilter,
     UTCFormatter,
     configure_uvicorn_logging,
     get_uvicorn_log_config,
@@ -46,25 +46,26 @@ def _access_record(path: str, status_code: object) -> logging.LogRecord:
     [
         ("/health", 200, False),
         ("/health?probe=readiness", "200", False),
+        ("/v1/runtime/pull-pending-tasks", 200, False),
+        ("/v1/runtime/pull-pending-tasks?timeout=1", "200", False),
         ("/health", 500, True),
+        ("/v1/runtime/pull-pending-tasks", 500, True),
         ("/v1/user/profile", 200, True),
         ("//[", 200, True),
     ],
 )
-def test_health_check_access_filter(
+def test_routine_access_filter(
     path: str, status_code: object, expected: bool
 ) -> None:
-    """Filter only successful health-check access records."""
-    assert (
-        HealthCheckAccessFilter().filter(_access_record(path, status_code)) is expected
-    )
+    """Filter only successful routine access records."""
+    assert RoutineAccessFilter().filter(_access_record(path, status_code)) is expected
 
 
-def test_health_check_access_filter_keeps_health_checks_at_debug() -> None:
-    """Keep successful health checks as debug records in debug mode."""
-    record = _access_record("/health", 200)
+def test_routine_access_filter_keeps_routine_requests_at_debug() -> None:
+    """Keep successful routine requests as debug records in debug mode."""
+    record = _access_record("/v1/runtime/pull-pending-tasks", 200)
 
-    assert HealthCheckAccessFilter(debug_enabled=True).filter(record)
+    assert RoutineAccessFilter(debug_enabled=True).filter(record)
     assert record.levelno == logging.DEBUG
     assert record.levelname == "DEBUG"
 
@@ -90,14 +91,14 @@ def test_get_uvicorn_log_config_keeps_configuration_scoped() -> None:
     assert config["loggers"]["uvicorn.access"]["handlers"] == ["access"]
     assert config["loggers"]["httpx"]["level"] == "WARNING"
     assert config["loggers"]["httpcore"]["level"] == "WARNING"
-    assert not config["filters"]["health_check_access"]["debug_enabled"]
+    assert not config["filters"]["routine_access"]["debug_enabled"]
 
 
-def test_get_uvicorn_log_config_enables_debug_health_checks() -> None:
-    """Pass debug state to the health-check filter."""
+def test_get_uvicorn_log_config_enables_debug_routine_requests() -> None:
+    """Pass debug state to the routine access filter."""
     config = get_uvicorn_log_config(logging.DEBUG)
 
-    assert config["filters"]["health_check_access"]["debug_enabled"]
+    assert config["filters"]["routine_access"]["debug_enabled"]
 
 
 def test_configure_uvicorn_logging_updates_existing_handlers() -> None:
@@ -139,13 +140,13 @@ def test_configure_uvicorn_logging_updates_existing_handlers() -> None:
         assert loggers["uvicorn.access"].level == logging.WARNING
         assert isinstance(default_handler.formatter, UTCFormatter)
         assert isinstance(access_handler.formatter, UTCFormatter)
-        health_filters = [
+        routine_filters = [
             log_filter
             for log_filter in access_handler.filters
-            if isinstance(log_filter, HealthCheckAccessFilter)
+            if isinstance(log_filter, RoutineAccessFilter)
         ]
-        assert len(health_filters) == 1
-        assert not health_filters[0].debug_enabled
+        assert len(routine_filters) == 1
+        assert not routine_filters[0].debug_enabled
         assert loggers["httpx"].level == logging.WARNING
         assert loggers["httpcore"].level == logging.WARNING
 
