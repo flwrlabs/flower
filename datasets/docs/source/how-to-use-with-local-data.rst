@@ -238,6 +238,18 @@ for that, e.g.:
   iid_partitioner_for_cifar = IidPartitioner(num_partitions=10)
   iid_partitioner_for_cifar.dataset = cifar_dataset
 
+If your local dataset is already sorted (for example by label or timestamp), use
+``shuffle=True`` so the IID shards are created from a randomized order:
+
+.. code-block:: python
+
+  shuffled_iid_partitioner = IidPartitioner(
+      num_partitions=10,
+      shuffle=True,
+      seed=42,
+  )
+  shuffled_iid_partitioner.dataset = your_dataset
+
 
 More Resources
 --------------
