@@ -31,6 +31,7 @@ from flwr.common.constant import CONN_RECONNECT_INTERVAL, CONN_REFRESH_PERIOD
 from flwr.proto.control_pb2 import StreamLogsRequest  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore import log as logger
+from flwr.supercore.control import ControlHttpClient
 
 from .utils import flwr_cli_exc_handler, init_channel_from_connection
 
@@ -44,7 +45,9 @@ class AllLogsRetrieved(BaseException):
 
 
 def start_stream(
-    run_id: int, stub: ControlStub, refresh_period: int = CONN_REFRESH_PERIOD
+    run_id: int,
+    stub: ControlStub | ControlHttpClient,
+    refresh_period: int = CONN_REFRESH_PERIOD,
 ) -> None:
     """Start log streaming for a given run ID.
 
@@ -77,7 +80,10 @@ def start_stream(
 
 
 def stream_logs(
-    run_id: int, stub: ControlStub, duration: int, after_timestamp: float
+    run_id: int,
+    stub: ControlStub | ControlHttpClient,
+    duration: int,
+    after_timestamp: float,
 ) -> float:
     """Stream logs from the beginning of a run with connection refresh.
 
@@ -105,7 +111,12 @@ def stream_logs(
 
     with flwr_cli_exc_handler():
         try:
-            for res in stub.StreamLogs(req, timeout=duration):
+            responses = (
+                stub.StreamLogs(req)
+                if isinstance(stub, ControlHttpClient)
+                else stub.StreamLogs(req, timeout=duration)
+            )
+            for res in responses:
                 print(res.log_output, end="")
             raise AllLogsRetrieved()
         except grpc.RpcError as e:
