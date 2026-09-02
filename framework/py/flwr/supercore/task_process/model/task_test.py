@@ -61,6 +61,24 @@ def test_handle_task_preserves_error_reply_after_provider_failure(
     client.PushTaskMessage.assert_called_once()
 
 
+def test_handle_task_marks_system_exit_as_cancelled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Record graceful model shutdown as cancellation."""
+    timing = Mock()
+    monkeypatch.setattr(task, "emit_runtime_timing", timing)
+    monkeypatch.setattr(
+        task, "_pull_model_request", Mock(return_value=_model_request())
+    )
+    monkeypatch.setattr(task, "invoke_model_provider", Mock(side_effect=SystemExit))
+
+    with pytest.raises(SystemExit):
+        task.handle_task(client=Mock(), task_id=22, run_id=7)
+
+    assert timing.call_args_list[-1].args == ("runtime.model.execution.finished",)
+    assert timing.call_args_list[-1].kwargs["outcome"] == "cancelled"
+
+
 def _model_request() -> ModelRequest:
     """Create a Model request with routed task metadata."""
     request = ModelRequest(

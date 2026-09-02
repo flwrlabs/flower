@@ -229,6 +229,10 @@ def handle_task(  # pylint: disable=too-many-locals,too-many-statements
                     raise
         model_outcome = "ok"
         model_error_kind = None
+    except SystemExit:
+        model_outcome = "cancelled"
+        model_error_kind = None
+        raise
     except Exception:  # pylint: disable=broad-exception-caught
         model_error_kind = provider_error_kind or "unknown"
         raise
