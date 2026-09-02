@@ -198,7 +198,9 @@ erDiagram
     VARCHAR fab_hash "nullable"
     TIMESTAMP finished_at "nullable"
     VARCHAR model_ref "nullable"
+    BIGINT parent_task_id "nullable"
     TIMESTAMP pending_at
+    BIGINT root_task_id "nullable"
     BIGINT run_id
     TIMESTAMP running_at "nullable"
     TIMESTAMP starting_at "nullable"

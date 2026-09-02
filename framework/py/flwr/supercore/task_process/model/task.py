@@ -195,6 +195,18 @@ def handle_task(  # pylint: disable=too-many-locals,too-many-statements
             provider_outcome = "ok"
             provider_error_kind = None
         finally:
+            emit_runtime_timing(
+                "runtime.model.provider.stream.finished",
+                component="model_task",
+                run_id=run_id,
+                task_id=task_id,
+                parent_task_id=parent_task_id,
+                root_task_id=parent_task_id,
+                task_type="flwr-model",
+                outcome=provider_outcome,
+                error_kind=provider_error_kind,
+                process_mode="new",
+            )
             try:
                 # Flush partial batches after the provider stream ends or fails.
                 _flush_events()
@@ -207,19 +219,6 @@ def handle_task(  # pylint: disable=too-many-locals,too-many-statements
                 # raises: its exception is re-raised after this finally block.
                 if response is not None:
                     _push_model_response(response)
-            finally:
-                emit_runtime_timing(
-                    "runtime.model.provider.stream.finished",
-                    component="model_task",
-                    run_id=run_id,
-                    task_id=task_id,
-                    parent_task_id=parent_task_id,
-                    root_task_id=parent_task_id,
-                    task_type="flwr-model",
-                    outcome=provider_outcome,
-                    error_kind=provider_error_kind,
-                    process_mode="new",
-                )
         model_outcome = "ok"
         model_error_kind = None
     except Exception:  # pylint: disable=broad-exception-caught

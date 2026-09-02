@@ -66,7 +66,10 @@ class BaseEphemeralExecPlugin(ExecPlugin):
         cmds += ["--parent-pid", str(os.getpid())]
         if self.runtime_dependency_install:
             cmds += ["--allow-runtime-dependency-installation"]
-        if is_runtime_timing_logging_enabled() and is_runtime_timing_task(task.type):
+        timing_enabled = is_runtime_timing_logging_enabled() and is_runtime_timing_task(
+            task.type
+        )
+        if timing_enabled:
             cmds += [
                 "--runtime-timing-run-id",
                 str(task.run_id),
@@ -74,36 +77,37 @@ class BaseEphemeralExecPlugin(ExecPlugin):
                 str(task.task_id),
             ]
             root_task_id = task.task_id if task.type == "flwr-agentapp" else None
-            emit_runtime_timing(
-                "runtime.executor.submission.accepted",
-                component="superexec",
-                run_id=task.run_id,
-                task_id=task.task_id,
-                root_task_id=root_task_id,
-                task_type=task.type,
-                executor_mode="fresh",
-            )
-            emit_runtime_timing(
-                "runtime.task.dispatch.accepted",
-                component="superexec",
-                run_id=task.run_id,
-                task_id=task.task_id,
-                root_task_id=root_task_id,
-                task_type=task.type,
-                executor_mode="fresh",
-            )
-            emit_runtime_timing(
-                "runtime.executor.child.spawn.started",
-                component="superexec",
-                run_id=task.run_id,
-                task_id=task.task_id,
-                root_task_id=root_task_id,
-                task_type=task.type,
-                executor_mode="fresh",
-            )
         # Perform any cleanup before launching the app
         if self.cleanup_before_launch is not None:
             self.cleanup_before_launch()
-        # Launch the app process and wait for it to finish
-        subprocess.run(cmds, check=False)
+        # Start the app process before recording that the executor accepted it.
+        with subprocess.Popen(cmds):
+            if timing_enabled:
+                emit_runtime_timing(
+                    "runtime.executor.submission.accepted",
+                    component="superexec",
+                    run_id=task.run_id,
+                    task_id=task.task_id,
+                    root_task_id=root_task_id,
+                    task_type=task.type,
+                    executor_mode="fresh",
+                )
+                emit_runtime_timing(
+                    "runtime.task.dispatch.accepted",
+                    component="superexec",
+                    run_id=task.run_id,
+                    task_id=task.task_id,
+                    root_task_id=root_task_id,
+                    task_type=task.type,
+                    executor_mode="fresh",
+                )
+                emit_runtime_timing(
+                    "runtime.executor.child.spawn.started",
+                    component="superexec",
+                    run_id=task.run_id,
+                    task_id=task.task_id,
+                    root_task_id=root_task_id,
+                    task_type=task.type,
+                    executor_mode="fresh",
+                )
         flwr_exit(ExitCode.SUCCESS, "App process finished, exiting SuperExec.")

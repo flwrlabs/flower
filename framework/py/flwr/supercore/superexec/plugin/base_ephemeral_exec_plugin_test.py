@@ -15,7 +15,9 @@
 """Tests for SuperExec base ephemeral plugin behavior."""
 
 
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from flwr.supercore.constant import TaskType
 from flwr.supercore.exit import ExitCode
@@ -66,15 +68,15 @@ def test_launch_task_runs_expected_command_and_exits() -> None:
             return_value=1234,
         ),
         patch(
-            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.run"
-        ) as run,
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.Popen"
+        ) as popen,
         patch(
             "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"
         ) as flwr_exit,
     ):
         plugin.launch_task(token="token-123", task=_get_task(task_id=5))
 
-    run.assert_called_once_with(
+    popen.assert_called_once_with(
         [
             "flwr-serverapp",
             "--insecure",
@@ -85,7 +87,6 @@ def test_launch_task_runs_expected_command_and_exits() -> None:
             "--parent-pid",
             "1234",
         ],
-        check=False,
     )
     flwr_exit.assert_called_once_with(
         ExitCode.SUCCESS,
@@ -100,11 +101,15 @@ def test_launch_task_calls_cleanup_before_launch() -> None:
     plugin = _get_ephemeral_plugin()
     plugin.cleanup_before_launch = lambda: call_log.append("cleanup")
 
+    def popen(*_args: object, **_kwargs: object) -> MagicMock:
+        call_log.append("subprocess")
+        return MagicMock()
+
     # Execute
     with (
         patch(
-            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.run",
-            side_effect=lambda *_, **__: call_log.append("subprocess"),
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.Popen",
+            side_effect=popen,
         ),
         patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
     ):
@@ -131,13 +136,13 @@ def test_launch_task_forwards_timing_context_for_agent_tasks() -> None:
             "emit_runtime_timing"
         ) as emit_runtime_timing,
         patch(
-            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.run"
-        ) as run,
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.Popen"
+        ) as popen,
         patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
     ):
         plugin.launch_task(token="token-123", task=task)
 
-    assert run.call_args.args[0][-4:] == [
+    assert popen.call_args.args[0][-4:] == [
         "--runtime-timing-run-id",
         "7",
         "--runtime-timing-task-id",
@@ -148,3 +153,30 @@ def test_launch_task_forwards_timing_context_for_agent_tasks() -> None:
         "runtime.task.dispatch.accepted",
         "runtime.executor.child.spawn.started",
     ]
+
+
+def test_launch_task_emits_no_acceptance_markers_when_spawn_fails() -> None:
+    """A failed child launch must not look like an accepted dispatch."""
+    plugin = _get_ephemeral_plugin()
+    task = _get_task(task_id=5, task_type=TaskType.AGENT_APP)
+    task.run_id = 7
+
+    with (
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin."
+            "is_runtime_timing_logging_enabled",
+            return_value=True,
+        ),
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin."
+            "emit_runtime_timing"
+        ) as emit_runtime_timing,
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.Popen",
+            side_effect=FileNotFoundError,
+        ),
+    ):
+        with pytest.raises(FileNotFoundError):
+            plugin.launch_task(token="token-123", task=task)
+
+    emit_runtime_timing.assert_not_called()

@@ -20,9 +20,8 @@ Create Date: 2026-09-02 12:45:28.131664
 """
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # pylint: disable=no-member
 

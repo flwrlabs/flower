@@ -42,6 +42,13 @@ def test_handle_task_marks_provider_event_flush_and_lineage(
     monkeypatch.setattr(task, "_pull_model_request", Mock(return_value=request))
     monkeypatch.setattr(task, "emit_runtime_timing", markers)
 
+    def assert_provider_finished_before_reply(_: object) -> None:
+        assert "runtime.model.provider.stream.finished" in [
+            call.args[0] for call in markers.call_args_list
+        ]
+
+    client.PushTaskMessage.side_effect = assert_provider_finished_before_reply
+
     def invoke_provider(
         _request: JSONObject,
         *,
@@ -63,9 +70,9 @@ def test_handle_task_marks_provider_event_flush_and_lineage(
         "runtime.model.execution.started",
         "runtime.model.provider.request.started",
         "runtime.model.provider.first_event.received",
+        "runtime.model.provider.stream.finished",
         "runtime.model.first_event.flush.started",
         "runtime.model.first_event.flush.finished",
-        "runtime.model.provider.stream.finished",
         "runtime.model.execution.finished",
     ]
     assert markers.call_args_list[0].kwargs["parent_task_id"] == 11
@@ -106,7 +113,8 @@ def test_handle_task_preserves_error_reply_after_provider_failure(
 
     client.PushTaskEvents.assert_called_once()
     client.PushTaskMessage.assert_called_once()
-    assert [call.args[0] for call in markers.call_args_list][-2:] == [
-        "runtime.model.provider.stream.finished",
-        "runtime.model.execution.finished",
-    ]
+    marker_names = [call.args[0] for call in markers.call_args_list]
+    assert marker_names.index(
+        "runtime.model.provider.stream.finished"
+    ) < marker_names.index("runtime.model.first_event.flush.started")
+    assert marker_names[-1] == "runtime.model.execution.finished"
