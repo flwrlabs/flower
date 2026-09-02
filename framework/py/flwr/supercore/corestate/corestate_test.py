@@ -982,6 +982,24 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(task.running_at, "")
         self.assertEqual(task.finished_at, "")
 
+    def test_create_and_get_task_lineage(self) -> None:
+        """Task lineage should survive a fresh CoreState lookup."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        parent_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert parent_task_id is not None
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=run_id,
+            parent_task_id=parent_task_id,
+            root_task_id=parent_task_id,
+        )
+        assert task_id is not None
+
+        self.assertEqual(
+            state.get_task_lineage(task_id), (parent_task_id, parent_task_id)
+        )
+
     def test_create_task_rejects_finished_requesting_task(self) -> None:
         """Task creation should fail if the requesting task is already finished."""
         state = self.state_factory()

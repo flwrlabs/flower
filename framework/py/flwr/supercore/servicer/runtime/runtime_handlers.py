@@ -131,27 +131,55 @@ def create_task(
     connector_ref = request.connector_ref or None
 
     _validate_create_task_request(request, task, connector_ref, state)
-    created_task_id = state.create_task(
-        task_type=request.type,
-        run_id=run_id,
-        fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
-        model_ref=request.model_ref if request.HasField("model_ref") else None,
-        connector_ref=connector_ref,
-        requesting_task_id=task.task_id,
+    lineage = (
+        (task.task_id, task.task_id)
+        if (
+            is_runtime_timing_logging_enabled()
+            and task.type == TaskType.AGENT_APP
+            and request.type == TaskType.MODEL
+        )
+        else None
     )
+    if lineage is not None:
+        created_task_id = state.create_task(
+            task_type=request.type,
+            run_id=run_id,
+            fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
+            model_ref=request.model_ref if request.HasField("model_ref") else None,
+            connector_ref=connector_ref,
+            requesting_task_id=task.task_id,
+            parent_task_id=lineage[0],
+            root_task_id=lineage[1],
+        )
+    else:
+        created_task_id = state.create_task(
+            task_type=request.type,
+            run_id=run_id,
+            fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
+            model_ref=request.model_ref if request.HasField("model_ref") else None,
+            connector_ref=connector_ref,
+            requesting_task_id=task.task_id,
+        )
     if created_task_id is None:
         raise FlowerError(
             ApiErrorCode.RUNTIME_TASK_CREATION_FAILED, "Failed to create task"
         )
 
     if task.type == TaskType.AGENT_APP and request.type == TaskType.MODEL:
+        if lineage is not None:
+            register_runtime_task_lineage(
+                run_id=run_id,
+                task_id=created_task_id,
+                parent_task_id=lineage[0],
+                root_task_id=lineage[1],
+            )
         emit_runtime_timing(
             "runtime.task.queued",
             component="superlink",
             run_id=run_id,
             task_id=created_task_id,
-            parent_task_id=task.task_id,
-            root_task_id=task.task_id,
+            parent_task_id=lineage[0] if lineage is not None else None,
+            root_task_id=lineage[1] if lineage is not None else None,
             task_type=request.type,
         )
 
@@ -247,10 +275,7 @@ def push_task_events(
         stored = state.store_task_events(request.events)
     except Exception:  # pylint: disable=broad-exception-caught
         if timing_enabled:
-            lineage = get_runtime_task_lineage(
-                run_id=task.run_id,
-                task_id=task.task_id,
-            )
+            lineage = _get_runtime_task_lineage(state, task)
             parent_task_id, root_task_id = (
                 lineage
                 if lineage is not None
@@ -277,10 +302,7 @@ def push_task_events(
             task.run_id,
         )
         if timing_enabled:
-            lineage = get_runtime_task_lineage(
-                run_id=task.run_id,
-                task_id=task.task_id,
-            )
+            lineage = _get_runtime_task_lineage(state, task)
             parent_task_id, root_task_id = (
                 lineage
                 if lineage is not None
@@ -300,10 +322,7 @@ def push_task_events(
         return PushTaskEventsResponse()
 
     if timing_enabled:
-        lineage = get_runtime_task_lineage(
-            run_id=task.run_id,
-            task_id=task.task_id,
-        )
+        lineage = _get_runtime_task_lineage(state, task)
         parent_task_id, root_task_id = (
             lineage
             if lineage is not None
@@ -392,6 +411,25 @@ def push_logs(
     merged_logs = "".join(request.logs)
     state.add_task_log(task.task_id, merged_logs)
     return PushLogsResponse()
+
+
+def _get_runtime_task_lineage(state: CoreState, task: Task) -> tuple[int, int] | None:
+    """Return cached or durable lineage without affecting runtime behavior."""
+    lineage = get_runtime_task_lineage(run_id=task.run_id, task_id=task.task_id)
+    if lineage is not None:
+        return lineage
+    try:
+        lineage = state.get_task_lineage(task.task_id)
+    except Exception:  # pylint: disable=broad-exception-caught
+        return None
+    if lineage is not None:
+        register_runtime_task_lineage(
+            run_id=task.run_id,
+            task_id=task.task_id,
+            parent_task_id=lineage[0],
+            root_task_id=lineage[1],
+        )
+    return lineage
 
 
 def _validate_create_task_request(

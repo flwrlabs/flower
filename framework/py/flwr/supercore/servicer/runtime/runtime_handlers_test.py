@@ -58,6 +58,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         """Set up test fixture."""
         self.state = Mock()
         self.state.get_tasks.return_value = []
+        self.state.get_task_lineage.return_value = None
 
     def _create_connector_task(self, connector_ref: str) -> CreateTaskResponse:
         """Create a connector task as an authenticated AgentApp task."""
@@ -191,6 +192,27 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                     requesting_task_id=789,
                 )
                 self.assertEqual(response.task_id, 456)
+
+    def test_create_task_persists_agent_model_lineage_when_timing_enabled(
+        self,
+    ) -> None:
+        """Agent-created Model tasks should retain lineage across a restart."""
+        self.state.create_task.return_value = 456
+        request = CreateTaskRequest(type=TaskType.MODEL, model_ref="model")
+
+        with patch.object(
+            runtime_handlers,
+            "is_runtime_timing_logging_enabled",
+            return_value=True,
+        ):
+            runtime_handlers.create_task(
+                request,
+                self.state,
+                Task(task_id=789, run_id=123, type=TaskType.AGENT_APP),
+            )
+
+        self.assertEqual(self.state.create_task.call_args.kwargs["parent_task_id"], 789)
+        self.assertEqual(self.state.create_task.call_args.kwargs["root_task_id"], 789)
 
     def test_create_task_allows_bound_oauth_connector(self) -> None:
         """CreateTask should allow an OAuth connector bound to the run."""
@@ -458,6 +480,52 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         self.state.get_task_events.assert_not_called()
         self.state.has_task_events.assert_called_once_with(task_id=123)
+
+    def test_push_task_events_restores_durable_model_lineage(self) -> None:
+        """First Model event markers should retain lineage after a restart."""
+        self.state.has_task_events.return_value = False
+        self.state.store_task_events.return_value = True
+        self.state.get_task_lineage.return_value = (11, 11)
+        request = PushTaskEventsRequest(
+            events=[TaskEvent(event="response.created", data="{}")]
+        )
+
+        with (
+            patch.object(
+                runtime_handlers,
+                "is_runtime_timing_logging_enabled",
+                return_value=True,
+            ),
+            patch.object(
+                runtime_handlers,
+                "get_runtime_task_lineage",
+                return_value=None,
+            ),
+            patch.object(runtime_handlers, "register_runtime_task_lineage"),
+            patch.object(
+                runtime_handlers,
+                "mark_runtime_task_first_event_persisted",
+                return_value=True,
+            ),
+            patch.object(runtime_handlers, "emit_runtime_timing") as markers,
+        ):
+            runtime_handlers.push_task_events(
+                request,
+                self.state,
+                Task(task_id=123, run_id=789, type=TaskType.MODEL),
+            )
+
+        self.state.get_task_lineage.assert_called_once_with(123)
+        self.assertEqual(
+            [marker.args[0] for marker in markers.call_args_list],
+            [
+                "runtime.events.first.persisted",
+                "runtime.agent.model.first_event.received",
+            ],
+        )
+        for marker in markers.call_args_list:
+            self.assertEqual(marker.kwargs["parent_task_id"], 11)
+            self.assertEqual(marker.kwargs["root_task_id"], 11)
 
     def test_push_task_events_logs_when_state_rejects_events(self) -> None:
         """PushTaskEvents should log when CoreState cannot store events."""

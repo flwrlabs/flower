@@ -143,6 +143,7 @@ class InMemoryCoreState(
         self.lock_automation_store = RLock()
         self._next_automation_id = 1
         self.task_store: dict[int, Task] = {}
+        self.task_lineage_store: dict[int, tuple[int, int]] = {}
         # Store task ID to token mapping
         self.task_token_store: dict[int, TokenRecord] = {}
         # Store token to task ID mapping
@@ -907,6 +908,8 @@ class InMemoryCoreState(
         model_ref: str | None = None,
         connector_ref: str | None = None,
         requesting_task_id: int | None = None,
+        parent_task_id: int | None = None,
+        root_task_id: int | None = None,
     ) -> int | None:
         """Create a task and return its ID."""
         with self.lock_task_store:
@@ -932,7 +935,14 @@ class InMemoryCoreState(
             )
 
             self.task_store[task_id] = task
+            if parent_task_id is not None and root_task_id is not None:
+                self.task_lineage_store[task_id] = (parent_task_id, root_task_id)
             return task_id
+
+    def get_task_lineage(self, task_id: int) -> tuple[int, int] | None:
+        """Return server-owned task lineage, if recorded."""
+        with self.lock_task_store:
+            return self.task_lineage_store.get(task_id)
 
     def get_tasks(  # pylint: disable=too-many-arguments
         self,

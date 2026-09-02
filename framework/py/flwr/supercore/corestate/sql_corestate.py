@@ -1179,6 +1179,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         model_ref: str | None = None,
         connector_ref: str | None = None,
         requesting_task_id: int | None = None,
+        parent_task_id: int | None = None,
+        root_task_id: int | None = None,
     ) -> int | None:
         """Create a task and return its ID."""
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
@@ -1191,6 +1193,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             literal(fab_hash, type_=TaskModel.fab_hash.type),
             literal(model_ref, type_=TaskModel.model_ref.type),
             literal(connector_ref, type_=TaskModel.connector_ref.type),
+            literal(
+                uint64_to_int64(parent_task_id) if parent_task_id is not None else None,
+                type_=TaskModel.parent_task_id.type,
+            ),
+            literal(
+                uint64_to_int64(root_task_id) if root_task_id is not None else None,
+                type_=TaskModel.root_task_id.type,
+            ),
             literal(now(), type_=TaskModel.pending_at.type),
         )
         if requesting_task_id is not None:
@@ -1214,6 +1224,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     TaskModel.fab_hash,
                     TaskModel.model_ref,
                     TaskModel.connector_ref,
+                    TaskModel.parent_task_id,
+                    TaskModel.root_task_id,
                     TaskModel.pending_at,
                 ],
                 task_values,
@@ -1226,6 +1238,24 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 return task_id if session.scalar(insert_stmt) is not None else None
             except IntegrityError:
                 return None
+
+    def get_task_lineage(self, task_id: int) -> tuple[int, int] | None:
+        """Return server-owned task lineage, if recorded."""
+        stmt = select(TaskModel.parent_task_id, TaskModel.root_task_id).where(
+            TaskModel.task_id == uint64_to_int64(task_id)
+        )
+        with self.session() as session:
+            lineage = session.execute(stmt).one_or_none()
+        if (
+            lineage is None
+            or lineage.parent_task_id is None
+            or lineage.root_task_id is None
+        ):
+            return None
+        return (
+            int64_to_uint64(lineage.parent_task_id),
+            int64_to_uint64(lineage.root_task_id),
+        )
 
     def get_tasks(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches
         self,

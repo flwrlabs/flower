@@ -201,6 +201,8 @@ class Task(FlwrBase):
     fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     model_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     connector_ref: Mapped[str | None] = mapped_column(String, nullable=True)
+    parent_task_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    root_task_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     token: Mapped[str | None] = mapped_column(String, nullable=True)
     active_until: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     pending_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
