@@ -18,7 +18,8 @@
 import hashlib
 import secrets
 from bisect import bisect_right
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from logging import ERROR
@@ -965,10 +966,8 @@ class InMemoryCoreState(
         if isinstance(statuses, str):
             raise ValueError("`statuses` must be a sequence of strings")
 
-        with self.lock_task_store:
+        with self._task_store_lock_with_cleanup():
             # Expire non-responsive tasks before getting tasks
-            self._cleanup_expired_task_tokens_locked()
-
             matched_task_ids = set(self.task_store.keys())
 
             if task_ids is not None:
@@ -1082,10 +1081,8 @@ class InMemoryCoreState(
 
     def activate_task(self, task_id: int) -> bool:
         """Move a task from starting to running."""
-        with self.lock_task_store:
+        with self._task_store_lock_with_cleanup():
             # Expire non-responsive tasks before transitioning task status.
-            self._cleanup_expired_task_tokens_locked()
-
             # Transition task from STARTING -> RUNNING.
             task = self.task_store.get(task_id)
             if task is None or task.status.status != Status.STARTING:
@@ -1110,10 +1107,8 @@ class InMemoryCoreState(
             log(ERROR, err)
             return False
 
-        with self.lock_task_store:
+        with self._task_store_lock_with_cleanup():
             # Expire non-responsive tasks before transitioning task status.
-            self._cleanup_expired_task_tokens_locked()
-
             # Transition task to FINISHED
             task = self.task_store.get(task_id)
             if task is None or task.status.status == Status.FINISHED:
@@ -1138,9 +1133,8 @@ class InMemoryCoreState(
 
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
         """Extend heartbeat state for the claimed task."""
-        with self.lock_task_store:
+        with self._task_store_lock_with_cleanup():
             # Heartbeats are accepted only for starting and running tasks
-            self._cleanup_expired_task_tokens_locked()
             task = self.task_store.get(task_id)
             record = self.task_token_store.get(task_id)
             if task is None or record is None or task.status.status == Status.FINISHED:
@@ -1152,9 +1146,8 @@ class InMemoryCoreState(
 
     def get_task_by_token(self, token: str) -> Task | None:
         """Return the task associated with the task token, if valid."""
-        with self.lock_task_store:
+        with self._task_store_lock_with_cleanup():
             # Resolve tokens after cleanup so callers never receive expired claims.
-            self._cleanup_expired_task_tokens_locked()
             task_id = self.task_token_to_task_id.get(token)
             if task_id is None:
                 return None
@@ -1172,8 +1165,7 @@ class InMemoryCoreState(
         src_task_id = cast(int, message.metadata.src_task_id)
         dst_task_id = cast(int, message.metadata.dst_task_id)
 
-        with self.lock_task_store, self.lock_task_message_store:
-            self._cleanup_expired_task_tokens_locked()
+        with self._task_store_lock_with_cleanup(), self.lock_task_message_store:
             self._cleanup_invalid_task_messages_locked(now().timestamp())
             src_task = self.task_store.get(src_task_id)
             dst_task = self.task_store.get(dst_task_id)
@@ -1226,8 +1218,7 @@ class InMemoryCoreState(
         if src_task_ids is not None and not src_task_ids:
             return []
 
-        with self.lock_task_store, self.lock_task_message_store:
-            self._cleanup_expired_task_tokens_locked()
+        with self._task_store_lock_with_cleanup(), self.lock_task_message_store:
             current = now().timestamp()
             self._cleanup_invalid_task_messages_locked(current)
 
@@ -1338,7 +1329,19 @@ class InMemoryCoreState(
             and (task_id_set is None or event.task_id in task_id_set)
         ]
 
-    def _cleanup_expired_task_tokens_locked(self) -> None:
+    @contextmanager
+    def _task_store_lock_with_cleanup(self) -> Iterator[None]:
+        """Acquire the task lock, clean up expired tasks, then emit their markers."""
+        expired_tasks: list[Task] = []
+        try:
+            with self.lock_task_store:
+                expired_tasks = self._cleanup_expired_task_tokens_locked()
+                yield
+        finally:
+            if expired_tasks:
+                self._on_task_tokens_expired_after_lock(expired_tasks)
+
+    def _cleanup_expired_task_tokens_locked(self) -> list[Task]:
         """Remove expired task tokens.
 
         Callers must acquire `lock_task_store` before calling this method.
@@ -1371,8 +1374,9 @@ class InMemoryCoreState(
                 del self.task_token_store[task_id]
                 self.task_token_to_task_id.pop(record.token, None)
 
-        if expired_tasks:
-            self._on_task_tokens_expired(expired_tasks)
+        if not expired_tasks:
+            return []
+        return self._on_task_tokens_expired(expired_tasks)
 
     def _cleanup_invalid_task_messages_locked(self, current: float) -> None:
         """Remove expired Messages and Messages for invalid destination tasks."""
@@ -1390,7 +1394,7 @@ class InMemoryCoreState(
             ):
                 del self.task_message_store[message_id]
 
-    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> list[Task]:
         """Handle cleanup of expired task tokens.
 
         Override in subclasses to add custom cleanup logic.
@@ -1400,6 +1404,10 @@ class InMemoryCoreState(
         tasks : list[Task]
             Copies of tasks whose claims expired and were marked FINISHED:FAILED.
         """
+        return tasks
+
+    def _on_task_tokens_expired_after_lock(self, tasks: list[Task]) -> None:
+        """Run slow optional expiration hooks after releasing the task lock."""
 
     def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:
         """Atomically reserve a nonce in a namespace."""

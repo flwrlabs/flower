@@ -755,8 +755,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         limit: int | None = None,
     ) -> Sequence[Run]:
         """Retrieve information about runs based on the specified filters."""
-        with self.lock_task_store:
-            self._cleanup_expired_task_tokens_locked()
+        with self._task_store_lock_with_cleanup():
+            pass
 
         with self.lock:
             # Build candidate set and apply each filter as an AND condition.
@@ -823,8 +823,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
     def get_run_status(self, run_ids: set[int]) -> dict[int, RunStatus]:
         """Retrieve the statuses for the specified runs."""
-        with self.lock_task_store:
-            self._cleanup_expired_task_tokens_locked()
+        with self._task_store_lock_with_cleanup():
+            pass
 
         with self.lock:
             return {
@@ -897,7 +897,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             self.federation_manager.report_run_usage()
         return result
 
-    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> list[Task]:
         """Fail unfinished tasks for runs whose primary task expired and report usage.
 
         When an expired task is the primary task of a run, this hook marks all
@@ -918,7 +918,11 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 collect_finished=True,
             )
             self.federation_manager.report_run_usage()
-        super()._on_task_tokens_expired([*tasks, *cascade_finished_tasks])
+        return [*tasks, *cascade_finished_tasks]
+
+    def _on_task_tokens_expired_after_lock(self, tasks: list[Task]) -> None:
+        """Emit expiry markers only after releasing the task lock."""
+        super()._on_task_tokens_expired(tasks)
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float

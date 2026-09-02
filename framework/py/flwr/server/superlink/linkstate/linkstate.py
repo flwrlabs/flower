@@ -34,9 +34,10 @@ from flwr.superlink.federation import FederationManager
 class LinkState(CoreState):  # pylint: disable=R0904
     """Abstract LinkState."""
 
-    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> list[Task]:
         """Clean up optional timing state for terminal task expirations."""
         complete_expired_runtime_timing_tasks(state=self, tasks=tasks)
+        return tasks
 
     @property
     @abc.abstractmethod
