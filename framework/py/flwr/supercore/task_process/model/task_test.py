@@ -118,3 +118,34 @@ def test_handle_task_preserves_error_reply_after_provider_failure(
         "runtime.model.provider.stream.finished"
     ) < marker_names.index("runtime.model.first_event.flush.started")
     assert marker_names[-1] == "runtime.model.execution.finished"
+
+
+def test_handle_task_classifies_response_publish_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A final-response publishing failure is not a provider failure."""
+    client = Mock()
+    request = ModelRequest(
+        dst_task_id=22,
+        input_="ignored",
+        model="model",
+        stream=True,
+    )
+    request.metadata.__dict__["_message_id"] = "request-id"
+    request.metadata.src_task_id = 11
+    markers = Mock()
+    monkeypatch.setattr(task, "_pull_model_request", Mock(return_value=request))
+    monkeypatch.setattr(task, "emit_runtime_timing", markers)
+    client.PushTaskMessage.side_effect = RuntimeError("reply publish failed")
+
+    monkeypatch.setattr(
+        task,
+        "invoke_model_provider",
+        Mock(return_value={"object": "response", "status": "completed", "output": []}),
+    )
+
+    with pytest.raises(RuntimeError, match="reply publish failed"):
+        task.handle_task(client=client, task_id=22, run_id=7)
+
+    assert markers.call_args_list[-1].args[0] == "runtime.model.execution.finished"
+    assert markers.call_args_list[-1].kwargs["error_kind"] == "publisher"

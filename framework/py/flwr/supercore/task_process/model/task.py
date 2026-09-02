@@ -218,7 +218,11 @@ def handle_task(  # pylint: disable=too-many-locals,too-many-statements
                 # Preserve the existing error-reply behavior when the provider
                 # raises: its exception is re-raised after this finally block.
                 if response is not None:
-                    _push_model_response(response)
+                    try:
+                        _push_model_response(response)
+                    except Exception:  # pylint: disable=broad-exception-caught
+                        provider_error_kind = "publisher"
+                        raise
         model_outcome = "ok"
         model_error_kind = None
     except Exception:  # pylint: disable=broad-exception-caught

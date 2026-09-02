@@ -80,7 +80,17 @@ class BaseEphemeralExecPlugin(ExecPlugin):
         # Perform any cleanup before launching the app
         if self.cleanup_before_launch is not None:
             self.cleanup_before_launch()
-        # Start the app process before recording that the executor accepted it.
+        if timing_enabled:
+            emit_runtime_timing(
+                "runtime.executor.child.spawn.started",
+                component="superexec",
+                run_id=task.run_id,
+                task_id=task.task_id,
+                root_task_id=root_task_id,
+                task_type=task.type,
+                executor_mode="fresh",
+            )
+        # Record executor acceptance only after the app process starts.
         with subprocess.Popen(cmds):
             if timing_enabled:
                 emit_runtime_timing(
@@ -94,15 +104,6 @@ class BaseEphemeralExecPlugin(ExecPlugin):
                 )
                 emit_runtime_timing(
                     "runtime.task.dispatch.accepted",
-                    component="superexec",
-                    run_id=task.run_id,
-                    task_id=task.task_id,
-                    root_task_id=root_task_id,
-                    task_type=task.type,
-                    executor_mode="fresh",
-                )
-                emit_runtime_timing(
-                    "runtime.executor.child.spawn.started",
                     component="superexec",
                     run_id=task.run_id,
                     task_id=task.task_id,

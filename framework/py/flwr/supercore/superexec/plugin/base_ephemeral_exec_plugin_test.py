@@ -140,6 +140,16 @@ def test_launch_task_forwards_timing_context_for_agent_tasks() -> None:
         ) as popen,
         patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
     ):
+
+        def assert_spawn_started_before_popen(
+            *_args: object, **_kwargs: object
+        ) -> Mock:
+            assert [call.args[0] for call in emit_runtime_timing.call_args_list] == [
+                "runtime.executor.child.spawn.started"
+            ]
+            return MagicMock()
+
+        popen.side_effect = assert_spawn_started_before_popen
         plugin.launch_task(token="token-123", task=task)
 
     assert popen.call_args.args[0][-4:] == [
@@ -149,9 +159,9 @@ def test_launch_task_forwards_timing_context_for_agent_tasks() -> None:
         "5",
     ]
     assert [call.args[0] for call in emit_runtime_timing.call_args_list] == [
+        "runtime.executor.child.spawn.started",
         "runtime.executor.submission.accepted",
         "runtime.task.dispatch.accepted",
-        "runtime.executor.child.spawn.started",
     ]
 
 
@@ -179,4 +189,6 @@ def test_launch_task_emits_no_acceptance_markers_when_spawn_fails() -> None:
         with pytest.raises(FileNotFoundError):
             plugin.launch_task(token="token-123", task=task)
 
-    emit_runtime_timing.assert_not_called()
+    assert [call.args[0] for call in emit_runtime_timing.call_args_list] == [
+        "runtime.executor.child.spawn.started"
+    ]

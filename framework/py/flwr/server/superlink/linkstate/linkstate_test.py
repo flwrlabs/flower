@@ -73,10 +73,7 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import get_object_tree
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
-from flwr.supercore.runtime_timing import (
-    get_runtime_task_lineage,
-    register_runtime_task_lineage,
-)
+from flwr.supercore.runtime_timing import get_runtime_task_lineage
 from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.linkstate_models import MessageIns as MessageInsModel
@@ -786,12 +783,6 @@ class StateTest(CoreStateTest):
                 root_task_id=10,
             )
             assert task_id is not None
-            register_runtime_task_lineage(
-                run_id=run_id,
-                task_id=task_id,
-                parent_task_id=10,
-                root_task_id=10,
-            )
             assert state.claim_task(task_id) is not None
             assert state.activate_task(task_id)
 

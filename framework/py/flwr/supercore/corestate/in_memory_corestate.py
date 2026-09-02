@@ -153,7 +153,7 @@ class InMemoryCoreState(
         self.task_usage_store: dict[int, TaskUsageRecord] = {}
         self.lock_task_usage_store = Lock()
         self._next_task_usage_id = 1
-        self.lock_task_store = Lock()
+        self.lock_task_store = RLock()
         self.task_message_store: dict[str, Message] = {}
         self.lock_task_message_store = Lock()
         self.task_event_store: dict[int, list[TaskEvent]] = {}
