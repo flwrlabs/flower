@@ -42,7 +42,12 @@ class TestExitHandlers(unittest.TestCase):
         """Test register_exit_handlers."""
         # Prepare
         handlers = [Mock(), Mock(), Mock()]
-        register_signal_handlers(EventType.PING, exit_handlers=handlers[:-1])  # type: ignore
+        signal_exit_handler = Mock()
+        register_signal_handlers(
+            EventType.PING,
+            signal_exit_handlers=[signal_exit_handler],
+            exit_handlers=handlers[:-1],  # type: ignore[arg-type]
+        )
         add_exit_handler(handlers[-1])
 
         # Execute
@@ -52,6 +57,7 @@ class TestExitHandlers(unittest.TestCase):
 
         # Assert
         mock_flwr_exit.assert_called_once()
+        signal_exit_handler.assert_called_once()
         for handler in handlers:
             handler.assert_called_once()
 

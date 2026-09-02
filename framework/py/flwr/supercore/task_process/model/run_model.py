@@ -87,6 +87,12 @@ def run_model(  # pylint: disable=too-many-locals,too-many-arguments,too-many-po
     details = "Model task failed with unknown error."
     exit_code = ExitCode.SUCCESS
 
+    def on_signal_exit() -> None:
+        nonlocal sub_status, details
+
+        sub_status = SubStatus.STOPPED
+        details = "Run stopped by user."
+
     def on_exit() -> None:
         log(DEBUG, "[flwr-model] Will push Model task output")
 
@@ -113,6 +119,7 @@ def run_model(  # pylint: disable=too-many-locals,too-many-arguments,too-many-po
     register_signal_handlers(
         event_type=EventType.FLWR_MODEL_RUN_LEAVE,
         exit_message="Run stopped by user.",
+        signal_exit_handlers=[on_signal_exit],
         exit_handlers=[on_exit],
     )
 

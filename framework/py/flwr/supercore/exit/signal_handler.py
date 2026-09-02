@@ -38,12 +38,13 @@ if hasattr(signal, "SIGQUIT"):
     SIGNAL_TO_EXIT_CODE[signal.SIGQUIT] = ExitCode.GRACEFUL_EXIT_SIGQUIT
 
 
-def register_signal_handlers(
+def register_signal_handlers(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     event_type: EventType,
     exit_message: str | None = None,
     grpc_servers: list[Server] | None = None,
     bckg_threads: list[Thread] | None = None,
     exit_handlers: list[Callable[[], None]] | None = None,
+    signal_exit_handlers: list[Callable[[], None]] | None = None,
 ) -> None:
     """Register exit handlers for `SIGINT`, `SIGTERM` and `SIGQUIT` signals.
 
@@ -62,6 +63,9 @@ def register_signal_handlers(
     exit_handlers: Optional[List[Callable[[], None]]] (default: None)
         An optional list of exit handlers to be called before exiting.
         Additional exit handlers can be added using `add_exit_handler`.
+    signal_exit_handlers: Optional[List[Callable[[], None]]] (default: None)
+        An optional list of handlers to call only for a signal-triggered exit,
+        before regular exit handlers are triggered.
     """
     default_handlers: dict[int, Callable[[int, FrameType], None]] = {}
     is_exiting = False
@@ -98,6 +102,12 @@ def register_signal_handlers(
         # Reset to default handlers
         for sig in SIGNAL_TO_EXIT_CODE:
             signal.signal(sig, default_handlers[sig])  # type: ignore
+
+        for handler in signal_exit_handlers or []:
+            try:
+                handler()
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
 
         # Setup things for graceful exit
         flwr_exit(

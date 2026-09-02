@@ -16,14 +16,32 @@
 
 
 import subprocess
+import sys
+from threading import Thread
+from typing import TextIO
 
 from flwr.supercore.constant import (
     TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
     TASK_TYPE_TO_COMMAND,
+    TaskType,
 )
-from flwr.supercore.runtime_timing import emit_runtime_timing, is_runtime_timing_task
+from flwr.supercore.runtime_timing import (
+    RUNTIME_TIMING_MESSAGE,
+    emit_runtime_timing,
+    is_runtime_timing_task,
+)
 
 from .types import ExecutionSpec, LaunchResult
+
+_RUNTIME_TIMING_LOG_PREFIX = f"{RUNTIME_TIMING_MESSAGE} {{"
+
+
+def _forward_runtime_timing_output(output: TextIO) -> None:
+    """Forward only timing markers from a suppressed task process."""
+    for line in output:
+        if _RUNTIME_TIMING_LOG_PREFIX in line:
+            sys.stdout.write(line)
+            sys.stdout.flush()
 
 
 class SubprocessExecutor:
@@ -77,6 +95,25 @@ class SubprocessExecutor:
                 task_type=spec.task_type,
                 executor_mode="fresh",
             )
+
+        if (
+            spec.suppress_output
+            and spec.runtime_timing_logging
+            and spec.task_type == TaskType.AGENT_APP
+        ):
+            process = subprocess.Popen(  # pylint: disable=consider-using-with
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+            )
+            if process.stdout is not None:
+                Thread(
+                    target=_forward_runtime_timing_output,
+                    args=(process.stdout,),
+                    daemon=True,
+                ).start()
+            return LaunchResult.accepted()
 
         if spec.suppress_output:
             subprocess.Popen(  # pylint: disable=consider-using-with

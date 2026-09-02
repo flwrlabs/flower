@@ -136,6 +136,12 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     agent_execution_started = False
     agent_execution_finished = False
 
+    def on_signal_exit() -> None:
+        nonlocal sub_status, details
+
+        sub_status = SubStatus.STOPPED
+        details = "Task stopped by user."
+
     def on_exit() -> None:
         nonlocal agent_execution_finished
 
@@ -188,6 +194,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     register_signal_handlers(
         event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
         exit_message="Task stopped by user.",
+        signal_exit_handlers=[on_signal_exit],
         exit_handlers=[on_exit],
     )
 

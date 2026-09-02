@@ -16,6 +16,8 @@
 
 
 import subprocess
+import sys
+from io import StringIO
 from typing import Any
 from unittest.mock import Mock, patch
 
@@ -23,7 +25,7 @@ import pytest
 
 from flwr.supercore.constant import TaskType
 
-from .subprocess_executor import SubprocessExecutor
+from .subprocess_executor import SubprocessExecutor, _forward_runtime_timing_output
 from .types import ExecutionSpec, LaunchResultStatus
 
 
@@ -112,6 +114,52 @@ def test_launch_suppresses_output_when_requested() -> None:
         "stderr": subprocess.DEVNULL,
     }
     assert result.status == LaunchResultStatus.ACCEPTED
+
+
+def test_launch_forwards_agent_timing_output_when_suppressed() -> None:
+    """Keep Agent timing markers visible without exposing task output."""
+    process = Mock()
+    with (
+        patch.object(subprocess, "Popen", return_value=process) as popen_mock,
+        patch("flwr.supercore.superexec.executor.subprocess_executor.Thread") as thread,
+    ):
+        result = SubprocessExecutor().launch(
+            _execution_spec(
+                task_type=TaskType.AGENT_APP,
+                suppress_output=True,
+                run_id=7,
+                runtime_timing_logging=True,
+            )
+        )
+
+    assert popen_mock.call_args.kwargs == {
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.DEVNULL,
+        "text": True,
+    }
+    thread.assert_called_once_with(
+        target=_forward_runtime_timing_output,
+        args=(process.stdout,),
+        daemon=True,
+    )
+    thread.return_value.start.assert_called_once()
+    assert result.status == LaunchResultStatus.ACCEPTED
+
+
+def test_forward_runtime_timing_output_filters_task_output() -> None:
+    """Forward only structured timing records from suppressed task output."""
+    output = StringIO(
+        "Agent output that must stay hidden\n"
+        'INFO    : runtime.timing {"event":"runtime.agent.execution.started"}\n'
+    )
+    forwarded = StringIO()
+
+    with patch.object(sys, "stdout", forwarded):
+        _forward_runtime_timing_output(output)
+
+    assert forwarded.getvalue() == (
+        'INFO    : runtime.timing {"event":"runtime.agent.execution.started"}\n'
+    )
 
 
 @pytest.mark.parametrize(
