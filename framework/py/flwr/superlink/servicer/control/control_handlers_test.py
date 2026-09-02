@@ -17,7 +17,8 @@
 
 import hashlib
 import unittest
-from unittest.mock import Mock, patch
+from typing import Any, cast
+from unittest.mock import Mock, call, patch
 
 from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
@@ -32,6 +33,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAppsRequest,
     ListAppsResponse,
     ListAutomationsRequest,
+    ListRunSeriesEventsRequest,
     RefreshAuthTokensRequest,
     RemoveAppRequest,
     RemoveAppResponse,
@@ -39,6 +41,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartRunRequest,
     StopAutomationRequest,
 )
+from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
@@ -51,12 +55,14 @@ from flwr.supercore.constant import (
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
+from flwr.superlink.extensions import RESULT_DELIVERY_CHANNEL_CHAT
 from flwr.superlink.federation import NoOpFederationManager
 
 from .control_handlers import (
     add_app,
     list_apps,
     list_automations,
+    list_run_series_events,
     refresh_auth_tokens,
     remove_app,
     start_automation,
@@ -65,7 +71,7 @@ from .control_handlers import (
 )
 
 
-class TestControlHandlers(unittest.TestCase):
+class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
     """Test Control API handlers."""
 
     def setUp(self) -> None:
@@ -79,6 +85,104 @@ class TestControlHandlers(unittest.TestCase):
             flwr_aid=NOOP_FLWR_AID,
             account_name=NOOP_ACCOUNT_NAME,
         )
+
+    def _create_dummy_run(self) -> int:
+        """Create a run owned by the test account."""
+        return self.state.create_run(
+            "flwr/demo",
+            "v0.0.1",
+            "hash123",
+            {},
+            NOOP_FEDERATION_ID,
+            None,
+            self.account.flwr_aid,
+            TaskType.SERVER_APP,
+        )
+
+    def _create_dummy_run_series(
+        self, series_id: int, run_ids: list[int] | None = None
+    ) -> None:
+        """Create a run series in the in-memory state."""
+        cast(Any, self.state).run_series_store[series_id] = RunSeries(
+            series_id=series_id,
+            federation=NOOP_FEDERATION_ID,
+            description=f"series {series_id}",
+            created_at="2026-05-29T00:00:00+00:00",
+            updated_at="2026-05-30T00:00:00+00:00",
+            run_ids=run_ids or [],
+        )
+
+    def test_list_run_series_events_returns_only_primary_task_events(self) -> None:
+        """Return primary-task events from every run in the series."""
+        run_ids = [self._create_dummy_run() for _ in range(2)]
+        primary_task_ids = [
+            cast(int, self.state.get_run_info(run_ids=[run_id])[0].primary_task_id)
+            for run_id in run_ids
+        ]
+        child_task_id = self.state.create_task(
+            task_type=TaskType.MODEL, run_id=run_ids[0]
+        )
+        assert child_task_id is not None
+        self._create_dummy_run_series(10, run_ids)
+        self.assertTrue(
+            self.state.store_task_events(
+                [
+                    TaskEvent(
+                        run_id=run_ids[0],
+                        task_id=primary_task_ids[0],
+                        event="response.created",
+                        data='{"type":"response.created"}',
+                    ),
+                    TaskEvent(
+                        run_id=run_ids[0],
+                        task_id=child_task_id,
+                        event="response.output_text.delta",
+                        data='{"type":"response.output_text.delta","delta":"child"}',
+                    ),
+                    TaskEvent(
+                        run_id=run_ids[1],
+                        task_id=primary_task_ids[1],
+                        event="response.completed",
+                        data='{"type":"response.completed"}',
+                    ),
+                ]
+            )
+        )
+
+        with patch(
+            "flwr.superlink.servicer.control.control_handlers"
+            ".extensions.notify_result_delivered"
+        ) as notify_result_delivered:
+            response = list_run_series_events(
+                ListRunSeriesEventsRequest(series_id=10), self.account, self.state
+            )
+
+        self.assertEqual([event.task_id for event in response.events], primary_task_ids)
+        runs = self.state.get_run_info(run_ids=run_ids)
+        notify_result_delivered.assert_has_calls(
+            [
+                call(run, self.account.flwr_aid, RESULT_DELIVERY_CHANNEL_CHAT)
+                for run in runs
+            ],
+            any_order=True,
+        )
+        self.assertEqual(notify_result_delivered.call_count, len(runs))
+
+    def test_list_run_series_events_hides_unauthorized_series(self) -> None:
+        """Reject event history access outside the caller's federations."""
+        self._create_dummy_run_series(10)
+
+        with (
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=False
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            list_run_series_events(
+                ListRunSeriesEventsRequest(series_id=10), self.account, self.state
+            )
+
+        self.assertEqual(error.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND)
 
     def test_refresh_auth_tokens_returns_rotated_tokens(self) -> None:
         """Return both tokens produced by the authentication plugin."""
@@ -204,6 +308,42 @@ class TestControlHandlers(unittest.TestCase):
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
             [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
+        )
+
+    def test_start_run_persists_agent_input_event(self) -> None:
+        """Persist agent input as a primary-task message item."""
+        request = StartRunRequest(federation=NOOP_FEDERATION_ID)
+        request.fab.content = b"AgentApp FAB"
+        request.override_config["agent.input"].string = "Hello"
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={
+                    "tool": {"flwr": {"app": {"config": {"agent": {"input": ""}}}}}
+                },
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/agent", "v0.0.1"),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers._get_app_type",
+                return_value=TaskType.AGENT_APP,
+            ),
+        ):
+            response = start_run(request, self.account, self.state, None)
+
+        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        event = self.state.get_task_events(run_ids=[response.run_id])[0]
+        self.assertEqual(
+            (event.task_id, event.event, event.data),
+            (
+                run.primary_task_id,
+                "message",
+                '{"type":"message","role":"user","content":"Hello"}',
+            ),
         )
 
     def test_start_run_notifies_extension_after_persisting_run(self) -> None:

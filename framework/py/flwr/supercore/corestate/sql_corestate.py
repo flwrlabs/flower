@@ -1258,7 +1258,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if run_ids is not None:
             if not run_ids:
                 return []
-            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
+            sint64_run_ids = [
+                uint64_to_int64(series_run_id) for series_run_id in run_ids
+            ]
             query = query.where(TaskModel.run_id.in_(sint64_run_ids))
 
         if statuses is not None:
@@ -1600,7 +1602,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def get_task_events(
         self,
         *,
-        run_id: int | None = None,
+        run_ids: Sequence[int] | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
@@ -1611,8 +1613,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .where(TaskEventModel.id > cursor)
             .order_by(TaskEventModel.id.asc())
         )
-        if run_id is not None:
-            query = query.where(TaskEventModel.run_id == uint64_to_int64(run_id))
+        if run_ids is not None:
+            if not run_ids:
+                return []
+            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
+            query = query.where(TaskEventModel.run_id.in_(sint64_run_ids))
         if task_ids is not None:
             if not task_ids:
                 return []
