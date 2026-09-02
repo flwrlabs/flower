@@ -22,7 +22,7 @@ import time
 from collections.abc import Sequence
 from queue import Empty, Queue
 from threading import Lock, Thread
-from typing import Literal, cast
+from typing import cast
 
 from google.protobuf.json_format import ParseDict
 
@@ -52,9 +52,7 @@ from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TO
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
     get_connector_tools,
-    has_builtin_connector,
 )
-from flwr.supercore.task_process.connector.web_fetch import WEB_FETCH_CONNECTOR_NAME
 from flwr.supercore.typing import JSONObject, JSONValue
 from flwr.supercore.utils import strict_json_dumps
 
@@ -346,39 +344,14 @@ class RuntimeAgentResponses(AgentResponses):
         self, *, name: str, call_id: str, arguments: JSONObject
     ) -> JSONObject:
         """Call a connector and emit/persist its activity events."""
-
-        def connector_event(
-            status: Literal["started", "completed", "failed"],
-            *,
-            output: JSONValue = None,
-            message: str | None = None,
-        ) -> list[JSONObject]:
-            if not has_builtin_connector(name):
-                return []
-
-            event: JSONObject = {
-                "type": f"response.tool_call.{status}",
-                "tool_call_id": call_id,
-                "connector_ref": name,
-                "arguments": arguments,
-            }
-
-            query = arguments.get("query")
-            if isinstance(query, str) and query:
-                event["query"] = query
-
-            url = arguments.get("url")
-            if name == WEB_FETCH_CONNECTOR_NAME and isinstance(url, str) and url:
-                event["links"] = [url]
-
-            if status == "completed":
-                event["output"] = output
-            elif status == "failed" and message is not None:
-                event["error"] = {"code": "connector_error", "message": message}
-
-            return [event]
-
-        self.append_and_push_run_events(connector_event("started"))
+        name = name.strip().lower()
+        function_call: JSONObject = {
+            "type": "function_call",
+            "call_id": call_id,
+            "name": name,
+            "arguments": strict_json_dumps(arguments, compact=True),
+        }
+        self.append_and_push_run_events([function_call])
 
         try:
             output = self.create_connector_response(
@@ -386,8 +359,22 @@ class RuntimeAgentResponses(AgentResponses):
                 call_id=call_id,
                 arguments=arguments,
             )
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            self.append_and_push_run_events(connector_event("failed", message=str(exc)))
+        except Exception:  # pylint: disable=broad-exception-caught
+            error_output: JSONObject = {
+                "error": {
+                    "code": "connector_error",
+                    "message": "Connector execution failed.",
+                }
+            }
+            self.append_and_push_run_events(
+                [
+                    {
+                        "type": "function_call_output",
+                        "call_id": call_id,
+                        "output": strict_json_dumps(error_output, compact=True),
+                    }
+                ]
+            )
             raise
 
         output_item: JSONObject = {
@@ -395,37 +382,20 @@ class RuntimeAgentResponses(AgentResponses):
             "call_id": call_id,
             "output": strict_json_dumps(output, compact=True),
         }
-        self.append_and_push_run_events(connector_event("completed", output=output))
-        self.append_context_items([output_item])
+        self.append_and_push_run_events([output_item])
         return output_item
 
     def call_automation_with_events(
         self, *, call_id: str, arguments: JSONObject
     ) -> JSONObject:
         """Create an automation and emit/persist its activity events."""
-
-        def automation_event(
-            status: Literal["started", "completed", "failed"],
-            *,
-            output: JSONValue = None,
-            message: str | None = None,
-        ) -> JSONObject:
-            event: JSONObject = {
-                "type": f"response.tool_call.{status}",
-                "tool_call_id": call_id,
-                "tool_name": START_AUTOMATION_TOOL_NAME,
-                "arguments": arguments,
-            }
-            if status == "completed":
-                event["output"] = output
-            elif status == "failed" and message is not None:
-                event["error"] = {
-                    "code": "automation_error",
-                    "message": message,
-                }
-            return event
-
-        self.append_and_push_run_events([automation_event("started")])
+        function_call: JSONObject = {
+            "type": "function_call",
+            "call_id": call_id,
+            "name": START_AUTOMATION_TOOL_NAME,
+            "arguments": strict_json_dumps(arguments, compact=True),
+        }
+        self.append_and_push_run_events([function_call])
         try:
             input_value = arguments.get("input")
             if not isinstance(input_value, str) or not input_value.strip():
@@ -450,9 +420,21 @@ class RuntimeAgentResponses(AgentResponses):
                 "series_id": response.series_id,
                 "next_run_at": response.next_run_at,
             }
-        except Exception as exc:  # pylint: disable=broad-exception-caught
+        except Exception:  # pylint: disable=broad-exception-caught
+            error_output: JSONObject = {
+                "error": {
+                    "code": "automation_error",
+                    "message": "Automation execution failed.",
+                }
+            }
             self.append_and_push_run_events(
-                [automation_event("failed", message=str(exc))]
+                [
+                    {
+                        "type": "function_call_output",
+                        "call_id": call_id,
+                        "output": strict_json_dumps(error_output, compact=True),
+                    }
+                ]
             )
             raise
 
@@ -461,8 +443,7 @@ class RuntimeAgentResponses(AgentResponses):
             "call_id": call_id,
             "output": strict_json_dumps(output, compact=True),
         }
-        self.append_and_push_run_events([automation_event("completed", output=output)])
-        self.append_context_items([output_item])
+        self.append_and_push_run_events([output_item])
         return output_item
 
     def push_run_events(self, events: Sequence[JSONObject]) -> None:
@@ -476,10 +457,6 @@ class RuntimeAgentResponses(AgentResponses):
             return
         append_items(self._context, events)
         self.push_run_events(events)
-
-    def append_context_items(self, items: list[JSONObject]) -> None:
-        """Append OpenResponses items to the AgentApp context."""
-        append_items(self._context, items)
 
     def _push_task_message(self, message: Message) -> None:
         """Push one task message and return its message ID."""

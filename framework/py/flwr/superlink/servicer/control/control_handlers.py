@@ -136,6 +136,7 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
@@ -162,6 +163,7 @@ from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
     CreateInvitationContext,
+    JSONObject,
     RegisterSupernodeContext,
     StartRunContext,
 )
@@ -630,6 +632,20 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 _derive_run_series_description(fused_run_config) or None
             )
 
+        initial_task_event = None
+        if primary_task_type == TaskType.AGENT_APP:
+            agent_input = fused_run_config.get("agent.input")
+            if isinstance(agent_input, str) and agent_input:
+                input_item: JSONObject = {
+                    "type": "message",
+                    "role": "user",
+                    "content": agent_input,
+                }
+                initial_task_event = TaskEvent(
+                    event="message",
+                    data=strict_json_dumps(input_item, compact=True),
+                )
+
         run_id = state.create_run(
             fab_id,
             fab_version,
@@ -642,6 +658,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             series_id=series_id,
             series_description=series_description,
             connector_refs=connector_refs,
+            initial_task_event=initial_task_event,
         )
 
         if run_id == 0:
