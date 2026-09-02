@@ -108,8 +108,8 @@ def test_emit_event_requires_type() -> None:
     stub.PushTaskEvents.assert_not_called()
 
 
-def test_agent_events_and_connector_events_use_same_publisher() -> None:
-    """Publish explicit and built-in AgentApp events through one publisher."""
+def test_agent_events_and_connector_items_use_same_publisher() -> None:
+    """Publish explicit AgentApp events and connector items through one publisher."""
     stub = Mock()
     events = Mock()
     responses = RuntimeAgentResponses(
@@ -124,7 +124,12 @@ def test_agent_events_and_connector_events_use_same_publisher() -> None:
         "type": "response.output_text.delta",
         "delta": "Hello",
     }
-    connector_event: JSONObject = {"type": "response.tool_call.started"}
+    connector_event: JSONObject = {
+        "type": "function_call",
+        "call_id": "call-1",
+        "name": "web_search",
+        "arguments": '{"query":"Flower"}',
+    }
 
     events.emit(model_event)
     responses.push_run_events([connector_event])
@@ -214,10 +219,9 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     }
 
     # Execute
-    with (
-        patch.object(responses, "append_and_push_run_events"),
-        patch.object(responses, "append_context_items"),
-    ):
+    with patch.object(
+        responses, "append_and_push_run_events"
+    ) as append_and_push_run_events:
         responses.call_automation_with_events(call_id="call-1", arguments=arguments)
 
     # Assert
@@ -235,6 +239,56 @@ def test_call_automation_embeds_input_in_control_request() -> None:
             series_id=2,
         ),
     )
+    items = [item.args[0][0] for item in append_and_push_run_events.call_args_list]
+    assert [item["type"] for item in items] == [
+        "function_call",
+        "function_call_output",
+    ]
+    assert items[0]["name"] == START_AUTOMATION_TOOL_NAME
+
+
+def test_connector_call_emits_standard_items() -> None:
+    """Emit standard function call and output items."""
+    responses = RuntimeAgentResponses(
+        stub=Mock(),
+        run_id=123,
+        task_id=789,
+        context=Mock(),
+        start_run_request=StartRunRequest(),
+        events=Mock(),
+    )
+    arguments: JSONObject = {"query": "Flower"}
+
+    with (
+        patch.object(
+            responses, "create_connector_response", return_value={"results": []}
+        ),
+        patch.object(
+            responses, "append_and_push_run_events"
+        ) as append_and_push_run_events,
+    ):
+        output = responses.call_connector_with_events(
+            name="notion_search", call_id="call-1", arguments=arguments
+        )
+
+    assert output == {
+        "type": "function_call_output",
+        "call_id": "call-1",
+        "output": '{"results":[]}',
+    }
+    assert append_and_push_run_events.call_args_list == [
+        call(
+            [
+                {
+                    "type": "function_call",
+                    "call_id": "call-1",
+                    "name": "notion_search",
+                    "arguments": '{"query":"Flower"}',
+                }
+            ]
+        ),
+        call([output]),
+    ]
 
 
 def test_create_connector_response_resolves_canonical_name() -> None:

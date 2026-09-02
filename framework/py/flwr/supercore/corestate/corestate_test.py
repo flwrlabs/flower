@@ -1779,14 +1779,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         # Execute: Store the events and read them through full and cursored fetches.
         self.assertFalse(state.store_task_events([]))
         self.assertTrue(state.store_task_events([event_1, event_2]))
-        events = state.get_task_events(run_id=run_id, after_task_event_id=None)
+        events = state.get_task_events(run_ids=[run_id], after_task_event_id=None)
         latest_id = events[-1].id
         after_first = state.get_task_events(
-            run_id=run_id, after_task_event_id=events[0].id
+            run_ids=[run_id], after_task_event_id=events[0].id
         )
-        no_new = state.get_task_events(run_id=run_id, after_task_event_id=latest_id)
-        filtered = state.get_task_events(run_id=run_id, task_ids=[task_id])
-        excluded = state.get_task_events(run_id=run_id, task_ids=[task_id + 1])
+        no_new = state.get_task_events(run_ids=[run_id], after_task_event_id=latest_id)
+        filtered = state.get_task_events(run_ids=[run_id], task_ids=[task_id])
+        excluded = state.get_task_events(run_ids=[run_id], task_ids=[task_id + 1])
+        no_runs = state.get_task_events(run_ids=[])
 
         # Assert: Events keep assigned ID order and cursor filtering works.
         self.assertEqual(len(events), 2)
@@ -1809,6 +1810,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(no_new, [])
         self.assertEqual(filtered, events)
         self.assertEqual(excluded, [])
+        self.assertEqual(no_runs, [])
 
     @parameterized.expand(  # type: ignore
         [
@@ -1849,7 +1851,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
 
         # Assert: The invalid payload rejects the whole batch.
-        events = state.get_task_events(run_id=run_id, after_task_event_id=None)
+        events = state.get_task_events(run_ids=[run_id], after_task_event_id=None)
         self.assertEqual(events, [])
 
     def test_reserve_nonce_first_reservation_succeeds(self) -> None:
