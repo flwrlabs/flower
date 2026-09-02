@@ -42,6 +42,7 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 from flwr.supercore.protobuf.client import ProtobufClientInterceptor
 from flwr.supercore.retry import make_simple_http_retry_invoker
 from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.runtime_timing import emit_runtime_timing, is_runtime_timing_task
 from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
@@ -264,6 +265,46 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
                 # Launch the app if a token was granted; do nothing if not
                 if claim_res.token:
+                    if is_runtime_timing_task(task.type):
+                        root_task_id = (
+                            task.task_id if task.type == "flwr-agentapp" else None
+                        )
+                        emit_runtime_timing(
+                            "runtime.executor.claim.received",
+                            component="superexec",
+                            run_id=task.run_id,
+                            task_id=task.task_id,
+                            root_task_id=root_task_id,
+                            task_type=task.type,
+                            executor_mode="fresh",
+                        )
+                        emit_runtime_timing(
+                            "runtime.executor.prepare.started",
+                            component="superexec",
+                            run_id=task.run_id,
+                            task_id=task.task_id,
+                            root_task_id=root_task_id,
+                            task_type=task.type,
+                            executor_mode="fresh",
+                        )
+                        emit_runtime_timing(
+                            "runtime.task.dispatch.started",
+                            component="superexec",
+                            run_id=task.run_id,
+                            task_id=task.task_id,
+                            root_task_id=root_task_id,
+                            task_type=task.type,
+                            executor_mode="fresh",
+                        )
+                        emit_runtime_timing(
+                            "runtime.executor.submission.started",
+                            component="superexec",
+                            run_id=task.run_id,
+                            task_id=task.task_id,
+                            root_task_id=root_task_id,
+                            task_type=task.type,
+                            executor_mode="fresh",
+                        )
 
                     # Destroy the auth secret before launching the app
                     # for ephemeral plugins
@@ -281,6 +322,32 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
                     launch_result = plugin.launch_task(token=claim_res.token, task=task)
                     _handle_launch_result(launch_result, task)
+                    if (
+                        launch_result is not None
+                        and launch_result.status == LaunchResultStatus.ACCEPTED
+                        and is_runtime_timing_task(task.type)
+                    ):
+                        root_task_id = (
+                            task.task_id if task.type == "flwr-agentapp" else None
+                        )
+                        emit_runtime_timing(
+                            "runtime.executor.submission.accepted",
+                            component="superexec",
+                            run_id=task.run_id,
+                            task_id=task.task_id,
+                            root_task_id=root_task_id,
+                            task_type=task.type,
+                            executor_mode="fresh",
+                        )
+                        emit_runtime_timing(
+                            "runtime.task.dispatch.accepted",
+                            component="superexec",
+                            run_id=task.run_id,
+                            task_id=task.task_id,
+                            root_task_id=root_task_id,
+                            task_type=task.type,
+                            executor_mode="fresh",
+                        )
 
             # Sleep for a while before checking again
             time.sleep(task_poll_interval)

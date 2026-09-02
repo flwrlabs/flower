@@ -21,6 +21,7 @@ from flwr.supercore.constant import (
     TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
     TASK_TYPE_TO_COMMAND,
 )
+from flwr.supercore.runtime_timing import emit_runtime_timing, is_runtime_timing_task
 
 from .types import ExecutionSpec, LaunchResult
 
@@ -51,6 +52,31 @@ class SubprocessExecutor:
 
         if spec.runtime_dependency_install:
             args.append("--allow-runtime-dependency-installation")
+
+        if (
+            spec.runtime_timing_logging
+            and spec.run_id is not None
+            and is_runtime_timing_task(spec.task_type)
+        ):
+            args.extend(
+                [
+                    "--runtime-timing-run-id",
+                    str(spec.run_id),
+                    "--runtime-timing-task-id",
+                    str(spec.task_id),
+                ]
+            )
+            emit_runtime_timing(
+                "runtime.executor.child.spawn.started",
+                component="superexec",
+                run_id=spec.run_id,
+                task_id=spec.task_id,
+                root_task_id=(
+                    spec.task_id if spec.task_type == "flwr-agentapp" else None
+                ),
+                task_type=spec.task_type,
+                executor_mode="fresh",
+            )
 
         if spec.suppress_output:
             subprocess.Popen(  # pylint: disable=consider-using-with

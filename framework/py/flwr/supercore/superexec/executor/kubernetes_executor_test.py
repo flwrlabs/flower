@@ -212,6 +212,31 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
     assert pod["spec"]["restartPolicy"] == "Never"
 
 
+def test_build_taskexecutor_pod_forwards_enabled_runtime_timing() -> None:
+    """Enabled timing should reach an Agent TaskExecutor without user config."""
+    spec = _execution_spec(
+        task_type=TaskType.AGENT_APP,
+        run_id=456,
+        runtime_timing_logging=True,
+    )
+    config = _executor_config()
+
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            spec, config, _appio_root_certificates(spec, config), _LAUNCH_ATTEMPT_ID
+        )
+    )
+    container = _as_dict(pod["spec"]["containers"][0])
+
+    assert container["env"] == [{"name": "FLWR_RUNTIME_TIMING_LOGGING", "value": "1"}]
+    assert container["args"][-4:] == [
+        "--runtime-timing-run-id",
+        "456",
+        "--runtime-timing-task-id",
+        "123",
+    ]
+
+
 def test_build_taskexecutor_pod_includes_configured_volumes() -> None:
     """Test configured Pod volumes and container volume mounts are included."""
     spec = _execution_spec()

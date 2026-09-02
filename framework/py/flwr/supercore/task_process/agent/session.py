@@ -47,6 +47,7 @@ from flwr.supercore.json_message.connector_message import (
 )
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.runtime_timing import emit_runtime_timing
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
@@ -67,16 +68,25 @@ _EVENT_PUBLISH_BATCH_WAIT = 0.05
 _EVENT_PUBLISH_STOP = object()
 
 
-class RuntimeAgentEvents(AgentEvents):
+class RuntimeAgentEvents(AgentEvents):  # pylint: disable=too-many-instance-attributes
     """Publish AgentApp-selected events through a background worker."""
 
-    def __init__(self, stub: RuntimeHttpClient) -> None:
+    def __init__(
+        self,
+        stub: RuntimeHttpClient,
+        *,
+        run_id: int | None = None,
+        task_id: int | None = None,
+    ) -> None:
         self._stub = stub
+        self._run_id = run_id
+        self._task_id = task_id
         self._queue: Queue[TaskEvent | object] = Queue(
             maxsize=_EVENT_PUBLISH_QUEUE_SIZE
         )
         self._error_lock = Lock()
         self._error: Exception | None = None
+        self._publish_failed = False
         self._closed = False
         self._worker = Thread(
             target=self._run,
@@ -118,6 +128,19 @@ class RuntimeAgentEvents(AgentEvents):
         try:
             self._stub.PushTaskEvents(PushTaskEventsRequest(events=batch))
         except Exception as err:  # pylint: disable=broad-exception-caught
+            if not self._publish_failed:
+                self._publish_failed = True
+                emit_runtime_timing(
+                    "runtime.events.publish.failed",
+                    component="agent_task",
+                    run_id=self._run_id,
+                    task_id=self._task_id,
+                    root_task_id=self._task_id,
+                    task_type="flwr-agentapp",
+                    outcome="error",
+                    error_kind="publisher",
+                    process_mode="new",
+                )
             with self._error_lock:
                 if self._error is None:
                     self._error = err
@@ -253,6 +276,15 @@ class RuntimeAgentResponses(AgentResponses):
                 "AgentResponses request requires a non-empty string 'model' field."
             )
 
+        emit_runtime_timing(
+            "runtime.agent.model.dispatch.started",
+            component="agent_task",
+            run_id=self._run_id,
+            task_id=self._task_id,
+            root_task_id=self._task_id,
+            task_type="flwr-agentapp",
+            process_mode="new",
+        )
         create_res = self._stub.CreateTask(
             CreateTaskRequest(type=TaskType.MODEL, model_ref=model)
         )
