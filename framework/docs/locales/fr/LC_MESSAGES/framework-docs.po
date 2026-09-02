@@ -112,9 +112,7 @@ msgid ""
 "`Charles Beauville`, `Daniel J. Beutel`, `Dimitris Stripelis`, `Heng "
 "Pan`, `Javier`, `Lorenzo Sani`, `Taner Topal`, `Yan Gao`, `jafermarq`"
 msgstr ""
-"`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Dimitris "
-"Stripelis`, `Heng Pan`, `Javier`, `Mohammad Naseri`, `Patrick Foley`, "
-"`William Lindskog`, `Yan Gao` <!---TOKEN_v1.22.0-->"
+
 
 #: ../../source/changelog/v0.13.0.md:4 ../../source/changelog/v0.14.0.md:4
 #: ../../source/changelog/v0.15.0.md:4 ../../source/changelog/v0.16.0.md:4
@@ -161,21 +159,7 @@ msgid ""
 "[#8027](https://github.com/flwrlabs/flower/pull/8027), "
 "[#8032](https://github.com/flwrlabs/flower/pull/8032))"
 msgstr ""
-"**Update dependencies and CI** "
-"([#5932](https://github.com/flwrlabs/flower/pull/5932), "
-"[#5941](https://github.com/flwrlabs/flower/pull/5941), "
-"[#5944](https://github.com/flwrlabs/flower/pull/5944), "
-"[#5964](https://github.com/flwrlabs/flower/pull/5964), "
-"[#6014](https://github.com/flwrlabs/flower/pull/6014), "
-"[#6020](https://github.com/flwrlabs/flower/pull/6020), "
-"[#6021](https://github.com/flwrlabs/flower/pull/6021), "
-"[#6022](https://github.com/flwrlabs/flower/pull/6022), "
-"[#6024](https://github.com/flwrlabs/flower/pull/6024), "
-"[#6026](https://github.com/flwrlabs/flower/pull/6026), "
-"[#6032](https://github.com/flwrlabs/flower/pull/6032), "
-"[#6035](https://github.com/flwrlabs/flower/pull/6035), "
-"[#6055](https://github.com/flwrlabs/flower/pull/6055), "
-"[#6065](https://github.com/flwrlabs/flower/pull/6065))"
+
 
 #: ../../source/changelog/v1.36.0.md:14
 msgid ""
@@ -198,14 +182,7 @@ msgid ""
 "[#8002](https://github.com/flwrlabs/flower/pull/8002), "
 "[#8031](https://github.com/flwrlabs/flower/pull/8031))"
 msgstr ""
-"**Fine-tune LLMs with LLM FlowerTune** "
-"([#3029](https://github.com/flwrlabs/flower/pull/3029), "
-"[#3089](https://github.com/flwrlabs/flower/pull/3089), "
-"[#3092](https://github.com/flwrlabs/flower/pull/3092), "
-"[#3100](https://github.com/flwrlabs/flower/pull/3100), "
-"[#3114](https://github.com/flwrlabs/flower/pull/3114), "
-"[#3162](https://github.com/flwrlabs/flower/pull/3162), "
-"[#3172](https://github.com/flwrlabs/flower/pull/3172))"
+
 
 #: ../../source/changelog/v1.36.0.md:18
 msgid ""
@@ -227,14 +204,7 @@ msgid ""
 "[#8029](https://github.com/flwrlabs/flower/pull/8029), "
 "[#8050](https://github.com/flwrlabs/flower/pull/8050))"
 msgstr ""
-"**Affiner la commande CLI `flwr federation`** "
-"([#6340](https://github.com/flwrlabs/flower/pull/6340), "
-"[#6461](https://github.com/flwrlabs/flower/pull/6461), "
-"[#6463](https://github.com/flwrlabs/flower/pull/6463), "
-"[#6468](https://github.com/flwrlabs/flower/pull/6468), "
-"[#6476](https://github.com/flwrlabs/flower/pull/6476), "
-"[#6479](https://github.com/flwrlabs/flower/pull/6479), "
-"[#6480](https://github.com/flwrlabs/flower/pull/6480))"
+
 
 #: ../../source/changelog/v1.36.0.md:22
 msgid ""
@@ -251,8 +221,7 @@ msgid ""
 "**Fix sending shared reply objects reliably from SuperNodes** "
 "([#8033](https://github.com/flwrlabs/flower/pull/8033))"
 msgstr ""
-"**Update FedRep baseline** "
-"([#4681](https://github.com/flwrlabs/flower/pull/4681))"
+
 
 #: ../../source/changelog/v1.36.0.md:26
 msgid ""
@@ -279,18 +248,7 @@ msgid ""
 "[#8043](https://github.com/flwrlabs/flower/pull/8043), "
 "[#8044](https://github.com/flwrlabs/flower/pull/8044))"
 msgstr ""
-"**Improve Docker support** "
-"([#4506](https://github.com/flwrlabs/flower/pull/4506), "
-"[#4424](https://github.com/flwrlabs/flower/pull/4424), "
-"[#4224](https://github.com/flwrlabs/flower/pull/4224), "
-"[#4413](https://github.com/flwrlabs/flower/pull/4413), "
-"[#4414](https://github.com/flwrlabs/flower/pull/4414), "
-"[#4336](https://github.com/flwrlabs/flower/pull/4336), "
-"[#4420](https://github.com/flwrlabs/flower/pull/4420), "
-"[#4407](https://github.com/flwrlabs/flower/pull/4407), "
-"[#4422](https://github.com/flwrlabs/flower/pull/4422), "
-"[#4532](https://github.com/flwrlabs/flower/pull/4532), "
-"[#4540](https://github.com/flwrlabs/flower/pull/4540))"
+
 
 #: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
 #: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
@@ -66219,4 +66177,3 @@ msgstr ""
 
 #~ msgid "Structured run event API."
 #~ msgstr ""
-
