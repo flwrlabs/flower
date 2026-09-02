@@ -60,6 +60,7 @@ from ..supercore.telemetry import event as event
 from .constant import MessageTypeLegacy as MessageTypeLegacy
 from .logger import configure as configure
 from .logger import log as log
+from .logger import logger as logger
 
 if TYPE_CHECKING:
     from ..app.message import Array as Array
@@ -153,6 +154,7 @@ __all__ = [
     "configure",
     "event",
     "log",
+    "logger",
     "ndarray_to_bytes",
     "ndarrays_to_parameters",
     "now",

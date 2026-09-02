@@ -14,11 +14,15 @@
 # ==============================================================================
 """Tests for backwards-compatible Flower logger exports."""
 
-import flwr.common.logger as common_logger
-import flwr.supercore.logger as supercore_logger
+from importlib import import_module
+
+from flwr.common import logger as common_public_logger
 from flwr.common import configure as common_configure
 from flwr.common import log as common_log
 from flwr.supercore import log as supercore_log
+
+common_logger = import_module("flwr.common.logger")
+supercore_logger = import_module("flwr.supercore.logger")
 
 
 def test_common_logger_reexports_supercore_implementation() -> None:
@@ -32,3 +36,8 @@ def test_common_log_reexports_supercore_log() -> None:
     """Verify the legacy package-level log export remains compatible."""
     assert common_log is supercore_log
     assert common_configure is supercore_logger.configure
+
+
+def test_common_logger_reexports_supercore_logger() -> None:
+    """Verify the supported package-level logger export remains compatible."""
+    assert common_public_logger is supercore_logger.logger

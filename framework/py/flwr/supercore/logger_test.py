@@ -27,7 +27,7 @@ import pytest
 
 from flwr.common import configure as common_configure
 from flwr.common import log as common_log
-from flwr.common.logger import logger as common_logger
+from flwr.common import logger as common_logger
 from flwr.supercore import log as supercore_log
 
 from .logger import (

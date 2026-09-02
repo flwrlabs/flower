@@ -40,16 +40,16 @@ example, to launch your ``SuperLink`` with ``DEBUG`` logs, use:
  Integrate with OpenTelemetry
 ******************************
 
-Flower exposes ``logger`` from ``flwr.common.logger`` as a standard Python
-``logging.Logger``. This makes Flower log records compatible with the OpenTelemetry
-Python logging bridge while keeping OpenTelemetry optional for Flower applications. The
-existing ``log`` function remains available for backwards compatibility.
+Flower exposes ``logger`` from ``flwr.common`` as a standard Python ``logging.Logger``.
+This makes Flower log records compatible with the OpenTelemetry Python logging bridge
+while keeping OpenTelemetry optional for Flower applications. The existing ``log``
+function remains available for backwards compatibility.
 
 For example, an application can use the supported logger directly:
 
 .. code-block:: python
 
-    from flwr.common.logger import logger
+    from flwr.common import logger
 
     logger.info("Starting the Flower application")
 
