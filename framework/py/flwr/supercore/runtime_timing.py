@@ -158,13 +158,16 @@ def emit_runtime_timing(  # pylint: disable=too-many-arguments
     error_kind: RuntimeTimingErrorKind | None = None,
     executor_mode: Literal["fresh", "warm"] | None = None,
     process_mode: Literal["new", "persistent"] | None = None,
+    dispatch_id: str | None = None,
 ) -> None:
     """Emit one structured lifecycle marker without affecting task execution.
 
     The fixed message prefix and JSON attributes let standard logging handlers carry
     the fields without custom formatting. The same attributes remain available on
     the LogRecord for structured handlers. This helper never accepts task payloads,
-    credentials, URLs, exception text, or other user-controlled values.
+    credentials, URLs, exception text, or other user-controlled values. A
+    dispatch ID, when present, must be an opaque server-generated value used to
+    pair dispatch markers.
     """
     if not is_runtime_timing_logging_enabled():
         return
@@ -183,6 +186,7 @@ def emit_runtime_timing(  # pylint: disable=too-many-arguments
         "error_kind": error_kind,
         "executor_mode": executor_mode,
         "process_mode": process_mode,
+        "dispatch_id": dispatch_id,
     }
     serialized_attributes = json.dumps(
         attributes, separators=(",", ":"), sort_keys=True

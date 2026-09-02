@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import secrets
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -185,6 +186,7 @@ def _start_exchange(
     """Create a child model task and send its request message."""
     model = cast(str, request.payload["model"])
     timing_enabled = is_runtime_timing_logging_enabled()
+    dispatch_id = secrets.token_hex(16) if timing_enabled else None
     if timing_enabled:
         emit_runtime_timing(
             "runtime.agent.model.dispatch.started",
@@ -193,6 +195,7 @@ def _start_exchange(
             task_id=task.task_id,
             root_task_id=task.task_id,
             task_type=task.type,
+            dispatch_id=dispatch_id,
         )
     try:
         response = runtime_handlers.create_task(
@@ -232,6 +235,7 @@ def _start_exchange(
             parent_task_id=task.task_id,
             root_task_id=task.task_id,
             task_type=TaskType.MODEL,
+            dispatch_id=dispatch_id,
         )
 
     return exchange

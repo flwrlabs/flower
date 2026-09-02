@@ -154,6 +154,10 @@ def test_responses_emits_model_dispatch_markers() -> None:
         patch(
             "flwr.superlink.routers.runtime.responses.emit_runtime_timing"
         ) as emit_marker,
+        patch(
+            "flwr.superlink.routers.runtime.responses.secrets.token_hex",
+            return_value="dispatch-1",
+        ),
     ):
 
         def create_task(*_args: object, **_kwargs: object) -> int:
@@ -173,6 +177,10 @@ def test_responses_emits_model_dispatch_markers() -> None:
     assert [call.args[0] for call in emit_marker.call_args_list] == [
         "runtime.agent.model.dispatch.started",
         "runtime.agent.model.dispatch.accepted",
+    ]
+    assert [call.kwargs["dispatch_id"] for call in emit_marker.call_args_list] == [
+        "dispatch-1",
+        "dispatch-1",
     ]
 
 

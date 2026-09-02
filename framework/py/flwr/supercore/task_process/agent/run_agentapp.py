@@ -134,6 +134,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     agent_events: RuntimeAgentEvents | None = None
     exit_code = ExitCode.SUCCESS
     agent_execution_started = False
+    agent_execution_finished = False
 
     def on_exit() -> None:
         log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
@@ -352,7 +353,6 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             process_mode="new",
         )
         agent_app(agent=agent, context=context)
-        agent_events.close()
         emit_runtime_timing(
             "runtime.agent.execution.finished",
             component="agent_task",
@@ -363,13 +363,15 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             outcome="ok",
             process_mode="new",
         )
+        agent_execution_finished = True
+        agent_events.close()
 
         # Set sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED
         details = ""
 
     except Exception as ex:  # pylint: disable=broad-exception-caught
-        if agent_execution_started:
+        if agent_execution_started and not agent_execution_finished:
             emit_runtime_timing(
                 "runtime.agent.execution.finished",
                 component="agent_task",

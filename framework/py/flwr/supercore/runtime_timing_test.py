@@ -68,6 +68,7 @@ def test_emit_runtime_timing_uses_only_structured_safe_fields(
         error_kind="provider",
         executor_mode="fresh",
         process_mode="new",
+        dispatch_id="dispatch-1",
     )
 
     expected_attributes = {
@@ -84,6 +85,7 @@ def test_emit_runtime_timing_uses_only_structured_safe_fields(
         "error_kind": "provider",
         "executor_mode": "fresh",
         "process_mode": "new",
+        "dispatch_id": "dispatch-1",
     }
     assert log.call_args.args[:3] == (
         INFO,
