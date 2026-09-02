@@ -19,6 +19,7 @@ from unittest.mock import Mock, call, patch
 
 import pytest
 
+from flwr.app import Message
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
@@ -161,7 +162,9 @@ def test_pull_task_messages_filters_by_child_task() -> None:
     )
 
 
-def test_model_dispatch_markers_share_an_opaque_id() -> None:
+def test_model_dispatch_markers_share_an_opaque_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A Model dispatch should pair its start and acceptance markers."""
     stub = Mock()
     stub.CreateTask.return_value = CreateTaskResponse(task_id=456)
@@ -179,7 +182,7 @@ def test_model_dispatch_markers_share_an_opaque_id() -> None:
         nonlocal message_id
         message_id = request.message.metadata.message_id
 
-    def pull_response(*, src_task_id: int) -> list[ModelResponse]:
+    def pull_response(*, src_task_id: int) -> list[Message]:
         assert src_task_id == 456
         assert message_id is not None
         return [
@@ -191,7 +194,7 @@ def test_model_dispatch_markers_share_an_opaque_id() -> None:
         ]
 
     stub.PushTaskMessage.side_effect = store_message
-    responses._pull_task_messages = pull_response  # pylint: disable=W0212
+    monkeypatch.setattr(responses, "_pull_task_messages", pull_response)
     markers = Mock()
     with (
         patch(
