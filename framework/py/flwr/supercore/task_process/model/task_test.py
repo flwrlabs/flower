@@ -46,8 +46,12 @@ def _completed_response() -> JSONObject:
     return {"object": "response", "status": "completed", "output": []}
 
 
+@pytest.mark.parametrize(
+    "first_text_event",
+    ["response.output_text.delta", "response.reasoning_summary_text.delta"],
+)
 def test_handle_task_flushes_first_text_event_eagerly(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, first_text_event: str
 ) -> None:
     """The first text event is persisted without waiting for a full batch."""
     stub = Mock()
@@ -67,7 +71,7 @@ def test_handle_task_flushes_first_text_event_eagerly(
         on_stream_event(
             cast(
                 JSONObject,
-                {"type": "response.output_text.delta", "delta": "Hello"},
+                {"type": first_text_event, "delta": "Hello"},
             )
         )
         assert stub.PushTaskEvents.call_count == 1
@@ -83,5 +87,5 @@ def test_handle_task_flushes_first_text_event_eagerly(
     assert [len(batch) for batch in batches] == [2, 16]
     assert [event.event for event in batches[0]] == [
         "response.created",
-        "response.output_text.delta",
+        first_text_event,
     ]

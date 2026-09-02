@@ -36,7 +36,9 @@ from flwr.supercore.utils import strict_json_dumps
 from .provider import ModelProviderError, invoke_model_provider
 
 _DEFAULT_TASK_EVENT_BATCH_SIZE = 16
-_TEXT_DELTA_EVENT = "response.output_text.delta"
+_TEXT_DELTA_EVENTS = frozenset(
+    {"response.output_text.delta", "response.reasoning_summary_text.delta"}
+)
 
 
 def handle_task(client: RuntimeHttpClient, task_id: int, run_id: int) -> None:
@@ -78,7 +80,7 @@ def handle_task(client: RuntimeHttpClient, task_id: int, run_id: int) -> None:
             return
         encoded = strict_json_dumps(event, compact=True)
         events.append(TaskEvent(event=cast(str, event["type"]), data=encoded))
-        if event["type"] == _TEXT_DELTA_EVENT and not first_text_event_flushed:
+        if event["type"] in _TEXT_DELTA_EVENTS and not first_text_event_flushed:
             _flush_events()
             first_text_event_flushed = True
         elif len(events) >= _DEFAULT_TASK_EVENT_BATCH_SIZE:
