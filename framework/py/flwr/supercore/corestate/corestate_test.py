@@ -1778,7 +1778,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         # Execute: Store the events and read them through full and cursored fetches.
         self.assertFalse(state.store_task_events([]))
+        self.assertFalse(state.has_task_events(task_id=task_id))
         self.assertTrue(state.store_task_events([event_1, event_2]))
+        self.assertTrue(state.has_task_events(task_id=task_id))
         events = state.get_task_events(run_ids=[run_id], after_task_event_id=None)
         latest_id = events[-1].id
         after_first = state.get_task_events(

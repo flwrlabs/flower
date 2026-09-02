@@ -112,3 +112,39 @@ def test_launch_task_calls_cleanup_before_launch() -> None:
 
     # Assert
     assert call_log == ["cleanup", "subprocess"]
+
+
+def test_launch_task_forwards_timing_context_for_agent_tasks() -> None:
+    """Ephemeral Agent launches should preserve timing correlation metadata."""
+    plugin = _get_ephemeral_plugin()
+    task = _get_task(task_id=5, task_type=TaskType.AGENT_APP)
+    task.run_id = 7
+
+    with (
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin."
+            "is_runtime_timing_logging_enabled",
+            return_value=True,
+        ),
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin."
+            "emit_runtime_timing"
+        ) as emit_runtime_timing,
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.run"
+        ) as run,
+        patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
+    ):
+        plugin.launch_task(token="token-123", task=task)
+
+    assert run.call_args.args[0][-4:] == [
+        "--runtime-timing-run-id",
+        "7",
+        "--runtime-timing-task-id",
+        "5",
+    ]
+    assert [call.args[0] for call in emit_runtime_timing.call_args_list] == [
+        "runtime.executor.submission.accepted",
+        "runtime.task.dispatch.accepted",
+        "runtime.executor.child.spawn.started",
+    ]

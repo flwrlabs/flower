@@ -235,6 +235,13 @@ def push_task_events(
     timing_enabled = is_runtime_timing_logging_enabled() and is_runtime_timing_task(
         task.type
     )
+    has_persisted_events = True
+    if timing_enabled:
+        try:
+            has_persisted_events = state.has_task_events(task_id=task.task_id)
+        except Exception:  # pylint: disable=broad-exception-caught
+            # Timing must not change event persistence semantics.
+            pass
 
     try:
         stored = state.store_task_events(request.events)
@@ -302,7 +309,7 @@ def push_task_events(
             if lineage is not None
             else (None, task.task_id if task.type == TaskType.AGENT_APP else None)
         )
-        if mark_runtime_task_first_event_persisted(
+        if not has_persisted_events and mark_runtime_task_first_event_persisted(
             run_id=task.run_id,
             task_id=task.task_id,
         ):

@@ -1599,6 +1599,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         return True
 
+    def has_task_events(self, *, task_id: int) -> bool:
+        """Return whether a task has at least one persisted event."""
+        query = select(
+            exists().where(TaskEventModel.task_id == uint64_to_int64(task_id))
+        )
+        with self.session() as session:
+            return bool(session.scalar(query))
+
     def get_task_events(
         self,
         *,

@@ -156,6 +156,7 @@ class InMemoryCoreState(
         self.task_message_store: dict[str, Message] = {}
         self.lock_task_message_store = Lock()
         self.task_event_store: dict[int, list[TaskEvent]] = {}
+        self.task_event_task_ids: set[int] = set()
         self.lock_task_event_store = Lock()
         self._next_task_event_id = 1
         self._object_push_sessions: dict[str, ObjectPushSession] = {}
@@ -1270,9 +1271,15 @@ class InMemoryCoreState(
                 event.id = self._next_task_event_id
                 event.timestamp = current
                 task_events.append(event)
+                self.task_event_task_ids.add(event.task_id)
                 self._next_task_event_id += 1
 
         return True
+
+    def has_task_events(self, *, task_id: int) -> bool:
+        """Return whether a task has at least one persisted event."""
+        with self.lock_task_event_store:
+            return task_id in self.task_event_task_ids
 
     def get_task_events(
         self,

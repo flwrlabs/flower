@@ -730,6 +730,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 initial_task_event.run_id = run_id
                 initial_task_event.task_id = task_id
                 self.task_event_store.setdefault(run_id, []).append(initial_task_event)
+                self.task_event_task_ids.add(task_id)
                 self._next_task_event_id += 1
             self.bind_connectors_to_run(
                 run_id=run_id,

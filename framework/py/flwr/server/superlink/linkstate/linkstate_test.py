@@ -181,6 +181,8 @@ class StateTest(CoreStateTest):
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
         assert run.series_id > 0
+        assert run.primary_task_id is not None
+        assert state.has_task_events(task_id=run.primary_task_id)
         stored_event = state.get_task_events(run_ids=[run_id])[0]
         assert stored_event.event == initial_event.event
         assert stored_event.data == initial_event.data

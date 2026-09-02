@@ -21,6 +21,11 @@ from collections.abc import Callable, Sequence
 
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.exit import ExitCode, flwr_exit
+from flwr.supercore.runtime_timing import (
+    emit_runtime_timing,
+    is_runtime_timing_logging_enabled,
+    is_runtime_timing_task,
+)
 
 from .exec_plugin import ExecPlugin
 
@@ -61,6 +66,41 @@ class BaseEphemeralExecPlugin(ExecPlugin):
         cmds += ["--parent-pid", str(os.getpid())]
         if self.runtime_dependency_install:
             cmds += ["--allow-runtime-dependency-installation"]
+        if is_runtime_timing_logging_enabled() and is_runtime_timing_task(task.type):
+            cmds += [
+                "--runtime-timing-run-id",
+                str(task.run_id),
+                "--runtime-timing-task-id",
+                str(task.task_id),
+            ]
+            root_task_id = task.task_id if task.type == "flwr-agentapp" else None
+            emit_runtime_timing(
+                "runtime.executor.submission.accepted",
+                component="superexec",
+                run_id=task.run_id,
+                task_id=task.task_id,
+                root_task_id=root_task_id,
+                task_type=task.type,
+                executor_mode="fresh",
+            )
+            emit_runtime_timing(
+                "runtime.task.dispatch.accepted",
+                component="superexec",
+                run_id=task.run_id,
+                task_id=task.task_id,
+                root_task_id=root_task_id,
+                task_type=task.type,
+                executor_mode="fresh",
+            )
+            emit_runtime_timing(
+                "runtime.executor.child.spawn.started",
+                component="superexec",
+                run_id=task.run_id,
+                task_id=task.task_id,
+                root_task_id=root_task_id,
+                task_type=task.type,
+                executor_mode="fresh",
+            )
         # Perform any cleanup before launching the app
         if self.cleanup_before_launch is not None:
             self.cleanup_before_launch()

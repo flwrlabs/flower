@@ -398,6 +398,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         """PushTaskEvents should derive run and task IDs from task auth."""
         # Prepare
         self.state.store_task_events.return_value = True
+        self.state.has_task_events.return_value = False
         request = PushTaskEventsRequest(
             events=[
                 TaskEvent(
@@ -456,6 +457,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             )
 
         self.state.get_task_events.assert_not_called()
+        self.state.has_task_events.assert_called_once_with(task_id=123)
 
     def test_push_task_events_logs_when_state_rejects_events(self) -> None:
         """PushTaskEvents should log when CoreState cannot store events."""
