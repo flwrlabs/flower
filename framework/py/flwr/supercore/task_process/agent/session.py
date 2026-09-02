@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 import time
 from collections.abc import Sequence
 from queue import Empty, Queue
@@ -47,7 +48,10 @@ from flwr.supercore.json_message.connector_message import (
 )
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.runtime import RuntimeHttpClient
-from flwr.supercore.runtime_timing import emit_runtime_timing
+from flwr.supercore.runtime_timing import (
+    emit_runtime_timing,
+    is_runtime_timing_logging_enabled,
+)
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
@@ -274,6 +278,9 @@ class RuntimeAgentResponses(AgentResponses):
                 "AgentResponses request requires a non-empty string 'model' field."
             )
 
+        dispatch_id = (
+            secrets.token_hex(16) if is_runtime_timing_logging_enabled() else None
+        )
         emit_runtime_timing(
             "runtime.agent.model.dispatch.started",
             component="agent_task",
@@ -282,6 +289,7 @@ class RuntimeAgentResponses(AgentResponses):
             root_task_id=self._task_id,
             task_type="flwr-agentapp",
             process_mode="new",
+            dispatch_id=dispatch_id,
         )
         create_res = self._stub.CreateTask(
             CreateTaskRequest(type=TaskType.MODEL, model_ref=model)
@@ -304,7 +312,7 @@ class RuntimeAgentResponses(AgentResponses):
             metadata=cast(JSONObject | None, request.get("metadata")),
             text=cast(JSONObject | None, request.get("text")),
         )
-        response_message = self._send_and_receive(message)
+        response_message = self._send_and_receive(message, dispatch_id=dispatch_id)
         response = ModelResponse.from_message(response_message)
         return response.payload
 
@@ -474,7 +482,9 @@ class RuntimeAgentResponses(AgentResponses):
         )
         return [message_from_proto(msg) for msg in res.messages]
 
-    def _send_and_receive(self, message: Message) -> Message:
+    def _send_and_receive(
+        self, message: Message, *, dispatch_id: str | None = None
+    ) -> Message:
         """Send one message and wait for its destination child task's direct reply.
 
         For now, `flwr-agentapp` expects a strict one-request-one-reply exchange with
@@ -486,6 +496,18 @@ class RuntimeAgentResponses(AgentResponses):
 
         # Push the message to the child task
         self._push_task_message(message)
+        if dispatch_id is not None:
+            emit_runtime_timing(
+                "runtime.agent.model.dispatch.accepted",
+                component="agent_task",
+                run_id=self._run_id,
+                task_id=child_task_id,
+                parent_task_id=self._task_id,
+                root_task_id=self._task_id,
+                task_type="flwr-model",
+                process_mode="new",
+                dispatch_id=dispatch_id,
+            )
         message_id = message.metadata.message_id
 
         # Pull until a message arrives that replies to the pushed message, or timeout

@@ -85,7 +85,7 @@ def test_handle_task_marks_provider_event_flush_and_lineage(
 def test_handle_task_preserves_error_reply_after_provider_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A provider failure should still flush and return the Model error reply."""
+    """A provider failure should publish its error reply without failing the task."""
     client = Mock()
     request = ModelRequest(
         dst_task_id=22,
@@ -111,8 +111,7 @@ def test_handle_task_preserves_error_reply_after_provider_failure(
 
     monkeypatch.setattr(task, "invoke_model_provider", invoke_provider)
 
-    with pytest.raises(RuntimeError, match="provider failed"):
-        task.handle_task(client=client, task_id=22, run_id=7)
+    task.handle_task(client=client, task_id=22, run_id=7)
 
     client.PushTaskEvents.assert_called_once()
     client.PushTaskMessage.assert_called_once()
@@ -121,6 +120,7 @@ def test_handle_task_preserves_error_reply_after_provider_failure(
         "runtime.model.provider.stream.finished"
     ) < marker_names.index("runtime.model.first_event.flush.started")
     assert marker_names[-1] == "runtime.model.execution.finished"
+    assert markers.call_args_list[-1].kwargs["outcome"] == "ok"
 
 
 def test_handle_task_classifies_response_publish_failure(

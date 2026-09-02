@@ -31,6 +31,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskMessageRequest,
     PullTaskMessageResponse,
     PushTaskEventsRequest,
+    PushTaskMessageRequest,
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
@@ -38,6 +39,7 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
+from flwr.supercore.json_message.model_message import ModelResponse
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject
@@ -157,6 +159,63 @@ def test_pull_task_messages_filters_by_child_task() -> None:
     stub.PullTaskMessage.assert_called_once_with(
         PullTaskMessageRequest(limit=1, src_task_id=456)
     )
+
+
+def test_model_dispatch_markers_share_an_opaque_id() -> None:
+    """A Model dispatch should pair its start and acceptance markers."""
+    stub = Mock()
+    stub.CreateTask.return_value = CreateTaskResponse(task_id=456)
+    responses = RuntimeAgentResponses(
+        stub=stub,
+        run_id=123,
+        task_id=789,
+        context=Mock(),
+        start_run_request=StartRunRequest(),
+        events=Mock(),
+    )
+    message_id: str | None = None
+
+    def store_message(request: PushTaskMessageRequest) -> None:
+        nonlocal message_id
+        message_id = request.message.metadata.message_id
+
+    def pull_response(*, src_task_id: int) -> list[ModelResponse]:
+        assert src_task_id == 456
+        assert message_id is not None
+        return [
+            ModelResponse(
+                dst_task_id=789,
+                response={"object": "response", "status": "completed", "output": []},
+                reply_to_message_id=message_id,
+            )
+        ]
+
+    stub.PushTaskMessage.side_effect = store_message
+    responses._pull_task_messages = pull_response  # pylint: disable=W0212
+    markers = Mock()
+    with (
+        patch(
+            "flwr.supercore.task_process.agent.session.is_runtime_timing_logging_enabled",
+            return_value=True,
+        ),
+        patch(
+            "flwr.supercore.task_process.agent.session.secrets.token_hex",
+            return_value="dispatch-1",
+        ),
+        patch("flwr.supercore.task_process.agent.session.emit_runtime_timing", markers),
+    ):
+        responses._create_model_response(  # pylint: disable=W0212
+            {"model": "model", "input": "ignored"}
+        )
+
+    assert [call.args[0] for call in markers.call_args_list] == [
+        "runtime.agent.model.dispatch.started",
+        "runtime.agent.model.dispatch.accepted",
+    ]
+    assert [call.kwargs["dispatch_id"] for call in markers.call_args_list] == [
+        "dispatch-1",
+        "dispatch-1",
+    ]
 
 
 def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
