@@ -155,6 +155,14 @@ def test_responses_emits_model_dispatch_markers() -> None:
             "flwr.superlink.routers.runtime.responses.emit_runtime_timing"
         ) as emit_marker,
     ):
+
+        def create_task(*_args: object, **_kwargs: object) -> int:
+            assert [call.args[0] for call in emit_marker.call_args_list] == [
+                "runtime.agent.model.dispatch.started"
+            ]
+            return 456
+
+        state.create_task.side_effect = create_task
         response = _client(state).post(
             "/v1/runtime/responses",
             json={"model": "model", "input": "hello"},

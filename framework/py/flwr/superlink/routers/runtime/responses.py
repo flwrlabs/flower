@@ -184,6 +184,16 @@ def _start_exchange(
 ) -> _Exchange:
     """Create a child model task and send its request message."""
     model = cast(str, request.payload["model"])
+    timing_enabled = is_runtime_timing_logging_enabled()
+    if timing_enabled:
+        emit_runtime_timing(
+            "runtime.agent.model.dispatch.started",
+            component="superlink",
+            run_id=task.run_id,
+            task_id=task.task_id,
+            root_task_id=task.task_id,
+            task_type=task.type,
+        )
     try:
         response = runtime_handlers.create_task(
             CreateTaskRequest(type=TaskType.MODEL, model_ref=model), state, task
@@ -207,16 +217,6 @@ def _start_exchange(
         model_task_id=model_task_id,
         run_id=task.run_id,
     )
-    timing_enabled = is_runtime_timing_logging_enabled()
-    if timing_enabled:
-        emit_runtime_timing(
-            "runtime.agent.model.dispatch.started",
-            component="superlink",
-            run_id=task.run_id,
-            task_id=task.task_id,
-            root_task_id=task.task_id,
-            task_type=task.type,
-        )
     if not state.store_task_message(request):
         _stop_model_task(state, exchange, "Model request was not stored.")
         raise _ResponsesError(
