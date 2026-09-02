@@ -38,6 +38,11 @@ from flwr.supercore import log
 from flwr.supercore.constant import TaskType
 from flwr.supercore.error import FlowerError
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
+from flwr.supercore.runtime_timing import (
+    complete_runtime_timing_tasks,
+    emit_runtime_timing,
+    is_runtime_timing_logging_enabled,
+)
 from flwr.supercore.servicer.runtime import runtime_handlers
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
@@ -77,6 +82,7 @@ class _Exchange:
 
     agent_task_id: int
     model_task_id: int
+    run_id: int
 
 
 class _ResponsesError(Exception):
@@ -196,18 +202,39 @@ def _start_exchange(
     request.metadata.__dict__["_run_id"] = task.run_id
     request.metadata.src_task_id = task.task_id
     request.metadata.__dict__["_message_id"] = request.object_id
-    if not state.store_task_message(request):
-        state.finish_task(
-            model_task_id, SubStatus.STOPPED, "Model request was not stored."
+    exchange = _Exchange(
+        agent_task_id=task.task_id,
+        model_task_id=model_task_id,
+        run_id=task.run_id,
+    )
+    timing_enabled = is_runtime_timing_logging_enabled()
+    if timing_enabled:
+        emit_runtime_timing(
+            "runtime.agent.model.dispatch.started",
+            component="superlink",
+            run_id=task.run_id,
+            task_id=task.task_id,
+            root_task_id=task.task_id,
+            task_type=task.type,
         )
+    if not state.store_task_message(request):
+        _stop_model_task(state, exchange, "Model request was not stored.")
         raise _ResponsesError(
             500, "Model request could not be stored.", "model_request_failed"
         )
 
-    return _Exchange(
-        agent_task_id=task.task_id,
-        model_task_id=model_task_id,
-    )
+    if timing_enabled:
+        emit_runtime_timing(
+            "runtime.agent.model.dispatch.accepted",
+            component="superlink",
+            run_id=task.run_id,
+            task_id=model_task_id,
+            parent_task_id=task.task_id,
+            root_task_id=task.task_id,
+            task_type=TaskType.MODEL,
+        )
+
+    return exchange
 
 
 async def _wait_for_response(
@@ -427,7 +454,18 @@ def _response_error_message(response: JSONObject) -> str:
 
 def _stop_model_task(state: LinkState, exchange: _Exchange, details: str) -> None:
     """Stop an unfinished model task and drain an already-arrived reply."""
-    state.finish_task(exchange.model_task_id, SubStatus.STOPPED, details)
+    if state.finish_task(exchange.model_task_id, SubStatus.STOPPED, details):
+        complete_runtime_timing_tasks(
+            state=state,
+            tasks=[
+                Task(
+                    task_id=exchange.model_task_id,
+                    run_id=exchange.run_id,
+                    type=TaskType.MODEL,
+                )
+            ],
+            outcome="cancelled",
+        )
     try:
         _claim_response(state, exchange)
     except _ResponsesError:

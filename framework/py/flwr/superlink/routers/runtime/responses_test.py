@@ -15,6 +15,7 @@
 """Tests for the Runtime Responses endpoint."""
 
 import asyncio
+import os
 from unittest.mock import AsyncMock, Mock, patch
 
 import anyio
@@ -35,6 +36,8 @@ from .responses import (
     _Exchange,
     _ResponsesError,
     _sse_frame,
+    _start_exchange,
+    _stop_model_task,
     _stream_response,
     _wait_for_response,
     router,
@@ -136,6 +139,74 @@ def test_responses_returns_correlated_model_response() -> None:
         limit=1,
         order_by="created_at",
     )
+
+
+def test_responses_emits_model_dispatch_markers() -> None:
+    """The direct Responses route must mark its Model task handoff."""
+    state = _state()
+    state.get_task_message.side_effect = [[], [_reply("request-message-id")]]
+    state.get_tasks.return_value = [
+        Task(task_id=456, status=TaskStatus(status=Status.FINISHED))
+    ]
+
+    with (
+        patch.dict(os.environ, {"FLWR_RUNTIME_TIMING_LOGGING": "1"}),
+        patch(
+            "flwr.superlink.routers.runtime.responses.emit_runtime_timing"
+        ) as emit_marker,
+    ):
+        response = _client(state).post(
+            "/v1/runtime/responses",
+            json={"model": "model", "input": "hello"},
+            headers={"Authorization": "Bearer task-token"},
+        )
+
+    assert response.status_code == 200
+    assert [call.args[0] for call in emit_marker.call_args_list] == [
+        "runtime.agent.model.dispatch.started",
+        "runtime.agent.model.dispatch.accepted",
+    ]
+
+
+def test_responses_stop_completes_model_timing_state() -> None:
+    """A direct Responses stop must complete the Model timing state."""
+    state = _state()
+    state.get_task_message.return_value = []
+    exchange = _Exchange(agent_task_id=123, model_task_id=456, run_id=789)
+
+    with (
+        patch.dict(os.environ, {"FLWR_RUNTIME_TIMING_LOGGING": "1"}),
+        patch(
+            "flwr.superlink.routers.runtime.responses.complete_runtime_timing_tasks"
+        ) as complete_timing,
+    ):
+        _stop_model_task(state, exchange, "Responses request ended early.")
+
+    completed_task = complete_timing.call_args.kwargs["tasks"][0]
+    assert completed_task.task_id == 456
+    assert completed_task.run_id == 789
+    assert completed_task.type == TaskType.MODEL
+    assert complete_timing.call_args.kwargs["outcome"] == "cancelled"
+
+
+def test_responses_storage_failure_completes_model_timing_state() -> None:
+    """A failed direct request store must complete the Model timing state."""
+    state = _state()
+    state.store_task_message.return_value = False
+    state.get_task_message.return_value = []
+
+    with patch(
+        "flwr.superlink.routers.runtime.responses.complete_runtime_timing_tasks"
+    ) as complete_timing:
+        with pytest.raises(_ResponsesError):
+            _start_exchange(
+                state,
+                state.get_task_by_token.return_value,
+                _stream_request(),
+            )
+
+    assert complete_timing.call_args.kwargs["tasks"][0].task_id == 456
+    assert complete_timing.call_args.kwargs["outcome"] == "cancelled"
 
 
 def test_responses_rejects_unsupported_fields() -> None:
@@ -290,6 +361,7 @@ def test_responses_stops_and_drains_when_response_wait_is_cancelled() -> None:
         exchange = _Exchange(
             agent_task_id=123,
             model_task_id=456,
+            run_id=789,
         )
         with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=10):
             response_wait = asyncio.create_task(
@@ -319,6 +391,7 @@ def test_responses_stops_and_drains_when_client_disconnects() -> None:
         exchange = _Exchange(
             agent_task_id=123,
             model_task_id=456,
+            run_id=789,
         )
         with pytest.raises(_ResponsesError) as exc_info:
             await _wait_for_response(request, state, exchange)
@@ -354,6 +427,7 @@ def test_responses_times_out_if_model_task_is_not_launched() -> None:
         exchange = _Exchange(
             agent_task_id=123,
             model_task_id=456,
+            run_id=789,
         )
         with patch(
             "flwr.superlink.routers.runtime.responses._model_task_launch_timeout",
@@ -388,6 +462,7 @@ def test_responses_times_out_if_running_model_task_does_not_respond() -> None:
         exchange = _Exchange(
             agent_task_id=123,
             model_task_id=456,
+            run_id=789,
         )
         with patch(
             "flwr.superlink.routers.runtime.responses._DEFAULT_MODEL_RESPONSE_TIMEOUT",
