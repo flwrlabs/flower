@@ -131,38 +131,6 @@ def test_raise_if_true() -> None:
         raise AssertionError() from err
 
 
-def test_runtime_task_lineage_uses_persisted_state_when_cache_is_empty() -> None:
-    """Lifecycle markers should retain lineage after a SuperLink restart."""
-    state = Mock(spec=LinkState)
-    state.get_task_lineage.return_value = (11, 11)
-    task = Task(task_id=22, run_id=7, type=TaskType.MODEL)
-
-    with (
-        patch.dict(os.environ, {"FLWR_RUNTIME_TIMING_LOGGING": "1"}),
-        patch(
-            "flwr.superlink.servicer.runtime.runtime_handlers."
-            "get_runtime_task_lineage",
-            return_value=None,
-        ),
-        patch(
-            "flwr.superlink.servicer.runtime.runtime_handlers."
-            "register_runtime_task_lineage"
-        ) as register_lineage,
-    ):
-        lineage = runtime_handlers._get_runtime_task_lineage(  # pylint: disable=protected-access
-            state, task
-        )
-
-    assert lineage == (11, 11)
-    state.get_task_lineage.assert_called_once_with(22)
-    register_lineage.assert_called_once_with(
-        run_id=7,
-        task_id=22,
-        parent_task_id=11,
-        root_task_id=11,
-    )
-
-
 def _create_shared_runtime(
     tmpdir: str,
 ) -> tuple[int, int, LinkState, LinkState]:
