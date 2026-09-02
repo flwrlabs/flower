@@ -73,6 +73,10 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import get_object_tree
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.runtime_timing import (
+    get_runtime_task_lineage,
+    register_runtime_task_lineage,
+)
 from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.linkstate_models import MessageIns as MessageInsModel
@@ -763,6 +767,55 @@ class StateTest(CoreStateTest):
 
         assert status.status == Status.PENDING
         state.federation_manager.report_run_usage.assert_not_called()
+
+    def test_expired_runtime_task_emits_timeout_and_discards_lineage(self) -> None:
+        """An expired Agent-runtime task must end and clear its timing state."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        fixed_now = now()
+        active_until = fixed_now + timedelta(
+            seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+        )
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(
+                task_type=TaskType.MODEL,
+                run_id=run_id,
+                parent_task_id=10,
+                root_task_id=10,
+            )
+            assert task_id is not None
+            register_runtime_task_lineage(
+                run_id=run_id,
+                task_id=task_id,
+                parent_task_id=10,
+                root_task_id=10,
+            )
+            assert state.claim_task(task_id) is not None
+            assert state.activate_task(task_id)
+
+            mock_dt.now.return_value = active_until + timedelta(seconds=1)
+            with (
+                patch(
+                    "flwr.supercore.runtime_timing.emit_runtime_timing"
+                ) as emit_marker,
+                patch.dict(os.environ, {"FLWR_RUNTIME_TIMING_LOGGING": "1"}),
+            ):
+                state.get_tasks(task_ids=[task_id])
+
+        emit_marker.assert_called_once_with(
+            "runtime.task.completed.persisted",
+            component="superlink",
+            run_id=run_id,
+            task_id=task_id,
+            parent_task_id=10,
+            root_task_id=10,
+            task_type=TaskType.MODEL,
+            outcome="timeout",
+            error_kind="timeout",
+        )
+        assert get_runtime_task_lineage(run_id=run_id, task_id=task_id) is None
 
     def test_get_message_ins_empty(self) -> None:
         """Validate that a new state has no input Messages."""

@@ -21,9 +21,13 @@ import os
 import time
 from logging import INFO
 from threading import Lock
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from flwr.supercore.logger import FLOWER_LOGGER
+
+if TYPE_CHECKING:
+    from flwr.proto.task_pb2 import Task
+    from flwr.supercore.corestate import CoreState
 
 RUNTIME_TIMING_LOGGING_ENV = "FLWR_RUNTIME_TIMING_LOGGING"
 RUNTIME_TIMING_MESSAGE = "runtime.timing"
@@ -85,6 +89,44 @@ def discard_runtime_task_lineage(*, run_id: int, task_id: int) -> None:
     with _task_lineage_lock:
         _task_lineage.pop(key, None)
         _first_persisted_event_tasks.discard(key)
+
+
+def complete_expired_runtime_timing_tasks(
+    *, state: CoreState, tasks: list[Task]
+) -> None:
+    """Record and discard timing state for tasks that expired while running."""
+    for task in tasks:
+        if not is_runtime_timing_task(task.type):
+            continue
+
+        if is_runtime_timing_logging_enabled():
+            lineage = get_runtime_task_lineage(run_id=task.run_id, task_id=task.task_id)
+            if lineage is None:
+                try:
+                    lineage = state.get_task_lineage(task.task_id)
+                except Exception:  # pylint: disable=broad-exception-caught
+                    lineage = None
+            parent_task_id, root_task_id = (
+                lineage
+                if lineage is not None
+                else (
+                    None,
+                    task.task_id if task.type == "flwr-agentapp" else None,
+                )
+            )
+            emit_runtime_timing(
+                "runtime.task.completed.persisted",
+                component="superlink",
+                run_id=task.run_id,
+                task_id=task.task_id,
+                parent_task_id=parent_task_id,
+                root_task_id=root_task_id,
+                task_type=task.type,
+                outcome="timeout",
+                error_kind="timeout",
+            )
+
+        discard_runtime_task_lineage(run_id=task.run_id, task_id=task.task_id)
 
 
 def emit_runtime_timing(  # pylint: disable=too-many-arguments

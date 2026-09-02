@@ -1204,18 +1204,20 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     RunModel.primary_task_id.in_(task_ids)
                 )
             ).all()
-        if not rows:
-            return
+        if rows:
+            # Fail any remaining tasks for expired runs
+            self._finish_run_tasks(
+                [
+                    (cast(int, run_id), primary_task_id)
+                    for run_id, primary_task_id in rows
+                ],
+                sub_status=SubStatus.FAILED,
+                details="Task failed because the run expired",
+            )
 
-        # Fail any remaining tasks for expired runs
-        self._finish_run_tasks(
-            [(cast(int, run_id), primary_task_id) for run_id, primary_task_id in rows],
-            sub_status=SubStatus.FAILED,
-            details="Task failed because the run expired",
-        )
-
-        # Report usage for the run
-        self.federation_manager.report_run_usage()
+            # Report usage for the run
+            self.federation_manager.report_run_usage()
+        super()._on_task_tokens_expired(tasks)
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float

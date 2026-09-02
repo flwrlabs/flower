@@ -24,14 +24,19 @@ from flwr.app.user_config import UserConfig
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
-from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.runtime_timing import complete_expired_runtime_timing_tasks
 from flwr.superlink.federation import FederationManager
 
 
 class LinkState(CoreState):  # pylint: disable=R0904
     """Abstract LinkState."""
+
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+        """Clean up optional timing state for terminal task expirations."""
+        complete_expired_runtime_timing_tasks(state=self, tasks=tasks)
 
     @property
     @abc.abstractmethod

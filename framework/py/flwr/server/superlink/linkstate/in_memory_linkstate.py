@@ -885,15 +885,14 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             for task in tasks
             if self._is_primary_task(task.task_id)
         ]
-        if not pairs:
-            return
-
-        self._finish_run_tasks(
-            pairs,
-            sub_status=SubStatus.FAILED,
-            details="Task failed because the run expired",
-        )
-        self.federation_manager.report_run_usage()
+        if pairs:
+            self._finish_run_tasks(
+                pairs,
+                sub_status=SubStatus.FAILED,
+                details="Task failed because the run expired",
+            )
+            self.federation_manager.report_run_usage()
+        super()._on_task_tokens_expired(tasks)
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
