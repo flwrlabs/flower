@@ -137,6 +137,21 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     agent_execution_finished = False
 
     def on_exit() -> None:
+        nonlocal agent_execution_finished
+
+        if agent_execution_started and not agent_execution_finished:
+            emit_runtime_timing(
+                "runtime.agent.execution.finished",
+                component="agent_task",
+                run_id=runtime_timing_run_id,
+                task_id=runtime_timing_task_id,
+                root_task_id=runtime_timing_task_id,
+                task_type="flwr-agentapp",
+                outcome="cancelled",
+                process_mode="new",
+            )
+            agent_execution_finished = True
+
         log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
 
         grid._retry_invoker.max_tries = 1
@@ -383,6 +398,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
                 error_kind="unknown",
                 process_mode="new",
             )
+            agent_execution_finished = True
         log(ERROR, "AgentApp raised an exception", exc_info=ex)
 
         sub_status = SubStatus.FAILED
