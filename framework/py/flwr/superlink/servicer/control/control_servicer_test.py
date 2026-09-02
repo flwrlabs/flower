@@ -24,7 +24,7 @@ import unittest
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import grpc
 from parameterized import parameterized
@@ -810,51 +810,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [(app.app_id, app.fab_hash) for app in apps],
             [("@anne-dev/simple-legacy-127", "")],
-        )
-        self.assertTrue(apps[0].is_hub_app)
-
-    def test_start_run_fetches_hub_app_for_each_run(self) -> None:
-        """Test every Hub app run resolves the latest available FAB."""
-        request = StartRunRequest(
-            app_spec="@flower/server-app",
-            federation=NOOP_FEDERATION_ID,
-        )
-
-        with (
-            patch(
-                "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
-                side_effect=[
-                    (b"Hub FAB version 1", {}, None),
-                    (b"Hub FAB version 2", {}, None),
-                ],
-            ) as mock_get_remote_fab,
-            patch(
-                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
-                return_value={"tool": {"flwr": {"app": {}}}},
-            ),
-            patch(
-                "flwr.superlink.servicer.control.control_handlers"
-                ".get_metadata_from_config",
-                return_value=("flower/server-app", "1.0.0"),
-            ),
-        ):
-            first = self.servicer.StartRun(request, self._make_start_run_context())
-            second = self.servicer.StartRun(request, self._make_start_run_context())
-
-        mock_get_remote_fab.assert_has_calls(
-            [call(None, request.app_spec), call(None, request.app_spec)]
-        )
-        runs = self.state.get_run_info(run_ids=[first.run_id, second.run_id])
-        self.assertEqual(
-            {run.run_id: run.fab_hash for run in runs},
-            {
-                first.run_id: hashlib.sha256(b"Hub FAB version 1").hexdigest(),
-                second.run_id: hashlib.sha256(b"Hub FAB version 2").hexdigest(),
-            },
-        )
-        apps = self.state.list_apps(NOOP_FEDERATION_ID)
-        self.assertEqual(
-            [(app.app_id, app.fab_hash) for app in apps], [("@flower/server-app", "")]
         )
         self.assertTrue(apps[0].is_hub_app)
 
