@@ -20,7 +20,7 @@ from typing import Any
 
 from uvicorn.logging import AccessFormatter, DefaultFormatter
 
-HEALTH_CHECK_PATH = "/health"
+ROUTINE_ACCESS_PATHS = frozenset({"/health", "/v1/runtime/pull-pending-tasks"})
 LOG_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
 UVICORN_DEFAULT_LOG_FORMAT = "%(levelprefix)s %(message)s"
@@ -41,8 +41,8 @@ class UTCFormatter(logging.Formatter):
     default_msec_format = "%s.%03dZ"
 
 
-class HealthCheckAccessFilter(logging.Filter):
-    """Hide successful health-check access logs unless debug is enabled."""
+class RoutineAccessFilter(logging.Filter):
+    """Hide successful routine access logs unless debug is enabled."""
 
     def __init__(self, debug_enabled: bool = False) -> None:
         super().__init__()
@@ -50,7 +50,7 @@ class HealthCheckAccessFilter(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
         """Return whether the log record should be emitted."""
-        if not self._is_successful_health_check(record):
+        if not self._is_successful_routine_request(record):
             return True
         if not self.debug_enabled:
             return False
@@ -59,7 +59,7 @@ class HealthCheckAccessFilter(logging.Filter):
         return True
 
     @staticmethod
-    def _is_successful_health_check(record: logging.LogRecord) -> bool:
+    def _is_successful_routine_request(record: logging.LogRecord) -> bool:
         if record.name != "uvicorn.access":
             return False
         if not isinstance(record.args, tuple) or len(record.args) < 5:
@@ -77,7 +77,7 @@ class HealthCheckAccessFilter(logging.Filter):
         else:
             return False
         path, _, _ = raw_path.partition("?")
-        return path == HEALTH_CHECK_PATH and status_code < 400
+        return path in ROUTINE_ACCESS_PATHS and status_code < 400
 
 
 def get_uvicorn_log_config(log_level: int) -> dict[str, Any]:
@@ -92,8 +92,8 @@ def get_uvicorn_log_config(log_level: int) -> dict[str, Any]:
             }
         },
         "filters": {
-            "health_check_access": {
-                "()": HealthCheckAccessFilter,
+            "routine_access": {
+                "()": RoutineAccessFilter,
                 "debug_enabled": log_level <= logging.DEBUG,
             }
         },
@@ -105,7 +105,7 @@ def get_uvicorn_log_config(log_level: int) -> dict[str, Any]:
             },
             "access": {
                 "class": "logging.StreamHandler",
-                "filters": ["health_check_access"],
+                "filters": ["routine_access"],
                 "formatter": "http",
                 "stream": "ext://sys.stdout",
             },
@@ -162,11 +162,11 @@ def configure_uvicorn_logging() -> None:
         elif not isinstance(handler.formatter, UTCFormatter):
             continue
         for log_filter in handler.filters:
-            if isinstance(log_filter, HealthCheckAccessFilter):
+            if isinstance(log_filter, RoutineAccessFilter):
                 log_filter.debug_enabled = debug_enabled
                 break
         else:
-            handler.addFilter(HealthCheckAccessFilter(debug_enabled))
+            handler.addFilter(RoutineAccessFilter(debug_enabled))
 
     for logger_name in ("httpcore", "httpx"):
         logger = logging.getLogger(logger_name)
