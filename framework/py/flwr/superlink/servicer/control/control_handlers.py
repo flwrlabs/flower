@@ -1515,7 +1515,7 @@ def add_app(
     """Add a Hub app to a federation."""
     federation_id = request.federation_id
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
-    fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, request.app_id)
+    fab_file, _, _ = _get_remote_fab(fleet_api_type, request.app_id)
     try:
         app_type = _get_app_type(get_fab_config(fab_file))
     except ValueError as e:
@@ -1525,11 +1525,7 @@ def add_app(
         ) from e
 
     state.store_app(
-        fab=Fab(
-            hash_str=hashlib.sha256(fab_file).hexdigest(),
-            content=fab_file,
-            verifications=verification_dict,
-        ),
+        fab=None,
         federation_id=federation_id,
         app_id=request.app_id,
         app_type=app_type,

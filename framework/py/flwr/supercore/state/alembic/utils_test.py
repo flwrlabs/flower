@@ -351,6 +351,69 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
+    def test_hub_fab_hash_migration_clears_only_hub_hashes(self) -> None:
+        """Ensure Hub hashes are cleared while custom hashes are retained."""
+        engine = self.create_engine("federation_app_hub_fab_hash.db")
+        try:
+            self.upgrade_to_revision(engine, "e4ecc602bd9a")
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO federation_app (
+                            federation_id, app_id, fab_hash, app_type,
+                            is_hub_app, added_by, added_at
+                        ) VALUES (
+                            :federation_id, :app_id, :fab_hash, :app_type,
+                            :is_hub_app, :added_by, :added_at
+                        )
+                        """
+                    ),
+                    [
+                        {
+                            "federation_id": "@alice/research",
+                            "app_id": "@flower/hub-agent",
+                            "fab_hash": "hub-hash",
+                            "app_type": TaskType.AGENT_APP,
+                            "is_hub_app": True,
+                            "added_by": "alice",
+                            "added_at": "2026-09-01 10:00:00+00:00",
+                        },
+                        {
+                            "federation_id": "@alice/research",
+                            "app_id": "@alice/custom-server",
+                            "fab_hash": "custom-hash",
+                            "app_type": TaskType.SERVER_APP,
+                            "is_hub_app": False,
+                            "added_by": "alice",
+                            "added_at": "2026-09-01 11:00:00+00:00",
+                        },
+                    ],
+                )
+
+            self.upgrade_to_revision(engine, "heads")
+
+            with engine.connect() as connection:
+                rows = connection.execute(
+                    text(
+                        """
+                        SELECT app_id, fab_hash
+                        FROM federation_app
+                        ORDER BY app_id
+                        """
+                    )
+                ).all()
+
+            self.assertEqual(
+                rows,
+                [
+                    ("@alice/custom-server", "custom-hash"),
+                    ("@flower/hub-agent", None),
+                ],
+            )
+        finally:
+            engine.dispose()
+
     def test_automation_timestamp_migration_normalizes_sqlite_text(self) -> None:
         """Ensure legacy SQLite automation timestamps use ORM-compatible text."""
         engine = self.create_engine("automation_timestamp_normalization.db")

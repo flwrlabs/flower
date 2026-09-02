@@ -464,7 +464,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
     def test_list_apps_preserves_hub_flag_over_wire(self) -> None:
         """ListApps preserves Hub provenance through protobuf serialization."""
-        fab_hash = self.state.store_app(
+        self.state.store_app(
             fab=Fab("", b"hub fab", {}),
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
@@ -480,7 +480,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
         round_tripped = ListAppsResponse.FromString(response.SerializeToString())
 
-        self.assertEqual(round_tripped.apps[0].fab_hash, fab_hash)
+        self.assertEqual(round_tripped.apps[0].fab_hash, "")
         self.assertTrue(round_tripped.apps[0].is_hub_app)
 
     def test_list_apps_preserves_unknown_hub_origin_over_wire(self) -> None:
@@ -535,12 +535,12 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
-            [("@flwr/demo", fab_hash, TaskType.AGENT_APP)],
+            [("@flwr/demo", "", TaskType.AGENT_APP)],
         )
         self.assertTrue(apps[0].is_hub_app)
-        self.assertEqual(
-            self.state.get_app(NOOP_FEDERATION_ID, "@flwr/demo", fab_hash),
-            Fab(fab_hash, fab_content, verification_dict),
+        self.assertIsNone(self.state.get_fab(fab_hash))
+        self.assertIsNone(
+            self.state.get_app(NOOP_FEDERATION_ID, "@flwr/demo", fab_hash)
         )
 
         remove_response = remove_app(
