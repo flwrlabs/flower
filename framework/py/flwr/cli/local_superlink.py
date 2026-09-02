@@ -20,10 +20,12 @@ from __future__ import annotations
 import os
 import subprocess
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import click
 import grpc
+import httpx
 import typer
 
 from flwr.common.constant import ISOLATION_MODE_SUBPROCESS
@@ -55,6 +57,20 @@ def ensure_local_superlink(connection: SuperLinkConnection) -> SuperLinkConnecti
     Connections with an explicit address are treated as user-managed and returned
     unchanged.
     """
+    return _ensure_local_superlink(connection, use_http=False)
+
+
+def ensure_local_superlink_http(
+    connection: SuperLinkConnection,
+) -> SuperLinkConnection:
+    """Ensure local SuperLink HTTP availability for local simulation connections."""
+    return _ensure_local_superlink(connection, use_http=True)
+
+
+def _ensure_local_superlink(
+    connection: SuperLinkConnection, *, use_http: bool
+) -> SuperLinkConnection:
+    """Resolve a local connection and ensure its selected API is available."""
     _check_deprecated_option_only_usage(connection)  # Backwards compatibility check
     if connection.address in (
         LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
@@ -62,16 +78,29 @@ def ensure_local_superlink(connection: SuperLinkConnection) -> SuperLinkConnecti
     ):
         runtime_connection = SuperLinkConnection(
             name=connection.name,
-            address=LOCAL_CONTROL_API_ADDRESS,
+            address=(
+                f"127.0.0.1:{LOCAL_RUNTIME_API_PORT}"
+                if use_http
+                else LOCAL_CONTROL_API_ADDRESS
+            ),
             root_certificates=None,
             insecure=True,
             federation=connection.federation,
             options=connection.options,
         )
-        if not _is_local_superlink_started():
-            _start_local_superlink(
+        is_started = (
+            _is_local_superlink_http_started
+            if use_http
+            else _is_local_superlink_started
+        )
+        if not is_started():
+            in_memory = (
                 connection.address == LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY
             )
+            if use_http:
+                _start_local_superlink(in_memory, readiness_check=is_started)
+            else:
+                _start_local_superlink(in_memory)
         return runtime_connection
 
     # Explicit addresses are user-managed.
@@ -101,8 +130,27 @@ def _is_local_superlink_started() -> bool:
         channel.close()
 
 
-def _start_local_superlink(in_memory: bool = False) -> None:
+def _is_local_superlink_http_started() -> bool:
+    """Return True if local SuperLink's HTTP endpoint is reachable."""
+    try:
+        response = httpx.get(
+            f"http://127.0.0.1:{LOCAL_RUNTIME_API_PORT}/health",
+            timeout=CONTROL_API_PROBE_TIMEOUT,
+        )
+        return response.is_success
+    except httpx.HTTPError:
+        return False
+
+
+def _start_local_superlink(
+    in_memory: bool = False,
+    *,
+    readiness_check: Callable[[], bool] | None = None,
+) -> None:
     """Start a managed local SuperLink in simulation mode and wait for readiness."""
+    if readiness_check is None:
+        readiness_check = _is_local_superlink_started
+
     database_path, log_file_path = _get_local_superlink_paths()
 
     typer.secho(
@@ -160,7 +208,7 @@ def _start_local_superlink(in_memory: bool = False) -> None:
                 f"See logs at {log_file_path}."
             )
 
-        if _is_local_superlink_started():
+        if readiness_check():
             return
         time.sleep(CONTROL_API_PROBE_INTERVAL)
 
