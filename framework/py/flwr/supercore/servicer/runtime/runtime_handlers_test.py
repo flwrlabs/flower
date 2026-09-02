@@ -429,6 +429,34 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(stored_events[0].event, " response.created ")
         self.assertEqual(stored_events[0].data, '{"payload":"preserved"}')
 
+    def test_push_task_events_does_not_read_event_history_for_timing(self) -> None:
+        """First-event timing should not load previous event batches."""
+        self.state.store_task_events.return_value = True
+        request = PushTaskEventsRequest(
+            events=[TaskEvent(event="response.created", data="{}")]
+        )
+
+        with (
+            patch.object(
+                runtime_handlers,
+                "is_runtime_timing_logging_enabled",
+                return_value=True,
+            ),
+            patch.object(
+                runtime_handlers,
+                "mark_runtime_task_first_event_persisted",
+                return_value=True,
+            ),
+            patch.object(runtime_handlers, "emit_runtime_timing"),
+        ):
+            runtime_handlers.push_task_events(
+                request,
+                self.state,
+                Task(task_id=123, run_id=789, type=TaskType.MODEL),
+            )
+
+        self.state.get_task_events.assert_not_called()
+
     def test_push_task_events_logs_when_state_rejects_events(self) -> None:
         """PushTaskEvents should log when CoreState cannot store events."""
         # Prepare

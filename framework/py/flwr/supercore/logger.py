@@ -200,7 +200,7 @@ class CustomHTTPHandler(HTTPHandler):
             "asctime": record_dict["asctime"],
             "filename": record_dict["filename"],
             "lineno": record_dict["lineno"],
-            "message": record_dict["message"],
+            "message": record.getMessage(),
         }
 
 

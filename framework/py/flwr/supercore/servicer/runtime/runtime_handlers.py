@@ -58,6 +58,7 @@ from flwr.supercore.runtime_timing import (
     get_runtime_task_lineage,
     is_runtime_timing_logging_enabled,
     is_runtime_timing_task,
+    mark_runtime_task_first_event_persisted,
     register_runtime_task_lineage,
 )
 from flwr.supercore.task_process.connector import registry as connector_registry
@@ -231,18 +232,14 @@ def push_task_events(
         event.run_id = task.run_id
         event.task_id = task.task_id
 
-    has_previous_events = False
-    if is_runtime_timing_logging_enabled() and is_runtime_timing_task(task.type):
-        try:
-            has_previous_events = bool(state.get_task_events(task_ids=[task.task_id]))
-        except Exception:  # pylint: disable=broad-exception-caught
-            # Avoid changing event persistence semantics for an observational query.
-            has_previous_events = True
+    timing_enabled = is_runtime_timing_logging_enabled() and is_runtime_timing_task(
+        task.type
+    )
 
     try:
         stored = state.store_task_events(request.events)
     except Exception:  # pylint: disable=broad-exception-caught
-        if is_runtime_timing_task(task.type):
+        if timing_enabled:
             lineage = get_runtime_task_lineage(
                 run_id=task.run_id,
                 task_id=task.task_id,
@@ -272,7 +269,7 @@ def push_task_events(
             task.task_id,
             task.run_id,
         )
-        if is_runtime_timing_task(task.type):
+        if timing_enabled:
             lineage = get_runtime_task_lineage(
                 run_id=task.run_id,
                 task_id=task.task_id,
@@ -295,7 +292,7 @@ def push_task_events(
             )
         return PushTaskEventsResponse()
 
-    if is_runtime_timing_task(task.type):
+    if timing_enabled:
         lineage = get_runtime_task_lineage(
             run_id=task.run_id,
             task_id=task.task_id,
@@ -305,7 +302,10 @@ def push_task_events(
             if lineage is not None
             else (None, task.task_id if task.type == TaskType.AGENT_APP else None)
         )
-        if not has_previous_events:
+        if mark_runtime_task_first_event_persisted(
+            run_id=task.run_id,
+            task_id=task.task_id,
+        ):
             emit_runtime_timing(
                 "runtime.events.first.persisted",
                 component="superlink",

@@ -190,6 +190,8 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)
         task_id = res.task_id
+        runtime_timing_run_id = run.run_id
+        runtime_timing_task_id = task_id
 
         emit_runtime_timing(
             "runtime.application.input.received",

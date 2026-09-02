@@ -23,8 +23,8 @@ from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import TaskType
-from flwr.supercore.superexec.executor import ExecutionSpec, Executor, LaunchResult
 from flwr.supercore.runtime_timing import is_runtime_timing_logging_enabled
+from flwr.supercore.superexec.executor import ExecutionSpec, Executor, LaunchResult
 
 from .exec_plugin import ExecPlugin
 

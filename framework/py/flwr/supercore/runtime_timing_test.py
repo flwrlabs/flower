@@ -14,6 +14,8 @@
 # ==============================================================================
 """Tests for runtime timing markers."""
 
+import json
+from logging import INFO, LogRecord
 from unittest.mock import Mock
 
 import pytest
@@ -27,7 +29,7 @@ def test_emit_runtime_timing_is_disabled_by_default(
     """Disabled timing logging should not create a LogRecord."""
     log = Mock()
     monkeypatch.delenv(runtime_timing.RUNTIME_TIMING_LOGGING_ENV, raising=False)
-    monkeypatch.setattr(runtime_timing.FLOWER_LOGGER, "log", log)
+    monkeypatch.setattr("flwr.supercore.runtime_timing.FLOWER_LOGGER.log", log)
 
     runtime_timing.emit_runtime_timing(
         "runtime.task.claimed",
@@ -46,9 +48,13 @@ def test_emit_runtime_timing_uses_only_structured_safe_fields(
     """Enabled markers should have join fields but no payload-bearing fields."""
     log = Mock()
     monkeypatch.setenv(runtime_timing.RUNTIME_TIMING_LOGGING_ENV, "1")
-    monkeypatch.setattr(runtime_timing.FLOWER_LOGGER, "log", log)
-    monkeypatch.setattr(runtime_timing.time, "time_ns", Mock(return_value=123))
-    monkeypatch.setattr(runtime_timing.time, "monotonic_ns", Mock(return_value=456))
+    monkeypatch.setattr("flwr.supercore.runtime_timing.FLOWER_LOGGER.log", log)
+    monkeypatch.setattr(
+        "flwr.supercore.runtime_timing.time.time_ns", Mock(return_value=123)
+    )
+    monkeypatch.setattr(
+        "flwr.supercore.runtime_timing.time.monotonic_ns", Mock(return_value=456)
+    )
 
     runtime_timing.emit_runtime_timing(
         "runtime.model.provider.stream.finished",
@@ -64,11 +70,7 @@ def test_emit_runtime_timing_uses_only_structured_safe_fields(
         process_mode="new",
     )
 
-    assert log.call_args.args == (
-        runtime_timing.INFO,
-        runtime_timing.RUNTIME_TIMING_MESSAGE,
-    )
-    assert log.call_args.kwargs["extra"] == {
+    expected_attributes = {
         "event": "runtime.model.provider.stream.finished",
         "emitted_at_unix_ns": 123,
         "monotonic_ns": 456,
@@ -83,6 +85,24 @@ def test_emit_runtime_timing_uses_only_structured_safe_fields(
         "executor_mode": "fresh",
         "process_mode": "new",
     }
+    assert log.call_args.args[:3] == (
+        INFO,
+        "%s %s",
+        runtime_timing.RUNTIME_TIMING_MESSAGE,
+    )
+    record = LogRecord(
+        "flwr",
+        INFO,
+        "",
+        0,
+        log.call_args.args[1],
+        log.call_args.args[2:],
+        None,
+    )
+    message = record.getMessage()
+    assert message.startswith(f"{runtime_timing.RUNTIME_TIMING_MESSAGE} ")
+    assert json.loads(message.split(" ", maxsplit=1)[1]) == expected_attributes
+    assert log.call_args.kwargs["extra"] == expected_attributes
 
 
 def test_runtime_task_lineage_is_write_once() -> None:
@@ -101,5 +121,15 @@ def test_runtime_task_lineage_is_write_once() -> None:
     )
 
     assert runtime_timing.get_runtime_task_lineage(run_id=10, task_id=20) == (11, 11)
+
+    runtime_timing.discard_runtime_task_lineage(run_id=10, task_id=20)
+
+
+def test_first_persisted_event_marker_is_write_once() -> None:
+    """Only the first successfully persisted event should be marked."""
+    assert runtime_timing.mark_runtime_task_first_event_persisted(run_id=10, task_id=20)
+    assert not runtime_timing.mark_runtime_task_first_event_persisted(
+        run_id=10, task_id=20
+    )
 
     runtime_timing.discard_runtime_task_lineage(run_id=10, task_id=20)

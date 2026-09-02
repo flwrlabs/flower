@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from logging import INFO
@@ -28,6 +29,7 @@ RUNTIME_TIMING_LOGGING_ENV = "FLWR_RUNTIME_TIMING_LOGGING"
 RUNTIME_TIMING_MESSAGE = "runtime.timing"
 
 _task_lineage: dict[tuple[int, int], tuple[int, int]] = {}
+_first_persisted_event_tasks: set[tuple[int, int]] = set()
 _task_lineage_lock = Lock()
 
 RuntimeTimingComponent = Literal["superlink", "superexec", "agent_task", "model_task"]
@@ -67,10 +69,22 @@ def get_runtime_task_lineage(*, run_id: int, task_id: int) -> tuple[int, int] | 
         return _task_lineage.get((run_id, task_id))
 
 
+def mark_runtime_task_first_event_persisted(*, run_id: int, task_id: int) -> bool:
+    """Mark the first persisted event for a task and return whether it was new."""
+    key = (run_id, task_id)
+    with _task_lineage_lock:
+        if key in _first_persisted_event_tasks:
+            return False
+        _first_persisted_event_tasks.add(key)
+        return True
+
+
 def discard_runtime_task_lineage(*, run_id: int, task_id: int) -> None:
     """Discard terminal task lineage from the current SuperLink process."""
+    key = (run_id, task_id)
     with _task_lineage_lock:
-        _task_lineage.pop((run_id, task_id), None)
+        _task_lineage.pop(key, None)
+        _first_persisted_event_tasks.discard(key)
 
 
 def emit_runtime_timing(  # pylint: disable=too-many-arguments
@@ -89,10 +103,10 @@ def emit_runtime_timing(  # pylint: disable=too-many-arguments
 ) -> None:
     """Emit one structured lifecycle marker without affecting task execution.
 
-    The fixed message and LogRecord ``extra`` attributes are intentionally used so
-    standard logging handlers can export the fields without parsing log text. This
-    helper never accepts task payloads, credentials, URLs, exception text, or other
-    user-controlled values.
+    The fixed message prefix and JSON attributes let standard logging handlers carry
+    the fields without custom formatting. The same attributes remain available on
+    the LogRecord for structured handlers. This helper never accepts task payloads,
+    credentials, URLs, exception text, or other user-controlled values.
     """
     if not is_runtime_timing_logging_enabled():
         return
@@ -112,8 +126,17 @@ def emit_runtime_timing(  # pylint: disable=too-many-arguments
         "executor_mode": executor_mode,
         "process_mode": process_mode,
     }
+    serialized_attributes = json.dumps(
+        attributes, separators=(",", ":"), sort_keys=True
+    )
     try:
-        FLOWER_LOGGER.log(INFO, RUNTIME_TIMING_MESSAGE, extra=attributes)
+        FLOWER_LOGGER.log(
+            INFO,
+            "%s %s",
+            RUNTIME_TIMING_MESSAGE,
+            serialized_attributes,
+            extra=attributes,
+        )
     except Exception:  # pylint: disable=broad-exception-caught
         # Runtime logging must remain observational, including with custom handlers.
         return
