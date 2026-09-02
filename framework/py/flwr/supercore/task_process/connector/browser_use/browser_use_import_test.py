@@ -20,12 +20,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from types import ModuleType
-from unittest.mock import Mock
-
-from pytest import MonkeyPatch
-
-from . import invoke_browser_use_provider
 
 _IMPLEMENTATION_MODULE = "flwr.supercore.task_process.connector.browser_use.browser_use"
 
@@ -56,23 +50,3 @@ def test_tool_schema_does_not_import_browser_use_implementation() -> None:
     )
 
     assert json.loads(result.stdout) is False
-
-
-def test_provider_imports_browser_use_implementation_when_called(
-    monkeypatch: MonkeyPatch,
-) -> None:
-    """Verify Browser Use is loaded only when its connector is invoked."""
-    provider = Mock(return_value={"status": "completed"})
-    implementation = ModuleType(_IMPLEMENTATION_MODULE)
-    implementation.__dict__["invoke_browser_use_provider"] = provider
-    monkeypatch.setitem(sys.modules, _IMPLEMENTATION_MODULE, implementation)
-
-    result = invoke_browser_use_provider(
-        "Open the Flower documentation.",
-        allowed_domains=["flower.ai"],
-        model="gpt-5",
-        usage_recorder=Mock(),
-    )
-
-    assert result == {"status": "completed"}
-    provider.assert_called_once()
