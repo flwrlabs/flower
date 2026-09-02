@@ -91,7 +91,8 @@ class BaseEphemeralExecPlugin(ExecPlugin):
                 executor_mode="fresh",
             )
         # Record executor acceptance only after the app process starts.
-        with subprocess.Popen(cmds):
+        process = subprocess.Popen(cmds)  # pylint: disable=consider-using-with
+        try:
             if timing_enabled:
                 emit_runtime_timing(
                     "runtime.executor.submission.accepted",
@@ -111,4 +112,9 @@ class BaseEphemeralExecPlugin(ExecPlugin):
                     task_type=task.type,
                     executor_mode="fresh",
                 )
+            process.wait()
+        except BaseException:
+            process.kill()
+            process.wait()
+            raise
         flwr_exit(ExitCode.SUCCESS, "App process finished, exiting SuperExec.")

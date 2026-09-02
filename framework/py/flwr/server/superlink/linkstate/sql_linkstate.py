@@ -61,6 +61,10 @@ from flwr.supercore.corestate.utils import timestamp_to_iso, validate_task_event
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.runtime_timing import (
+    complete_runtime_timing_tasks,
+    is_runtime_timing_logging_enabled,
+)
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
@@ -1171,6 +1175,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
         result = super().finish_task(task_id, sub_status, details)
+        timing_enabled = is_runtime_timing_logging_enabled()
         if result:
             sint64_task_id = uint64_to_int64(task_id)
             # Check whether this task is referenced as a run's primary task
@@ -1189,11 +1194,20 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 else:
                     finish_sub_status = SubStatus.FAILED
                     finish_details = "Task failed because the run finished"
-                self._finish_run_tasks(
+                cascade_finished_tasks = self._finish_run_tasks(
                     [(run_id, sint64_task_id)],
                     sub_status=finish_sub_status,
                     details=finish_details,
+                    collect_finished=timing_enabled,
                 )
+                if cascade_finished_tasks:
+                    complete_runtime_timing_tasks(
+                        state=self,
+                        tasks=cascade_finished_tasks,
+                        outcome=(
+                            "cancelled" if sub_status == SubStatus.STOPPED else "error"
+                        ),
+                    )
                 self.federation_manager.report_run_usage()
         return result
 

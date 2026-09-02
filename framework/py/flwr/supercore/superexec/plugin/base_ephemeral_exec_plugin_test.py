@@ -119,6 +119,26 @@ def test_launch_task_calls_cleanup_before_launch() -> None:
     assert call_log == ["cleanup", "subprocess"]
 
 
+def test_launch_task_kills_child_when_interrupted() -> None:
+    """An interrupted SuperExec must not leave its child running."""
+    plugin = _get_ephemeral_plugin()
+    process = MagicMock()
+    process.wait.side_effect = [SystemExit, None]
+
+    with (
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.Popen",
+            return_value=process,
+        ),
+        patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
+        pytest.raises(SystemExit),
+    ):
+        plugin.launch_task(token="token-123", task=_get_task(task_id=5))
+
+    process.kill.assert_called_once()
+    assert process.wait.call_count == 2
+
+
 def test_launch_task_forwards_timing_context_for_agent_tasks() -> None:
     """Ephemeral Agent launches should preserve timing correlation metadata."""
     plugin = _get_ephemeral_plugin()

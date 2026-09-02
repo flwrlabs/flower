@@ -91,10 +91,14 @@ def discard_runtime_task_lineage(*, run_id: int, task_id: int) -> None:
         _first_persisted_event_tasks.discard(key)
 
 
-def complete_expired_runtime_timing_tasks(
-    *, state: CoreState, tasks: list[Task]
+def complete_runtime_timing_tasks(
+    *,
+    state: CoreState,
+    tasks: list[Task],
+    outcome: RuntimeTimingOutcome,
+    error_kind: RuntimeTimingErrorKind | None = None,
 ) -> None:
-    """Record and discard timing state for tasks that expired while running."""
+    """Record and discard timing state for tasks finished outside runtime handlers."""
     for task in tasks:
         if not is_runtime_timing_task(task.type):
             continue
@@ -122,11 +126,23 @@ def complete_expired_runtime_timing_tasks(
                 parent_task_id=parent_task_id,
                 root_task_id=root_task_id,
                 task_type=task.type,
-                outcome="timeout",
-                error_kind="timeout",
+                outcome=outcome,
+                error_kind=error_kind,
             )
 
         discard_runtime_task_lineage(run_id=task.run_id, task_id=task.task_id)
+
+
+def complete_expired_runtime_timing_tasks(
+    *, state: CoreState, tasks: list[Task]
+) -> None:
+    """Record and discard timing state for tasks that expired while running."""
+    complete_runtime_timing_tasks(
+        state=state,
+        tasks=tasks,
+        outcome="timeout",
+        error_kind="timeout",
+    )
 
 
 def emit_runtime_timing(  # pylint: disable=too-many-arguments

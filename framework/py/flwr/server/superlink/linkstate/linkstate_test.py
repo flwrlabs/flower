@@ -862,6 +862,48 @@ class StateTest(CoreStateTest):
         assert model_markers[0].kwargs["outcome"] == "timeout"
         assert get_runtime_task_lineage(run_id=run_id, task_id=model_task_id) is None
 
+    def test_primary_completion_cleans_up_running_model_timing_state(self) -> None:
+        """A primary completion must also terminate active Model timing state."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state, primary_task_type=TaskType.AGENT_APP)
+        primary_task_id = get_primary_task_id(state, run_id)
+        model_task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=run_id,
+            parent_task_id=primary_task_id,
+            root_task_id=primary_task_id,
+        )
+        assert model_task_id is not None
+        register_runtime_task_lineage(
+            run_id=run_id,
+            task_id=model_task_id,
+            parent_task_id=primary_task_id,
+            root_task_id=primary_task_id,
+        )
+        assert state.claim_task(primary_task_id) is not None
+        assert state.activate_task(primary_task_id)
+        assert state.claim_task(model_task_id) is not None
+        assert state.activate_task(model_task_id)
+
+        with (
+            patch("flwr.supercore.runtime_timing.emit_runtime_timing") as emit_marker,
+            patch.dict(os.environ, {"FLWR_RUNTIME_TIMING_LOGGING": "1"}),
+        ):
+            assert state.finish_task(primary_task_id, SubStatus.COMPLETED, "")
+
+        emit_marker.assert_called_once_with(
+            "runtime.task.completed.persisted",
+            component="superlink",
+            run_id=run_id,
+            task_id=model_task_id,
+            parent_task_id=primary_task_id,
+            root_task_id=primary_task_id,
+            task_type=TaskType.MODEL,
+            outcome="error",
+            error_kind=None,
+        )
+        assert get_runtime_task_lineage(run_id=run_id, task_id=model_task_id) is None
+
     def test_get_message_ins_empty(self) -> None:
         """Validate that a new state has no input Messages."""
         # Prepare

@@ -48,6 +48,10 @@ from flwr.supercore.corestate.utils import validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.runtime_timing import (
+    complete_runtime_timing_tasks,
+    is_runtime_timing_logging_enabled,
+)
 from flwr.superlink.federation import FederationManager
 
 from .utils import (
@@ -864,6 +868,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
         result = super().finish_task(task_id, sub_status, details)
+        timing_enabled = is_runtime_timing_logging_enabled()
+        cascade_finished_tasks: list[Task] = []
         if result and self._is_primary_task(task_id):
             with self.lock_task_store:
                 task = self.task_store.get(task_id)
@@ -876,11 +882,18 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     else:
                         finish_sub_status = SubStatus.FAILED
                         finish_details = "Task failed because the run finished"
-                    self._finish_run_tasks(
+                    cascade_finished_tasks = self._finish_run_tasks(
                         [(task.run_id, task_id)],
                         sub_status=finish_sub_status,
                         details=finish_details,
+                        collect_finished=timing_enabled,
                     )
+            if cascade_finished_tasks:
+                complete_runtime_timing_tasks(
+                    state=self,
+                    tasks=cascade_finished_tasks,
+                    outcome="cancelled" if sub_status == SubStatus.STOPPED else "error",
+                )
             self.federation_manager.report_run_usage()
         return result
 
