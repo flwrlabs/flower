@@ -12,19 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===============================================================================
-"""Tests for the Flower CLI gRPC client interceptor."""
+"""Tests for the Flower CLI client interceptors."""
 
 from collections import namedtuple
 from unittest import TestCase
 from unittest.mock import Mock
 
 import grpc
+import httpx
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.proto.control_pb2 import ListRunsRequest  # pylint: disable=E0611
 from flwr.supercore.constant import FLWR_CLIENT_METADATA_KEY
+from flwr.supercore.protobuf.client import ProtobufRequestContext
 
-from .cli_client_interceptor import CliClientInterceptor
+from .cli_client_interceptor import CliClientHttpInterceptor, CliClientInterceptor
 
 _ClientCallDetails = namedtuple(
     "_ClientCallDetails",
@@ -96,3 +98,20 @@ class TestCliClientInterceptor(TestCase):
         )
 
         self.assertEqual(captured["metadata"], [(FLWR_CLIENT_METADATA_KEY, "cli")])
+
+
+def test_http_interceptor_adds_client_header() -> None:
+    """Identify every HTTP request as originating from the CLI."""
+    context = ProtobufRequestContext(
+        rpc_method="/flwr.proto.Control/ListRuns",
+        message=ListRunsRequest(),
+        request=httpx.Request("POST", "https://control.example"),
+    )
+    response = httpx.Response(200)
+    call_next = Mock(return_value=response)
+
+    result = CliClientHttpInterceptor().intercept(context, call_next)
+
+    assert result is response
+    assert context.request.headers[FLWR_CLIENT_METADATA_KEY] == "cli"
+    call_next.assert_called_once_with(context)
