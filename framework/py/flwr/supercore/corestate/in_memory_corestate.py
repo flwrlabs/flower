@@ -158,6 +158,7 @@ class InMemoryCoreState(
         self.lock_task_message_store = Lock()
         self.task_event_store: dict[int, list[TaskEvent]] = {}
         self.task_event_task_ids: set[int] = set()
+        self.task_event_types_by_task_id: dict[int, set[str]] = {}
         self.lock_task_event_store = Lock()
         self._next_task_event_id = 1
         self._object_push_sessions: dict[str, ObjectPushSession] = {}
@@ -1282,6 +1283,9 @@ class InMemoryCoreState(
                 event.timestamp = current
                 task_events.append(event)
                 self.task_event_task_ids.add(event.task_id)
+                self.task_event_types_by_task_id.setdefault(event.task_id, set()).add(
+                    event.event
+                )
                 self._next_task_event_id += 1
 
         return True
@@ -1292,10 +1296,9 @@ class InMemoryCoreState(
         """Return whether a task has a persisted event outside excluded types."""
         with self.lock_task_event_store:
             if excluded_event_types:
-                return any(
-                    event.task_id == task_id and event.event not in excluded_event_types
-                    for events in self.task_event_store.values()
-                    for event in events
+                return bool(
+                    self.task_event_types_by_task_id.get(task_id, set())
+                    - excluded_event_types
                 )
             return task_id in self.task_event_task_ids
 
