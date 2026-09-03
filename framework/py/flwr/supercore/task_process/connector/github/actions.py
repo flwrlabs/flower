@@ -12,49 +12,106 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""GitHub action definitions."""
+"""GitHub action definitions aligned with Open Connector."""
 
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ActionAccess, ActionDefinition
-from ..tool_schema import integer_property, string_property
 
-_REPOSITORY: JSONObject = {
-    "owner": string_property("GitHub organization or repository owner."),
-    "repo": string_property("Public GitHub repository name."),
+_USER_SUMMARY: JSONObject = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "login": {"type": "string"},
+        "avatar_url": {"type": "string"},
+        "html_url": {"type": "string"},
+        "type": {"type": "string"},
+    },
+    "additionalProperties": True,
+}
+_SEARCH_ITEM: JSONObject = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "path": {"type": "string"},
+        "sha": {"type": "string"},
+        "url": {"type": "string"},
+        "git_url": {"type": "string"},
+        "html_url": {"type": "string"},
+        "repository": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer"},
+                "full_name": {"type": "string"},
+                "html_url": {"type": "string"},
+                "owner": _USER_SUMMARY,
+            },
+            "additionalProperties": True,
+        },
+    },
+    "additionalProperties": True,
 }
 
 ACTIONS = (
     ActionDefinition(
         name="search_code",
-        description="Search code in one public GitHub repository.",
+        description="Search GitHub code with GitHub search syntax.",
         access=ActionAccess.READ,
         input_schema={
             "type": "object",
             "properties": {
-                **_REPOSITORY,
-                "query": string_property("Code search query without repo qualifier."),
-                "limit": integer_property(
-                    "Maximum number of matches to return.", minimum=1, maximum=10
-                ),
+                "query": {"type": "string", "minLength": 1},
+                "sort": {"type": "string", "enum": ["indexed", "updated"]},
+                "order": {"type": "string", "enum": ["asc", "desc"]},
+                "perPage": {"type": "integer"},
+                "page": {"type": "integer"},
             },
-            "required": ["owner", "repo", "query"],
+            "additionalProperties": False,
+            "required": ["query"],
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "total_count": {"type": "integer"},
+                "incomplete_results": {"type": "boolean"},
+                "items": {"type": "array", "items": _SEARCH_ITEM},
+            },
             "additionalProperties": False,
         },
     ),
     ActionDefinition(
-        name="get_file_content",
-        description="Read one UTF-8 text file from a public GitHub repository.",
+        name="get_file_contents",
+        description=(
+            "Read a repository file and return both base64 and decoded text when "
+            "available."
+        ),
         access=ActionAccess.READ,
         input_schema={
             "type": "object",
             "properties": {
-                **_REPOSITORY,
-                "path": string_property("Repository-relative path to the file."),
-                "ref": string_property("Optional branch, tag, or commit."),
+                "owner": {"type": "string", "minLength": 1},
+                "repo": {"type": "string", "minLength": 1},
+                "path": {"type": "string", "minLength": 1},
+                "ref": {"type": "string"},
             },
-            "required": ["owner", "repo", "path"],
             "additionalProperties": False,
+            "required": ["owner", "repo", "path"],
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "type": {"const": "file", "type": "string"},
+                "name": {"type": "string"},
+                "path": {"type": "string"},
+                "sha": {"type": "string"},
+                "size": {"type": "integer"},
+                "html_url": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                "download_url": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                "content_base64": {"type": "string"},
+                "decoded_content": {"type": "string"},
+                "encoding": {"type": "string"},
+            },
+            "additionalProperties": True,
         },
     ),
 )

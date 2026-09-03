@@ -42,6 +42,7 @@ class ActionDefinition:
     description: str
     access: ActionAccess
     input_schema: JSONObject
+    output_schema: JSONObject | None = None
 
     def tool_name(self, provider_ref: str) -> str:
         """Return the globally unique model-facing action name."""
