@@ -144,10 +144,30 @@ class TestInitFlwrConfig(unittest.TestCase):
             secho.assert_called_once()
             self.assertEqual(exc_info.exception.exit_code, 1)
             message = secho.call_args.args[0]
+            self.assertIn("SuperLink connection `supergrid`", message)
             self.assertIn("supergrid.flower.ai", message)
             self.assertIn("api.flower.ai", message)
             self.assertIn(expected_command, message)
             self.assertIn(str(config_path), message)
+
+    def test_init_flwr_config_ignores_old_address_outside_address_fields(self) -> None:
+        """Do not warn when the old address only appears outside its address field."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_path = Path(tmp_dir) / "config.toml"
+            config_path.write_text(
+                "# supergrid.flower.ai\n"
+                '[superlink.supergrid]\naddress = "api.flower.ai"\n'
+                'root-certificates = "supergrid.flower.ai"\n',
+                encoding="utf-8",
+            )
+
+            with (
+                patch.dict(os.environ, {FLWR_HOME: tmp_dir}),
+                patch("flwr.cli.flower_config.typer.secho") as secho,
+            ):
+                init_flwr_config()
+
+            secho.assert_not_called()
 
 
 class TestSuperLinkConnection(unittest.TestCase):

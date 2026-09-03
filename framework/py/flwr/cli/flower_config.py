@@ -51,18 +51,20 @@ from flwr.supercore.utils import get_flwr_home
 
 def _get_supergrid_address_update_command(config_path: Path) -> str:
     """Return a platform-appropriate command for updating the SuperGrid address."""
+    old_assignment = f'address = "{LEGACY_SUPERGRID_ADDRESS}"'
+    new_assignment = f'address = "{SUPERGRID_HTTP_ADDRESS}"'
     if platform.system() == "Windows":
         config_arg = str(config_path).replace("'", "''")
         return (
             f"$path = '{config_arg}'; "
             "[System.IO.File]::WriteAllText($path, "
             "[System.IO.File]::ReadAllText($path).Replace("
-            f"'{LEGACY_SUPERGRID_ADDRESS}', '{SUPERGRID_HTTP_ADDRESS}'))"
+            f"'{old_assignment}', '{new_assignment}'))"
         )
 
     return (
         "sed -i.bak "
-        f"'s/{re.escape(LEGACY_SUPERGRID_ADDRESS)}/{SUPERGRID_HTTP_ADDRESS}/g' "
+        f"'s/{re.escape(old_assignment)}/{new_assignment}/' "
         f"{shlex.quote(str(config_path))}"
     )
 
@@ -189,9 +191,32 @@ def init_flwr_config() -> None:
             f"\nFlower configuration not found. Created default configuration"
             f" at {config_path}\n",
         )
-    elif LEGACY_SUPERGRID_ADDRESS in config_path.read_text(encoding="utf-8"):
+    else:
+        try:
+            with config_path.open("rb") as file:
+                config = tomli.load(file)
+        except tomli.TOMLDecodeError:
+            return
+
+        superlinks = config.get(SuperLinkConnectionTomlKey.SUPERLINK)
+        if not isinstance(superlinks, dict):
+            return
+        legacy_connection = next(
+            (
+                name
+                for name, connection in superlinks.items()
+                if isinstance(connection, dict)
+                and connection.get(SuperLinkConnectionTomlKey.ADDRESS)
+                == LEGACY_SUPERGRID_ADDRESS
+            ),
+            None,
+        )
+        if legacy_connection is None:
+            return
+
         typer.secho(
-            "\n⚠️ The Flower configuration uses the old SuperGrid address "
+            f"\n⚠️ You are using SuperLink connection `{legacy_connection}`, which "
+            "uses the old SuperGrid address "
             f"`{LEGACY_SUPERGRID_ADDRESS}`. Update it to "
             f"`{SUPERGRID_HTTP_ADDRESS}` manually or by running:\n\n"
             f"{_get_supergrid_address_update_command(config_path)}\n",
