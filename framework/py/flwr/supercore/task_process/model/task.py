@@ -41,6 +41,9 @@ from flwr.supercore.utils import strict_json_dumps
 from .provider import ModelProviderError, invoke_model_provider
 
 _DEFAULT_TASK_EVENT_BATCH_SIZE = 16
+_TEXT_DELTA_EVENTS = frozenset(
+    {"response.output_text.delta", "response.reasoning_summary_text.delta"}
+)
 
 
 def handle_task(  # pylint: disable=too-many-locals,too-many-statements
@@ -93,6 +96,7 @@ def handle_task(  # pylint: disable=too-many-locals,too-many-statements
     first_provider_event_received = False
     first_event_flush_finished = False
     publisher_failed = False
+    first_text_event_flushed = False
 
     def _flush_events() -> None:
         """Push buffered stream events."""
@@ -145,7 +149,7 @@ def handle_task(  # pylint: disable=too-many-locals,too-many-statements
 
     def _buffer_event(event: JSONObject) -> None:
         """Buffer one Open Responses stream event."""
-        nonlocal first_provider_event_received
+        nonlocal first_provider_event_received, first_text_event_flushed
         if not is_stream:
             return
         if not first_provider_event_received:
@@ -162,7 +166,10 @@ def handle_task(  # pylint: disable=too-many-locals,too-many-statements
             )
         encoded = strict_json_dumps(event, compact=True)
         events.append(TaskEvent(event=cast(str, event["type"]), data=encoded))
-        if len(events) >= _DEFAULT_TASK_EVENT_BATCH_SIZE:
+        if event["type"] in _TEXT_DELTA_EVENTS and not first_text_event_flushed:
+            _flush_events()
+            first_text_event_flushed = True
+        elif len(events) >= _DEFAULT_TASK_EVENT_BATCH_SIZE:
             _flush_events()
 
     response: JSONObject | None = None
