@@ -50,8 +50,6 @@ from ..utils import (
     print_json_to_stdout,
 )
 
-CONN_REFRESH_PERIOD = 60  # Connection refresh period for log streaming (seconds)
-
 
 # pylint: disable-next=too-many-locals, too-many-branches, R0913, R0917
 def run(
@@ -238,7 +236,7 @@ def _run_with_control_api(
             print_json_to_stdout(payload)
 
         if stream:
-            start_stream(res.run_id, control_client, CONN_REFRESH_PERIOD)
+            start_stream(res.run_id, control_client)
     finally:
         if control_client:
             control_client.close()

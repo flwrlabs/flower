@@ -21,11 +21,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListFederationsRequest,
     ListFederationsResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
 
 from ..utils import (
     flwr_cli_exc_handler,
-    init_channel_from_connection,
+    init_http_client_from_connection,
     load_cli_auth_plugin_from_connection,
 )
 from .chat_app import ChatApplication
@@ -38,14 +37,13 @@ def chat() -> None:
     if superlink_connection.address is None:
         raise ValueError("The SuperGrid connection has no address.")
     auth_plugin = load_cli_auth_plugin_from_connection(superlink_connection.address)
-    channel = init_channel_from_connection(superlink_connection, auth_plugin)
-    stub = ControlStub(channel)
+    control_client = init_http_client_from_connection(superlink_connection, auth_plugin)
     try:
         # Verify stored credentials before showing the interactive prompt.
         with flwr_cli_exc_handler():
-            response: ListFederationsResponse = stub.ListFederations(
+            response: ListFederationsResponse = control_client.ListFederations(
                 ListFederationsRequest()
             )
-        ChatApplication(stub, list(response.federations), auth_plugin).run()
+        ChatApplication(control_client, list(response.federations), auth_plugin).run()
     finally:
-        channel.close()
+        control_client.close()

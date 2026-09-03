@@ -89,9 +89,7 @@ def create(  # pylint: disable=R0914, R0913, R0917, R0912
                 description=description if description else "",
                 simulation=simulation,
             )
-            _create_federation(
-                stub=control_client, request=request, is_json=is_json
-            )
+            _create_federation(stub=control_client, request=request, is_json=is_json)
 
         finally:
             if control_client:
