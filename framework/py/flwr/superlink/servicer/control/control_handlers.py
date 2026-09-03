@@ -23,8 +23,10 @@ import secrets
 import time
 from collections.abc import Callable, Generator, Sequence
 from datetime import UTC, datetime, timedelta
-from logging import ERROR, INFO
+from logging import ERROR, INFO, WARNING
+from threading import Lock, Thread
 from typing import Any, cast
+from weakref import WeakKeyDictionary
 
 import requests
 
@@ -178,6 +180,17 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
 from flwr.superlink.run_source import RunSource
+
+
+HUB_APP_REFRESH_INTERVAL = 5 * 60
+
+_hub_app_refresh_lock = Lock()
+_hub_app_refresh_after: WeakKeyDictionary[LinkState, dict[tuple[str, str], float]] = (
+    WeakKeyDictionary()
+)
+_hub_app_refreshing: WeakKeyDictionary[LinkState, set[tuple[str, str]]] = (
+    WeakKeyDictionary()
+)
 
 
 class InvalidConnectorRequestError(FlowerError):
@@ -472,6 +485,26 @@ def validate_run_connector_refs(
     return canonical_refs
 
 
+<<<<<<< Updated upstream
+=======
+def _get_cached_hub_fab(
+    state: LinkState, federation_id: str, app_id: str
+) -> Fab | None:
+    """Return the locally cached FAB for a federation-associated Hub app."""
+    app = next(
+        (
+            item
+            for item in state.list_apps(federation_id)
+            if item.app_id == app_id and item.HasField("is_hub_app") and item.is_hub_app
+        ),
+        None,
+    )
+    if app is None or not app.fab_hash:
+        return None
+    return state.get_fab(app.fab_hash)
+
+
+>>>>>>> Stashed changes
 def _get_hub_app_id(
     state: LinkState, federation_id: str, request: StartRunRequest
 ) -> str | None:
@@ -498,6 +531,78 @@ def _get_hub_app_id(
     return None
 
 
+<<<<<<< Updated upstream
+=======
+def _mark_hub_app_fresh(state: LinkState, federation_id: str, app_id: str) -> None:
+    """Delay the next background refresh for a Hub app."""
+    key = (federation_id, app_id)
+    with _hub_app_refresh_lock:
+        refresh_after = _hub_app_refresh_after.setdefault(state, {})
+        refresh_after[key] = time.monotonic() + HUB_APP_REFRESH_INTERVAL
+
+
+def _refresh_hub_app(
+    state: LinkState,
+    federation_id: str,
+    app_id: str,
+    added_by: str,
+    fleet_api_type: str | None,
+) -> None:
+    """Refresh one cached Hub app without blocking run creation."""
+    key = (federation_id, app_id)
+    try:
+        fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, app_id)
+        fab_config = get_fab_config(fab_file)
+        fab_id, _ = get_metadata_from_config(fab_config)
+        if f"@{fab_id}" != app_id:
+            raise ValueError("Downloaded FAB ID does not match the Hub app ID")
+        state.store_app(
+            fab=Fab(
+                hash_str=hashlib.sha256(fab_file).hexdigest(),
+                content=fab_file,
+                verifications=verification_dict,
+            ),
+            federation_id=federation_id,
+            app_id=app_id,
+            app_type=_get_app_type(fab_config),
+            added_by=added_by,
+            is_hub_app=True,
+        )
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        # A refresh failure must not invalidate the last known-good cached FAB.
+        log(WARNING, "Failed to refresh Hub app %s: %s", app_id, exc)
+    finally:
+        with _hub_app_refresh_lock:
+            _hub_app_refreshing.setdefault(state, set()).discard(key)
+
+
+def _start_hub_app_refresh(
+    state: LinkState,
+    federation_id: str,
+    app_id: str,
+    added_by: str,
+    fleet_api_type: str | None,
+) -> None:
+    """Start a stale Hub app refresh at most once per refresh interval."""
+    key = (federation_id, app_id)
+    current_time = time.monotonic()
+    with _hub_app_refresh_lock:
+        refresh_after = _hub_app_refresh_after.setdefault(state, {})
+        refreshing = _hub_app_refreshing.setdefault(state, set())
+        if key in refreshing or current_time < refresh_after.get(key, 0):
+            return
+        refreshing.add(key)
+        refresh_after[key] = current_time + HUB_APP_REFRESH_INTERVAL
+
+    Thread(
+        target=_refresh_hub_app,
+        args=(state, federation_id, app_id, added_by, fleet_api_type),
+        daemon=True,
+        name=f"hub-app-refresh-{app_id}",
+    ).start()
+
+
+>>>>>>> Stashed changes
 def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
@@ -535,16 +640,23 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     verification_dict: dict[str, str] = {}
     note: str | None = None
     app_id = None
+    app_version = None
     if request.app_spec:
         try:
-            app_id, _ = parse_app_spec(request.app_spec)
+            app_id, app_version = parse_app_spec(request.app_spec)
         except ValueError as e:
             raise FlowerError(
                 ApiErrorCode.INVALID_APP_SPEC,
                 f"Invalid app specification: {request.app_spec}",
             ) from e
     is_stored_app = bool(request.fab.hash_str and not request.fab.content)
+    cached_hub_fab = (
+        _get_cached_hub_fab(state, federation_id, app_id)
+        if app_id is not None and app_version is None and not is_stored_app
+        else None
+    )
     is_hub_app = False
+    is_cached_hub_app = False
 
     # Start a run using a stored app
     if is_stored_app:
@@ -565,7 +677,21 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             )
         fab_file = stored_fab.content
         verification_dict = stored_fab.verifications
-    # Start a run using a remote app
+    # Start an unversioned Hub app from the local cache and refresh it without
+    # blocking this run.
+    elif cached_hub_fab is not None:
+        fab_file = cached_hub_fab.content
+        verification_dict = cached_hub_fab.verifications
+        is_hub_app = True
+        is_cached_hub_app = True
+        _start_hub_app_refresh(
+            state,
+            federation_id,
+            cast(str, app_id),
+            flwr_aid,
+            fleet_api_type,
+        )
+    # Download a Hub app only when it is not locally cached or is version-pinned.
     elif request.app_spec:
         fab_file, verification_dict, note = _get_remote_fab(
             fleet_api_type, request.app_spec
@@ -640,7 +766,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 "Stored app ID does not match the request",
             )
 
-        if not is_stored_app:
+        if not is_stored_app and not is_cached_hub_app:
             state.store_app(
                 fab=fab,
                 federation_id=federation_id,
@@ -649,6 +775,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 added_by=flwr_aid,
                 is_hub_app=is_hub_app,
             )
+            if is_hub_app and app_version is None:
+                _mark_hub_app_fresh(state, federation_id, app_id)
 
         series_id = request.series_id if request.HasField("series_id") else None
         series_description: str | None = None
@@ -950,8 +1078,12 @@ def start_automation(  # pylint: disable=too-many-branches,too-many-locals
     stored_start_run_request.federation = federation_id
     app_id = _get_hub_app_id(state, federation_id, stored_start_run_request)
     if app_id is not None:
+<<<<<<< Updated upstream
         # Store Hub automations by unversioned app ID. Each dispatch then resolves
         # the latest compatible version instead of pinning the current run's FAB.
+=======
+        # Resolve the current locally cached FAB when each occurrence starts.
+>>>>>>> Stashed changes
         stored_start_run_request.app_spec = app_id
         stored_start_run_request.ClearField("fab")
 
@@ -1564,6 +1696,7 @@ def add_app(
         added_by=account.flwr_aid,
         is_hub_app=True,
     )
+    _mark_hub_app_fresh(state, federation_id, request.app_id)
 
     return AddAppResponse()
 
