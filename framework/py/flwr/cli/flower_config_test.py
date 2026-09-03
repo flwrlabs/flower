@@ -84,9 +84,7 @@ class TestInitFlwrConfig(unittest.TestCase):
         # 3. Check [superlink.supergrid]
         self.assertIn("supergrid", superlink)
         supergrid = superlink["supergrid"]
-        self.assertEqual(
-            supergrid[SuperLinkConnectionTomlKey.ADDRESS], "supergrid.flower.ai"
-        )
+        self.assertEqual(supergrid[SuperLinkConnectionTomlKey.ADDRESS], "api.flower.ai")
 
         # 4. Check [superlink.local]
         self.assertIn("local", superlink)

@@ -56,6 +56,7 @@ from .utils import (
     AppPathDepthError,
     _format_flower_error,
     build_pathspec,
+    cli_output_control_client,
     cli_output_handler,
     collect_files,
     depth_of,
@@ -329,6 +330,31 @@ def test_init_http_client_from_connection_uses_resolved_connection() -> None:
     )
     assert credentials.access_token == "new-access-token"
     assert credentials.refresh_token == "new-refresh-token"
+
+
+def test_cli_output_control_client_closes_client() -> None:
+    """Close the HTTP client after a CLI output command completes."""
+    connection = Mock()
+    control_client = Mock()
+
+    with (
+        patch("flwr.cli.utils.cli_output_handler") as output_handler,
+        patch(
+            "flwr.cli.utils.read_superlink_connection", return_value=connection
+        ) as read_connection,
+        patch(
+            "flwr.cli.utils.init_http_client_from_connection",
+            return_value=control_client,
+        ) as init_client,
+    ):
+        output_handler.return_value.__enter__.return_value = True
+        with cli_output_control_client("remote", "json") as result:
+            assert result == (control_client, True)
+
+    output_handler.assert_called_once_with(output_format="json")
+    read_connection.assert_called_once_with("remote")
+    init_client.assert_called_once_with(connection)
+    control_client.close.assert_called_once_with()
 
 
 @pytest.mark.parametrize(

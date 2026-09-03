@@ -20,7 +20,7 @@ from typing import Annotated, Literal
 import typer
 
 from flwr.cli.utils import (
-    cli_output_control_stub,
+    cli_output_control_client,
     flwr_cli_exc_handler,
     print_json_to_stdout,
 )
@@ -29,7 +29,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RevokeInvitationRequest,
     RevokeInvitationResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.control import ControlHttpClient
 
 
 def revoke(
@@ -57,7 +57,7 @@ def revoke(
     ] = CliOutputFormat.DEFAULT,
 ) -> None:
     """Revoke a pending invitation."""
-    with cli_output_control_stub(superlink, output_format) as (stub, is_json):
+    with cli_output_control_client(superlink, output_format) as (stub, is_json):
         request = RevokeInvitationRequest(
             invitee_account_name=account,
             federation_name=federation,
@@ -66,7 +66,7 @@ def revoke(
 
 
 def _revoke_invitation(
-    stub: ControlStub,
+    stub: ControlHttpClient,
     request: RevokeInvitationRequest,
     is_json: bool,
 ) -> None:

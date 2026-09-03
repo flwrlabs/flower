@@ -25,12 +25,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddNodeToFederationRequest,
     AddNodeToFederationResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.control import ControlHttpClient
 
 from ..utils import (
     cli_output_handler,
     flwr_cli_exc_handler,
-    init_channel_from_connection,
+    init_http_client_from_connection,
     print_json_to_stdout,
 )
 
@@ -65,25 +65,24 @@ def add_supernode(
 
         # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
-        channel = None
+        control_client = None
 
         try:
-            channel = init_channel_from_connection(superlink_connection)
-            stub = ControlStub(channel)
+            control_client = init_http_client_from_connection(superlink_connection)
 
             request = AddNodeToFederationRequest(
                 federation_name=federation,
                 node_id=node_id,
             )
-            _add_supernode(stub=stub, request=request, is_json=is_json)
+            _add_supernode(stub=control_client, request=request, is_json=is_json)
 
         finally:
-            if channel:
-                channel.close()
+            if control_client:
+                control_client.close()
 
 
 def _add_supernode(  # pylint: disable=W0613
-    stub: ControlStub,
+    stub: ControlHttpClient,
     request: AddNodeToFederationRequest,
     is_json: bool,
 ) -> None:
