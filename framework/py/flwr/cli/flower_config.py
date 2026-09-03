@@ -16,6 +16,7 @@
 
 
 import re
+import sys
 from pathlib import Path
 from typing import Any, cast
 
@@ -27,6 +28,8 @@ import typer
 from flwr.cli.constant import (
     DEFAULT_FLOWER_CONFIG_TOML,
     FLOWER_CONFIG_FILE,
+    LEGACY_SUPERGRID_ADDRESS,
+    SUPERGRID_HTTP_ADDRESS,
     SimulationBackendConfigTomlKey,
     SimulationClientResourcesTomlKey,
     SimulationInitArgsTomlKey,
@@ -296,8 +299,37 @@ def read_superlink_connection(
             raise click.ClickException(msg)
 
         conn_dict = superlink_config[connection_name]
+        if (
+            isinstance(conn_dict, dict)
+            and conn_dict.get(SuperLinkConnectionTomlKey.ADDRESS)
+            == LEGACY_SUPERGRID_ADDRESS
+        ):
+            config_path = config_path.resolve()
+            typer.secho(
+                f"\n⚠️ You are using SuperLink connection `{connection_name}`, which "
+                "uses the old SuperGrid address "
+                f"`{LEGACY_SUPERGRID_ADDRESS}`.\n\n"
+                f"To update it manually, open `{config_path}`, find `address` under "
+                f"the `[superlink.{connection_name}]` section, and replace "
+                f"`{LEGACY_SUPERGRID_ADDRESS}` with `{SUPERGRID_HTTP_ADDRESS}`.\n",
+                fg=typer.colors.YELLOW,
+            )
+            if (
+                sys.stdin.isatty()
+                and sys.stdout.isatty()
+                and typer.confirm(f"Do you want me to update `{config_path}` now?")
+            ):
+                conn_dict[SuperLinkConnectionTomlKey.ADDRESS] = SUPERGRID_HTTP_ADDRESS
+                write_flower_config(toml_dict)
+                typer.secho(
+                    f"Updated `{config_path}`. Please run the command again.",
+                    fg=typer.colors.GREEN,
+                )
+            raise typer.Exit(code=1)
         return parse_superlink_connection(conn_dict, connection_name)
 
+    except typer.Exit:
+        raise
     except ValueError as err:
         raise click.ClickException(
             f"Failed to parse the Flower configuration file ({config_path}). {err}"

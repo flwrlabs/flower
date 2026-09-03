@@ -27,6 +27,7 @@ import click
 import grpc
 import httpx
 import pytest
+import typer
 from parameterized import parameterized
 
 from flwr.cli.constant import (
@@ -35,7 +36,7 @@ from flwr.cli.constant import (
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
 )
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
-from flwr.common.constant import FLWR_DIR
+from flwr.common.constant import FLWR_DIR, CliOutputFormat
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RefreshAuthTokensRequest,
     RefreshAuthTokensResponse,
@@ -458,6 +459,15 @@ def test_cli_output_handler_raises_click_exception_for_json_error() -> None:
             raise click.ClickException('{"message": "request failed", "code": 400}')
 
     assert exc_info.value.message == '{"message": "request failed", "code": 400}'
+
+
+def test_cli_output_handler_preserves_json_exit_code() -> None:
+    """cli_output_handler preserves a nonzero exit code for JSON output."""
+    with pytest.raises(typer.Exit) as exc_info:
+        with cli_output_handler(output_format=CliOutputFormat.JSON):
+            raise typer.Exit(code=1)
+
+    assert exc_info.value.exit_code == 1
 
 
 @pytest.mark.parametrize(
