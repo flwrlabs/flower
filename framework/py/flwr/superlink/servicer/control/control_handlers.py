@@ -554,15 +554,18 @@ def _refresh_hub_app(
     try:
         fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, app_id)
         _validate_hub_fab(fab_file, app_id)
-        state.update_hub_app(
-            fab=Fab(
+        fab_hash = state.store_fab(
+            Fab(
                 hash_str=hashlib.sha256(fab_file).hexdigest(),
                 content=fab_file,
                 verifications=verification_dict,
-            ),
+            )
+        )
+        state.update_hub_app(
             federation_id=federation_id,
             app_id=app_id,
             expected_fab_hash=expected_fab_hash,
+            fab_hash=fab_hash,
         )
     except Exception as exc:  # pylint: disable=broad-exception-caught
         # A refresh failure must not invalidate the last known-good cached FAB.

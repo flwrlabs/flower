@@ -170,51 +170,31 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_update_hub_app_requires_unchanged_association(self) -> None:
         """Update only the Hub app association observed before a refresh."""
         state = self.state_factory()
-        current_hash = state.store_app(
-            Fab("", b"current", {}),
-            "@me/fed",
-            "@me/app",
-            TaskType.AGENT_APP,
-            "account-a",
-            is_hub_app=True,
-        )
-        refreshed_fab = Fab("", b"refreshed", {})
 
+        def store_hub_app(content: bytes) -> str:
+            return state.store_app(
+                Fab("", content, {}),
+                "@me/fed",
+                "@me/app",
+                TaskType.AGENT_APP,
+                "account-a",
+                is_hub_app=True,
+            )
+
+        current_hash = store_hub_app(b"current")
+        refreshed_hash = state.store_fab(Fab("", b"refreshed", {}))
         self.assertTrue(
-            state.update_hub_app(
-                refreshed_fab,
-                "@me/fed",
-                "@me/app",
-                current_hash,
-            )
+            state.update_hub_app("@me/fed", "@me/app", current_hash, refreshed_hash)
         )
-        refreshed_hash = state.list_apps("@me/fed")[0].fab_hash
-        replacement_hash = state.store_app(
-            Fab("", b"replacement", {}),
-            "@me/fed",
-            "@me/app",
-            TaskType.AGENT_APP,
-            "account-a",
-            is_hub_app=True,
-        )
-        stale_fab = Fab("", b"stale refresh", {})
+        replacement_hash = store_hub_app(b"replacement")
+        stale_hash = state.store_fab(Fab("", b"stale refresh", {}))
         self.assertFalse(
-            state.update_hub_app(
-                stale_fab,
-                "@me/fed",
-                "@me/app",
-                refreshed_hash,
-            )
+            state.update_hub_app("@me/fed", "@me/app", refreshed_hash, stale_hash)
         )
         self.assertEqual(state.list_apps("@me/fed")[0].fab_hash, replacement_hash)
         self.assertTrue(state.delete_app("@me/fed", "@me/app"))
         self.assertFalse(
-            state.update_hub_app(
-                stale_fab,
-                "@me/fed",
-                "@me/app",
-                replacement_hash,
-            )
+            state.update_hub_app("@me/fed", "@me/app", replacement_hash, stale_hash)
         )
 
     def test_connector_upsert_get_and_delete(self) -> None:

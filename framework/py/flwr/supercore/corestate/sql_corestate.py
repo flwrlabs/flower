@@ -418,37 +418,42 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab,
+        fab: Fab | None,
         federation_id: str,
         app_id: str,
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
     ) -> str:
-        """Store a FAB and associate its app with a federation."""
+        """Store an optional FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
             raise ValueError(
                 "Federation ID, app ID, app type, and added by are required"
             )
-        fab_hash = hashlib.sha256(fab.content).hexdigest()
-        if fab.hash_str and fab.hash_str != fab_hash:
-            raise ValueError(
-                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+        if fab is None and not is_hub_app:
+            raise ValueError("A FAB is required for custom apps")
+        fab_hash = None
+        fab_stmt = None
+        if fab is not None:
+            fab_hash = hashlib.sha256(fab.content).hexdigest()
+            if fab.hash_str and fab.hash_str != fab_hash:
+                raise ValueError(
+                    f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+                )
+            # Keep launch behavior: last write wins for metadata under the same
+            # content hash.
+            fab_stmt = self.dialect_insert(FabModel).values(
+                fab_hash=fab_hash,
+                content=fab.content,
+                verifications=json.dumps(fab.verifications),
             )
-        # Keep launch behavior: last write wins for metadata under the same
-        # content hash.
-        fab_stmt = self.dialect_insert(FabModel).values(
-            fab_hash=fab_hash,
-            content=fab.content,
-            verifications=json.dumps(fab.verifications),
-        )
-        fab_stmt = fab_stmt.on_conflict_do_update(
-            index_elements=[FabModel.fab_hash],
-            set_={
-                "content": fab_stmt.excluded.content,
-                "verifications": fab_stmt.excluded.verifications,
-            },
-        )
+            fab_stmt = fab_stmt.on_conflict_do_update(
+                index_elements=[FabModel.fab_hash],
+                set_={
+                    "content": fab_stmt.excluded.content,
+                    "verifications": fab_stmt.excluded.verifications,
+                },
+            )
         app_stmt = self.dialect_insert(FederationAppModel).values(
             federation_id=federation_id,
             app_id=app_id,
@@ -470,23 +475,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             },
         )
         with self.session() as session:
-            session.execute(fab_stmt)
+            if fab_stmt is not None:
+                session.execute(fab_stmt)
             session.execute(app_stmt)
-        return fab_hash
+        return fab_hash or ""
 
     def update_hub_app(
         self,
-        fab: Fab,
         federation_id: str,
         app_id: str,
         expected_fab_hash: str,
+        fab_hash: str,
     ) -> bool:
         """Update a Hub app only if it still points to the expected FAB."""
-        fab_hash = hashlib.sha256(fab.content).hexdigest()
-        if fab.hash_str and fab.hash_str != fab_hash:
-            raise ValueError(
-                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
-            )
         app_stmt = (
             update(FederationAppModel)
             .where(
@@ -494,27 +495,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 FederationAppModel.app_id == app_id,
                 FederationAppModel.is_hub_app.is_(True),
                 FederationAppModel.fab_hash == expected_fab_hash,
+                exists().where(FabModel.fab_hash == fab_hash),
             )
             .values(fab_hash=fab_hash)
             .returning(FederationAppModel.app_id)
         )
-        fab_stmt = self.dialect_insert(FabModel).values(
-            fab_hash=fab_hash,
-            content=fab.content,
-            verifications=json.dumps(fab.verifications),
-        )
-        fab_stmt = fab_stmt.on_conflict_do_update(
-            index_elements=[FabModel.fab_hash],
-            set_={
-                "content": fab_stmt.excluded.content,
-                "verifications": fab_stmt.excluded.verifications,
-            },
-        )
         with self.session() as session:
-            if session.scalar(app_stmt) is None:
-                return False
-            session.execute(fab_stmt)
-        return True
+            return session.scalar(app_stmt) is not None
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
