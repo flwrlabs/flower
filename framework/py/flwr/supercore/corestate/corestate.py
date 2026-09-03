@@ -120,14 +120,14 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab | None,
+        fab: Fab,
         federation_id: str,
         app_id: str,
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
     ) -> str:
-        """Store an optional FAB and associate its app with a federation.
+        """Store a FAB and associate its app with a federation.
 
         A federation has at most one association for each app ID. Storing the app
         again updates its FAB hash and type while preserving when and by whom it was
@@ -135,9 +135,8 @@ class CoreState(ABC):  # pylint: disable=R0904
 
         Parameters
         ----------
-        fab : Fab | None
-            FAB content and verification metadata to store. Required for custom
-            apps and optional for Hub apps.
+        fab : Fab
+            FAB content and verification metadata to store.
         federation_id : str
             ID of the federation to associate with the app.
         app_id : str
@@ -152,8 +151,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         Returns
         -------
         str
-            Canonical SHA-256 hash of the stored FAB, or an empty string when no
-            FAB was provided.
+            Canonical SHA-256 hash of the stored FAB.
         """
 
     @abstractmethod

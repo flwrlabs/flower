@@ -418,42 +418,37 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab | None,
+        fab: Fab,
         federation_id: str,
         app_id: str,
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
     ) -> str:
-        """Store an optional FAB and associate its app with a federation."""
+        """Store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
             raise ValueError(
                 "Federation ID, app ID, app type, and added by are required"
             )
-        if fab is None and not is_hub_app:
-            raise ValueError("A FAB is required for custom apps")
-        fab_hash = None
-        fab_stmt = None
-        if fab is not None:
-            fab_hash = hashlib.sha256(fab.content).hexdigest()
-            if fab.hash_str and fab.hash_str != fab_hash:
-                raise ValueError(
-                    f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
-                )
-            # Keep launch behavior: last write wins for metadata under the same
-            # content hash.
-            fab_stmt = self.dialect_insert(FabModel).values(
-                fab_hash=fab_hash,
-                content=fab.content,
-                verifications=json.dumps(fab.verifications),
+        fab_hash = hashlib.sha256(fab.content).hexdigest()
+        if fab.hash_str and fab.hash_str != fab_hash:
+            raise ValueError(
+                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
             )
-            fab_stmt = fab_stmt.on_conflict_do_update(
-                index_elements=[FabModel.fab_hash],
-                set_={
-                    "content": fab_stmt.excluded.content,
-                    "verifications": fab_stmt.excluded.verifications,
-                },
-            )
+        # Keep launch behavior: last write wins for metadata under the same
+        # content hash.
+        fab_stmt = self.dialect_insert(FabModel).values(
+            fab_hash=fab_hash,
+            content=fab.content,
+            verifications=json.dumps(fab.verifications),
+        )
+        fab_stmt = fab_stmt.on_conflict_do_update(
+            index_elements=[FabModel.fab_hash],
+            set_={
+                "content": fab_stmt.excluded.content,
+                "verifications": fab_stmt.excluded.verifications,
+            },
+        )
         app_stmt = self.dialect_insert(FederationAppModel).values(
             federation_id=federation_id,
             app_id=app_id,
@@ -475,10 +470,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             },
         )
         with self.session() as session:
-            if fab_stmt is not None:
-                session.execute(fab_stmt)
+            session.execute(fab_stmt)
             session.execute(app_stmt)
-        return fab_hash or ""
+        return fab_hash
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
