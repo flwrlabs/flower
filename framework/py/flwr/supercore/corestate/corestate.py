@@ -120,23 +120,24 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab,
+        fab: Fab | None,
         federation_id: str,
         app_id: str,
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
     ) -> str:
-        """Atomically store a FAB and associate its app with a federation.
+        """Store an optional FAB and associate its app with a federation.
 
         A federation has at most one association for each app ID. Storing the app
-        again updates its FAB hash and type while preserving when and by whom it was
-        first added.
+        again updates its FAB hash, when applicable, and type while preserving when
+        and by whom it was first added.
 
         Parameters
         ----------
-        fab : Fab
-            FAB content and verification metadata to store.
+        fab : Fab | None
+            FAB content and verification metadata to store. Required for custom
+            apps and optional for Hub apps.
         federation_id : str
             ID of the federation to associate with the app.
         app_id : str
@@ -146,12 +147,14 @@ class CoreState(ABC):  # pylint: disable=R0904
         added_by : str
             ID of the account adding the app to the federation.
         is_hub_app : bool, default=False
-            Whether the app was fetched from Flower Hub.
+            Whether the app was fetched from Flower Hub. Hub app associations do
+            not retain a FAB hash so future runs resolve the latest version.
 
         Returns
         -------
         str
-            Canonical SHA-256 hash of the stored FAB.
+            Canonical SHA-256 hash of the stored FAB, or an empty string when no
+            FAB was provided.
         """
 
     @abstractmethod
