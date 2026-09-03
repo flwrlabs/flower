@@ -51,13 +51,13 @@ flwr new @flwrlabs/numpy-ci
 cd numpy-ci
 
 # Modify the config file
-printf '\n[tool.flwr.federations.e2e]\naddress = "127.0.0.1:9093"\ninsecure = true\n' >> pyproject.toml
+printf '\n[tool.flwr.federations.e2e]\naddress = "127.0.0.1:8000"\ninsecure = true\n' >> pyproject.toml
 
 # Start the SuperLink and wait until its control API is ready.
 flower-superlink --insecure &
 sl_pid=$!
 background_pids+=("$sl_pid")
-wait_for_port "$sl_pid" 9092 "SuperLink"
+wait_for_port "$sl_pid" 8000 "SuperLink"
 
 # Start two SuperNodes and wait until their ClientApp APIs are ready.
 flower-supernode --insecure --superlink 127.0.0.1:9092 \

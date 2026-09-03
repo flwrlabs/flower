@@ -27,6 +27,7 @@ import click
 import grpc
 import httpx
 import pytest
+import typer
 from parameterized import parameterized
 
 from flwr.cli.constant import (
@@ -35,7 +36,7 @@ from flwr.cli.constant import (
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
 )
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
-from flwr.common.constant import FLWR_DIR
+from flwr.common.constant import FLWR_DIR, CliOutputFormat
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RefreshAuthTokensRequest,
     RefreshAuthTokensResponse,
@@ -56,6 +57,7 @@ from .utils import (
     AppPathDepthError,
     _format_flower_error,
     build_pathspec,
+    cli_output_control_client,
     cli_output_handler,
     collect_files,
     depth_of,
@@ -331,6 +333,31 @@ def test_init_http_client_from_connection_uses_resolved_connection() -> None:
     assert credentials.refresh_token == "new-refresh-token"
 
 
+def test_cli_output_control_client_closes_client() -> None:
+    """Close the HTTP client after a CLI output command completes."""
+    connection = Mock()
+    control_client = Mock()
+
+    with (
+        patch("flwr.cli.utils.cli_output_handler") as output_handler,
+        patch(
+            "flwr.cli.utils.read_superlink_connection", return_value=connection
+        ) as read_connection,
+        patch(
+            "flwr.cli.utils.init_http_client_from_connection",
+            return_value=control_client,
+        ) as init_client,
+    ):
+        output_handler.return_value.__enter__.return_value = True
+        with cli_output_control_client("remote", "json") as result:
+            assert result == (control_client, True)
+
+    output_handler.assert_called_once_with(output_format="json")
+    read_connection.assert_called_once_with("remote")
+    init_client.assert_called_once_with(connection)
+    control_client.close.assert_called_once_with()
+
+
 @pytest.mark.parametrize(
     "transport_error",
     [
@@ -432,6 +459,15 @@ def test_cli_output_handler_raises_click_exception_for_json_error() -> None:
             raise click.ClickException('{"message": "request failed", "code": 400}')
 
     assert exc_info.value.message == '{"message": "request failed", "code": 400}'
+
+
+def test_cli_output_handler_preserves_json_exit_code() -> None:
+    """cli_output_handler preserves a nonzero exit code for JSON output."""
+    with pytest.raises(typer.Exit) as exc_info:
+        with cli_output_handler(output_format=CliOutputFormat.JSON):
+            raise typer.Exit(code=1)
+
+    assert exc_info.value.exit_code == 1
 
 
 @pytest.mark.parametrize(

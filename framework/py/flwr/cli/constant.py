@@ -17,8 +17,6 @@
 
 import os
 
-from flwr.supercore.constant import SUPERGRID_ADDRESS
-
 # General help message for config overrides
 CONFIG_HELP_MESSAGE = (
     "Override {0} values using one of the following formats:\n\n"
@@ -164,13 +162,15 @@ CONTROL_API_PROBE_INTERVAL = 0.2
 
 # CLI connection configuration file name
 FLOWER_CONFIG_FILE = "config.toml"
+LEGACY_SUPERGRID_ADDRESS = "supergrid.flower.ai"
+SUPERGRID_HTTP_ADDRESS = "api.flower.ai"
 
 # The default configuration for the Flower config file
 DEFAULT_FLOWER_CONFIG_TOML = f"""[superlink]
 default = "local"
 
 [superlink.supergrid]
-address = "{SUPERGRID_ADDRESS}"
+address = "{SUPERGRID_HTTP_ADDRESS}"
 
 [superlink.local]
 address = "{LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE}"
