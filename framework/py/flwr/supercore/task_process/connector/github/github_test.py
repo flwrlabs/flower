@@ -35,7 +35,7 @@ def _response(payload: object, status_code: int = 200) -> Mock:
     return response
 
 
-def test_get_file_contents_decodes_utf8() -> None:
+def test_get_file_content_decodes_utf8() -> None:
     """File reads should decode GitHub's Base64 content."""
     response = _response(
         {
@@ -47,41 +47,14 @@ def test_get_file_contents_decodes_utf8() -> None:
     )
     with patch(_HTTP_REQUEST, return_value=response):
         result = registry.invoke_connector(
-            "github_get_file_contents",
+            "github_get_file_content",
             {"owner": "acme", "repo": "repo", "path": "src/app.py"},
             Mock(),
             {"access_token": "secret"},
             {},
         )
     assert isinstance(result, dict)
-    assert result["decoded_content"] == 'print("hi")\n'
-    assert result["content_base64"] == response.json.return_value["content"]
-
-
-def test_search_code_forwards_open_connector_arguments() -> None:
-    """Code search should forward the Open Connector search controls."""
-    response = _response({"total_count": 0, "incomplete_results": False, "items": []})
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        registry.invoke_connector(
-            "github_search_code",
-            {
-                "query": "repo:flower/framework language:python",
-                "sort": "indexed",
-                "order": "desc",
-                "perPage": 20,
-                "page": 2,
-            },
-            Mock(),
-            {"access_token": "secret"},
-            {},
-        )
-    assert request.call_args.kwargs["params"] == {
-        "q": "repo:flower/framework language:python",
-        "sort": "indexed",
-        "order": "desc",
-        "per_page": "20",
-        "page": "2",
-    }
+    assert result["content"] == 'print("hi")\n'
 
 
 def test_github_oauth_requests_no_scope() -> None:

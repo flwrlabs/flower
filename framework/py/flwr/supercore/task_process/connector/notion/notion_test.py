@@ -44,6 +44,12 @@ def test_notion_definition_is_registered() -> None:
     ("name", "arguments", "method", "path"),
     [
         ("notion_search", {"query": "release"}, "POST", "/search"),
+        (
+            "notion_get_page_content",
+            {"page_id": "page-1"},
+            "GET",
+            "/blocks/page-1/children",
+        ),
     ],
 )
 def test_notion_tools_call_read_endpoints(
@@ -59,57 +65,6 @@ def test_notion_tools_call_read_endpoints(
     assert result == response.json.return_value
     assert request.call_args.args == (method, f"https://api.notion.com/v1{path}")
     assert request.call_args.kwargs["headers"]["Notion-Version"] == "2026-03-11"
-
-
-def test_notion_get_page_aggregates_page_and_children() -> None:
-    """The Open Connector get_page action should perform both underlying reads."""
-    responses = [
-        Mock(status_code=200, **{"json.return_value": {"object": "page"}}),
-        Mock(status_code=200, **{"json.return_value": {"object": "list"}}),
-    ]
-    with patch(_HTTP_REQUEST, side_effect=responses) as request:
-        result = registry.invoke_connector(
-            "notion_get_page",
-            {"pageId": "page-1"},
-            Mock(),
-            credentials=_CREDENTIALS,
-            config={},
-        )
-    assert result == {
-        "page": {"object": "page"},
-        "block_children": {"object": "list"},
-    }
-    assert [call.args[1] for call in request.call_args_list] == [
-        "https://api.notion.com/v1/pages/page-1",
-        "https://api.notion.com/v1/blocks/page-1/children",
-    ]
-
-
-def test_notion_search_forwards_open_connector_arguments() -> None:
-    """Notion search should translate the Open Connector field names."""
-    response = Mock(status_code=200)
-    response.json.return_value = {"results": [], "has_more": False}
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        registry.invoke_connector(
-            "notion_search",
-            {
-                "query": "release",
-                "filter": {"property": "object", "value": "page"},
-                "sort": {"direction": "descending", "timestamp": "last_edited_time"},
-                "pageSize": 25,
-                "startCursor": "opaque",
-            },
-            Mock(),
-            credentials=_CREDENTIALS,
-            config={},
-        )
-    assert request.call_args.kwargs["json"] == {
-        "query": "release",
-        "filter": {"property": "object", "value": "page"},
-        "sort": {"direction": "descending", "timestamp": "last_edited_time"},
-        "page_size": 25,
-        "start_cursor": "opaque",
-    }
 
 
 def test_notion_api_errors_are_secret_safe() -> None:
