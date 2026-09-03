@@ -197,7 +197,7 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         self, request: PullMessagesRequest, context: grpc.ServicerContext
     ) -> PullMessagesResponse:
         """Pull Messages."""
-        log(INFO, "[Fleet.PullMessages] node_id=%s", request.node.node_id)
+        log(DEBUG, "[Fleet.PullMessages] node_id=%s", request.node.node_id)
         log(DEBUG, "[Fleet.PullMessages] Request: %s", MessageToDict(request))
         return message_handler.pull_messages(
             request=request,

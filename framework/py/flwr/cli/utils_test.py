@@ -31,15 +31,25 @@ from parameterized import parameterized
 
 from flwr.cli.constant import (
     LOCAL_CONTROL_API_ADDRESS,
+    LOCAL_RUNTIME_API_PORT,
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
 )
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
 from flwr.common.constant import FLWR_DIR
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    RefreshAuthTokensRequest,
+    RefreshAuthTokensResponse,
+)
 from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
-from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
+from flwr.supercore.interceptors import (
+    RuntimeVersionClientInterceptor,
+    RuntimeVersionHttpInterceptor,
+)
 
+from .cli_account_auth_interceptor import CliAccountAuthHttpInterceptor
+from .cli_client_interceptor import CliClientHttpInterceptor, CliClientInterceptor
 from .utils import (
     AUTHENTICATION_FAILED_MESSAGE,
     SUPERLINK_UNAVAILABLE_MESSAGE,
@@ -54,6 +64,7 @@ from .utils import (
     get_executed_command,
     get_sha256_hash,
     init_channel_from_connection,
+    init_http_client_from_connection,
     load_gitignore_patterns,
     validate_federation_name,
     wait_for_control_api_channel,
@@ -254,11 +265,70 @@ def test_init_channel_from_connection_uses_resolved_connection() -> None:
     assert kwargs["insecure"] is True
     assert kwargs["root_certificates"] is None
     assert kwargs["max_message_length"] == GRPC_MAX_MESSAGE_LENGTH
-    assert len(kwargs["interceptors"]) == 2
-    assert isinstance(kwargs["interceptors"][0], RuntimeVersionClientInterceptor)
+    assert len(kwargs["interceptors"]) == 3
+    assert isinstance(kwargs["interceptors"][0], CliClientInterceptor)
+    assert isinstance(kwargs["interceptors"][1], RuntimeVersionClientInterceptor)
     # pylint: disable-next=protected-access
-    assert kwargs["interceptors"][0]._metadata.component_name == "flwr CLI"
+    assert kwargs["interceptors"][1]._metadata.component_name == "flwr CLI"
     channel.subscribe.assert_called_once()
+
+
+def test_init_http_client_from_connection_uses_resolved_connection() -> None:
+    """Configure the HTTP client from the resolved local connection."""
+    unresolved = SuperLinkConnection(
+        name="local",
+        address=LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
+        options=SuperLinkSimulationOptions(num_supernodes=2),
+    )
+    resolved = SuperLinkConnection(
+        name="local",
+        address=f"127.0.0.1:{LOCAL_RUNTIME_API_PORT}",
+        insecure=True,
+        options=SuperLinkSimulationOptions(num_supernodes=2),
+    )
+    auth_plugin = Mock()
+    http_client = Mock()
+    http_client.RefreshAuthTokens.return_value = RefreshAuthTokensResponse(
+        access_token="new-access-token",
+        refresh_token="new-refresh-token",
+    )
+
+    with (
+        patch("flwr.cli.utils.ensure_local_superlink_http", return_value=resolved),
+        patch("flwr.cli.utils.load_certificate_in_connection", return_value=None),
+        patch(
+            "flwr.cli.utils.load_cli_auth_plugin_from_connection",
+            return_value=auth_plugin,
+        ) as load_auth_plugin,
+        patch(
+            "flwr.cli.utils.ControlHttpClient.from_server_address",
+            return_value=http_client,
+        ) as client_factory,
+    ):
+        result = init_http_client_from_connection(unresolved)
+
+    assert result is http_client
+    address = f"127.0.0.1:{LOCAL_RUNTIME_API_PORT}"
+    load_auth_plugin.assert_called_once_with(address)
+    auth_plugin.load_tokens.assert_called_once_with()
+
+    kwargs = client_factory.call_args.kwargs
+    assert kwargs["server_address"] == address
+    assert kwargs["insecure"] is True
+    assert kwargs["root_certificates"] is None
+    assert len(kwargs["interceptors"]) == 3
+    assert isinstance(kwargs["interceptors"][0], CliClientHttpInterceptor)
+    assert isinstance(kwargs["interceptors"][1], RuntimeVersionHttpInterceptor)
+    auth_interceptor = kwargs["interceptors"][2]
+    assert isinstance(auth_interceptor, CliAccountAuthHttpInterceptor)
+
+    credentials = auth_interceptor.refresh_tokens("old-refresh-token")
+
+    http_client.RefreshAuthTokens.assert_called_once_with(
+        RefreshAuthTokensRequest(refresh_token="old-refresh-token")
+    )
+    assert credentials.access_token == "new-access-token"
+    assert credentials.refresh_token == "new-refresh-token"
 
 
 @pytest.mark.parametrize(

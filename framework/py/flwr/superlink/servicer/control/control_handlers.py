@@ -93,6 +93,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListInvitationsResponse,
     ListNodesRequest,
     ListNodesResponse,
+    ListRunSeriesEventsRequest,
+    ListRunSeriesEventsResponse,
     ListRunSeriesRequest,
     ListRunSeriesResponse,
     ListRunsRequest,
@@ -134,6 +136,7 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
@@ -159,6 +162,7 @@ from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
     CreateInvitationContext,
+    JSONObject,
     RegisterSupernodeContext,
     StartRunContext,
 )
@@ -173,7 +177,7 @@ from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
-from flwr.superlink.run_source import RunStartSource
+from flwr.superlink.run_source import RunSource
 
 
 class InvalidConnectorRequestError(FlowerError):
@@ -474,7 +478,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     state: LinkState,
     fleet_api_type: str | None,
     *,
-    source: RunStartSource = "unknown",
+    source: RunSource = "unknown",
 ) -> StartRunResponse:
     """Create run ID."""
     log(INFO, "ControlServicer.StartRun")
@@ -627,6 +631,20 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 _derive_run_series_description(fused_run_config) or None
             )
 
+        initial_task_event = None
+        if primary_task_type == TaskType.AGENT_APP:
+            agent_input = fused_run_config.get("agent.input")
+            if isinstance(agent_input, str) and agent_input:
+                input_item: JSONObject = {
+                    "type": "message",
+                    "role": "user",
+                    "content": agent_input,
+                }
+                initial_task_event = TaskEvent(
+                    event="message",
+                    data=strict_json_dumps(input_item, compact=True),
+                )
+
         run_id = state.create_run(
             fab_id,
             fab_version,
@@ -639,6 +657,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             series_id=series_id,
             series_description=series_description,
             connector_refs=connector_refs,
+            initial_task_event=initial_task_event,
         )
 
         if run_id == 0:
@@ -692,7 +711,9 @@ def stream_logs(
     _validate_federation_membership_in_request(
         state, account.flwr_aid, run.federation_id
     )
-    extensions.notify_result_delivered(run, account.flwr_aid, "logs")
+    extensions.notify_result_delivered(
+        run, account.flwr_aid, extensions.RESULT_DELIVERY_CHANNEL_LOGS
+    )
 
     after_timestamp = request.after_timestamp + 1e-6
     return _stream_logs(run_id, task_id, after_timestamp, state, is_active)
@@ -750,11 +771,10 @@ def stream_run_events(
     _validate_federation_membership_in_request(
         state, account.flwr_aid, run.federation_id
     )
-    # A chat/read receipt represents an AgentApp result. ServerApp and
-    # simulation runs can also expose task events, but those are not chat
-    # results and must not be classified as such.
-    if run.primary_task_type == TaskType.AGENT_APP:
-        extensions.notify_result_delivered(run, account.flwr_aid, "chat")
+    # Record every accepted result request, regardless of the primary task type.
+    extensions.notify_result_delivered(
+        run, account.flwr_aid, extensions.RESULT_DELIVERY_CHANNEL_CHAT
+    )
 
     after_task_event_id = None
     if request.HasField("after_task_event_id"):
@@ -784,7 +804,7 @@ def _stream_run_events(
         # Retrieve and yield all task events generated after the latest
         # streamed task event
         events = state.get_task_events(
-            run_id=run_id,
+            run_ids=[run_id],
             task_ids=[primary_task_id],
             after_task_event_id=after_task_event_id,
         )
@@ -1158,6 +1178,33 @@ def get_run_series(
         context=context_to_proto(series_context) if series_context else None,
     )
     return response
+
+
+def list_run_series_events(
+    request: ListRunSeriesEventsRequest, account: AccountInfo, state: LinkState
+) -> ListRunSeriesEventsResponse:
+    """List task events for all runs in a run series."""
+    log(INFO, "ControlServicer.ListRunSeriesEvents")
+
+    series_id = request.series_id
+    series_matches = state.get_run_series(series_ids=[series_id])
+    if not series_matches or not state.federation_manager.has_member(
+        account.flwr_aid, series_matches[0].federation
+    ):
+        raise FlowerError(
+            ApiErrorCode.RUN_SERIES_ID_NOT_FOUND,
+            f"Run series {series_id} not found for {account.flwr_aid}.",
+        )
+
+    run_ids = series_matches[0].run_ids
+    runs = state.get_run_info(run_ids=run_ids)
+    for run in runs:
+        extensions.notify_result_delivered(
+            run, account.flwr_aid, extensions.RESULT_DELIVERY_CHANNEL_CHAT
+        )
+    primary_task_ids = [cast(int, run.primary_task_id) for run in runs]
+    events = state.get_task_events(run_ids=run_ids, task_ids=primary_task_ids)
+    return ListRunSeriesEventsResponse(events=events)
 
 
 def stop_run(

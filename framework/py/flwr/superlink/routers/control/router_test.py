@@ -485,6 +485,41 @@ def test_start_run_forwards_caller_provided_source() -> None:
     assert start_run.call_args.kwargs["source"] == "cli"
 
 
+def test_start_run_reads_client_metadata_header() -> None:
+    """Read and normalize the client metadata header through the HTTP stack."""
+    linkstate = Mock(spec=LinkState)
+    app = _create_app()
+    app.state.fleet_api_type = "grpc-rere"
+    app.dependency_overrides[get_linkstate] = lambda: linkstate
+    expected = StartRunResponse(run_id=1)
+
+    with patch.object(
+        control_handlers,
+        "start_run",
+        return_value=expected,
+    ) as start_run:
+        response = TestClient(app).post(
+            "/v1/control/start-run",
+            content=StartRunRequest().SerializeToString(),
+            headers={
+                "authorization": "Bearer access-token",
+                "content-type": PROTOBUF_MEDIA_TYPE,
+                "x-flwr-client": "web_ui",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
+    assert StartRunResponse.FromString(response.content) == expected
+    start_run.assert_called_once_with(
+        StartRunRequest(),
+        _ACCOUNT,
+        linkstate,
+        "grpc-rere",
+        source="web_ui",
+    )
+
+
 def test_add_app_forwards_fleet_api_type() -> None:
     """Forward the configured Fleet API transport type to the control handler."""
     request = AddAppRequest()
