@@ -39,9 +39,8 @@ ACTIONS = (
     ActionDefinition(
         name="identify",
         description=(
-            "Identify the current Attio token, its workspace, permissions, and the "
-            "workspace member who authorized it. Use authorized_by_workspace_member_id "
-            "with get_workspace_member when a request refers to 'me' or 'my'."
+            "Identify the current Attio access token, its workspace, permissions, "
+            "and authorizing workspace member."
         ),
         access=ActionAccess.READ,
         input_schema={
@@ -53,9 +52,7 @@ ACTIONS = (
     ActionDefinition(
         name="get_workspace_member",
         description=(
-            "Get an Attio workspace member, including their email address, by UUID. "
-            "For 'me' or 'my', first call identify and use its "
-            "authorized_by_workspace_member_id."
+            "Get an Attio workspace member, including their email address, by UUID."
         ),
         access=ActionAccess.READ,
         input_schema={
@@ -96,11 +93,8 @@ ACTIONS = (
     ActionDefinition(
         name="list_meetings",
         description=(
-            "List meetings in the authenticated Attio workspace. For the latest "
-            "workspace meeting, use limit 1 and sort start_desc with no other filters. "
-            "For the current user's latest meeting, call identify and "
-            "get_workspace_member first, then pass the returned email in participants. "
-            "Never use 'me' or invent a cursor or linked-record ID."
+            "List meetings in the authenticated Attio workspace, optionally filtering "
+            "by linked record or participant email address and sorting by start time."
         ),
         access=ActionAccess.READ,
         input_schema={
