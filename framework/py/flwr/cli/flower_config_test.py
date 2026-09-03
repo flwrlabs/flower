@@ -112,17 +112,10 @@ class TestInitFlwrConfig(unittest.TestCase):
                     config_path.read_text(encoding="utf-8"), "existing_content"
                 )
 
-    @parameterized.expand(  # type: ignore[untyped-decorator]
-        [
-            ("Darwin", "sed -i.bak"),
-            ("Linux", "sed -i.bak"),
-            ("Windows", "[System.IO.File]::WriteAllText"),
-        ]
-    )
     def test_read_superlink_connection_warns_about_old_supergrid_address(
-        self, operating_system: str, expected_command: str
+        self,
     ) -> None:
-        """Warn, provide a platform-appropriate command, and stop execution."""
+        """Offer to update the old SuperGrid address and stop execution."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             config_path = Path(tmp_dir) / "config.toml"
             config_path.write_text(
@@ -132,23 +125,30 @@ class TestInitFlwrConfig(unittest.TestCase):
 
             with (
                 patch.dict(os.environ, {FLWR_HOME: tmp_dir}),
-                patch(
-                    "flwr.cli.flower_config.platform.system",
-                    return_value=operating_system,
-                ),
                 patch("flwr.cli.flower_config.typer.secho") as secho,
+                patch(
+                    "flwr.cli.flower_config.typer.confirm", return_value=True
+                ) as confirm,
             ):
                 with self.assertRaises(typer.Exit) as exc_info:
                     read_superlink_connection("supergrid")
 
-            secho.assert_called_once()
             self.assertEqual(exc_info.exception.exit_code, 1)
-            message = secho.call_args.args[0]
+            message = secho.call_args_list[0].args[0]
             self.assertIn("SuperLink connection `supergrid`", message)
             self.assertIn("supergrid.flower.ai", message)
             self.assertIn("api.flower.ai", message)
-            self.assertIn(expected_command, message)
-            self.assertIn(str(config_path), message)
+            self.assertIn(str(config_path.resolve()), message)
+            self.assertIn("[superlink.supergrid]", message)
+            confirm.assert_called_once_with(
+                f"Do you want me to update `{config_path.resolve()}` now?"
+            )
+            self.assertEqual(
+                tomli.loads(config_path.read_text(encoding="utf-8"))["superlink"][
+                    "supergrid"
+                ]["address"],
+                "api.flower.ai",
+            )
 
     def test_read_superlink_connection_only_checks_selected_connection(self) -> None:
         """Do not warn about the old address on an unused connection."""
