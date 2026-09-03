@@ -14,13 +14,26 @@
 # ===============================================================================
 """Attio action definitions."""
 
+from flwr.supercore.typing import JSONObject
+
 from ..definition import ActionAccess, ActionDefinition
 from ..tool_schema import integer_property, string_property
 
-_CURSOR = string_property("Cursor returned by the previous Attio response.")
-_PAGE_LIMIT = integer_property(
-    "Maximum number of results to return.", minimum=1, maximum=50
+_CURSOR = string_property(
+    "Opaque cursor returned in pagination.next_cursor by the previous Attio response "
+    "for the same action and filters. Omit it for the first request."
 )
+_PAGE_LIMIT = integer_property(
+    "Number of items to request in this page. Omit it to request 50.",
+    minimum=1,
+    maximum=200,
+)
+
+
+def _uuid_property(description: str) -> JSONObject:
+    """Build an Attio UUID property schema."""
+    return {**string_property(description), "format": "uuid"}
+
 
 ACTIONS = (
     ActionDefinition(
@@ -38,7 +51,9 @@ ACTIONS = (
                     "description": "Attio object types to search.",
                 },
                 "limit": integer_property(
-                    "Maximum number of matches to return.", minimum=1, maximum=25
+                    "Number of matches to request. Omit it to request 25.",
+                    minimum=1,
+                    maximum=25,
                 ),
             },
             "required": ["query", "objects"],
@@ -54,9 +69,34 @@ ACTIONS = (
             "properties": {
                 "limit": _PAGE_LIMIT,
                 "cursor": _CURSOR,
-                "linked_object": string_property("Attio linked object type."),
-                "linked_record_id": string_property("Attio linked record ID."),
-                "participants": string_property("Meeting participant filter."),
+                "linked_object": string_property(
+                    "Attio object slug or ID. Must be provided together with "
+                    "linked_record_id."
+                ),
+                "linked_record_id": _uuid_property(
+                    "Attio record UUID. Must be provided together with linked_object."
+                ),
+                "participants": {
+                    "type": "array",
+                    "items": {
+                        **string_property("A participant's full email address."),
+                        "format": "email",
+                    },
+                    "minItems": 1,
+                    "uniqueItems": True,
+                    "description": (
+                        "Participant email addresses to match. Use full addresses such "
+                        "as 'ada@example.com'; do not use names, domains, or 'me'."
+                    ),
+                },
+                "sort": {
+                    "type": "string",
+                    "enum": ["start_asc", "start_desc"],
+                    "description": (
+                        "Meeting start-time order. Use start_desc for the latest "
+                        "meeting."
+                    ),
+                },
             },
             "additionalProperties": False,
         },
@@ -68,9 +108,12 @@ ACTIONS = (
         input_schema={
             "type": "object",
             "properties": {
-                "meeting_id": string_property("Attio meeting ID."),
+                "meeting_id": _uuid_property("Attio meeting UUID."),
                 "limit": integer_property(
-                    "Maximum number of recordings to return.", minimum=1, maximum=200
+                    "Number of recordings to request in this page. Omit it to "
+                    "request 50.",
+                    minimum=1,
+                    maximum=200,
                 ),
                 "cursor": _CURSOR,
             },
@@ -85,8 +128,8 @@ ACTIONS = (
         input_schema={
             "type": "object",
             "properties": {
-                "meeting_id": string_property("Attio meeting ID."),
-                "call_recording_id": string_property("Attio call recording ID."),
+                "meeting_id": _uuid_property("Attio meeting UUID."),
+                "call_recording_id": _uuid_property("Attio call recording UUID."),
                 "cursor": _CURSOR,
             },
             "required": ["meeting_id", "call_recording_id"],

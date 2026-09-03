@@ -31,6 +31,7 @@ from flwr.supercore.json_message.connector_message import (
 from . import registry
 from .definition import ConnectorExecutionContext
 from .http import ConnectorApiError
+from .json_utils import ConnectorInputError
 from .task import handle_task
 
 
@@ -168,6 +169,21 @@ class TestHandleTask(unittest.TestCase):
             handle_task(client=self.stub, task_id=22, run_id=7)
 
         assert _pushed_response(self.stub).payload["error"] == {
-            "code": "connector_error",
+            "code": "validation_error",
             "message": "Notion API request failed: validation_error (400).",
+        }
+
+    def test_exposes_safe_input_validation_errors(self) -> None:
+        """Controlled connector validation failures should remain actionable."""
+        self._configure_connector("notion", connector_ref="notion")
+        self.provider.side_effect = ConnectorInputError(
+            "Notion cursor must be copied from next_cursor."
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "must be copied from next_cursor"):
+            handle_task(client=self.stub, task_id=22, run_id=7)
+
+        assert _pushed_response(self.stub).payload["error"] == {
+            "code": "invalid_input",
+            "message": "Notion cursor must be copied from next_cursor.",
         }

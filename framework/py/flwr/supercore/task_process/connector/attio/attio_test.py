@@ -62,6 +62,19 @@ def test_attio_actions_are_registered_as_read_only() -> None:
     assert [tool["name"] for tool in tools] == [
         f"{ATTIO_CONNECTOR_REF}_{action.name}" for action in ACTIONS
     ]
+    meeting_parameters = tools[1]["parameters"]
+    assert isinstance(meeting_parameters, dict)
+    meeting_properties = meeting_parameters["properties"]
+    assert isinstance(meeting_properties, dict)
+    participants = meeting_properties["participants"]
+    linked_record_id = meeting_properties["linked_record_id"]
+    assert isinstance(participants, dict)
+    assert isinstance(linked_record_id, dict)
+    assert participants["type"] == "array"
+    participant_items = participants["items"]
+    assert isinstance(participant_items, dict)
+    assert participant_items["format"] == "email"
+    assert linked_record_id["format"] == "uuid"
 
 
 def test_search_records_calls_attio() -> None:
@@ -85,6 +98,55 @@ def test_search_records_calls_attio() -> None:
     assert result == {"data": []}
 
 
+def test_list_meetings_forwards_validated_filters_and_sort() -> None:
+    """Meeting reads should forward documented Attio query formats."""
+    response = _response({"data": [], "pagination": {"next_cursor": None}})
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = _invoke(
+            "attio_list_meetings",
+            {
+                "limit": 1,
+                "linked_object": "people",
+                "linked_record_id": "CB59AB17-AD15-460C-A126-0715617C0853",
+                "participants": ["ada@example.com", " grace@example.com "],
+                "sort": "start_desc",
+            },
+        )
+
+    assert result == response.json.return_value
+    assert request.call_args.kwargs["params"] == {
+        "limit": "1",
+        "linked_object": "people",
+        "linked_record_id": "cb59ab17-ad15-460c-a126-0715617c0853",
+        "participants": "ada@example.com,grace@example.com",
+        "sort": "start_desc",
+    }
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"linked_object": "people"},
+        {"linked_record_id": "cb59ab17-ad15-460c-a126-0715617c0853"},
+        {
+            "linked_object": "people",
+            "linked_record_id": "not-a-uuid",
+        },
+        {"participants": "Ada Lovelace"},
+        {"participants": "example.com"},
+        {"participants": "me"},
+        {"participants": []},
+        {"sort": "latest"},
+    ],
+)
+def test_list_meetings_rejects_invalid_filters(arguments: JSONObject) -> None:
+    """Invalid meeting filters should fail before reaching Attio."""
+    with patch(_HTTP_REQUEST) as request, pytest.raises(ValueError):
+        _invoke("attio_list_meetings", arguments)
+
+    request.assert_not_called()
+
+
 def test_api_errors_are_secret_safe() -> None:
     """API errors should not expose tokens or response text."""
     with (
@@ -100,6 +162,27 @@ def test_api_errors_are_secret_safe() -> None:
         _invoke("attio_search_records", {"query": "Flower", "objects": ["companies"]})
 
     assert error.value.code == "http_error"
+    assert "attio-secret" not in str(error.value)
+
+
+def test_api_errors_return_safe_attio_code() -> None:
+    """Attio's structured code should be useful without exposing its message."""
+    with (
+        patch(
+            _HTTP_REQUEST,
+            return_value=_response(
+                {
+                    "code": "invalid_query",
+                    "message": "attio-secret",
+                },
+                status_code=400,
+            ),
+        ),
+        pytest.raises(AttioApiError) as error,
+    ):
+        _invoke("attio_search_records", {"query": "Flower", "objects": ["people"]})
+
+    assert error.value.code == "invalid_query"
     assert "attio-secret" not in str(error.value)
 
 

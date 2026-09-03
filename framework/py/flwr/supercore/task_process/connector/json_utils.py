@@ -14,7 +14,6 @@
 # ==============================================================================
 """Validation helpers shared by account-scoped connectors."""
 
-
 from collections.abc import Callable
 from typing import cast
 
@@ -23,10 +22,16 @@ from flwr.supercore.typing import JSONObject
 ErrorFactory = Callable[[str], Exception]
 
 
+class ConnectorInputError(ValueError):
+    """Input validation failure that is safe to return to connector callers."""
+
+    code = "invalid_input"
+
+
 def require_string(value: object, provider: str, name: str) -> str:
     """Validate and normalize a required connector argument."""
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{provider} {name} must be a non-empty string.")
+        raise ConnectorInputError(f"{provider} {name} must be a non-empty string.")
     return value.strip()
 
 
@@ -39,6 +44,19 @@ def optional_string(value: object, provider: str, name: str) -> str | None:
     return require_string(value, provider, name)
 
 
+def optional_cursor(value: object, provider: str, response_path: str) -> str | None:
+    """Validate an optional opaque cursor copied from a provider response."""
+    cursor = optional_string(value, provider, "cursor")
+    if cursor is None:
+        return None
+    if cursor.casefold() in {"none", "null"} or cursor == "0":
+        raise ConnectorInputError(
+            f"{provider} cursor must be copied from {response_path}; omit it for "
+            "the first request."
+        )
+    return cursor
+
+
 def require_int_range(
     value: object,
     provider: str,
@@ -49,16 +67,18 @@ def require_int_range(
 ) -> int:
     """Validate an integer connector argument with inclusive bounds."""
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(f"{provider} {name} must be an integer.")
+        raise ConnectorInputError(f"{provider} {name} must be an integer.")
     if value < minimum or value > maximum:
-        raise ValueError(f"{provider} {name} must be between {minimum} and {maximum}.")
+        raise ConnectorInputError(
+            f"{provider} {name} must be between {minimum} and {maximum}."
+        )
     return value
 
 
 def require_bool(value: object, provider: str, name: str) -> bool:
     """Validate a boolean connector argument."""
     if not isinstance(value, bool):
-        raise ValueError(f"{provider} {name} must be a boolean.")
+        raise ConnectorInputError(f"{provider} {name} must be a boolean.")
     return value
 
 

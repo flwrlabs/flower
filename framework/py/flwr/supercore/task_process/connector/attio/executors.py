@@ -14,15 +14,28 @@
 # ===============================================================================
 """Attio action executors."""
 
+import re
 from urllib.parse import quote
+from uuid import UUID
+
+import requests
 
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
 from ..http import ConnectorApiError, request_json_object
-from ..json_utils import optional_string, require_int_range, require_string
+from ..json_utils import (
+    ConnectorInputError,
+    optional_cursor,
+    optional_string,
+    require_int_range,
+    require_string,
+)
 
 _ATTIO_API_BASE_URL = "https://api.attio.com/v2"
+_ATTIO_MEETING_SORTS = {"start_asc", "start_desc"}
+_EMAIL_ADDRESS = re.compile(r"^[^@\s,]+@[^@\s,]+$")
+_SAFE_ERROR_CODE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 
 class AttioApiError(ConnectorApiError):
@@ -37,7 +50,7 @@ def search_records(
     """Search records in one Attio workspace."""
     objects = arguments.get("objects")
     if not isinstance(objects, list) or not objects:
-        raise ValueError("Attio objects must be a non-empty list.")
+        raise ConnectorInputError("Attio objects must be a non-empty list.")
     return _call_attio_api(
         "POST",
         "/objects/records/search",
@@ -55,16 +68,27 @@ def list_meetings(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
     """List meetings in one Attio workspace."""
+    linked_object = _optional(arguments, "linked_object")
+    linked_record_id = _optional(arguments, "linked_record_id")
+    if (linked_object is None) != (linked_record_id is None):
+        raise ConnectorInputError(
+            "Attio linked_object and linked_record_id must be provided together."
+        )
+    if linked_record_id is not None:
+        linked_record_id = _uuid(linked_record_id, "linked_record_id")
     return _call_attio_api(
         "GET",
         "/meetings",
         context.credentials,
         params={
-            "limit": str(_limit(arguments, default=50, maximum=50)),
-            "cursor": _optional(arguments, "cursor"),
-            "linked_object": _optional(arguments, "linked_object"),
-            "linked_record_id": _optional(arguments, "linked_record_id"),
-            "participants": _optional(arguments, "participants"),
+            "limit": str(_limit(arguments, default=50, maximum=200)),
+            "cursor": optional_cursor(
+                arguments.get("cursor"), "Attio", "pagination.next_cursor"
+            ),
+            "linked_object": linked_object,
+            "linked_record_id": linked_record_id,
+            "participants": _participants(arguments),
+            "sort": _meeting_sort(arguments),
         },
     )
 
@@ -80,7 +104,9 @@ def list_call_recordings(
         context.credentials,
         params={
             "limit": str(_limit(arguments, default=50, maximum=200)),
-            "cursor": _optional(arguments, "cursor"),
+            "cursor": optional_cursor(
+                arguments.get("cursor"), "Attio", "pagination.next_cursor"
+            ),
         },
     )
 
@@ -97,7 +123,11 @@ def get_call_transcript(
         "GET",
         f"/meetings/{meeting_id}/call_recordings/{recording_id}/transcript",
         context.credentials,
-        params={"cursor": _optional(arguments, "cursor")},
+        params={
+            "cursor": optional_cursor(
+                arguments.get("cursor"), "Attio", "pagination.next_cursor"
+            )
+        },
     )
 
 
@@ -131,15 +161,13 @@ def _call_attio_api(
         },
         params={k: v for k, v in (params or {}).items() if v is not None},
         json=json_body,
-        http_error_code=lambda response: (
-            "rate_limited" if response.status_code == 429 else "http_error"
-        ),
+        http_error_code=_response_error_code,
     )
 
 
 def _path_segment(value: object, name: str) -> str:
     """Validate and encode one Attio path segment."""
-    return quote(require_string(value, "Attio", name), safe="")
+    return quote(_uuid(require_string(value, "Attio", name), name), safe="")
 
 
 def _limit(arguments: JSONObject, *, default: int, maximum: int) -> int:
@@ -152,3 +180,53 @@ def _limit(arguments: JSONObject, *, default: int, maximum: int) -> int:
 def _optional(arguments: JSONObject, name: str) -> str | None:
     """Return one optional Attio string argument."""
     return optional_string(arguments.get(name), "Attio", name)
+
+
+def _meeting_sort(arguments: JSONObject) -> str:
+    """Return a validated Attio meeting sort order."""
+    sort = optional_string(arguments.get("sort"), "Attio", "sort") or "start_asc"
+    if sort not in _ATTIO_MEETING_SORTS:
+        raise ConnectorInputError("Attio sort must be 'start_asc' or 'start_desc'.")
+    return sort
+
+
+def _participants(arguments: JSONObject) -> str | None:
+    """Return model-native email input in Attio's comma-separated format."""
+    participants = arguments.get("participants")
+    if participants is None:
+        return None
+    if isinstance(participants, str):
+        # Retain compatibility with calls made before participants became an array.
+        emails = [email.strip() for email in participants.split(",")]
+    elif isinstance(participants, list):
+        emails = [
+            require_string(email, "Attio", "participant") for email in participants
+        ]
+    else:
+        raise ConnectorInputError(
+            "Attio participants must be a list of email addresses."
+        )
+    if not emails or any(_EMAIL_ADDRESS.fullmatch(email) is None for email in emails):
+        raise ConnectorInputError(
+            "Attio participants must contain full email addresses."
+        )
+    return ",".join(emails)
+
+
+def _uuid(value: str, name: str) -> str:
+    """Return one normalized Attio UUID argument."""
+    try:
+        return str(UUID(value))
+    except ValueError:
+        raise ConnectorInputError(f"Attio {name} must be a UUID.") from None
+
+
+def _response_error_code(response: requests.Response) -> str:
+    """Return Attio's structured error code when it is safe to expose."""
+    try:
+        code = response.json().get("code")
+    except (AttributeError, ValueError):
+        code = None
+    if isinstance(code, str) and _SAFE_ERROR_CODE.fullmatch(code):
+        return code
+    return "rate_limited" if response.status_code == 429 else "http_error"
