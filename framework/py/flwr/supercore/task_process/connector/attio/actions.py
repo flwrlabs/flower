@@ -37,6 +37,39 @@ def _uuid_property(description: str) -> JSONObject:
 
 ACTIONS = (
     ActionDefinition(
+        name="identify",
+        description=(
+            "Identify the current Attio token, its workspace, permissions, and the "
+            "workspace member who authorized it. Use authorized_by_workspace_member_id "
+            "with get_workspace_member when a request refers to 'me' or 'my'."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_workspace_member",
+        description=(
+            "Get an Attio workspace member, including their email address, by UUID. "
+            "For 'me' or 'my', first call identify and use its "
+            "authorized_by_workspace_member_id."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "workspace_member_id": _uuid_property(
+                    "Attio workspace member UUID returned by identify."
+                ),
+            },
+            "required": ["workspace_member_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
         name="search_records",
         description="Search records in Attio.",
         access=ActionAccess.READ,
@@ -62,7 +95,13 @@ ACTIONS = (
     ),
     ActionDefinition(
         name="list_meetings",
-        description="List meetings in Attio.",
+        description=(
+            "List meetings in the authenticated Attio workspace. For the latest "
+            "workspace meeting, use limit 1 and sort start_desc with no other filters. "
+            "For the current user's latest meeting, call identify and "
+            "get_workspace_member first, then pass the returned email in participants. "
+            "Never use 'me' or invent a cursor or linked-record ID."
+        ),
         access=ActionAccess.READ,
         input_schema={
             "type": "object",

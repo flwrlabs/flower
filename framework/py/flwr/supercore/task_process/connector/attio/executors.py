@@ -42,6 +42,26 @@ class AttioApiError(ConnectorApiError):
     provider = "Attio"
 
 
+def identify(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """Identify the current Attio token and workspace."""
+    del arguments
+    return _call_attio_api("GET", "/self", context.credentials)
+
+
+def get_workspace_member(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """Get one member of the current Attio workspace."""
+    workspace_member_id = _path_segment(
+        arguments.get("workspace_member_id"), "workspace_member_id"
+    )
+    return _call_attio_api(
+        "GET",
+        f"/workspace_members/{workspace_member_id}",
+        context.credentials,
+    )
+
+
 def search_records(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
@@ -132,6 +152,8 @@ def get_call_transcript(
 
 
 EXECUTORS: dict[str, ConnectorExecutor] = {
+    "identify": identify,
+    "get_workspace_member": get_workspace_member,
     "search_records": search_records,
     "list_meetings": list_meetings,
     "list_call_recordings": list_call_recordings,

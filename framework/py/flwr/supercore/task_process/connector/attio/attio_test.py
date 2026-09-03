@@ -55,14 +55,15 @@ def _invoke(name: str, arguments: JSONObject) -> JSONValue:
 
 
 def test_attio_actions_are_registered_as_read_only() -> None:
-    """Attio should expose four account-scoped read actions."""
-    assert len(ACTIONS) == 4
+    """Attio should expose six account-scoped read actions."""
+    assert len(ACTIONS) == 6
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     tools = registry.get_connector_tools(ATTIO_CONNECTOR_REF)
     assert [tool["name"] for tool in tools] == [
         f"{ATTIO_CONNECTOR_REF}_{action.name}" for action in ACTIONS
     ]
-    meeting_parameters = tools[1]["parameters"]
+    meeting_tool = next(tool for tool in tools if tool["name"] == "attio_list_meetings")
+    meeting_parameters = meeting_tool["parameters"]
     assert isinstance(meeting_parameters, dict)
     meeting_properties = meeting_parameters["properties"]
     assert isinstance(meeting_properties, dict)
@@ -75,6 +76,64 @@ def test_attio_actions_are_registered_as_read_only() -> None:
     assert isinstance(participant_items, dict)
     assert participant_items["format"] == "email"
     assert linked_record_id["format"] == "uuid"
+
+
+def test_identify_member_and_list_latest_meeting() -> None:
+    """Attio should resolve the current member before filtering their meetings."""
+    member_id = "50cf242c-7fa3-4cad-87d0-75b1af71c57b"
+    responses = [
+        _response(
+            {
+                "active": True,
+                "authorized_by_workspace_member_id": member_id,
+                "workspace_id": "14beef7a-99f7-4534-a87e-70b564330a4c",
+            }
+        ),
+        _response(
+            {
+                "data": {
+                    "id": {"workspace_member_id": member_id},
+                    "email_address": "ada@example.com",
+                }
+            }
+        ),
+        _response({"data": [{"title": "Latest call"}]}),
+    ]
+    with patch(_HTTP_REQUEST, side_effect=responses) as request:
+        identity = _invoke("attio_identify", {})
+        assert isinstance(identity, dict)
+        resolved_member_id = identity["authorized_by_workspace_member_id"]
+        assert isinstance(resolved_member_id, str)
+
+        member = _invoke(
+            "attio_get_workspace_member",
+            {"workspace_member_id": resolved_member_id},
+        )
+        assert isinstance(member, dict)
+        member_data = member["data"]
+        assert isinstance(member_data, dict)
+        email = member_data["email_address"]
+        assert isinstance(email, str)
+
+        result = _invoke(
+            "attio_list_meetings",
+            {"participants": [email], "sort": "start_desc", "limit": 1},
+        )
+
+    assert result == {"data": [{"title": "Latest call"}]}
+    assert [item.args[:2] for item in request.call_args_list] == [
+        ("GET", "https://api.attio.com/v2/self"),
+        (
+            "GET",
+            f"https://api.attio.com/v2/workspace_members/{member_id}",
+        ),
+        ("GET", "https://api.attio.com/v2/meetings"),
+    ]
+    assert request.call_args_list[-1].kwargs["params"] == {
+        "limit": "1",
+        "participants": "ada@example.com",
+        "sort": "start_desc",
+    }
 
 
 def test_search_records_calls_attio() -> None:
@@ -125,7 +184,7 @@ def test_list_meetings_forwards_validated_filters_and_sort() -> None:
 def test_list_actions_omit_unspecified_limit() -> None:
     """Attio should apply its own defaults when callers omit the limit."""
     response = _response({"data": [], "pagination": {"next_cursor": None}})
-    cases = [
+    cases: list[tuple[str, JSONObject]] = [
         ("attio_list_meetings", {}),
         (
             "attio_list_call_recordings",
