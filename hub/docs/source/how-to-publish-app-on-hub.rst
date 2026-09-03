@@ -263,7 +263,7 @@ Next, log in to your SuperLink connection that points to SuperGrid:
 This will open a browser window where you can authenticate using your Flower account.
 
 .. note::
-   To login to SuperGrid it is expected that your Flower Configuration has a SuperLink connection
+   To log in to SuperGrid it is expected that your Flower Configuration has a SuperLink connection
    named :code:`superlink.supergrid` with the address :code:`api.flower.ai`. This connection should
    be present by default after intalling Flower. Read more about SuperLink connections and how to configure them in the
    `Flower Configuration documentation <https://flower.ai/docs/framework/ref-flower-configuration.html>`_.
