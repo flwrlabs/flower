@@ -15,7 +15,9 @@
 """Flower command line interface configuration utils."""
 
 
+import platform
 import re
+import shlex
 from pathlib import Path
 from typing import Any, cast
 
@@ -27,6 +29,8 @@ import typer
 from flwr.cli.constant import (
     DEFAULT_FLOWER_CONFIG_TOML,
     FLOWER_CONFIG_FILE,
+    LEGACY_SUPERGRID_ADDRESS,
+    SUPERGRID_HTTP_ADDRESS,
     SimulationBackendConfigTomlKey,
     SimulationClientResourcesTomlKey,
     SimulationInitArgsTomlKey,
@@ -43,6 +47,26 @@ from flwr.cli.typing import (
 from flwr.common.config import flatten_dict
 from flwr.supercore.constant import DEFAULT_SIMULATION_CONFIG
 from flwr.supercore.utils import get_flwr_home
+
+_WARNED_LEGACY_SUPERGRID_CONFIGS: set[Path] = set()
+
+
+def _get_supergrid_address_update_command(config_path: Path) -> str:
+    """Return a platform-appropriate command for updating the SuperGrid address."""
+    if platform.system() == "Windows":
+        config_arg = str(config_path).replace("'", "''")
+        return (
+            f"$path = '{config_arg}'; "
+            "[System.IO.File]::WriteAllText($path, "
+            "[System.IO.File]::ReadAllText($path).Replace("
+            f"'{LEGACY_SUPERGRID_ADDRESS}', '{SUPERGRID_HTTP_ADDRESS}'))"
+        )
+
+    return (
+        "sed -i.bak "
+        f"'s/{re.escape(LEGACY_SUPERGRID_ADDRESS)}/{SUPERGRID_HTTP_ADDRESS}/g' "
+        f"{shlex.quote(str(config_path))}"
+    )
 
 
 def _parse_simulation_options(options: dict[str, Any]) -> SuperLinkSimulationOptions:
@@ -166,6 +190,18 @@ def init_flwr_config() -> None:
         typer.secho(
             f"\nFlower configuration not found. Created default configuration"
             f" at {config_path}\n",
+        )
+    elif (
+        config_path not in _WARNED_LEGACY_SUPERGRID_CONFIGS
+        and LEGACY_SUPERGRID_ADDRESS in config_path.read_text(encoding="utf-8")
+    ):
+        _WARNED_LEGACY_SUPERGRID_CONFIGS.add(config_path)
+        typer.secho(
+            "\n⚠️ The Flower configuration uses the old SuperGrid address "
+            f"`{LEGACY_SUPERGRID_ADDRESS}`. Update it to "
+            f"`{SUPERGRID_HTTP_ADDRESS}` manually or by running:\n\n"
+            f"{_get_supergrid_address_update_command(config_path)}\n",
+            fg=typer.colors.YELLOW,
         )
 
 

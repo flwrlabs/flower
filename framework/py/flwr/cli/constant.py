@@ -162,6 +162,7 @@ CONTROL_API_PROBE_INTERVAL = 0.2
 
 # CLI connection configuration file name
 FLOWER_CONFIG_FILE = "config.toml"
+LEGACY_SUPERGRID_ADDRESS = "supergrid.flower.ai"
 SUPERGRID_HTTP_ADDRESS = "api.flower.ai"
 
 # The default configuration for the Flower config file

@@ -111,6 +111,42 @@ class TestInitFlwrConfig(unittest.TestCase):
                     config_path.read_text(encoding="utf-8"), "existing_content"
                 )
 
+    @parameterized.expand(  # type: ignore[untyped-decorator]
+        [
+            ("Darwin", "sed -i.bak"),
+            ("Linux", "sed -i.bak"),
+            ("Windows", "[System.IO.File]::WriteAllText"),
+        ]
+    )
+    def test_init_flwr_config_warns_about_old_supergrid_address(
+        self, operating_system: str, expected_command: str
+    ) -> None:
+        """Warn once and provide a platform-appropriate update command."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_path = Path(tmp_dir) / "config.toml"
+            config_path.write_text(
+                '[superlink.supergrid]\naddress = "supergrid.flower.ai"\n',
+                encoding="utf-8",
+            )
+
+            with (
+                patch.dict(os.environ, {FLWR_HOME: tmp_dir}),
+                patch(
+                    "flwr.cli.flower_config.platform.system",
+                    return_value=operating_system,
+                ),
+                patch("flwr.cli.flower_config.typer.secho") as secho,
+            ):
+                init_flwr_config()
+                init_flwr_config()
+
+            secho.assert_called_once()
+            message = secho.call_args.args[0]
+            self.assertIn("supergrid.flower.ai", message)
+            self.assertIn("api.flower.ai", message)
+            self.assertIn(expected_command, message)
+            self.assertIn(str(config_path), message)
+
 
 class TestSuperLinkConnection(unittest.TestCase):
     """Unit tests for SuperLink connections."""
