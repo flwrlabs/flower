@@ -265,9 +265,9 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             )
             return CancellableProtobufStreamingResponse(
                 content,
-                 stream_context,
-                 PROTOBUF_STREAM_MEDIA_TYPE,
-             )
+                stream_context,
+                PROTOBUF_STREAM_MEDIA_TYPE,
+            )
 
         raise FlowerError(
             ApiErrorCode.INVALID_HANDLER_RESPONSE,
