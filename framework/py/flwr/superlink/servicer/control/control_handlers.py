@@ -181,7 +181,6 @@ from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
 from flwr.superlink.run_source import RunSource
 
-
 HUB_APP_REFRESH_INTERVAL = 5 * 60
 
 _hub_app_refresh_lock = Lock()
