@@ -18,6 +18,8 @@ import re
 from urllib.parse import quote
 from uuid import UUID
 
+import requests
+
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
@@ -157,6 +159,7 @@ def _call_attio_api(
         },
         params={k: v for k, v in (params or {}).items() if v is not None},
         json=json_body,
+        http_error_details=_response_error_details,
     )
 
 
@@ -210,3 +213,19 @@ def _uuid(value: str, name: str) -> str:
         return str(UUID(value))
     except ValueError:
         raise ValueError(f"Attio {name} must be a UUID.") from None
+
+
+def _response_error_details(response: requests.Response) -> tuple[str, str | None]:
+    """Return Attio's documented error code and message without translation."""
+    try:
+        payload = response.json()
+    except ValueError:
+        return "http_error", None
+    if not isinstance(payload, dict):
+        return "http_error", None
+    code = payload.get("code")
+    message = payload.get("message")
+    return (
+        code if isinstance(code, str) and code else "http_error",
+        message if isinstance(message, str) and message else None,
+    )

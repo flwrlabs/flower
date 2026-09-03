@@ -147,22 +147,28 @@ def test_list_meetings_rejects_invalid_filters(arguments: JSONObject) -> None:
     request.assert_not_called()
 
 
-def test_api_errors_are_secret_safe() -> None:
-    """API errors should not expose tokens or response text."""
+def test_api_errors_include_attio_code_and_message() -> None:
+    """Attio's documented error fields should remain readable to callers."""
     with (
         patch(
             _HTTP_REQUEST,
             return_value=_response(
-                {"message": "attio-secret"},
-                status_code=401,
+                {
+                    "code": "invalid_query",
+                    "message": "Participants must be email addresses",
+                },
+                status_code=400,
             ),
         ),
         pytest.raises(AttioApiError) as error,
     ):
-        _invoke("attio_search_records", {"query": "Flower", "objects": ["companies"]})
+        _invoke("attio_search_records", {"query": "Flower", "objects": ["people"]})
 
-    assert error.value.code == "http_error"
-    assert "attio-secret" not in str(error.value)
+    assert error.value.code == "invalid_query"
+    assert str(error.value) == (
+        "Attio API request failed: invalid_query (400): "
+        "Participants must be email addresses."
+    )
 
 
 def test_oauth_builds_url_and_exchanges_code() -> None:
