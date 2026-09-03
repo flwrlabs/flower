@@ -1,0 +1,61 @@
+---
+# this is the config that will be loaded as default by main.py
+# Please follow the provided structure (this will ensuring all baseline follow
+# a similar configuration structure and hence be easy to customise)
+
+num_clients: 100
+num_rounds: 200
+verbose: 1
+
+dataset:
+  name: 'mnist' # [cifar10, mnist]
+  # If path is specified, look for (or download) the dataset in that path,
+  # otherwise use current folder.
+  data_path: './dataset'
+  split: 'iid' # {iid, non-iid}
+  classes_pc: 4
+  minibatch_size: 128
+
+model:
+  name: 'Conv4' # [Conv8/6/4, LeNet]
+  mode: 'mask' # [mask, dense]
+  local_epochs: 3
+  activation: 'relu'
+  agg_steps: 5
+
+server_device: cuda # cpu or cuda
+client_resources:
+  num_cpus: 2
+  num_gpus: 0.2
+
+strategy:
+  _target_: fedpm.strategy.FedPMStrategy
+  fraction_fit: 0.02
+  fraction_evaluate: 0
+  min_fit_clients: 0
+  min_evaluate_clients: 0
+  min_available_clients: 0
+  local_epochs: 3
+  local_lr: 0.1
+  device: ${server_device}
+  loss_fn:
+    _target_: torch.nn.CrossEntropyLoss
+  
+client:
+  _target_: fedpm.client.FedPMClient
+  model_cfg: ${model}
+
+compressor:
+  compress: True
+  type: 'sign_sgd' # {sign_sgd, qsgd}
+  local_epochs: 3
+  sign_sgd:
+    local_lr: 0.1
+    server_lr: 0.0002
+  qsgd:
+    local_lr: 0.0003
+    server_lr: 0.1
+    num_level: 6
+  fedavg:
+    local_lr: 0.01
+    server_lr: 0.0002
