@@ -48,8 +48,6 @@ from flwr.common.config import flatten_dict
 from flwr.supercore.constant import DEFAULT_SIMULATION_CONFIG
 from flwr.supercore.utils import get_flwr_home
 
-_WARNED_LEGACY_SUPERGRID_CONFIGS: set[Path] = set()
-
 
 def _get_supergrid_address_update_command(config_path: Path) -> str:
     """Return a platform-appropriate command for updating the SuperGrid address."""
@@ -191,11 +189,7 @@ def init_flwr_config() -> None:
             f"\nFlower configuration not found. Created default configuration"
             f" at {config_path}\n",
         )
-    elif (
-        config_path not in _WARNED_LEGACY_SUPERGRID_CONFIGS
-        and LEGACY_SUPERGRID_ADDRESS in config_path.read_text(encoding="utf-8")
-    ):
-        _WARNED_LEGACY_SUPERGRID_CONFIGS.add(config_path)
+    elif LEGACY_SUPERGRID_ADDRESS in config_path.read_text(encoding="utf-8"):
         typer.secho(
             "\n⚠️ The Flower configuration uses the old SuperGrid address "
             f"`{LEGACY_SUPERGRID_ADDRESS}`. Update it to "
@@ -203,6 +197,7 @@ def init_flwr_config() -> None:
             f"{_get_supergrid_address_update_command(config_path)}\n",
             fg=typer.colors.YELLOW,
         )
+        raise typer.Exit(code=1)
 
 
 def parse_superlink_connection(

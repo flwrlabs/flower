@@ -24,6 +24,7 @@ from unittest.mock import Mock, patch
 
 import click
 import tomli
+import typer
 from parameterized import parameterized
 
 from flwr.cli.constant import (
@@ -121,7 +122,7 @@ class TestInitFlwrConfig(unittest.TestCase):
     def test_init_flwr_config_warns_about_old_supergrid_address(
         self, operating_system: str, expected_command: str
     ) -> None:
-        """Warn once and provide a platform-appropriate update command."""
+        """Warn, provide a platform-appropriate command, and stop execution."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             config_path = Path(tmp_dir) / "config.toml"
             config_path.write_text(
@@ -137,10 +138,11 @@ class TestInitFlwrConfig(unittest.TestCase):
                 ),
                 patch("flwr.cli.flower_config.typer.secho") as secho,
             ):
-                init_flwr_config()
-                init_flwr_config()
+                with self.assertRaises(typer.Exit) as exc_info:
+                    init_flwr_config()
 
             secho.assert_called_once()
+            self.assertEqual(exc_info.exception.exit_code, 1)
             message = secho.call_args.args[0]
             self.assertIn("supergrid.flower.ai", message)
             self.assertIn("api.flower.ai", message)
