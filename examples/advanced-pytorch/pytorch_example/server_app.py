@@ -1,13 +1,19 @@
 """pytorch-example: A Flower / PyTorch app."""
 
 import torch
-from datasets import load_dataset
 from flwr.app import ArrayRecord, ConfigRecord, Context, MetricRecord
 from flwr.serverapp import Grid, ServerApp
+from pytorch_example.strategy import CustomFedAvg
+from pytorch_example.task import (
+    NUM_CLASSES,
+    Net,
+    apply_eval_transforms,
+    create_run_dir,
+    test,
+)
 from torch.utils.data import DataLoader
 
-from pytorch_example.strategy import CustomFedAvg
-from pytorch_example.task import Net, apply_eval_transforms, create_run_dir, test
+from datasets import load_dataset
 
 # Create ServerApp
 app = ServerApp()
@@ -70,7 +76,16 @@ def get_global_evaluate_fn(device: str):
         net = Net()
         net.load_state_dict(arrays.to_torch_state_dict())
         net.to(device)
-        loss, accuracy = test(net, testloader, device=device)
-        return MetricRecord({"accuracy": accuracy, "loss": loss})
+        loss, test_results = test(net, testloader, device=device)
+        metrics = {
+            "accuracy": test_results["accuracy"],
+            "accuracy_top3": test_results["top3_accuracy"],
+            "loss": loss,
+        }
+        for class_idx in range(NUM_CLASSES):
+            metrics[f"accuracy_class_{class_idx}"] = test_results[
+                f"class_accuracy_{class_idx}"
+            ]
+        return MetricRecord(metrics)
 
     return global_evaluate
