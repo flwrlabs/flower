@@ -27,9 +27,16 @@ To reproduce the full robustness sweep (0%, 20%, 30%, 50% malicious fractions), 
 ## Benchmark Scripts & Results
 
 See `_static/` for the generated benchmark charts:
-- `python -m merkleTrim.benchmark_overhead` $\rightarrow$ `_static/benchmark_overhead.png` (Payload & compute time)
-- `python -m merkleTrim.benchmark_robustness` $\rightarrow$ `_static/benchmark_robustness.png` (Accuracy damage curve)
+- `python -m merkleTrim.benchmark_overhead` (Payload & compute time)
+- `python -m merkleTrim.benchmark_robustness` (Accuracy damage curve)
 - `python -m merkleTrim.test_merkle_verification` (Cross-language Python/EVM Merkle verification test)
+
+### Overhead Benchmark
+![Benchmark Overhead](_static/benchmark_overhead.png)
+
+### Robustness Benchmark
+![Benchmark Robustness](_static/benchmark_robustness.png)
+
 
 ## On-chain Verification Note
 
