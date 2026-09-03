@@ -278,6 +278,7 @@ def test_get_federations() -> None:
     assert result2[0].members[0].account.id == NOOP_FLWR_AID
     assert result2[0].members[0].account.name == NOOP_ACCOUNT_NAME
     assert result2[0].members[0].role == "owner"
+    assert result2[0].member_count == 1
     assert result2[0].archived is False
     assert result2[0].simulation is False
     assert result2[0].can_invite_members is False

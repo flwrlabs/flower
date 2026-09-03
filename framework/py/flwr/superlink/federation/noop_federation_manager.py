@@ -105,6 +105,7 @@ class NoOpFederationManager(FederationManager):
                 config=self._simulation_config,
                 can_invite_members=False,
                 can_add_supernodes=False,
+                member_count=1,
             )
         ]
 
@@ -129,6 +130,7 @@ class NoOpFederationManager(FederationManager):
             config=self._simulation_config,
             can_invite_members=False,
             can_add_supernodes=False,
+            member_count=1,
         )
 
     def get_simulation_config(self, federation_id: str) -> SimulationConfig | None:

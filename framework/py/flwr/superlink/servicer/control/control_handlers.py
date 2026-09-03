@@ -1507,6 +1507,11 @@ def list_federations(
                 name=fed.id,
                 description=fed.description,
                 members=fed.members,
+                member_count=(
+                    fed.member_count
+                    if fed.member_count is not None
+                    else len(fed.members)
+                ),
                 archived=fed.archived,
                 simulation=fed.simulation,
                 can_invite_members=fed.can_invite_members,
@@ -1605,6 +1610,7 @@ def show_federation(
         name=federation_id,
         description=details.description,
         members=details.members,
+        member_count=len(details.members),
         nodes=details.nodes,
         runs=[run_to_proto(run) for run in details.runs],
         archived=details.archived,
@@ -1665,6 +1671,7 @@ def create_federation(
             name=federation.id,
             description=federation.description,
             members=federation.members,
+            member_count=len(federation.members),
             simulation=federation.simulation,
             can_invite_members=federation.can_invite_members,
             can_add_supernodes=federation.can_add_supernodes,
