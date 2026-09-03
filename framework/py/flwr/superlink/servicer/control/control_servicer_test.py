@@ -1311,6 +1311,17 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(response.federations[0].can_invite_members)
         self.assertFalse(response.federations[0].can_add_supernodes)
 
+    def test_federation_member_count_wire_round_trip(self) -> None:
+        """Test the member count survives protobuf serialization."""
+        response = ListFederationsResponse()
+        federation = response.federations.add(member_count=300)
+
+        serialized_federation = federation.SerializeToString()
+        round_tripped = ListFederationsResponse.FromString(response.SerializeToString())
+
+        self.assertEqual(serialized_federation, b"\x58\xac\x02")
+        self.assertEqual(round_tripped.federations[0].member_count, 300)
+
     def test_create_federation_success(self) -> None:
         """Test CreateFederation succeeds when federation_manager.create_federation
         works."""
