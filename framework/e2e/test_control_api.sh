@@ -7,7 +7,10 @@ case "$1" in
       ./generate.sh
       server_arg='--ssl-ca-certfile ../certificates/ca.crt
                   --ssl-certfile    ../certificates/server.pem
-                  --ssl-keyfile     ../certificates/server.key'
+                  --ssl-keyfile     ../certificates/server.key
+                  --appio-ssl-ca-certfile ../certificates/ca.crt
+                  --appio-ssl-certfile    ../certificates/server.pem
+                  --appio-ssl-keyfile     ../certificates/server.key'
       client_arg='--root-certificates ../certificates/ca.crt'
       ;;
     insecure)
