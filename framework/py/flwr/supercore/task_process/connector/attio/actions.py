@@ -19,10 +19,13 @@ from flwr.supercore.typing import JSONObject
 from ..definition import ActionAccess, ActionDefinition
 from ..tool_schema import string_property
 
-_CURSOR = string_property(
-    "Opaque cursor returned in pagination.next_cursor by the previous Attio response "
-    "for the same action and filters. Omit it for the first request."
-)
+_CURSOR: JSONObject = {
+    "type": "string",
+    "description": (
+        "Opaque cursor returned in pagination.next_cursor by the previous Attio "
+        "response for the same action and filters."
+    ),
+}
 _PAGE_LIMIT: JSONObject = {
     "type": "integer",
     "minimum": 1,
@@ -32,7 +35,7 @@ _PAGE_LIMIT: JSONObject = {
 
 def _uuid_property(description: str) -> JSONObject:
     """Build an Attio UUID property schema."""
-    return {**string_property(description), "format": "uuid"}
+    return {"type": "string", "format": "uuid", "description": description}
 
 
 ACTIONS = (
@@ -73,10 +76,17 @@ ACTIONS = (
         input_schema={
             "type": "object",
             "properties": {
-                "query": string_property("Attio record search query."),
+                "query": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "description": "Attio record search query.",
+                },
                 "objects": {
                     "type": "array",
-                    "items": string_property("Attio object type."),
+                    "items": {
+                        "type": "string",
+                        "description": "Attio object slug or UUID.",
+                    },
                     "minItems": 1,
                     "description": "Attio object types to search.",
                 },
@@ -84,8 +94,48 @@ ACTIONS = (
                     **_PAGE_LIMIT,
                     "description": "The maximum number of matches to return.",
                 },
+                "request_as": {
+                    "description": "Context in which to perform the search.",
+                    "anyOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "type": {"type": "string", "enum": ["workspace"]}
+                            },
+                            "required": ["type"],
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["workspace-member"],
+                                },
+                                "workspace_member_id": _uuid_property(
+                                    "Attio workspace member UUID."
+                                ),
+                            },
+                            "required": ["type", "workspace_member_id"],
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["workspace-member"],
+                                },
+                                "email_address": {
+                                    "type": "string",
+                                    "format": "email",
+                                    "description": "Attio workspace member email.",
+                                },
+                            },
+                            "required": ["type", "email_address"],
+                        },
+                    ],
+                },
             },
-            "required": ["query", "objects"],
+            "required": ["query", "objects", "request_as"],
             "additionalProperties": False,
         },
     ),
@@ -109,17 +159,8 @@ ACTIONS = (
                     "Attio record UUID. Must be provided together with linked_object."
                 ),
                 "participants": {
-                    "type": "array",
-                    "items": {
-                        **string_property("A participant's full email address."),
-                        "format": "email",
-                    },
-                    "minItems": 1,
-                    "uniqueItems": True,
-                    "description": (
-                        "Participant email addresses to match. Use full addresses such "
-                        "as 'ada@example.com'; do not use names, domains, or 'me'."
-                    ),
+                    "type": "string",
+                    "description": "Comma-separated participant email addresses.",
                 },
                 "sort": {
                     "type": "string",
@@ -127,6 +168,20 @@ ACTIONS = (
                     "description": (
                         "Meeting start-time order. Use start_desc for the latest "
                         "meeting."
+                    ),
+                },
+                "ends_from": {
+                    "type": ["string", "null"],
+                    "description": "Inclusive lower bound for meeting end time.",
+                },
+                "starts_before": {
+                    "type": ["string", "null"],
+                    "description": "Exclusive upper bound for meeting start time.",
+                },
+                "timezone": {
+                    "type": "string",
+                    "description": (
+                        "Timezone for evaluating all-day meeting time filters."
                     ),
                 },
             },

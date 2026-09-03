@@ -71,11 +71,14 @@ def test_attio_actions_are_registered_as_read_only() -> None:
     linked_record_id = meeting_properties["linked_record_id"]
     assert isinstance(participants, dict)
     assert isinstance(linked_record_id, dict)
-    assert participants["type"] == "array"
-    participant_items = participants["items"]
-    assert isinstance(participant_items, dict)
-    assert participant_items["format"] == "email"
+    assert participants["type"] == "string"
     assert linked_record_id["format"] == "uuid"
+    search_tool = next(tool for tool in tools if tool["name"] == "attio_search_records")
+    search_parameters = search_tool["parameters"]
+    assert isinstance(search_parameters, dict)
+    search_required = search_parameters["required"]
+    assert isinstance(search_required, list)
+    assert "request_as" in search_required
     for tool in tools:
         parameters = tool["parameters"]
         assert isinstance(parameters, dict)
@@ -126,7 +129,7 @@ def test_identify_member_and_list_latest_meeting() -> None:
 
         result = _invoke(
             "attio_list_meetings",
-            {"participants": [email], "sort": "start_desc", "limit": 1},
+            {"participants": email, "sort": "start_desc", "limit": 1},
         )
 
     assert result == {"data": [{"title": "Latest call"}]}
@@ -150,7 +153,12 @@ def test_search_records_calls_attio() -> None:
     response = _response({"data": []})
     with patch(_HTTP_REQUEST, return_value=response) as request:
         result = _invoke(
-            "attio_search_records", {"query": "Flower", "objects": ["companies"]}
+            "attio_search_records",
+            {
+                "query": "Flower",
+                "objects": ["companies"],
+                "request_as": {"type": "workspace"},
+            },
         )
 
     assert request.call_args.args == (
@@ -165,8 +173,8 @@ def test_search_records_calls_attio() -> None:
     assert result == {"data": []}
 
 
-def test_list_meetings_forwards_validated_filters_and_sort() -> None:
-    """Meeting reads should forward documented Attio query formats."""
+def test_list_meetings_forwards_attio_query_parameters() -> None:
+    """Meeting reads should forward documented Attio query parameters."""
     response = _response({"data": [], "pagination": {"next_cursor": None}})
     with patch(_HTTP_REQUEST, return_value=response) as request:
         result = _invoke(
@@ -175,8 +183,11 @@ def test_list_meetings_forwards_validated_filters_and_sort() -> None:
                 "limit": 1,
                 "linked_object": "people",
                 "linked_record_id": "CB59AB17-AD15-460C-A126-0715617C0853",
-                "participants": ["ada@example.com", " grace@example.com "],
+                "participants": "ada@example.com,grace@example.com",
                 "sort": "start_desc",
+                "ends_from": "2026-08-01T00:00:00Z",
+                "starts_before": "2026-09-01T00:00:00Z",
+                "timezone": "Europe/Berlin",
             },
         )
 
@@ -184,9 +195,12 @@ def test_list_meetings_forwards_validated_filters_and_sort() -> None:
     assert request.call_args.kwargs["params"] == {
         "limit": "1",
         "linked_object": "people",
-        "linked_record_id": "cb59ab17-ad15-460c-a126-0715617c0853",
+        "linked_record_id": "CB59AB17-AD15-460C-A126-0715617C0853",
         "participants": "ada@example.com,grace@example.com",
         "sort": "start_desc",
+        "ends_from": "2026-08-01T00:00:00Z",
+        "starts_before": "2026-09-01T00:00:00Z",
+        "timezone": "Europe/Berlin",
     }
 
 
@@ -204,6 +218,7 @@ def test_list_actions_omit_unspecified_limit() -> None:
         with patch(_HTTP_REQUEST, return_value=response) as request:
             _invoke(name, arguments)
         assert "limit" not in request.call_args.kwargs["params"]
+        assert "sort" not in request.call_args.kwargs["params"]
 
 
 def test_list_meetings_forwards_limit_without_local_maximum() -> None:
@@ -215,28 +230,26 @@ def test_list_meetings_forwards_limit_without_local_maximum() -> None:
     assert request.call_args.kwargs["params"]["limit"] == "201"
 
 
-@pytest.mark.parametrize(
-    "arguments",
-    [
-        {"linked_object": "people"},
-        {"linked_record_id": "cb59ab17-ad15-460c-a126-0715617c0853"},
-        {
-            "linked_object": "people",
-            "linked_record_id": "not-a-uuid",
-        },
-        {"participants": "Ada Lovelace"},
-        {"participants": "example.com"},
-        {"participants": "me"},
-        {"participants": []},
-        {"sort": "latest"},
-    ],
-)
-def test_list_meetings_rejects_invalid_filters(arguments: JSONObject) -> None:
-    """Invalid meeting filters should fail before reaching Attio."""
-    with patch(_HTTP_REQUEST) as request, pytest.raises(ValueError):
+def test_list_meetings_leaves_filter_validation_to_attio() -> None:
+    """Meeting filters should reach Attio without local rewriting."""
+    response = _response(
+        {"code": "validation_error", "message": "Invalid meeting filters"},
+        status_code=400,
+    )
+    arguments: JSONObject = {
+        "cursor": "0",
+        "linked_object": "people",
+        "linked_record_id": "me",
+        "participants": "me",
+        "sort": "latest",
+    }
+    with (
+        patch(_HTTP_REQUEST, return_value=response) as request,
+        pytest.raises(AttioApiError),
+    ):
         _invoke("attio_list_meetings", arguments)
 
-    request.assert_not_called()
+    assert request.call_args.kwargs["params"] == arguments
 
 
 def test_api_errors_include_attio_code_and_message() -> None:
@@ -254,7 +267,14 @@ def test_api_errors_include_attio_code_and_message() -> None:
         ),
         pytest.raises(AttioApiError) as error,
     ):
-        _invoke("attio_search_records", {"query": "Flower", "objects": ["people"]})
+        _invoke(
+            "attio_search_records",
+            {
+                "query": "Flower",
+                "objects": ["people"],
+                "request_as": {"type": "workspace"},
+            },
+        )
 
     assert error.value.code == "invalid_query"
     assert str(error.value) == (

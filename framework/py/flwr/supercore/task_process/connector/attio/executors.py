@@ -14,9 +14,7 @@
 # ===============================================================================
 """Attio action executors."""
 
-import re
 from urllib.parse import quote
-from uuid import UUID
 
 import requests
 
@@ -24,15 +22,8 @@ from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
 from ..http import ConnectorApiError, request_json_object
-from ..json_utils import (
-    optional_cursor,
-    optional_string,
-    require_string,
-)
 
 _ATTIO_API_BASE_URL = "https://api.attio.com/v2"
-_ATTIO_MEETING_SORTS = {"start_asc", "start_desc"}
-_EMAIL_ADDRESS = re.compile(r"^[^@\s,]+@[^@\s,]+$")
 
 
 class AttioApiError(ConnectorApiError):
@@ -65,16 +56,11 @@ def search_records(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
     """Search records in one Attio workspace."""
-    objects = arguments.get("objects")
-    if not isinstance(objects, list) or not objects:
-        raise ValueError("Attio objects must be a non-empty list.")
     body: JSONObject = {
-        "query": require_string(arguments.get("query"), "Attio", "query"),
-        "objects": [require_string(item, "Attio", "object") for item in objects],
-        "request_as": {"type": "workspace"},
+        name: arguments[name]
+        for name in ("query", "objects", "limit", "request_as")
+        if name in arguments
     }
-    if (limit := _limit(arguments)) is not None:
-        body["limit"] = limit
     return _call_attio_api(
         "POST",
         "/objects/records/search",
@@ -87,28 +73,24 @@ def list_meetings(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
     """List meetings in one Attio workspace."""
-    linked_object = _optional(arguments, "linked_object")
-    linked_record_id = _optional(arguments, "linked_record_id")
-    if (linked_object is None) != (linked_record_id is None):
-        raise ValueError(
-            "Attio linked_object and linked_record_id must be provided together."
-        )
-    if linked_record_id is not None:
-        linked_record_id = _uuid(linked_record_id, "linked_record_id")
     return _call_attio_api(
         "GET",
         "/meetings",
         context.credentials,
-        params={
-            "limit": _limit_param(arguments),
-            "cursor": optional_cursor(
-                arguments.get("cursor"), "Attio", "pagination.next_cursor"
+        params=_query_params(
+            arguments,
+            (
+                "limit",
+                "cursor",
+                "linked_object",
+                "linked_record_id",
+                "participants",
+                "sort",
+                "ends_from",
+                "starts_before",
+                "timezone",
             ),
-            "linked_object": linked_object,
-            "linked_record_id": linked_record_id,
-            "participants": _participants(arguments),
-            "sort": _meeting_sort(arguments),
-        },
+        ),
     )
 
 
@@ -121,12 +103,7 @@ def list_call_recordings(
         "GET",
         f"/meetings/{meeting_id}/call_recordings",
         context.credentials,
-        params={
-            "limit": _limit_param(arguments),
-            "cursor": optional_cursor(
-                arguments.get("cursor"), "Attio", "pagination.next_cursor"
-            ),
-        },
+        params=_query_params(arguments, ("limit", "cursor")),
     )
 
 
@@ -142,11 +119,7 @@ def get_call_transcript(
         "GET",
         f"/meetings/{meeting_id}/call_recordings/{recording_id}/transcript",
         context.credentials,
-        params={
-            "cursor": optional_cursor(
-                arguments.get("cursor"), "Attio", "pagination.next_cursor"
-            )
-        },
+        params=_query_params(arguments, ("cursor",)),
     )
 
 
@@ -165,7 +138,7 @@ def _call_attio_api(
     path: str,
     credentials: JSONObject,
     *,
-    params: dict[str, str | None] | None = None,
+    params: dict[str, str] | None = None,
     json_body: JSONObject | None = None,
 ) -> JSONObject:
     """Call one Attio REST endpoint."""
@@ -180,73 +153,26 @@ def _call_attio_api(
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         },
-        params={k: v for k, v in (params or {}).items() if v is not None},
+        params=params or {},
         json=json_body,
         http_error_details=_response_error_details,
     )
 
 
 def _path_segment(value: object, name: str) -> str:
-    """Validate and encode one Attio path segment."""
-    return quote(_uuid(require_string(value, "Attio", name), name), safe="")
+    """Encode one Attio path segment without changing its value."""
+    if not isinstance(value, str):
+        raise TypeError(f"Attio {name} must be a string.")
+    return quote(value, safe="")
 
 
-def _limit(arguments: JSONObject) -> int | None:
-    """Return a validated Attio page limit when one was supplied."""
-    if "limit" not in arguments:
-        return None
-    limit = arguments["limit"]
-    if isinstance(limit, bool) or not isinstance(limit, int):
-        raise ValueError("Attio limit must be an integer.")
-    if limit < 1:
-        raise ValueError("Attio limit must be at least 1.")
-    return limit
-
-
-def _limit_param(arguments: JSONObject) -> str | None:
-    """Return an optional validated Attio limit query parameter."""
-    limit = _limit(arguments)
-    return str(limit) if limit is not None else None
-
-
-def _optional(arguments: JSONObject, name: str) -> str | None:
-    """Return one optional Attio string argument."""
-    return optional_string(arguments.get(name), "Attio", name)
-
-
-def _meeting_sort(arguments: JSONObject) -> str:
-    """Return a validated Attio meeting sort order."""
-    sort = optional_string(arguments.get("sort"), "Attio", "sort") or "start_asc"
-    if sort not in _ATTIO_MEETING_SORTS:
-        raise ValueError("Attio sort must be 'start_asc' or 'start_desc'.")
-    return sort
-
-
-def _participants(arguments: JSONObject) -> str | None:
-    """Return model-native email input in Attio's comma-separated format."""
-    participants = arguments.get("participants")
-    if participants is None:
-        return None
-    if isinstance(participants, str):
-        # Retain compatibility with calls made before participants became an array.
-        emails = [email.strip() for email in participants.split(",")]
-    elif isinstance(participants, list):
-        emails = [
-            require_string(email, "Attio", "participant") for email in participants
-        ]
-    else:
-        raise ValueError("Attio participants must be a list of email addresses.")
-    if not emails or any(_EMAIL_ADDRESS.fullmatch(email) is None for email in emails):
-        raise ValueError("Attio participants must contain full email addresses.")
-    return ",".join(emails)
-
-
-def _uuid(value: str, name: str) -> str:
-    """Return one normalized Attio UUID argument."""
-    try:
-        return str(UUID(value))
-    except ValueError:
-        raise ValueError(f"Attio {name} must be a UUID.") from None
+def _query_params(arguments: JSONObject, names: tuple[str, ...]) -> dict[str, str]:
+    """Serialize supplied Attio query values without renaming them."""
+    return {
+        name: str(arguments[name])
+        for name in names
+        if name in arguments and arguments[name] is not None
+    }
 
 
 def _response_error_details(response: requests.Response) -> tuple[str, str | None]:
