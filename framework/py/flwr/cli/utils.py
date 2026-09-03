@@ -37,7 +37,6 @@ from rich.console import Console
 from flwr.cli.typing import SuperLinkConnection
 from flwr.common.constant import AuthnType, CliOutputFormat
 from flwr.proto.control_pb2 import RefreshAuthTokensRequest  # pylint: disable=E0611
-from flwr.proto.control_pb2_grpc import ControlStub  # pylint: disable=E0611
 from flwr.supercore.auth.typing import AccountAuthCredentials
 from flwr.supercore.constant import (
     APP_PUBLISH_EXCLUDE_PATTERNS,
@@ -443,11 +442,11 @@ def init_http_client_from_connection(
 
 
 @contextmanager  # docsig: disable=SIG503
-def cli_output_control_stub(
+def cli_output_control_client(
     superlink: str | None,
     output_format: str = CliOutputFormat.DEFAULT,
-) -> Iterator[tuple[ControlStub, bool]]:
-    """Manage CLI output handling and Control API stub lifecycle.
+) -> Iterator[tuple[ControlHttpClient, bool]]:
+    """Manage CLI output handling and Control API client lifecycle.
 
     Parameters
     ----------
@@ -458,16 +457,17 @@ def cli_output_control_stub(
 
     Yields
     ------
-    tuple[ControlStub, bool]
-        A tuple of (ControlStub, is_json), where `is_json` indicates JSON output.
+    tuple[ControlHttpClient, bool]
+        A tuple of (ControlHttpClient, is_json), where `is_json` indicates JSON
+        output.
     """
     with cli_output_handler(output_format=output_format) as is_json:
         superlink_connection = read_superlink_connection(superlink)
-        channel = init_channel_from_connection(superlink_connection)
+        control_client = init_http_client_from_connection(superlink_connection)
         try:
-            yield ControlStub(channel), is_json
+            yield control_client, is_json
         finally:
-            channel.close()
+            control_client.close()
 
 
 def wait_for_control_api_channel(

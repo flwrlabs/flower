@@ -19,9 +19,6 @@ import unittest
 from typing import NoReturn
 from unittest.mock import Mock, call, patch
 
-import grpc
-
-from flwr.common.constant import CONN_REFRESH_PERIOD
 from flwr.proto.control_pb2 import StreamLogsResponse  # pylint: disable=E0611
 
 from .log import _log_with_control_api, print_logs, stream_logs
@@ -45,7 +42,7 @@ class TestFlwrLog(unittest.TestCase):
     """Unit tests for `flwr log` CLI functions."""
 
     def setUp(self) -> None:
-        """Initialize mock ControlStub before each test."""
+        """Initialize a mock Control API client before each test."""
         self.expected_stream_call = [
             call("log_output_1"),
             call("log_output_2"),
@@ -65,50 +62,28 @@ class TestFlwrLog(unittest.TestCase):
         """Test stream_logs."""
         with patch("builtins.print") as mock_print:
             with self.assertRaises(KeyboardInterrupt):
-                stream_logs(
-                    run_id=123, stub=self.mock_stub, duration=1, after_timestamp=0.0
-                )
+                stream_logs(run_id=123, stub=self.mock_stub, after_timestamp=0.0)
                 # Assert that mock print was called with the expected arguments
                 mock_print.assert_has_calls(self.expected_stream_call)
 
     def test_flwr_log_print_method(self) -> None:
         """Test print_logs."""
         with patch("builtins.print") as mock_print:
-            print_logs(run_id=123, stub=self.mock_stub, timeout=0)
+            print_logs(run_id=123, stub=self.mock_stub)
             # Assert that mock print was called with the expected arguments
             mock_print.assert_has_calls(self.expected_print_call)
 
-    def test_flwr_log_stream_method_deadline_exceeded(self) -> None:
-        """Test stream_logs handles deadline exceeded without raising."""
-        rpc_err = grpc.RpcError()
-        rpc_err.code = lambda: grpc.StatusCode.DEADLINE_EXCEEDED
-        self.mock_stub.StreamLogs.side_effect = rpc_err
-
-        result = stream_logs(
-            run_id=123, stub=self.mock_stub, duration=1, after_timestamp=0.0
-        )
-
-        self.assertEqual(result, 0.0)
-
-    def test_flwr_log_print_method_deadline_exceeded(self) -> None:
-        """Test print_logs handles deadline exceeded without raising."""
-        rpc_err = grpc.RpcError()
-        rpc_err.code = lambda: grpc.StatusCode.DEADLINE_EXCEEDED
-        self.mock_stub.StreamLogs.side_effect = rpc_err
-
-        print_logs(run_id=123, stub=self.mock_stub, timeout=0)
-
-    def test_log_with_control_api_owns_channel_lifecycle(self) -> None:
-        """Construct the stub once and close its channel at the command boundary."""
-        channel = Mock()
-        stub = Mock()
+    def test_log_with_control_api_owns_client_lifecycle(self) -> None:
+        """Close the HTTP client at the command boundary."""
+        control_client = Mock()
         with (
-            patch("flwr.cli.log.init_channel_from_connection", return_value=channel),
-            patch("flwr.cli.log.ControlStub", return_value=stub) as stub_class,
+            patch(
+                "flwr.cli.log.init_http_client_from_connection",
+                return_value=control_client,
+            ),
             patch("flwr.cli.log.start_stream") as start_stream,
         ):
             _log_with_control_api(Mock(), run_id=123, stream=True)
 
-        stub_class.assert_called_once_with(channel)
-        start_stream.assert_called_once_with(123, stub, CONN_REFRESH_PERIOD)
-        channel.close.assert_called_once_with()
+        start_stream.assert_called_once_with(123, control_client)
+        control_client.close.assert_called_once_with()

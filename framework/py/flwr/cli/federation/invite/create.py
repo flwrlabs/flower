@@ -20,7 +20,7 @@ from typing import Annotated, Literal
 import typer
 
 from flwr.cli.utils import (
-    cli_output_control_stub,
+    cli_output_control_client,
     flwr_cli_exc_handler,
     print_json_to_stdout,
 )
@@ -29,7 +29,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateInvitationRequest,
     CreateInvitationResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.control import ControlHttpClient
 
 
 def create(
@@ -55,7 +55,7 @@ def create(
     ] = CliOutputFormat.DEFAULT,
 ) -> None:
     """Create an invitation to join a federation."""
-    with cli_output_control_stub(superlink, output_format) as (stub, is_json):
+    with cli_output_control_client(superlink, output_format) as (stub, is_json):
         request = CreateInvitationRequest(
             invitee_account_name=account,
             federation_name=federation,
@@ -64,7 +64,7 @@ def create(
 
 
 def _create_invitation(
-    stub: ControlStub,
+    stub: ControlHttpClient,
     request: CreateInvitationRequest,
     is_json: bool,
 ) -> None:
