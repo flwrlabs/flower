@@ -84,6 +84,20 @@ SuperNode Runtime API and starts the ClientApp processes.
 The Runtime API in this example listens on ``127.0.0.1``, so both jobs must use the same
 compute node.
 
+.. warning::
+
+    The process-isolation examples below are minimal configurations for a dedicated or
+    otherwise trusted compute node. On a multi-tenant node, binding the Runtime API to
+    ``127.0.0.1`` does not prevent other local jobs from connecting to it. Because the
+    examples do not enable SuperExec authentication, another local process could claim
+    ClientApp tasks and access their inputs.
+
+    For a shared or production compute node, create a secret file with restricted file
+    permissions and pass the same file to both ``flower-supernode`` and
+    ``flower-superexec`` with ``--superexec-auth-secret-file <path-to-secret>``. This
+    experimental shared-secret mechanism authenticates SuperExec requests. The same
+    requirement applies to the GPU example.
+
 Create ``supernode-process.sbatch``:
 
 .. code-block:: bash
@@ -156,9 +170,11 @@ inherit the CPU and memory allocation of the SuperExec job.
 .. note::
 
     ``--insecure`` applies only to the local Runtime API connection between SuperExec
-    and SuperNode. The connection from SuperNode to SuperGrid still uses TLS. If the
-    Runtime API crosses a trusted-host boundary, configure TLS as described in
-    :doc:`Enable TLS connections <how-to-enable-tls-connections>`.
+    and SuperNode. The connection from SuperNode to SuperGrid still uses TLS. To protect
+    Runtime API traffic outside a trusted host, configure TLS as described in
+    :doc:`Enable TLS connections <how-to-enable-tls-connections>`. Runtime API TLS
+    authenticates the server but does not replace the SuperExec caller authentication
+    described above.
 
 ********************************************
  Use process isolation with a GPU ClientApp
