@@ -18,14 +18,11 @@ import re
 from urllib.parse import quote
 from uuid import UUID
 
-import requests
-
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
 from ..http import ConnectorApiError, request_json_object
 from ..json_utils import (
-    ConnectorInputError,
     optional_cursor,
     optional_string,
     require_int_range,
@@ -35,7 +32,6 @@ from ..json_utils import (
 _ATTIO_API_BASE_URL = "https://api.attio.com/v2"
 _ATTIO_MEETING_SORTS = {"start_asc", "start_desc"}
 _EMAIL_ADDRESS = re.compile(r"^[^@\s,]+@[^@\s,]+$")
-_SAFE_ERROR_CODE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 
 class AttioApiError(ConnectorApiError):
@@ -50,7 +46,7 @@ def search_records(
     """Search records in one Attio workspace."""
     objects = arguments.get("objects")
     if not isinstance(objects, list) or not objects:
-        raise ConnectorInputError("Attio objects must be a non-empty list.")
+        raise ValueError("Attio objects must be a non-empty list.")
     return _call_attio_api(
         "POST",
         "/objects/records/search",
@@ -71,7 +67,7 @@ def list_meetings(
     linked_object = _optional(arguments, "linked_object")
     linked_record_id = _optional(arguments, "linked_record_id")
     if (linked_object is None) != (linked_record_id is None):
-        raise ConnectorInputError(
+        raise ValueError(
             "Attio linked_object and linked_record_id must be provided together."
         )
     if linked_record_id is not None:
@@ -161,7 +157,6 @@ def _call_attio_api(
         },
         params={k: v for k, v in (params or {}).items() if v is not None},
         json=json_body,
-        http_error_code=_response_error_code,
     )
 
 
@@ -186,7 +181,7 @@ def _meeting_sort(arguments: JSONObject) -> str:
     """Return a validated Attio meeting sort order."""
     sort = optional_string(arguments.get("sort"), "Attio", "sort") or "start_asc"
     if sort not in _ATTIO_MEETING_SORTS:
-        raise ConnectorInputError("Attio sort must be 'start_asc' or 'start_desc'.")
+        raise ValueError("Attio sort must be 'start_asc' or 'start_desc'.")
     return sort
 
 
@@ -203,13 +198,9 @@ def _participants(arguments: JSONObject) -> str | None:
             require_string(email, "Attio", "participant") for email in participants
         ]
     else:
-        raise ConnectorInputError(
-            "Attio participants must be a list of email addresses."
-        )
+        raise ValueError("Attio participants must be a list of email addresses.")
     if not emails or any(_EMAIL_ADDRESS.fullmatch(email) is None for email in emails):
-        raise ConnectorInputError(
-            "Attio participants must contain full email addresses."
-        )
+        raise ValueError("Attio participants must contain full email addresses.")
     return ",".join(emails)
 
 
@@ -218,15 +209,4 @@ def _uuid(value: str, name: str) -> str:
     try:
         return str(UUID(value))
     except ValueError:
-        raise ConnectorInputError(f"Attio {name} must be a UUID.") from None
-
-
-def _response_error_code(response: requests.Response) -> str:
-    """Return Attio's structured error code when it is safe to expose."""
-    try:
-        code = response.json().get("code")
-    except (AttributeError, ValueError):
-        code = None
-    if isinstance(code, str) and _SAFE_ERROR_CODE.fullmatch(code):
-        return code
-    return "rate_limited" if response.status_code == 429 else "http_error"
+        raise ValueError(f"Attio {name} must be a UUID.") from None

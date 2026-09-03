@@ -22,16 +22,10 @@ from flwr.supercore.typing import JSONObject
 ErrorFactory = Callable[[str], Exception]
 
 
-class ConnectorInputError(ValueError):
-    """Input validation failure that is safe to return to connector callers."""
-
-    code = "invalid_input"
-
-
 def require_string(value: object, provider: str, name: str) -> str:
     """Validate and normalize a required connector argument."""
     if not isinstance(value, str) or not value.strip():
-        raise ConnectorInputError(f"{provider} {name} must be a non-empty string.")
+        raise ValueError(f"{provider} {name} must be a non-empty string.")
     return value.strip()
 
 
@@ -50,7 +44,7 @@ def optional_cursor(value: object, provider: str, response_path: str) -> str | N
     if cursor is None:
         return None
     if cursor.casefold() in {"none", "null"} or cursor == "0":
-        raise ConnectorInputError(
+        raise ValueError(
             f"{provider} cursor must be copied from {response_path}; omit it for "
             "the first request."
         )
@@ -67,18 +61,16 @@ def require_int_range(
 ) -> int:
     """Validate an integer connector argument with inclusive bounds."""
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ConnectorInputError(f"{provider} {name} must be an integer.")
+        raise ValueError(f"{provider} {name} must be an integer.")
     if value < minimum or value > maximum:
-        raise ConnectorInputError(
-            f"{provider} {name} must be between {minimum} and {maximum}."
-        )
+        raise ValueError(f"{provider} {name} must be between {minimum} and {maximum}.")
     return value
 
 
 def require_bool(value: object, provider: str, name: str) -> bool:
     """Validate a boolean connector argument."""
     if not isinstance(value, bool):
-        raise ConnectorInputError(f"{provider} {name} must be a boolean.")
+        raise ValueError(f"{provider} {name} must be a boolean.")
     return value
 
 

@@ -165,27 +165,6 @@ def test_api_errors_are_secret_safe() -> None:
     assert "attio-secret" not in str(error.value)
 
 
-def test_api_errors_return_safe_attio_code() -> None:
-    """Attio's structured code should be useful without exposing its message."""
-    with (
-        patch(
-            _HTTP_REQUEST,
-            return_value=_response(
-                {
-                    "code": "invalid_query",
-                    "message": "attio-secret",
-                },
-                status_code=400,
-            ),
-        ),
-        pytest.raises(AttioApiError) as error,
-    ):
-        _invoke("attio_search_records", {"query": "Flower", "objects": ["people"]})
-
-    assert error.value.code == "invalid_query"
-    assert "attio-secret" not in str(error.value)
-
-
 def test_oauth_builds_url_and_exchanges_code() -> None:
     """OAuth should validate redirects and return Attio credentials."""
     url = _flow().build_authorization_url(

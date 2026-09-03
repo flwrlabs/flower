@@ -21,7 +21,7 @@ import pytest
 import requests
 
 from .http import ConnectorApiError, request_json_object
-from .json_utils import ConnectorInputError, optional_cursor, optional_string
+from .json_utils import optional_cursor, optional_string
 from .registry import CONNECTORS
 from .tool_schema import string_property
 
@@ -67,7 +67,7 @@ def test_optional_string_rejects_non_string_values() -> None:
 @pytest.mark.parametrize("value", ["0", "none", "NONE", "null"])
 def test_optional_cursor_rejects_invented_sentinels(value: str) -> None:
     """Common model-invented cursor sentinels should fail locally."""
-    with pytest.raises(ConnectorInputError, match="copied from next_cursor"):
+    with pytest.raises(ValueError, match="copied from next_cursor"):
         optional_cursor(value, "Example", "next_cursor")
 
 
