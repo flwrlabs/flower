@@ -15,9 +15,8 @@
 """Flower command line interface configuration utils."""
 
 
-import platform
 import re
-import shlex
+import sys
 from pathlib import Path
 from typing import Any, cast
 
@@ -47,24 +46,6 @@ from flwr.cli.typing import (
 from flwr.common.config import flatten_dict
 from flwr.supercore.constant import DEFAULT_SIMULATION_CONFIG
 from flwr.supercore.utils import get_flwr_home
-
-
-def _get_supergrid_address_update_command(config_path: Path) -> str:
-    """Return a platform-appropriate command for updating the SuperGrid address."""
-    if platform.system() == "Windows":
-        config_arg = str(config_path).replace("'", "''")
-        return (
-            f"$path = '{config_arg}'; "
-            "[System.IO.File]::WriteAllText($path, "
-            "[System.IO.File]::ReadAllText($path).Replace("
-            f"'{LEGACY_SUPERGRID_ADDRESS}', '{SUPERGRID_HTTP_ADDRESS}'))"
-        )
-
-    return (
-        "sed -i.bak "
-        f"'s/{re.escape(LEGACY_SUPERGRID_ADDRESS)}/{SUPERGRID_HTTP_ADDRESS}/g' "
-        f"{shlex.quote(str(config_path))}"
-    )
 
 
 def _parse_simulation_options(options: dict[str, Any]) -> SuperLinkSimulationOptions:
@@ -189,15 +170,6 @@ def init_flwr_config() -> None:
             f"\nFlower configuration not found. Created default configuration"
             f" at {config_path}\n",
         )
-    elif LEGACY_SUPERGRID_ADDRESS in config_path.read_text(encoding="utf-8"):
-        typer.secho(
-            "\n⚠️ The Flower configuration uses the old SuperGrid address "
-            f"`{LEGACY_SUPERGRID_ADDRESS}`. Update it to "
-            f"`{SUPERGRID_HTTP_ADDRESS}` manually or by running:\n\n"
-            f"{_get_supergrid_address_update_command(config_path)}\n",
-            fg=typer.colors.YELLOW,
-        )
-        raise typer.Exit(code=1)
 
 
 def parse_superlink_connection(
@@ -327,8 +299,37 @@ def read_superlink_connection(
             raise click.ClickException(msg)
 
         conn_dict = superlink_config[connection_name]
+        if (
+            isinstance(conn_dict, dict)
+            and conn_dict.get(SuperLinkConnectionTomlKey.ADDRESS)
+            == LEGACY_SUPERGRID_ADDRESS
+        ):
+            config_path = config_path.resolve()
+            typer.secho(
+                f"\n⚠️ You are using SuperLink connection `{connection_name}`, which "
+                "uses the old SuperGrid address "
+                f"`{LEGACY_SUPERGRID_ADDRESS}`.\n\n"
+                f"To update it manually, open `{config_path}`, find `address` under "
+                f"the `[superlink.{connection_name}]` section, and replace "
+                f"`{LEGACY_SUPERGRID_ADDRESS}` with `{SUPERGRID_HTTP_ADDRESS}`.\n",
+                fg=typer.colors.YELLOW,
+            )
+            if (
+                sys.stdin.isatty()
+                and sys.stdout.isatty()
+                and typer.confirm(f"Do you want me to update `{config_path}` now?")
+            ):
+                conn_dict[SuperLinkConnectionTomlKey.ADDRESS] = SUPERGRID_HTTP_ADDRESS
+                write_flower_config(toml_dict)
+                typer.secho(
+                    f"Updated `{config_path}`. Please run the command again.",
+                    fg=typer.colors.GREEN,
+                )
+            raise typer.Exit(code=1)
         return parse_superlink_connection(conn_dict, connection_name)
 
+    except typer.Exit:
+        raise
     except ValueError as err:
         raise click.ClickException(
             f"Failed to parse the Flower configuration file ({config_path}). {err}"

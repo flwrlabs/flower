@@ -118,10 +118,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type, app.is_hub_app) for app in apps],
             [
-                ("@me/z-agent", agent_hash, TaskType.AGENT_APP, True),
+                ("@me/z-agent", "", TaskType.AGENT_APP, True),
                 ("@me/server", server_hash, TaskType.SERVER_APP, False),
             ],
         )
+        self.assertIsNotNone(state.get_fab(agent_hash))
         self.assertEqual(
             state.get_app("@me/fed-a", "@me/server", server_hash),
             Fab(server_hash, b"server", {}),
@@ -146,10 +147,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         updated = state.list_apps("@me/fed-a")
         self.assertEqual(len(updated), 2)
-        self.assertEqual(updated[1].fab_hash, updated_hash)
+        self.assertEqual(updated[1].fab_hash, "")
         self.assertTrue(updated[1].is_hub_app)
         self.assertIsNone(state.get_app("@me/fed-a", "@me/server", server_hash))
-        self.assertIsNotNone(state.get_app("@me/fed-a", "@me/server", updated_hash))
+        self.assertIsNone(state.get_app("@me/fed-a", "@me/server", updated_hash))
 
         self.assertTrue(state.delete_app("@me/fed-a", "@me/server"))
         self.assertFalse(state.delete_app("@me/fed-a", "@me/server"))
