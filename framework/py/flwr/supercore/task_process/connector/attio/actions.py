@@ -17,17 +17,17 @@
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ActionAccess, ActionDefinition
-from ..tool_schema import integer_property, string_property
+from ..tool_schema import string_property
 
 _CURSOR = string_property(
     "Opaque cursor returned in pagination.next_cursor by the previous Attio response "
     "for the same action and filters. Omit it for the first request."
 )
-_PAGE_LIMIT = integer_property(
-    "The maximum number of items to return.",
-    minimum=1,
-    maximum=200,
-)
+_PAGE_LIMIT: JSONObject = {
+    "type": "integer",
+    "minimum": 1,
+    "description": "The maximum number of items to return.",
+}
 
 
 def _uuid_property(description: str) -> JSONObject:
@@ -80,11 +80,10 @@ ACTIONS = (
                     "minItems": 1,
                     "description": "Attio object types to search.",
                 },
-                "limit": integer_property(
-                    "The maximum number of matches to return.",
-                    minimum=1,
-                    maximum=25,
-                ),
+                "limit": {
+                    **_PAGE_LIMIT,
+                    "description": "The maximum number of matches to return.",
+                },
             },
             "required": ["query", "objects"],
             "additionalProperties": False,
@@ -142,11 +141,10 @@ ACTIONS = (
             "type": "object",
             "properties": {
                 "meeting_id": _uuid_property("Attio meeting UUID."),
-                "limit": integer_property(
-                    "The maximum number of recordings to return.",
-                    minimum=1,
-                    maximum=200,
-                ),
+                "limit": {
+                    **_PAGE_LIMIT,
+                    "description": "The maximum number of recordings to return.",
+                },
                 "cursor": _CURSOR,
             },
             "required": ["meeting_id"],

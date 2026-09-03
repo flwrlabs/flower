@@ -76,6 +76,15 @@ def test_attio_actions_are_registered_as_read_only() -> None:
     assert isinstance(participant_items, dict)
     assert participant_items["format"] == "email"
     assert linked_record_id["format"] == "uuid"
+    for tool in tools:
+        parameters = tool["parameters"]
+        assert isinstance(parameters, dict)
+        properties = parameters["properties"]
+        assert isinstance(properties, dict)
+        limit = properties.get("limit")
+        if isinstance(limit, dict):
+            assert limit["minimum"] == 1
+            assert "maximum" not in limit
 
 
 def test_identify_member_and_list_latest_meeting() -> None:
@@ -195,6 +204,15 @@ def test_list_actions_omit_unspecified_limit() -> None:
         with patch(_HTTP_REQUEST, return_value=response) as request:
             _invoke(name, arguments)
         assert "limit" not in request.call_args.kwargs["params"]
+
+
+def test_list_meetings_forwards_limit_without_local_maximum() -> None:
+    """Attio, rather than the connector, should enforce an upper limit."""
+    response = _response({"data": []})
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        _invoke("attio_list_meetings", {"limit": 201})
+
+    assert request.call_args.kwargs["params"]["limit"] == "201"
 
 
 @pytest.mark.parametrize(
