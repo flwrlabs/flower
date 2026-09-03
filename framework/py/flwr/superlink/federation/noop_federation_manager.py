@@ -92,7 +92,12 @@ class NoOpFederationManager(FederationManager):
             Federation(
                 id=NOOP_FEDERATION_ID,
                 description=NOOP_FEDERATION_DESCRIPTION,
-                members=[],
+                members=[
+                    Member(
+                        account=Account(id=NOOP_FLWR_AID, name=NOOP_ACCOUNT_NAME),
+                        role="owner",
+                    )
+                ],
                 nodes=[],
                 runs=[],
                 archived=False,

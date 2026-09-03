@@ -1474,6 +1474,7 @@ def list_federations(
             Federation(
                 name=fed.id,
                 description=fed.description,
+                members=fed.members,
                 archived=fed.archived,
                 simulation=fed.simulation,
                 can_invite_members=fed.can_invite_members,

@@ -1299,6 +1299,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         )
 
         self.assertEqual(len(response.federations), 1)
+        self.assertEqual(len(response.federations[0].members), 1)
+        self.assertEqual(
+            response.federations[0].members[0].account.name, NOOP_ACCOUNT_NAME
+        )
+        self.assertEqual(response.federations[0].members[0].role, "owner")
         self.assertTrue(response.federations[0].simulation)
         self.assertFalse(response.federations[0].can_invite_members)
         self.assertFalse(response.federations[0].can_add_supernodes)
