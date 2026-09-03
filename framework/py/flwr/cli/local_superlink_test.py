@@ -20,9 +20,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from flwr.cli.constant import (
-    LOCAL_RUNTIME_API_PORT,
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY,
+    LOCAL_SUPERLINK_HTTP_API_PORT,
 )
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
 from flwr.supercore.constant import FLWR_DISABLE_UPDATE_CHECK
@@ -45,7 +45,7 @@ def test_magic_address_connection_uses_local_superlink() -> None:
         with patch(_START_PATH) as mock_start:
             resolved = ensure_local_superlink(connection)
 
-    assert resolved.address == f"127.0.0.1:{LOCAL_RUNTIME_API_PORT}"
+    assert resolved.address == f"127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}"
     assert resolved.insecure is True
     assert resolved.root_certificates is None
     mock_is_started.assert_called_once()
@@ -64,7 +64,7 @@ def test_magic_address_connection_starts_local_superlink_when_unavailable() -> N
         with patch(_START_PATH) as mock_start:
             resolved = ensure_local_superlink(connection)
 
-    assert resolved.address == f"127.0.0.1:{LOCAL_RUNTIME_API_PORT}"
+    assert resolved.address == f"127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}"
     assert resolved.insecure is True
     mock_start.assert_called_once_with(False)
 
@@ -81,7 +81,7 @@ def test_in_memory_magic_address_starts_local_superlink_in_memory() -> None:
         with patch(_START_PATH) as mock_start:
             resolved = ensure_local_superlink(connection)
 
-    assert resolved.address == f"127.0.0.1:{LOCAL_RUNTIME_API_PORT}"
+    assert resolved.address == f"127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}"
     assert resolved.insecure is True
     mock_start.assert_called_once_with(True)
 
@@ -115,7 +115,7 @@ def test_options_only_connection_warns_and_uses_local_magic_address() -> None:
         with patch(_START_PATH) as mock_start:
             resolved = ensure_local_superlink(connection)
 
-    assert resolved.address == f"127.0.0.1:{LOCAL_RUNTIME_API_PORT}"
+    assert resolved.address == f"127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}"
     assert resolved.insecure is True
     assert resolved.root_certificates is None
     mock_is_started.assert_called_once()
@@ -150,7 +150,7 @@ def test_start_local_superlink_uses_builtin_log_rotation(tmp_path: Path) -> None
     assert "--host" in cmd
     assert cmd[cmd.index("--host") + 1] == "127.0.0.1"
     assert "--port" in cmd
-    assert cmd[cmd.index("--port") + 1] == LOCAL_RUNTIME_API_PORT
+    assert cmd[cmd.index("--port") + 1] == LOCAL_SUPERLINK_HTTP_API_PORT
     assert "--serverappio-api-address" not in cmd
     assert "--database" in cmd
     assert str(database) in cmd

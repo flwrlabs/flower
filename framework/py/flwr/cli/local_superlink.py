@@ -34,9 +34,9 @@ from .constant import (
     CONTROL_API_PROBE_INTERVAL,
     CONTROL_API_PROBE_TIMEOUT,
     LOCAL_CONTROL_API_ADDRESS,
-    LOCAL_RUNTIME_API_PORT,
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY,
+    LOCAL_SUPERLINK_HTTP_API_PORT,
     LOCAL_SUPERLINK_STARTUP_TIMEOUT,
 )
 from .typing import SuperLinkConnection
@@ -59,7 +59,7 @@ def ensure_local_superlink(connection: SuperLinkConnection) -> SuperLinkConnecti
     ):
         runtime_connection = SuperLinkConnection(
             name=connection.name,
-            address=f"127.0.0.1:{LOCAL_RUNTIME_API_PORT}",
+            address=f"127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}",
             root_certificates=None,
             insecure=True,
             federation=connection.federation,
@@ -89,7 +89,7 @@ def _is_local_superlink_started() -> bool:
     """Return True if local SuperLink's HTTP endpoint is reachable."""
     try:
         response = httpx.get(
-            f"http://127.0.0.1:{LOCAL_RUNTIME_API_PORT}/health",
+            f"http://127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}/health",
             timeout=CONTROL_API_PROBE_TIMEOUT,
         )
         return response.is_success
@@ -104,7 +104,7 @@ def _start_local_superlink(
     database_path, log_file_path = _get_local_superlink_paths()
 
     typer.secho(
-        f"Starting local SuperLink on 127.0.0.1:{LOCAL_RUNTIME_API_PORT}...",
+        f"Starting local SuperLink on 127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}...",
         fg=typer.colors.BLUE,
     )
 
@@ -119,7 +119,7 @@ def _start_local_superlink(
         "--host",
         "127.0.0.1",
         "--port",
-        LOCAL_RUNTIME_API_PORT,
+        LOCAL_SUPERLINK_HTTP_API_PORT,
         "--log-file",
         str(log_file_path),
         "--log-rotation-interval-hours",

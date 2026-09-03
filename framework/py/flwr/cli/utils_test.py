@@ -30,8 +30,8 @@ import typer
 from parameterized import parameterized
 
 from flwr.cli.constant import (
-    LOCAL_RUNTIME_API_PORT,
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
+    LOCAL_SUPERLINK_HTTP_API_PORT,
 )
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
 from flwr.common.constant import FLWR_DIR, CliOutputFormat
@@ -210,7 +210,7 @@ def test_init_http_client_from_connection_uses_resolved_connection() -> None:
     )
     resolved = SuperLinkConnection(
         name="local",
-        address=f"127.0.0.1:{LOCAL_RUNTIME_API_PORT}",
+        address=f"127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}",
         insecure=True,
         options=SuperLinkSimulationOptions(num_supernodes=2),
     )
@@ -236,7 +236,7 @@ def test_init_http_client_from_connection_uses_resolved_connection() -> None:
         result = init_http_client_from_connection(unresolved)
 
     assert result is http_client
-    address = f"127.0.0.1:{LOCAL_RUNTIME_API_PORT}"
+    address = f"127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}"
     load_auth_plugin.assert_called_once_with(address)
     auth_plugin.load_tokens.assert_called_once_with()
 
