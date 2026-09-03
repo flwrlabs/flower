@@ -1,0 +1,41 @@
+---
+seed: 0
+
+num_clients: 100
+num_rounds: 500
+clients_per_round: 20
+num_epochs: 20
+batch_size: 50
+
+server_device: cuda
+
+client_resources:
+  num_cpus: 1
+  num_gpus: 0.1
+
+dataset_config:
+  name: CIFAR10
+  num_classes: 10
+  alpha: 0.3
+
+model:
+  _target_: fedexp.models.ResNet18
+  num_classes: ${dataset_config.num_classes}
+
+hyperparams:
+  eta_l: 0.01     # local learning rate
+  epsilon: 0.001
+  decay : 0.998
+  weight_decay: 0.0001
+  max_norm: 10
+  use_gradient_clipping: true
+
+strategy:
+  _target_: fedexp.strategy.FedExP
+  algorithm: FedExP
+  fraction_fit: 0.00001
+  fraction_evaluate: 0.0
+  min_evaluate_clients: 0
+  min_fit_clients: ${clients_per_round}
+  min_available_clients: ${clients_per_round}
+  accept_failures: false
