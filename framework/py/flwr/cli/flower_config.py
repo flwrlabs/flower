@@ -51,20 +51,22 @@ from flwr.supercore.utils import get_flwr_home
 
 def _get_supergrid_address_update_command(config_path: Path) -> str:
     """Return a platform-appropriate command for updating the SuperGrid address."""
-    old_assignment = f'address = "{LEGACY_SUPERGRID_ADDRESS}"'
-    new_assignment = f'address = "{SUPERGRID_HTTP_ADDRESS}"'
     if platform.system() == "Windows":
         config_arg = str(config_path).replace("'", "''")
         return (
             f"$path = '{config_arg}'; "
+            "$pattern = '(?m)^(\\s*address\\s*=\\s*[''\"])"
+            f"{re.escape(LEGACY_SUPERGRID_ADDRESS)}(?=[''\"])'; "
             "[System.IO.File]::WriteAllText($path, "
-            "[System.IO.File]::ReadAllText($path).Replace("
-            f"'{old_assignment}', '{new_assignment}'))"
+            "[regex]::Replace([System.IO.File]::ReadAllText($path), "
+            f"$pattern, '${{1}}{SUPERGRID_HTTP_ADDRESS}'))"
         )
 
     return (
-        "sed -i.bak "
-        f"'s/{re.escape(old_assignment)}/{new_assignment}/' "
+        "sed -i.bak -E '/^[[:space:]]*address[[:space:]]*=/s/"
+        "([\"'\"'\"'])"
+        f"{re.escape(LEGACY_SUPERGRID_ADDRESS)}"
+        f"([\"'\"'\"'])/\\1{SUPERGRID_HTTP_ADDRESS}\\2/' "
         f"{shlex.quote(str(config_path))}"
     )
 
