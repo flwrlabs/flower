@@ -472,28 +472,29 @@ def validate_run_connector_refs(
     return canonical_refs
 
 
-def _is_hub_app(state: LinkState, federation_id: str, app_id: str) -> bool:
-    """Return whether an app association explicitly identifies a Hub app."""
-    return any(
-        app.app_id == app_id and app.HasField("is_hub_app") and app.is_hub_app
-        for app in state.list_apps(federation_id)
-    )
-
-
-def _get_start_run_app_id(request: StartRunRequest) -> str | None:
-    """Return the app ID declared by a StartRun request, if identifiable."""
+def _get_hub_app_id(
+    state: LinkState, federation_id: str, request: StartRunRequest
+) -> str | None:
+    """Return the Hub app ID declared by a StartRun request, if any."""
     if request.app_spec:
         try:
             app_id, _ = parse_app_spec(request.app_spec)
-            return app_id
         except ValueError:
             return None
-    if request.fab.content:
+    elif request.fab.content:
         try:
             fab_id, _ = get_metadata_from_config(get_fab_config(request.fab.content))
-            return f"@{fab_id}"
+            app_id = f"@{fab_id}"
         except ValueError:
             return None
+    else:
+        return None
+
+    if any(
+        app.app_id == app_id and app.HasField("is_hub_app") and app.is_hub_app
+        for app in state.list_apps(federation_id)
+    ):
+        return app_id
     return None
 
 
@@ -947,8 +948,8 @@ def start_automation(  # pylint: disable=too-many-branches,too-many-locals
     stored_start_run_request = StartRunRequest()
     stored_start_run_request.CopyFrom(start_run_request)
     stored_start_run_request.federation = federation_id
-    app_id = _get_start_run_app_id(stored_start_run_request)
-    if app_id is not None and _is_hub_app(state, federation_id, app_id):
+    app_id = _get_hub_app_id(state, federation_id, stored_start_run_request)
+    if app_id is not None:
         # Store Hub automations by unversioned app ID. Each dispatch then resolves
         # the latest compatible version instead of pinning the current run's FAB.
         stored_start_run_request.app_spec = app_id
