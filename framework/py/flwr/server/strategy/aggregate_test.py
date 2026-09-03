@@ -16,6 +16,7 @@
 
 
 import numpy as np
+import pytest
 
 from .aggregate import (
     _aggregate_n_closest_weights,
@@ -139,3 +140,15 @@ def test_aggregate_n_closest_weights_mean() -> None:
             )
         )
     )
+
+
+def test_weighted_loss_avg_zero_total_examples() -> None:
+    """Test weighted_loss_avg raises when every result reports zero examples."""
+    # Prepare: a round in which no client evaluated on any example
+    results: list[tuple[int, float]] = [(0, 2.0), (0, 3.0)]
+
+    # Execute & Assert: must raise rather than divide by zero, and say why
+    with pytest.raises(
+        ValueError, match="total number of evaluation examples.*greater than zero"
+    ):
+        weighted_loss_avg(results)
