@@ -135,6 +135,8 @@ def cli_output_handler(
         if is_json:
             restore_output()
             print_json_error(captured_output.getvalue(), err)
+            if isinstance(err, typer.Exit):
+                raise
         else:
             if isinstance(err, typer.Exit):
                 raise  # Allow typer.Exit to escape normally
