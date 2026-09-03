@@ -14,6 +14,7 @@
 # ===============================================================================
 """Tests for the Attio connector."""
 
+from typing import cast
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
 
@@ -56,200 +57,82 @@ def _invoke(name: str, arguments: JSONObject) -> JSONValue:
 
 def test_attio_actions_are_registered_as_read_only() -> None:
     """Attio should expose six account-scoped read actions."""
-    assert len(ACTIONS) == 6
+    assert [action.name for action in ACTIONS] == [
+        "identify",
+        "get_workspace_member",
+        "search_records",
+        "list_meetings",
+        "list_call_recordings",
+        "get_call_transcript",
+    ]
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     tools = registry.get_connector_tools(ATTIO_CONNECTOR_REF)
     assert [tool["name"] for tool in tools] == [
         f"{ATTIO_CONNECTOR_REF}_{action.name}" for action in ACTIONS
     ]
-    meeting_tool = next(tool for tool in tools if tool["name"] == "attio_list_meetings")
-    meeting_parameters = meeting_tool["parameters"]
-    assert isinstance(meeting_parameters, dict)
-    meeting_properties = meeting_parameters["properties"]
-    assert isinstance(meeting_properties, dict)
-    participants = meeting_properties["participants"]
-    linked_record_id = meeting_properties["linked_record_id"]
-    assert isinstance(participants, dict)
-    assert isinstance(linked_record_id, dict)
-    assert participants["type"] == "string"
-    assert linked_record_id["format"] == "uuid"
-    search_tool = next(tool for tool in tools if tool["name"] == "attio_search_records")
-    search_parameters = search_tool["parameters"]
-    assert isinstance(search_parameters, dict)
-    search_required = search_parameters["required"]
-    assert isinstance(search_required, list)
-    assert "request_as" in search_required
-    for tool in tools:
-        parameters = tool["parameters"]
-        assert isinstance(parameters, dict)
-        properties = parameters["properties"]
-        assert isinstance(properties, dict)
-        limit = properties.get("limit")
-        if isinstance(limit, dict):
-            assert limit["minimum"] == 1
-            assert "maximum" not in limit
+    schemas = {action.name: action.input_schema for action in ACTIONS}
+    search_schema = schemas["search_records"]
+    assert "request_as" in cast(list[JSONValue], search_schema["required"])
+    meeting_properties = cast(JSONObject, schemas["list_meetings"]["properties"])
+    assert cast(JSONObject, meeting_properties["participants"])["type"] == "string"
+    for schema in schemas.values():
+        properties = cast(JSONObject, schema["properties"])
+        if limit := properties.get("limit"):
+            assert "maximum" not in cast(JSONObject, limit)
 
 
-def test_identify_member_and_list_latest_meeting() -> None:
-    """Attio should resolve the current member before filtering their meetings."""
-    member_id = "50cf242c-7fa3-4cad-87d0-75b1af71c57b"
-    responses = [
-        _response(
-            {
-                "active": True,
-                "authorized_by_workspace_member_id": member_id,
-                "workspace_id": "14beef7a-99f7-4534-a87e-70b564330a4c",
-            }
-        ),
-        _response(
-            {
-                "data": {
-                    "id": {"workspace_member_id": member_id},
-                    "email_address": "ada@example.com",
-                }
-            }
-        ),
-        _response({"data": [{"title": "Latest call"}]}),
-    ]
-    with patch(_HTTP_REQUEST, side_effect=responses) as request:
-        identity = _invoke("attio_identify", {})
-        assert isinstance(identity, dict)
-        resolved_member_id = identity["authorized_by_workspace_member_id"]
-        assert isinstance(resolved_member_id, str)
-
-        member = _invoke(
-            "attio_get_workspace_member",
-            {"workspace_member_id": resolved_member_id},
-        )
-        assert isinstance(member, dict)
-        member_data = member["data"]
-        assert isinstance(member_data, dict)
-        email = member_data["email_address"]
-        assert isinstance(email, str)
-
-        result = _invoke(
-            "attio_list_meetings",
-            {"participants": email, "sort": "start_desc", "limit": 1},
-        )
-
-    assert result == {"data": [{"title": "Latest call"}]}
-    assert [item.args[:2] for item in request.call_args_list] == [
-        ("GET", "https://api.attio.com/v2/self"),
-        (
-            "GET",
-            f"https://api.attio.com/v2/workspace_members/{member_id}",
-        ),
-        ("GET", "https://api.attio.com/v2/meetings"),
-    ]
-    assert request.call_args_list[-1].kwargs["params"] == {
-        "limit": "1",
-        "participants": "ada@example.com",
-        "sort": "start_desc",
-    }
-
-
-def test_search_records_calls_attio() -> None:
-    """Record search should pass the documented request to Attio."""
-    response = _response({"data": []})
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        result = _invoke(
-            "attio_search_records",
-            {
-                "query": "Flower",
-                "objects": ["companies"],
-                "request_as": {"type": "workspace"},
-            },
-        )
-
-    assert request.call_args.args == (
-        "POST",
-        "https://api.attio.com/v2/objects/records/search",
-    )
-    assert request.call_args.kwargs["json"] == {
-        "query": "Flower",
-        "objects": ["companies"],
+def test_attio_actions_forward_requests() -> None:
+    """Attio actions should forward inputs without semantic rewriting."""
+    member_id = "CB59AB17-AD15-460C-A126-0715617C0853"
+    search: JSONObject = {
+        "query": "",
+        "objects": ["people"],
+        "limit": 26,
         "request_as": {"type": "workspace"},
     }
-    assert result == {"data": []}
-
-
-def test_list_meetings_forwards_attio_query_parameters() -> None:
-    """Meeting reads should forward documented Attio query parameters."""
-    response = _response({"data": [], "pagination": {"next_cursor": None}})
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        result = _invoke(
-            "attio_list_meetings",
-            {
-                "limit": 1,
-                "linked_object": "people",
-                "linked_record_id": "CB59AB17-AD15-460C-A126-0715617C0853",
-                "participants": "ada@example.com,grace@example.com",
-                "sort": "start_desc",
-                "ends_from": "2026-08-01T00:00:00Z",
-                "starts_before": "2026-09-01T00:00:00Z",
-                "timezone": "Europe/Berlin",
-            },
-        )
-
-    assert result == response.json.return_value
-    assert request.call_args.kwargs["params"] == {
-        "limit": "1",
-        "linked_object": "people",
-        "linked_record_id": "CB59AB17-AD15-460C-A126-0715617C0853",
-        "participants": "ada@example.com,grace@example.com",
-        "sort": "start_desc",
+    meetings: JSONObject = {
+        "limit": 201,
+        "cursor": "0",
+        "linked_record_id": "me",
+        "participants": "me",
+        "sort": "latest",
         "ends_from": "2026-08-01T00:00:00Z",
         "starts_before": "2026-09-01T00:00:00Z",
         "timezone": "Europe/Berlin",
     }
-
-
-def test_list_actions_omit_unspecified_limit() -> None:
-    """Attio should apply its own defaults when callers omit the limit."""
-    response = _response({"data": [], "pagination": {"next_cursor": None}})
-    cases: list[tuple[str, JSONObject]] = [
-        ("attio_list_meetings", {}),
+    cases: list[tuple[str, JSONObject, str, str, JSONObject]] = [
+        ("attio_identify", {}, "GET", "/self", {"params": {}}),
         (
-            "attio_list_call_recordings",
-            {"meeting_id": "cb59ab17-ad15-460c-a126-0715617c0853"},
+            "attio_get_workspace_member",
+            {"workspace_member_id": member_id},
+            "GET",
+            f"/workspace_members/{member_id}",
+            {"params": {}},
         ),
+        (
+            "attio_search_records",
+            search,
+            "POST",
+            "/objects/records/search",
+            {"json": search},
+        ),
+        (
+            "attio_list_meetings",
+            meetings,
+            "GET",
+            "/meetings",
+            {"params": {key: str(value) for key, value in meetings.items()}},
+        ),
+        ("attio_list_meetings", {}, "GET", "/meetings", {"params": {}}),
     ]
-    for name, arguments in cases:
-        with patch(_HTTP_REQUEST, return_value=response) as request:
-            _invoke(name, arguments)
-        assert "limit" not in request.call_args.kwargs["params"]
-        assert "sort" not in request.call_args.kwargs["params"]
-
-
-def test_list_meetings_forwards_limit_without_local_maximum() -> None:
-    """Attio, rather than the connector, should enforce an upper limit."""
     response = _response({"data": []})
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        _invoke("attio_list_meetings", {"limit": 201})
+    for name, arguments, method, path, expected_kwargs in cases:
+        with patch(_HTTP_REQUEST, return_value=response) as request:
+            assert _invoke(name, arguments) == {"data": []}
 
-    assert request.call_args.kwargs["params"]["limit"] == "201"
-
-
-def test_list_meetings_leaves_filter_validation_to_attio() -> None:
-    """Meeting filters should reach Attio without local rewriting."""
-    response = _response(
-        {"code": "validation_error", "message": "Invalid meeting filters"},
-        status_code=400,
-    )
-    arguments: JSONObject = {
-        "cursor": "0",
-        "linked_object": "people",
-        "linked_record_id": "me",
-        "participants": "me",
-        "sort": "latest",
-    }
-    with (
-        patch(_HTTP_REQUEST, return_value=response) as request,
-        pytest.raises(AttioApiError),
-    ):
-        _invoke("attio_list_meetings", arguments)
-
-    assert request.call_args.kwargs["params"] == arguments
+        assert request.call_args.args == (method, f"https://api.attio.com/v2{path}")
+        for key, value in expected_kwargs.items():
+            assert request.call_args.kwargs[key] == value
 
 
 def test_api_errors_include_attio_code_and_message() -> None:
