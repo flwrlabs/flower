@@ -82,6 +82,7 @@ from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
+    FLWR_CLIENT_METADATA_KEY,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     ActionType,
@@ -102,8 +103,11 @@ from flwr.supercore.typing import (
     StartRunContext,
 )
 from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
+from flwr.superlink.extensions import (
+    RESULT_DELIVERY_CHANNEL_CHAT,
+    RESULT_DELIVERY_CHANNEL_LOGS,
+)
 from flwr.superlink.federation import NoOpFederationManager
-from flwr.superlink.run_source import RUN_SOURCE_METADATA_KEY
 from flwr.superlink.servicer.control.control_account_auth_interceptor import (
     shared_account_info,
 )
@@ -424,7 +428,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         """Forward caller-provided source metadata for analytics attribution."""
         context = Mock()
         context.invocation_metadata.return_value = (
-            (RUN_SOURCE_METADATA_KEY, "web_ui"),
+            (FLWR_CLIENT_METADATA_KEY, "web_ui"),
         )
         expected = StartRunResponse(run_id=42)
 
@@ -1803,7 +1807,7 @@ class TestControlServicerAuth(unittest.TestCase):
             mock_get_run_info.assert_called_with(run_ids=[run_id])
             mock_get_task_log.assert_called_once_with(456, 1e-06)
             notify_result_delivered.assert_called_once_with(
-                mock_run, "user-123", "logs"
+                mock_run, "user-123", RESULT_DELIVERY_CHANNEL_LOGS
             )
             self.assertEqual(len(msgs), 1)
             self.assertIsInstance(msgs[0], StreamLogsResponse)
@@ -1847,7 +1851,7 @@ class TestControlServicerAuth(unittest.TestCase):
             federation_id=NOOP_FEDERATION_ID,
             primary_task_id=123,
             status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
-            primary_task_type=TaskType.AGENT_APP,
+            primary_task_type=TaskType.SERVER_APP,
         )
         event = TaskEvent(
             id=6,
@@ -1877,9 +1881,11 @@ class TestControlServicerAuth(unittest.TestCase):
             msgs = list(self.servicer.StreamRunEvents(request, ctx))
 
         # Assert
-        notify_result_delivered.assert_called_once_with(mock_run, "user-123", "chat")
+        notify_result_delivered.assert_called_once_with(
+            mock_run, "user-123", RESULT_DELIVERY_CHANNEL_CHAT
+        )
         mock_get_task_events.assert_called_once_with(
-            run_id=run_id,
+            run_ids=[run_id],
             task_ids=[123],
             after_task_event_id=4,
         )

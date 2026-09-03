@@ -55,6 +55,7 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.message_pb2 import Message as ProtoMessage
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
@@ -157,6 +158,7 @@ class StateTest(CoreStateTest):
         """Test if create_run and get_run_info work correctly."""
         # Prepare
         state: LinkState = self.state_factory()
+        initial_event = TaskEvent(event="message", data='{"type":"message"}')
         run_id = state.create_run(
             None,
             None,
@@ -166,6 +168,7 @@ class StateTest(CoreStateTest):
             None,
             "i1r9f",
             TaskType.SERVER_APP,
+            initial_task_event=initial_event,
         )
 
         # Execute
@@ -178,6 +181,10 @@ class StateTest(CoreStateTest):
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
         assert run.series_id > 0
+        stored_event = state.get_task_events(run_ids=[run_id])[0]
+        assert stored_event.event == initial_event.event
+        assert stored_event.data == initial_event.data
+        assert stored_event.task_id == run.primary_task_id
 
     def test_create_run_uses_existing_series_id(self) -> None:
         """Test create_run links the run to an existing run series."""

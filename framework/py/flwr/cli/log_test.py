@@ -21,9 +21,10 @@ from unittest.mock import Mock, call, patch
 
 import grpc
 
+from flwr.common.constant import CONN_REFRESH_PERIOD
 from flwr.proto.control_pb2 import StreamLogsResponse  # pylint: disable=E0611
 
-from .log import print_logs, stream_logs
+from .log import _log_with_control_api, print_logs, stream_logs
 
 
 class InterruptedStreamLogsResponse:
@@ -59,16 +60,6 @@ class TestFlwrLog(unittest.TestCase):
         ]
         self.mock_stub = Mock()
         self.mock_stub.StreamLogs.side_effect = mock_response_iterator
-        self.patcher = patch("flwr.cli.log.ControlStub", return_value=self.mock_stub)
-
-        self.patcher.start()
-
-        # Create mock channel
-        self.mock_channel = Mock()
-
-    def tearDown(self) -> None:
-        """Cleanup."""
-        self.patcher.stop()
 
     def test_flwr_log_stream_method(self) -> None:
         """Test stream_logs."""
@@ -83,7 +74,7 @@ class TestFlwrLog(unittest.TestCase):
     def test_flwr_log_print_method(self) -> None:
         """Test print_logs."""
         with patch("builtins.print") as mock_print:
-            print_logs(run_id=123, channel=self.mock_channel, timeout=0)
+            print_logs(run_id=123, stub=self.mock_stub, timeout=0)
             # Assert that mock print was called with the expected arguments
             mock_print.assert_has_calls(self.expected_print_call)
 
@@ -105,4 +96,19 @@ class TestFlwrLog(unittest.TestCase):
         rpc_err.code = lambda: grpc.StatusCode.DEADLINE_EXCEEDED
         self.mock_stub.StreamLogs.side_effect = rpc_err
 
-        print_logs(run_id=123, channel=self.mock_channel, timeout=0)
+        print_logs(run_id=123, stub=self.mock_stub, timeout=0)
+
+    def test_log_with_control_api_owns_channel_lifecycle(self) -> None:
+        """Construct the stub once and close its channel at the command boundary."""
+        channel = Mock()
+        stub = Mock()
+        with (
+            patch("flwr.cli.log.init_channel_from_connection", return_value=channel),
+            patch("flwr.cli.log.ControlStub", return_value=stub) as stub_class,
+            patch("flwr.cli.log.start_stream") as start_stream,
+        ):
+            _log_with_control_api(Mock(), run_id=123, stream=True)
+
+        stub_class.assert_called_once_with(channel)
+        start_stream.assert_called_once_with(123, stub, CONN_REFRESH_PERIOD)
+        channel.close.assert_called_once_with()
