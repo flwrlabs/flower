@@ -311,8 +311,8 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
         )
 
-    def test_start_run_uses_cached_hub_fab_and_refreshes_in_background(self) -> None:
-        """Start an unversioned Hub app from cache without waiting for Hub."""
+    def test_start_run_uses_cached_hub_fab_and_throttles_refresh(self) -> None:
+        """Start from cache and schedule at most one refresh per interval."""
         fab_content = b"cached Hub FAB"
         fab_hash = self.state.store_app(
             fab=Fab("", fab_content, {"valid_license": "Valid"}),
@@ -336,33 +336,28 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             patch(
                 "flwr.superlink.servicer.control.control_handlers._get_remote_fab"
             ) as get_remote_fab,
-            patch(
-                "flwr.superlink.servicer.control.control_handlers"
-                "._start_hub_app_refresh"
-            ) as start_refresh,
-            patch.object(self.state, "store_app") as store_app,
+            patch("flwr.superlink.servicer.control.control_handlers.Thread") as thread,
         ):
-            response = start_run(
-                StartRunRequest(
-                    app_spec="@flwr/demo",
-                    federation=NOOP_FEDERATION_ID,
-                ),
-                self.account,
-                self.state,
-                None,
-            )
+            responses = [
+                start_run(
+                    StartRunRequest(
+                        app_spec="@flwr/demo",
+                        federation=NOOP_FEDERATION_ID,
+                    ),
+                    self.account,
+                    self.state,
+                    None,
+                )
+                for _ in range(2)
+            ]
 
         get_remote_fab.assert_not_called()
-        start_refresh.assert_called_once_with(
-            self.state,
-            NOOP_FEDERATION_ID,
-            "@flwr/demo",
-            self.account.flwr_aid,
-            None,
+        thread.assert_called_once()
+        thread.return_value.start.assert_called_once()
+        runs = self.state.get_run_info(
+            run_ids=[response.run_id for response in responses]
         )
-        store_app.assert_not_called()
-        run = self.state.get_run_info(run_ids=[response.run_id])[0]
-        self.assertEqual(run.fab_hash, fab_hash)
+        self.assertEqual([run.fab_hash for run in runs], [fab_hash, fab_hash])
 
     def test_refresh_hub_app_updates_cached_fab(self) -> None:
         """Atomically advance a Hub app association to the refreshed FAB."""
@@ -560,7 +555,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
     def test_list_apps_preserves_hub_flag_over_wire(self) -> None:
         """ListApps preserves Hub provenance through protobuf serialization."""
-        self.state.store_app(
+        fab_hash = self.state.store_app(
             fab=Fab("", b"hub fab", {}),
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
@@ -576,7 +571,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
         round_tripped = ListAppsResponse.FromString(response.SerializeToString())
 
-        self.assertEqual(round_tripped.apps[0].fab_hash, "")
+        self.assertEqual(round_tripped.apps[0].fab_hash, fab_hash)
         self.assertTrue(round_tripped.apps[0].is_hub_app)
 
     def test_list_apps_preserves_unknown_hub_origin_over_wire(self) -> None:
@@ -598,7 +593,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(round_tripped.apps[0].HasField("is_hub_app"))
 
     def test_add_and_remove_hub_app_metadata(self) -> None:
-        """AddApp stores Hub metadata without retaining the downloaded FAB."""
+        """AddApp stores Hub metadata and caches the downloaded FAB."""
         fab_content = b"hub FAB"
         verification_dict = {"publisher-key": "verified"}
         with (
@@ -631,12 +626,12 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
-            [("@flwr/demo", "", TaskType.AGENT_APP)],
+            [("@flwr/demo", fab_hash, TaskType.AGENT_APP)],
         )
         self.assertTrue(apps[0].is_hub_app)
-        self.assertIsNone(self.state.get_fab(fab_hash))
-        self.assertIsNone(
-            self.state.get_app(NOOP_FEDERATION_ID, "@flwr/demo", fab_hash)
+        self.assertEqual(
+            self.state.get_fab(fab_hash),
+            Fab(fab_hash, fab_content, verification_dict),
         )
 
         remove_response = remove_app(
@@ -712,39 +707,25 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(stored_automation.HasField("fixed_interval"))
         self.assertFalse(listed_automation.HasField("fixed_interval"))
 
-<<<<<<< Updated upstream
-    def test_start_automation_stores_hub_app_without_fab(self) -> None:
-        """Store Hub automations by app ID so dispatch fetches the latest FAB."""
-        self.state.store_app(
-            fab=None,
-=======
     def test_start_automation_resolves_hub_app_from_local_cache(self) -> None:
         """Store a Hub app ID so each occurrence uses the current cached FAB."""
+        fab_content = b"current Hub FAB"
         self.state.store_app(
-            fab=Fab("", b"current Hub FAB", {}),
->>>>>>> Stashed changes
+            fab=Fab("", fab_content, {}),
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/agent",
             app_type=TaskType.AGENT_APP,
             added_by=self.account.flwr_aid,
             is_hub_app=True,
         )
-<<<<<<< Updated upstream
-        fab_content = b"current Hub FAB"
-=======
->>>>>>> Stashed changes
         request = StartAutomationRequest(
             start_run_request=StartRunRequest(
                 federation=NOOP_FEDERATION_ID,
                 series_id=1,
             )
         )
-<<<<<<< Updated upstream
         request.start_run_request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.start_run_request.fab.content = fab_content
-=======
-        request.start_run_request.fab.content = b"current Hub FAB"
->>>>>>> Stashed changes
 
         with (
             patch(

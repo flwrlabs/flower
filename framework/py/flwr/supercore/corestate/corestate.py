@@ -130,8 +130,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Store an optional FAB and associate its app with a federation.
 
         A federation has at most one association for each app ID. Storing the app
-        again updates its FAB hash, when applicable, and type while preserving when
-        and by whom it was first added.
+        again updates its FAB hash and type while preserving when and by whom it was
+        first added.
 
         Parameters
         ----------
@@ -147,8 +147,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         added_by : str
             ID of the account adding the app to the federation.
         is_hub_app : bool, default=False
-            Whether the app was fetched from Flower Hub. Hub app associations do
-            not retain a FAB hash so future runs resolve the latest version.
+            Whether the app was fetched from Flower Hub.
 
         Returns
         -------

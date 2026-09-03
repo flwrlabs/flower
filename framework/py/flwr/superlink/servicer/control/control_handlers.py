@@ -188,9 +188,6 @@ _hub_app_refresh_lock = Lock()
 _hub_app_refresh_after: WeakKeyDictionary[LinkState, dict[tuple[str, str], float]] = (
     WeakKeyDictionary()
 )
-_hub_app_refreshing: WeakKeyDictionary[LinkState, set[tuple[str, str]]] = (
-    WeakKeyDictionary()
-)
 
 
 class InvalidConnectorRequestError(FlowerError):
@@ -485,8 +482,6 @@ def validate_run_connector_refs(
     return canonical_refs
 
 
-<<<<<<< Updated upstream
-=======
 def _get_cached_hub_fab(
     state: LinkState, federation_id: str, app_id: str
 ) -> Fab | None:
@@ -504,7 +499,6 @@ def _get_cached_hub_fab(
     return state.get_fab(app.fab_hash)
 
 
->>>>>>> Stashed changes
 def _get_hub_app_id(
     state: LinkState, federation_id: str, request: StartRunRequest
 ) -> str | None:
@@ -531,8 +525,6 @@ def _get_hub_app_id(
     return None
 
 
-<<<<<<< Updated upstream
-=======
 def _mark_hub_app_fresh(state: LinkState, federation_id: str, app_id: str) -> None:
     """Delay the next background refresh for a Hub app."""
     key = (federation_id, app_id)
@@ -549,7 +541,6 @@ def _refresh_hub_app(
     fleet_api_type: str | None,
 ) -> None:
     """Refresh one cached Hub app without blocking run creation."""
-    key = (federation_id, app_id)
     try:
         fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, app_id)
         fab_config = get_fab_config(fab_file)
@@ -571,9 +562,6 @@ def _refresh_hub_app(
     except Exception as exc:  # pylint: disable=broad-exception-caught
         # A refresh failure must not invalidate the last known-good cached FAB.
         log(WARNING, "Failed to refresh Hub app %s: %s", app_id, exc)
-    finally:
-        with _hub_app_refresh_lock:
-            _hub_app_refreshing.setdefault(state, set()).discard(key)
 
 
 def _start_hub_app_refresh(
@@ -588,10 +576,8 @@ def _start_hub_app_refresh(
     current_time = time.monotonic()
     with _hub_app_refresh_lock:
         refresh_after = _hub_app_refresh_after.setdefault(state, {})
-        refreshing = _hub_app_refreshing.setdefault(state, set())
-        if key in refreshing or current_time < refresh_after.get(key, 0):
+        if current_time < refresh_after.get(key, 0):
             return
-        refreshing.add(key)
         refresh_after[key] = current_time + HUB_APP_REFRESH_INTERVAL
 
     Thread(
@@ -602,7 +588,6 @@ def _start_hub_app_refresh(
     ).start()
 
 
->>>>>>> Stashed changes
 def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
@@ -1078,12 +1063,8 @@ def start_automation(  # pylint: disable=too-many-branches,too-many-locals
     stored_start_run_request.federation = federation_id
     app_id = _get_hub_app_id(state, federation_id, stored_start_run_request)
     if app_id is not None:
-<<<<<<< Updated upstream
-        # Store Hub automations by unversioned app ID. Each dispatch then resolves
-        # the latest compatible version instead of pinning the current run's FAB.
-=======
-        # Resolve the current locally cached FAB when each occurrence starts.
->>>>>>> Stashed changes
+        # Store the unversioned Hub app ID. Each dispatch resolves the current
+        # locally cached FAB instead of pinning the originating run's FAB.
         stored_start_run_request.app_spec = app_id
         stored_start_run_request.ClearField("fab")
 
@@ -1679,7 +1660,7 @@ def add_app(
     """Add a Hub app to a federation."""
     federation_id = request.federation_id
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
-    fab_file, _, _ = _get_remote_fab(fleet_api_type, request.app_id)
+    fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, request.app_id)
     try:
         app_type = _get_app_type(get_fab_config(fab_file))
     except ValueError as e:
@@ -1689,7 +1670,11 @@ def add_app(
         ) from e
 
     state.store_app(
-        fab=None,
+        fab=Fab(
+            hash_str=hashlib.sha256(fab_file).hexdigest(),
+            content=fab_file,
+            verifications=verification_dict,
+        ),
         federation_id=federation_id,
         app_id=request.app_id,
         app_type=app_type,

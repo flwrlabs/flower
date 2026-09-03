@@ -366,7 +366,7 @@ class InMemoryCoreState(
             self.federation_app_store[key] = FederationAppRecord(
                 federation_id=federation_id,
                 app_id=app_id,
-                fab_hash=None if is_hub_app else fab_hash,
+                fab_hash=fab_hash,
                 app_type=app_type,
                 is_hub_app=is_hub_app,
                 added_by=existing.added_by if existing else added_by,
