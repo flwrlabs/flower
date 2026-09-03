@@ -44,6 +44,7 @@ Problem-oriented how-to guides show step-by-step how to achieve a specific goal.
 
   how-to-use-baselines
   how-to-contribute-baselines
+  how-to-upgrade-baselines
 
 
 Explanations
