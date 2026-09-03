@@ -41,7 +41,7 @@ message Federation {
   SimulationConfig config = 8;  // Added in v1.28.0
   bool can_invite_members = 9;  // Added in v1.34.0
   bool can_add_supernodes = 10; // Added in v1.34.0
-  uint32 member_count = 11;      // Added in v1.37.0
+  uint32 member_count = 11;     // Added in v1.37.0
 }
 
 message Invitation {
