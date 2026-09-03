@@ -369,6 +369,39 @@ class InMemoryCoreState(
             )
         return fab_hash
 
+    def update_hub_app(
+        self,
+        fab: Fab,
+        federation_id: str,
+        app_id: str,
+        expected_fab_hash: str,
+    ) -> bool:
+        """Update a Hub app only if it still points to the expected FAB."""
+        fab_hash = hashlib.sha256(fab.content).hexdigest()
+        if fab.hash_str and fab.hash_str != fab_hash:
+            raise ValueError(
+                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+            )
+        key = (federation_id, app_id)
+        with self.lock_fab_store, self.lock_federation_app_store:
+            existing = self.federation_app_store.get(key)
+            if (
+                existing is None
+                or not existing.is_hub_app
+                or existing.fab_hash != expected_fab_hash
+            ):
+                return False
+            self.fab_store[fab_hash] = Fab(
+                hash_str=fab_hash,
+                content=fab.content,
+                verifications=dict(fab.verifications),
+            )
+            self.federation_app_store[key] = replace(
+                existing,
+                fab_hash=fab_hash,
+            )
+        return True
+
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
         with self.lock_fab_store:

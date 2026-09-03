@@ -155,6 +155,16 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
+    def update_hub_app(
+        self,
+        fab: Fab,
+        federation_id: str,
+        app_id: str,
+        expected_fab_hash: str,
+    ) -> bool:
+        """Update a Hub app only if it still points to the expected FAB."""
+
+    @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return the FAB for the given hash, if present."""
 

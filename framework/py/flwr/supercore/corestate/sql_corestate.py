@@ -474,6 +474,48 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             session.execute(app_stmt)
         return fab_hash
 
+    def update_hub_app(
+        self,
+        fab: Fab,
+        federation_id: str,
+        app_id: str,
+        expected_fab_hash: str,
+    ) -> bool:
+        """Update a Hub app only if it still points to the expected FAB."""
+        fab_hash = hashlib.sha256(fab.content).hexdigest()
+        if fab.hash_str and fab.hash_str != fab_hash:
+            raise ValueError(
+                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+            )
+        app_stmt = (
+            update(FederationAppModel)
+            .where(
+                FederationAppModel.federation_id == federation_id,
+                FederationAppModel.app_id == app_id,
+                FederationAppModel.is_hub_app.is_(True),
+                FederationAppModel.fab_hash == expected_fab_hash,
+            )
+            .values(fab_hash=fab_hash)
+            .returning(FederationAppModel.app_id)
+        )
+        fab_stmt = self.dialect_insert(FabModel).values(
+            fab_hash=fab_hash,
+            content=fab.content,
+            verifications=json.dumps(fab.verifications),
+        )
+        fab_stmt = fab_stmt.on_conflict_do_update(
+            index_elements=[FabModel.fab_hash],
+            set_={
+                "content": fab_stmt.excluded.content,
+                "verifications": fab_stmt.excluded.verifications,
+            },
+        )
+        with self.session() as session:
+            if session.scalar(app_stmt) is None:
+                return False
+            session.execute(fab_stmt)
+        return True
+
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
         with self.session() as session:

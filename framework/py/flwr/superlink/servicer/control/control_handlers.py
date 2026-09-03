@@ -532,21 +532,29 @@ def _mark_hub_app_fresh(state: LinkState, federation_id: str, app_id: str) -> No
         refresh_after[key] = time.monotonic() + HUB_APP_REFRESH_INTERVAL
 
 
+def _validate_hub_fab(fab_file: bytes, app_id: str) -> dict[str, Any]:
+    """Validate a downloaded Hub FAB before caching it."""
+    if len(fab_file) > FAB_MAX_SIZE:
+        raise ValueError(f"FAB exceeds the maximum size of {FAB_MAX_SIZE} bytes")
+    fab_config = get_fab_config(fab_file)
+    fab_id, _ = get_metadata_from_config(fab_config)
+    if f"@{fab_id}" != app_id:
+        raise ValueError("Downloaded FAB ID does not match the Hub app ID")
+    return fab_config
+
+
 def _refresh_hub_app(
     state: LinkState,
     federation_id: str,
     app_id: str,
-    added_by: str,
+    expected_fab_hash: str,
     fleet_api_type: str | None,
 ) -> None:
     """Refresh one cached Hub app without blocking run creation."""
     try:
         fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, app_id)
-        fab_config = get_fab_config(fab_file)
-        fab_id, _ = get_metadata_from_config(fab_config)
-        if f"@{fab_id}" != app_id:
-            raise ValueError("Downloaded FAB ID does not match the Hub app ID")
-        state.store_app(
+        _validate_hub_fab(fab_file, app_id)
+        state.update_hub_app(
             fab=Fab(
                 hash_str=hashlib.sha256(fab_file).hexdigest(),
                 content=fab_file,
@@ -554,9 +562,7 @@ def _refresh_hub_app(
             ),
             federation_id=federation_id,
             app_id=app_id,
-            app_type=_get_app_type(fab_config),
-            added_by=added_by,
-            is_hub_app=True,
+            expected_fab_hash=expected_fab_hash,
         )
     except Exception as exc:  # pylint: disable=broad-exception-caught
         # A refresh failure must not invalidate the last known-good cached FAB.
@@ -567,7 +573,7 @@ def _start_hub_app_refresh(
     state: LinkState,
     federation_id: str,
     app_id: str,
-    added_by: str,
+    expected_fab_hash: str,
     fleet_api_type: str | None,
 ) -> None:
     """Start a stale Hub app refresh at most once per refresh interval."""
@@ -581,7 +587,13 @@ def _start_hub_app_refresh(
 
     Thread(
         target=_refresh_hub_app,
-        args=(state, federation_id, app_id, added_by, fleet_api_type),
+        args=(
+            state,
+            federation_id,
+            app_id,
+            expected_fab_hash,
+            fleet_api_type,
+        ),
         daemon=True,
         name=f"hub-app-refresh-{app_id}",
     ).start()
@@ -672,7 +684,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             state,
             federation_id,
             cast(str, app_id),
-            flwr_aid,
+            cached_hub_fab.hash_str,
             fleet_api_type,
         )
     # Download a Hub app only when it is not locally cached or is version-pinned.
@@ -1661,7 +1673,7 @@ def add_app(
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
     fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, request.app_id)
     try:
-        app_type = _get_app_type(get_fab_config(fab_file))
+        app_type = _get_app_type(_validate_hub_fab(fab_file, request.app_id))
     except ValueError as e:
         raise FlowerError(
             ApiErrorCode.INVALID_APP_SPEC,

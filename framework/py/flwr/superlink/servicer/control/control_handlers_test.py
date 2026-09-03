@@ -361,7 +361,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
     def test_refresh_hub_app_updates_cached_fab(self) -> None:
         """Atomically advance a Hub app association to the refreshed FAB."""
-        self.state.store_app(
+        current_hash = self.state.store_app(
             fab=Fab("", b"old Hub FAB", {}),
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
@@ -390,7 +390,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 self.state,
                 NOOP_FEDERATION_ID,
                 "@flwr/demo",
-                self.account.flwr_aid,
+                current_hash,
                 None,
             )
 
@@ -400,6 +400,42 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         refreshed_fab = self.state.get_fab(expected_hash)
         self.assertIsNotNone(refreshed_fab)
         self.assertEqual(cast(Fab, refreshed_fab).content, refreshed_content)
+
+    def test_refresh_hub_app_rejects_oversized_fab(self) -> None:
+        """Keep the cached FAB when a refresh exceeds the size limit."""
+        current_hash = self.state.store_app(
+            Fab("", b"current", {}),
+            NOOP_FEDERATION_ID,
+            "@flwr/demo",
+            TaskType.SERVER_APP,
+            self.account.flwr_aid,
+            is_hub_app=True,
+        )
+        oversized_fab = b"oversized"
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.FAB_MAX_SIZE",
+                1,
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
+                return_value=(oversized_fab, {}, None),
+            ),
+        ):
+            _refresh_hub_app(
+                self.state,
+                NOOP_FEDERATION_ID,
+                "@flwr/demo",
+                current_hash,
+                None,
+            )
+
+        self.assertEqual(
+            self.state.list_apps(NOOP_FEDERATION_ID)[0].fab_hash,
+            current_hash,
+        )
+        self.assertIsNone(self.state.get_fab(hashlib.sha256(oversized_fab).hexdigest()))
 
     def test_start_run_persists_agent_input_event(self) -> None:
         """Persist agent input as a primary-task message item."""
@@ -609,6 +645,11 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                     }
                 },
             ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/demo", "1.0.0"),
+            ),
         ):
             response = add_app(
                 AddAppRequest(
@@ -644,6 +685,37 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
 
         self.assertEqual(remove_response, RemoveAppResponse())
+        self.assertEqual(self.state.list_apps(NOOP_FEDERATION_ID), [])
+
+    def test_add_app_rejects_mismatched_fab_id(self) -> None:
+        """Reject a Hub FAB whose metadata does not match the requested app."""
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
+                return_value=(b"FAB", {}, None),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/other", "1.0.0"),
+            ),
+        ):
+            with self.assertRaises(FlowerError) as error:
+                add_app(
+                    AddAppRequest(
+                        federation_id=NOOP_FEDERATION_ID,
+                        app_id="@flwr/demo",
+                    ),
+                    self.account,
+                    self.state,
+                    None,
+                )
+
+        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_APP_SPEC)
         self.assertEqual(self.state.list_apps(NOOP_FEDERATION_ID), [])
 
     def test_start_automation_preserves_recurrence_and_normalizes_start_at(
