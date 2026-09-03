@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "quickstart-cpp"
+version = "1.0.0"
+description = "Quickstart C++ with Flower"
+license = "Apache-2.0"
+requires-python = ">=3.9"
+dependencies = [
+    "flwr>=1.27.0",
+    "numpy>=1.26.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.flwr.app]
+publisher = "flwrlabs"
+
+[tool.flwr.app.components]
+serverapp = "server:app"
+clientapp = "client:app"
+
+[tool.flwr.app.config]
+num-server-rounds = 3
+
