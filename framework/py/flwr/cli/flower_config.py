@@ -191,38 +191,6 @@ def init_flwr_config() -> None:
             f"\nFlower configuration not found. Created default configuration"
             f" at {config_path}\n",
         )
-    else:
-        try:
-            with config_path.open("rb") as file:
-                config = tomli.load(file)
-        except tomli.TOMLDecodeError:
-            return
-
-        superlinks = config.get(SuperLinkConnectionTomlKey.SUPERLINK)
-        if not isinstance(superlinks, dict):
-            return
-        legacy_connection = next(
-            (
-                name
-                for name, connection in superlinks.items()
-                if isinstance(connection, dict)
-                and connection.get(SuperLinkConnectionTomlKey.ADDRESS)
-                == LEGACY_SUPERGRID_ADDRESS
-            ),
-            None,
-        )
-        if legacy_connection is None:
-            return
-
-        typer.secho(
-            f"\n⚠️ You are using SuperLink connection `{legacy_connection}`, which "
-            "uses the old SuperGrid address "
-            f"`{LEGACY_SUPERGRID_ADDRESS}`. Update it to "
-            f"`{SUPERGRID_HTTP_ADDRESS}` manually or by running:\n\n"
-            f"{_get_supergrid_address_update_command(config_path)}\n",
-            fg=typer.colors.YELLOW,
-        )
-        raise typer.Exit(code=1)
 
 
 def parse_superlink_connection(
@@ -352,8 +320,24 @@ def read_superlink_connection(
             raise click.ClickException(msg)
 
         conn_dict = superlink_config[connection_name]
+        if (
+            isinstance(conn_dict, dict)
+            and conn_dict.get(SuperLinkConnectionTomlKey.ADDRESS)
+            == LEGACY_SUPERGRID_ADDRESS
+        ):
+            typer.secho(
+                f"\n⚠️ You are using SuperLink connection `{connection_name}`, which "
+                "uses the old SuperGrid address "
+                f"`{LEGACY_SUPERGRID_ADDRESS}`. Update it to "
+                f"`{SUPERGRID_HTTP_ADDRESS}` manually or by running:\n\n"
+                f"{_get_supergrid_address_update_command(config_path)}\n",
+                fg=typer.colors.YELLOW,
+            )
+            raise typer.Exit(code=1)
         return parse_superlink_connection(conn_dict, connection_name)
 
+    except typer.Exit:
+        raise
     except ValueError as err:
         raise click.ClickException(
             f"Failed to parse the Flower configuration file ({config_path}). {err}"

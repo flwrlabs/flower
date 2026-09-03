@@ -119,7 +119,7 @@ class TestInitFlwrConfig(unittest.TestCase):
             ("Windows", "[System.IO.File]::WriteAllText"),
         ]
     )
-    def test_init_flwr_config_warns_about_old_supergrid_address(
+    def test_read_superlink_connection_warns_about_old_supergrid_address(
         self, operating_system: str, expected_command: str
     ) -> None:
         """Warn, provide a platform-appropriate command, and stop execution."""
@@ -139,7 +139,7 @@ class TestInitFlwrConfig(unittest.TestCase):
                 patch("flwr.cli.flower_config.typer.secho") as secho,
             ):
                 with self.assertRaises(typer.Exit) as exc_info:
-                    init_flwr_config()
+                    read_superlink_connection("supergrid")
 
             secho.assert_called_once()
             self.assertEqual(exc_info.exception.exit_code, 1)
@@ -150,14 +150,13 @@ class TestInitFlwrConfig(unittest.TestCase):
             self.assertIn(expected_command, message)
             self.assertIn(str(config_path), message)
 
-    def test_init_flwr_config_ignores_old_address_outside_address_fields(self) -> None:
-        """Do not warn when the old address only appears outside its address field."""
+    def test_read_superlink_connection_only_checks_selected_connection(self) -> None:
+        """Do not warn about the old address on an unused connection."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             config_path = Path(tmp_dir) / "config.toml"
             config_path.write_text(
-                "# supergrid.flower.ai\n"
-                '[superlink.supergrid]\naddress = "api.flower.ai"\n'
-                'root-certificates = "supergrid.flower.ai"\n',
+                '[superlink.supergrid]\naddress = "supergrid.flower.ai"\n'
+                '[superlink.local]\naddress = ":local:"\n',
                 encoding="utf-8",
             )
 
@@ -165,9 +164,10 @@ class TestInitFlwrConfig(unittest.TestCase):
                 patch.dict(os.environ, {FLWR_HOME: tmp_dir}),
                 patch("flwr.cli.flower_config.typer.secho") as secho,
             ):
-                init_flwr_config()
+                connection = read_superlink_connection("local")
 
             secho.assert_not_called()
+            self.assertEqual(connection.name, "local")
 
 
 class TestSuperLinkConnection(unittest.TestCase):
