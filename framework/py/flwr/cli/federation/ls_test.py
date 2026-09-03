@@ -14,7 +14,7 @@
 # ==============================================================================
 """Tests for the Flower CLI federation list command."""
 
-from unittest.mock import ANY, MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from flwr.cli.typing import SuperLinkConnection
 
@@ -31,11 +31,6 @@ def test_ls_uses_control_http_client() -> None:
     output_context = MagicMock()
     output_context.__enter__.return_value = False
     client = Mock()
-    client_context = MagicMock()
-    client_context.__enter__.return_value = client
-    auth_plugin = Mock()
-    runtime_interceptor = Mock()
-    auth_interceptor = Mock()
 
     with (
         patch("flwr.cli.federation.ls.cli_output_handler", return_value=output_context),
@@ -45,40 +40,13 @@ def test_ls_uses_control_http_client() -> None:
             return_value=connection,
         ),
         patch(
-            "flwr.cli.federation.ls.load_certificate_in_connection",
-            return_value=b"certificate",
-        ),
-        patch(
-            "flwr.cli.federation.ls.load_cli_auth_plugin_from_connection",
-            return_value=auth_plugin,
-        ),
-        patch(
-            "flwr.cli.federation.ls.RuntimeVersionHttpInterceptor",
-            return_value=runtime_interceptor,
-        ),
-        patch(
-            "flwr.cli.federation.ls.CliAccountAuthHttpInterceptor",
-            return_value=auth_interceptor,
-        ) as auth_interceptor_factory,
-        patch(
-            "flwr.cli.federation.ls.ControlHttpClient.from_server_address",
-            return_value=client_context,
-        ) as client_factory,
+            "flwr.cli.federation.ls.init_http_client_from_connection",
+            return_value=client,
+        ) as init_client,
         patch("flwr.cli.federation.ls._list_federations", return_value=[]),
         patch("flwr.cli.federation.ls.Console"),
-        patch("flwr.cli.federation.ls.log_superlink_connection"),
     ):
         ls(Mock(args=[]), superlink="remote")
 
-    auth_plugin.load_tokens.assert_called_once_with()
-    auth_interceptor_factory.assert_called_once_with(
-        auth_plugin,
-        refresh_tokens=ANY,
-    )
-    client_factory.assert_called_once_with(
-        server_address="control.example:443",
-        insecure=False,
-        root_certificates=b"certificate",
-        interceptors=[runtime_interceptor, auth_interceptor],
-    )
-    client_context.__exit__.assert_called_once()
+    init_client.assert_called_once_with(connection)
+    client.close.assert_called_once_with()
