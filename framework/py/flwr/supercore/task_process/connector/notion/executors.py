@@ -20,7 +20,7 @@ from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
 from ..http import ConnectorApiError, request_json_object
-from ..json_utils import optional_string, require_int_range, require_string
+from ..json_utils import ConnectorInputError, optional_string, require_int_range
 
 _NOTION_API_BASE_URL = "https://api.notion.com/v1"
 NOTION_API_VERSION = "2026-03-11"
@@ -34,42 +34,40 @@ class NotionApiError(ConnectorApiError):
 
 def search(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
     """Search pages and data sources shared with the Notion connection."""
-    body: JSONObject = {
-        "query": require_string(arguments.get("query"), "Notion", "query"),
-        "page_size": require_int_range(
-            arguments.get("limit", 10), "Notion", "limit", maximum=100
-        ),
-    }
-    if cursor := optional_string(arguments.get("cursor"), "Notion", "cursor"):
+    query = arguments.get("query")
+    if not isinstance(query, str):
+        raise ConnectorInputError("Notion query must be a string.")
+    body: JSONObject = {"query": query}
+    for name in ("filter", "sort"):
+        value = arguments.get(name)
+        if value is not None:
+            if not isinstance(value, dict):
+                raise ConnectorInputError(f"Notion {name} must be an object.")
+            body[name] = value
+    if "pageSize" in arguments:
+        body["page_size"] = require_int_range(
+            arguments["pageSize"], "Notion", "pageSize", maximum=100
+        )
+    if cursor := optional_string(arguments.get("startCursor"), "Notion", "startCursor"):
         body["start_cursor"] = cursor
     return _call_notion_api("POST", "/search", context.credentials, body=body)
 
 
-def get_page_content(
-    arguments: JSONObject, context: ConnectorExecutionContext
-) -> JSONObject:
-    """Read one page of a Notion page's block content."""
-    params = {
-        "page_size": str(
-            require_int_range(
-                arguments.get("max_blocks", 100),
-                "Notion",
-                "max_blocks",
-                maximum=100,
-            )
-        )
-    }
-    if cursor := optional_string(arguments.get("cursor"), "Notion", "cursor"):
-        params["start_cursor"] = cursor
-    page_id = require_string(arguments.get("page_id"), "Notion", "page_id")
-    return _call_notion_api(
-        "GET", f"/blocks/{page_id}/children", context.credentials, params=params
+def get_page(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """Get a Notion page together with its first-level child blocks."""
+    page_id = optional_string(arguments.get("pageId"), "Notion", "pageId")
+    if page_id is None:
+        raise ConnectorInputError("Notion pageId must be a non-empty string.")
+    page = _call_notion_api("GET", f"/pages/{page_id}", context.credentials)
+    block_children = _call_notion_api(
+        "GET", f"/blocks/{page_id}/children", context.credentials
     )
+    return {"page": page, "block_children": block_children}
 
 
 EXECUTORS: dict[str, ConnectorExecutor] = {
     "search": search,
-    "get_page_content": get_page_content,
+    "get_page": get_page,
 }
 
 
