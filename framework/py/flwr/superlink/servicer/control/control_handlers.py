@@ -472,6 +472,32 @@ def validate_run_connector_refs(
     return canonical_refs
 
 
+def _get_hub_app_id(
+    state: LinkState, federation_id: str, request: StartRunRequest
+) -> str | None:
+    """Return the Hub app ID declared by a StartRun request, if any."""
+    if request.app_spec:
+        try:
+            app_id, _ = parse_app_spec(request.app_spec)
+        except ValueError:
+            return None
+    elif request.fab.content:
+        try:
+            fab_id, _ = get_metadata_from_config(get_fab_config(request.fab.content))
+            app_id = f"@{fab_id}"
+        except ValueError:
+            return None
+    else:
+        return None
+
+    if any(
+        app.app_id == app_id and app.HasField("is_hub_app") and app.is_hub_app
+        for app in state.list_apps(federation_id)
+    ):
+        return app_id
+    return None
+
+
 def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
@@ -827,7 +853,7 @@ def _stream_run_events(
         time.sleep(RUN_EVENTS_STREAM_INTERVAL)
 
 
-def start_automation(  # pylint: disable=too-many-locals
+def start_automation(  # pylint: disable=too-many-branches,too-many-locals
     request: StartAutomationRequest,
     account: AccountInfo,
     state: LinkState,
@@ -922,6 +948,12 @@ def start_automation(  # pylint: disable=too-many-locals
     stored_start_run_request = StartRunRequest()
     stored_start_run_request.CopyFrom(start_run_request)
     stored_start_run_request.federation = federation_id
+    app_id = _get_hub_app_id(state, federation_id, stored_start_run_request)
+    if app_id is not None:
+        # Store Hub automations by unversioned app ID. Each dispatch then resolves
+        # the latest compatible version instead of pinning the current run's FAB.
+        stored_start_run_request.app_spec = app_id
+        stored_start_run_request.ClearField("fab")
 
     # Persist the unresolved run request so dispatch uses the StartRun workflow.
     try:
@@ -1516,7 +1548,7 @@ def add_app(
     """Add a Hub app to a federation."""
     federation_id = request.federation_id
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
-    fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, request.app_id)
+    fab_file, _, _ = _get_remote_fab(fleet_api_type, request.app_id)
     try:
         app_type = _get_app_type(get_fab_config(fab_file))
     except ValueError as e:
@@ -1526,11 +1558,7 @@ def add_app(
         ) from e
 
     state.store_app(
-        fab=Fab(
-            hash_str=hashlib.sha256(fab_file).hexdigest(),
-            content=fab_file,
-            verifications=verification_dict,
-        ),
+        fab=None,
         federation_id=federation_id,
         app_id=request.app_id,
         app_type=app_type,
