@@ -93,7 +93,6 @@ def test_search_records_calls_attio() -> None:
         "query": "Flower",
         "objects": ["companies"],
         "request_as": {"type": "workspace"},
-        "limit": 25,
     }
     assert result == {"data": []}
 
@@ -121,6 +120,22 @@ def test_list_meetings_forwards_validated_filters_and_sort() -> None:
         "participants": "ada@example.com,grace@example.com",
         "sort": "start_desc",
     }
+
+
+def test_list_actions_omit_unspecified_limit() -> None:
+    """Attio should apply its own defaults when callers omit the limit."""
+    response = _response({"data": [], "pagination": {"next_cursor": None}})
+    cases = [
+        ("attio_list_meetings", {}),
+        (
+            "attio_list_call_recordings",
+            {"meeting_id": "cb59ab17-ad15-460c-a126-0715617c0853"},
+        ),
+    ]
+    for name, arguments in cases:
+        with patch(_HTTP_REQUEST, return_value=response) as request:
+            _invoke(name, arguments)
+        assert "limit" not in request.call_args.kwargs["params"]
 
 
 @pytest.mark.parametrize(

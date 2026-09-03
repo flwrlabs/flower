@@ -49,16 +49,18 @@ def search_records(
     objects = arguments.get("objects")
     if not isinstance(objects, list) or not objects:
         raise ValueError("Attio objects must be a non-empty list.")
+    body: JSONObject = {
+        "query": require_string(arguments.get("query"), "Attio", "query"),
+        "objects": [require_string(item, "Attio", "object") for item in objects],
+        "request_as": {"type": "workspace"},
+    }
+    if (limit := _limit(arguments, maximum=25)) is not None:
+        body["limit"] = limit
     return _call_attio_api(
         "POST",
         "/objects/records/search",
         context.credentials,
-        json_body={
-            "query": require_string(arguments.get("query"), "Attio", "query"),
-            "objects": [require_string(item, "Attio", "object") for item in objects],
-            "request_as": {"type": "workspace"},
-            "limit": _limit(arguments, default=25, maximum=25),
-        },
+        json_body=body,
     )
 
 
@@ -79,7 +81,7 @@ def list_meetings(
         "/meetings",
         context.credentials,
         params={
-            "limit": str(_limit(arguments, default=50, maximum=200)),
+            "limit": _limit_param(arguments, maximum=200),
             "cursor": optional_cursor(
                 arguments.get("cursor"), "Attio", "pagination.next_cursor"
             ),
@@ -101,7 +103,7 @@ def list_call_recordings(
         f"/meetings/{meeting_id}/call_recordings",
         context.credentials,
         params={
-            "limit": str(_limit(arguments, default=50, maximum=200)),
+            "limit": _limit_param(arguments, maximum=200),
             "cursor": optional_cursor(
                 arguments.get("cursor"), "Attio", "pagination.next_cursor"
             ),
@@ -168,11 +170,17 @@ def _path_segment(value: object, name: str) -> str:
     return quote(_uuid(require_string(value, "Attio", name), name), safe="")
 
 
-def _limit(arguments: JSONObject, *, default: int, maximum: int) -> int:
-    """Return one validated Attio page limit."""
-    return require_int_range(
-        arguments.get("limit", default), "Attio", "limit", maximum=maximum
-    )
+def _limit(arguments: JSONObject, *, maximum: int) -> int | None:
+    """Return a validated Attio page limit when one was supplied."""
+    if "limit" not in arguments:
+        return None
+    return require_int_range(arguments["limit"], "Attio", "limit", maximum=maximum)
+
+
+def _limit_param(arguments: JSONObject, *, maximum: int) -> str | None:
+    """Return an optional validated Attio limit query parameter."""
+    limit = _limit(arguments, maximum=maximum)
+    return str(limit) if limit is not None else None
 
 
 def _optional(arguments: JSONObject, name: str) -> str | None:

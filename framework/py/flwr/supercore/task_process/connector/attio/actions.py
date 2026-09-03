@@ -24,7 +24,7 @@ _CURSOR = string_property(
     "for the same action and filters. Omit it for the first request."
 )
 _PAGE_LIMIT = integer_property(
-    "Number of items to request in this page. Omit it to request 50.",
+    "The maximum number of items to return.",
     minimum=1,
     maximum=200,
 )
@@ -51,7 +51,7 @@ ACTIONS = (
                     "description": "Attio object types to search.",
                 },
                 "limit": integer_property(
-                    "Number of matches to request. Omit it to request 25.",
+                    "The maximum number of matches to return.",
                     minimum=1,
                     maximum=25,
                 ),
@@ -110,8 +110,7 @@ ACTIONS = (
             "properties": {
                 "meeting_id": _uuid_property("Attio meeting UUID."),
                 "limit": integer_property(
-                    "Number of recordings to request in this page. Omit it to "
-                    "request 50.",
+                    "The maximum number of recordings to return.",
                     minimum=1,
                     maximum=200,
                 ),
