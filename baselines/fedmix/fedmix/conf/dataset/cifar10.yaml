@@ -1,0 +1,4 @@
+name: cifar10
+num_classes_per_client: 2
+batch_size: 10
+mash_batch_size: all
