@@ -126,6 +126,8 @@ class TestInitFlwrConfig(unittest.TestCase):
             with (
                 patch.dict(os.environ, {FLWR_HOME: tmp_dir}),
                 patch("flwr.cli.flower_config.typer.secho") as secho,
+                patch("flwr.cli.flower_config.sys.stdin.isatty", return_value=True),
+                patch("flwr.cli.flower_config.sys.stdout.isatty", return_value=True),
                 patch(
                     "flwr.cli.flower_config.typer.confirm", return_value=True
                 ) as confirm,
@@ -148,6 +150,33 @@ class TestInitFlwrConfig(unittest.TestCase):
                     "supergrid"
                 ]["address"],
                 "api.flower.ai",
+            )
+
+    def test_read_superlink_connection_does_not_prompt_when_noninteractive(
+        self,
+    ) -> None:
+        """Do not prompt to update the old address when output is redirected."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_path = Path(tmp_dir) / "config.toml"
+            config_path.write_text(
+                '[superlink.supergrid]\naddress = "supergrid.flower.ai"\n',
+                encoding="utf-8",
+            )
+
+            with (
+                patch.dict(os.environ, {FLWR_HOME: tmp_dir}),
+                patch("flwr.cli.flower_config.sys.stdout.isatty", return_value=False),
+                patch("flwr.cli.flower_config.typer.confirm") as confirm,
+                self.assertRaises(typer.Exit),
+            ):
+                read_superlink_connection("supergrid")
+
+            confirm.assert_not_called()
+            self.assertEqual(
+                tomli.loads(config_path.read_text(encoding="utf-8"))["superlink"][
+                    "supergrid"
+                ]["address"],
+                "supergrid.flower.ai",
             )
 
     def test_read_superlink_connection_only_checks_selected_connection(self) -> None:

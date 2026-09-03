@@ -16,6 +16,7 @@
 
 
 import re
+import sys
 from pathlib import Path
 from typing import Any, cast
 
@@ -313,7 +314,11 @@ def read_superlink_connection(
                 f"`{LEGACY_SUPERGRID_ADDRESS}` with `{SUPERGRID_HTTP_ADDRESS}`.\n",
                 fg=typer.colors.YELLOW,
             )
-            if typer.confirm(f"Do you want me to update `{config_path}` now?"):
+            if (
+                sys.stdin.isatty()
+                and sys.stdout.isatty()
+                and typer.confirm(f"Do you want me to update `{config_path}` now?")
+            ):
                 conn_dict[SuperLinkConnectionTomlKey.ADDRESS] = SUPERGRID_HTTP_ADDRESS
                 write_flower_config(toml_dict)
                 typer.secho(
