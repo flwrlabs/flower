@@ -20,7 +20,6 @@ from __future__ import annotations
 import hashlib
 import os
 import sys
-import time
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from io import StringIO
@@ -28,7 +27,6 @@ from pathlib import Path
 from typing import Any, cast
 
 import click
-import grpc
 import httpx
 import pathspec
 import typer
@@ -47,28 +45,17 @@ from flwr.supercore.constant import (
 from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.credential_store import get_credential_store
 from flwr.supercore.error import FlowerError
-from flwr.supercore.grpc import (
-    GRPC_MAX_MESSAGE_LENGTH,
-    create_channel,
-    on_channel_state_change,
-)
-from flwr.supercore.interceptors import (
-    RuntimeVersionClientInterceptor,
-    RuntimeVersionHttpInterceptor,
-)
+from flwr.supercore.interceptors import RuntimeVersionHttpInterceptor
 from flwr.supercore.logger import print_json_error, redirect_output, restore_output
 from flwr.supercore.utils import is_valid_name
 
 from .auth_plugin import CliAuthPlugin, get_cli_plugin_class
-from .cli_account_auth_interceptor import (
-    CliAccountAuthHttpInterceptor,
-    CliAccountAuthInterceptor,
-)
-from .cli_client_interceptor import CliClientHttpInterceptor, CliClientInterceptor
+from .cli_account_auth_interceptor import CliAccountAuthHttpInterceptor
+from .cli_client_interceptor import CliClientHttpInterceptor
 from .config_utils import load_certificate_in_connection
 from .constant import AUTHN_TYPE_STORE_KEY
 from .flower_config import read_superlink_connection
-from .local_superlink import ensure_local_superlink, ensure_local_superlink_http
+from .local_superlink import ensure_local_superlink
 
 SUPERLINK_UNAVAILABLE_MESSAGE = (
     "Connection to the SuperLink is unavailable. Please check your network "
@@ -77,8 +64,6 @@ SUPERLINK_UNAVAILABLE_MESSAGE = (
 AUTHENTICATION_FAILED_MESSAGE = (
     "Authentication failed. Please run `flwr login` to authenticate and try again."
 )
-CONTROL_API_READY_TIMEOUT_SECONDS = 5
-CONTROL_API_READY_CHECK_INTERVAL_SECONDS = 1
 
 
 def print_json_to_stdout(data: str | Any) -> None:
@@ -336,54 +321,6 @@ def get_executed_command() -> str:
     return " ".join(cmd_parts)
 
 
-def init_channel_from_connection(
-    connection: SuperLinkConnection, auth_plugin: CliAuthPlugin | None = None
-) -> grpc.Channel:
-    """Initialize gRPC channel to the Control API.
-
-    Parameters
-    ----------
-    connection : SuperLinkConnection
-        SuperLink connection configuration.
-    auth_plugin : CliAuthPlugin | None (default: None)
-        Authentication plugin instance for handling credentials.
-
-    Returns
-    -------
-    grpc.Channel
-        Configured gRPC channel with authentication interceptors.
-    """
-    connection = ensure_local_superlink(connection)
-    address = cast(str, connection.address)
-    log_superlink_connection(connection)
-
-    root_certificates_bytes = load_certificate_in_connection(connection)
-
-    # Load authentication plugin
-    if auth_plugin is None:
-        auth_plugin = load_cli_auth_plugin_from_connection(address)
-    # Load tokens
-    auth_plugin.load_tokens()
-
-    # Create the gRPC channel
-    channel = create_channel(
-        server_address=address,
-        insecure=connection.insecure,
-        root_certificates=root_certificates_bytes,
-        max_message_length=GRPC_MAX_MESSAGE_LENGTH,
-        interceptors=[
-            CliClientInterceptor(),
-            RuntimeVersionClientInterceptor(component_name="flwr CLI"),
-            CliAccountAuthInterceptor(auth_plugin),
-        ],
-    )
-    channel.subscribe(on_channel_state_change)
-
-    # Wait for the channel to be ready before returning it
-    wait_for_control_api_channel(channel)
-    return channel
-
-
 def init_http_client_from_connection(
     connection: SuperLinkConnection,
     auth_plugin: CliAuthPlugin | None = None,
@@ -402,7 +339,7 @@ def init_http_client_from_connection(
     ControlHttpClient
         Configured HTTP client with runtime-version and authentication interceptors.
     """
-    connection = ensure_local_superlink_http(connection)
+    connection = ensure_local_superlink(connection)
 
     address = cast(str, connection.address)
     log_superlink_connection(connection)
@@ -472,30 +409,11 @@ def cli_output_control_client(
             control_client.close()
 
 
-def wait_for_control_api_channel(
-    channel: grpc.Channel,
-    timeout: float = CONTROL_API_READY_TIMEOUT_SECONDS,
-    check_interval: float = CONTROL_API_READY_CHECK_INTERVAL_SECONDS,
-) -> None:
-    """Wait for the Control API channel to become ready before sending an RPC."""
-    deadline = time.monotonic() + timeout
-    future = grpc.channel_ready_future(channel)
-    while True:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise click.ClickException(SUPERLINK_UNAVAILABLE_MESSAGE)
-        try:
-            future.result(timeout=min(check_interval, remaining))
-            return
-        except grpc.FutureTimeoutError:
-            continue
-
-
 @contextmanager  # docsig: disable=SIG503
 def flwr_cli_exc_handler(
     custom_handler: Callable[[Exception], None] | None = None,
 ) -> Iterator[None]:
-    """Handle Flower CLI errors from the Control API transports.
+    """Handle Flower CLI errors from the HTTP Control API.
 
     Translate structured Flower errors and transport failures into Click exceptions
     with consistent user-facing messages.
@@ -518,26 +436,9 @@ def flwr_cli_exc_handler(
     """
     try:
         yield
-    except (grpc.RpcError, httpx.HTTPError) as err:
+    except httpx.HTTPError as err:
         if custom_handler is not None:
             custom_handler(err)
-
-        if isinstance(err, grpc.RpcError):
-            # Control API serializes FlowerError into gRPC details. If the payload is
-            # not a valid FlowerError, the raw gRPC fallback below handles it.
-            details = cast(str, err.details())  # pylint: disable=E1101
-            if flower_error := FlowerError.from_json(details):
-                raise click.ClickException(_format_flower_error(flower_error)) from None
-
-            # Keep special handling only for transport-level errors that are not part
-            # of the FlowerError catalog.
-            # pylint: disable-next=E1101
-            if err.code() == grpc.StatusCode.UNAUTHENTICATED:
-                raise click.ClickException(AUTHENTICATION_FAILED_MESSAGE) from None
-            if err.code() == grpc.StatusCode.UNAVAILABLE:  # pylint: disable=E1101
-                raise click.ClickException(SUPERLINK_UNAVAILABLE_MESSAGE) from None
-
-            raise click.ClickException(details) from None
 
         if isinstance(err, httpx.RequestError):
             raise click.ClickException(SUPERLINK_UNAVAILABLE_MESSAGE) from None
