@@ -14,55 +14,10 @@
 # ===============================================================================
 """Client interceptors for Flower CLI metadata."""
 
-from collections.abc import Callable
-from typing import Any
-
-import grpc
 import httpx
 
 from flwr.supercore.constant import FLWR_CLIENT_METADATA_KEY
 from flwr.supercore.protobuf.client import ProtobufCall, ProtobufRequestContext
-
-
-class CliClientInterceptor(
-    grpc.UnaryUnaryClientInterceptor,  # type: ignore[misc]
-    grpc.UnaryStreamClientInterceptor,  # type: ignore[misc]
-):
-    """Attach the CLI client identifier to every outgoing Control API call."""
-
-    def _intercept_call(
-        self,
-        continuation: Callable[[Any, Any], Any],
-        client_call_details: grpc.ClientCallDetails,
-        request: Any,
-    ) -> grpc.Call:
-        """Add the CLI client identifier to a gRPC call."""
-        metadata = [
-            (key, value)
-            for key, value in (client_call_details.metadata or [])
-            if key != FLWR_CLIENT_METADATA_KEY
-        ]
-        metadata.append((FLWR_CLIENT_METADATA_KEY, "cli"))
-        details = client_call_details._replace(metadata=metadata)
-        return continuation(details, request)
-
-    def intercept_unary_unary(
-        self,
-        continuation: Callable[[Any, Any], Any],
-        client_call_details: grpc.ClientCallDetails,
-        request: Any,
-    ) -> grpc.Call:
-        """Add the CLI client identifier to a unary-unary call."""
-        return self._intercept_call(continuation, client_call_details, request)
-
-    def intercept_unary_stream(
-        self,
-        continuation: Callable[[Any, Any], Any],
-        client_call_details: grpc.ClientCallDetails,
-        request: Any,
-    ) -> grpc.Call:
-        """Add the CLI client identifier to a unary-stream call."""
-        return self._intercept_call(continuation, client_call_details, request)
 
 
 class CliClientHttpInterceptor:
