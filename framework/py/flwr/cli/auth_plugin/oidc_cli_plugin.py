@@ -31,11 +31,9 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetAuthTokensRequest,
     GetAuthTokensResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore.auth.typing import AccountAuthCredentials, AccountAuthLoginDetails
 from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.credential_store import get_credential_store
-from flwr.supercore.utils import get_metadata_str
 
 from .auth_plugin import CliAuthPlugin, LoginError
 
@@ -56,7 +54,7 @@ class OidcCliPlugin(CliAuthPlugin):
     @staticmethod
     def login(
         login_details: AccountAuthLoginDetails,
-        control_client: ControlStub | ControlHttpClient,
+        control_client: ControlHttpClient,
     ) -> AccountAuthCredentials:
         """Authenticate the account and retrieve authentication credentials.
 
@@ -64,7 +62,7 @@ class OidcCliPlugin(CliAuthPlugin):
         ----------
         login_details : AccountAuthLoginDetails
             Login details containing device code and verification URI.
-        control_client : ControlStub | ControlHttpClient
+        control_client : ControlHttpClient
             Control client for making authentication requests.
 
         Returns
@@ -147,18 +145,3 @@ class OidcCliPlugin(CliAuthPlugin):
             (ACCESS_TOKEN_KEY, self.access_token),
             (REFRESH_TOKEN_KEY, self.refresh_token),
         ]
-
-    def read_tokens_from_metadata(
-        self, metadata: Sequence[tuple[str, str | bytes]]
-    ) -> AccountAuthCredentials | None:
-        """Read authentication tokens from the provided metadata."""
-        access_token = get_metadata_str(metadata, ACCESS_TOKEN_KEY)
-        refresh_token = get_metadata_str(metadata, REFRESH_TOKEN_KEY)
-
-        if access_token is not None and refresh_token is not None:
-            return AccountAuthCredentials(
-                access_token=access_token,
-                refresh_token=refresh_token,
-            )
-
-        return None
