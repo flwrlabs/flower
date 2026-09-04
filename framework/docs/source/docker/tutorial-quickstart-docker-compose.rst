@@ -310,7 +310,7 @@ You can add more SuperNodes and ClientApps by uncommenting their definitions in 
             USER app
 
             WORKDIR /app
-            COPY --chown=app:app pyproject.toml .
+            COPY --chown=app:app pyproject.toml LICENSE* ./
             RUN sed -i 's/.*flwr\[simulation\].*//' pyproject.toml \
               && python -m pip install -U --no-cache-dir .
 
