@@ -106,6 +106,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         content: bytes,
         app_id: str = "@flwr/demo",
         app_type: str = TaskType.SERVER_APP,
+        note: str | None = None,
     ) -> str:
         """Store a Hub app for a handler test."""
         return self.state.store_app(
@@ -115,6 +116,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             app_type,
             self.account.flwr_aid,
             is_hub_app=True,
+            hub_resolution_note=note,
         )
 
     @staticmethod
@@ -138,14 +140,20 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
         return stack
 
-    def _run_hub_refresh(self, content: bytes, expected_hash: str) -> None:
+    def _run_hub_refresh(
+        self,
+        content: bytes,
+        expected_hash: str,
+        note: str | None = None,
+        config: dict[str, Any] | None = None,
+    ) -> None:
         """Run a Hub refresh with a mocked download."""
         with (
             patch(
                 "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
-                return_value=(content, {}, None),
+                return_value=(content, {}, note),
             ),
-            self._patch_fab_metadata(),
+            self._patch_fab_metadata(config=config),
         ):
             _refresh_hub_app(
                 self.state, NOOP_FEDERATION_ID, "@flwr/demo", expected_hash, None
@@ -364,7 +372,8 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
     def test_start_run_uses_cached_hub_fab_and_throttles_refresh(self) -> None:
         """Start from cache and schedule at most one refresh per interval."""
-        fab_hash = self._store_hub_app(b"cached Hub FAB")
+        note = "Using an older compatible release"
+        fab_hash = self._store_hub_app(b"cached Hub FAB", note=note)
         request = StartRunRequest(app_spec="@flwr/demo", federation=NOOP_FEDERATION_ID)
 
         with (
@@ -385,16 +394,26 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             run_ids=[response.run_id for response in responses]
         )
         self.assertEqual([run.fab_hash for run in runs], [fab_hash, fab_hash])
+        self.assertEqual([response.note for response in responses], [note, note])
 
     def test_refresh_hub_app_updates_cached_fab(self) -> None:
         """Atomically advance a Hub app association to the refreshed FAB."""
         current_hash = self._store_hub_app(b"old Hub FAB")
         refreshed_content = b"refreshed Hub FAB"
-        self._run_hub_refresh(refreshed_content, current_hash)
+        note = "Using a compatible AgentApp release"
+        self._run_hub_refresh(
+            refreshed_content,
+            current_hash,
+            note,
+            {"tool": {"flwr": {"app": {"components": {"agentapp": "x"}}}}},
+        )
 
         app = self.state.list_apps(NOOP_FEDERATION_ID)[0]
         expected_hash = hashlib.sha256(refreshed_content).hexdigest()
         self.assertEqual(app.fab_hash, expected_hash)
+        self.assertEqual(app.app_type, TaskType.AGENT_APP)
+        cached = self.state.get_hub_app(NOOP_FEDERATION_ID, "@flwr/demo")
+        self.assertEqual(cached.resolution_note if cached else None, note)
 
     def test_refresh_hub_app_rejects_oversized_fab(self) -> None:
         """Keep the cached FAB when a refresh exceeds the size limit."""

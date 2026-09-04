@@ -45,7 +45,7 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.date import now
-from flwr.supercore.fab import Fab
+from flwr.supercore.fab import CachedHubApp, Fab
 from flwr.supercore.typing import ConnectorRecord
 
 from . import CoreState
@@ -183,18 +183,38 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         current_hash = store_hub_app(b"current")
         refreshed_hash = state.store_fab(Fab("", b"refreshed", {}))
-        self.assertTrue(
-            state.update_hub_app("@me/fed", "@me/app", current_hash, refreshed_hash)
+        cached_app = CachedHubApp(
+            Fab(refreshed_hash, b"refreshed", {}),
+            TaskType.SERVER_APP,
+            "compatibility note",
         )
+        self.assertTrue(
+            state.update_hub_app("@me/fed", "@me/app", current_hash, cached_app)
+        )
+        cached = state.get_hub_app("@me/fed", "@me/app")
+        self.assertEqual(
+            cached.resolution_note if cached else None, "compatibility note"
+        )
+        self.assertEqual(state.list_apps("@me/fed")[0].app_type, TaskType.SERVER_APP)
         replacement_hash = store_hub_app(b"replacement")
         stale_hash = state.store_fab(Fab("", b"stale refresh", {}))
         self.assertFalse(
-            state.update_hub_app("@me/fed", "@me/app", refreshed_hash, stale_hash)
+            state.update_hub_app(
+                "@me/fed",
+                "@me/app",
+                refreshed_hash,
+                CachedHubApp(Fab(stale_hash, b"", {}), TaskType.AGENT_APP, None),
+            )
         )
         self.assertEqual(state.list_apps("@me/fed")[0].fab_hash, replacement_hash)
         self.assertTrue(state.delete_app("@me/fed", "@me/app"))
         self.assertFalse(
-            state.update_hub_app("@me/fed", "@me/app", replacement_hash, stale_hash)
+            state.update_hub_app(
+                "@me/fed",
+                "@me/app",
+                replacement_hash,
+                CachedHubApp(Fab(stale_hash, b"", {}), TaskType.AGENT_APP, None),
+            )
         )
 
     def test_connector_upsert_get_and_delete(self) -> None:

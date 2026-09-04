@@ -156,7 +156,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.fab import Fab
+from flwr.supercore.fab import CachedHubApp, Fab
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.run import Run
 from flwr.supercore.task_process.connector import registry as connector_registry
@@ -481,23 +481,6 @@ def validate_run_connector_refs(
     return canonical_refs
 
 
-def _get_cached_hub_fab(
-    state: LinkState, federation_id: str, app_id: str
-) -> Fab | None:
-    """Return the locally cached FAB for a federation-associated Hub app."""
-    app = next(
-        (
-            item
-            for item in state.list_apps(federation_id)
-            if item.app_id == app_id and item.HasField("is_hub_app") and item.is_hub_app
-        ),
-        None,
-    )
-    if app is None or not app.fab_hash:
-        return None
-    return state.get_fab(app.fab_hash)
-
-
 def _get_hub_app_id(
     state: LinkState, federation_id: str, request: StartRunRequest
 ) -> str | None:
@@ -552,20 +535,23 @@ def _refresh_hub_app(
 ) -> None:
     """Refresh one cached Hub app without blocking run creation."""
     try:
-        fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, app_id)
-        _validate_hub_fab(fab_file, app_id)
-        fab_hash = state.store_fab(
-            Fab(
+        fab_file, verification_dict, note = _get_remote_fab(fleet_api_type, app_id)
+        fab_config = _validate_hub_fab(fab_file, app_id)
+        cached_app = CachedHubApp(
+            fab=Fab(
                 hash_str=hashlib.sha256(fab_file).hexdigest(),
                 content=fab_file,
                 verifications=verification_dict,
-            )
+            ),
+            app_type=_get_app_type(fab_config),
+            resolution_note=note,
         )
+        state.store_fab(cached_app.fab)
         state.update_hub_app(
             federation_id=federation_id,
             app_id=app_id,
             expected_fab_hash=expected_fab_hash,
-            fab_hash=fab_hash,
+            cached_app=cached_app,
         )
     except Exception as exc:  # pylint: disable=broad-exception-caught
         # A refresh failure must not invalidate the last known-good cached FAB.
@@ -649,8 +635,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 f"Invalid app specification: {request.app_spec}",
             ) from e
     is_stored_app = bool(request.fab.hash_str and not request.fab.content)
-    cached_hub_fab = (
-        _get_cached_hub_fab(state, federation_id, app_id)
+    cached_hub_app = (
+        state.get_hub_app(federation_id, app_id)
         if app_id is not None and app_version is None and not is_stored_app
         else None
     )
@@ -678,7 +664,9 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         verification_dict = stored_fab.verifications
     # Start an unversioned Hub app from the local cache and refresh it without
     # blocking this run.
-    elif cached_hub_fab is not None:
+    elif cached_hub_app is not None:
+        cached_hub_fab = cached_hub_app.fab
+        note = cached_hub_app.resolution_note
         fab_file = cached_hub_fab.content
         verification_dict = cached_hub_fab.verifications
         is_hub_app = True
@@ -773,6 +761,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 app_type=app_type,
                 added_by=flwr_aid,
                 is_hub_app=is_hub_app,
+                hub_resolution_note=note if is_hub_app else None,
             )
             if is_hub_app and app_version is None:
                 _mark_hub_app_fresh(state, federation_id, app_id)
@@ -1674,7 +1663,7 @@ def add_app(
     """Add a Hub app to a federation."""
     federation_id = request.federation_id
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
-    fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, request.app_id)
+    fab_file, verification_dict, note = _get_remote_fab(fleet_api_type, request.app_id)
     try:
         app_type = _get_app_type(_validate_hub_fab(fab_file, request.app_id))
     except ValueError as e:
@@ -1694,6 +1683,7 @@ def add_app(
         app_type=app_type,
         added_by=account.flwr_aid,
         is_hub_app=True,
+        hub_resolution_note=note,
     )
     _mark_hub_app_fresh(state, federation_id, request.app_id)
 
