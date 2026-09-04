@@ -31,15 +31,15 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.typing import JSONObject
 
-from .idle_slot import (
-    IDLE_SLOT_DEPENDENCY_ENVIRONMENT_ANNOTATION,
-    IDLE_SLOT_FAB_HASH_ANNOTATION,
-    IDLE_SLOT_LABEL,
-    IDLE_SLOT_MODULE,
-    IDLE_SLOT_READY_FILE,
-    IDLE_SLOT_RUNTIME_IMAGE_ANNOTATION,
-    _IdleSlotPoolKey,
-    _new_idle_slot_id,
+from .idle_taskexecutor import (
+    IDLE_TASKEXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION,
+    IDLE_TASKEXECUTOR_FAB_HASH_ANNOTATION,
+    IDLE_TASKEXECUTOR_LABEL,
+    IDLE_TASKEXECUTOR_MODULE,
+    IDLE_TASKEXECUTOR_READY_FILE,
+    IDLE_TASKEXECUTOR_RUNTIME_IMAGE_ANNOTATION,
+    _new_idle_taskexecutor_id,
+    _TaskExecutorPoolKey,
 )
 from .types import ExecutionSpec, LaunchResult
 
@@ -333,11 +333,11 @@ class KubernetesExecutor:
 
         return LaunchResult.accepted()
 
-    def _launch_idle_slot(self, pool_key: _IdleSlotPoolKey) -> LaunchResult:
-        """Submit one inert TaskExecutor Pod for a fixed compatibility key."""
+    def _launch_idle_taskexecutor(self, pool_key: _TaskExecutorPoolKey) -> LaunchResult:
+        """Submit one idle TaskExecutor Pod for a fixed compatibility key."""
         try:
             pod = _build_idle_taskexecutor_pod(
-                pool_key, self._config, _new_idle_slot_id()
+                pool_key, self._config, _new_idle_taskexecutor_id()
             )
             self._client.create_namespaced_pod(self._config.namespace, pod)
         except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -503,17 +503,17 @@ def _build_taskexecutor_pod(
 
 
 def _build_idle_taskexecutor_pod(
-    pool_key: _IdleSlotPoolKey,
+    pool_key: _TaskExecutorPoolKey,
     config: KubernetesExecutorConfig,
-    slot_id: str,
+    executor_id: str,
 ) -> JSONObject:
     """Build an inert TaskExecutor Pod without task authority or credentials."""
     container: JSONObject = {
         "name": "taskexecutor",
         "image": pool_key.runtime_image,
-        "command": ["python", "-m", IDLE_SLOT_MODULE],
+        "command": ["python", "-m", IDLE_TASKEXECUTOR_MODULE],
         "readinessProbe": {
-            "exec": {"command": ["test", "-f", IDLE_SLOT_READY_FILE]},
+            "exec": {"command": ["test", "-f", IDLE_TASKEXECUTOR_READY_FILE]},
             "periodSeconds": 1,
         },
     }
@@ -524,7 +524,7 @@ def _build_idle_taskexecutor_pod(
     return {
         "apiVersion": "v1",
         "kind": "Pod",
-        "metadata": _idle_slot_metadata(_idle_slot_pod_name(slot_id), pool_key, config),
+        "metadata": _idle_pod_metadata(_idle_pod_name(executor_id), pool_key, config),
         "spec": _taskexecutor_pod_spec(container, config.volumes or [], config),
     }
 
@@ -718,9 +718,9 @@ def _pod_name(spec: ExecutionSpec, launch_attempt_id: str) -> str:
     return f"flwr-taskexecutor-{spec.task_id}-{launch_attempt_id}"
 
 
-def _idle_slot_pod_name(slot_id: str) -> str:
-    """Return the TaskExecutor Pod name for an idle slot."""
-    return f"flwr-taskexecutor-idle-{slot_id}"
+def _idle_pod_name(executor_id: str) -> str:
+    """Return the name of an idle TaskExecutor Pod."""
+    return f"flwr-taskexecutor-idle-{executor_id}"
 
 
 def _credential_secret_name(spec: ExecutionSpec, launch_attempt_id: str) -> str:
@@ -760,12 +760,12 @@ def _metadata(
     return metadata
 
 
-def _idle_slot_metadata(
+def _idle_pod_metadata(
     name: str,
-    pool_key: _IdleSlotPoolKey,
+    pool_key: _TaskExecutorPoolKey,
     config: KubernetesExecutorConfig,
 ) -> JSONObject:
-    """Return metadata identifying one compatible idle TaskExecutor slot."""
+    """Return metadata identifying one compatible idle TaskExecutor Pod."""
     labels: JSONObject = {}
     labels.update(_caller_labels(config))
     labels.update(
@@ -773,7 +773,7 @@ def _idle_slot_metadata(
             _NAME_LABEL: "flower",
             _COMPONENT_LABEL: "taskexecutor",
             _TASK_TYPE_LABEL: pool_key.task_type.value,
-            IDLE_SLOT_LABEL: "true",
+            IDLE_TASKEXECUTOR_LABEL: "true",
         }
     )
     if config.resource_pool is not None:
@@ -783,9 +783,9 @@ def _idle_slot_metadata(
     annotations.update(config.annotations or {})
     annotations.update(
         {
-            IDLE_SLOT_FAB_HASH_ANNOTATION: pool_key.fab_hash,
-            IDLE_SLOT_RUNTIME_IMAGE_ANNOTATION: pool_key.runtime_image,
-            IDLE_SLOT_DEPENDENCY_ENVIRONMENT_ANNOTATION: (
+            IDLE_TASKEXECUTOR_FAB_HASH_ANNOTATION: pool_key.fab_hash,
+            IDLE_TASKEXECUTOR_RUNTIME_IMAGE_ANNOTATION: pool_key.runtime_image,
+            IDLE_TASKEXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION: (
                 pool_key.dependency_environment_version
             ),
         }
