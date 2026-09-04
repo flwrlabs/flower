@@ -335,12 +335,14 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                 image: flwr/superlink:|stable_flwr_version|
                 args:
                   - "--insecure"
+                  - "--host"
+                  - "0.0.0.0"
                   - "--isolation"
                   - "process"
                 ports:  # which ports to expose/available
                 - containerPort: 9091
                 - containerPort: 9092
-                - containerPort: 9093
+                - containerPort: 8000
         ---
         apiVersion: v1
         kind: Service
@@ -359,8 +361,8 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
             targetPort: 9092  # the SuperLink container port
             name: superlink-fleetapi
           - protocol: TCP
-            port: 9093   # Port for Flower app submission
-            targetPort: 9093  # the SuperLink container port
+            port: 8000   # Port for Flower app submission over HTTP
+            targetPort: 8000  # the SuperLink container port
             name: superlink-controlapi
           type: LoadBalancer  # balances workload, makes the service publicly available
 
@@ -629,7 +631,7 @@ Flower Configuration file:
        :caption: config.toml
 
        [superlink.gcp-deployment]
-       address = "<EXTERNAL_IP>:9093" # replace the EXTERNAL_IP with the correct value
+       address = "<EXTERNAL_IP>:8000" # replace the EXTERNAL_IP with the correct value
        insecure = true
 
 Then we can execute the example on the GCP cluster by running:
