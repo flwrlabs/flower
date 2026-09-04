@@ -4,8 +4,8 @@ Run an AgentApp locally with Flower's Community Edition runtime. This setup is
 useful while developing an app: it runs SuperLink and the AgentApp processes on
 your machine, without a SuperGrid account or Enterprise services.
 
-This guide targets Flower 1.37.0. Run the CLI and SuperLink from the same
-project environment to avoid protocol mismatches.
+This guide targets Flower |stable_flwr_version|. Run the CLI and SuperLink from
+the same project environment to avoid protocol mismatches.
 
 If you haven't created an AgentApp yet, start with [Write your first
 AgentApp](../tutorials/write-your-first-agentapp.md).
