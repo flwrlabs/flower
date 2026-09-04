@@ -20,7 +20,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from uuid import uuid4
 
-from flwr.supercore.constant import TaskType
+from flwr.supercore.constant import TASK_TYPES_REQUIRING_FAB_HASH, TaskType
 
 WARM_EXECUTOR_LABEL = "flower.ai/warm-executor"
 WARM_EXECUTOR_FAB_HASH_ANNOTATION = "flower.ai/warm-executor-fab-hash"
@@ -37,7 +37,7 @@ class WarmExecutorPoolKey:
     """Identify the task environment served by a warm executor pool."""
 
     task_type: TaskType
-    fab_hash: str
+    fab_hash: str | None
     runtime_image: str
     dependency_environment_version: str
 
@@ -45,11 +45,16 @@ class WarmExecutorPoolKey:
         """Validate values persisted on a warm TaskExecutor Pod."""
         if not isinstance(self.task_type, TaskType):
             raise ValueError("Warm executor pool key requires a TaskType.")
-        for field_name in (
-            "fab_hash",
-            "runtime_image",
-            "dependency_environment_version",
-        ):
+        if self.fab_hash is None:
+            if self.task_type in TASK_TYPES_REQUIRING_FAB_HASH:
+                raise ValueError(
+                    f"Warm executor pool key requires a fab_hash for {self.task_type}."
+                )
+        elif not isinstance(self.fab_hash, str) or not self.fab_hash.strip():
+            raise ValueError(
+                "Warm executor pool key requires a non-empty fab_hash when provided."
+            )
+        for field_name in ("runtime_image", "dependency_environment_version"):
             value = getattr(self, field_name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(

@@ -813,13 +813,16 @@ def _warm_executor_metadata(
     annotations.update(config.annotations or {})
     annotations.update(
         {
-            WARM_EXECUTOR_FAB_HASH_ANNOTATION: pool_key.fab_hash,
             WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION: pool_key.runtime_image,
             WARM_EXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION: (
                 pool_key.dependency_environment_version
             ),
         }
     )
+    if pool_key.fab_hash is None:
+        annotations.pop(WARM_EXECUTOR_FAB_HASH_ANNOTATION, None)
+    else:
+        annotations[WARM_EXECUTOR_FAB_HASH_ANNOTATION] = pool_key.fab_hash
     return {
         "name": name,
         "namespace": config.namespace,

@@ -242,9 +242,14 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
 ) -> None:
     """Test a warm TaskExecutor is inert, reports readiness, and is swept."""
     client = Mock()
-    monkeypatch.setattr(kube, "new_warm_executor_id", Mock(return_value="executor123"))
+    monkeypatch.setattr(
+        kube,
+        "new_warm_executor_id",
+        Mock(side_effect=["executor123", "executor456"]),
+    )
     config = _executor_config(
         labels={WARM_EXECUTOR_LABEL: "false"},
+        annotations={WARM_EXECUTOR_FAB_HASH_ANNOTATION: "caller-fab"},
         container_security_context={"readOnlyRootFilesystem": True},
     )
     executor = KubernetesExecutor(client=client, config=config)
@@ -302,12 +307,27 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
     assert is_warm_executor_ready(pod, pool_key)
 
     incompatible_keys = (
-        _warm_executor_pool_key(task_type=TaskType.MODEL),
+        _warm_executor_pool_key(task_type=TaskType.MODEL, fab_hash=None),
         _warm_executor_pool_key(fab_hash="another-fab-sha256"),
         _warm_executor_pool_key(runtime_image="taskexecutor:other"),
         _warm_executor_pool_key(dependency_environment_version="agent-env-v2"),
     )
     assert not any(is_warm_executor_ready(pod, key) for key in incompatible_keys)
+
+    fabless_key = _warm_executor_pool_key(task_type=TaskType.MODEL, fab_hash=None)
+    fabless_result = executor._launch_warm_executor(  # pylint: disable=protected-access
+        fabless_key
+    )
+    assert fabless_result.status == LaunchResultStatus.ACCEPTED
+    fabless_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
+    assert (
+        WARM_EXECUTOR_FAB_HASH_ANNOTATION not in fabless_pod["metadata"]["annotations"]
+    )
+    fabless_pod["status"] = {
+        "phase": "Running",
+        "conditions": [{"type": "Ready", "status": "True"}],
+    }
+    assert is_warm_executor_ready(fabless_pod, fabless_key)
 
     pod["status"]["phase"] = "Succeeded"
     client.list_namespaced_pod.return_value = {"items": [pod]}
