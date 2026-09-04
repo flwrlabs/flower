@@ -14,6 +14,7 @@
 # ==============================================================================
 """Validation helpers shared by account-scoped connectors."""
 
+
 from collections.abc import Callable
 from typing import cast
 
@@ -36,19 +37,6 @@ def optional_string(value: object, provider: str, name: str) -> str | None:
     if isinstance(value, str) and not value.strip():
         return None
     return require_string(value, provider, name)
-
-
-def optional_cursor(value: object, provider: str, response_path: str) -> str | None:
-    """Validate an optional opaque cursor copied from a provider response."""
-    cursor = optional_string(value, provider, "cursor")
-    if cursor is None:
-        return None
-    if cursor.casefold() in {"none", "null"} or cursor == "0":
-        raise ValueError(
-            f"{provider} cursor must be copied from {response_path}; omit it for "
-            "the first request."
-        )
-    return cursor
 
 
 def require_int_range(
