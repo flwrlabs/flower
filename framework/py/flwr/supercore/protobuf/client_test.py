@@ -269,11 +269,17 @@ def test_unary_stream_sends_and_receives_framed_protobuf() -> None:
 def test_unary_stream_sets_read_timeout() -> None:
     """Apply the optional timeout while reading a successful stream."""
     response = _stream_response(200, [])
+    read_timeout = None
+
+    def send(request: httpx.Request, **_kwargs: object) -> httpx.Response:
+        nonlocal read_timeout
+        read_timeout = request.extensions["timeout"]["read"]
+        return response
 
     with patch(
         "flwr.supercore.protobuf.client.httpx.Client.send",
-        return_value=response,
-    ) as send:
+        side_effect=send,
+    ):
         list(
             _stream_call(
                 ProtobufClient("https://api.example/", timeout=10.0),
@@ -281,7 +287,7 @@ def test_unary_stream_sets_read_timeout() -> None:
             )
         )
 
-    assert send.call_args.args[0].extensions["timeout"]["read"] == 5.0
+    assert read_timeout == 5.0
 
 
 @pytest.mark.parametrize(

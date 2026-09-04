@@ -312,7 +312,8 @@ class ProtobufClient:
                 # Bound response establishment and error-body reads.
                 timeout = current_context.request.extensions["timeout"]
                 stream_read_timeout = timeout["read"]
-                timeout["read"] = self._client.timeout.read
+                if stream_read_timeout is None:
+                    timeout["read"] = self._client.timeout.read
                 response = self._client.send(current_context.request, stream=True)
                 if response.is_error:
                     # Let response-side interceptors inspect a bounded error payload.
