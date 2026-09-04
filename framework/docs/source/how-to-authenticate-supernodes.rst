@@ -129,7 +129,7 @@ the path to the CA certificate used to launch the SuperLink. For example:
     :emphasize-lines: 3
 
     [superlink.local-deployment]
-    address = "127.0.0.1:9093"
+    address = "127.0.0.1:8000"
     root-certificates = "/absolute/path/to/certificates/ca.crt"
 
 You can verify that your connection is correctly configured by running a ``flwr ls``
