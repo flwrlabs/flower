@@ -6,10 +6,13 @@ services:
       - --host
       - 0.0.0.0
       - --port
-      - "9091"
+      - "8000"
       - --ssl-ca-certfile=certificates/ca.crt
       - --ssl-certfile=certificates/server.pem
       - --ssl-keyfile=certificates/server.key
+      - --appio-ssl-ca-certfile=certificates/ca.crt
+      - --appio-ssl-certfile=certificates/server.pem
+      - --appio-ssl-keyfile=certificates/server.key
     secrets:
       - source: superlink-ca-certfile
         target: /app/certificates/ca.crt
@@ -17,6 +20,18 @@ services:
         target: /app/certificates/server.pem
       - source: superlink-keyfile
         target: /app/certificates/server.key
+
+  superexec-serverapp:
+    command:
+      - --root-certificates
+      - certificates/superlink-ca.crt
+      - --plugin-type
+      - serverapp
+      - --runtime-api-address
+      - superlink:8000
+    secrets:
+      - source: superlink-ca-certfile
+        target: /app/certificates/superlink-ca.crt
 
   supernode-1:
     command:
