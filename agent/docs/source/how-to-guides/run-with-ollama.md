@@ -5,9 +5,9 @@ Run a Flower AgentApp entirely on your machine with an
 require a Flower account or model API key.
 
 This guide builds on [Run an AgentApp with a local
-SuperLink](run-with-local-superlink.md) and targets Flower
-|stable_flwr_version|. The example streams responses from `qwen3.5:4b`, but you
-can use another model that supports the required Ollama endpoint.
+SuperLink](run-with-local-superlink.md). The example streams responses from
+`qwen3.5:4b`, but you can use another model that supports the required Ollama
+endpoint.
 
 ```{warning}
 This guide disables TLS and is intended for local development only. Do not
@@ -114,7 +114,7 @@ description = "A local Flower AgentApp backed by Ollama"
 license = "Apache-2.0"
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "flwr>=|stable_flwr_version|,<2.0",
+    "flwr>=1.37.0,<2.0",
     "openai>=2.16.0,<3.0.0",
 ]
 
@@ -124,7 +124,7 @@ packages = ["agent"]
 [tool.flwr.app]
 publisher = "local"
 display-name = "Ollama Agent"
-flwr-version-target = "|stable_flwr_version|"
+flwr-version-target = "1.37.0"
 fab-include = ["agent/**/*.py"]
 
 [tool.flwr.app.components]
