@@ -9,9 +9,9 @@ services:
       - --host
       - 0.0.0.0
       - --port
-      - "9091"
+      - "8000"
     ports:
-      - 9093:9093
+      - 8000:8000
 
   # create a SuperExec service for SuperLink to execute ServerApps
   superexec-serverapp:
@@ -39,7 +39,7 @@ services:
       - --plugin-type
       - serverapp
       - --runtime-api-address
-      - superlink:9091
+      - superlink:8000
     restart: on-failure:3
     depends_on:
       - superlink

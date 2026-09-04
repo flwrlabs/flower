@@ -111,7 +111,7 @@ connection in your Flower configuration file.
        :caption: config.toml
 
        [superlink.local-deployment]
-       address = "127.0.0.1:9093"
+       address = "127.0.0.1:8000"
        insecure = true
 
 2. Run the quickstart example, monitor the ``ServerApp`` logs and wait for the summary
@@ -169,7 +169,7 @@ In the next step, change the application code.
 
        INFO :      Starting logstream for run_id `10386255862566726253`
        INFO :      Starting Flower ServerApp
-       WARNING :   Option `--insecure` was set. Starting insecure HTTP channel to superlink:9091.
+       WARNING :   Option `--insecure` was set. Starting insecure HTTP channel to superlink:8000.
        🎊 Successfully installed quickstart-pytorch to /app/.flwr/apps/flower.quickstart-pytorch.1.0.0.35361a47.
        Get weights
        INFO :      Starting Flower ServerApp, config: num_rounds=3, no round_timeout
@@ -251,7 +251,7 @@ service, ensuring that it maintains its state even after a restart.
        :caption: config.toml
 
        [superlink.local-deployment-tls]
-       address = "127.0.0.1:9093"
+       address = "127.0.0.1:8000"
        root-certificates = "/absolute/path/to/superlink-certificates/ca.crt"
 
 3. Restart the services with TLS enabled:
@@ -370,25 +370,36 @@ Restart the services with:
 To run Flower with persisted SuperLink state and enabled TLS, a slight change in the
 ``with-state.yml`` file is required:
 
-1. Comment out the lines 2-6 and uncomment the lines 7-13:
+1. Comment out the first ``command`` block and uncomment the second one:
 
    .. code-block:: yaml
        :caption: with-state.yml
        :linenos:
-       :emphasize-lines: 2-13
+       :emphasize-lines: 2-23
 
          superlink:
            # command:
            # - --insecure
            # - --isolation
            # - process
+           # - --host
+           # - 0.0.0.0
+           # - --port
+           # - "8000"
            # - --database=state/state.db
            command:
              - --isolation
              - process
+             - --host
+             - 0.0.0.0
+             - --port
+             - "8000"
              - --ssl-ca-certfile=certificates/ca.crt
              - --ssl-certfile=certificates/server.pem
              - --ssl-keyfile=certificates/server.key
+             - --appio-ssl-ca-certfile=certificates/ca.crt
+             - --appio-ssl-certfile=certificates/server.pem
+             - --appio-ssl-keyfile=certificates/server.key
              - --database=state/state.db
            volumes:
              - ./state/:/app/state/:rw
