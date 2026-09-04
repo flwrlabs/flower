@@ -111,7 +111,7 @@ runtime, as summarized in the table below.
 
 .. note::
 
-    Runtime API communication uses HTTP starting with Flower 1.36. Starting with Flower
+    Runtime API communication uses HTTP starting with Flower 1.35. Starting with Flower
     1.37, the Flower CLI also communicates with the Control API over HTTP.
 
 .. list-table::
