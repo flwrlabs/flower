@@ -23,7 +23,8 @@ import secrets
 import time
 from collections.abc import Callable, Generator, Sequence
 from datetime import UTC, datetime, timedelta
-from logging import ERROR, INFO
+from logging import ERROR, INFO, WARNING
+from threading import Thread
 from typing import Any, cast
 
 import requests
@@ -178,6 +179,8 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
 from flwr.superlink.run_source import RunSource
+
+HUB_APP_REFRESH_INTERVAL = timedelta(minutes=5)
 
 
 class InvalidConnectorRequestError(FlowerError):
@@ -498,6 +501,36 @@ def _get_hub_app_id(
     return None
 
 
+def _refresh_hub_app(
+    state: LinkState,
+    federation_id: str,
+    app_id: str,
+    expected_fab_hash: str,
+    fleet_api_type: str | None,
+) -> None:
+    """Refresh a cached Hub app."""
+    try:
+        fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, app_id)
+        if len(fab_file) > FAB_MAX_SIZE:
+            raise ValueError("Downloaded FAB exceeds the maximum size")
+        fab_config = get_fab_config(fab_file)
+        fab_id, _ = get_metadata_from_config(fab_config)
+        if f"@{fab_id}" != app_id:
+            raise ValueError("Downloaded FAB ID does not match the Hub app ID")
+        fab_hash = state.store_fab(
+            Fab(hashlib.sha256(fab_file).hexdigest(), fab_file, verification_dict)
+        )
+        state.update_hub_app(
+            federation_id,
+            app_id,
+            expected_fab_hash,
+            fab_hash,
+            _get_app_type(fab_config),
+        )
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        log(WARNING, "Failed to refresh Hub app %s: %s", app_id, exc)
+
+
 def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
@@ -535,16 +568,23 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     verification_dict: dict[str, str] = {}
     note: str | None = None
     app_id = None
+    app_version = None
     if request.app_spec:
         try:
-            app_id, _ = parse_app_spec(request.app_spec)
+            app_id, app_version = parse_app_spec(request.app_spec)
         except ValueError as e:
             raise FlowerError(
                 ApiErrorCode.INVALID_APP_SPEC,
                 f"Invalid app specification: {request.app_spec}",
             ) from e
     is_stored_app = bool(request.fab.hash_str and not request.fab.content)
+    cached_hub_app = (
+        state.get_hub_app(federation_id, app_id)
+        if app_id is not None and app_version is None and not is_stored_app
+        else None
+    )
     is_hub_app = False
+    is_cached_hub_app = False
 
     # Start a run using a stored app
     if is_stored_app:
@@ -565,6 +605,13 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             )
         fab_file = stored_fab.content
         verification_dict = stored_fab.verifications
+    # Start an unversioned Hub app using its cached FAB
+    elif cached_hub_app is not None:
+        cached_fab, _ = cached_hub_app
+        fab_file = cached_fab.content
+        verification_dict = cached_fab.verifications
+        is_hub_app = True
+        is_cached_hub_app = True
     # Start a run using a remote app
     elif request.app_spec:
         fab_file, verification_dict, note = _get_remote_fab(
@@ -640,7 +687,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 "Stored app ID does not match the request",
             )
 
-        if not is_stored_app:
+        if not is_stored_app and not is_cached_hub_app:
             state.store_app(
                 fab=fab,
                 federation_id=federation_id,
@@ -712,6 +759,20 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         run_id=run_id, note=note, series_id=series_id, federation=run.federation_id
     )
     extensions.notify_run_started(run, source)
+    if cached_hub_app is not None:
+        cached_fab, updated_at = cached_hub_app
+        if updated_at < now() - HUB_APP_REFRESH_INTERVAL:
+            Thread(
+                target=_refresh_hub_app,
+                args=(
+                    state,
+                    federation_id,
+                    app_id,
+                    cached_fab.hash_str,
+                    fleet_api_type,
+                ),
+                daemon=True,
+            ).start()
     return response
 
 
@@ -1547,7 +1608,7 @@ def add_app(
     """Add a Hub app to a federation."""
     federation_id = request.federation_id
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
-    fab_file, _, _ = _get_remote_fab(fleet_api_type, request.app_id)
+    fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, request.app_id)
     try:
         app_type = _get_app_type(get_fab_config(fab_file))
     except ValueError as e:
@@ -1557,7 +1618,7 @@ def add_app(
         ) from e
 
     state.store_app(
-        fab=None,
+        fab=Fab(hashlib.sha256(fab_file).hexdigest(), fab_file, verification_dict),
         federation_id=federation_id,
         app_id=request.app_id,
         app_type=app_type,

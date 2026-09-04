@@ -56,8 +56,9 @@ erDiagram
     TIMESTAMP added_at
     VARCHAR added_by
     VARCHAR app_type
-    VARCHAR fab_hash "nullable"
+    VARCHAR fab_hash
     BOOLEAN is_hub_app "nullable"
+    TIMESTAMP updated_at
   }
 
   message_ins {
