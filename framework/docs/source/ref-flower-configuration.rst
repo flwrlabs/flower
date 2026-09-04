@@ -190,8 +190,8 @@ configure connections that point to a remote SuperLink.
   ``my-server.example.com:8000``).
 - ``root-certificates``: Path to the root certificate file for TLS encryption. This
   secures the communication between your CLI and the SuperLink. If omitted, Flower uses
-  the system's default CA certificates. This field is ignored if ``insecure`` is set to
-  ``true``.
+  the default CA bundle configured by its HTTP client. This field is ignored if
+  ``insecure`` is set to ``true``.
 - ``insecure``: Set to ``true`` to disable TLS encryption (only use this for local
   testing, never in production). Defaults to ``false`` if omitted, meaning TLS is
   enabled by default.
