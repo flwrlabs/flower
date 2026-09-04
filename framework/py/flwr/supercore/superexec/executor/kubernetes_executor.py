@@ -36,9 +36,10 @@ from .idle_taskexecutor import (
     IDLE_TASKEXECUTOR_FAB_HASH_ANNOTATION,
     IDLE_TASKEXECUTOR_LABEL,
     IDLE_TASKEXECUTOR_MODULE,
-    IDLE_TASKEXECUTOR_READY_FILE,
+    IDLE_TASKEXECUTOR_READINESS_COMMAND,
     IDLE_TASKEXECUTOR_RUNTIME_IMAGE_ANNOTATION,
     TaskExecutorPoolKey,
+    is_idle_taskexecutor,
     new_idle_taskexecutor_id,
 )
 from .types import ExecutionSpec, LaunchResult
@@ -389,7 +390,7 @@ class CompletedPodSweeper:
             pod_name = _object_name(pod)
             if (
                 pod_name is None
-                or not _has_task_id_label(pod)
+                or not (_has_task_id_label(pod) or is_idle_taskexecutor(pod))
                 or not _is_terminal_pod(pod)
             ):
                 continue
@@ -513,7 +514,7 @@ def _build_idle_taskexecutor_pod(
         "image": pool_key.runtime_image,
         "command": ["python", "-m", IDLE_TASKEXECUTOR_MODULE],
         "readinessProbe": {
-            "exec": {"command": ["test", "-f", IDLE_TASKEXECUTOR_READY_FILE]},
+            "exec": {"command": list(IDLE_TASKEXECUTOR_READINESS_COMMAND)},
             "periodSeconds": 1,
         },
     }

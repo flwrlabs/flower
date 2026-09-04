@@ -30,7 +30,7 @@ from .idle_taskexecutor import (
     IDLE_TASKEXECUTOR_FAB_HASH_ANNOTATION,
     IDLE_TASKEXECUTOR_LABEL,
     IDLE_TASKEXECUTOR_MODULE,
-    IDLE_TASKEXECUTOR_READY_FILE,
+    IDLE_TASKEXECUTOR_READINESS_COMMAND,
     IDLE_TASKEXECUTOR_RUNTIME_IMAGE_ANNOTATION,
     TaskExecutorPoolKey,
     is_idle_taskexecutor_ready,
@@ -236,7 +236,7 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
 def test_launch_idle_taskexecutor_is_inert_and_becomes_ready(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test an idle TaskExecutor has no authority and reports exact readiness."""
+    """Test an idle TaskExecutor is inert, reports readiness, and is swept."""
     client = Mock()
     monkeypatch.setattr(
         kube, "new_idle_taskexecutor_id", Mock(return_value="executor123")
@@ -275,7 +275,7 @@ def test_launch_idle_taskexecutor_is_inert_and_becomes_ready(
         "image": "ghcr.io/flwrlabs/taskexecutor:warm",
         "command": ["python", "-m", IDLE_TASKEXECUTOR_MODULE],
         "readinessProbe": {
-            "exec": {"command": ["test", "-f", IDLE_TASKEXECUTOR_READY_FILE]},
+            "exec": {"command": list(IDLE_TASKEXECUTOR_READINESS_COMMAND)},
             "periodSeconds": 1,
         },
     }
@@ -297,6 +297,19 @@ def test_launch_idle_taskexecutor_is_inert_and_becomes_ready(
         _taskexecutor_pool_key(dependency_environment_version="agent-env-v2"),
     )
     assert not any(is_idle_taskexecutor_ready(pod, key) for key in incompatible_keys)
+
+    pod["status"]["phase"] = "Succeeded"
+    client.list_namespaced_pod.return_value = {"items": [pod]}
+    client.list_namespaced_secret.return_value = {"items": []}
+
+    CompletedPodSweeper(client=client, config=_executor_config()).sweep()
+
+    client.delete_namespaced_pod.assert_called_once_with(
+        name="flwr-taskexecutor-idle-executor123",
+        namespace="flower-system",
+        grace_period_seconds=0,
+    )
+    client.delete_namespaced_secret.assert_not_called()
 
 
 def test_build_taskexecutor_pod_includes_configured_volumes() -> None:

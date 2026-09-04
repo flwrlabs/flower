@@ -34,6 +34,14 @@ IDLE_TASKEXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION = (
 )
 IDLE_TASKEXECUTOR_MODULE = "flwr.supercore.superexec.executor.idle_taskexecutor"
 IDLE_TASKEXECUTOR_READY_FILE = "/tmp/flwr-idle-taskexecutor-ready"
+IDLE_TASKEXECUTOR_READINESS_COMMAND = (
+    "python",
+    "-c",
+    (
+        "from pathlib import Path; "
+        f"raise SystemExit(not Path({IDLE_TASKEXECUTOR_READY_FILE!r}).is_file())"
+    ),
+)
 _TASK_ID_LABEL = "flower.ai/superexec-task-id"
 _TASK_TYPE_LABEL = "flower.ai/task-type"
 
@@ -113,6 +121,13 @@ def is_idle_taskexecutor_ready(pod: object, pool_key: TaskExecutorPoolKey) -> bo
         and _object_field(condition, "status") == "True"
         for condition in conditions
     )
+
+
+def is_idle_taskexecutor(pod: object) -> bool:
+    """Return true if a Pod is identified as an idle TaskExecutor."""
+    metadata = _object_field(pod, "metadata")
+    labels = _object_field(metadata, "labels")
+    return _object_field(labels, IDLE_TASKEXECUTOR_LABEL) == "true"
 
 
 def _is_compatible_idle_taskexecutor(
