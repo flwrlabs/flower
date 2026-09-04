@@ -340,7 +340,6 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                   - "--isolation"
                   - "process"
                 ports:  # which ports to expose/available
-                - containerPort: 9091
                 - containerPort: 9092
                 - containerPort: 8000
         ---
@@ -353,17 +352,13 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
             app: superlink
           ports:  # like a dynamic IP routing table/mapping that routes traffic to the designated ports
           - protocol: TCP
-            port: 9091   # Port for ServerApp connection
-            targetPort: 9091  # the SuperLink container port
-            name: superlink-serverappioapi
-          - protocol: TCP
             port: 9092   # Port for SuperNode connection
             targetPort: 9092  # the SuperLink container port
             name: superlink-fleetapi
           - protocol: TCP
-            port: 8000   # Port for Flower app submission over HTTP
+            port: 8000   # Port for Control and Runtime API connections over HTTP
             targetPort: 8000  # the SuperLink container port
-            name: superlink-controlapi
+            name: superlink-http-api
           type: LoadBalancer  # balances workload, makes the service publicly available
 
 .. dropdown:: supernode-1-deployment.yaml
@@ -485,7 +480,7 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                 args:
                   - "--insecure"
                   - "--runtime-api-address"
-                  - "superlink-service:9091"
+                  - "superlink-service:8000"
                   - "--plugin-type"
                   - "serverapp"
 
