@@ -314,13 +314,15 @@ class ProtobufClient:
                 stream_read_timeout = timeout["read"]
                 if stream_read_timeout is None:
                     timeout["read"] = self._client.timeout.read
-                response = self._client.send(current_context.request, stream=True)
-                if response.is_error:
-                    # Let response-side interceptors inspect a bounded error payload.
-                    response = _buffer_error_response(response)
-                else:
+                try:
+                    response = self._client.send(current_context.request, stream=True)
+                    if response.is_error:
+                        # Let response-side interceptors inspect a bounded
+                        # error payload.
+                        response = _buffer_error_response(response)
+                    return response
+                finally:
                     timeout["read"] = stream_read_timeout
-                return response
             return self._client.send(current_context.request)
 
         call_next: ProtobufCall = send

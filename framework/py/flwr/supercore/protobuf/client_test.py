@@ -409,7 +409,14 @@ def test_unary_stream_bounds_error_response_body() -> None:
         request=httpx.Request("POST", "http://api.example"),
     )
     captured_responses: list[httpx.Response] = []
+    sent_requests: list[httpx.Request] = []
+    read_timeouts: list[float | None] = []
     interceptor = Mock()
+
+    def send(request: httpx.Request, **_kwargs: object) -> httpx.Response:
+        sent_requests.append(request)
+        read_timeouts.append(request.extensions["timeout"]["read"])
+        return response
 
     def capture_response(
         context: ProtobufRequestContext, call_next: ProtobufCall
@@ -422,8 +429,8 @@ def test_unary_stream_bounds_error_response_body() -> None:
     with (
         patch(
             "flwr.supercore.protobuf.client.httpx.Client.send",
-            return_value=response,
-        ) as send,
+            side_effect=send,
+        ),
         pytest.raises(httpx.HTTPStatusError),
     ):
         list(
@@ -436,8 +443,8 @@ def test_unary_stream_bounds_error_response_body() -> None:
             )
         )
 
-    request = send.call_args.args[0]
-    assert request.extensions["timeout"]["read"] == 10.0
+    assert read_timeouts == [10.0]
+    assert sent_requests[0].extensions["timeout"]["read"] is None
     assert len(captured_responses[0].content) == max_len
     assert captured_responses[0].content == compressed_content[:max_len]
     assert "content-encoding" not in captured_responses[0].headers
