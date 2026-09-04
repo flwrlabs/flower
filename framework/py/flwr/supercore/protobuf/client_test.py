@@ -67,13 +67,16 @@ def _call(client: ProtobufClient) -> ClaimTaskResponse:
     )
 
 
-def _stream_call(client: ProtobufClient) -> Generator[ClaimTaskResponse, None, None]:
+def _stream_call(
+    client: ProtobufClient, *, read_timeout: float | None = None
+) -> Generator[ClaimTaskResponse, None, None]:
     """Call one representative streaming protobuf operation."""
     return client._unary_stream(  # pylint: disable=protected-access
         path=_PATH,
         rpc_method=_METHOD,
         request=_REQUEST,
         response_type=ClaimTaskResponse,
+        read_timeout=read_timeout,
     )
 
 
@@ -261,6 +264,24 @@ def test_unary_stream_sends_and_receives_framed_protobuf() -> None:
     }
     assert send.call_args.kwargs == {"stream": True}
     assert response.is_closed
+
+
+def test_unary_stream_sets_read_timeout() -> None:
+    """Apply the optional timeout while reading a successful stream."""
+    response = _stream_response(200, [])
+
+    with patch(
+        "flwr.supercore.protobuf.client.httpx.Client.send",
+        return_value=response,
+    ) as send:
+        list(
+            _stream_call(
+                ProtobufClient("https://api.example/", timeout=10.0),
+                read_timeout=5.0,
+            )
+        )
+
+    assert send.call_args.args[0].extensions["timeout"]["read"] == 5.0
 
 
 @pytest.mark.parametrize(

@@ -105,3 +105,14 @@ def test_unary_stream_method(endpoint: str) -> None:
     assert call.call_args.kwargs["rpc_method"] == f"/flwr.proto.Control/{method_name}"
     assert call.call_args.kwargs["request"] is request
     assert call.call_args.kwargs["response_type"].__name__ == f"{method_name}Response"
+
+
+def test_stream_logs_forwards_read_timeout() -> None:
+    """Delegate the optional log stream read timeout to the shared HTTP client."""
+    request = Mock()
+    client = ControlHttpClient("http://control.example")
+
+    with patch.object(ProtobufClient, "_unary_stream") as call:
+        client.StreamLogs(request, read_timeout=5.0)
+
+    assert call.call_args.kwargs["read_timeout"] == 5.0
