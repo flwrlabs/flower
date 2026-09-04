@@ -78,7 +78,7 @@ Deployed Flower systems have at least two types of network connections:
 - **CLI to SuperLink (Control API)**: The ``flwr`` `CLI command <ref-api-cli.html>`_,
   typically run on the users workstation, is used to interface with a deployed Flower
   federation consisting of SuperLink and SuperNodes. From a networking perspective, the
-  ``flwr`` CLI acts as a gRPC client and the SuperLink acts as a gRPC server. The
+  ``flwr`` CLI acts as an HTTP client and the SuperLink acts as an HTTP server. The
   ``flwr`` CLI is the only way for a user (AI researchers, data scientist) to interface
   with a deployed Flower federation. They cannot, for example, interface directly with
   SuperNodes connected to the SuperLink. The ``flwr`` CLI to SuperLink connection should
@@ -109,6 +109,11 @@ Control API. The SuperNode component independently hosts the same Runtime API co
 Each API serves a distinct purpose when running a Flower app using the deployment
 runtime, as summarized in the table below.
 
+.. note::
+
+    Runtime API communication uses HTTP starting with Flower 1.36. Starting with Flower
+    1.37, the Flower CLI also communicates with the Control API over HTTP.
+
 .. list-table::
     :widths: 25 25 35 65
     :header-rows: 1
@@ -118,7 +123,7 @@ runtime, as summarized in the table below.
       - API
       - Purpose
     - - SuperLink
-      - 9091
+      - 8000
       - Runtime API
       - Used by the SuperExec and the ``ServerApp`` processes
     - -
@@ -126,7 +131,7 @@ runtime, as summarized in the table below.
       - Fleet API
       - Used by the SuperNodes
     - -
-      - 9093
+      - 8000
       - Control API
       - Users interface with the SuperLink via this API using the `FlowerCLI
         <ref-api-cli.html>`_
@@ -134,6 +139,8 @@ runtime, as summarized in the table below.
       - 9094
       - Runtime API
       - Used by the SuperExec and the ``ClientApp`` processes
+
+The SuperLink Runtime and Control APIs share the same HTTP server and default port.
 
 .. note::
 
@@ -164,13 +171,13 @@ to allow the external process running the SuperExec, ``ServerApp``, or ``ClientA
 communicate with the SuperLink or SuperNode:
 
 - **SuperExec/ServerApp process to SuperLink (Runtime API)**: Both the SuperExec for
-  ``ServerApp``\s and the ``ServerApp`` processes act as gRPC clients and connect to the
+  ``ServerApp``\s and the ``ServerApp`` processes act as HTTP clients and connect to the
   SuperLink's Runtime API. This connection enables the SuperExec to discover runs to
   launch and the ``ServerApp`` process to pull the necessary inputs to execute the
   ``ServerApp``. It also allows the ``ServerApp``, once running, to do typical things
   like sending/receiving messages to/from available SuperNodes (via the SuperLink).
 - **SuperExec/ClientApp process to SuperNode (Runtime API)**: Both the SuperExec for
-  ``ClientApp``\s and the ``ClientApp`` processes act as gRPC clients and connect to the
+  ``ClientApp``\s and the ``ClientApp`` processes act as HTTP clients and connect to the
   SuperNode's Runtime API. This connection enables the SuperExec to discover runs to
   launch and the ``ClientApp`` process to pull the necessary details (e.g., FAB file) to
   execute the ``ClientApp``, execute the ``ClientApp`` (e.g., local model training), and
