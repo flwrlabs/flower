@@ -90,7 +90,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopRunRequest,
     StreamRunEventsRequest,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.fab_pb2 import Fab  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -99,6 +98,7 @@ from flwr.supercore.constant import (
     FLOWER_AGENT_APP_ID,
     FLWR_SUPERGRID_API_URL,
 )
+from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.typing import JSONObject
 
 from ..auth_plugin import CliAuthPlugin, OidcCliPlugin
@@ -230,7 +230,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
     def __init__(
         self,
-        stub: ControlStub,
+        stub: ControlHttpClient,
         federations: list[Federation],
         auth_plugin: CliAuthPlugin,
     ) -> None:
@@ -972,7 +972,7 @@ def format_chat_help() -> str:
 
 
 def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-    stub: ControlStub,
+    stub: ControlHttpClient,
     prompt: str,
     federation: str | None,
     series_id: int | None,
@@ -996,8 +996,8 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
     if not res.HasField("run_id"):
         raise click.ClickException("Failed to start chat run.")
     if res.HasField("series_id"):
-        series_id = cast(int, res.series_id)
-    return cast(int, res.run_id), series_id
+        series_id = res.series_id
+    return res.run_id, series_id
 
 
 def format_failure_event(payload: JSONObject) -> str:

@@ -7,7 +7,10 @@ case "$1" in
       ./generate.sh
       server_arg='--ssl-ca-certfile ../certificates/ca.crt
                   --ssl-certfile    ../certificates/server.pem
-                  --ssl-keyfile     ../certificates/server.key'
+                  --ssl-keyfile     ../certificates/server.key
+                  --appio-ssl-ca-certfile ../certificates/ca.crt
+                  --appio-ssl-certfile    ../certificates/server.pem
+                  --appio-ssl-keyfile     ../certificates/server.key'
       client_arg='--root-certificates ../certificates/ca.crt'
       ;;
     insecure)
@@ -60,10 +63,10 @@ pip install -e . --no-deps
 # Check if the first argument is 'insecure'
 if [ "$1" == "insecure" ]; then
   # If $1 is 'insecure', append the first line
-  echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:9093\"\ninsecure = true" >> pyproject.toml
+  echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:8000\"\ninsecure = true" >> pyproject.toml
 else
   # Otherwise, append the second line
-  echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:9093\"\nroot-certificates = \"../certificates/ca.crt\"" >> pyproject.toml
+  echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:8000\"\nroot-certificates = \"../certificates/ca.crt\"" >> pyproject.toml
 fi
 
 if [ "$3" = "simulation-engine" ]; then

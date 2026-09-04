@@ -15,24 +15,21 @@
 """Flower command line interface `log` command."""
 
 
-import time
-from logging import DEBUG, ERROR, INFO
-from typing import Annotated, cast
+from logging import DEBUG, INFO
+from typing import Annotated
 
 import click
-import grpc
 import typer
 
 from flwr.cli.config_migration import migrate, warn_if_federation_config_overrides
 from flwr.cli.constant import FEDERATION_CONFIG_HELP_MESSAGE
 from flwr.cli.flower_config import read_superlink_connection
 from flwr.cli.typing import SuperLinkConnection
-from flwr.common.constant import CONN_RECONNECT_INTERVAL, CONN_REFRESH_PERIOD
 from flwr.proto.control_pb2 import StreamLogsRequest  # pylint: disable=E0611
-from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore import log as logger
+from flwr.supercore.control import ControlHttpClient
 
-from .utils import flwr_cli_exc_handler, init_channel_from_connection
+from .utils import flwr_cli_exc_handler, init_http_client_from_connection
 
 
 class AllLogsRetrieved(BaseException):
@@ -43,52 +40,39 @@ class AllLogsRetrieved(BaseException):
     """
 
 
-def start_stream(
-    run_id: int, stub: ControlStub, refresh_period: int = CONN_REFRESH_PERIOD
-) -> None:
+def start_stream(run_id: int, stub: ControlHttpClient) -> None:
     """Start log streaming for a given run ID.
 
     Parameters
     ----------
     run_id : int
         The unique identifier of the run to stream logs from.
-    stub : ControlStub
-        The gRPC stub to interact with the Control service.
-    refresh_period : int (default: CONN_REFRESH_PERIOD)
-        Connection refresh period in seconds.
+    stub : ControlHttpClient
+        The HTTP client for Control API communication.
     """
     after_timestamp = 0.0
     try:
         logger(INFO, "Starting logstream for run_id `%s`", run_id)
-        while True:
-            after_timestamp = stream_logs(run_id, stub, refresh_period, after_timestamp)
-            time.sleep(CONN_RECONNECT_INTERVAL)
-            logger(DEBUG, "Reconnecting to logstream")
+        stream_logs(run_id, stub, after_timestamp)
     except KeyboardInterrupt:
         logger(INFO, "Exiting logstream")
-    except grpc.RpcError as e:
-        # pylint: disable=E1101
-        if e.code() == grpc.StatusCode.NOT_FOUND:
-            logger(ERROR, "Invalid run_id `%s`, exiting", run_id)
-        else:
-            raise e
     except AllLogsRetrieved:
         pass
 
 
 def stream_logs(
-    run_id: int, stub: ControlStub, duration: int, after_timestamp: float
+    run_id: int,
+    stub: ControlHttpClient,
+    after_timestamp: float,
 ) -> float:
-    """Stream logs from the beginning of a run with connection refresh.
+    """Stream logs from the beginning of a run.
 
     Parameters
     ----------
     run_id : int
         The identifier of the run.
-    stub : ControlStub
-        The gRPC stub to interact with the Control service.
-    duration : int
-        The timeout duration for each stream connection in seconds.
+    stub : ControlHttpClient
+        The HTTP client for Control API communication.
     after_timestamp : float
         The timestamp to start streaming logs from.
 
@@ -105,47 +89,32 @@ def stream_logs(
 
     with flwr_cli_exc_handler():
         try:
-            for res in stub.StreamLogs(req, timeout=duration):
+            for res in stub.StreamLogs(req):
                 print(res.log_output, end="")
             raise AllLogsRetrieved()
-        except grpc.RpcError as e:
-            # pylint: disable=E1101
-            if e.code() != grpc.StatusCode.DEADLINE_EXCEEDED:
-                raise e
         finally:
             if res is not None:
-                latest_timestamp = cast(float, res.latest_timestamp)
+                latest_timestamp = res.latest_timestamp
 
     return max(latest_timestamp, after_timestamp)
 
 
-def print_logs(run_id: int, stub: ControlStub, timeout: int) -> None:
+def print_logs(run_id: int, stub: ControlHttpClient) -> None:
     """Print logs from the beginning of a run.
 
     Parameters
     ----------
     run_id : int
         The unique identifier of the run to retrieve logs from.
-    stub : ControlStub
-        The gRPC stub to interact with the Control service.
-    timeout : int
-        Timeout duration in seconds for the log retrieval request.
+    stub : ControlHttpClient
+        The HTTP client for Control API communication.
     """
     req = StreamLogsRequest(run_id=run_id, after_timestamp=0.0)
 
     with flwr_cli_exc_handler():
-        try:
-            # Enforce timeout for graceful exit
-            for res in stub.StreamLogs(req, timeout=timeout):
-                print(res.log_output)
-                break
-        except grpc.RpcError as e:
-            if e.code() == grpc.StatusCode.NOT_FOUND:  # pylint: disable=E1101
-                logger(ERROR, "Invalid run_id `%s`, exiting", run_id)
-            elif e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:  # pylint: disable=E1101
-                pass
-            else:
-                raise e
+        for res in stub.StreamLogs(req):
+            print(res.log_output)
+            break
 
 
 def log(
@@ -210,14 +179,13 @@ def _log_with_control_api(
     stream : bool
         If True, stream logs continuously; if False, print once.
     """
-    channel = init_channel_from_connection(superlink_connection)
+    control_client = init_http_client_from_connection(superlink_connection)
     try:
-        stub = ControlStub(channel)
         if stream:
-            start_stream(run_id, stub, CONN_REFRESH_PERIOD)
+            start_stream(run_id, control_client)
         else:
             logger(INFO, "Printing logstream for run_id `%s`", run_id)
-            print_logs(run_id, stub, timeout=5)
+            print_logs(run_id, control_client)
     finally:
-        channel.close()
-        logger(DEBUG, "Channel closed")
+        control_client.close()
+        logger(DEBUG, "HTTP client closed")

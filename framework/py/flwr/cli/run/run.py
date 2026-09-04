@@ -32,7 +32,6 @@ from flwr.common.config import get_metadata_from_config, parse_config_args
 from flwr.common.constant import FAB_CONFIG_FILE, CliOutputFormat
 from flwr.common.serde import fab_to_proto, user_config_to_proto
 from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
-from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.supercore.constant import NOOP_FEDERATION_ID
 from flwr.supercore.fab import Fab
@@ -47,11 +46,9 @@ from ..utils import (
     AppPathDepthError,
     cli_output_handler,
     flwr_cli_exc_handler,
-    init_channel_from_connection,
+    init_http_client_from_connection,
     print_json_to_stdout,
 )
-
-CONN_REFRESH_PERIOD = 60  # Connection refresh period for log streaming (seconds)
 
 
 # pylint: disable-next=too-many-locals, too-many-branches, R0913, R0917
@@ -167,7 +164,7 @@ def _run_with_control_api(
     is_json: bool,
     app_spec: str | None,
 ) -> None:
-    channel = None
+    control_client = None
     is_remote_app = app_spec is not None
 
     # Determine federation to use
@@ -177,8 +174,7 @@ def _run_with_control_api(
         federation_id = superlink_connection.federation or ""
 
     try:
-        channel = init_channel_from_connection(superlink_connection)
-        stub = ControlStub(channel)
+        control_client = init_http_client_from_connection(superlink_connection)
 
         # Build FAB if local app
         if not is_remote_app:
@@ -205,7 +201,7 @@ def _run_with_control_api(
             app_spec=app_spec or "",
         )
         with flwr_cli_exc_handler():
-            res = stub.StartRun(req)
+            res = control_client.StartRun(req)
 
         if res.HasField("note"):
             typer.secho(f"Note: {res.note}", fg=typer.colors.YELLOW, err=True)
@@ -240,10 +236,10 @@ def _run_with_control_api(
             print_json_to_stdout(payload)
 
         if stream:
-            start_stream(res.run_id, stub, CONN_REFRESH_PERIOD)
+            start_stream(res.run_id, control_client)
     finally:
-        if channel:
-            channel.close()
+        if control_client:
+            control_client.close()
 
 
 def _parse_federation_config_overrides(

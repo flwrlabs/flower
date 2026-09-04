@@ -27,9 +27,9 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetRunSeriesRequest,
     ListRunSeriesRequest,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.supercore.control import ControlHttpClient
 
 from ..utils import flwr_cli_exc_handler
 
@@ -43,7 +43,7 @@ class HistoryBlock:
     selected_index: int = 0
 
 
-def load_history(stub: ControlStub, federation: str) -> HistoryBlock | None:
+def load_history(stub: ControlHttpClient, federation: str) -> HistoryBlock | None:
     """Load chronological conversation history for a federation."""
     with flwr_cli_exc_handler():
         response = stub.ListRunSeries(
@@ -57,7 +57,7 @@ def load_history(stub: ControlStub, federation: str) -> HistoryBlock | None:
 
 
 def load_conversation(
-    stub: ControlStub, entry: RunSeries, federation: str
+    stub: ControlHttpClient, entry: RunSeries, federation: str
 ) -> list[tuple[str, str]]:
     """Load displayable messages for one conversation."""
     with flwr_cli_exc_handler():
