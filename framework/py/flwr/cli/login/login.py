@@ -22,12 +22,11 @@ import typer
 
 from flwr.cli.auth_plugin import LoginError, NoOpCliAuthPlugin
 from flwr.cli.constant import FEDERATION_CONFIG_HELP_MESSAGE
-from flwr.cli.utils import init_channel_from_connection
+from flwr.cli.utils import init_http_client_from_connection
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore.auth.typing import AccountAuthLoginDetails
 
 from ..config_migration import migrate, warn_if_federation_config_overrides
@@ -68,36 +67,41 @@ def login(
             "`true` in the federation configuration."
         )
 
-    channel = init_channel_from_connection(superlink_connection, NoOpCliAuthPlugin())
-    stub = ControlStub(channel)
-
-    login_request = GetLoginDetailsRequest()
-    with flwr_cli_exc_handler():
-        login_response: GetLoginDetailsResponse = stub.GetLoginDetails(login_request)
-
-    # Get the auth plugin
-    authn_plugin = load_cli_auth_plugin_from_connection(
-        cast(str, superlink_connection.address), login_response.authn_type
-    )
-
-    # Login
-    details = AccountAuthLoginDetails(
-        authn_type=login_response.authn_type,
-        device_code=login_response.device_code,
-        verification_uri_complete=login_response.verification_uri_complete,
-        expires_in=login_response.expires_in,
-        interval=login_response.interval,
+    control_client = init_http_client_from_connection(
+        superlink_connection, NoOpCliAuthPlugin()
     )
     try:
+        login_request = GetLoginDetailsRequest()
         with flwr_cli_exc_handler():
-            credentials = authn_plugin.login(details, stub)
-        typer.secho(
-            "✅ Login successful.",
-            fg=typer.colors.GREEN,
-            bold=False,
-        )
-    except LoginError as e:
-        raise click.ClickException(f"Login failed: {e.message}") from None
+            login_response: GetLoginDetailsResponse = control_client.GetLoginDetails(
+                login_request
+            )
 
-    # Store the tokens
-    authn_plugin.store_tokens(credentials)
+        # Get the auth plugin
+        authn_plugin = load_cli_auth_plugin_from_connection(
+            cast(str, superlink_connection.address), login_response.authn_type
+        )
+
+        # Login
+        details = AccountAuthLoginDetails(
+            authn_type=login_response.authn_type,
+            device_code=login_response.device_code,
+            verification_uri_complete=login_response.verification_uri_complete,
+            expires_in=login_response.expires_in,
+            interval=login_response.interval,
+        )
+        try:
+            with flwr_cli_exc_handler():
+                credentials = authn_plugin.login(details, control_client)
+            typer.secho(
+                "✅ Login successful.",
+                fg=typer.colors.GREEN,
+                bold=False,
+            )
+        except LoginError as e:
+            raise click.ClickException(f"Login failed: {e.message}") from None
+
+        # Store the tokens
+        authn_plugin.store_tokens(credentials)
+    finally:
+        control_client.close()
