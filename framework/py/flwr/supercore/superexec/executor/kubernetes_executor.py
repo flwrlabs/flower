@@ -31,6 +31,16 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.typing import JSONObject
 
+from .idle_slot import (
+    IDLE_SLOT_DEPENDENCY_ENVIRONMENT_ANNOTATION,
+    IDLE_SLOT_FAB_HASH_ANNOTATION,
+    IDLE_SLOT_LABEL,
+    IDLE_SLOT_MODULE,
+    IDLE_SLOT_READY_FILE,
+    IDLE_SLOT_RUNTIME_IMAGE_ANNOTATION,
+    _IdleSlotPoolKey,
+    _new_idle_slot_id,
+)
 from .types import ExecutionSpec, LaunchResult
 
 APPIO_CREDENTIALS_MOUNT_PATH = "/run/flwr/appio"
@@ -323,6 +333,17 @@ class KubernetesExecutor:
 
         return LaunchResult.accepted()
 
+    def _launch_idle_slot(self, pool_key: _IdleSlotPoolKey) -> LaunchResult:
+        """Submit one inert TaskExecutor Pod for a fixed compatibility key."""
+        try:
+            pod = _build_idle_taskexecutor_pod(
+                pool_key, self._config, _new_idle_slot_id()
+            )
+            self._client.create_namespaced_pod(self._config.namespace, pod)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            return _launch_result_from_exception(exc)
+        return LaunchResult.accepted()
+
     def _active_pod_count(self) -> int:
         """Return the active TaskExecutor Pod count for the configured pool."""
         pod_list = self._client.list_namespaced_pod(
@@ -457,14 +478,7 @@ def _build_taskexecutor_pod(
         "args": _taskexecutor_args(spec, runtime_root_certificates),
         "volumeMounts": volume_mounts,
     }
-    if config.image_pull_policy is not None:
-        container["imagePullPolicy"] = config.image_pull_policy
-    if config.resources is not None:
-        container["resources"] = config.resources
-    if config.env is not None:
-        container["env"] = config.env
-    if config.container_security_context is not None:
-        container["securityContext"] = config.container_security_context
+    _apply_taskexecutor_container_config(container, config)
 
     volumes: list[JSONObject] = [
         {
@@ -478,12 +492,70 @@ def _build_taskexecutor_pod(
     if config.volumes is not None:
         volumes.extend(config.volumes)
 
+    return {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": _metadata(
+            _pod_name(spec, launch_attempt_id), spec, config, launch_attempt_id
+        ),
+        "spec": _taskexecutor_pod_spec(container, volumes, config),
+    }
+
+
+def _build_idle_taskexecutor_pod(
+    pool_key: _IdleSlotPoolKey,
+    config: KubernetesExecutorConfig,
+    slot_id: str,
+) -> JSONObject:
+    """Build an inert TaskExecutor Pod without task authority or credentials."""
+    container: JSONObject = {
+        "name": "taskexecutor",
+        "image": pool_key.runtime_image,
+        "command": ["python", "-m", IDLE_SLOT_MODULE],
+        "readinessProbe": {
+            "exec": {"command": ["test", "-f", IDLE_SLOT_READY_FILE]},
+            "periodSeconds": 1,
+        },
+    }
+    if config.volume_mounts is not None:
+        container["volumeMounts"] = config.volume_mounts
+    _apply_taskexecutor_container_config(container, config)
+
+    return {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": _idle_slot_metadata(_idle_slot_pod_name(slot_id), pool_key, config),
+        "spec": _taskexecutor_pod_spec(container, config.volumes or [], config),
+    }
+
+
+def _apply_taskexecutor_container_config(
+    container: JSONObject, config: KubernetesExecutorConfig
+) -> None:
+    """Apply shared optional configuration to a TaskExecutor container."""
+    if config.image_pull_policy is not None:
+        container["imagePullPolicy"] = config.image_pull_policy
+    if config.resources is not None:
+        container["resources"] = config.resources
+    if config.env is not None:
+        container["env"] = config.env
+    if config.container_security_context is not None:
+        container["securityContext"] = config.container_security_context
+
+
+def _taskexecutor_pod_spec(
+    container: JSONObject,
+    volumes: list[JSONObject],
+    config: KubernetesExecutorConfig,
+) -> JSONObject:
+    """Build the shared TaskExecutor Pod lifecycle and placement fields."""
     pod_spec: JSONObject = {
         "automountServiceAccountToken": False,
         "restartPolicy": "Never",
         "containers": [container],
-        "volumes": volumes,
     }
+    if volumes:
+        pod_spec["volumes"] = volumes
     if config.service_account_name is not None:
         pod_spec["serviceAccountName"] = config.service_account_name
     if config.node_selector is not None:
@@ -497,14 +569,7 @@ def _build_taskexecutor_pod(
     if config.pod_security_context is not None:
         pod_spec["securityContext"] = config.pod_security_context
 
-    return {
-        "apiVersion": "v1",
-        "kind": "Pod",
-        "metadata": _metadata(
-            _pod_name(spec, launch_attempt_id), spec, config, launch_attempt_id
-        ),
-        "spec": pod_spec,
-    }
+    return pod_spec
 
 
 def _taskexecutor_args(
@@ -653,6 +718,11 @@ def _pod_name(spec: ExecutionSpec, launch_attempt_id: str) -> str:
     return f"flwr-taskexecutor-{spec.task_id}-{launch_attempt_id}"
 
 
+def _idle_slot_pod_name(slot_id: str) -> str:
+    """Return the TaskExecutor Pod name for an idle slot."""
+    return f"flwr-taskexecutor-idle-{slot_id}"
+
+
 def _credential_secret_name(spec: ExecutionSpec, launch_attempt_id: str) -> str:
     """Return the AppIo credential Secret name."""
     return _credential_secret_name_from_pod_name(_pod_name(spec, launch_attempt_id))
@@ -688,6 +758,44 @@ def _metadata(
     if config.annotations is not None:
         metadata["annotations"] = cast(JSONObject, config.annotations)
     return metadata
+
+
+def _idle_slot_metadata(
+    name: str,
+    pool_key: _IdleSlotPoolKey,
+    config: KubernetesExecutorConfig,
+) -> JSONObject:
+    """Return metadata identifying one compatible idle TaskExecutor slot."""
+    labels: JSONObject = {}
+    labels.update(_caller_labels(config))
+    labels.update(
+        {
+            _NAME_LABEL: "flower",
+            _COMPONENT_LABEL: "taskexecutor",
+            _TASK_TYPE_LABEL: pool_key.task_type.value,
+            IDLE_SLOT_LABEL: "true",
+        }
+    )
+    if config.resource_pool is not None:
+        labels[_RESOURCE_POOL_LABEL] = config.resource_pool
+
+    annotations: JSONObject = {}
+    annotations.update(config.annotations or {})
+    annotations.update(
+        {
+            IDLE_SLOT_FAB_HASH_ANNOTATION: pool_key.fab_hash,
+            IDLE_SLOT_RUNTIME_IMAGE_ANNOTATION: pool_key.runtime_image,
+            IDLE_SLOT_DEPENDENCY_ENVIRONMENT_ANNOTATION: (
+                pool_key.dependency_environment_version
+            ),
+        }
+    )
+    return {
+        "name": name,
+        "namespace": config.namespace,
+        "labels": labels,
+        "annotations": annotations,
+    }
 
 
 def _labels(

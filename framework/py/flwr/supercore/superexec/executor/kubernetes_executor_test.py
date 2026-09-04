@@ -25,6 +25,16 @@ import pytest
 from flwr.supercore.constant import TaskType
 
 from . import kubernetes_executor as kube
+from .idle_slot import (
+    IDLE_SLOT_DEPENDENCY_ENVIRONMENT_ANNOTATION,
+    IDLE_SLOT_FAB_HASH_ANNOTATION,
+    IDLE_SLOT_LABEL,
+    IDLE_SLOT_MODULE,
+    IDLE_SLOT_READY_FILE,
+    IDLE_SLOT_RUNTIME_IMAGE_ANNOTATION,
+    _IdleSlotPoolKey,
+    _is_idle_slot_ready,
+)
 from .kubernetes_executor import (
     _COMPLETED_POD_SWEEP_INTERVAL_SECONDS,
     _TASK_ID_LABEL,
@@ -82,6 +92,17 @@ def _executor_config(**overrides: Any) -> KubernetesExecutorConfig:
     }
     base.update(overrides)
     return KubernetesExecutorConfig(**base)
+
+
+def _idle_slot_pool_key(**overrides: Any) -> _IdleSlotPoolKey:
+    base: dict[str, Any] = {
+        "task_type": TaskType.AGENT_APP,
+        "fab_hash": "fab-sha256",
+        "runtime_image": "ghcr.io/flwrlabs/taskexecutor:warm",
+        "dependency_environment_version": "agent-env-v1",
+    }
+    base.update(overrides)
+    return _IdleSlotPoolKey(**base)
 
 
 def _as_dict(value: object) -> dict[str, Any]:
@@ -210,6 +231,66 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
     ]
     assert pod["spec"]["automountServiceAccountToken"] is False
     assert pod["spec"]["restartPolicy"] == "Never"
+
+
+def test_launch_idle_slot_is_inert_and_becomes_ready(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test an idle slot has no task authority and reports exact readiness."""
+    client = Mock()
+    monkeypatch.setattr(kube, "_new_idle_slot_id", Mock(return_value="slot123"))
+    executor = KubernetesExecutor(client=client, config=_executor_config())
+    pool_key = _idle_slot_pool_key()
+
+    result = executor._launch_idle_slot(pool_key)  # pylint: disable=protected-access
+
+    assert result.status == LaunchResultStatus.ACCEPTED
+    client.create_namespaced_pod.assert_called_once()
+    client.create_namespaced_secret.assert_not_called()
+    pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
+    metadata = pod["metadata"]
+    container = pod["spec"]["containers"][0]
+
+    assert metadata["labels"] == {
+        "app.kubernetes.io/name": "flower",
+        "app.kubernetes.io/component": "taskexecutor",
+        "flower.ai/task-type": "flwr-agentapp",
+        IDLE_SLOT_LABEL: "true",
+    }
+    assert metadata["annotations"] == {
+        IDLE_SLOT_FAB_HASH_ANNOTATION: "fab-sha256",
+        IDLE_SLOT_RUNTIME_IMAGE_ANNOTATION: "ghcr.io/flwrlabs/taskexecutor:warm",
+        IDLE_SLOT_DEPENDENCY_ENVIRONMENT_ANNOTATION: "agent-env-v1",
+    }
+    assert _TASK_ID_LABEL not in metadata["labels"]
+    assert LAUNCH_ATTEMPT_LABEL not in metadata["labels"]
+    assert container == {
+        "name": "taskexecutor",
+        "image": "ghcr.io/flwrlabs/taskexecutor:warm",
+        "command": ["python", "-m", IDLE_SLOT_MODULE],
+        "readinessProbe": {
+            "exec": {"command": ["test", "-f", IDLE_SLOT_READY_FILE]},
+            "periodSeconds": 1,
+        },
+    }
+    assert "volumes" not in pod["spec"]
+    assert pod["spec"]["automountServiceAccountToken"] is False
+
+    pod["status"] = {
+        "phase": "Running",
+        "conditions": [{"type": "Ready", "status": "False"}],
+    }
+    assert not _is_idle_slot_ready(pod, pool_key)
+    pod["status"]["conditions"][0]["status"] = "True"
+    assert _is_idle_slot_ready(pod, pool_key)
+
+    incompatible_keys = (
+        _idle_slot_pool_key(task_type=TaskType.MODEL),
+        _idle_slot_pool_key(fab_hash="another-fab-sha256"),
+        _idle_slot_pool_key(runtime_image="taskexecutor:other"),
+        _idle_slot_pool_key(dependency_environment_version="agent-env-v2"),
+    )
+    assert not any(_is_idle_slot_ready(pod, key) for key in incompatible_keys)
 
 
 def test_build_taskexecutor_pod_includes_configured_volumes() -> None:
