@@ -31,6 +31,7 @@ from .idle_taskexecutor import (
     IDLE_TASKEXECUTOR_LABEL,
     IDLE_TASKEXECUTOR_MODULE,
     IDLE_TASKEXECUTOR_READINESS_COMMAND,
+    IDLE_TASKEXECUTOR_READY_DIRECTORY,
     IDLE_TASKEXECUTOR_RUNTIME_IMAGE_ANNOTATION,
     TaskExecutorPoolKey,
     is_idle_taskexecutor_ready,
@@ -241,7 +242,10 @@ def test_launch_idle_taskexecutor_is_inert_and_becomes_ready(
     monkeypatch.setattr(
         kube, "new_idle_taskexecutor_id", Mock(return_value="executor123")
     )
-    executor = KubernetesExecutor(client=client, config=_executor_config())
+    config = _executor_config(
+        container_security_context={"readOnlyRootFilesystem": True}
+    )
+    executor = KubernetesExecutor(client=client, config=config)
     pool_key = _taskexecutor_pool_key()
 
     result = executor._launch_idle_taskexecutor(  # pylint: disable=protected-access
@@ -274,12 +278,21 @@ def test_launch_idle_taskexecutor_is_inert_and_becomes_ready(
         "name": "taskexecutor",
         "image": "ghcr.io/flwrlabs/taskexecutor:warm",
         "command": ["python", "-m", IDLE_TASKEXECUTOR_MODULE],
+        "volumeMounts": [
+            {
+                "name": "idle-taskexecutor-ready",
+                "mountPath": IDLE_TASKEXECUTOR_READY_DIRECTORY,
+            }
+        ],
         "readinessProbe": {
             "exec": {"command": list(IDLE_TASKEXECUTOR_READINESS_COMMAND)},
             "periodSeconds": 1,
         },
+        "securityContext": {"readOnlyRootFilesystem": True},
     }
-    assert "volumes" not in pod["spec"]
+    assert pod["spec"]["volumes"] == [
+        {"name": "idle-taskexecutor-ready", "emptyDir": {}}
+    ]
     assert pod["spec"]["automountServiceAccountToken"] is False
 
     pod["status"] = {

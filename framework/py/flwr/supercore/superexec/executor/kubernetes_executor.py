@@ -14,6 +14,8 @@
 # ==============================================================================
 """Kubernetes executor for SuperExec TaskExecutor processes."""
 
+# pylint: disable=too-many-lines
+
 import importlib
 import re
 import time
@@ -37,6 +39,7 @@ from .idle_taskexecutor import (
     IDLE_TASKEXECUTOR_LABEL,
     IDLE_TASKEXECUTOR_MODULE,
     IDLE_TASKEXECUTOR_READINESS_COMMAND,
+    IDLE_TASKEXECUTOR_READY_DIRECTORY,
     IDLE_TASKEXECUTOR_RUNTIME_IMAGE_ANNOTATION,
     TaskExecutorPoolKey,
     is_idle_taskexecutor,
@@ -64,6 +67,7 @@ _EXECUTOR_OWNED_LABELS = frozenset(
     }
 )
 _APPIO_CREDENTIAL_SECRET_SUFFIX = "-appio"
+_IDLE_TASKEXECUTOR_READY_VOLUME_NAME = "idle-taskexecutor-ready"
 _COMPLETED_POD_SWEEP_INTERVAL_SECONDS = 60.0
 _FORBIDDEN_TASKEXECUTOR_ENV_NAMES = frozenset(
     {
@@ -513,20 +517,29 @@ def _build_idle_taskexecutor_pod(
         "name": "taskexecutor",
         "image": pool_key.runtime_image,
         "command": ["python", "-m", IDLE_TASKEXECUTOR_MODULE],
+        "volumeMounts": [
+            {
+                "name": _IDLE_TASKEXECUTOR_READY_VOLUME_NAME,
+                "mountPath": IDLE_TASKEXECUTOR_READY_DIRECTORY,
+            },
+            *(config.volume_mounts or []),
+        ],
         "readinessProbe": {
             "exec": {"command": list(IDLE_TASKEXECUTOR_READINESS_COMMAND)},
             "periodSeconds": 1,
         },
     }
-    if config.volume_mounts is not None:
-        container["volumeMounts"] = config.volume_mounts
     _apply_taskexecutor_container_config(container, config)
 
+    volumes: list[JSONObject] = [
+        {"name": _IDLE_TASKEXECUTOR_READY_VOLUME_NAME, "emptyDir": {}},
+        *(config.volumes or []),
+    ]
     return {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": _idle_pod_metadata(_idle_pod_name(executor_id), pool_key, config),
-        "spec": _taskexecutor_pod_spec(container, config.volumes or [], config),
+        "spec": _taskexecutor_pod_spec(container, volumes, config),
     }
 
 

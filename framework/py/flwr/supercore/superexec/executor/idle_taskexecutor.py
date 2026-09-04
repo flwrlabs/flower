@@ -33,7 +33,8 @@ IDLE_TASKEXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION = (
     "flower.ai/idle-taskexecutor-dependency-environment"
 )
 IDLE_TASKEXECUTOR_MODULE = "flwr.supercore.superexec.executor.idle_taskexecutor"
-IDLE_TASKEXECUTOR_READY_FILE = "/tmp/flwr-idle-taskexecutor-ready"
+IDLE_TASKEXECUTOR_READY_DIRECTORY = "/tmp/flwr-idle-taskexecutor"
+IDLE_TASKEXECUTOR_READY_FILE = f"{IDLE_TASKEXECUTOR_READY_DIRECTORY}/ready"
 IDLE_TASKEXECUTOR_READINESS_COMMAND = (
     "python",
     "-c",
