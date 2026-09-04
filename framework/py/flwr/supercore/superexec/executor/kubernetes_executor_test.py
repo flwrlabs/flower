@@ -32,8 +32,8 @@ from .idle_taskexecutor import (
     IDLE_TASKEXECUTOR_MODULE,
     IDLE_TASKEXECUTOR_READY_FILE,
     IDLE_TASKEXECUTOR_RUNTIME_IMAGE_ANNOTATION,
-    _is_idle_taskexecutor_ready,
-    _TaskExecutorPoolKey,
+    TaskExecutorPoolKey,
+    is_idle_taskexecutor_ready,
 )
 from .kubernetes_executor import (
     _COMPLETED_POD_SWEEP_INTERVAL_SECONDS,
@@ -94,7 +94,7 @@ def _executor_config(**overrides: Any) -> KubernetesExecutorConfig:
     return KubernetesExecutorConfig(**base)
 
 
-def _taskexecutor_pool_key(**overrides: Any) -> _TaskExecutorPoolKey:
+def _taskexecutor_pool_key(**overrides: Any) -> TaskExecutorPoolKey:
     base: dict[str, Any] = {
         "task_type": TaskType.AGENT_APP,
         "fab_hash": "fab-sha256",
@@ -102,7 +102,7 @@ def _taskexecutor_pool_key(**overrides: Any) -> _TaskExecutorPoolKey:
         "dependency_environment_version": "agent-env-v1",
     }
     base.update(overrides)
-    return _TaskExecutorPoolKey(**base)
+    return TaskExecutorPoolKey(**base)
 
 
 def _as_dict(value: object) -> dict[str, Any]:
@@ -239,7 +239,7 @@ def test_launch_idle_taskexecutor_is_inert_and_becomes_ready(
     """Test an idle TaskExecutor has no authority and reports exact readiness."""
     client = Mock()
     monkeypatch.setattr(
-        kube, "_new_idle_taskexecutor_id", Mock(return_value="executor123")
+        kube, "new_idle_taskexecutor_id", Mock(return_value="executor123")
     )
     executor = KubernetesExecutor(client=client, config=_executor_config())
     pool_key = _taskexecutor_pool_key()
@@ -286,9 +286,9 @@ def test_launch_idle_taskexecutor_is_inert_and_becomes_ready(
         "phase": "Running",
         "conditions": [{"type": "Ready", "status": "False"}],
     }
-    assert not _is_idle_taskexecutor_ready(pod, pool_key)
+    assert not is_idle_taskexecutor_ready(pod, pool_key)
     pod["status"]["conditions"][0]["status"] = "True"
-    assert _is_idle_taskexecutor_ready(pod, pool_key)
+    assert is_idle_taskexecutor_ready(pod, pool_key)
 
     incompatible_keys = (
         _taskexecutor_pool_key(task_type=TaskType.MODEL),
@@ -296,7 +296,7 @@ def test_launch_idle_taskexecutor_is_inert_and_becomes_ready(
         _taskexecutor_pool_key(runtime_image="taskexecutor:other"),
         _taskexecutor_pool_key(dependency_environment_version="agent-env-v2"),
     )
-    assert not any(_is_idle_taskexecutor_ready(pod, key) for key in incompatible_keys)
+    assert not any(is_idle_taskexecutor_ready(pod, key) for key in incompatible_keys)
 
 
 def test_build_taskexecutor_pod_includes_configured_volumes() -> None:

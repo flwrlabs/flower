@@ -19,7 +19,7 @@ from threading import Event
 from typing import cast
 from unittest.mock import Mock
 
-from .idle_taskexecutor import _run_idle_taskexecutor
+from .idle_taskexecutor import run_idle_taskexecutor
 
 
 def test_run_idle_taskexecutor_reports_ready_and_cleans_up(
@@ -34,7 +34,7 @@ def test_run_idle_taskexecutor_reports_ready_and_cleans_up(
 
     stop_event.wait.side_effect = assert_ready
 
-    _run_idle_taskexecutor(ready_file, cast(Event, stop_event))
+    run_idle_taskexecutor(ready_file, cast(Event, stop_event))
 
     stop_event.wait.assert_called_once_with()
     assert not ready_file.exists()

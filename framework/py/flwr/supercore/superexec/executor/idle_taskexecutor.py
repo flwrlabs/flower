@@ -39,7 +39,7 @@ _TASK_TYPE_LABEL = "flower.ai/task-type"
 
 
 @dataclass(frozen=True)
-class _TaskExecutorPoolKey:
+class TaskExecutorPoolKey:
     """Identify the task environment served by a warm executor pool."""
 
     task_type: TaskType
@@ -63,12 +63,12 @@ class _TaskExecutorPoolKey:
                 )
 
 
-def _new_idle_taskexecutor_id() -> str:
+def new_idle_taskexecutor_id() -> str:
     """Return a DNS-label-safe opaque identifier for one idle TaskExecutor Pod."""
     return uuid4().hex[:12]
 
 
-def _run_idle_taskexecutor(
+def run_idle_taskexecutor(
     ready_file: Path = Path(IDLE_TASKEXECUTOR_READY_FILE),
     stop_event: Event | None = None,
 ) -> None:
@@ -90,7 +90,7 @@ def _run_idle_taskexecutor(
         ready_file.unlink(missing_ok=True)
 
 
-def _is_idle_taskexecutor_ready(pod: object, pool_key: _TaskExecutorPoolKey) -> bool:
+def is_idle_taskexecutor_ready(pod: object, pool_key: TaskExecutorPoolKey) -> bool:
     """Return true for a ready idle TaskExecutor Pod with the exact pool key."""
     if not _is_compatible_idle_taskexecutor(pod, pool_key):
         return False
@@ -116,7 +116,7 @@ def _is_idle_taskexecutor_ready(pod: object, pool_key: _TaskExecutorPoolKey) -> 
 
 
 def _is_compatible_idle_taskexecutor(
-    pod: object, pool_key: _TaskExecutorPoolKey
+    pod: object, pool_key: TaskExecutorPoolKey
 ) -> bool:
     """Return true if an idle TaskExecutor Pod has the supplied pool key."""
     metadata = _object_field(pod, "metadata")
@@ -164,4 +164,4 @@ def _object_field(value: object, field_name: str) -> object | None:
 
 
 if __name__ == "__main__":
-    _run_idle_taskexecutor()
+    run_idle_taskexecutor()

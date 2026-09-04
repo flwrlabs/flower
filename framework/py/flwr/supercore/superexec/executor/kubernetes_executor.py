@@ -38,8 +38,8 @@ from .idle_taskexecutor import (
     IDLE_TASKEXECUTOR_MODULE,
     IDLE_TASKEXECUTOR_READY_FILE,
     IDLE_TASKEXECUTOR_RUNTIME_IMAGE_ANNOTATION,
-    _new_idle_taskexecutor_id,
-    _TaskExecutorPoolKey,
+    TaskExecutorPoolKey,
+    new_idle_taskexecutor_id,
 )
 from .types import ExecutionSpec, LaunchResult
 
@@ -333,11 +333,11 @@ class KubernetesExecutor:
 
         return LaunchResult.accepted()
 
-    def _launch_idle_taskexecutor(self, pool_key: _TaskExecutorPoolKey) -> LaunchResult:
+    def _launch_idle_taskexecutor(self, pool_key: TaskExecutorPoolKey) -> LaunchResult:
         """Submit one idle TaskExecutor Pod for a fixed compatibility key."""
         try:
             pod = _build_idle_taskexecutor_pod(
-                pool_key, self._config, _new_idle_taskexecutor_id()
+                pool_key, self._config, new_idle_taskexecutor_id()
             )
             self._client.create_namespaced_pod(self._config.namespace, pod)
         except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -503,7 +503,7 @@ def _build_taskexecutor_pod(
 
 
 def _build_idle_taskexecutor_pod(
-    pool_key: _TaskExecutorPoolKey,
+    pool_key: TaskExecutorPoolKey,
     config: KubernetesExecutorConfig,
     executor_id: str,
 ) -> JSONObject:
@@ -762,7 +762,7 @@ def _metadata(
 
 def _idle_pod_metadata(
     name: str,
-    pool_key: _TaskExecutorPoolKey,
+    pool_key: TaskExecutorPoolKey,
     config: KubernetesExecutorConfig,
 ) -> JSONObject:
     """Return metadata identifying one compatible idle TaskExecutor Pod."""
