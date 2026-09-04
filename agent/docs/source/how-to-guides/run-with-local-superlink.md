@@ -4,7 +4,7 @@ Run an AgentApp locally with Flower's Community Edition runtime. This setup is
 useful while developing an app: it runs SuperLink and the AgentApp processes on
 your machine, without a SuperGrid account or Enterprise services.
 
-This guide targets Flower 1.35.0. Run the CLI and SuperLink from the same
+This guide targets Flower 1.37.0. Run the CLI and SuperLink from the same
 project environment to avoid protocol mismatches.
 
 If you haven't created an AgentApp yet, start with [Write your first
@@ -30,7 +30,7 @@ To use another Open Responses-compatible endpoint, set its full `/responses`
 URL instead:
 
 ```console
-$ export FLWR_MODEL_API_ENDPOINT="http://127.0.0.1:8000/v1/responses"
+$ export FLWR_MODEL_API_ENDPOINT="http://127.0.0.1:8080/v1/responses"
 $ export FLWR_MODEL_API_KEY="<your-provider-api-key>"
 ```
 
@@ -50,7 +50,7 @@ From your AgentApp project directory, start an insecure local SuperLink:
 $ uv run flower-superlink --insecure
 ```
 
-SuperLink starts its Control API on `127.0.0.1:9093` and launches the local
+SuperLink starts its HTTP API on `127.0.0.1:8000` and launches the local
 processes needed to execute the AgentApp and its model requests. You don't need
 to start a SuperNode for an AgentApp run.
 
@@ -63,7 +63,7 @@ In another terminal, add a connection for the local Control API to
 
 ```toml
 [superlink.local-agent]
-address = "127.0.0.1:9093"
+address = "127.0.0.1:8000"
 insecure = true
 ```
 
@@ -117,6 +117,6 @@ Common problems include:
 - **Invalid model endpoint:** `FLWR_MODEL_API_ENDPOINT` must include the full
   `/responses` path
 - **Connection refused:** confirm that SuperLink is still running and that the
-  configured address is `127.0.0.1:9093`
+  configured address is `127.0.0.1:8000`
 - **Version mismatch:** start SuperLink and run the CLI from the same project
   environment so they use compatible Flower versions
