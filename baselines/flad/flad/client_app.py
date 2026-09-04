@@ -45,6 +45,7 @@ from .model import compile_model, load_model
 # tcmalloc preloaded instead (see README).
 _GLOBAL_SCOPE = ctypes.CDLL(None)
 _USE_TCMALLOC = hasattr(_GLOBAL_SCOPE, "MallocExtension_ReleaseFreeMemory")
+_USE_MALLOC_TRIM = hasattr(_GLOBAL_SCOPE, "malloc_trim")
 
 
 def _trim_memory() -> None:
@@ -52,7 +53,7 @@ def _trim_memory() -> None:
     if platform.system() == "Linux":
         if _USE_TCMALLOC:
             _GLOBAL_SCOPE.MallocExtension_ReleaseFreeMemory()
-        else:
+        elif _USE_MALLOC_TRIM:
             _GLOBAL_SCOPE.malloc_trim(0)
 
 

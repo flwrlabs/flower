@@ -38,7 +38,7 @@ CLI_WEIGHTS = [np.array([10.0, 10.0]), np.array([20.0, 20.0]), np.array([30.0, 3
 
 
 #
-# utitily functions
+# utility functions
 #
 def make_strategy() -> Flad:
     """Create a Flad strategy with clients mapped to node IDs."""

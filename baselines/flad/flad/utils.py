@@ -26,10 +26,11 @@ def make_run_output_folder(output_folder: str, rn_seed: int) -> str:
     """Create and return a timestamped output folder."""
     os.makedirs(output_folder, exist_ok=True)
     run_folder = (
-        output_folder
-        + f"/federated_training_flad_{rn_seed}-"
-        + time.strftime("%Y%m%d-%H%M%S")
-        + "/"
+        os.path.join(
+            output_folder,
+            f"federated_training_flad_{rn_seed}-{time.strftime('%Y%m%d-%H%M%S')}",
+        )
+        + os.sep
     )
     os.makedirs(run_folder, exist_ok=True)
     return run_folder
@@ -46,8 +47,10 @@ def save_training_history(
         output_folder + "/" + history_filename, "w", newline="", encoding="utf-8"
     ) as history_file:
         round_fieldnames = ["Round"]
-        for key in evaluate_metrics_clientapp[1].keys():
-            round_fieldnames.append(key)
+        for round_metrics in evaluate_metrics_clientapp.values():
+            for key in round_metrics.keys():
+                if key not in round_fieldnames:
+                    round_fieldnames.append(key)
         writer = csv.DictWriter(history_file, fieldnames=round_fieldnames)
         writer.writeheader()
 

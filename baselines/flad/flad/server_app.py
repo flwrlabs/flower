@@ -37,7 +37,7 @@ def main(grid: Grid, context: Context) -> None:
     # Configure logging
     update_console_handler(level=INFO, timestamps=True)
 
-    # Load config (load all paramters for logging purposes)
+    # Load config (load all parameters for logging purposes)
     log(INFO, "Loading configuration for Flad strategy...")
     client_names = str(context.run_config["client_names"])
     min_epochs = int(context.run_config["min_epochs"])

@@ -70,7 +70,7 @@ Each client contains samples of benign traffic and only one type of attack. Alth
 
 | Name        | Value | Description |
 |-------------|-------|-------------|
-| PATIENCE    | 25    | Max FL rounds with no progress. |
+| PATIENCE    | 25    | Stop when the number of consecutive rounds with no progress exceeds this value.  |
 | Min epochs  | 1     | Min number of local training epochs. |
 | Max epochs  | 5     | Max number of local training epochs. |
 | Min steps   | 10    | Min number MBGD steps. |
@@ -115,7 +115,7 @@ can be treated differently by the server than the other clients. For this reason
 FLAD strategy assigns a name to each client. In `./pyproject.toml` you can find the `client_names` parameter — a comma-separated string of client names used to identify each client. The same names, mapped to their corresponding `client_id`, are present in `./flad/client_app.py`, in the `client_names` dictionary.
 
 Unlike other strategies, FLAD does not use a fixed number of rounds — it dynamically
-decides when to stop training based on the clients' F1 score. Setting `num_rounds` to
+decides when to stop training based on the clients' F1 score. Setting `num-server-rounds` to
 `0` in `./pyproject.toml` enables this behavior.
 
 Finally, since much of FLAD's behavior is driven by each client's F1 score, this metric must be returned during the evaluation phase.
@@ -126,7 +126,7 @@ To run a single experiment of this baseline, do:
 flwr run . --federation-config="num-supernodes=13 client-resources-num-cpus=2" --stream
 ```
 
-In the `output_folder` specified in the `pyproject.toml` file, you will find a directory whose name is `federated_training_flad_<rnd_seed>-<yyyymmdd>-<hhmmss>`. Inside that directory, you can find the best model (`model.keras`) and the training history file. 
+In the `output_folder` specified in the `pyproject.toml` file, you will find a directory whose name is `federated_training_flad_<rn_seed>-<yyyymmdd>-<hhmmss>`. Inside that directory, you can find the best model (`model.keras`) and the training history file. 
 
 In order to run 10 experiments with different random seeds, you can use this script:
 
@@ -142,7 +142,7 @@ If you hit OOM errors during training, you can try running the experiments with
 `LD_PRELOAD`:
 
 ```bash
-# Unbuntu/Debian
+# Ubuntu/Debian
 sudo apt install libtcmalloc-minimal4t64
 export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
 ```

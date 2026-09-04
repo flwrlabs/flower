@@ -1,4 +1,4 @@
-"""Produce a summary table by FLAD experiments.
+"""Produce a summary table of FLAD experiments.
 
 Assumes CSV files are located at:
 `<log_dir>/<experiment_dir>/training_history_<rn_seed>.csv`

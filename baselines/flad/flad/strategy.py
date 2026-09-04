@@ -100,7 +100,16 @@ class Flad(Strategy):
         grid: Grid,
     ) -> None:
         """Query clients to map client names to node IDs in the grid."""
-        node_ids = list(grid.get_node_ids())
+        # Wait until all clients are online
+        while len(node_ids := list(grid.get_node_ids())) < len(self.clients):
+            log(
+                INFO,
+                "Waiting for nodes to connect: %d connected (target: %d).",
+                len(node_ids),
+                len(self.clients),
+            )
+            time.sleep(1)
+
         msgs = []
         log(INFO, "Mapping clients to node IDs in the grid.")
         for nid in node_ids:
@@ -427,13 +436,9 @@ class Flad(Strategy):
             )
 
         if len(replies) < len(self.round_participants):
-            log(
-                WARNING,
-                "aggregate_evaluate: expected %d replies but received only %d; "
-                "%d client(s) did not respond this round.",
-                len(self.round_participants),
-                len(replies),
-                len(self.round_participants) - len(replies),
+            raise InconsistentMessageReplies(
+                f"aggregate_evaluate: expected {len(self.round_participants)} replies "
+                f"but received only {len(replies)}; "
             )
         for reply in replies:
             client = self._check_reply_from_client(reply)
@@ -595,6 +600,10 @@ class Flad(Strategy):
             )
 
             # Aggregate evaluate.
+            # Note: this function updates self.best_average_f1 to the max
+            # of its previous value and this round's average, so we capture
+            # the previous value first to detect strict improvement.
+            previous_best_average_f1 = self.best_average_f1
             agg_evaluate_metrics = self.aggregate_evaluate(
                 current_round,
                 evaluate_replies,
@@ -609,7 +618,7 @@ class Flad(Strategy):
             self.last_round_average_f1 = cast(
                 float, agg_evaluate_metrics["avg_f1_score"]
             )
-            if self.last_round_average_f1 < self.best_average_f1:
+            if self.last_round_average_f1 <= previous_best_average_f1:
                 stop_counter += 1
             else:
                 # Contrary to Flower standard strategy, we keep the best model not the
