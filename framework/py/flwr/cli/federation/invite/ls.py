@@ -25,7 +25,7 @@ from rich.table import Table
 from rich.text import Text
 
 from flwr.cli.utils import (
-    cli_output_control_stub,
+    cli_output_control_client,
     flwr_cli_exc_handler,
     print_json_to_stdout,
 )
@@ -34,9 +34,9 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListInvitationsRequest,
     ListInvitationsResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.federation_pb2 import Invitation  # pylint: disable=E0611
 from flwr.supercore.constant import InvitationStatus
+from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.date import isoformat8601_utc
 
 _STATUS_TO_COLOR: dict[str, str] = {
@@ -70,7 +70,7 @@ def ls(
     ] = False,
 ) -> None:
     """List invitations addressed to you and invitations created by you (alias: ls)."""
-    with cli_output_control_stub(superlink, output_format) as (stub, is_json):
+    with cli_output_control_client(superlink, output_format) as (stub, is_json):
         request = ListInvitationsRequest()
         _list_invitations(
             stub=stub,
@@ -81,7 +81,7 @@ def ls(
 
 
 def _list_invitations(
-    stub: ControlStub,
+    stub: ControlHttpClient,
     request: ListInvitationsRequest,
     is_json: bool,
     verbose: bool,

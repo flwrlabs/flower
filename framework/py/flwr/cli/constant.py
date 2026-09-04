@@ -17,8 +17,6 @@
 
 import os
 
-from flwr.supercore.constant import SUPERGRID_ADDRESS
-
 # General help message for config overrides
 CONFIG_HELP_MESSAGE = (
     "Override {0} values using one of the following formats:\n\n"
@@ -155,7 +153,9 @@ class SimulationBackendConfigTomlKey:
 # Local SuperLink configuration
 LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE = ":local:"
 LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY = ":local-in-memory:"
-LOCAL_RUNTIME_API_PORT = os.environ.get("FLWR_LOCAL_RUNTIME_API_PORT", "39091")
+LOCAL_SUPERLINK_HTTP_API_PORT = os.environ.get(
+    "FLWR_LOCAL_SUPERLINK_HTTP_API_PORT", "39091"
+)
 LOCAL_CONTROL_API_PORT = os.environ.get("FLWR_LOCAL_CONTROL_API_PORT", "39093")
 LOCAL_CONTROL_API_ADDRESS = f"127.0.0.1:{LOCAL_CONTROL_API_PORT}"
 LOCAL_SUPERLINK_STARTUP_TIMEOUT = 15.0
@@ -164,13 +164,15 @@ CONTROL_API_PROBE_INTERVAL = 0.2
 
 # CLI connection configuration file name
 FLOWER_CONFIG_FILE = "config.toml"
+LEGACY_SUPERGRID_ADDRESS = "supergrid.flower.ai"
+SUPERGRID_HTTP_ADDRESS = "api.flower.ai"
 
 # The default configuration for the Flower config file
 DEFAULT_FLOWER_CONFIG_TOML = f"""[superlink]
 default = "local"
 
 [superlink.supergrid]
-address = "{SUPERGRID_ADDRESS}"
+address = "{SUPERGRID_HTTP_ADDRESS}"
 
 [superlink.local]
 address = "{LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE}"

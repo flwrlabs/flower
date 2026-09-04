@@ -7,10 +7,13 @@ services:
       - --host
       - 0.0.0.0
       - --port
-      - "9091"
+      - "8000"
       - --ssl-ca-certfile=certificates/ca.crt
       - --ssl-certfile=certificates/server.pem
       - --ssl-keyfile=certificates/server.key
+      - --appio-ssl-ca-certfile=certificates/ca.crt
+      - --appio-ssl-certfile=certificates/server.pem
+      - --appio-ssl-keyfile=certificates/server.key
       - --database=state/state.db
     volumes:
       - ./state/:/app/state/:rw
@@ -23,7 +26,7 @@ services:
         target: /app/certificates/server.key
     ports:
       - 9092:9092
-      - 9093:9093
+      - 8000:8000
 
   superexec-serverapp:
     build:
@@ -32,17 +35,21 @@ services:
         FROM flwr/superexec:${FLWR_VERSION:-1.37.0}
 
         WORKDIR /app
-        COPY --chown=app:app pyproject.toml .
+        COPY --chown=app:app pyproject.toml LICENSE* ./
         RUN sed -i 's/.*flwr\[simulation\].*//' pyproject.toml \
           && python -m pip install -U --no-cache-dir .
 
         ENTRYPOINT ["flower-superexec"]
     command:
-      - --insecure
+      - --root-certificates
+      - certificates/superlink-ca.crt
       - --plugin-type
       - serverapp
       - --runtime-api-address
-      - superlink:9091
+      - superlink:8000
+    secrets:
+      - source: superlink-ca-certfile
+        target: /app/certificates/superlink-ca.crt
     depends_on:
       - superlink
 

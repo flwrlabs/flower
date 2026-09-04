@@ -24,38 +24,34 @@ from typing import cast
 from unittest.mock import Mock, patch
 
 import click
-import grpc
 import httpx
 import pytest
+import typer
 from parameterized import parameterized
 
 from flwr.cli.constant import (
-    LOCAL_CONTROL_API_ADDRESS,
-    LOCAL_RUNTIME_API_PORT,
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
+    LOCAL_SUPERLINK_HTTP_API_PORT,
 )
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
-from flwr.common.constant import FLWR_DIR
+from flwr.common.constant import FLWR_DIR, CliOutputFormat
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RefreshAuthTokensRequest,
     RefreshAuthTokensResponse,
 )
 from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
-from flwr.supercore.interceptors import (
-    RuntimeVersionClientInterceptor,
-    RuntimeVersionHttpInterceptor,
-)
+from flwr.supercore.interceptors import RuntimeVersionHttpInterceptor
 
 from .cli_account_auth_interceptor import CliAccountAuthHttpInterceptor
-from .cli_client_interceptor import CliClientHttpInterceptor, CliClientInterceptor
+from .cli_client_interceptor import CliClientHttpInterceptor
 from .utils import (
     AUTHENTICATION_FAILED_MESSAGE,
     SUPERLINK_UNAVAILABLE_MESSAGE,
     AppPathDepthError,
     _format_flower_error,
     build_pathspec,
+    cli_output_control_client,
     cli_output_handler,
     collect_files,
     depth_of,
@@ -63,11 +59,9 @@ from .utils import (
     flwr_cli_exc_handler,
     get_executed_command,
     get_sha256_hash,
-    init_channel_from_connection,
     init_http_client_from_connection,
     load_gitignore_patterns,
     validate_federation_name,
-    wait_for_control_api_channel,
 )
 
 
@@ -182,27 +176,6 @@ def test_load_gitignore_patterns_with_pathspec() -> None:
     assert spec.match_file("good.py") is False
 
 
-def test_wait_for_control_api_channel_retries_until_ready() -> None:
-    """Test that Control API readiness waits through transient unavailability."""
-    future = Mock()
-    future.result.side_effect = [grpc.FutureTimeoutError(), None]
-
-    with patch("flwr.cli.utils.grpc.channel_ready_future", return_value=future):
-        wait_for_control_api_channel(Mock(), timeout=1, check_interval=0.01)
-
-    assert future.result.call_count == 2
-
-
-def test_wait_for_control_api_channel_fails_after_timeout() -> None:
-    """Test that Control API readiness fails after the timeout expires."""
-    future = Mock()
-    future.result.side_effect = grpc.FutureTimeoutError()
-
-    with patch("flwr.cli.utils.grpc.channel_ready_future", return_value=future):
-        with pytest.raises(click.ClickException, match="SuperLink is unavailable"):
-            wait_for_control_api_channel(Mock(), timeout=0.01, check_interval=0.01)
-
-
 def test_get_executed_command_single() -> None:
     """Test get_executed_command with a two-word command (e.g., flwr ls)."""
     root_group = click.Group("flwr")
@@ -228,51 +201,6 @@ def test_get_executed_command_nested() -> None:
                 assert get_executed_command() == "flwr federation list"
 
 
-def test_init_channel_from_connection_uses_resolved_connection() -> None:
-    """Ensure resolved connection values are used for channel creation."""
-    unresolved = SuperLinkConnection(
-        name="local",
-        address=LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
-        options=SuperLinkSimulationOptions(num_supernodes=2),
-    )
-    resolved = SuperLinkConnection(
-        name="local",
-        address=LOCAL_CONTROL_API_ADDRESS,
-        insecure=True,
-        options=SuperLinkSimulationOptions(num_supernodes=2),
-    )
-    auth_plugin = Mock()
-    auth_plugin.load_tokens = Mock()
-
-    with (
-        patch(
-            "flwr.cli.utils.ensure_local_superlink", return_value=resolved
-        ) as mock_ensure,
-        patch("flwr.cli.utils.load_certificate_in_connection", return_value=None),
-        patch("flwr.cli.utils.create_channel") as mock_create,
-        patch("flwr.cli.utils.wait_for_control_api_channel"),
-    ):
-        channel = Mock()
-        mock_create.return_value = channel
-        ret = init_channel_from_connection(unresolved, auth_plugin)
-
-    assert ret is channel
-    mock_ensure.assert_called_once_with(unresolved)
-    auth_plugin.load_tokens.assert_called_once()
-
-    kwargs = mock_create.call_args.kwargs
-    assert kwargs["server_address"] == LOCAL_CONTROL_API_ADDRESS
-    assert kwargs["insecure"] is True
-    assert kwargs["root_certificates"] is None
-    assert kwargs["max_message_length"] == GRPC_MAX_MESSAGE_LENGTH
-    assert len(kwargs["interceptors"]) == 3
-    assert isinstance(kwargs["interceptors"][0], CliClientInterceptor)
-    assert isinstance(kwargs["interceptors"][1], RuntimeVersionClientInterceptor)
-    # pylint: disable-next=protected-access
-    assert kwargs["interceptors"][1]._metadata.component_name == "flwr CLI"
-    channel.subscribe.assert_called_once()
-
-
 def test_init_http_client_from_connection_uses_resolved_connection() -> None:
     """Configure the HTTP client from the resolved local connection."""
     unresolved = SuperLinkConnection(
@@ -282,7 +210,7 @@ def test_init_http_client_from_connection_uses_resolved_connection() -> None:
     )
     resolved = SuperLinkConnection(
         name="local",
-        address=f"127.0.0.1:{LOCAL_RUNTIME_API_PORT}",
+        address=f"127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}",
         insecure=True,
         options=SuperLinkSimulationOptions(num_supernodes=2),
     )
@@ -294,7 +222,7 @@ def test_init_http_client_from_connection_uses_resolved_connection() -> None:
     )
 
     with (
-        patch("flwr.cli.utils.ensure_local_superlink_http", return_value=resolved),
+        patch("flwr.cli.utils.ensure_local_superlink", return_value=resolved),
         patch("flwr.cli.utils.load_certificate_in_connection", return_value=None),
         patch(
             "flwr.cli.utils.load_cli_auth_plugin_from_connection",
@@ -308,7 +236,7 @@ def test_init_http_client_from_connection_uses_resolved_connection() -> None:
         result = init_http_client_from_connection(unresolved)
 
     assert result is http_client
-    address = f"127.0.0.1:{LOCAL_RUNTIME_API_PORT}"
+    address = f"127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}"
     load_auth_plugin.assert_called_once_with(address)
     auth_plugin.load_tokens.assert_called_once_with()
 
@@ -331,18 +259,37 @@ def test_init_http_client_from_connection_uses_resolved_connection() -> None:
     assert credentials.refresh_token == "new-refresh-token"
 
 
-@pytest.mark.parametrize(
-    "transport_error",
-    [
-        grpc.RpcError(),
-        httpx.ConnectError(
-            "Connection refused",
-            request=httpx.Request("POST", "http://api.example"),
-        ),
-    ],
-)
-def test_custom_err_handler(transport_error: Exception) -> None:
-    """Call a custom handler for either transport error."""
+def test_cli_output_control_client_closes_client() -> None:
+    """Close the HTTP client after a CLI output command completes."""
+    connection = Mock()
+    control_client = Mock()
+
+    with (
+        patch("flwr.cli.utils.cli_output_handler") as output_handler,
+        patch(
+            "flwr.cli.utils.read_superlink_connection", return_value=connection
+        ) as read_connection,
+        patch(
+            "flwr.cli.utils.init_http_client_from_connection",
+            return_value=control_client,
+        ) as init_client,
+    ):
+        output_handler.return_value.__enter__.return_value = True
+        with cli_output_control_client("remote", "json") as result:
+            assert result == (control_client, True)
+
+    output_handler.assert_called_once_with(output_format="json")
+    read_connection.assert_called_once_with("remote")
+    init_client.assert_called_once_with(connection)
+    control_client.close.assert_called_once_with()
+
+
+def test_custom_err_handler() -> None:
+    """Call a custom handler for an HTTP transport error."""
+    transport_error = httpx.ConnectError(
+        "Connection refused",
+        request=httpx.Request("POST", "http://api.example"),
+    )
 
     # Prepare
     class CustomError(Exception):
@@ -432,6 +379,15 @@ def test_cli_output_handler_raises_click_exception_for_json_error() -> None:
             raise click.ClickException('{"message": "request failed", "code": 400}')
 
     assert exc_info.value.message == '{"message": "request failed", "code": 400}'
+
+
+def test_cli_output_handler_preserves_json_exit_code() -> None:
+    """cli_output_handler preserves a nonzero exit code for JSON output."""
+    with pytest.raises(typer.Exit) as exc_info:
+        with cli_output_handler(output_format=CliOutputFormat.JSON):
+            raise typer.Exit(code=1)
+
+    assert exc_info.value.exit_code == 1
 
 
 @pytest.mark.parametrize(
