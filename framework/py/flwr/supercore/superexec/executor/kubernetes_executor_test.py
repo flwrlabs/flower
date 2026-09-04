@@ -25,17 +25,6 @@ import pytest
 from flwr.supercore.constant import TaskType
 
 from . import kubernetes_executor as kube
-from .idle_taskexecutor import (
-    IDLE_TASKEXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION,
-    IDLE_TASKEXECUTOR_FAB_HASH_ANNOTATION,
-    IDLE_TASKEXECUTOR_LABEL,
-    IDLE_TASKEXECUTOR_MODULE,
-    IDLE_TASKEXECUTOR_READINESS_COMMAND,
-    IDLE_TASKEXECUTOR_READY_DIRECTORY,
-    IDLE_TASKEXECUTOR_RUNTIME_IMAGE_ANNOTATION,
-    TaskExecutorPoolKey,
-    is_idle_taskexecutor_ready,
-)
 from .kubernetes_executor import (
     _COMPLETED_POD_SWEEP_INTERVAL_SECONDS,
     _TASK_ID_LABEL,
@@ -51,6 +40,19 @@ from .kubernetes_executor import (
     _get_runtime_root_certificates,
 )
 from .types import ExecutionSpec, LaunchResultStatus
+from .warm_executor import (
+    WARM_EXECUTOR_MODULE,
+    WARM_EXECUTOR_READINESS_COMMAND,
+    WARM_EXECUTOR_READY_DIRECTORY,
+)
+from .warm_executor_pool import (
+    WARM_EXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION,
+    WARM_EXECUTOR_FAB_HASH_ANNOTATION,
+    WARM_EXECUTOR_LABEL,
+    WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION,
+    WarmExecutorPoolKey,
+    is_warm_executor_ready,
+)
 
 
 class _KubernetesApiError(Exception):
@@ -95,7 +97,7 @@ def _executor_config(**overrides: Any) -> KubernetesExecutorConfig:
     return KubernetesExecutorConfig(**base)
 
 
-def _taskexecutor_pool_key(**overrides: Any) -> TaskExecutorPoolKey:
+def _warm_executor_pool_key(**overrides: Any) -> WarmExecutorPoolKey:
     base: dict[str, Any] = {
         "task_type": TaskType.AGENT_APP,
         "fab_hash": "fab-sha256",
@@ -103,7 +105,7 @@ def _taskexecutor_pool_key(**overrides: Any) -> TaskExecutorPoolKey:
         "dependency_environment_version": "agent-env-v1",
     }
     base.update(overrides)
-    return TaskExecutorPoolKey(**base)
+    return WarmExecutorPoolKey(**base)
 
 
 def _as_dict(value: object) -> dict[str, Any]:
@@ -234,21 +236,20 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
     assert pod["spec"]["restartPolicy"] == "Never"
 
 
-def test_launch_idle_taskexecutor_is_inert_and_becomes_ready(
+def test_launch_warm_executor_is_inert_and_becomes_ready(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test an idle TaskExecutor is inert, reports readiness, and is swept."""
+    """Test a warm TaskExecutor is inert, reports readiness, and is swept."""
     client = Mock()
-    monkeypatch.setattr(
-        kube, "new_idle_taskexecutor_id", Mock(return_value="executor123")
-    )
+    monkeypatch.setattr(kube, "new_warm_executor_id", Mock(return_value="executor123"))
     config = _executor_config(
-        container_security_context={"readOnlyRootFilesystem": True}
+        labels={WARM_EXECUTOR_LABEL: "false"},
+        container_security_context={"readOnlyRootFilesystem": True},
     )
     executor = KubernetesExecutor(client=client, config=config)
-    pool_key = _taskexecutor_pool_key()
+    pool_key = _warm_executor_pool_key()
 
-    result = executor._launch_idle_taskexecutor(  # pylint: disable=protected-access
+    result = executor._launch_warm_executor(  # pylint: disable=protected-access
         pool_key
     )
 
@@ -263,66 +264,68 @@ def test_launch_idle_taskexecutor_is_inert_and_becomes_ready(
         "app.kubernetes.io/name": "flower",
         "app.kubernetes.io/component": "taskexecutor",
         "flower.ai/task-type": "flwr-agentapp",
-        IDLE_TASKEXECUTOR_LABEL: "true",
+        WARM_EXECUTOR_LABEL: "true",
     }
     assert metadata["annotations"] == {
-        IDLE_TASKEXECUTOR_FAB_HASH_ANNOTATION: "fab-sha256",
-        IDLE_TASKEXECUTOR_RUNTIME_IMAGE_ANNOTATION: (
-            "ghcr.io/flwrlabs/taskexecutor:warm"
-        ),
-        IDLE_TASKEXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION: "agent-env-v1",
+        WARM_EXECUTOR_FAB_HASH_ANNOTATION: "fab-sha256",
+        WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION: ("ghcr.io/flwrlabs/taskexecutor:warm"),
+        WARM_EXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION: "agent-env-v1",
     }
     assert _TASK_ID_LABEL not in metadata["labels"]
     assert LAUNCH_ATTEMPT_LABEL not in metadata["labels"]
     assert container == {
         "name": "taskexecutor",
         "image": "ghcr.io/flwrlabs/taskexecutor:warm",
-        "command": ["python", "-m", IDLE_TASKEXECUTOR_MODULE],
+        "command": ["python", "-m", WARM_EXECUTOR_MODULE],
         "volumeMounts": [
             {
-                "name": "idle-taskexecutor-ready",
-                "mountPath": IDLE_TASKEXECUTOR_READY_DIRECTORY,
+                "name": "warm-executor-ready",
+                "mountPath": WARM_EXECUTOR_READY_DIRECTORY,
             }
         ],
         "readinessProbe": {
-            "exec": {"command": list(IDLE_TASKEXECUTOR_READINESS_COMMAND)},
+            "exec": {"command": list(WARM_EXECUTOR_READINESS_COMMAND)},
             "periodSeconds": 1,
         },
         "securityContext": {"readOnlyRootFilesystem": True},
     }
-    assert pod["spec"]["volumes"] == [
-        {"name": "idle-taskexecutor-ready", "emptyDir": {}}
-    ]
+    assert pod["spec"]["volumes"] == [{"name": "warm-executor-ready", "emptyDir": {}}]
     assert pod["spec"]["automountServiceAccountToken"] is False
 
     pod["status"] = {
         "phase": "Running",
         "conditions": [{"type": "Ready", "status": "False"}],
     }
-    assert not is_idle_taskexecutor_ready(pod, pool_key)
+    assert not is_warm_executor_ready(pod, pool_key)
     pod["status"]["conditions"][0]["status"] = "True"
-    assert is_idle_taskexecutor_ready(pod, pool_key)
+    assert is_warm_executor_ready(pod, pool_key)
 
     incompatible_keys = (
-        _taskexecutor_pool_key(task_type=TaskType.MODEL),
-        _taskexecutor_pool_key(fab_hash="another-fab-sha256"),
-        _taskexecutor_pool_key(runtime_image="taskexecutor:other"),
-        _taskexecutor_pool_key(dependency_environment_version="agent-env-v2"),
+        _warm_executor_pool_key(task_type=TaskType.MODEL),
+        _warm_executor_pool_key(fab_hash="another-fab-sha256"),
+        _warm_executor_pool_key(runtime_image="taskexecutor:other"),
+        _warm_executor_pool_key(dependency_environment_version="agent-env-v2"),
     )
-    assert not any(is_idle_taskexecutor_ready(pod, key) for key in incompatible_keys)
+    assert not any(is_warm_executor_ready(pod, key) for key in incompatible_keys)
 
     pod["status"]["phase"] = "Succeeded"
     client.list_namespaced_pod.return_value = {"items": [pod]}
     client.list_namespaced_secret.return_value = {"items": []}
 
-    CompletedPodSweeper(client=client, config=_executor_config()).sweep()
+    CompletedPodSweeper(client=client, config=config).sweep()
 
     client.delete_namespaced_pod.assert_called_once_with(
-        name="flwr-taskexecutor-idle-executor123",
+        name="flwr-taskexecutor-warm-executor123",
         namespace="flower-system",
         grace_period_seconds=0,
     )
     client.delete_namespaced_secret.assert_not_called()
+    client.list_namespaced_pod.assert_called_once_with(
+        "flower-system",
+        label_selector=(
+            "app.kubernetes.io/component=taskexecutor,app.kubernetes.io/name=flower"
+        ),
+    )
 
 
 def test_build_taskexecutor_pod_includes_configured_volumes() -> None:
@@ -360,6 +363,10 @@ def test_build_taskexecutor_pod_includes_configured_volumes() -> None:
         (
             {"volumes": [{"name": "appio-credentials", "emptyDir": {}}]},
             "appio-credentials",
+        ),
+        (
+            {"volumes": [{"name": "warm-executor-ready", "emptyDir": {}}]},
+            "warm-executor-ready",
         ),
         (
             {"volumes": [{"name": "secret", "secret": {"secretName": "api-key"}}]},
@@ -406,9 +413,21 @@ def test_build_taskexecutor_pod_includes_configured_volumes() -> None:
             "appio-credentials",
         ),
         (
+            {"volume_mounts": [{"name": "warm-executor-ready", "mountPath": "/ready"}]},
+            "warm-executor-ready",
+        ),
+        (
             {
                 "volume_mounts": [
                     {"name": "credentials", "mountPath": APPIO_CREDENTIALS_MOUNT_PATH}
+                ]
+            },
+            "mount path",
+        ),
+        (
+            {
+                "volume_mounts": [
+                    {"name": "ready", "mountPath": WARM_EXECUTOR_READY_DIRECTORY}
                 ]
             },
             "mount path",
