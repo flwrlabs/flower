@@ -44,6 +44,7 @@ from .warm_executor import (
     WARM_EXECUTOR_MODULE,
     WARM_EXECUTOR_READINESS_COMMAND,
     WARM_EXECUTOR_READY_DIRECTORY,
+    WARM_EXECUTOR_READY_FILE,
 )
 from .warm_executor_pool import (
     WARM_EXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION,
@@ -428,6 +429,14 @@ def test_build_taskexecutor_pod_includes_configured_volumes() -> None:
             {
                 "volume_mounts": [
                     {"name": "ready", "mountPath": WARM_EXECUTOR_READY_DIRECTORY}
+                ]
+            },
+            "mount path",
+        ),
+        (
+            {
+                "volume_mounts": [
+                    {"name": "ready-file", "mountPath": WARM_EXECUTOR_READY_FILE}
                 ]
             },
             "mount path",
