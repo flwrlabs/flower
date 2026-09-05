@@ -38,6 +38,7 @@ from flwr.common.constant import (
     CONTROL_API_DEFAULT_SERVER_ADDRESS,
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
+    FLWR_INTERNAL_GRPC_CONTROL_API,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
@@ -150,7 +151,8 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         # Force initialization before starting network servers
         self.state_factory.state()
 
-        self._start_control_api()
+        if os.getenv(FLWR_INTERNAL_GRPC_CONTROL_API) == "1":
+            self._start_control_api()
         self._start_fleet_api()
         self._start_superexec_if_needed()
         self._start_health_server_if_needed()
@@ -490,8 +492,8 @@ def flower_superlink() -> None:
 
     event(EventType.RUN_SUPERLINK_ENTER)
 
-    # Blocking: FastAPI serves Runtime HTTP while its lifespan owns Control and
-    # Fleet gRPC servers.
+    # Blocking: FastAPI serves the Runtime and Control HTTP APIs while its lifespan
+    # owns the Fleet gRPC server and, when enabled, the gRPC Control API server.
     _run_superlink_http_api(lifespan_config=config)
 
 
@@ -520,10 +522,16 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
         lifespan_config.host,
         lifespan_config.port,
     )
+    log(
+        INFO,
+        "Starting the SuperLink Control HTTP API on %s:%s.",
+        lifespan_config.host,
+        lifespan_config.port,
+    )
 
     # Uvicorn workers must stay at 1 while the lifespan starts gRPC servers. With
-    # multiple workers, every worker process would try to bind the same Control,
-    # Fleet and Runtime API ports.
+    # multiple workers, every worker process would try to bind the same enabled
+    # gRPC API and Runtime API ports.
     uvicorn.run(
         app=fastapi_app,
         host=lifespan_config.host,
