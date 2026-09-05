@@ -65,7 +65,7 @@ services:
         FROM flwr/superexec:${FLWR_VERSION:-1.37.0}
 
         WORKDIR /app
-        COPY --chown=app:app pyproject.toml .
+        COPY --chown=app:app pyproject.toml LICENSE* ./
         RUN sed -i 's/.*flwr\[simulation\].*//' pyproject.toml \
           && python -m pip install -U --no-cache-dir .
 
@@ -91,7 +91,7 @@ services:
         FROM flwr/superexec:${FLWR_VERSION:-1.37.0}
 
         WORKDIR /app
-        COPY --chown=app:app pyproject.toml .
+        COPY --chown=app:app pyproject.toml LICENSE* ./
         RUN sed -i 's/.*flwr\[simulation\].*//' pyproject.toml \
           && python -m pip install -U --no-cache-dir .
 
@@ -118,7 +118,7 @@ services:
   #       FROM flwr/superexec:${FLWR_VERSION:-1.37.0}
 
   #       WORKDIR /app
-  #       COPY --chown=app:app pyproject.toml .
+  #       COPY --chown=app:app pyproject.toml LICENSE* ./
   #       RUN sed -i 's/.*flwr\[simulation\].*//' pyproject.toml \
   #         && python -m pip install -U --no-cache-dir .
 
