@@ -1,0 +1,29 @@
+name: Framework AgentApp E2E
+
+on:
+  workflow_dispatch:
+
+env:
+  FLWR_TELEMETRY_ENABLED: 0
+
+jobs:
+  agentapp:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    name: E2E AgentApp
+    defaults:
+      run:
+        working-directory: framework/e2e/e2e-agentapp
+    steps:
+      - uses: actions/checkout@v5
+      - name: Bootstrap
+        uses: ./.github/actions/bootstrap
+      - name: Install dependencies
+        run: python -m pip install --upgrade .
+      - name: Run AgentApp E2E
+        env:
+          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          FLWR_MODEL_API_KEY: ${{ secrets.FLWR_MODEL_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+        run: ./test.sh
