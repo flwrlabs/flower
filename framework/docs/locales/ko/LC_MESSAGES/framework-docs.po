@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-02 00:10+0000\n"
+"POT-Creation-Date: 2026-09-05 00:10+0000\n"
 "PO-Revision-Date: 2026-05-23 06:53+0000\n"
 "Last-Translator: Seulki Yun <icstuckyi@gmail.com>\n"
 "Language: ko\n"
@@ -14665,7 +14665,7 @@ msgid ""
 "different process modes here: :doc:`run-as-subprocess`."
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:41 ../../source/docker/enable-tls.rst:126
+#: ../../source/docker/enable-tls.rst:41 ../../source/docker/enable-tls.rst:132
 #, fuzzy
 msgid ""
 "To enable TLS between the SuperLink and SuperNode, as well as between the"
@@ -14693,28 +14693,28 @@ msgstr ""
 msgid "Understanding the command"
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:61 ../../source/docker/enable-tls.rst:103
-#: ../../source/docker/enable-tls.rst:147
-#: ../../source/docker/enable-tls.rst:186
-#: ../../source/docker/enable-tls.rst:213
-#: ../../source/docker/enable-tls.rst:238
-#: ../../source/docker/tutorial-quickstart-docker.rst:83
-#: ../../source/docker/tutorial-quickstart-docker.rst:126
-#: ../../source/docker/tutorial-quickstart-docker.rst:243
-#: ../../source/docker/tutorial-quickstart-docker.rst:281
+#: ../../source/docker/enable-tls.rst:64 ../../source/docker/enable-tls.rst:109
+#: ../../source/docker/enable-tls.rst:156
+#: ../../source/docker/enable-tls.rst:199
+#: ../../source/docker/enable-tls.rst:228
+#: ../../source/docker/enable-tls.rst:253
+#: ../../source/docker/tutorial-quickstart-docker.rst:84
+#: ../../source/docker/tutorial-quickstart-docker.rst:129
+#: ../../source/docker/tutorial-quickstart-docker.rst:246
+#: ../../source/docker/tutorial-quickstart-docker.rst:284
 #, fuzzy
 msgid "``docker run``: This tells Docker to run a container from an image."
 msgstr "``docker run``: 새 Docker 컨테이너를 실행하는 명령입니다."
 
-#: ../../source/docker/enable-tls.rst:62 ../../source/docker/enable-tls.rst:104
-#: ../../source/docker/enable-tls.rst:148
-#: ../../source/docker/enable-tls.rst:187
-#: ../../source/docker/enable-tls.rst:214
-#: ../../source/docker/enable-tls.rst:239
-#: ../../source/docker/tutorial-quickstart-docker.rst:84
-#: ../../source/docker/tutorial-quickstart-docker.rst:127
-#: ../../source/docker/tutorial-quickstart-docker.rst:244
-#: ../../source/docker/tutorial-quickstart-docker.rst:282
+#: ../../source/docker/enable-tls.rst:65 ../../source/docker/enable-tls.rst:110
+#: ../../source/docker/enable-tls.rst:157
+#: ../../source/docker/enable-tls.rst:200
+#: ../../source/docker/enable-tls.rst:229
+#: ../../source/docker/enable-tls.rst:254
+#: ../../source/docker/tutorial-quickstart-docker.rst:85
+#: ../../source/docker/tutorial-quickstart-docker.rst:130
+#: ../../source/docker/tutorial-quickstart-docker.rst:247
+#: ../../source/docker/tutorial-quickstart-docker.rst:285
 msgid "``--rm``: Remove the container once it is stopped or the command exits."
 msgstr ""
 
@@ -14745,7 +14745,7 @@ msgstr ""
 msgid "directory."
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:69
+#: ../../source/docker/enable-tls.rst:72
 msgid "``<superlink-image>``: The name of your SuperLink image to be run."
 msgstr ""
 
@@ -14811,12 +14811,24 @@ msgstr ""
 msgid "the network."
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:86
+#: ../../source/docker/enable-tls.rst
+msgid "``--appio-ssl-ca-certfile``, ``--appio-ssl-certfile``, and"
+msgstr ""
+
+#: ../../source/docker/enable-tls.rst
+msgid "``--appio-ssl-keyfile``: Configure TLS for the shared Runtime and Control"
+msgstr ""
+
+#: ../../source/docker/enable-tls.rst
+msgid "HTTP APIs."
+msgstr ""
+
+#: ../../source/docker/enable-tls.rst:92
 #, fuzzy
 msgid "**SuperNode**"
 msgstr "run\\_supernode"
 
-#: ../../source/docker/enable-tls.rst:90 ../../source/docker/enable-tls.rst:196
+#: ../../source/docker/enable-tls.rst:96 ../../source/docker/enable-tls.rst:211
 msgid ""
 "If you're generating self-signed certificates and the ``ca.crt`` "
 "certificate doesn't exist on the SuperNode, you can copy it over after "
@@ -14840,7 +14852,7 @@ msgstr ""
 msgid "volume at the ``/app/ca.crt`` directory inside the container."
 msgstr "VSCode Dev Container에서 개발"
 
-#: ../../source/docker/enable-tls.rst:108
+#: ../../source/docker/enable-tls.rst:114
 msgid "``<supernode-image>``: The name of your SuperNode image to be run."
 msgstr ""
 
@@ -14858,7 +14870,7 @@ msgstr ""
 msgid "Isolation Mode ``process``"
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:116
+#: ../../source/docker/enable-tls.rst:122
 msgid ""
 "In isolation mode ``process``, the ServerApp and ClientApp run in their "
 "own processes. Unlike in isolation mode ``subprocess``, the SuperLink or "
@@ -14866,18 +14878,18 @@ msgid ""
 "they must be created externally."
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:120
+#: ../../source/docker/enable-tls.rst:126
 msgid ""
 "It is possible to run only the SuperLink in isolation mode ``subprocess``"
 " and the SuperNode in isolation mode ``process``, or vice versa, or even "
 "both with isolation mode ``process``."
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:124
+#: ../../source/docker/enable-tls.rst:130
 msgid "**SuperLink and ServerApp**"
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:129
+#: ../../source/docker/enable-tls.rst:135
 #, fuzzy
 msgid ""
 "Assuming all files we need are in the local ``superlink-certificates`` "
@@ -14926,7 +14938,7 @@ msgstr ""
 msgid "independent process. The SuperLink does not attempt to create it."
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:175
+#: ../../source/docker/enable-tls.rst:187
 #, fuzzy
 msgid "Start the ServerApp container:"
 msgstr "현재 클라이언트 속성입니다."
@@ -14941,27 +14953,32 @@ msgstr "현재 클라이언트 속성입니다."
 msgid "Understand the command"
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:188
+#: ../../source/docker/enable-tls.rst
+msgid "``--volume ./superlink-certificates/ca.crt:/app/certificates/ca.crt:ro``:"
+msgstr ""
+
+#: ../../source/docker/enable-tls.rst
+#, fuzzy
+msgid "Mount the ``ca.crt`` file inside the container as read-only."
+msgstr "VSCode Dev Container에서 개발"
+
+#: ../../source/docker/enable-tls.rst:203
 msgid "``<serverapp-image>``: The name of your ServerApp image to be run."
 msgstr ""
 
 #: ../../source/docker/enable-tls.rst
-msgid ""
-"``--insecure``:  This flag tells the container to operate in an insecure "
-"mode, allowing"
+msgid "``--root-certificates certificates/ca.crt``: Use the CA certificate to"
 msgstr ""
 
 #: ../../source/docker/enable-tls.rst
-msgid ""
-"unencrypted communication. Secure connections will be added in future "
-"releases."
+msgid "verify the SuperLink's identity when connecting to its Runtime API."
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:192
+#: ../../source/docker/enable-tls.rst:207
 msgid "**SuperNode and ClientApp**"
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:199
+#: ../../source/docker/enable-tls.rst:214
 #, fuzzy
 msgid "Start the SuperNode container:"
 msgstr "이미 *서버*를 시작할 수 있습니다:"
@@ -14999,33 +15016,45 @@ msgstr ""
 msgid "independent process. The SuperNode does not attempt to create it."
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:227
+#: ../../source/docker/enable-tls.rst:242
 #, fuzzy
 msgid "Start the ClientApp container:"
 msgstr "현재 클라이언트 속성입니다."
 
-#: ../../source/docker/enable-tls.rst:240
+#: ../../source/docker/enable-tls.rst:255
 msgid "``<clientapp-image>``: The name of your ClientApp image to be run."
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:244
+#: ../../source/docker/enable-tls.rst
+msgid ""
+"``--insecure``:  This flag tells the container to operate in an insecure "
+"mode, allowing"
+msgstr ""
+
+#: ../../source/docker/enable-tls.rst
+msgid ""
+"unencrypted communication. Secure connections will be added in future "
+"releases."
+msgstr ""
+
+#: ../../source/docker/enable-tls.rst:259
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:61
 msgid "Locate the Flower Configuration TOML file in your machine."
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:256
+#: ../../source/docker/enable-tls.rst:271
 #, fuzzy
 msgid ""
 "Append the following lines to the end of the ``config.toml`` file to add "
 "a new SuperLink connection and save it:"
 msgstr "``pyproject.toml``에 다음 버전 제약 조건을 설정했는지 확인하세요:"
 
-#: ../../source/docker/enable-tls.rst:259
+#: ../../source/docker/enable-tls.rst:274
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:75
 #: ../../source/docker/tutorial-deploy-on-multiple-machines.rst:167
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:110
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:250
-#: ../../source/docker/tutorial-quickstart-docker.rst:328
+#: ../../source/docker/tutorial-quickstart-docker.rst:331
 #: ../../source/how-to-authenticate-accounts.rst:71
 #: ../../source/how-to-authenticate-supernodes.rst:127
 #: ../../source/how-to-enable-tls-connections.rst:222
@@ -15039,14 +15068,14 @@ msgstr "``pyproject.toml``에 다음 버전 제약 조건을 설정했는지 확
 msgid "config.toml"
 msgstr "컨피그 레코드"
 
-#: ../../source/docker/enable-tls.rst:268
+#: ../../source/docker/enable-tls.rst:283
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:84
 msgid ""
 "You can customize the string that follows ``superlink.`` to fit your "
 "needs. However, please note that the string cannot contain a dot (``.``)."
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:271
+#: ../../source/docker/enable-tls.rst:286
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:87
 msgid ""
 "In this example, ``local-deployment`` has been used. Just remember to "
@@ -15337,7 +15366,7 @@ msgid "ServerApp"
 msgstr ""
 
 #: ../../source/docker/run-as-subprocess.rst:38
-#: ../../source/docker/run-as-subprocess.rst:79
+#: ../../source/docker/run-as-subprocess.rst:80
 #, fuzzy
 msgid "**Prerequisites**"
 msgstr "전제 조건"
@@ -15381,19 +15410,19 @@ msgstr ""
 msgid "ClientApp"
 msgstr "클라이언트앱"
 
-#: ../../source/docker/run-as-subprocess.rst:81
+#: ../../source/docker/run-as-subprocess.rst:82
 msgid ""
 "1. Before running the ClientApp as a subprocess, ensure that the FAB "
 "dependencies have been installed in the SuperNode images. This can be "
 "done by extending the SuperNode image:"
 msgstr ""
 
-#: ../../source/docker/run-as-subprocess.rst:85
+#: ../../source/docker/run-as-subprocess.rst:86
 #, fuzzy
 msgid "supernode.Dockerfile"
 msgstr "SuperNode Dockerfile 만들기"
 
-#: ../../source/docker/run-as-subprocess.rst:99
+#: ../../source/docker/run-as-subprocess.rst:100
 #, fuzzy
 msgid ""
 "2. Next, build the SuperNode Docker image by running the following "
@@ -15402,12 +15431,12 @@ msgstr ""
 "다음으로, Dockerfile 및 ClientApp 코드가 있는 디렉터리에서 다음 명령을 실행하여 SuperNode Docker "
 "이미지를 빌드합니다."
 
-#: ../../source/docker/run-as-subprocess.rst:106
+#: ../../source/docker/run-as-subprocess.rst:107
 #, fuzzy
 msgid "**Run the ClientApp as a Subprocess**"
 msgstr "린터 및 테스트 실행"
 
-#: ../../source/docker/run-as-subprocess.rst:108
+#: ../../source/docker/run-as-subprocess.rst:109
 msgid ""
 "Start the SuperNode and run the ClientApp as a subprocess (note that the "
 "subprocess mode is the default, so you do not have to explicitly set the "
@@ -15682,7 +15711,7 @@ msgid "You can connect to the remote machine from your local machine."
 msgstr ""
 
 #: ../../source/docker/tutorial-deploy-on-multiple-machines.rst:32
-msgid "Ports ``9091`` and ``9093`` are accessible on the remote machine."
+msgid "Ports ``8000`` and ``9092`` are accessible on the remote machine."
 msgstr ""
 
 #: ../../source/docker/tutorial-deploy-on-multiple-machines.rst:36
@@ -15899,38 +15928,37 @@ msgstr "서버(SuperLink)"
 msgid "Open your terminal and run:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:85
+#: ../../source/docker/tutorial-quickstart-docker.rst:86
 msgid ""
-"``-p 9091:9091 -p 9092:9092 -p 9093:9093``: Map port ``9091``, ``9092`` "
-"and ``9093`` of the container to the same port of the host machine, "
-"allowing other services to access the Runtime API on "
-"``http://localhost:9091``, the Fleet API on ``http://localhost:9092`` and"
-" the Control API on ``http://localhost:9093``."
+"``-p 8000:8000 -p 9092:9092``: Map ports ``8000`` and ``9092`` of the "
+"container to the same port of the host machine, allowing other services "
+"to access the Runtime and Control APIs on ``http://localhost:8000`` and "
+"the Fleet API on ``localhost:9092``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:89
-#: ../../source/docker/tutorial-quickstart-docker.rst:131
-#: ../../source/docker/tutorial-quickstart-docker.rst:245
-#: ../../source/docker/tutorial-quickstart-docker.rst:283
+#: ../../source/docker/tutorial-quickstart-docker.rst:90
+#: ../../source/docker/tutorial-quickstart-docker.rst:134
+#: ../../source/docker/tutorial-quickstart-docker.rst:248
+#: ../../source/docker/tutorial-quickstart-docker.rst:286
 msgid ""
 "``--network flwr-network``: Make the container join the network named "
 "``flwr-network``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:90
+#: ../../source/docker/tutorial-quickstart-docker.rst:91
 msgid "``--name superlink``: Assign the name ``superlink`` to the container."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:91
-#: ../../source/docker/tutorial-quickstart-docker.rst:133
-#: ../../source/docker/tutorial-quickstart-docker.rst:247
-#: ../../source/docker/tutorial-quickstart-docker.rst:285
+#: ../../source/docker/tutorial-quickstart-docker.rst:92
+#: ../../source/docker/tutorial-quickstart-docker.rst:136
+#: ../../source/docker/tutorial-quickstart-docker.rst:250
+#: ../../source/docker/tutorial-quickstart-docker.rst:288
 msgid ""
 "``--detach``: Run the container in the background, freeing up the "
 "terminal."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:92
+#: ../../source/docker/tutorial-quickstart-docker.rst:93
 msgid ""
 ":substitution-code:`flwr/superlink:|stable_flwr_version|`: The name of "
 "the image to be run and the specific tag of the image. The tag "
@@ -15938,14 +15966,20 @@ msgid ""
 "version <pin-version>` of the image."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:94
-#: ../../source/docker/tutorial-quickstart-docker.rst:136
+#: ../../source/docker/tutorial-quickstart-docker.rst:95
+#: ../../source/docker/tutorial-quickstart-docker.rst:139
 msgid ""
 "``--insecure``: This flag tells the container to operate in an insecure "
 "mode, allowing unencrypted communication."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:96
+#: ../../source/docker/tutorial-quickstart-docker.rst:97
+msgid ""
+"``--host 0.0.0.0``: Make the Runtime and Control HTTP APIs reachable "
+"outside the container."
+msgstr ""
+
+#: ../../source/docker/tutorial-quickstart-docker.rst:99
 msgid ""
 "``--isolation process``: Tells the SuperLink that the ServerApp is "
 "executed by separate independent process. The SuperLink does not attempt "
@@ -15953,57 +15987,57 @@ msgid ""
 " :doc:`run-as-subprocess`."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:102
+#: ../../source/docker/tutorial-quickstart-docker.rst:105
 #, fuzzy
 msgid "Step 3: Start the SuperNodes"
 msgstr "서버(SuperLink)"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:104
+#: ../../source/docker/tutorial-quickstart-docker.rst:107
 msgid "Start two SuperNode containers."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:106
+#: ../../source/docker/tutorial-quickstart-docker.rst:109
 msgid "Start the first container:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:128
+#: ../../source/docker/tutorial-quickstart-docker.rst:131
 msgid ""
 "``-p 9094:9094``: Map port ``9094`` of the container to the same port of "
 "the host machine, allowing other services to access the SuperNode API on "
 "``http://localhost:9094``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:132
+#: ../../source/docker/tutorial-quickstart-docker.rst:135
 msgid "``--name supernode-1``: Assign the name ``supernode-1`` to the container."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:134
+#: ../../source/docker/tutorial-quickstart-docker.rst:137
 #, fuzzy
 msgid ""
 ":substitution-code:`flwr/supernode:|stable_flwr_version|`: This is the "
 "name of the image to be run and the specific tag of the image."
 msgstr "``flwr_supernode:0.0.1``: 사용할 Docker 이미지의 태그 이름입니다."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:138
+#: ../../source/docker/tutorial-quickstart-docker.rst:141
 msgid ""
 "``--superlink superlink:9092``: Connect to the SuperLink's Fleet API at "
 "the address ``superlink:9092``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:140
+#: ../../source/docker/tutorial-quickstart-docker.rst:143
 msgid ""
 "``--node-config \"partition-id=0 num-partitions=2\"``: Set the partition "
 "ID to ``0`` and the number of partitions to ``2`` for the SuperNode "
 "configuration."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:142
+#: ../../source/docker/tutorial-quickstart-docker.rst:145
 msgid ""
 "``--host 0.0.0.0``: Make the SuperNode Runtime API accessible outside the"
 " container."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:143
+#: ../../source/docker/tutorial-quickstart-docker.rst:146
 msgid ""
 "``--port 9094``: Set the port where the SuperNode listens for the "
 "ClientApp process. If multiple SuperNodes are started on the same "
@@ -16011,23 +16045,23 @@ msgid ""
 "next step, we set the second SuperNode container to listen on port 9095)"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:146
+#: ../../source/docker/tutorial-quickstart-docker.rst:149
 msgid ""
 "``--isolation process``: Tells the SuperNode that the ClientApp is "
 "executed by a separate independent process. The SuperNode does not "
 "attempt to execute it."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:149
+#: ../../source/docker/tutorial-quickstart-docker.rst:152
 msgid "Start the second container:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:169
+#: ../../source/docker/tutorial-quickstart-docker.rst:172
 #, fuzzy
 msgid "Step 4: Start the SuperExec to execute ServerApps"
 msgstr "서버(SuperLink)"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:171
+#: ../../source/docker/tutorial-quickstart-docker.rst:174
 msgid ""
 "The **SuperExec** Docker image comes with a pre-installed version of "
 "Flower and serves as a base for building your own image. Use a **single**"
@@ -16036,19 +16070,19 @@ msgid ""
 "corresponding processes on demand."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:176
+#: ../../source/docker/tutorial-quickstart-docker.rst:179
 msgid ""
 "When using SuperExec with the *serverapp* plugin, pass ``--runtime-api-"
 "address`` pointing to the SuperLink's **Runtime API** endpoint."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:179
+#: ../../source/docker/tutorial-quickstart-docker.rst:182
 msgid ""
 "Create a Dockerfile called ``superexec.Dockerfile`` and paste the "
 "following:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:181
+#: ../../source/docker/tutorial-quickstart-docker.rst:184
 #: ../../source/how-to-run-flower-on-gcp.rst
 #, fuzzy
 msgid "superexec.Dockerfile"
@@ -16059,7 +16093,7 @@ msgstr "SuperNode Dockerfile 만들기"
 msgid "Understand the Dockerfile"
 msgstr "SuperNode Dockerfile 만들기"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:197
+#: ../../source/docker/tutorial-quickstart-docker.rst:200
 #, fuzzy
 msgid ""
 ":substitution-code:`FROM flwr/superexec:|stable_flwr_version|`: This line"
@@ -16068,46 +16102,46 @@ msgid ""
 "code:`|stable_flwr_version|`."
 msgstr "다음 명령은 ``superlink:1.8.0`` 태그가 참조하는 현재 이미지 해시를 반환합니다:"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:199
+#: ../../source/docker/tutorial-quickstart-docker.rst:202
 msgid ""
 "``WORKDIR /app``: Set the working directory for the container to "
 "``/app``. Any subsequent commands that reference a directory will be "
 "relative to this directory."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:201
+#: ../../source/docker/tutorial-quickstart-docker.rst:204
 msgid ""
 "``COPY pyproject.toml .``: Copy the ``pyproject.toml`` file. from the "
 "current working directory into the container's ``/app`` directory."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:203
+#: ../../source/docker/tutorial-quickstart-docker.rst:206
 msgid ""
 "``RUN sed -i 's/.*flwr\\[simulation\\].*//' pyproject.toml``: Remove the "
 "``flwr`` dependency from the ``pyproject.toml``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:205
+#: ../../source/docker/tutorial-quickstart-docker.rst:208
 msgid ""
 "``python -m pip install -U --no-cache-dir .``: Run the ``pip`` install "
 "command to install the dependencies defined in the ``pyproject.toml`` "
 "file."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:208
+#: ../../source/docker/tutorial-quickstart-docker.rst:211
 msgid ""
 "The ``-U`` flag indicates that any existing packages should be upgraded, "
 "and ``--no-cache-dir`` prevents pip from using the cache to speed up the "
 "installation."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:210
+#: ../../source/docker/tutorial-quickstart-docker.rst:213
 msgid ""
 "``ENTRYPOINT [\"flower-superexec\"]``: Set the command ``flower-"
 "superexec`` to be the default command run when the container is started."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:215
+#: ../../source/docker/tutorial-quickstart-docker.rst:218
 msgid ""
 "Note that `flwr <https://pypi.org/project/flwr/>`__ is already installed "
 "in the ``flwr/superexec`` base image, so only other package dependencies "
@@ -16116,97 +16150,97 @@ msgid ""
 "after it has been copied into the Docker image (see line 5)."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:221
+#: ../../source/docker/tutorial-quickstart-docker.rst:224
 msgid ""
 "Afterward, in the directory that holds the Dockerfile, execute this "
 "Docker command to build the SuperExec image:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:228
+#: ../../source/docker/tutorial-quickstart-docker.rst:231
 #, fuzzy
 msgid "Start the **SuperExec for ServerApps** container:"
 msgstr "현재 클라이언트 속성입니다."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:246
+#: ../../source/docker/tutorial-quickstart-docker.rst:249
 msgid "``--name superexec-serverapp``: Give the container a descriptive name."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:248
-#: ../../source/docker/tutorial-quickstart-docker.rst:286
+#: ../../source/docker/tutorial-quickstart-docker.rst:251
+#: ../../source/docker/tutorial-quickstart-docker.rst:289
 #, fuzzy
 msgid ""
 "``flwr_superexec:0.0.1``: This is the name of the image to be run and the"
 " specific tag of the image."
 msgstr "``flwr_supernode:0.0.1``: 사용할 Docker 이미지의 태그 이름입니다."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:250
-#: ../../source/docker/tutorial-quickstart-docker.rst:288
+#: ../../source/docker/tutorial-quickstart-docker.rst:253
+#: ../../source/docker/tutorial-quickstart-docker.rst:291
 msgid ""
 "``--insecure``: This flag tells the container to operate in an insecure "
 "mode, allowing unencrypted communication. Secure connections will be "
 "added in future releases."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:252
+#: ../../source/docker/tutorial-quickstart-docker.rst:255
 msgid ""
 "``--plugin-type serverapp``: Load the *serverapp* plugin. SuperExec will "
 "spawn ServerApp processes as needed."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:254
+#: ../../source/docker/tutorial-quickstart-docker.rst:257
 msgid ""
-"``--runtime-api-address superlink:9091``: Connect to the SuperLink's "
-"Runtime API at the address ``superlink:9091``."
+"``--runtime-api-address superlink:8000``: Connect to the SuperLink's "
+"Runtime API at the address ``superlink:8000``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:259
+#: ../../source/docker/tutorial-quickstart-docker.rst:262
 #, fuzzy
 msgid "Step 5: Start the SuperExec to execute ClientApps"
 msgstr "서버(SuperLink)"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:261
+#: ../../source/docker/tutorial-quickstart-docker.rst:264
 msgid ""
 "For ClientApps, reuse the **same** image and change the plugin and API "
 "address. When using the *clientapp* plugin, pass ``--runtime-api-"
 "address`` pointing to the SuperNode's **Runtime API** endpoint."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:265
+#: ../../source/docker/tutorial-quickstart-docker.rst:268
 msgid "(No new Dockerfile is needed; reuse ``flwr_superexec:0.0.1``.)"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:266
+#: ../../source/docker/tutorial-quickstart-docker.rst:269
 #, fuzzy
 msgid "Start the first **SuperExec for ClientApps** container:"
 msgstr "현재 클라이언트 속성입니다."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:284
+#: ../../source/docker/tutorial-quickstart-docker.rst:287
 msgid "``--name superexec-clientapp-1``: Give the container a descriptive name."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:290
+#: ../../source/docker/tutorial-quickstart-docker.rst:293
 msgid ""
 "``--plugin-type clientapp``: Load the *clientapp* plugin. SuperExec will "
 "spawn ClientApp processes as needed."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:292
+#: ../../source/docker/tutorial-quickstart-docker.rst:295
 msgid ""
 "``--runtime-api-address supernode-1:9094``: Connect to the SuperNode's "
 "Runtime API at the address ``supernode-1:9094``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:295
+#: ../../source/docker/tutorial-quickstart-docker.rst:298
 #, fuzzy
 msgid "Start the second **SuperExec for ClientApps** container:"
 msgstr "현재 클라이언트 속성입니다."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:310
+#: ../../source/docker/tutorial-quickstart-docker.rst:313
 msgid "Step 6: Run the Quickstart Project"
 msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:94
-#: ../../source/docker/tutorial-quickstart-docker.rst:312
+#: ../../source/docker/tutorial-quickstart-docker.rst:315
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:198
 msgid ""
 "Find the Flower Configuration TOML file in your machine. This file is "
@@ -16215,87 +16249,87 @@ msgid ""
 "as the path to the configuration file."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:326
+#: ../../source/docker/tutorial-quickstart-docker.rst:329
 #, fuzzy
 msgid ""
 "Add the following lines to the ``config.toml`` to add a new SuperLink "
 "connection:"
 msgstr "``pyproject.toml``에 다음 버전 제약 조건을 설정했는지 확인하세요:"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:335
+#: ../../source/docker/tutorial-quickstart-docker.rst:338
 msgid ""
 "Run the ``quickstart-pytorch`` project and follow the ServerApp logs to "
 "track the execution of the run:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:344
+#: ../../source/docker/tutorial-quickstart-docker.rst:347
 msgid "Step 7: Update the Application"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:346
+#: ../../source/docker/tutorial-quickstart-docker.rst:349
 msgid ""
 "Change the application code. For example, change the ``seed`` in "
 "``pytorchexample/task.py`` to ``43`` and save it:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:349
+#: ../../source/docker/tutorial-quickstart-docker.rst:352
 msgid "pytorchexample/task.py"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:356
+#: ../../source/docker/tutorial-quickstart-docker.rst:359
 #, fuzzy
 msgid "Stop the running containers:"
 msgstr "이미 *서버*를 시작할 수 있습니다:"
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:148
-#: ../../source/docker/tutorial-quickstart-docker.rst:360
+#: ../../source/docker/tutorial-quickstart-docker.rst:363
 msgid ""
 "If you have modified the dependencies listed in your ``pyproject.toml`` "
 "file, it is essential to rebuild images."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:363
+#: ../../source/docker/tutorial-quickstart-docker.rst:366
 msgid "If you haven't made any changes, you can skip steps 2 through 4."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:369
+#: ../../source/docker/tutorial-quickstart-docker.rst:372
 #, fuzzy
 msgid "Rebuild the SuperExec image:"
 msgstr "기본 이미지 빌드"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:375
+#: ../../source/docker/tutorial-quickstart-docker.rst:378
 msgid ""
 "Launch **one SuperExec container** for the new ServerApp and **two "
 "SuperExec containers** for the new ClientApps:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:405
+#: ../../source/docker/tutorial-quickstart-docker.rst:408
 msgid "Run the updated project:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:413
+#: ../../source/docker/tutorial-quickstart-docker.rst:416
 msgid "Step 8: Clean Up"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:415
+#: ../../source/docker/tutorial-quickstart-docker.rst:418
 msgid "Remove the containers and the bridge network:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:436
-#: ../../source/docker/tutorial-quickstart-docker.rst:427
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:447
+#: ../../source/docker/tutorial-quickstart-docker.rst:430
 #, fuzzy
 msgid "Where to Go Next"
 msgstr "시작 위치"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:429
+#: ../../source/docker/tutorial-quickstart-docker.rst:432
 msgid ":doc:`enable-tls`"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:430
+#: ../../source/docker/tutorial-quickstart-docker.rst:433
 msgid ":doc:`persist-superlink-state`"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:431
+#: ../../source/docker/tutorial-quickstart-docker.rst:434
 msgid ":doc:`tutorial-quickstart-docker-compose`"
 msgstr ""
 
@@ -16506,7 +16540,7 @@ msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:208
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:263
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:402
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:413
 #, fuzzy
 msgid "Rerun the ``quickstart-pytorch`` project:"
 msgstr "빠른 시작 튜토리얼"
@@ -16588,45 +16622,45 @@ msgid ""
 msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:373
-msgid "Comment out the lines 2-6 and uncomment the lines 7-13:"
+msgid "Comment out the first ``command`` block and uncomment the second one:"
 msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:375
 msgid "with-state.yml"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:396
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:407
 #, fuzzy
 msgid "Restart the services:"
 msgstr "이미 *서버*를 시작할 수 있습니다:"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:410
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:421
 msgid "Step 9: Merge Multiple Compose Files"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:412
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:423
 msgid ""
 "You can merge multiple Compose files into a single file. For instance, if"
 " you wish to combine the basic configuration with the TLS configuration, "
 "execute the following command:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:421
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:432
 msgid ""
 "This will merge the contents of ``compose.yml`` and ``with-tls.yml`` into"
 " a new file called ``my_compose.yml``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:426
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:437
 msgid "Step 10: Clean Up"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:428
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:439
 #, fuzzy
 msgid "Remove all services and volumes:"
 msgstr "R에서 모든 항목을 제거합니다."
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:438
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:449
 #, fuzzy
 msgid ":doc:`run-quickstart-examples-docker-compose`"
 msgstr "빠른 시작 튜토리얼"
@@ -23128,6 +23162,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-connect-supernodes-to-supergrid.rst:19
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:21
 msgid "You will need:"
 msgstr ""
 
@@ -23725,6 +23760,264 @@ msgid ""
 msgstr ""
 "Archivez une fédération lorsque un projet ou une collaboration est "
 "terminé. Seul le propriétaire de la fédération peut l'archiver."
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:-1
+msgid ""
+"Deploy Flower SuperNodes as Slurm jobs with subprocess isolation, process"
+" isolation, or GPU resources."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:7
+msgid "Deploy SuperNodes using Slurm"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:9
+msgid ""
+"This guide shows how to deploy a SuperNode as a Slurm job with one of "
+"four deployment patterns:"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:12
+msgid "Default ``subprocess`` isolation"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:13
+msgid "``process`` isolation with a separate SuperExec"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:14
+msgid "``process`` isolation with a GPU-enabled SuperExec"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:15
+msgid "``process`` isolation with scheduler-selected nodes"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:17
+msgid ""
+"Each example connects a SuperNode to SuperGrid. Before you continue, "
+"register a separate key pair for every SuperNode that you plan to deploy."
+" See :doc:`Connect SuperNodes to SuperGrid <how-to-connect-supernodes-to-"
+"supergrid>` for instructions."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:23
+msgid "Access to a Slurm cluster and a compute partition"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:24
+msgid ":doc:`Flower installed <how-to-install-flower>` on the compute nodes"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:25
+#, fuzzy
+msgid "A registered SuperNode private key that is readable from the compute node"
+msgstr "SuperNodes 인증하기"
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:26
+msgid "All ClientApp dependencies installed in the execution environment"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:28
+msgid ""
+"In the examples, replace each value in angle brackets with the "
+"corresponding value for your cluster. The first two process-isolation "
+"examples select one compute node that can run both jobs at the same time."
+" The final example lets Slurm place each job."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:34
+msgid ""
+"You can install ClientApp dependencies in advance or let Flower install "
+"them when an app starts. For the available options and their network "
+"requirements, see :doc:`Install Flower App dependencies at runtime <how-"
+"to-install-app-dependencies-at-runtime>`."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:41
+msgid "Use default subprocess isolation"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:43
+msgid ""
+"By default, the SuperNode starts each ClientApp as a subprocess. This "
+"model needs only one Slurm job, and the command does not require an "
+"``--isolation`` option."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:46
+msgid "Create ``supernode-subprocess.sbatch``:"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:68
+msgid "Submit the batch script to deploy the SuperNode:"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:74
+msgid ""
+"Each ClientApp process that the SuperNode starts can use the CPU and "
+"memory assigned to this job."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:79
+msgid "Use process isolation"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:81
+msgid ""
+"With ``process`` isolation, Slurm manages the SuperNode and SuperExec as "
+"separate jobs. The SuperNode receives tasks from SuperGrid, while the "
+"SuperExec connects to the SuperNode Runtime API and starts the ClientApp "
+"processes."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:85
+msgid ""
+"The Runtime API in this example listens on ``127.0.0.1``, so both jobs "
+"must use the same compute node."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:90
+msgid ""
+"The process-isolation examples below are minimal configurations for a "
+"dedicated or otherwise trusted compute node. On a multi-tenant node, "
+"binding the Runtime API to ``127.0.0.1`` does not prevent other local "
+"jobs from connecting to it. Another local process could claim ClientApp "
+"tasks and access their inputs. Do not use these examples unchanged on a "
+"shared or production compute node. Security hardening for those "
+"environments is outside the scope of this guide."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:97
+msgid "Create ``supernode-process.sbatch``:"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:123
+msgid "Create ``superexec-clientapp.sbatch``:"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:156
+msgid "Submit the SuperNode job first, then submit the SuperExec job:"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:163
+msgid ""
+"The SuperExec waits for ClientApp tasks from the SuperNode. The ClientApp"
+" processes inherit the CPU and memory allocation of the SuperExec job."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:168
+msgid ""
+"``--insecure`` applies only to the local Runtime API connection between "
+"SuperExec and SuperNode. The connection from SuperNode to SuperGrid still"
+" uses TLS. To protect Runtime API traffic outside a trusted host, "
+"configure TLS as described in :doc:`Enable TLS connections <how-to-"
+"enable-tls-connections>`."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:175
+msgid "Use process isolation with a GPU ClientApp"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:177
+msgid ""
+"To run a ClientApp on a GPU, use the ``supernode-process.sbatch`` script "
+"from the previous section without adding a GPU request. The SuperNode "
+"coordinates the work but does not execute the ClientApp, so it does not "
+"need access to the GPU."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:181
+msgid ""
+"Request the GPU only in the SuperExec job. The ClientApp process then "
+"inherits the SuperExec environment, including ``CUDA_VISIBLE_DEVICES``. "
+"Configure both batch scripts with the same ``<partition>`` and "
+"``<compute-node>`` values so that they run together on the GPU-capable "
+"node."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:186
+msgid "Create ``superexec-clientapp-gpu.sbatch``:"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:225
+msgid ""
+"Submit the unchanged process-isolated SuperNode job first, then submit "
+"the GPU SuperExec job:"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:233
+msgid ""
+"The ClientApp environment must include a GPU-enabled version of its "
+"machine learning framework and the required GPU libraries. For example, a"
+" PyTorch ClientApp can use the device that Slurm exposes through "
+"``CUDA_VISIBLE_DEVICES``."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:239
+msgid "Discover the SuperNode address from its job ID"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:241
+msgid ""
+"The preceding process-isolation examples use ``--nodelist`` to place both"
+" jobs on the same node. You can remove this constraint when the compute "
+"nodes can reach each other. In this model, a submission script passes the"
+" SuperNode job ID to a dependent SuperExec job. After the SuperNode "
+"starts, SuperExec uses that ID to discover the assigned node's address."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:247
+msgid "Create ``supernode-process-dynamic.sbatch``:"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:272
+msgid ""
+"The SuperNode listens on all network interfaces because Slurm can place "
+"SuperExec on a different node. Create ``superexec-clientapp-"
+"dynamic.sbatch`` without a ``--nodelist`` directive:"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:334
+msgid ""
+"This example requests one GPU for SuperExec. Remove ``#SBATCH "
+"--gres=gpu:1`` when the ClientApp does not need a GPU."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:337
+msgid "Create ``submit-process-pair.sh`` to submit both jobs:"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:357
+msgid "Run the submission script:"
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:363
+msgid ""
+"The first ``sbatch`` command returns the SuperNode job ID. The second job"
+" uses an ``after:<job-id>`` dependency, so Slurm holds it until the "
+"SuperNode job starts. The SuperExec script then uses ``squeue`` and "
+"``scontrol`` to resolve the assigned ``NodeAddr``. The short readiness "
+"loop accounts for the time between job startup and the Runtime API "
+"becoming available."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:371
+msgid ""
+"This minimal example exposes an unauthenticated and unencrypted Runtime "
+"API on the compute-node network. Use it only in a trusted, isolated test "
+"environment. Do not use it unchanged on a shared or production cluster. "
+"Security hardening for those environments is outside the scope of this "
+"guide."
+msgstr ""
+
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:376
+msgid ""
+"For more information about the two isolation modes and the Runtime API, "
+"see :doc:`Flower Network Communication <ref-flower-network-"
+"communication>`. After the SuperNode is online, see :doc:`Run Flower Apps"
+" on SuperGrid <how-to-run-flower-apps-on-supergrid>`."
+msgstr ""
 
 #: ../../source/how-to-design-stateful-clients.rst:-1
 msgid ""
@@ -41305,7 +41598,9 @@ msgid "Implemented based on: https://arxiv.org/abs/1803.01498"
 msgstr ""
 
 #: flwr.server.strategy.fedtrimmedavg.FedTrimmedAvg:25 of
-msgid "Fraction to cut off of both tails of the distribution. Defaults to 0.2."
+msgid ""
+"Fraction to cut off of both tails of the distribution. Must be in the "
+"range ``[0, 0.5)``. Defaults to 0.2."
 msgstr ""
 
 #: flwr.server.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
@@ -44856,7 +45151,9 @@ msgid ":py:obj:`summary <flwr.serverapp.strategy.FedProx.summary>`\\ \\(\\)"
 msgstr ":py:obj:`flwr.server <flwr.server>`\\"
 
 #: flwr.serverapp.strategy.fedtrimmedavg.FedTrimmedAvg:36 of
-msgid "Fraction to cut off of both tails of the distribution."
+msgid ""
+"Fraction to cut off of both tails of the distribution. Must be in the "
+"range ``[0, 0.5)``."
 msgstr ""
 
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
@@ -87940,5 +88237,32 @@ msgstr ""
 #~ "SuperExec should connect to. In this "
 #~ "example, ``127.0.0.1:9091`` is the SuperLink's"
 #~ " Runtime API."
+#~ msgstr ""
+
+#~ msgid "Ports ``9091`` and ``9093`` are accessible on the remote machine."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``-p 9091:9091 -p 9092:9092 -p "
+#~ "9093:9093``: Map port ``9091``, ``9092`` "
+#~ "and ``9093`` of the container to "
+#~ "the same port of the host machine,"
+#~ " allowing other services to access "
+#~ "the Runtime API on ``http://localhost:9091``,"
+#~ " the Fleet API on ``http://localhost:9092``"
+#~ " and the Control API on "
+#~ "``http://localhost:9093``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``--runtime-api-address superlink:9091``: "
+#~ "Connect to the SuperLink's Runtime API"
+#~ " at the address ``superlink:9091``."
+#~ msgstr ""
+
+#~ msgid "Comment out the lines 2-6 and uncomment the lines 7-13:"
+#~ msgstr ""
+
+#~ msgid "Fraction to cut off of both tails of the distribution."
 #~ msgstr ""
 
