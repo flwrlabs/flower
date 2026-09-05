@@ -492,8 +492,8 @@ def flower_superlink() -> None:
 
     event(EventType.RUN_SUPERLINK_ENTER)
 
-    # Blocking: FastAPI serves Runtime HTTP while its lifespan owns the Fleet
-    # gRPC server and, when enabled, the gRPC Control API server.
+    # Blocking: FastAPI serves the Runtime and Control HTTP APIs while its lifespan
+    # owns the Fleet gRPC server and, when enabled, the gRPC Control API server.
     _run_superlink_http_api(lifespan_config=config)
 
 
