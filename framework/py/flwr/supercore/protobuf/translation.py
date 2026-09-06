@@ -259,7 +259,9 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
 
         # Synchronous generators and other iterables are streamed lazily too.
         # Starlette advances a synchronous iterator outside the event loop.
-        if isinstance(result, Iterable):
+        if isinstance(result, Iterable) and not isinstance(
+            result, (str, bytes, bytearray, memoryview)
+        ):
             content = (
                 frame_message(message) for message in cast(Iterable[Message], result)
             )
