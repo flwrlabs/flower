@@ -1,0 +1,23 @@
+[project]
+name = "quickstart-cpp"
+version = "1.0.0"
+description = "Flower C++ quickstart example with synthetic linear regression"
+dependencies = [
+  "flwr>=1.31.0,<2.0.0",
+  "numpy>=1.24.0",
+]
+requires-python = ">=3.10"
+
+[tool.flwr.app]
+publisher = "flower"
+
+[tool.flwr.app.components]
+serverapp = "server:app"
+clientapp = "client:app"
+
+[tool.flwr.federations]
+default = "local-deployment"
+
+[tool.flwr.federations.local-deployment]
+address = "127.0.0.1:9093"
+insecure = true
