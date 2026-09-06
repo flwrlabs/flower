@@ -14,7 +14,6 @@
 # ==============================================================================
 """Load SuperLink configuration and config-driven components."""
 
-
 import os
 import sys
 from dataclasses import dataclass
@@ -31,7 +30,6 @@ from flwr.superlink.federation import FederationManager, NoOpFederationManager
 try:
     from flwr.ee import (
         get_control_authn_ee_plugins,
-        get_ee_federation_manager,
         get_ee_linkstate_factory,
         get_ee_objectstore_factory,
     )
@@ -40,10 +38,6 @@ except ImportError:
     def get_control_authn_ee_plugins() -> dict[str, type[ControlAuthnPlugin]]:
         """Return all Control API authentication plugins for EE."""
         return {}
-
-    def get_ee_federation_manager() -> FederationManager:
-        """Return the EE FederationManager."""
-        raise NotImplementedError("No federation manager is currently supported.")
 
     def get_ee_objectstore_factory(database: str) -> ObjectStoreFactory:
         """Return an EE ObjectStoreFactory for supported non-SQLite database URLs."""
@@ -56,6 +50,17 @@ except ImportError:
     ) -> LinkStateFactory:
         """Return an EE LinkStateFactory for supported non-SQLite database URLs."""
         raise NotImplementedError("No additional state backends are supported.")
+
+
+try:
+    from flwr.sgxt import get_sgxt_federation_manager
+except ModuleNotFoundError as exc:
+    if exc.name != "flwr.sgxt":
+        raise
+
+    def get_sgxt_federation_manager() -> FederationManager:
+        """Return the SGXT FederationManager."""
+        raise NotImplementedError("No federation manager is currently supported.")
 
 
 @dataclass
@@ -122,7 +127,7 @@ def load_control_event_log_plugin() -> EventLogWriterPlugin:
 def get_federation_manager(is_simulation: bool = False) -> FederationManager:
     """Return the FederationManager."""
     try:
-        federation_manager: FederationManager = get_ee_federation_manager()
+        federation_manager: FederationManager = get_sgxt_federation_manager()
         return federation_manager
     except NotImplementedError:
         return NoOpFederationManager(simulation=is_simulation)
