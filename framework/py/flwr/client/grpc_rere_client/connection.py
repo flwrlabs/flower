@@ -19,6 +19,7 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from logging import ERROR
 from pathlib import Path
+from typing import cast
 
 import grpc
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -36,6 +37,7 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
     ActivateNodeResponse,
     DeactivateNodeRequest,
+    FleetPushTaskEventsRequest,
     PullMessagesRequest,
     PullMessagesResponse,
     PushMessagesRequest,
@@ -51,6 +53,7 @@ from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.fab import Fab
 from flwr.supercore.grpc import (
@@ -84,6 +87,9 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         tuple[ec.EllipticCurvePrivateKey, ec.EllipticCurvePublicKey] | None
     ) = None,
     adapter_cls: type[FleetStub] | type[GrpcAdapter] | None = None,
+    on_task_events_ready: (
+        Callable[[Callable[[int, Sequence[TaskEvent]], None]], None] | None
+    ) = None,
 ) -> Iterator[
     tuple[
         int,
@@ -334,7 +340,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
             node=node,
             run_id=run_id,
         )
-        return fn(object_id)
+        return cast(bytes, fn(object_id))
 
     def push_object(
         run_id: int, session_id: str, object_id: str, contents: bytes
@@ -364,6 +370,19 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
             run_id=run_id,
         )
         fn(object_id)
+
+    def push_task_events(run_id: int, events: Sequence[TaskEvent]) -> None:
+        """Push lifecycle events produced by the current ClientApp task."""
+        if node is None:
+            raise RuntimeError("Node instance missing")
+        if not events:
+            return
+        stub.PushTaskEvents(
+            FleetPushTaskEventsRequest(node=node, run_id=run_id, events=events)
+        )
+
+    if on_task_events_ready is not None:
+        on_task_events_ready(push_task_events)
 
     try:
         if self_registered:

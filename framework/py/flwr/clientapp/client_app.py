@@ -16,6 +16,8 @@
 
 
 import inspect
+import math
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
@@ -27,12 +29,34 @@ from flwr.client.message_handler.message_handler import (
     handle_legacy_message_from_msgtype,
 )
 from flwr.client.mod.utils import make_ffn
+from flwr.common.fl_event import (
+    FL_NODE_EVALUATE_COMPLETED,
+    FL_NODE_EVALUATE_FAILED,
+    FL_NODE_EVALUATE_STARTED,
+    FL_NODE_FIT_COMPLETED,
+    FL_NODE_FIT_FAILED,
+    FL_NODE_FIT_STARTED,
+    make_task_event,
+)
 from flwr.compat.client.client import Client
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.logger import warn_deprecated_feature
+from flwr.supercore.typing import JSONValue
 
 from .typing import ClientAppCallable, Mod
 
 DEFAULT_ACTION = "default"
+_NODE_METRIC_NAMES = frozenset(
+    {
+        "accuracy",
+        "loss",
+        "num_examples",
+        "train_accuracy",
+        "train_loss",
+        "val_accuracy",
+        "val_loss",
+    }
+)
 
 
 def _alert_erroneous_client_fn() -> None:
@@ -69,7 +93,7 @@ def _inspect_maybe_adapt_client_fn_signature(client_fn: ClientFnExt) -> ClientFn
             # if patition-id is defined, pass it. Else pass node_id that should
             # always be defined during Context init.
             cid = context.node_config.get("partition-id", context.node_id)
-            return client_fn(str(cid))  # type: ignore
+            return client_fn(str(cid))
 
         return adaptor_fn
 
@@ -81,12 +105,41 @@ def _empty_lifespan(_: Context) -> Iterator[None]:
     yield
 
 
+def _parse_server_round(group_id: str) -> int | None:
+    """Parse a group ID string as a server round number."""
+    try:
+        return int(group_id)
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_node_metrics(message: Message) -> dict[str, JSONValue]:
+    """Return a safe, small subset of scalar metrics from a ClientApp reply."""
+    metrics: dict[str, JSONValue] = {}
+    records = (
+        *message.content.metric_records.values(),
+        *message.content.config_records.values(),
+    )
+    for record in records:
+        for name in _NODE_METRIC_NAMES:
+            if name in metrics or (value := record.get(name)) is None:
+                continue
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            if math.isfinite(value):
+                metrics[name] = value
+    return metrics
+
+
 class ClientAppException(Exception):
     """Exception raised when an exception is raised while executing a ClientApp."""
 
-    def __init__(self, message: str):
+    def __init__(
+        self, message: str, task_events: list[TaskEvent] | None = None
+    ) -> None:
         ex_name = self.__class__.__name__
         self.message = f"\nException {ex_name} occurred. Message: " + message
+        self.task_events = task_events or []
         super().__init__(self.message)
 
 
@@ -111,9 +164,11 @@ class ClientApp:
         self,
         client_fn: ClientFnExt | None = None,  # Only for backward compatibility
         mods: list[Mod] | None = None,
+        event_callback: Callable[[TaskEvent], None] | None = None,
     ) -> None:
         self._mods: list[Mod] = mods if mods is not None else []
         self._registered_funcs: dict[str, ClientAppCallable] = {}
+        self._event_callback: Callable[[TaskEvent], None] | None = event_callback
 
         # Create wrapper function for `handle`
         self._call: ClientAppCallable | None = None
@@ -125,10 +180,9 @@ class ClientApp:
                 message: Message,
                 context: Context,
             ) -> Message:  # pylint: disable=invalid-name
-                out_message = handle_legacy_message_from_msgtype(
+                return handle_legacy_message_from_msgtype(
                     client_fn=client_fn, message=message, context=context
                 )
-                return out_message
 
             # Wrap mods around the wrapped handle function
             self._call = make_ffn(ffn, mods if mods is not None else [])
@@ -138,6 +192,10 @@ class ClientApp:
 
     def __call__(self, message: Message, context: Context) -> Message:
         """Execute `ClientApp`."""
+        return self._call_with_lifecycle_event(message, self._execute, context)
+
+    def _execute(self, message: Message, context: Context) -> Message:
+        """Execute the handler, including the ClientApp lifespan."""
         with self._lifespan(context):
             # Execute message using `client_fn`
             if self._call:
@@ -161,6 +219,102 @@ class ClientApp:
                 return self._registered_funcs[full_name](message, context)
 
             raise ValueError(f"No {category} function registered with name '{action}'")
+
+    def _call_with_lifecycle_event(
+        self,
+        message: Message,
+        call: ClientAppCallable,
+        context: Context,
+    ) -> Message:
+        """Execute a train or evaluate handler and emit its lifecycle events."""
+        event_names = {
+            MessageType.TRAIN: (
+                FL_NODE_FIT_STARTED,
+                FL_NODE_FIT_COMPLETED,
+                FL_NODE_FIT_FAILED,
+            ),
+            MessageType.EVALUATE: (
+                FL_NODE_EVALUATE_STARTED,
+                FL_NODE_EVALUATE_COMPLETED,
+                FL_NODE_EVALUATE_FAILED,
+            ),
+        }
+        events = event_names.get(message.metadata.message_type.split(".")[0])
+        if events is None:
+            return call(message, context)
+
+        node_id = message.metadata.dst_node_id
+        server_round = _parse_server_round(message.metadata.group_id)
+        self._emit_event(events[0], node_id=node_id, server_round=server_round)
+        started_at = time.perf_counter()
+        try:
+            result = call(message, context)
+        except Exception:
+            self._emit_event(
+                events[2],
+                node_id=node_id,
+                server_round=server_round,
+                metadata={
+                    "error": "execution_failed",
+                    "elapsed_time": time.perf_counter() - started_at,
+                },
+            )
+            raise
+        if result.has_error():
+            self._emit_event(
+                events[2],
+                node_id=node_id,
+                server_round=server_round,
+                metadata={
+                    "error": "execution_failed",
+                    "elapsed_time": time.perf_counter() - started_at,
+                },
+            )
+            return result
+        try:
+            metrics = _extract_node_metrics(result)
+        except Exception:  # pylint: disable=broad-exception-caught
+            metrics = {}
+        metrics["elapsed_time"] = time.perf_counter() - started_at
+        self._emit_event(
+            events[1],
+            node_id=node_id,
+            server_round=server_round,
+            metadata=metrics,
+        )
+        return result
+
+    def _emit_event(
+        self,
+        event: str,
+        *,
+        node_id: int | None,
+        server_round: int | None,
+        metadata: dict[str, JSONValue] | None = None,
+    ) -> None:
+        """Emit an event without allowing delivery failures to affect the task."""
+        if self._event_callback is None:
+            return
+        try:
+            self._event_callback(
+                make_task_event(
+                    event,
+                    node_id=node_id,
+                    server_round=server_round,
+                    metadata=metadata,
+                )
+            )
+        except Exception:  # pylint: disable=broad-exception-caught
+            # Lifecycle event delivery is observational and must be best-effort.
+            pass
+
+    def set_event_callback(self, callback: Callable[[TaskEvent], None] | None) -> None:
+        """Set the callback used to deliver lifecycle events."""
+        self._event_callback = callback
+
+    def get_event_callback(self) -> Callable[[TaskEvent], None] | None:
+        """Return the callback used to deliver lifecycle events."""
+        return self._event_callback
 
     def train(
         self, action: str = DEFAULT_ACTION, *, mods: list[Mod] | None = None

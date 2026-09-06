@@ -22,6 +22,7 @@ import "flwr/proto/node.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/fab.proto";
 import "flwr/proto/message.proto";
+import "flwr/proto/task.proto";
 
 service Fleet {
   // Register Node
@@ -65,6 +66,10 @@ service Fleet {
   // Confirm Message Received
   rpc ConfirmMessageReceived(ConfirmMessageReceivedRequest)
       returns (ConfirmMessageReceivedResponse) {}
+
+  // Push lifecycle events produced by a SuperNode task.
+  rpc PushTaskEvents(FleetPushTaskEventsRequest)
+      returns (FleetPushTaskEventsResponse) {}
 }
 
 // RegisterNode messages (add prefix to avoid name clash)
@@ -112,3 +117,10 @@ message PushMessagesResponse {
 }
 
 message Reconnect { uint64 reconnect = 1; }
+
+message FleetPushTaskEventsRequest {
+  Node node = 1;
+  uint64 run_id = 2;
+  repeated TaskEvent events = 3;
+}
+message FleetPushTaskEventsResponse {}

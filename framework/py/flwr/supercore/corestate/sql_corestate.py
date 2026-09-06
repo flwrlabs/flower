@@ -1589,19 +1589,41 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return False
 
         current = now()
-        event_rows = [
-            {
-                "timestamp": current,
-                "run_id": uint64_to_int64(event.run_id),
-                "task_id": uint64_to_int64(event.task_id),
-                "event": event.event,
-                "data": event.data,
-            }
-            for event in events
-        ]
-
         with self.session() as session:
-            session.execute(insert(TaskEventModel), event_rows)
+            event_rows = []
+            seen: set[tuple[int, int, str, str]] = set()
+            for event in events:
+                key = (
+                    uint64_to_int64(event.run_id),
+                    uint64_to_int64(event.task_id),
+                    event.event,
+                    event.data,
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                exists = session.scalar(
+                    select(TaskEventModel.id)
+                    .where(
+                        TaskEventModel.run_id == key[0],
+                        TaskEventModel.task_id == key[1],
+                        TaskEventModel.event == key[2],
+                        TaskEventModel.data == key[3],
+                    )
+                    .limit(1)
+                )
+                if exists is None:
+                    event_rows.append(
+                        {
+                            "timestamp": current,
+                            "run_id": key[0],
+                            "task_id": key[1],
+                            "event": key[2],
+                            "data": key[3],
+                        }
+                    )
+            if event_rows:
+                session.execute(insert(TaskEventModel), event_rows)
 
         return True
 
