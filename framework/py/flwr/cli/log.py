@@ -19,6 +19,7 @@ from logging import DEBUG, INFO
 from typing import Annotated
 
 import click
+import httpx
 import typer
 
 from flwr.cli.config_migration import migrate, warn_if_federation_config_overrides
@@ -30,6 +31,8 @@ from flwr.supercore import log as logger
 from flwr.supercore.control import ControlHttpClient
 
 from .utils import flwr_cli_exc_handler, init_http_client_from_connection
+
+_SHOW_LOGS_TIMEOUT = 5.0
 
 
 class AllLogsRetrieved(BaseException):
@@ -112,9 +115,12 @@ def print_logs(run_id: int, stub: ControlHttpClient) -> None:
     req = StreamLogsRequest(run_id=run_id, after_timestamp=0.0)
 
     with flwr_cli_exc_handler():
-        for res in stub.StreamLogs(req):
-            print(res.log_output)
-            break
+        try:
+            for res in stub.StreamLogs(req, read_timeout=_SHOW_LOGS_TIMEOUT):
+                print(res.log_output)
+                break
+        except httpx.ReadTimeout:
+            pass
 
 
 def log(

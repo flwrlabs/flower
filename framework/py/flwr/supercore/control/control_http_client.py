@@ -152,7 +152,7 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
         )
 
     def StreamLogs(
-        self, request: StreamLogsRequest
+        self, request: StreamLogsRequest, *, read_timeout: float | None = None
     ) -> Generator[StreamLogsResponse, None, None]:
         """Stream logs for a run."""
         return self._unary_stream(
@@ -160,6 +160,7 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/StreamLogs",
             request=request,
             response_type=StreamLogsResponse,
+            read_timeout=read_timeout,
         )
 
     def ListRuns(self, request: ListRunsRequest) -> ListRunsResponse:

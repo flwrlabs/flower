@@ -206,19 +206,18 @@ class ProtobufClient:
         rpc_method: str,
         request: Message,
         response_type: type[ResponseT],
+        read_timeout: float | None = None,
     ) -> Generator[ResponseT, None, None]:
         """Send a unary request and iterate over its streaming response."""
         path = path if path.startswith("/") else f"/{path}"
         content = request.SerializeToString(deterministic=True)
 
-        # Streaming requests intentionally have no read timeout. Add an overall
-        # deadline when Control API deadline and cancellation semantics are introduced.
         def send() -> httpx.Response:
             # Build a fresh request for every attempt so interceptors can safely
             # mutate it without leaking state into a retry.
             stream_timeout = httpx.Timeout(
                 connect=self._client.timeout.connect,
-                read=None,
+                read=read_timeout,
                 write=self._client.timeout.write,
                 pool=self._client.timeout.pool,
             )
@@ -312,14 +311,18 @@ class ProtobufClient:
             if stream:
                 # Bound response establishment and error-body reads.
                 timeout = current_context.request.extensions["timeout"]
-                timeout["read"] = self._client.timeout.read
-                response = self._client.send(current_context.request, stream=True)
-                if response.is_error:
-                    # Let response-side interceptors inspect a bounded error payload.
-                    response = _buffer_error_response(response)
-                else:
-                    timeout["read"] = None
-                return response
+                stream_read_timeout = timeout["read"]
+                if stream_read_timeout is None:
+                    timeout["read"] = self._client.timeout.read
+                try:
+                    response = self._client.send(current_context.request, stream=True)
+                    if response.is_error:
+                        # Let response-side interceptors inspect a bounded
+                        # error payload.
+                        response = _buffer_error_response(response)
+                    return response
+                finally:
+                    timeout["read"] = stream_read_timeout
             return self._client.send(current_context.request)
 
         call_next: ProtobufCall = send
