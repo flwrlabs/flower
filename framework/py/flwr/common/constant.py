@@ -71,6 +71,7 @@ FAB_EXCLUDE_KEY = "fab-exclude"
 # FAB file include patterns (gitignore-style patterns)
 FAB_INCLUDE_PATTERNS = (
     "**/*.py",
+    "**/*.m",
     "**/*.toml",
     "**/*.md",
     "**/*.yaml",

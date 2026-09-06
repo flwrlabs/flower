@@ -94,6 +94,7 @@ RUN_SERIES_DESCRIPTION_MAX_LENGTH = 80
 APP_PUBLISH_ALLOWED_LICENSE_FILES = ("LICENSE", "LICENSE.md")
 APP_PUBLISH_INCLUDE_PATTERNS = (
     "**/*.py",
+    "**/*.m",
     "**/*.toml",
     "**/*.md",
     "**/*.yaml",

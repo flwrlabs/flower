@@ -207,6 +207,7 @@ binary files) is not a recognised FAB file type and cannot be included:
     **/*.yml       YAML configuration files (alternate extension)
     **/*.json      JSON data files
     **/*.jsonl     JSON Lines data files
+    **/*.m         MATLAB source files
     /LICENSE       Top-level license file
 
 **Always excluded** (``FAB_EXCLUDE_PATTERNS``):
