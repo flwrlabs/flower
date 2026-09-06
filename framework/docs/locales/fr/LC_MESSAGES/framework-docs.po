@@ -21509,12 +21509,12 @@ msgstr "Comprendre la commande"
 #: ../../source/docker/enable-tls.rst
 #, fuzzy
 msgid "``--volume ./superlink-certificates/ca.crt:/app/certificates/ca.crt:ro``:"
-msgstr "``--volume ./superlink-certificates/:/app/certificates/:ro``: Monter le"
+msgstr ""
 
 #: ../../source/docker/enable-tls.rst
 #, fuzzy
 msgid "Mount the ``ca.crt`` file inside the container as read-only."
-msgstr "volume dans le dossier ``/app/ca.crt`` à l'intérieur du conteneur. "
+msgstr ""
 
 #: ../../source/docker/enable-tls.rst:203
 msgid "``<serverapp-image>``: The name of your ServerApp image to be run."
@@ -21524,8 +21524,6 @@ msgstr "``<serverapp-image>``: Le nom de votre image ServerApp à exécuter."
 #, fuzzy
 msgid "``--root-certificates certificates/ca.crt``: Use the CA certificate to"
 msgstr ""
-"``--ssl-ca-certfile certificates/ca.crt``: Spécifiez l'emplacement du "
-"fichier de certificat CA"
 
 #: ../../source/docker/enable-tls.rst
 msgid "verify the SuperLink's identity when connecting to its Runtime API."
@@ -22402,7 +22400,7 @@ msgstr ""
 #: ../../source/docker/tutorial-deploy-on-multiple-machines.rst:32
 #, fuzzy
 msgid "Ports ``8000`` and ``9092`` are accessible on the remote machine."
-msgstr "Les ports ``9091`` et ``9093`` sont accessibles sur la machine distante."
+msgstr ""
 
 #: ../../source/docker/tutorial-deploy-on-multiple-machines.rst:36
 msgid ""
@@ -22677,12 +22675,6 @@ msgid ""
 "to access the Runtime and Control APIs on ``http://localhost:8000`` and "
 "the Fleet API on ``localhost:9092``."
 msgstr ""
-"``-p 9091:9091 -p 9092:9092 -p 9093:9093``: Cartographiez les ports "
-"``9091``, ``9092`` et ``9093`` du conteneur vers le même port de la "
-"machine hôte, permettant à d'autres services d'accéder au SuperAppIO API "
-"sur ``http://localhost:9091``, la flotte API sur "
-"``http://localhost:9092`` et le Contrôle API sur "
-"``http://localhost:9093``: "
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:90
 #: ../../source/docker/tutorial-quickstart-docker.rst:134
@@ -23006,8 +22998,6 @@ msgid ""
 "``--runtime-api-address superlink:8000``: Connect to the SuperLink's "
 "Runtime API at the address ``superlink:8000``."
 msgstr ""
-"``--runtime-api-address superlink:9091``: Connectez-vous à l'API Runtime "
-"de SuperLink à l'adresse ``superlink:9091``."
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:262
 msgid "Step 5: Start the SuperExec to execute ClientApps"
@@ -23523,7 +23513,7 @@ msgstr ""
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:373
 #, fuzzy
 msgid "Comment out the first ``command`` block and uncomment the second one:"
-msgstr "Commentez les lignes 2-6 et décommentez les lignes 7-13 :"
+msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:375
 msgid "with-state.yml"
@@ -30575,11 +30565,6 @@ msgid ""
 "variables "
 "<https://github.com/grpc/grpc/blob/master/doc/environment_variables.md>`_."
 msgstr ""
-"Flower utilise `gRPC <https://grpc.io/>`_ pour communiquer entre chaque "
-"composant (voir :doc:`ref-flower-network-communication`). Vous pouvez "
-"définir le niveau de verbosité des journaux ``gRPC`` à l'aide de `gRPC "
-"environment variables "
-"<https://github.com/grpc/grpc/blob/master/doc/environment_variables.md>`_."
 
 #: ../../source/how-to-configure-pyproject-toml.rst:-1
 msgid ""
@@ -31797,7 +31782,7 @@ msgstr ""
 #: ../../source/how-to-deploy-supernode-using-slurm.rst:7
 #, fuzzy
 msgid "Deploy SuperNodes using Slurm"
-msgstr "Déployer SuperNode à l'aide de Helm"
+msgstr ""
 
 #: ../../source/how-to-deploy-supernode-using-slurm.rst:9
 msgid ""
@@ -31837,8 +31822,6 @@ msgstr ""
 #, fuzzy
 msgid ":doc:`Flower installed <how-to-install-flower>` on the compute nodes"
 msgstr ""
-"Le ``flwr`` CLI est :doc:`installed <../how-to-install-flower>` "
-"localement."
 
 #: ../../source/how-to-deploy-supernode-using-slurm.rst:25
 msgid "A registered SuperNode private key that is readable from the compute node"
@@ -31882,7 +31865,7 @@ msgstr ""
 #: ../../source/how-to-deploy-supernode-using-slurm.rst:68
 #, fuzzy
 msgid "Submit the batch script to deploy the SuperNode:"
-msgstr "Mode d'isolement du SuperNode"
+msgstr ""
 
 #: ../../source/how-to-deploy-supernode-using-slurm.rst:74
 msgid ""
@@ -32712,9 +32695,6 @@ msgid ""
 "SuperExec should connect to. In this example, ``127.0.0.1:8000`` is the "
 "SuperLink's Runtime API."
 msgstr ""
-"``--appio-api-address``: Spécifiez l'adresse de l'API AppIo que SuperExec"
-" doit se connecter à. Dans cet exemple, ``127.0.0.1:9091`` est l'API "
-"ServerAppIo du SuperLink."
 
 #: ../../source/how-to-enable-tls-connections.rst
 msgid ""
@@ -34118,8 +34098,6 @@ msgid ""
 "You can override the default HTTP API port with the "
 "``FLWR_LOCAL_SUPERLINK_HTTP_API_PORT`` environment variable."
 msgstr ""
-"Vous pouvez surcharger la valeur de port du contrôle local API avec "
-"l'environnement variable ``FLWR_LOCAL_CONTROL_API_PORT``."
 
 #: ../../source/how-to-run-flower-locally.rst:46
 msgid "Runtime dependency installation"
@@ -34284,9 +34262,6 @@ msgid ""
 "``FLWR_LOCAL_SUPERLINK_HTTP_API_PORT``, replace ``39091`` in the commands"
 " above."
 msgstr ""
-"Si vous avez changé la valeur de port du contrôle local API avec "
-"``FLWR_LOCAL_CONTROL_API_PORT``, remplacez ``39093`` dans les commandes "
-"ci-dessus."
 
 #: ../../source/how-to-run-flower-locally.rst:210
 msgid "Troubleshooting"
@@ -34473,13 +34448,6 @@ msgid ""
 " (``SuperNode``), and port ``8000`` serves the HTTP Control API used to "
 "submit and execute Flower applications."
 msgstr ""
-"Lors de l'exécution de l'application Flower, la VM serveur "
-"(``SuperLink``) sera responsable d'orchestrer l'exécution de "
-"l'application sur les VM clients (``SuperNode``). Lorsque le serveur "
-"SuperLink démarre, par défaut, il écoute les ports suivants : ``{9092, "
-"9093}``. Le port `9092` est utilisé pour communiquer avec les clients de "
-"la fédération (``SuperNode``) et le port ``9093`` pour recevoir et "
-"exécuter les applications Flower."
 
 #: ../../source/how-to-run-flower-on-azure.rst:95
 msgid ""
@@ -34565,14 +34533,6 @@ msgid ""
 "However, if we want to keep the port widely open we simply need to change"
 " source to ``Any``."
 msgstr ""
-"Enfin, nous devons également ouvrir le port 9093 pour permettre la "
-"réception et l'exécution des demandes d'applications en provenance. Pour "
-"y parvenir, il suffit de répéter les étapes ci-dessus, c'est-à-dire créer"
-" un nouveau règle entrant, où nous affecterons le port 9093 à la plage de"
-" ports. Si nous savons déjà l'adresse IP publique à partir de laquelle "
-"notre machine locale (par exemple, ordinateur portable) soumettra des "
-"applications au cluster Azure, alors il suffit de spécifier l'adresse IP "
-"source/CIDR."
 
 #: ../../source/how-to-run-flower-on-azure.rst:128
 msgid ""
@@ -58637,8 +58597,6 @@ msgid ""
 "``[superlink.local-poc]`` defines a configuration for connecting to a "
 "locally running SuperLink at address ``127.0.0.1:8000``"
 msgstr ""
-"``[superlink.local-poc]`` defines a configuration for connecting to a "
-"locally running SuperLink at address ``127.0.0.1:9093``"
 
 #: ../../source/ref-flower-configuration.rst:98
 msgid ""
@@ -58795,8 +58753,6 @@ msgid ""
 "``address`` (required): The address of the SuperLink Control API to "
 "connect to (e.g., ``my-server.example.com:8000``)."
 msgstr ""
-"``address`` (obligatoire) : L'adresse du contrôle SuperLink Flower à "
-"connecter (par exemple, ``my-server.example.com:9093``)."
 
 #: ../../source/ref-flower-configuration.rst:191
 #, fuzzy
@@ -59000,17 +58956,6 @@ msgid ""
 "SuperLink connection should always use TLS, but ``insecure`` mode is "
 "supported for local testing."
 msgstr ""
-"**CLI vers SuperLink (Control API)** : la `commande CLI <ref-api-"
-"cli.html>`_ ``flwr``, généralement exécutée sur le poste de travail de "
-"l'utilisateur, sert à interagir avec une fédération Flower déployée "
-"composée de SuperLink et de SuperNodes. Du point de vue réseau, la CLI "
-"``flwr`` agit comme un client gRPC et SuperLink agit comme un serveur "
-"gRPC. La CLI ``flwr`` est le seul moyen pour un utilisateur (chercheur en"
-" IA ou data scientist) d'interagir avec une fédération Flower déployée. "
-"Il ne peut pas, par exemple, interagir directement avec les SuperNodes "
-"connectés au SuperLink. La connexion de la CLI ``flwr`` à SuperLink doit "
-"toujours utiliser TLS, mais le mode ``insecure`` est pris en charge pour "
-"les tests locaux."
 
 #: ../../source/ref-flower-network-communication.rst:86
 msgid ""
@@ -59241,15 +59186,6 @@ msgid ""
 "sending/receiving messages to/from available SuperNodes (via the "
 "SuperLink)."
 msgstr ""
-"**SuperExec/ServerApp process to SuperLink (ServerAppIO API)** : Les deux"
-" processus SuperExec pour ``ServerApp``\\s et les processus ``ServerApp``"
-" agissent comme clients gRPC et se connectent à l'API ServerAppIO du "
-"SuperLink. Cette connexion permet au SuperExec de découvrir des "
-"exécutions à lancer et aux processus ``ServerApp`` de récupérer les "
-"entrées nécessaires pour exécuter le ``ServerApp``. Cela permet également"
-" aux processus ``ServerApp``, une fois en cours d'exécution, de faire des"
-" choses typiques comme envoyer/recevoir des messages vers/à partir des "
-"SuperNodes disponibles (via le SuperLink)."
 
 #: ../../source/ref-flower-network-communication.rst:179
 #, fuzzy
@@ -59263,15 +59199,6 @@ msgid ""
 "and return the execution results (e.g., locally update model parameters) "
 "to the SuperNode."
 msgstr ""
-"**SuperExec/ClientApp process to SuperNode (ClientAppIO API)** : Les deux"
-" processus SuperExec pour ``ClientApp``\\s et les processus ``ClientApp``"
-" agissent comme clients gRPC et se connectent à l'API ClientAppIO du "
-"SuperNode. Cette connexion permet au SuperExec de découvrir des "
-"exécutions à lancer et aux processus ``ClientApp`` de récupérer les "
-"détails nécessaires (par exemple, fichier FAB) pour exécuter le "
-"``ClientApp``, exécuter le ``ClientApp`` (par exemple, entraînement local"
-" du modèle), et renvoyer les résultats d'exécution (par exemple, mise à "
-"jour locale des paramètres de modèle) au SuperNode."
 
 #: ../../source/ref-flower-network-communication.rst:188
 #, fuzzy
@@ -59682,9 +59609,6 @@ msgid ""
 "communication.html>`_ runs independently from the SuperLink and "
 "communicates with it over HTTP via the Runtime API."
 msgstr ""
-"``ServerApp`` `process or subprocess <ref-flower-network-"
-"communication.html>`_ s'exécute indépendamment du SuperLink et communique"
-" avec lui par le biais de gRPC via la classe ServerAppIO API."
 
 #: ../../source/ref-flower-runtime-comparison.rst:65
 msgid "**Client-side Infrastructure**"
@@ -59730,10 +59654,6 @@ msgid ""
 "and communicates with it over HTTP via the Runtime API. ``ClientApps`` "
 "are stateless."
 msgstr ""
-"Initialisé comme un ``ClientApp`` `process or subprocess <ref-flower-"
-"network-communication.html>`_, il s'exécute indépendamment du SuperNode "
-"et communique avec lui par le biais de gRPC via la classe ClientAppIo "
-"API. Les ``ClientApps`` sont sans état."
 
 #: ../../source/ref-telemetry.md:1
 msgid "Telemetry"
@@ -66519,4 +66439,3 @@ msgstr ""
 
 #~ msgid "TLS-enabled gRPC."
 #~ msgstr "gRPC avec chiffrement TLS."
-

@@ -23290,7 +23290,7 @@ msgstr ""
 #: ../../source/how-to-deploy-supernode-using-slurm.rst:25
 #, fuzzy
 msgid "A registered SuperNode private key that is readable from the compute node"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/how-to-deploy-supernode-using-slurm.rst:26
 msgid "All ClientApp dependencies installed in the execution environment"
@@ -25384,7 +25384,7 @@ msgstr ""
 #: ../../source/how-to-run-flower-on-azure.rst:151
 #, fuzzy
 msgid "``8000``"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:141
 msgid "Otherwise, we change the properties as follows:"
@@ -92059,4 +92059,3 @@ msgstr ""
 #~ " it over gRPC via the Runtime "
 #~ "API. ``ClientApps`` are stateless."
 #~ msgstr ""
-

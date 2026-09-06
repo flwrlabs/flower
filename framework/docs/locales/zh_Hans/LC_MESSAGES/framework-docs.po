@@ -18556,7 +18556,7 @@ msgstr ""
 #: ../../source/docker/enable-tls.rst
 #, fuzzy
 msgid "Mount the ``ca.crt`` file inside the container as read-only."
-msgstr "使用 VSCode Dev Containers 进行开发"
+msgstr ""
 
 #: ../../source/docker/enable-tls.rst:203
 msgid "``<serverapp-image>``: The name of your ServerApp image to be run."
@@ -27416,7 +27416,7 @@ msgstr ""
 #: ../../source/how-to-deploy-supernode-using-slurm.rst:25
 #, fuzzy
 msgid "A registered SuperNode private key that is readable from the compute node"
-msgstr "验证超级节点"
+msgstr ""
 
 #: ../../source/how-to-deploy-supernode-using-slurm.rst:26
 msgid "All ClientApp dependencies installed in the execution environment"
@@ -29574,7 +29574,7 @@ msgstr ""
 #: ../../source/how-to-run-flower-on-azure.rst:151
 #, fuzzy
 msgid "``8000``"
-msgstr "配置日志记录"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:141
 msgid "Otherwise, we change the properties as follows:"
@@ -88377,4 +88377,3 @@ msgstr ""
 #~ " it over gRPC via the Runtime "
 #~ "API. ``ClientApps`` are stateless."
 #~ msgstr ""
-
