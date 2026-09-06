@@ -54,6 +54,7 @@ from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
 from flwr.supercore.logger import flush_logs, start_log_uploader, stop_log_uploader
 from flwr.supercore.object_ref import load_app
+from flwr.supercore.runtime_timing import emit_runtime_timing
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
@@ -86,8 +87,29 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     certificates_path: str | None = None,
     parent_pid: int | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
+    runtime_timing_run_id: int | None = None,
+    runtime_timing_task_id: int | None = None,
 ) -> None:
     """Run Flower AgentApp process."""
+    emit_runtime_timing(
+        "runtime.executor.child.entry",
+        component="agent_task",
+        run_id=runtime_timing_run_id,
+        task_id=runtime_timing_task_id,
+        root_task_id=runtime_timing_task_id,
+        task_type="flwr-agentapp",
+        executor_mode="fresh",
+        process_mode="new",
+    )
+    emit_runtime_timing(
+        "runtime.application.entry",
+        component="agent_task",
+        run_id=runtime_timing_run_id,
+        task_id=runtime_timing_task_id,
+        root_task_id=runtime_timing_task_id,
+        task_type="flwr-agentapp",
+        process_mode="new",
+    )
     # Monitor the main process in case of SIGKILL
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
@@ -111,6 +133,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     runtime_env_dir: Path | None = None
     agent_events: RuntimeAgentEvents | None = None
     exit_code = ExitCode.SUCCESS
+    agent_execution_started = False
 
     def on_exit() -> None:
         log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
@@ -167,6 +190,18 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)
         task_id = res.task_id
+        runtime_timing_run_id = run.run_id
+        runtime_timing_task_id = task_id
+
+        emit_runtime_timing(
+            "runtime.application.input.received",
+            component="agent_task",
+            run_id=run.run_id,
+            task_id=task_id,
+            root_task_id=task_id,
+            task_type="flwr-agentapp",
+            process_mode="new",
+        )
 
         hash_run_id = get_sha256_hash(run.run_id)
 
@@ -188,19 +223,52 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
 
         if runtime_dependency_install:
             log(DEBUG, "[flwr-agentapp] Installing app dependencies.")
-            runtime_env_dir = install_app_dependencies(
-                app_path,
-                launch_id=token,
+            emit_runtime_timing(
+                "runtime.environment.sync.started",
+                component="agent_task",
                 run_id=run.run_id,
-                index_context={
-                    "component": "agentapp",
-                    "project_dir": app_path,
-                    "run_id": run.run_id,
-                    "launch_id": token,
-                    "fab_id": run.fab_id,
-                    "fab_version": run.fab_version,
-                    "fab_hash": fab.hash_str,
-                },
+                task_id=task_id,
+                root_task_id=task_id,
+                task_type="flwr-agentapp",
+                process_mode="new",
+            )
+            try:
+                runtime_env_dir = install_app_dependencies(
+                    app_path,
+                    launch_id=token,
+                    run_id=run.run_id,
+                    index_context={
+                        "component": "agentapp",
+                        "project_dir": app_path,
+                        "run_id": run.run_id,
+                        "launch_id": token,
+                        "fab_id": run.fab_id,
+                        "fab_version": run.fab_version,
+                        "fab_hash": fab.hash_str,
+                    },
+                )
+            except Exception:  # pylint: disable=broad-exception-caught
+                emit_runtime_timing(
+                    "runtime.environment.sync.finished",
+                    component="agent_task",
+                    run_id=run.run_id,
+                    task_id=task_id,
+                    root_task_id=task_id,
+                    task_type="flwr-agentapp",
+                    outcome="error",
+                    error_kind="dependency",
+                    process_mode="new",
+                )
+                raise
+            emit_runtime_timing(
+                "runtime.environment.sync.finished",
+                component="agent_task",
+                run_id=run.run_id,
+                task_id=task_id,
+                root_task_id=task_id,
+                task_type="flwr-agentapp",
+                outcome="ok",
+                process_mode="new",
             )
         else:
             log(
@@ -249,7 +317,11 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             raise LoadAgentAppError(
                 f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
             ) from None
-        agent_events = RuntimeAgentEvents(grid._runtime_client)
+        agent_events = RuntimeAgentEvents(
+            grid._runtime_client,
+            run_id=run.run_id,
+            task_id=task_id,
+        )
         responses = RuntimeAgentResponses(
             stub=grid._runtime_client,
             run_id=context.run_id,
@@ -269,14 +341,46 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             connectors=RuntimeAgentConnectors(responses),
             events=agent_events,
         )
+        agent_execution_started = True
+        emit_runtime_timing(
+            "runtime.agent.execution.started",
+            component="agent_task",
+            run_id=run.run_id,
+            task_id=task_id,
+            root_task_id=task_id,
+            task_type="flwr-agentapp",
+            process_mode="new",
+        )
         agent_app(agent=agent, context=context)
         agent_events.close()
+        emit_runtime_timing(
+            "runtime.agent.execution.finished",
+            component="agent_task",
+            run_id=run.run_id,
+            task_id=task_id,
+            root_task_id=task_id,
+            task_type="flwr-agentapp",
+            outcome="ok",
+            process_mode="new",
+        )
 
         # Set sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED
         details = ""
 
     except Exception as ex:  # pylint: disable=broad-exception-caught
+        if agent_execution_started:
+            emit_runtime_timing(
+                "runtime.agent.execution.finished",
+                component="agent_task",
+                run_id=runtime_timing_run_id,
+                task_id=runtime_timing_task_id,
+                root_task_id=runtime_timing_task_id,
+                task_type="flwr-agentapp",
+                outcome="error",
+                error_kind="unknown",
+                process_mode="new",
+            )
         log(ERROR, "AgentApp raised an exception", exc_info=ex)
 
         sub_status = SubStatus.FAILED

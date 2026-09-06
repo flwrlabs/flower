@@ -143,6 +143,7 @@ class InMemoryCoreState(
         self.lock_automation_store = RLock()
         self._next_automation_id = 1
         self.task_store: dict[int, Task] = {}
+        self.task_lineage_store: dict[int, tuple[int, int]] = {}
         # Store task ID to token mapping
         self.task_token_store: dict[int, TokenRecord] = {}
         # Store token to task ID mapping
@@ -152,10 +153,11 @@ class InMemoryCoreState(
         self.task_usage_store: dict[int, TaskUsageRecord] = {}
         self.lock_task_usage_store = Lock()
         self._next_task_usage_id = 1
-        self.lock_task_store = Lock()
+        self.lock_task_store = RLock()
         self.task_message_store: dict[str, Message] = {}
         self.lock_task_message_store = Lock()
         self.task_event_store: dict[int, list[TaskEvent]] = {}
+        self.task_event_task_ids: set[int] = set()
         self.lock_task_event_store = Lock()
         self._next_task_event_id = 1
         self._object_push_sessions: dict[str, ObjectPushSession] = {}
@@ -911,6 +913,8 @@ class InMemoryCoreState(
         model_ref: str | None = None,
         connector_ref: str | None = None,
         requesting_task_id: int | None = None,
+        parent_task_id: int | None = None,
+        root_task_id: int | None = None,
     ) -> int | None:
         """Create a task and return its ID."""
         with self.lock_task_store:
@@ -936,7 +940,14 @@ class InMemoryCoreState(
             )
 
             self.task_store[task_id] = task
+            if parent_task_id is not None and root_task_id is not None:
+                self.task_lineage_store[task_id] = (parent_task_id, root_task_id)
             return task_id
+
+    def get_task_lineage(self, task_id: int) -> tuple[int, int] | None:
+        """Return server-owned task lineage, if recorded."""
+        with self.lock_task_store:
+            return self.task_lineage_store.get(task_id)
 
     def get_tasks(  # pylint: disable=too-many-arguments
         self,
@@ -1275,9 +1286,15 @@ class InMemoryCoreState(
                 event.id = self._next_task_event_id
                 event.timestamp = current
                 task_events.append(event)
+                self.task_event_task_ids.add(event.task_id)
                 self._next_task_event_id += 1
 
         return True
+
+    def has_task_events(self, *, task_id: int) -> bool:
+        """Return whether a task has at least one persisted event."""
+        with self.lock_task_event_store:
+            return task_id in self.task_event_task_ids
 
     def get_task_events(
         self,

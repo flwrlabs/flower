@@ -53,7 +53,19 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.runtime_timing import (
+    emit_runtime_timing,
+    get_runtime_task_lineage,
+    is_runtime_timing_logging_enabled,
+    is_runtime_timing_task,
+    mark_runtime_task_first_event_persisted,
+    register_runtime_task_lineage,
+)
 from flwr.supercore.task_process.connector import registry as connector_registry
+
+_FINAL_RUN_EVENT_TYPES = frozenset(
+    {"response.completed", "response.failed", "response.incomplete"}
+)
 
 
 def pull_pending_tasks(
@@ -73,6 +85,24 @@ def claim_task(request: ClaimTaskRequest, state: CoreState) -> ClaimTaskResponse
     log(DEBUG, "Runtime.ClaimTask")
 
     token = state.claim_task(request.task_id)
+    if token and is_runtime_timing_logging_enabled():
+        try:
+            tasks = state.get_tasks(task_ids=[request.task_id])
+        except Exception:  # pylint: disable=broad-exception-caught
+            # Timing must not change the outcome of an already-successful claim.
+            tasks = []
+        if tasks and is_runtime_timing_task(tasks[0].type):
+            task = tasks[0]
+            emit_runtime_timing(
+                "runtime.task.claimed",
+                component="superlink",
+                run_id=task.run_id,
+                task_id=task.task_id,
+                root_task_id=(
+                    task.task_id if task.type == TaskType.AGENT_APP else None
+                ),
+                task_type=task.type,
+            )
     return ClaimTaskResponse(token=token)
 
 
@@ -101,17 +131,56 @@ def create_task(
     connector_ref = request.connector_ref or None
 
     _validate_create_task_request(request, task, connector_ref, state)
-    created_task_id = state.create_task(
-        task_type=request.type,
-        run_id=run_id,
-        fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
-        model_ref=request.model_ref if request.HasField("model_ref") else None,
-        connector_ref=connector_ref,
-        requesting_task_id=task.task_id,
+    lineage = (
+        (task.task_id, task.task_id)
+        if (
+            is_runtime_timing_logging_enabled()
+            and task.type == TaskType.AGENT_APP
+            and request.type == TaskType.MODEL
+        )
+        else None
     )
+    if lineage is not None:
+        created_task_id = state.create_task(
+            task_type=request.type,
+            run_id=run_id,
+            fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
+            model_ref=request.model_ref if request.HasField("model_ref") else None,
+            connector_ref=connector_ref,
+            requesting_task_id=task.task_id,
+            parent_task_id=lineage[0],
+            root_task_id=lineage[1],
+        )
+    else:
+        created_task_id = state.create_task(
+            task_type=request.type,
+            run_id=run_id,
+            fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
+            model_ref=request.model_ref if request.HasField("model_ref") else None,
+            connector_ref=connector_ref,
+            requesting_task_id=task.task_id,
+        )
     if created_task_id is None:
         raise FlowerError(
             ApiErrorCode.RUNTIME_TASK_CREATION_FAILED, "Failed to create task"
+        )
+
+    if task.type == TaskType.AGENT_APP and request.type == TaskType.MODEL:
+        if lineage is not None:
+            register_runtime_task_lineage(
+                run_id=run_id,
+                task_id=created_task_id,
+                parent_task_id=lineage[0],
+                root_task_id=lineage[1],
+            )
+        emit_runtime_timing(
+            "runtime.task.queued",
+            component="superlink",
+            run_id=run_id,
+            task_id=created_task_id,
+            parent_task_id=lineage[0] if lineage is not None else None,
+            root_task_id=lineage[1] if lineage is not None else None,
+            task_type=request.type,
         )
 
     return CreateTaskResponse(task_id=created_task_id)
@@ -140,6 +209,39 @@ def push_task_message(
             "Task message could not be stored.",
         )
 
+    if is_runtime_timing_logging_enabled():
+        try:
+            destination_tasks = state.get_tasks(
+                task_ids=(
+                    [message.metadata.dst_task_id]
+                    if message.metadata.dst_task_id is not None
+                    else []
+                )
+            )
+        except Exception:  # pylint: disable=broad-exception-caught
+            # The message is already stored. Skip optional lineage on lookup failure.
+            destination_tasks = []
+        if (
+            task.type == TaskType.AGENT_APP
+            and destination_tasks
+            and destination_tasks[0].type == TaskType.MODEL
+        ):
+            register_runtime_task_lineage(
+                run_id=task.run_id,
+                task_id=destination_tasks[0].task_id,
+                parent_task_id=task.task_id,
+                root_task_id=task.task_id,
+            )
+            emit_runtime_timing(
+                "runtime.agent.model.dispatch.accepted",
+                component="superlink",
+                run_id=task.run_id,
+                task_id=destination_tasks[0].task_id,
+                parent_task_id=task.task_id,
+                root_task_id=task.task_id,
+                task_type=TaskType.MODEL,
+            )
+
     return PushTaskMessageResponse(message_id=message.metadata.message_id)
 
 
@@ -158,13 +260,109 @@ def push_task_events(
         event.run_id = task.run_id
         event.task_id = task.task_id
 
-    if not state.store_task_events(request.events):
+    timing_enabled = is_runtime_timing_logging_enabled() and is_runtime_timing_task(
+        task.type
+    )
+    has_persisted_events = True
+    if timing_enabled:
+        try:
+            has_persisted_events = state.has_task_events(task_id=task.task_id)
+        except Exception:  # pylint: disable=broad-exception-caught
+            # Timing must not change event persistence semantics.
+            pass
+
+    try:
+        stored = state.store_task_events(request.events)
+    except Exception:  # pylint: disable=broad-exception-caught
+        if timing_enabled:
+            lineage = _get_runtime_task_lineage(state, task)
+            parent_task_id, root_task_id = (
+                lineage
+                if lineage is not None
+                else (None, task.task_id if task.type == TaskType.AGENT_APP else None)
+            )
+            emit_runtime_timing(
+                "runtime.events.publish.failed",
+                component="superlink",
+                run_id=task.run_id,
+                task_id=task.task_id,
+                parent_task_id=parent_task_id,
+                root_task_id=root_task_id,
+                task_type=task.type,
+                outcome="error",
+                error_kind="state",
+            )
+        raise
+
+    if not stored:
         log(
             ERROR,
             "Task events could not be stored for task %d of run %d.",
             task.task_id,
             task.run_id,
         )
+        if timing_enabled:
+            lineage = _get_runtime_task_lineage(state, task)
+            parent_task_id, root_task_id = (
+                lineage
+                if lineage is not None
+                else (None, task.task_id if task.type == TaskType.AGENT_APP else None)
+            )
+            emit_runtime_timing(
+                "runtime.events.publish.failed",
+                component="superlink",
+                run_id=task.run_id,
+                task_id=task.task_id,
+                parent_task_id=parent_task_id,
+                root_task_id=root_task_id,
+                task_type=task.type,
+                outcome="error",
+                error_kind="state",
+            )
+        return PushTaskEventsResponse()
+
+    if timing_enabled:
+        lineage = _get_runtime_task_lineage(state, task)
+        parent_task_id, root_task_id = (
+            lineage
+            if lineage is not None
+            else (None, task.task_id if task.type == TaskType.AGENT_APP else None)
+        )
+        if not has_persisted_events and mark_runtime_task_first_event_persisted(
+            run_id=task.run_id,
+            task_id=task.task_id,
+        ):
+            emit_runtime_timing(
+                "runtime.events.first.persisted",
+                component="superlink",
+                run_id=task.run_id,
+                task_id=task.task_id,
+                parent_task_id=parent_task_id,
+                root_task_id=root_task_id,
+                task_type=task.type,
+            )
+            if task.type == TaskType.MODEL and lineage is not None:
+                # AgentApp does not consume Model stream events directly. This is the
+                # nearest content-free relay boundary for its first Model event.
+                emit_runtime_timing(
+                    "runtime.agent.model.first_event.received",
+                    component="superlink",
+                    run_id=task.run_id,
+                    task_id=task.task_id,
+                    parent_task_id=parent_task_id,
+                    root_task_id=root_task_id,
+                    task_type=task.type,
+                )
+        if any(event.event in _FINAL_RUN_EVENT_TYPES for event in request.events):
+            emit_runtime_timing(
+                "runtime.events.final.persisted",
+                component="superlink",
+                run_id=task.run_id,
+                task_id=task.task_id,
+                parent_task_id=parent_task_id,
+                root_task_id=root_task_id,
+                task_type=task.type,
+            )
 
     return PushTaskEventsResponse()
 
@@ -213,6 +411,25 @@ def push_logs(
     merged_logs = "".join(request.logs)
     state.add_task_log(task.task_id, merged_logs)
     return PushLogsResponse()
+
+
+def _get_runtime_task_lineage(state: CoreState, task: Task) -> tuple[int, int] | None:
+    """Return cached or durable lineage without affecting runtime behavior."""
+    lineage = get_runtime_task_lineage(run_id=task.run_id, task_id=task.task_id)
+    if lineage is not None:
+        return lineage
+    try:
+        lineage = state.get_task_lineage(task.task_id)
+    except Exception:  # pylint: disable=broad-exception-caught
+        return None
+    if lineage is not None:
+        register_runtime_task_lineage(
+            run_id=task.run_id,
+            task_id=task.task_id,
+            parent_task_id=lineage[0],
+            root_task_id=lineage[1],
+        )
+    return lineage
 
 
 def _validate_create_task_request(

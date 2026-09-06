@@ -157,6 +157,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.run import Run
+from flwr.supercore.runtime_timing import emit_runtime_timing
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.typing import (
     AcceptInvitationContext,
@@ -697,6 +698,16 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
         run = state.get_run_info(run_ids=[run_id])[0]
         series_id = run.series_id
+
+        if primary_task_type == TaskType.AGENT_APP and run.primary_task_id is not None:
+            emit_runtime_timing(
+                "runtime.task.queued",
+                component="superlink",
+                run_id=run_id,
+                task_id=run.primary_task_id,
+                root_task_id=run.primary_task_id,
+                task_type=TaskType.AGENT_APP,
+            )
 
     except ValueError as e:
         log(ERROR, "Could not start run: %s", str(e))

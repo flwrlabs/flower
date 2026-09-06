@@ -663,6 +663,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         model_ref: str | None = None,
         connector_ref: str | None = None,
         requesting_task_id: int | None = None,
+        parent_task_id: int | None = None,
+        root_task_id: int | None = None,
     ) -> int | None:
         """Create a new task.
 
@@ -681,6 +683,10 @@ class CoreState(ABC):  # pylint: disable=R0904
         requesting_task_id : Optional[int] (default: None)
             Task requesting creation of the new task. If set, task creation fails
             when the requesting task does not exist or is already finished.
+        parent_task_id : Optional[int] (default: None)
+            Server-owned parent task ID used for internal task lineage.
+        root_task_id : Optional[int] (default: None)
+            Server-owned root task ID used for internal task lineage.
 
         Returns
         -------
@@ -694,6 +700,10 @@ class CoreState(ABC):  # pylint: disable=R0904
         This method only persists task data. It does not validate whether the
         provided fields are required for the given task type.
         """
+
+    @abstractmethod
+    def get_task_lineage(self, task_id: int) -> tuple[int, int] | None:
+        """Return server-owned parent and root task IDs, if recorded."""
 
     @abstractmethod
     def get_tasks(  # pylint: disable=too-many-arguments
@@ -931,6 +941,14 @@ class CoreState(ABC):  # pylint: disable=R0904
         -------
         bool
             True if the events were stored, otherwise False.
+        """
+
+    @abstractmethod
+    def has_task_events(self, *, task_id: int) -> bool:
+        """Return whether a task has at least one persisted event.
+
+        Implementations should use an existence check rather than materializing
+        event payloads.
         """
 
     @abstractmethod

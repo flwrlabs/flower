@@ -45,6 +45,8 @@ def flwr_model() -> None:
             args.root_certificates, args.insecure
         ),
         parent_pid=args.parent_pid,
+        runtime_timing_run_id=getattr(args, "runtime_timing_run_id", None),
+        runtime_timing_task_id=getattr(args, "runtime_timing_task_id", None),
     )
 
     # Restore stdout/stderr
@@ -63,6 +65,16 @@ def _parse_args_run_flwr_model() -> argparse.ArgumentParser:
         type=str,
         help="Address of SuperLink's Runtime API (IPv4, IPv6, or a domain name)."
         f"By default, it is set to {SUPERLINK_DEFAULT_CLIENT_ADDRESS}.",
+    )
+    parser.add_argument(
+        "--runtime-timing-run-id",
+        type=int,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--runtime-timing-task-id",
+        type=int,
+        help=argparse.SUPPRESS,
     )
     add_args_flwr_app_common(parser=parser)
     return parser

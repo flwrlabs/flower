@@ -730,6 +730,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 initial_task_event.run_id = run_id
                 initial_task_event.task_id = task_id
                 self.task_event_store.setdefault(run_id, []).append(initial_task_event)
+                self.task_event_task_ids.add(task_id)
                 self._next_task_event_id += 1
             self.bind_connectors_to_run(
                 run_id=run_id,
@@ -829,12 +830,18 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             }
 
     def _finish_run_tasks(
-        self, run_primary_pairs: list[tuple[int, int]], sub_status: str, details: str
-    ) -> None:
+        self,
+        run_primary_pairs: list[tuple[int, int]],
+        sub_status: str,
+        details: str,
+        *,
+        collect_finished: bool = False,
+    ) -> list[Task]:
         """Finish all unfinished tasks of the run for the given run/primary-task pairs.
 
         Each task's ``finished_at`` is copied from its run's primary task.
         """
+        finished_tasks: list[Task] = []
         for run_id, primary_task_id in run_primary_pairs:
             primary_task = self.task_store.get(primary_task_id)
             if primary_task is None:
@@ -848,6 +855,11 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     task.status.details = details
                     if record := self.task_token_store.pop(task.task_id, None):
                         self.task_token_to_task_id.pop(record.token, None)
+                    if collect_finished:
+                        finished_task = Task()
+                        finished_task.CopyFrom(task)
+                        finished_tasks.append(finished_task)
+        return finished_tasks
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
@@ -884,15 +896,16 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             for task in tasks
             if self._is_primary_task(task.task_id)
         ]
-        if not pairs:
-            return
-
-        self._finish_run_tasks(
-            pairs,
-            sub_status=SubStatus.FAILED,
-            details="Task failed because the run expired",
-        )
-        self.federation_manager.report_run_usage()
+        cascade_finished_tasks: list[Task] = []
+        if pairs:
+            cascade_finished_tasks = self._finish_run_tasks(
+                pairs,
+                sub_status=SubStatus.FAILED,
+                details="Task failed because the run expired",
+                collect_finished=True,
+            )
+            self.federation_manager.report_run_usage()
+        super()._on_task_tokens_expired([*tasks, *cascade_finished_tasks])
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float

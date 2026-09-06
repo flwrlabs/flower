@@ -56,7 +56,7 @@ from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.utils.validator import validate_message
 from flwr.supercore import log
 from flwr.supercore.constant import NodeStatus, TaskType
-from flwr.supercore.corestate.sql_corestate import SqlCoreState
+from flwr.supercore.corestate.sql_corestate import SqlCoreState, task_from_model
 from flwr.supercore.corestate.utils import timestamp_to_iso, validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
@@ -1118,15 +1118,20 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         return simulation_config_from_json(json.loads(fed_config_json))
 
     def _finish_run_tasks(
-        self, run_primary_pairs: list[tuple[int, int]], sub_status: str, details: str
-    ) -> None:
+        self,
+        run_primary_pairs: list[tuple[int, int]],
+        sub_status: str,
+        details: str,
+        *,
+        collect_finished: bool = False,
+    ) -> list[Task]:
         """Finish all unfinished tasks of the run for the given run/primary-task pairs.
 
         The IDs must be sint64 DB values. Each task's ``finished_at`` is copied from
         its run's primary task.
         """
         if not run_primary_pairs:
-            return
+            return []
 
         sint_run_ids = [pair[0] for pair in run_primary_pairs]
         sint_task_ids = [pair[1] for pair in run_primary_pairs]
@@ -1155,7 +1160,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             )
         )
         with self.session() as session:
-            session.execute(stmt)
+            if not collect_finished:
+                session.execute(stmt)
+                return []
+            return [
+                task_from_model(task)
+                for task in session.scalars(stmt.returning(TaskModel)).all()
+            ]
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
@@ -1204,18 +1215,23 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     RunModel.primary_task_id.in_(task_ids)
                 )
             ).all()
-        if not rows:
-            return
+        if rows:
+            # Fail any remaining tasks for expired runs
+            cascade_finished_tasks = self._finish_run_tasks(
+                [
+                    (cast(int, run_id), primary_task_id)
+                    for run_id, primary_task_id in rows
+                ],
+                sub_status=SubStatus.FAILED,
+                details="Task failed because the run expired",
+                collect_finished=True,
+            )
 
-        # Fail any remaining tasks for expired runs
-        self._finish_run_tasks(
-            [(cast(int, run_id), primary_task_id) for run_id, primary_task_id in rows],
-            sub_status=SubStatus.FAILED,
-            details="Task failed because the run expired",
-        )
-
-        # Report usage for the run
-        self.federation_manager.report_run_usage()
+            # Report usage for the run
+            self.federation_manager.report_run_usage()
+        else:
+            cascade_finished_tasks = []
+        super()._on_task_tokens_expired([*tasks, *cascade_finished_tasks])
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float

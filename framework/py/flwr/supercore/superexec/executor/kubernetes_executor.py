@@ -29,6 +29,7 @@ from flwr.supercore.constant import (
     TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
     TASK_TYPE_TO_COMMAND,
 )
+from flwr.supercore.runtime_timing import emit_runtime_timing, is_runtime_timing_task
 from flwr.supercore.typing import JSONObject
 
 from .types import ExecutionSpec, LaunchResult
@@ -312,6 +313,22 @@ class KubernetesExecutor:
             return _launch_result_from_exception(exc)
 
         try:
+            if (
+                spec.runtime_timing_logging
+                and spec.run_id is not None
+                and is_runtime_timing_task(spec.task_type)
+            ):
+                emit_runtime_timing(
+                    "runtime.executor.child.spawn.started",
+                    component="superexec",
+                    run_id=spec.run_id,
+                    task_id=spec.task_id,
+                    root_task_id=(
+                        spec.task_id if spec.task_type == "flwr-agentapp" else None
+                    ),
+                    task_type=spec.task_type,
+                    executor_mode="fresh",
+                )
             self._client.create_namespaced_pod(self._config.namespace, pod)
         except Exception as exc:  # pylint: disable=broad-exception-caught
             result = _launch_result_from_exception(exc)
@@ -461,8 +478,9 @@ def _build_taskexecutor_pod(
         container["imagePullPolicy"] = config.image_pull_policy
     if config.resources is not None:
         container["resources"] = config.resources
-    if config.env is not None:
-        container["env"] = config.env
+    env = _taskexecutor_container_env(spec, config)
+    if env:
+        container["env"] = env
     if config.container_security_context is not None:
         container["securityContext"] = config.container_security_context
 
@@ -526,7 +544,38 @@ def _taskexecutor_args(
     if spec.runtime_dependency_install:
         args.append("--allow-runtime-dependency-installation")
 
+    if (
+        spec.runtime_timing_logging
+        and spec.run_id is not None
+        and is_runtime_timing_task(spec.task_type)
+    ):
+        args.extend(
+            [
+                "--runtime-timing-run-id",
+                str(spec.run_id),
+                "--runtime-timing-task-id",
+                str(spec.task_id),
+            ]
+        )
+
     return args
+
+
+def _taskexecutor_container_env(
+    spec: ExecutionSpec, config: KubernetesExecutorConfig
+) -> list[JSONObject]:
+    """Return configured environment plus the opt-in timing setting for task Pods."""
+    env = list(config.env) if config.env is not None else []
+    if not (
+        spec.runtime_timing_logging
+        and spec.run_id is not None
+        and is_runtime_timing_task(spec.task_type)
+    ):
+        return env
+
+    env = [entry for entry in env if entry["name"] != "FLWR_RUNTIME_TIMING_LOGGING"]
+    env.append({"name": "FLWR_RUNTIME_TIMING_LOGGING", "value": "1"})
+    return env
 
 
 def _taskexecutor_env(env: list[JSONObject]) -> list[JSONObject]:

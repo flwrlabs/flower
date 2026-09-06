@@ -37,19 +37,39 @@ from flwr.supercore.interceptors import (
 )
 from flwr.supercore.retry import RetryInvoker, make_simple_http_retry_invoker
 from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.runtime_timing import emit_runtime_timing
 from flwr.supercore.telemetry import EventType, event
 
 from .task import handle_task
 
 
-def run_model(  # pylint: disable=too-many-locals
+def run_model(  # pylint: disable=too-many-locals,too-many-arguments,too-many-positional-arguments
     runtime_api_address: str,
     token: str,
     insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
+    runtime_timing_run_id: int | None = None,
+    runtime_timing_task_id: int | None = None,
 ) -> None:
     """Run Flower model task process."""
+    emit_runtime_timing(
+        "runtime.executor.child.entry",
+        component="model_task",
+        run_id=runtime_timing_run_id,
+        task_id=runtime_timing_task_id,
+        task_type="flwr-model",
+        executor_mode="fresh",
+        process_mode="new",
+    )
+    emit_runtime_timing(
+        "runtime.application.entry",
+        component="model_task",
+        run_id=runtime_timing_run_id,
+        task_id=runtime_timing_task_id,
+        task_type="flwr-model",
+        process_mode="new",
+    )
     # Monitor the main process in case of SIGKILL
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)

@@ -23,6 +23,7 @@ from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import TaskType
+from flwr.supercore.runtime_timing import is_runtime_timing_logging_enabled
 from flwr.supercore.superexec.executor import ExecutionSpec, Executor, LaunchResult
 
 from .exec_plugin import ExecPlugin
@@ -81,11 +82,12 @@ class BaseExecPlugin(ExecPlugin):
                 token=token,
                 task_type=task_type,
                 task_id=task.task_id,
+                run_id=task.run_id,
             )
         )
 
     def _build_execution_spec(
-        self, token: str, task_type: TaskType, task_id: int
+        self, token: str, task_type: TaskType, task_id: int, run_id: int
     ) -> ExecutionSpec:
         """Build the execution spec for the selected task."""
         return ExecutionSpec(
@@ -100,6 +102,8 @@ class BaseExecPlugin(ExecPlugin):
                 self.suppress_output and task_type not in self.visible_output_task_types
             ),
             task_id=task_id,
+            run_id=run_id,
+            runtime_timing_logging=is_runtime_timing_logging_enabled(),
         )
 
     def _get_supported_task_type(self, task: Task) -> TaskType | None:

@@ -71,6 +71,14 @@ from flwr.supercore.inflatable.inflatable_object import (
     no_object_id_recompute,
 )
 from flwr.supercore.object_store import NoObjectInStoreError
+from flwr.supercore.runtime_timing import (
+    discard_runtime_task_lineage,
+    emit_runtime_timing,
+    get_runtime_task_lineage,
+    is_runtime_timing_logging_enabled,
+    is_runtime_timing_task,
+    register_runtime_task_lineage,
+)
 from flwr.superlink.servicer.control.control_handlers import process_due_automations
 from flwr.superlink.servicer.control.control_handlers import (
     start_automation as start_control_automation,
@@ -249,6 +257,16 @@ def pull_task_input(
     log(DEBUG, "Runtime.PullTaskInput")
     run_id = task.run_id
 
+    if is_runtime_timing_task(task.type):
+        emit_runtime_timing(
+            "runtime.task.input.pull.received",
+            component="superlink",
+            run_id=run_id,
+            task_id=task.task_id,
+            root_task_id=(task.task_id if task.type == TaskType.AGENT_APP else None),
+            task_type=task.type,
+        )
+
     runs = state.get_run_info(run_ids=[run_id])
     run = runs[0] if runs else None
     fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
@@ -256,6 +274,22 @@ def pull_task_input(
     if run and run.series_id:
         series_context = state.get_run_series_context(run.series_id)
     if run and fab and series_context and state.activate_task(task.task_id):
+        if is_runtime_timing_task(task.type):
+            lineage = _get_runtime_task_lineage(state, task)
+            parent_task_id, root_task_id = (
+                lineage
+                if lineage is not None
+                else (None, task.task_id if task.type == TaskType.AGENT_APP else None)
+            )
+            emit_runtime_timing(
+                "runtime.task.running.persisted",
+                component="superlink",
+                run_id=run_id,
+                task_id=task.task_id,
+                parent_task_id=parent_task_id,
+                root_task_id=root_task_id,
+                task_type=task.type,
+            )
         log(INFO, "Started task %d of run %d", task.task_id, run_id)
         return PullTaskInputResponse(
             context=context_to_proto(series_context),
@@ -286,6 +320,28 @@ def push_task_output(
     if state.finish_task(
         task.task_id, sub_status=request.sub_status, details=request.details
     ):
+        if is_runtime_timing_task(task.type):
+            lineage = _get_runtime_task_lineage(state, task)
+            parent_task_id, root_task_id = (
+                lineage
+                if lineage is not None
+                else (None, task.task_id if task.type == TaskType.AGENT_APP else None)
+            )
+            emit_runtime_timing(
+                "runtime.task.completed.persisted",
+                component="superlink",
+                run_id=run_id,
+                task_id=task.task_id,
+                parent_task_id=parent_task_id,
+                root_task_id=root_task_id,
+                task_type=task.type,
+                outcome=(
+                    "ok"
+                    if request.sub_status == "completed"
+                    else "cancelled" if request.sub_status == "stopped" else "error"
+                ),
+            )
+            discard_runtime_task_lineage(run_id=run_id, task_id=task.task_id)
         log(INFO, "Finished task %d of run %d", task.task_id, run_id)
         if request.HasField("context"):
             runs = state.get_run_info(run_ids=[run_id])
@@ -381,6 +437,25 @@ def confirm_message_received(
     _ = _get_authenticated_serverapp_run_id(task)
     state.object_store.delete(request.message_object_id)
     return ConfirmMessageReceivedResponse()
+
+
+def _get_runtime_task_lineage(state: LinkState, task: Task) -> tuple[int, int] | None:
+    """Return cached or durable lineage without affecting runtime behavior."""
+    lineage = get_runtime_task_lineage(run_id=task.run_id, task_id=task.task_id)
+    if lineage is not None or not is_runtime_timing_logging_enabled():
+        return lineage
+    try:
+        lineage = state.get_task_lineage(task.task_id)
+    except Exception:  # pylint: disable=broad-exception-caught
+        return None
+    if lineage is not None:
+        register_runtime_task_lineage(
+            run_id=task.run_id,
+            task_id=task.task_id,
+            parent_task_id=lineage[0],
+            root_task_id=lineage[1],
+        )
+    return lineage
 
 
 def _get_authenticated_serverapp_run_id(task: Task) -> int:
