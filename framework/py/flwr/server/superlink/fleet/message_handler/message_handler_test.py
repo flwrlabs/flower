@@ -88,6 +88,26 @@ def test_pull_messages_records_traffic_when_messages_found() -> None:
     assert call_args[1]["bytes_recv"] > 0
 
 
+def test_push_messages_empty_list() -> None:
+    """Test push_messages does not raise on an empty messages_list.
+
+    An empty messages_list is a legitimate request (Fleet.PushMessages logs
+    "No replies to push" for it), so push_messages must return a no-op response
+    instead of indexing into the empty list.
+    """
+    # Prepare
+    request = PushMessagesRequest(messages_list=[], message_object_trees=[])
+    state = MagicMock()
+
+    # Execute
+    response = push_messages(request=request, state=state)
+
+    # Assert: no-op response, state untouched
+    assert response.results == {}
+    state.start_session.assert_not_called()
+    state.store_message_and_object_tree.assert_not_called()
+
+
 def test_push_messages() -> None:
     """Test push_messages."""
     # Prepare
