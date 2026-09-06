@@ -17,6 +17,7 @@
 
 import hashlib
 import unittest
+from datetime import timedelta
 from typing import Any, cast
 from unittest.mock import Mock, call, patch
 
@@ -310,6 +311,44 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
         )
 
+    def test_start_run_uses_and_refreshes_stale_hub_fab(self) -> None:
+        """Start from the cached FAB before refreshing it in the background."""
+        fab_hash = self.state.store_app(
+            Fab("", b"cached FAB", {}),
+            NOOP_FEDERATION_ID,
+            "@flwr/demo",
+            TaskType.SERVER_APP,
+            self.account.flwr_aid,
+            is_hub_app=True,
+        )
+        request = StartRunRequest(app_spec="@flwr/demo", federation=NOOP_FEDERATION_ID)
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/demo", "1.0.0"),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".HUB_APP_REFRESH_INTERVAL",
+                timedelta(seconds=-1),
+            ),
+            patch("flwr.superlink.servicer.control.control_handlers.Thread") as thread,
+            patch(
+                "flwr.superlink.servicer.control.control_handlers._get_remote_fab"
+            ) as get_remote_fab,
+        ):
+            response = start_run(request, self.account, self.state, None)
+
+        get_remote_fab.assert_not_called()
+        thread.return_value.start.assert_called_once()
+        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        self.assertEqual(run.fab_hash, fab_hash)
+
     def test_start_run_persists_agent_input_event(self) -> None:
         """Persist agent input as a primary-task message item."""
         request = StartRunRequest(federation=NOOP_FEDERATION_ID)
@@ -464,7 +503,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
     def test_list_apps_preserves_hub_flag_over_wire(self) -> None:
         """ListApps preserves Hub provenance through protobuf serialization."""
-        self.state.store_app(
+        fab_hash = self.state.store_app(
             fab=Fab("", b"hub fab", {}),
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
@@ -480,7 +519,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
         round_tripped = ListAppsResponse.FromString(response.SerializeToString())
 
-        self.assertEqual(round_tripped.apps[0].fab_hash, "")
+        self.assertEqual(round_tripped.apps[0].fab_hash, fab_hash)
         self.assertTrue(round_tripped.apps[0].is_hub_app)
 
     def test_list_apps_preserves_unknown_hub_origin_over_wire(self) -> None:
@@ -502,7 +541,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(round_tripped.apps[0].HasField("is_hub_app"))
 
     def test_add_and_remove_hub_app_metadata(self) -> None:
-        """AddApp stores Hub metadata without retaining the downloaded FAB."""
+        """AddApp stores Hub metadata and the downloaded FAB."""
         fab_content = b"hub FAB"
         verification_dict = {"publisher-key": "verified"}
         with (
@@ -535,12 +574,12 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
-            [("@flwr/demo", "", TaskType.AGENT_APP)],
+            [("@flwr/demo", fab_hash, TaskType.AGENT_APP)],
         )
         self.assertTrue(apps[0].is_hub_app)
-        self.assertIsNone(self.state.get_fab(fab_hash))
-        self.assertIsNone(
-            self.state.get_app(NOOP_FEDERATION_ID, "@flwr/demo", fab_hash)
+        self.assertEqual(
+            self.state.get_app(NOOP_FEDERATION_ID, "@flwr/demo", fab_hash),
+            Fab(fab_hash, fab_content, verification_dict),
         )
 
         remove_response = remove_app(
@@ -618,15 +657,15 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
     def test_start_automation_stores_hub_app_without_fab(self) -> None:
         """Store Hub automations by app ID so dispatch fetches the latest FAB."""
+        fab_content = b"current Hub FAB"
         self.state.store_app(
-            fab=None,
+            fab=Fab("", fab_content, {}),
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/agent",
             app_type=TaskType.AGENT_APP,
             added_by=self.account.flwr_aid,
             is_hub_app=True,
         )
-        fab_content = b"current Hub FAB"
         request = StartAutomationRequest(
             start_run_request=StartRunRequest(
                 federation=NOOP_FEDERATION_ID,
