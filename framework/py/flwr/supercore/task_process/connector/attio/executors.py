@@ -16,11 +16,12 @@
 
 from urllib.parse import quote
 
+import requests
+
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
 from ..http import ConnectorApiError, request_json_object
-from ..json_utils import optional_string, require_int_range, require_string
 
 _ATTIO_API_BASE_URL = "https://api.attio.com/v2"
 
@@ -31,23 +32,40 @@ class AttioApiError(ConnectorApiError):
     provider = "Attio"
 
 
+def identify(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """Identify the current Attio token and workspace."""
+    del arguments
+    return _call_attio_api("GET", "/self", context.credentials)
+
+
+def get_workspace_member(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """Get one member of the current Attio workspace."""
+    workspace_member_id = _path_segment(
+        arguments.get("workspace_member_id"), "workspace_member_id"
+    )
+    return _call_attio_api(
+        "GET",
+        f"/workspace_members/{workspace_member_id}",
+        context.credentials,
+    )
+
+
 def search_records(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
     """Search records in one Attio workspace."""
-    objects = arguments.get("objects")
-    if not isinstance(objects, list) or not objects:
-        raise ValueError("Attio objects must be a non-empty list.")
+    body: JSONObject = {
+        name: arguments[name]
+        for name in ("query", "objects", "limit", "request_as")
+        if name in arguments
+    }
     return _call_attio_api(
         "POST",
         "/objects/records/search",
         context.credentials,
-        json_body={
-            "query": require_string(arguments.get("query"), "Attio", "query"),
-            "objects": [require_string(item, "Attio", "object") for item in objects],
-            "request_as": {"type": "workspace"},
-            "limit": _limit(arguments, default=25, maximum=25),
-        },
+        json_body=body,
     )
 
 
@@ -59,13 +77,20 @@ def list_meetings(
         "GET",
         "/meetings",
         context.credentials,
-        params={
-            "limit": str(_limit(arguments, default=50, maximum=50)),
-            "cursor": _optional(arguments, "cursor"),
-            "linked_object": _optional(arguments, "linked_object"),
-            "linked_record_id": _optional(arguments, "linked_record_id"),
-            "participants": _optional(arguments, "participants"),
-        },
+        params=_query_params(
+            arguments,
+            (
+                "limit",
+                "cursor",
+                "linked_object",
+                "linked_record_id",
+                "participants",
+                "sort",
+                "ends_from",
+                "starts_before",
+                "timezone",
+            ),
+        ),
     )
 
 
@@ -78,10 +103,7 @@ def list_call_recordings(
         "GET",
         f"/meetings/{meeting_id}/call_recordings",
         context.credentials,
-        params={
-            "limit": str(_limit(arguments, default=50, maximum=200)),
-            "cursor": _optional(arguments, "cursor"),
-        },
+        params=_query_params(arguments, ("limit", "cursor")),
     )
 
 
@@ -97,11 +119,13 @@ def get_call_transcript(
         "GET",
         f"/meetings/{meeting_id}/call_recordings/{recording_id}/transcript",
         context.credentials,
-        params={"cursor": _optional(arguments, "cursor")},
+        params=_query_params(arguments, ("cursor",)),
     )
 
 
 EXECUTORS: dict[str, ConnectorExecutor] = {
+    "identify": identify,
+    "get_workspace_member": get_workspace_member,
     "search_records": search_records,
     "list_meetings": list_meetings,
     "list_call_recordings": list_call_recordings,
@@ -114,7 +138,7 @@ def _call_attio_api(
     path: str,
     credentials: JSONObject,
     *,
-    params: dict[str, str | None] | None = None,
+    params: dict[str, str] | None = None,
     json_body: JSONObject | None = None,
 ) -> JSONObject:
     """Call one Attio REST endpoint."""
@@ -129,26 +153,39 @@ def _call_attio_api(
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         },
-        params={k: v for k, v in (params or {}).items() if v is not None},
+        params=params or {},
         json=json_body,
-        http_error_code=lambda response: (
-            "rate_limited" if response.status_code == 429 else "http_error"
-        ),
+        http_error_details=_response_error_details,
     )
 
 
 def _path_segment(value: object, name: str) -> str:
-    """Validate and encode one Attio path segment."""
-    return quote(require_string(value, "Attio", name), safe="")
+    """Encode one Attio path segment without changing its value."""
+    if not isinstance(value, str):
+        raise TypeError(f"Attio {name} must be a string.")
+    return quote(value, safe="")
 
 
-def _limit(arguments: JSONObject, *, default: int, maximum: int) -> int:
-    """Return one validated Attio page limit."""
-    return require_int_range(
-        arguments.get("limit", default), "Attio", "limit", maximum=maximum
+def _query_params(arguments: JSONObject, names: tuple[str, ...]) -> dict[str, str]:
+    """Serialize supplied Attio query values without renaming them."""
+    return {
+        name: str(arguments[name])
+        for name in names
+        if name in arguments and arguments[name] is not None
+    }
+
+
+def _response_error_details(response: requests.Response) -> tuple[str, str | None]:
+    """Return Attio's documented error code and message without translation."""
+    try:
+        payload = response.json()
+    except ValueError:
+        return "http_error", None
+    if not isinstance(payload, dict):
+        return "http_error", None
+    code = payload.get("code")
+    message = payload.get("message")
+    return (
+        code if isinstance(code, str) and code else "http_error",
+        message if isinstance(message, str) and message else None,
     )
-
-
-def _optional(arguments: JSONObject, name: str) -> str | None:
-    """Return one optional Attio string argument."""
-    return optional_string(arguments.get(name), "Attio", name)
