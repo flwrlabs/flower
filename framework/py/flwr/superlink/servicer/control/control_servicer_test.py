@@ -30,7 +30,13 @@ import grpc
 from parameterized import parameterized
 
 from flwr.app import ConfigRecord, Context, RecordDict
-from flwr.common.constant import NOOP_ACCOUNT_NAME, SUPERLINK_NODE_ID, Status, SubStatus
+from flwr.common.constant import (
+    NOOP_ACCOUNT_NAME,
+    NOOP_FLWR_AID,
+    SUPERLINK_NODE_ID,
+    Status,
+    SubStatus,
+)
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -1276,8 +1282,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(response.federation.can_invite_members)
         self.assertFalse(response.federation.can_add_supernodes)
 
-    def test_list_federations_includes_simulation_flag(self) -> None:
-        """Test ListFederations surfaces the federation simulation flag."""
+    def test_list_federations_includes_summary_fields(self) -> None:
+        """Test ListFederations surfaces federation summary fields."""
         objectstore_factory = Mock(store=Mock(return_value=self.store))
         servicer = ControlServicer(
             linkstate_factory=LinkStateFactory(
@@ -1294,9 +1300,27 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         )
 
         self.assertEqual(len(response.federations), 1)
+        self.assertEqual(len(response.federations[0].members), 1)
+        self.assertEqual(
+            response.federations[0].members[0].account.name, NOOP_ACCOUNT_NAME
+        )
+        self.assertEqual(response.federations[0].members[0].account.id, NOOP_FLWR_AID)
+        self.assertEqual(response.federations[0].members[0].role, "owner")
+        self.assertEqual(response.federations[0].member_count, 1)
         self.assertTrue(response.federations[0].simulation)
         self.assertFalse(response.federations[0].can_invite_members)
         self.assertFalse(response.federations[0].can_add_supernodes)
+
+    def test_federation_member_count_wire_round_trip(self) -> None:
+        """Test the member count survives protobuf serialization."""
+        response = ListFederationsResponse()
+        federation = response.federations.add(member_count=300)
+
+        serialized_federation = federation.SerializeToString()
+        round_tripped = ListFederationsResponse.FromString(response.SerializeToString())
+
+        self.assertEqual(serialized_federation, b"\x58\xac\x02")
+        self.assertEqual(round_tripped.federations[0].member_count, 300)
 
     def test_create_federation_success(self) -> None:
         """Test CreateFederation succeeds when federation_manager.create_federation
