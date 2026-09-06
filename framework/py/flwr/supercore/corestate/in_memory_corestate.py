@@ -52,7 +52,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
 from flwr.supercore.date import now
-from flwr.supercore.fab import Fab
+from flwr.supercore.fab import CachedHubApp, Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
@@ -93,7 +93,7 @@ class AutomationRecord:
 
 
 @dataclass(frozen=True)
-class FederationAppRecord:
+class FederationAppRecord:  # pylint: disable=too-many-instance-attributes
     """Record containing a federation app and its association metadata."""
 
     federation_id: str
@@ -101,6 +101,7 @@ class FederationAppRecord:
     fab_hash: str | None
     app_type: str
     is_hub_app: bool
+    hub_resolution_note: str | None
     added_by: str
     added_at: datetime
 
@@ -337,6 +338,7 @@ class InMemoryCoreState(
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
+        hub_resolution_note: str | None = None,
     ) -> str:
         """Store an optional FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
@@ -366,13 +368,55 @@ class InMemoryCoreState(
             self.federation_app_store[key] = FederationAppRecord(
                 federation_id=federation_id,
                 app_id=app_id,
-                fab_hash=None if is_hub_app else fab_hash,
+                fab_hash=fab_hash,
                 app_type=app_type,
                 is_hub_app=is_hub_app,
+                hub_resolution_note=hub_resolution_note if is_hub_app else None,
                 added_by=existing.added_by if existing else added_by,
                 added_at=existing.added_at if existing else now(),
             )
         return fab_hash or ""
+
+    def update_hub_app(
+        self,
+        federation_id: str,
+        app_id: str,
+        expected_fab_hash: str,
+        cached_app: CachedHubApp,
+    ) -> bool:
+        """Update cached Hub metadata if it still points to the expected FAB."""
+        key = (federation_id, app_id)
+        with self.lock_fab_store, self.lock_federation_app_store:
+            existing = self.federation_app_store.get(key)
+            if (
+                existing is None
+                or not existing.is_hub_app
+                or existing.fab_hash != expected_fab_hash
+                or cached_app.fab.hash_str not in self.fab_store
+            ):
+                return False
+            self.federation_app_store[key] = replace(
+                existing,
+                fab_hash=cached_app.fab.hash_str,
+                app_type=cached_app.app_type,
+                hub_resolution_note=cached_app.resolution_note,
+            )
+        return True
+
+    def get_hub_app(self, federation_id: str, app_id: str) -> CachedHubApp | None:
+        """Return a cached Hub FAB and its compatibility note, if present."""
+        with self.lock_fab_store, self.lock_federation_app_store:
+            app = self.federation_app_store.get((federation_id, app_id))
+            if app is None or not app.is_hub_app or app.fab_hash is None:
+                return None
+            fab = self.fab_store.get(app.fab_hash)
+            if fab is None:
+                return None
+            return CachedHubApp(
+                fab=Fab(fab.hash_str, fab.content, dict(fab.verifications)),
+                app_type=app.app_type,
+                resolution_note=app.hub_resolution_note,
+            )
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""

@@ -25,3 +25,12 @@ class Fab:
     hash_str: str
     content: bytes
     verifications: dict[str, str]
+
+
+@dataclass(frozen=True)
+class CachedHubApp:
+    """Cached Hub app and its resolution metadata."""
+
+    fab: Fab
+    app_type: str
+    resolution_note: str | None

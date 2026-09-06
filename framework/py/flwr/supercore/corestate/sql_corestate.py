@@ -76,7 +76,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
 from flwr.supercore.date import now
-from flwr.supercore.fab import Fab
+from flwr.supercore.fab import CachedHubApp, Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_models import Automation as AutomationModel
 from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
@@ -424,6 +424,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
+        hub_resolution_note: str | None = None,
     ) -> str:
         """Store an optional FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
@@ -457,9 +458,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         app_stmt = self.dialect_insert(FederationAppModel).values(
             federation_id=federation_id,
             app_id=app_id,
-            fab_hash=None if is_hub_app else fab_hash,
+            fab_hash=fab_hash,
             app_type=app_type,
             is_hub_app=is_hub_app,
+            hub_resolution_note=hub_resolution_note if is_hub_app else None,
             added_by=added_by,
             added_at=now(),
         )
@@ -472,6 +474,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 "fab_hash": app_stmt.excluded.fab_hash,
                 "app_type": app_stmt.excluded.app_type,
                 "is_hub_app": app_stmt.excluded.is_hub_app,
+                "hub_resolution_note": app_stmt.excluded.hub_resolution_note,
             },
         )
         with self.session() as session:
@@ -479,6 +482,66 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 session.execute(fab_stmt)
             session.execute(app_stmt)
         return fab_hash or ""
+
+    def update_hub_app(
+        self,
+        federation_id: str,
+        app_id: str,
+        expected_fab_hash: str,
+        cached_app: CachedHubApp,
+    ) -> bool:
+        """Update cached Hub metadata if it still points to the expected FAB."""
+        app_stmt = (
+            update(FederationAppModel)
+            .where(
+                FederationAppModel.federation_id == federation_id,
+                FederationAppModel.app_id == app_id,
+                FederationAppModel.is_hub_app.is_(True),
+                FederationAppModel.fab_hash == expected_fab_hash,
+                exists().where(FabModel.fab_hash == cached_app.fab.hash_str),
+            )
+            .values(
+                fab_hash=cached_app.fab.hash_str,
+                app_type=cached_app.app_type,
+                hub_resolution_note=cached_app.resolution_note,
+            )
+            .returning(FederationAppModel.app_id)
+        )
+        with self.session() as session:
+            return session.scalar(app_stmt) is not None
+
+    def get_hub_app(self, federation_id: str, app_id: str) -> CachedHubApp | None:
+        """Return a cached Hub FAB and its compatibility note, if present."""
+        query = (
+            select(
+                FabModel,
+                FederationAppModel.app_type,
+                FederationAppModel.hub_resolution_note,
+            )
+            .join(
+                FederationAppModel,
+                FederationAppModel.fab_hash == FabModel.fab_hash,
+            )
+            .where(
+                FederationAppModel.federation_id == federation_id,
+                FederationAppModel.app_id == app_id,
+                FederationAppModel.is_hub_app.is_(True),
+            )
+        )
+        with self.session() as session:
+            row = session.execute(query).one_or_none()
+            if row is None:
+                return None
+            fab, app_type, note = row
+            return CachedHubApp(
+                fab=Fab(
+                    hash_str=fab.fab_hash,
+                    content=fab.content,
+                    verifications=json.loads(fab.verifications),
+                ),
+                app_type=app_type,
+                resolution_note=note,
+            )
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""

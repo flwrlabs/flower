@@ -14,6 +14,8 @@
 # ==============================================================================
 """Abstract base class CoreState."""
 
+# pylint: disable=too-many-lines
+
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -29,7 +31,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
-from flwr.supercore.fab import Fab
+from flwr.supercore.fab import CachedHubApp, Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..constant import AutomationStatus
@@ -126,6 +128,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
+        hub_resolution_note: str | None = None,
     ) -> str:
         """Store an optional FAB and associate its app with a federation.
 
@@ -147,8 +150,9 @@ class CoreState(ABC):  # pylint: disable=R0904
         added_by : str
             ID of the account adding the app to the federation.
         is_hub_app : bool, default=False
-            Whether the app was fetched from Flower Hub. Hub app associations do
-            not retain a FAB hash so future runs resolve the latest version.
+            Whether the app was fetched from Flower Hub.
+        hub_resolution_note : str | None, default=None
+            Compatibility note returned when resolving the Hub app.
 
         Returns
         -------
@@ -156,6 +160,20 @@ class CoreState(ABC):  # pylint: disable=R0904
             Canonical SHA-256 hash of the stored FAB, or an empty string when no
             FAB was provided.
         """
+
+    @abstractmethod
+    def update_hub_app(
+        self,
+        federation_id: str,
+        app_id: str,
+        expected_fab_hash: str,
+        cached_app: CachedHubApp,
+    ) -> bool:
+        """Update cached Hub metadata if it still points to the expected FAB."""
+
+    @abstractmethod
+    def get_hub_app(self, federation_id: str, app_id: str) -> CachedHubApp | None:
+        """Return a cached Hub FAB and its compatibility note, if present."""
 
     @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:

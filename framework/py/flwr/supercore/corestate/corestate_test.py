@@ -45,7 +45,7 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.date import now
-from flwr.supercore.fab import Fab
+from flwr.supercore.fab import CachedHubApp, Fab
 from flwr.supercore.typing import ConnectorRecord
 
 from . import CoreState
@@ -118,7 +118,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type, app.is_hub_app) for app in apps],
             [
-                ("@me/z-agent", "", TaskType.AGENT_APP, True),
+                ("@me/z-agent", agent_hash, TaskType.AGENT_APP, True),
                 ("@me/server", server_hash, TaskType.SERVER_APP, False),
             ],
         )
@@ -147,10 +147,13 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         updated = state.list_apps("@me/fed-a")
         self.assertEqual(len(updated), 2)
-        self.assertEqual(updated[1].fab_hash, "")
+        self.assertEqual(updated[1].fab_hash, updated_hash)
         self.assertTrue(updated[1].is_hub_app)
         self.assertIsNone(state.get_app("@me/fed-a", "@me/server", server_hash))
-        self.assertIsNone(state.get_app("@me/fed-a", "@me/server", updated_hash))
+        self.assertEqual(
+            state.get_app("@me/fed-a", "@me/server", updated_hash),
+            Fab(updated_hash, b"updated", {}),
+        )
 
         self.assertTrue(state.delete_app("@me/fed-a", "@me/server"))
         self.assertFalse(state.delete_app("@me/fed-a", "@me/server"))
@@ -163,6 +166,56 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             ["@me/server"],
         )
         self.assertIsNotNone(state.get_fab(updated_hash))
+
+    def test_update_hub_app_requires_unchanged_association(self) -> None:
+        """Update only the Hub app association observed before a refresh."""
+        state = self.state_factory()
+
+        def store_hub_app(content: bytes) -> str:
+            return state.store_app(
+                Fab("", content, {}),
+                "@me/fed",
+                "@me/app",
+                TaskType.AGENT_APP,
+                "account-a",
+                is_hub_app=True,
+            )
+
+        current_hash = store_hub_app(b"current")
+        refreshed_hash = state.store_fab(Fab("", b"refreshed", {}))
+        cached_app = CachedHubApp(
+            Fab(refreshed_hash, b"refreshed", {}),
+            TaskType.SERVER_APP,
+            "compatibility note",
+        )
+        self.assertTrue(
+            state.update_hub_app("@me/fed", "@me/app", current_hash, cached_app)
+        )
+        cached = state.get_hub_app("@me/fed", "@me/app")
+        self.assertEqual(
+            cached.resolution_note if cached else None, "compatibility note"
+        )
+        self.assertEqual(state.list_apps("@me/fed")[0].app_type, TaskType.SERVER_APP)
+        replacement_hash = store_hub_app(b"replacement")
+        stale_hash = state.store_fab(Fab("", b"stale refresh", {}))
+        self.assertFalse(
+            state.update_hub_app(
+                "@me/fed",
+                "@me/app",
+                refreshed_hash,
+                CachedHubApp(Fab(stale_hash, b"", {}), TaskType.AGENT_APP, None),
+            )
+        )
+        self.assertEqual(state.list_apps("@me/fed")[0].fab_hash, replacement_hash)
+        self.assertTrue(state.delete_app("@me/fed", "@me/app"))
+        self.assertFalse(
+            state.update_hub_app(
+                "@me/fed",
+                "@me/app",
+                replacement_hash,
+                CachedHubApp(Fab(stale_hash, b"", {}), TaskType.AGENT_APP, None),
+            )
+        )
 
     def test_connector_upsert_get_and_delete(self) -> None:
         """A connector can be created, updated, retrieved, and deleted."""
