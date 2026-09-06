@@ -1,0 +1,23 @@
+# Small evaluated smoke: 4 clients, 3 rounds, sparse + centralized eval.
+num-server-rounds = 3
+num-clients = 4
+fraction-train = 1.0
+fraction-evaluate = 0.0
+local-epochs = 1
+batch-size = 16
+learning-rate = 0.1
+lr-scheduler = "default"
+lr-decay = 0.998
+momentum = 0.0
+weight-decay = 0.0005
+dataset = "cifar10"
+model = "resnet18"
+partition-alpha = 0.3
+dense-ratio = 0.5
+seed = 550
+transport = "sparse"
+evaluate-every = 1
+save-model = false
+save-checkpoints = false
+checkpoint-dir = "outputs/cifar10_eval_smoke"
+wandb-mode = "disabled"
