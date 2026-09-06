@@ -215,7 +215,7 @@ testing locally, real deployments require TLS).
        :caption: config.toml
 
        [superlink.local-deployment]
-       address = "127.0.0.1:9093"
+       address = "127.0.0.1:8000"
        insecure = true
 
    .. note::

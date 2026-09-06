@@ -189,13 +189,13 @@ API hosted by the SuperLink:
 
     $ flower-superexec \
         --root-certificates certificates/ca.crt \
-        --runtime-api-address 127.0.0.1:9091 \
+        --runtime-api-address 127.0.0.1:8000 \
         --plugin-type serverapp
 
 .. dropdown:: Understand the command
 
     * ``--root-certificates``: Specify the location of the CA certificate file. The ``ca.crt`` file is used by SuperExec to verify the Runtime API server certificate.
-    * | ``--runtime-api-address``: Specify the address of the Runtime API that SuperExec should connect to. In this example, ``127.0.0.1:9091`` is the SuperLink's Runtime API.
+    * | ``--runtime-api-address``: Specify the address of the Runtime API that SuperExec should connect to. In this example, ``127.0.0.1:8000`` is the SuperLink's Runtime API.
     * | ``--plugin-type``: Specify the type of app process SuperExec should launch. Use ``serverapp`` for a ``ServerApp`` SuperExec.
 
 Next, use the same procedure for a ``ClientApp`` SuperExec, but pass the SuperNode's
@@ -224,7 +224,7 @@ Configuration TOML file with a new field that reads the certificate:
     :emphasize-lines: 3,3
 
     [superlink.local-deployment]
-    address = "127.0.0.1:9093"
+    address = "127.0.0.1:8000"
     root-certificates = "/absolute/path/to/certificates/ca.crt"
 
 Note that the path to the ``root-certificates`` is relative to the root of the project.
