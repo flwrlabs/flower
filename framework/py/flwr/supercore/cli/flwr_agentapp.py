@@ -99,11 +99,14 @@ def _try_obtain_agentapp_token(args: argparse.Namespace) -> str:
         return try_obtain_flwr_app_token(args)
 
     try:
-        token_input = (
-            cast(BufferedReader, sys.stdin.buffer)
-            .read1(_TOKEN_STDIN_READ_LIMIT)
-            .decode("ascii")
-        )
+        token_bytes = bytearray()
+        token_stdin = cast(BufferedReader, sys.stdin.buffer)
+        while b"\n" not in token_bytes and len(token_bytes) < _TOKEN_STDIN_READ_LIMIT:
+            chunk = token_stdin.read1(_TOKEN_STDIN_READ_LIMIT - len(token_bytes))
+            if not chunk:
+                break
+            token_bytes.extend(chunk)
+        token_input = token_bytes.decode("ascii")
     except (AttributeError, OSError, UnicodeError):
         sys.exit("Standard input does not contain exactly one valid task token.")
     finally:
