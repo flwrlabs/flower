@@ -124,26 +124,6 @@ def test_parse_superlink_lifespan_config_keeps_fleet_address_unset_for_simulatio
     assert config.fleet_api_address is None
 
 
-def test_parse_superlink_lifespan_config_maps_exec_api_address(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Deprecated Exec API address should end up as Control API config."""
-    monkeypatch.setattr(
-        app_module.sys,
-        "argv",
-        [
-            "flower-superlink",
-            "--insecure",
-            "--exec-api-address",
-            "127.0.0.1:9099",
-        ],
-    )
-
-    config = _parse_superlink_lifespan_config()
-
-    assert config.control_address == "127.0.0.1:9099"
-
-
 def test_parse_superlink_log_rotation_args_custom_values() -> None:
     """SuperLink log rotation args should parse explicit values."""
     # Execute

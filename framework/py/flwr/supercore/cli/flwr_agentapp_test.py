@@ -26,7 +26,10 @@ from unittest.mock import Mock, patch
 import pytest
 
 from flwr.common.constant import FLWR_TASK_TOKEN_LENGTH
-from flwr.supercore.cli.flwr_agentapp import _parse_args_run_flwr_agentapp
+from flwr.supercore.cli.flwr_agentapp import (
+    _parse_args_run_flwr_agentapp,
+    _try_obtain_agentapp_token,
+)
 from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 
 flwr_agentapp_module = importlib.import_module("flwr.supercore.cli.flwr_agentapp")
@@ -150,17 +153,24 @@ def test_flwr_agentapp_reads_stdin_token_and_acknowledges_start(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """A valid private handoff should close stdin and start the AgentApp."""
-    token_stdin = io.StringIO(_VALID_TASK_TOKEN)
+    """An open sender should receive acknowledgement after one token write."""
+    read_fd, write_fd = os.pipe()
+    token_stdin = os.fdopen(read_fd, encoding="ascii")
+    token_writer = os.fdopen(write_fd, "w", encoding="ascii")
+    token_writer.write(f"{_VALID_TASK_TOKEN}\n")
+    token_writer.flush()
     monkeypatch.setattr(sys, "stdin", token_stdin)
     monkeypatch.setattr(sys, "argv", ["flwr-agentapp", "--token-stdin"])
 
-    with (
-        patch.object(flwr_agentapp_module, "mirror_output_to_queue"),
-        patch.object(flwr_agentapp_module, "restore_output"),
-        patch.object(flwr_agentapp_module, "run_agentapp") as run_agentapp,
-    ):
-        flwr_agentapp_module.flwr_agentapp()
+    try:
+        with (
+            patch.object(flwr_agentapp_module, "mirror_output_to_queue"),
+            patch.object(flwr_agentapp_module, "restore_output"),
+            patch.object(flwr_agentapp_module, "run_agentapp") as run_agentapp,
+        ):
+            flwr_agentapp_module.flwr_agentapp()
+    finally:
+        token_writer.close()
 
     assert token_stdin.closed
     assert capsys.readouterr().out == "FLWR_AGENTAPP_TOKEN_ACCEPTED\n"
@@ -181,12 +191,12 @@ def test_flwr_agentapp_rejects_invalid_stdin_without_disclosure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Invalid private handoffs should fail closed without echoing their input."""
-    token_stdin = io.StringIO(token_input)
+    token_stdin = io.TextIOWrapper(io.BytesIO(token_input.encode("ascii")))
     monkeypatch.setattr(sys, "stdin", token_stdin)
     args = _parse_args_run_flwr_agentapp().parse_args(["--token-stdin"])
 
     with pytest.raises(SystemExit) as exc_info:
-        flwr_agentapp_module._try_obtain_agentapp_token(args)
+        _try_obtain_agentapp_token(args)
 
     assert token_stdin.closed
     assert not token_input or token_input not in str(exc_info.value)
