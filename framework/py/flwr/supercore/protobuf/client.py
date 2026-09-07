@@ -199,7 +199,7 @@ class ProtobufClient:
             raise ValueError("Invalid protobuf response payload") from exc
         return result
 
-    def _unary_stream(
+    def _unary_stream(  # pylint: disable=too-many-arguments
         self,
         *,
         path: str,
