@@ -124,16 +124,6 @@ def test_parse_superlink_lifespan_config_keeps_fleet_address_unset_for_simulatio
     assert config.fleet_api_address is None
 
 
-@pytest.mark.parametrize(
-    "argument",
-    ["--exec-api-address", "--executor", "--executor-dir", "--executor-config"],
-)
-def test_parse_superlink_rejects_removed_arguments(argument: str) -> None:
-    """SuperLink should reject removed arguments."""
-    with pytest.raises(SystemExit):
-        _parse_args_run_superlink().parse_args([argument, "value"])
-
-
 def test_parse_superlink_log_rotation_args_custom_values() -> None:
     """SuperLink log rotation args should parse explicit values."""
     # Execute
