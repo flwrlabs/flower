@@ -150,13 +150,11 @@ def test_parse_superlink_appio_tls_args_rejected() -> None:
         _parse_args_run_superlink().parse_args(
             ["--appio-ssl-certfile", "appio-cert.pem"]
         )
-    
+
     # Test that --appio-ssl-keyfile is rejected
     with pytest.raises(SystemExit):
-        _parse_args_run_superlink().parse_args(
-            ["--appio-ssl-keyfile", "appio-key.pem"]
-        )
-    
+        _parse_args_run_superlink().parse_args(["--appio-ssl-keyfile", "appio-key.pem"])
+
     # Test that --appio-ssl-ca-certfile is rejected
     with pytest.raises(SystemExit):
         _parse_args_run_superlink().parse_args(
@@ -296,6 +294,7 @@ def test_obtain_superlink_certificates_returns_certificates(
 
     assert result == fleet_certificates
 
+
 def test_obtain_superlink_certificates_skips_cert_loading_when_insecure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -310,6 +309,7 @@ def test_obtain_superlink_certificates_skips_cert_loading_when_insecure(
 
     obtain_server_certificates_mock.assert_not_called()
     assert result is None
+
 
 def test_run_fleet_api_grpc_rere_orders_default_interceptors(
     monkeypatch: pytest.MonkeyPatch,

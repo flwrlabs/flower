@@ -23,7 +23,6 @@ import sys
 import threading
 from collections.abc import Sequence
 from logging import INFO, WARN
-from pathlib import Path
 from time import sleep
 from typing import cast
 
@@ -84,7 +83,6 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import (
     get_client_tls_args,
-    try_obtain_optional_runtime_server_certificates,
 )
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.utils import get_popen_detach_kwargs
