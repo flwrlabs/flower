@@ -15,9 +15,7 @@
 # ==============================================================================
 """flad: A Flower Baseline."""
 
-import ctypes
 import os
-import platform
 from typing import Any
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -39,43 +37,10 @@ from sklearn.metrics import f1_score
 
 from .dataset import load_data, set_seed
 from .model import compile_model, load_model
-
-# glibc's default malloc() retains freed memory in its own arena rather
-# than returning it to the OS. If you hit OOM errors, run with
-# tcmalloc preloaded instead (see README).
-_GLOBAL_SCOPE = ctypes.CDLL(None)
-_USE_TCMALLOC = hasattr(_GLOBAL_SCOPE, "MallocExtension_ReleaseFreeMemory")
-_USE_MALLOC_TRIM = hasattr(_GLOBAL_SCOPE, "malloc_trim")
-
-
-def _trim_memory() -> None:
-    """Release freed memory back to the OS."""
-    if platform.system() == "Linux":
-        if _USE_TCMALLOC:
-            _GLOBAL_SCOPE.MallocExtension_ReleaseFreeMemory()
-        elif _USE_MALLOC_TRIM:
-            _GLOBAL_SCOPE.malloc_trim(0)
-
+from .utils import get_client_name, trim_memory
 
 # Flower ClientApp
 app = ClientApp()
-
-# Map partition-id to client name
-client_names = {
-    0: "00-WebDDoS",
-    1: "01-LDAP",
-    2: "02-Portmap",
-    3: "03-DNS",
-    4: "04-UDPLag",
-    5: "05-NTP",
-    6: "06-SNMP",
-    7: "07-SSDP",
-    8: "08-Syn",
-    9: "09-TFTP",
-    10: "10-UDP",
-    11: "11-NetBIOS",
-    12: "12-MSSQL",
-}
 
 
 def _as_int(value: Any) -> int:
@@ -90,7 +55,7 @@ def train(msg: Message, context: Context):
     # FLAD clients are pets not cattle, so we need to name them.
     client: dict[str, Any] = {}
     client_id = int(context.node_config["partition-id"])
-    client["name"] = client_names[client_id]
+    client["name"] = get_client_name(str(context.run_config["client_names"]), client_id)
 
     client["rn_seed"] = int(context.run_config["rn_seed"])
     client["optimizer"] = str(context.run_config["optimizer"])
@@ -140,7 +105,7 @@ def train(msg: Message, context: Context):
     metrics = MetricRecord({"train_loss": train_loss, "val_loss": val_loss})
     content = RecordDict({"arrays": model_record, "metrics": metrics})
 
-    _trim_memory()
+    trim_memory()
     return Message(content=content, reply_to=msg)
 
 
@@ -150,7 +115,7 @@ def evaluate(msg: Message, context: Context):
     # FLAD clients are pets not cattle, so we need to name them.
     client: dict[str, Any] = {}
     client_id = int(context.node_config["partition-id"])
-    client["name"] = client_names[client_id]
+    client["name"] = get_client_name(str(context.run_config["client_names"]), client_id)
     client["rn_seed"] = int(context.run_config["rn_seed"])
     client["dataset_folder"] = str(context.run_config["dataset_folder"])
 
@@ -175,7 +140,7 @@ def evaluate(msg: Message, context: Context):
     metrics = MetricRecord({"f1_score": float(client_f1)})
     content = RecordDict({"metrics": metrics})
 
-    _trim_memory()
+    trim_memory()
     return Message(content=content, reply_to=msg)
 
 
@@ -184,7 +149,7 @@ def info(msg: Message, context: Context) -> Message:
     """Return the client name."""
     # Return the client name
     client_id = int(context.node_config["partition-id"])
-    client_name = client_names[client_id]
+    client_name = get_client_name(str(context.run_config["client_names"]), client_id)
     content = RecordDict(
         {
             "config": ConfigRecord({"name": client_name}),

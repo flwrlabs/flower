@@ -531,7 +531,7 @@ class Flad(Strategy):
         # Initialize if None
         train_config = ConfigRecord() if train_config is None else train_config
         evaluate_config = ConfigRecord() if evaluate_config is None else evaluate_config
-        result = Result()
+        result = Result(arrays=initial_arrays)
 
         # Validate train_config once, upfront, so misconfiguration fails fast
         # instead of raising deep into the round loop.

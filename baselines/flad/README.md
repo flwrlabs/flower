@@ -112,7 +112,7 @@ By default, the dataset will be saved in `./dataset/DOS2019_highly_unbalanced`. 
 
 In FLAD, clients are considered "pets", not "cattle": each client is identified by name and
 can be treated differently by the server than the other clients. For this reason, the
-FLAD strategy assigns a name to each client. In `./pyproject.toml` you can find the `client_names` parameter — a comma-separated string of client names used to identify each client. The same names, mapped to their corresponding `client_id`, are present in `./flad/client_app.py`, in the `client_names` dictionary.
+FLAD strategy assigns a name to each client. In `./pyproject.toml` you can find the `client_names` parameter — a comma-separated string of client names used to identify each client. 
 
 Unlike other strategies, FLAD does not use a fixed number of rounds — it dynamically
 decides when to stop training based on the clients' F1 score. Setting `num-server-rounds` to

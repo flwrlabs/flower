@@ -16,10 +16,38 @@
 """flad: A Flower Baseline."""
 
 import csv
+import ctypes
 import os
+import platform
 import time
 
 from flwr.app import MetricRecord
+
+# glibc's default malloc() retains freed memory in its own arena rather
+# than returning it to the OS. If you hit OOM errors, run with
+# tcmalloc preloaded instead (see README).
+_GLOBAL_SCOPE = ctypes.CDLL(None)
+_USE_TCMALLOC = hasattr(_GLOBAL_SCOPE, "MallocExtension_ReleaseFreeMemory")
+_USE_MALLOC_TRIM = hasattr(_GLOBAL_SCOPE, "malloc_trim")
+
+
+def trim_memory() -> None:
+    """Release freed memory back to the OS."""
+    if platform.system() == "Linux":
+        if _USE_TCMALLOC:
+            _GLOBAL_SCOPE.MallocExtension_ReleaseFreeMemory()
+        elif _USE_MALLOC_TRIM:
+            _GLOBAL_SCOPE.malloc_trim(0)
+
+
+def get_client_name(client_names: str, partition_id: int) -> str:
+    """Return the client name for a given partition-id.
+
+    ``client_names`` is the comma-separated string from the ``client_names``
+    run config (see pyproject.toml), the single source of truth for the
+    partition-id-to-name mapping shared by ClientApp and ServerApp.
+    """
+    return client_names.split(",")[partition_id]
 
 
 def make_run_output_folder(output_folder: str, rn_seed: int) -> str:
