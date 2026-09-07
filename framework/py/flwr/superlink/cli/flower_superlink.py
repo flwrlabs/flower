@@ -295,22 +295,7 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
             backup_count=args.log_rotation_backup_count,
         )
 
-    # Detect if `--executor*` arguments were set
-    if args.executor or args.executor_dir or args.executor_config:
-        flwr_exit(
-            ExitCode.SUPERLINK_INVALID_ARGS,
-            "The arguments `--executor`, `--executor-dir`, and `--executor-config` are "
-            "deprecated and will be removed in a future release. To run SuperLink with "
-            "the simulation runtime, please use `--simulation`.",
-        )
-
-    # Detect if both Control API and Exec API addresses were set explicitly
-    explicit_args = set()
-    for arg in sys.argv[1:]:
-        if arg.startswith("--"):
-            explicit_args.add(
-                arg.split("=")[0]
-            )  # handles both `--arg val` and `--arg=val`
+    explicit_args = {arg.split("=")[0] for arg in sys.argv[1:] if arg.startswith("--")}
 
     # The old opt-in flag is accepted for compatibility, but no longer needed.
     if "--allow-runtime-dependency-installation" in explicit_args:
@@ -322,24 +307,13 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         )
 
     control_api_set = "--control-api-address" in explicit_args
-    exec_api_set = "--exec-api-address" in explicit_args
 
-    if control_api_set and exec_api_set:
-        flwr_exit(
-            ExitCode.SUPERLINK_INVALID_ARGS,
-            "Both `--control-api-address` and `--exec-api-address` are set. "
-            "Please use only `--control-api-address` as `--exec-api-address` is "
-            "deprecated.",
-        )
-
-    # Warn deprecated `--exec-api-address` argument
-    if args.exec_api_address is not None:
+    if control_api_set:
         log(
             WARN,
-            "The `--exec-api-address` argument is deprecated and will be removed in a "
-            "future release. Use `--control-api-address` instead.",
+            "The `--control-api-address` argument is deprecated. The Control API "
+            "now operates over HTTP. Use `--host` and `--port` instead.",
         )
-        args.control_api_address = args.exec_api_address
 
     # Parse IP addresses
     control_address, _, _ = _format_address(args.control_api_address)
@@ -882,30 +856,9 @@ def _add_args_control_api(parser: argparse.ArgumentParser) -> None:
     """Add command line arguments for Control API."""
     parser.add_argument(
         "--control-api-address",
-        help="Control API server address (IPv4, IPv6, or a domain name) "
-        f"By default, it is set to {CONTROL_API_DEFAULT_SERVER_ADDRESS}.",
+        help="Deprecated. The Control API now operates over HTTP. Use `--host` and "
+        "`--port` instead.",
         default=CONTROL_API_DEFAULT_SERVER_ADDRESS,
-    )
-    parser.add_argument(
-        "--exec-api-address",
-        help="This argument is deprecated and will be removed in a future release. "
-        "Use `--control-api-address` instead.",
-        default=None,
-    )
-    parser.add_argument(
-        "--executor",
-        help="This argument is deprecated and will be removed in a future release.",
-        default=None,
-    )
-    parser.add_argument(
-        "--executor-dir",
-        help="This argument is deprecated and will be removed in a future release.",
-        default=None,
-    )
-    parser.add_argument(
-        "--executor-config",
-        help="This argument is deprecated and will be removed in a future release.",
-        default=None,
     )
     parser.add_argument(  # To be removed in follow-up PRs
         "--simulation",
