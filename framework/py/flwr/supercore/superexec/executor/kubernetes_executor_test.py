@@ -16,6 +16,8 @@
 
 # pylint: disable=too-many-lines
 
+import importlib
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -425,7 +427,7 @@ def test_launch_dispatches_compatible_ready_pod_without_a_credential_secret(
     response = _WarmExecResponse()
     stream = Mock(return_value=response)
     monkeypatch.setattr(
-        kube.importlib,
+        importlib,
         "import_module",
         Mock(return_value=SimpleNamespace(stream=stream)),
     )
@@ -435,7 +437,7 @@ def test_launch_dispatches_compatible_ready_pod_without_a_credential_secret(
         assert daemon
         return SimpleNamespace(start=lambda: started.append((target, args)))
 
-    monkeypatch.setattr(kube.threading, "Thread", _thread)
+    monkeypatch.setattr(threading, "Thread", _thread)
     executor = KubernetesExecutor(client=client, config=config)
 
     result = executor.launch(
@@ -508,12 +510,12 @@ def test_launch_returns_unknown_after_unacknowledged_warm_token_delivery(
     }
     response = _WarmExecResponse(acknowledge=False)
     monkeypatch.setattr(
-        kube.importlib,
+        importlib,
         "import_module",
         Mock(return_value=SimpleNamespace(stream=Mock(return_value=response))),
     )
     monkeypatch.setattr(
-        kube.threading,
+        threading,
         "Thread",
         lambda **_kwargs: SimpleNamespace(start=lambda: None),
     )

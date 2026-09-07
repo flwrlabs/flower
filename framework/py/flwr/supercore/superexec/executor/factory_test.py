@@ -122,6 +122,7 @@ def test_get_executor_parses_agentapp_warm_executor_pool(
         },
     )
 
+    assert isinstance(executor, KubernetesExecutor)
     pool = executor._config.warm_executor_pools[0]  # pylint: disable=protected-access
     assert pool.key.task_type.value == "flwr-agentapp"
     assert pool.key.fab_hash == "agent-fab-sha256"
