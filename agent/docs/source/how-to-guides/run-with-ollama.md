@@ -5,9 +5,9 @@ Run a Flower AgentApp entirely on your machine with an
 require a Flower account or model API key.
 
 This guide builds on [Run an AgentApp with a local
-SuperLink](run-with-local-superlink.md) and targets Flower 1.35.0. The example
-streams responses from `qwen3.5:4b`, but you can use another model that
-supports the required Ollama endpoint.
+SuperLink](run-with-local-superlink.md). The example streams responses from
+`qwen3.5:4b`, but you can use another model that supports the required Ollama
+endpoint.
 
 ```{warning}
 This guide disables TLS and is intended for local development only. Do not
@@ -114,7 +114,7 @@ description = "A local Flower AgentApp backed by Ollama"
 license = "Apache-2.0"
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "flwr>=1.35.0,<2.0",
+    "flwr>=1.37.0,<2.0",
     "openai>=2.16.0,<3.0.0",
 ]
 
@@ -124,7 +124,7 @@ packages = ["agent"]
 [tool.flwr.app]
 publisher = "local"
 display-name = "Ollama Agent"
-flwr-version-target = "1.35.0"
+flwr-version-target = "1.37.0"
 fab-include = ["agent/**/*.py"]
 
 [tool.flwr.app.components]
@@ -162,7 +162,7 @@ In another terminal, add the local SuperLink connection to
 
 ```toml
 [superlink.local-agent]
-address = "127.0.0.1:9093"
+address = "127.0.0.1:8000"
 insecure = true
 ```
 
@@ -193,8 +193,8 @@ $ uv run flwr run . local-agent \
   confirm that the desktop app is running.
 - **Ollama reports that the model is missing:** run `ollama pull <model>` and
   retry the Flower run.
-- **Port `9093` refuses connections:** confirm that SuperLink is running and
-  that `local-agent` points to `127.0.0.1:9093`.
+- **Port `8000` refuses connections:** confirm that SuperLink is running and
+  that `local-agent` points to `127.0.0.1:8000`.
 - **The run fails without enough detail:** inspect it with `uv run flwr list --run-id <run-id> local-agent` and `uv run flwr log <run-id> local-agent --show`.
 
 Press {kbd}`Ctrl+C` in the SuperLink and `ollama serve` terminals when you are

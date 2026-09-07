@@ -14,6 +14,7 @@
 # ===============================================================================
 """Tests for the Attio connector."""
 
+from typing import cast
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
 
@@ -55,52 +56,114 @@ def _invoke(name: str, arguments: JSONObject) -> JSONValue:
 
 
 def test_attio_actions_are_registered_as_read_only() -> None:
-    """Attio should expose four account-scoped read actions."""
-    assert len(ACTIONS) == 4
+    """Attio should expose six account-scoped read actions."""
+    assert [action.name for action in ACTIONS] == [
+        "identify",
+        "get_workspace_member",
+        "search_records",
+        "list_meetings",
+        "list_call_recordings",
+        "get_call_transcript",
+    ]
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     tools = registry.get_connector_tools(ATTIO_CONNECTOR_REF)
     assert [tool["name"] for tool in tools] == [
         f"{ATTIO_CONNECTOR_REF}_{action.name}" for action in ACTIONS
     ]
+    schemas = {action.name: action.input_schema for action in ACTIONS}
+    search_schema = schemas["search_records"]
+    assert "request_as" in cast(list[JSONValue], search_schema["required"])
+    meeting_properties = cast(JSONObject, schemas["list_meetings"]["properties"])
+    assert cast(JSONObject, meeting_properties["participants"])["type"] == "string"
+    for schema in schemas.values():
+        properties = cast(JSONObject, schema["properties"])
+        if limit := properties.get("limit"):
+            assert "maximum" not in cast(JSONObject, limit)
 
 
-def test_search_records_calls_attio() -> None:
-    """Record search should pass the documented request to Attio."""
-    response = _response({"data": []})
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        result = _invoke(
-            "attio_search_records", {"query": "Flower", "objects": ["companies"]}
-        )
-
-    assert request.call_args.args == (
-        "POST",
-        "https://api.attio.com/v2/objects/records/search",
-    )
-    assert request.call_args.kwargs["json"] == {
-        "query": "Flower",
-        "objects": ["companies"],
+def test_attio_actions_forward_requests() -> None:
+    """Attio actions should forward inputs without semantic rewriting."""
+    member_id = "CB59AB17-AD15-460C-A126-0715617C0853"
+    search: JSONObject = {
+        "query": "",
+        "objects": ["people"],
+        "limit": 26,
         "request_as": {"type": "workspace"},
-        "limit": 25,
     }
-    assert result == {"data": []}
+    meetings: JSONObject = {
+        "limit": 201,
+        "cursor": "0",
+        "linked_record_id": "me",
+        "participants": "me",
+        "sort": "latest",
+        "ends_from": "2026-08-01T00:00:00Z",
+        "starts_before": "2026-09-01T00:00:00Z",
+        "timezone": "Europe/Berlin",
+    }
+    cases: list[tuple[str, JSONObject, str, str, JSONObject]] = [
+        ("attio_identify", {}, "GET", "/self", {"params": {}}),
+        (
+            "attio_get_workspace_member",
+            {"workspace_member_id": member_id},
+            "GET",
+            f"/workspace_members/{member_id}",
+            {"params": {}},
+        ),
+        (
+            "attio_search_records",
+            search,
+            "POST",
+            "/objects/records/search",
+            {"json": search},
+        ),
+        (
+            "attio_list_meetings",
+            meetings,
+            "GET",
+            "/meetings",
+            {"params": {key: str(value) for key, value in meetings.items()}},
+        ),
+        ("attio_list_meetings", {}, "GET", "/meetings", {"params": {}}),
+    ]
+    response = _response({"data": []})
+    for name, arguments, method, path, expected_kwargs in cases:
+        with patch(_HTTP_REQUEST, return_value=response) as request:
+            assert _invoke(name, arguments) == {"data": []}
+
+        assert request.call_args.args == (method, f"https://api.attio.com/v2{path}")
+        for key, value in expected_kwargs.items():
+            assert request.call_args.kwargs[key] == value
 
 
-def test_api_errors_are_secret_safe() -> None:
-    """API errors should not expose tokens or response text."""
+def test_api_errors_include_attio_code_and_message() -> None:
+    """Attio's documented error fields should remain readable to callers."""
     with (
         patch(
             _HTTP_REQUEST,
             return_value=_response(
-                {"message": "attio-secret"},
-                status_code=401,
+                {
+                    "code": "invalid_query",
+                    "message": "Participants must be email addresses",
+                },
+                status_code=400,
             ),
         ),
         pytest.raises(AttioApiError) as error,
     ):
-        _invoke("attio_search_records", {"query": "Flower", "objects": ["companies"]})
+        _invoke(
+            "attio_search_records",
+            {
+                "query": "Flower",
+                "objects": ["people"],
+                "request_as": {"type": "workspace"},
+            },
+        )
 
-    assert error.value.code == "http_error"
-    assert "attio-secret" not in str(error.value)
+    assert error.value.code == "invalid_query"
+    assert str(error.value) == (
+        "Attio API request failed: invalid_query (400): "
+        "Participants must be email addresses."
+    )
 
 
 def test_oauth_builds_url_and_exchanges_code() -> None:
