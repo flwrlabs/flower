@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flwr-datasets"
-version = "0.6.0"
+version = "0.6.1"
 description = "Flower Datasets"
 license = "Apache-2.0"
 authors = [{ name = "The Flower Authors", email = "hello@flower.ai" }]
