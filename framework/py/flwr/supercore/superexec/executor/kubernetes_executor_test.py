@@ -119,7 +119,11 @@ def _ready_warm_pod(
     name: str = "flwr-taskexecutor-warm-ready",
 ) -> dict[str, Any]:
     """Build one compatible Ready Pod returned by the Kubernetes API."""
-    pod = _as_dict(kube._build_warm_executor_pod(pool_key, config, "ready"))
+    pod = _as_dict(
+        kube._build_warm_executor_pod(  # pylint: disable=protected-access
+            pool_key, config, "ready"
+        )
+    )
     pod["metadata"]["name"] = name
     pod["status"] = {
         "phase": "Running",
@@ -555,7 +559,9 @@ def test_warm_pool_replaces_consumed_pod_and_cleans_up_idle_pods() -> None:
     pool._wait_for_task_and_replace(  # pylint: disable=protected-access
         "consumed",
         pool_key,
-        kube._KubernetesWarmExecutorDispatch(_WarmExecResponse(False)),
+        kube._KubernetesWarmExecutorDispatch(  # pylint: disable=protected-access
+            _WarmExecResponse(False)
+        ),
     )
 
     client.delete_namespaced_pod.assert_called_once_with(

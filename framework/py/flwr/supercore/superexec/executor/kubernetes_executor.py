@@ -358,6 +358,7 @@ class _WarmExecutorPoolManager:
         self._lock = threading.Lock()
         self.ensure_capacity()
 
+    # pylint: disable-next=too-many-return-statements
     def launch(
         self, spec: ExecutionSpec, runtime_root_certificates: str | None
     ) -> LaunchResult | None:
