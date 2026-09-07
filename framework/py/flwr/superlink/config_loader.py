@@ -68,7 +68,6 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     port: int
     insecure: bool
     certificates: tuple[bytes, bytes, bytes] | None
-    runtime_certificates: tuple[bytes, bytes, bytes] | None
     superexec_auth_secret: bytes | None
     authn_plugin: ControlAuthnPlugin
     event_log_plugin: EventLogWriterPlugin | None

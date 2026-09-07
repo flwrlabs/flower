@@ -267,7 +267,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         runtime_address = resolve_bind_address(f"{runtime_host}:{config.port}")
         command = _get_superexec_command(
             runtime_address=runtime_address,
-            runtime_certificates=config.runtime_certificates,
+            runtime_certificates=config.certificates,
             runtime_root_certificates_path=config.runtime_ssl_ca_certfile,
             parent_pid=os.getpid(),
             runtime_dependency_install=config.runtime_dependency_install,
@@ -322,7 +322,7 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         health_server_address, _, _ = _format_address(args.health_server_address)
 
     # Obtain certificates
-    certificates, runtime_certificates = _obtain_superlink_certificates(args)
+    certificates = _obtain_superlink_certificates(args)
 
     # Load SuperExec auth secret
     superexec_auth_secret: bytes | None = None
@@ -427,7 +427,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         port=args.port,
         insecure=args.insecure,
         certificates=certificates,
-        runtime_certificates=runtime_certificates,
         superexec_auth_secret=superexec_auth_secret,
         authn_plugin=authn_plugin,
         event_log_plugin=event_log_plugin,
@@ -441,17 +440,9 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         ssl_certfile=args.ssl_certfile,
         database=args.database,
         isolation=args.isolation,
-        runtime_ssl_ca_certfile=args.runtime_ssl_ca_certfile,
-        runtime_ssl_certfile=(
-            str(Path(args.runtime_ssl_certfile).expanduser())
-            if runtime_certificates is not None
-            else None
-        ),
-        runtime_ssl_keyfile=(
-            str(Path(args.runtime_ssl_keyfile).expanduser())
-            if runtime_certificates is not None
-            else None
-        ),
+        runtime_ssl_ca_certfile=args.ssl_ca_certfile,
+        runtime_ssl_certfile=args.ssl_certfile,
+        runtime_ssl_keyfile=args.ssl_keyfile,
         runtime_dependency_install=args.runtime_dependency_install,
     )
 
@@ -521,8 +512,8 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
 
 def _obtain_superlink_certificates(
     args: argparse.Namespace,
-) -> tuple[tuple[bytes, bytes, bytes] | None, tuple[bytes, bytes, bytes] | None]:
-    """Return Fleet/Control and Runtime API certificate tuples."""
+) -> tuple[bytes, bytes, bytes] | None:
+    """Return TLS certificate tuple used by all APIs (Fleet, Control, and Runtime)."""
     if args.insecure:
         log(
             WARN,
@@ -530,10 +521,8 @@ def _obtain_superlink_certificates(
             "unencrypted communication (TLS disabled). Proceed only if you understand "
             "the risks.",
         )
-        return None, None
-    certificates = try_obtain_server_certificates(args)
-    runtime_certificates = try_obtain_optional_runtime_server_certificates(args)
-    return certificates, runtime_certificates
+        return None
+    return try_obtain_server_certificates(args)
 
 
 def _get_superexec_command(
@@ -787,30 +776,36 @@ def _add_args_http_api(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_args_runtime_api(parser: argparse.ArgumentParser) -> None:
+    # Deprecated: Runtime API now uses the same TLS certificates as Fleet/Control APIs
     parser.add_argument(
         "--appio-ssl-certfile",
         dest="runtime_ssl_certfile",
-        help="Runtime API server TLS certificate file (as a path str) "
-        "to create a secure connection. The certificate must include SANs for "
-        "the Runtime API address used by SuperExec.",
-        type=str,
-        default=None,
+        help=argparse.SUPPRESS,
+        type=lambda v: _deprecated_appio_ssl_flag(v, "appio-ssl-certfile"),
     )
     parser.add_argument(
         "--appio-ssl-keyfile",
         dest="runtime_ssl_keyfile",
-        help="Runtime API server TLS private key file (as a path str) "
-        "to create a secure connection.",
-        type=str,
+        help=argparse.SUPPRESS,
+        type=lambda v: _deprecated_appio_ssl_flag(v, "appio-ssl-keyfile"),
     )
     parser.add_argument(
         "--appio-ssl-ca-certfile",
         dest="runtime_ssl_ca_certfile",
-        help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
-        "the Runtime API server certificate. This is not a client certificate "
-        "for mTLS.",
-        type=str,
+        help=argparse.SUPPRESS,
+        type=lambda v: _deprecated_appio_ssl_flag(v, "appio-ssl-ca-certfile"),
     )
+
+
+def _deprecated_appio_ssl_flag(value: str, flag_name: str) -> str:
+    """Reject a deprecated --appio-ssl-* flag."""
+    flwr_exit(
+        ExitCode.SUPERLINK_INVALID_ARGS,
+        f"The `--{flag_name}` flag no longer exists. ControlAPI, FleetAPI and "
+        "Runtime API use the same TLS certificates. Use `--ssl-certfile`, "
+        "`--ssl-keyfile`, and `--ssl-ca-certfile` instead.",
+    )
+    return value  # Never reached
 
 
 def _positive_int(value: str) -> int:
