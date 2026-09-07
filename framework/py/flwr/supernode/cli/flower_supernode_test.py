@@ -50,22 +50,56 @@ def test_parse_supernode_version_flag(
     assert captured.out == f"Flower version: {package_version}\n"
 
 
-def test_parse_supernode_appio_tls_args() -> None:
-    """SuperNode should parse AppIO-named TLS args for its Runtime API."""
+def test_parse_supernode_tls_args() -> None:
+    """SuperNode should parse TLS args for its Runtime API."""
     args = _parse_args_run_supernode().parse_args(
         [
-            "--appio-ssl-certfile",
-            "appio-cert.pem",
-            "--appio-ssl-keyfile",
-            "appio-key.pem",
-            "--appio-ssl-ca-certfile",
-            "appio-ca.pem",
+            "--ssl-certfile",
+            "cert.pem",
+            "--ssl-keyfile",
+            "key.pem",
+            "--ssl-ca-certfile",
+            "ca.pem",
         ]
     )
 
-    assert args.runtime_ssl_certfile == "appio-cert.pem"
-    assert args.runtime_ssl_keyfile == "appio-key.pem"
-    assert args.runtime_ssl_ca_certfile == "appio-ca.pem"
+    assert args.runtime_ssl_certfile == "cert.pem"
+    assert args.runtime_ssl_keyfile == "key.pem"
+    assert args.runtime_ssl_ca_certfile == "ca.pem"
+
+
+def test_parse_supernode_deprecated_appio_tls_args(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Deprecated AppIO TLS args should warn and map to the new destinations."""
+    log = Mock()
+    monkeypatch.setattr(flower_supernode_module, "log", log)
+
+    args = _parse_args_run_supernode().parse_args(
+        [
+            "--appio-ssl-certfile",
+            "cert.pem",
+            "--appio-ssl-keyfile",
+            "key.pem",
+            "--appio-ssl-ca-certfile",
+            "ca.pem",
+        ]
+    )
+
+    assert args.runtime_ssl_certfile == "cert.pem"
+    assert args.runtime_ssl_keyfile == "key.pem"
+    assert args.runtime_ssl_ca_certfile == "ca.pem"
+    assert log.call_count == 3
+    assert all("deprecated" in call.args[1] for call in log.call_args_list)
+
+
+def test_parse_supernode_help_marks_appio_tls_args_deprecated() -> None:
+    """Deprecated AppIO TLS args should point to their replacements in help."""
+    help_message = _parse_args_run_supernode().format_help()
+
+    assert "Deprecated: use `--ssl-certfile` instead." in help_message
+    assert "Deprecated: use `--ssl-keyfile` instead." in help_message
+    assert "Deprecated: use `--ssl-ca-certfile` instead." in help_message
 
 
 def test_parse_supernode_lifespan_config_returns_final_defaults(
@@ -95,10 +129,10 @@ def test_parse_supernode_lifespan_config_returns_final_defaults(
     assert config.runtime_dependency_install is False
 
 
-def test_parse_supernode_lifespan_config_preserves_appio_tls_args(
+def test_parse_supernode_lifespan_config_preserves_tls_args(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """SuperNode lifespan config should preserve AppIO-specific TLS args."""
+    """SuperNode lifespan config should preserve Runtime API TLS args."""
     runtime_certificates = (b"appio-ca", b"appio-cert", b"appio-key")
     monkeypatch.setattr(
         sys,
@@ -106,24 +140,26 @@ def test_parse_supernode_lifespan_config_preserves_appio_tls_args(
         [
             "flower-supernode",
             "--insecure",
-            "--appio-ssl-certfile",
-            "appio-cert.pem",
-            "--appio-ssl-keyfile",
-            "appio-key.pem",
-            "--appio-ssl-ca-certfile",
-            "appio-ca.pem",
+            "--ssl-certfile",
+            "cert.pem",
+            "--ssl-keyfile",
+            "key.pem",
+            "--ssl-ca-certfile",
+            "ca.pem",
         ],
     )
+    obtain_certificates = Mock(return_value=runtime_certificates)
     monkeypatch.setattr(
         flower_supernode_module,
         "try_obtain_optional_runtime_server_certificates",
-        Mock(return_value=runtime_certificates),
+        obtain_certificates,
     )
 
     config = _parse_supernode_lifespan_config()
 
     assert config.runtime_certificates == runtime_certificates
-    assert config.runtime_root_certificates_path == "appio-ca.pem"
+    assert config.runtime_root_certificates_path == "ca.pem"
+    assert obtain_certificates.call_args.kwargs == {"option_prefix": ""}
 
 
 def test_flower_supernode_checks_for_update(

@@ -17,10 +17,12 @@
 
 import argparse
 import threading
+from collections.abc import Sequence
 from dataclasses import dataclass
 from logging import DEBUG, INFO, WARN
 from pathlib import Path
 from time import sleep
+from typing import Any
 
 import uvicorn
 import yaml
@@ -99,7 +101,9 @@ def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
     if trusted_entities:
         _validate_public_keys_ed25519(trusted_entities)
     root_certificates = try_obtain_root_certificates(args, args.superlink)
-    runtime_certificates = try_obtain_optional_runtime_server_certificates(args)
+    runtime_certificates = try_obtain_optional_runtime_server_certificates(
+        args, option_prefix=""
+    )
     authentication_keys = _try_setup_client_authentication(args)
     superexec_auth_secret = None
     if args.superexec_auth_secret_file is not None:
@@ -296,7 +300,7 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--appio-ssl-certfile",
+        "--ssl-certfile",
         dest="runtime_ssl_certfile",
         help="Runtime API server TLS certificate file (as a path str) "
         "to create a secure connection. The certificate must include SANs for "
@@ -305,19 +309,37 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
         default=None,
     )
     parser.add_argument(
-        "--appio-ssl-keyfile",
+        "--ssl-keyfile",
         dest="runtime_ssl_keyfile",
         help="Runtime API server TLS private key file (as a path str) "
         "to create a secure connection.",
         type=str,
     )
     parser.add_argument(
-        "--appio-ssl-ca-certfile",
+        "--ssl-ca-certfile",
         dest="runtime_ssl_ca_certfile",
         help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
         "the Runtime API server certificate. This is not a client certificate "
         "for mTLS.",
         type=str,
+    )
+    parser.add_argument(
+        "--appio-ssl-certfile",
+        dest="runtime_ssl_certfile",
+        action=_DeprecatedAppioSslOption,
+        help="Deprecated: use `--ssl-certfile` instead.",
+    )
+    parser.add_argument(
+        "--appio-ssl-keyfile",
+        dest="runtime_ssl_keyfile",
+        action=_DeprecatedAppioSslOption,
+        help="Deprecated: use `--ssl-keyfile` instead.",
+    )
+    parser.add_argument(
+        "--appio-ssl-ca-certfile",
+        dest="runtime_ssl_ca_certfile",
+        action=_DeprecatedAppioSslOption,
+        help="Deprecated: use `--ssl-ca-certfile` instead.",
     )
     parser.add_argument(
         "--trusted-entities",
@@ -336,6 +358,26 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
     add_args_health(parser)
 
     return parser
+
+
+class _DeprecatedAppioSslOption(argparse.Action):
+    """Route a deprecated AppIO TLS option to its replacement."""
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str | Sequence[Any] | None,
+        option_string: str | None = None,
+    ) -> None:
+        replacement = option_string.replace("--appio-", "--") if option_string else ""
+        log(
+            WARN,
+            "The `%s` flag is deprecated; use `%s` instead.",
+            option_string,
+            replacement,
+        )
+        setattr(namespace, self.dest, values)
 
 
 def _port_int(value: str) -> int:
