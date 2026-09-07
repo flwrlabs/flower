@@ -131,7 +131,11 @@ class Flad(Strategy):
                 )
             )
 
-        replies = grid.send_and_receive(msgs, timeout=self.mapping_clients_timeout)
+        # Use the time remaining until `deadline` so that the combined wait for
+        # nodes to connect and for their replies never exceeds
+        # mapping_clients_timeout overall.
+        remaining_timeout = max(deadline - time.time(), 0.0)
+        replies = grid.send_and_receive(msgs, timeout=remaining_timeout)
         replies = list(replies)
         if len(replies) < len(node_ids):
             raise InconsistentMessageReplies(

@@ -94,7 +94,6 @@ def train(msg: Message, context: Context):
         tf.data.Dataset.from_tensor_slices(
             (client["training"][0], client["training"][1])
         )
-        .cache()
         .shuffle(buffer_size=len(client["training"][1]), seed=client["rn_seed"])
         .repeat()
         .batch(client["batch_size"])
