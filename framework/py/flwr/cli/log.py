@@ -121,7 +121,11 @@ def print_logs(run_id: int, stub: ControlHttpClient) -> None:
                 break
         except httpx.ReadTimeout as err:
             # Suppress only the expected no-log timeout.
-            if err.request.url.path != "/v1/control/stream-logs":
+            try:
+                request = err.request
+            except RuntimeError:
+                raise err from None
+            if request.url.path != "/v1/control/stream-logs":
                 raise
 
 
