@@ -157,11 +157,11 @@ TLS-enabled connections.
 
 .. note::
 
-    The ``--ssl-*`` Runtime API TLS options configure server-authenticated TLS.
-    They do not configure mutual TLS. The ``--ssl-ca-certfile`` file is used by
-    SuperExec and app processes to verify the Runtime API server certificate, not as a
-    client certificate. If Runtime API TLS is not configured, internal Runtime API
-    connections remain unencrypted and should stay inside a trusted network.
+    The ``--ssl-*`` Runtime API TLS options configure server-authenticated TLS. They do
+    not configure mutual TLS. The ``--ssl-ca-certfile`` file is used by SuperExec and
+    app processes to verify the Runtime API server certificate, not as a client
+    certificate. If Runtime API TLS is not configured, internal Runtime API connections
+    remain unencrypted and should stay inside a trusted network.
 
 *************************************************************
  TLS for Runtime API Connections in "Process" Isolation Mode
