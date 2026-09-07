@@ -324,6 +324,13 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
     control_api_set = "--control-api-address" in explicit_args
     exec_api_set = "--exec-api-address" in explicit_args
 
+    if control_api_set:
+        log(
+            WARN,
+            "The `--control-api-address` argument is deprecated. The Control API "
+            "now operates over HTTP. Use `--host` and `--port` instead.",
+        )
+
     if control_api_set and exec_api_set:
         flwr_exit(
             ExitCode.SUPERLINK_INVALID_ARGS,
@@ -882,8 +889,8 @@ def _add_args_control_api(parser: argparse.ArgumentParser) -> None:
     """Add command line arguments for Control API."""
     parser.add_argument(
         "--control-api-address",
-        help="Control API server address (IPv4, IPv6, or a domain name) "
-        f"By default, it is set to {CONTROL_API_DEFAULT_SERVER_ADDRESS}.",
+        help="Deprecated. The Control API now operates over HTTP. Use `--host` and "
+        "`--port` instead.",
         default=CONTROL_API_DEFAULT_SERVER_ADDRESS,
     )
     parser.add_argument(
