@@ -18,6 +18,7 @@
 import argparse
 import re
 import sys
+from io import BufferedReader
 from logging import DEBUG, INFO
 from pathlib import Path
 from queue import Queue
@@ -98,8 +99,12 @@ def _try_obtain_agentapp_token(args: argparse.Namespace) -> str:
         return try_obtain_flwr_app_token(args)
 
     try:
-        token_input = sys.stdin.read(_TOKEN_STDIN_READ_LIMIT)
-    except (OSError, UnicodeError):
+        token_input = (
+            cast(BufferedReader, sys.stdin.buffer)
+            .read1(_TOKEN_STDIN_READ_LIMIT)
+            .decode("ascii")
+        )
+    except (AttributeError, OSError, UnicodeError):
         sys.exit("Standard input does not contain exactly one valid task token.")
     finally:
         try:
