@@ -15,6 +15,7 @@
 # ==============================================================================
 """flad: A Flower Baseline."""
 
+import math
 import os
 from typing import Any
 
@@ -80,18 +81,21 @@ def train(msg: Message, context: Context):
 
     if client["steps_per_epoch"] > 0:
         client["batch_size"] = max(
-            int(len(client["training"][1]) / client["steps_per_epoch"]), 1
+            math.ceil(len(client["training"][1]) / client["steps_per_epoch"]), 1
         )
     else:
         raise ValueError("Steps per epoch must be greater than zero.")
 
-    # Train the model
+    # Train the model. `steps_per_epoch` is passed explicitly so that
+    # rounding in the batch_size computation above cannot increase the
+    # number of gradient updates beyond the budget assigned by the strategy.
     history = model.fit(
         x=client["training"][0],
         y=client["training"][1],
         validation_data=(client["validation"][0], client["validation"][1]),
         epochs=client["epochs"],
         batch_size=client["batch_size"],
+        steps_per_epoch=client["steps_per_epoch"],
         verbose=0,
         callbacks=[],
     )

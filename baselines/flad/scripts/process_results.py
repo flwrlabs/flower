@@ -18,13 +18,24 @@ def _parse_round(value: str) -> int:
 
 
 def _find_experiment_dir(rn_seed: int, log_dir: str) -> str:
-    """Find the experiment directory for a given `rn_seed`."""
+    """Find the experiment directory for a given `rn_seed`.
+
+    Directory names embed a `%Y%m%d-%H%M%S` timestamp, so sorting them
+    lexicographically is equivalent to sorting chronologically. If more than
+    one run exists for this seed, the most recent one is selected.
+    """
     matches = glob.glob(os.path.join(log_dir, f"federated_training_flad_{rn_seed}-*"))
     if not matches:
         raise FileNotFoundError(
             f"No experiment directory found for rn_seed={rn_seed} under {log_dir}"
         )
-    return matches[0]
+    matches.sort()
+    if len(matches) > 1:
+        print(
+            f"Found {len(matches)} runs for rn_seed={rn_seed}; "
+            f"using the most recent one: {matches[-1]}"
+        )
+    return matches[-1]
 
 
 def plot_f1_over_rounds(
@@ -52,6 +63,7 @@ def plot_f1_over_rounds(
     plt.plot(rounds, values)
     plt.xlabel("Round")
     plt.ylabel("F1 Score")
+    plt.ylim(0, 1.05)
     if client_name is None:
         plt.title(f"Overall F1 Score over rounds (rn_seed={rn_seed})")
     else:
