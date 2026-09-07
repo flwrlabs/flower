@@ -25,6 +25,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # pylint: disable=wrong-import-position
 import numpy as np
+import tensorflow as tf
 from flwr.app import (
     ArrayRecord,
     ConfigRecord,
@@ -86,15 +87,25 @@ def train(msg: Message, context: Context):
     else:
         raise ValueError("Steps per epoch must be greater than zero.")
 
-    # Train the model. `steps_per_epoch` is passed explicitly so that
-    # rounding in the batch_size computation above cannot increase the
-    # number of gradient updates beyond the budget assigned by the strategy.
+    # Build a repeating dataset so that model.fit can always draw exactly
+    # `steps_per_epoch` batches, regardless of how batch_size * steps_per_epoch
+    # relates to the number of local training samples.
+    train_dataset = (
+        tf.data.Dataset.from_tensor_slices(
+            (client["training"][0], client["training"][1])
+        )
+        .cache()
+        .shuffle(buffer_size=len(client["training"][1]), seed=client["rn_seed"])
+        .repeat()
+        .batch(client["batch_size"])
+        .prefetch(tf.data.AUTOTUNE)
+    )
+
+    # Train the model. `shuffle=False` since train_dataset is already shuffled.
     history = model.fit(
-        x=client["training"][0],
-        y=client["training"][1],
+        train_dataset,
         validation_data=(client["validation"][0], client["validation"][1]),
         epochs=client["epochs"],
-        batch_size=client["batch_size"],
         steps_per_epoch=client["steps_per_epoch"],
         verbose=0,
         callbacks=[],
