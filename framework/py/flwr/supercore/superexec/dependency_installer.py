@@ -144,6 +144,7 @@ def install_app_dependencies(
     log(DEBUG, "Using UV_PROJECT_ENVIRONMENT=%s", sync_env["UV_PROJECT_ENVIRONMENT"])
 
     installed_packages: set[str] = set()
+    log(INFO, "Starting uv sync.")
     sync_error = _run_cmd(
         sync_cmd,
         cwd=project_dir,
@@ -151,6 +152,7 @@ def install_app_dependencies(
         log_output_level=DEBUG,
         installed_packages=installed_packages,
     )
+    log(INFO, "Finished uv sync.")
     if sync_error is not None:
         raise RuntimeDependencyInstallationError(f"uv sync failed: {sync_error}")
 
