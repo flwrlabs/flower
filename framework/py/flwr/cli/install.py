@@ -228,7 +228,7 @@ def _verify_hashes(list_content: str, tmpdir: Path) -> bool:
         True if all file hashes match, False otherwise.
     """
     for line in list_content.strip().split("\n"):
-        rel_path, hash_expected, _ = line.split(",")
+        rel_path, hash_expected, _ = line.rsplit(",", maxsplit=2)
         file_path = tmpdir / rel_path
         if not file_path.exists() or get_sha256_hash(file_path) != hash_expected:
             return False
