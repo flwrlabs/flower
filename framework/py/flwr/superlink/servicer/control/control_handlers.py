@@ -1205,9 +1205,19 @@ def get_run_series(
     # Run series context is created atomically by LinkState.create_run(...)
     # and should never be None.
     series_context = state.get_run_series_context(request.series_id)
+    run_series = series_matches[0]
+    runs_by_id = {
+        run.run_id: run for run in state.get_run_info(run_ids=run_series.run_ids)
+    }
+    runs = [
+        run_to_proto(run)
+        for run_id in run_series.run_ids
+        if (run := runs_by_id.get(run_id)) is not None
+    ]
     response = GetRunSeriesResponse(
-        series=_with_last_run_statuses(state, series_matches)[0],
+        series=_with_last_run_statuses(state, [run_series])[0],
         context=context_to_proto(series_context) if series_context else None,
+        runs=runs,
     )
     return response
 
