@@ -799,7 +799,7 @@ def _deprecated_appio_ssl_flag(value: str, flag_name: str) -> str:
     """Reject a deprecated --appio-ssl-* flag."""
     flwr_exit(
         ExitCode.SUPERLINK_INVALID_ARGS,
-        f"The `--{flag_name}` flag no longer exists. ControlAPI, FleetAPI and "
+        f"The `--{flag_name}` flag no longer exists. Control API, Fleet API, and "
         "Runtime API use the same TLS certificates. Use `--ssl-certfile`, "
         "`--ssl-keyfile`, and `--ssl-ca-certfile` instead.",
     )
