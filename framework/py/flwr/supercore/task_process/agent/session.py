@@ -215,7 +215,7 @@ class RuntimeAgentConnectors(AgentConnectors):
 class RuntimeAgentResponses(AgentResponses):
     """AgentResponses implementation backed by Runtime task messages."""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         *,
         stub: RuntimeHttpClient,
