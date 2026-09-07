@@ -239,10 +239,12 @@ tutorial on :doc:`how to deploy Flower in GCP <how-to-run-flower-on-gcp>`.
                   image: flwr/superlink:|stable_flwr_version|
                   args:
                     - "--insecure"
+                    - "--host"
+                    - "0.0.0.0"
                   ports: # which ports to expose/available
                     - containerPort: 9092
                       name: fleet
-                    - containerPort: 9093
+                    - containerPort: 8000
                       name: control
                   volumeMounts:
                     - name: cache-volume
@@ -289,7 +291,7 @@ pod and insert the following YAML definition:
             targetPort: fleet  # the SuperLink container port
             name: superlink-fleetapi
           - protocol: TCP
-            port: 9093   # Port for Flower app submission
+            port: 8000   # Port for Flower app submission over HTTP
             targetPort: control  # the SuperLink container port
             name: superlink-controlapi
           type: LoadBalancer  # balances workload, makes the service publicly available
@@ -683,7 +685,7 @@ connection in the Flower Configuration file:
        :caption: config.toml
 
        [superlink.remote]
-       address = "superlink-service:9093"  # use the service name created earlier
+       address = "superlink-service:8000"  # use the service name created earlier
        insecure = true
 
 And finally, run your Flower app as usual with ``flwr run``:

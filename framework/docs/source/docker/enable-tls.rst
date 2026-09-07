@@ -54,6 +54,9 @@ Transport Layer Security (TLS) for each Flower component to ensure secure commun
                 --ssl-ca-certfile certificates/ca.crt \
                 --ssl-certfile certificates/server.pem \
                 --ssl-keyfile certificates/server.key \
+                --appio-ssl-ca-certfile certificates/ca.crt \
+                --appio-ssl-certfile certificates/server.pem \
+                --appio-ssl-keyfile certificates/server.key \
                 <additional-args>
 
         .. dropdown:: Understanding the command
@@ -82,6 +85,9 @@ Transport Layer Security (TLS) for each Flower component to ensure secure commun
               |
               | The ``certificates/server.key`` file is used to decrypt the data that is transmitted over
               | the network.
+            * | ``--appio-ssl-ca-certfile``, ``--appio-ssl-certfile``, and
+              | ``--appio-ssl-keyfile``: Configure TLS for the shared Runtime and Control
+              | HTTP APIs.
 
         **SuperNode**
 
@@ -139,6 +145,9 @@ Transport Layer Security (TLS) for each Flower component to ensure secure commun
                 --ssl-ca-certfile certificates/ca.crt \
                 --ssl-certfile certificates/server.pem \
                 --ssl-keyfile certificates/server.key \
+                --appio-ssl-ca-certfile certificates/ca.crt \
+                --appio-ssl-certfile certificates/server.pem \
+                --appio-ssl-keyfile certificates/server.key \
                 --isolation process \
                 <additional-args>
 
@@ -169,6 +178,9 @@ Transport Layer Security (TLS) for each Flower component to ensure secure commun
               |
               | The ``certificates/server.key`` file is used to decrypt the data that is transmitted over
               | the network.
+            * | ``--appio-ssl-ca-certfile``, ``--appio-ssl-certfile``, and
+              | ``--appio-ssl-keyfile``: Configure TLS for the shared Runtime and Control
+              | HTTP APIs.
             * | ``--isolation process``: Tells the SuperLink that the ServerApp is created by separate
               | independent process. The SuperLink does not attempt to create it.
 
@@ -177,17 +189,20 @@ Transport Layer Security (TLS) for each Flower component to ensure secure commun
         .. code-block:: bash
 
             $ docker run --rm \
+                --volume ./superlink-certificates/ca.crt:/app/certificates/ca.crt:ro \
                 <serverapp-image> \
-                --insecure \
+                --root-certificates certificates/ca.crt \
                 <additional-args>
 
         .. dropdown:: Understand the command
 
             * ``docker run``: This tells Docker to run a container from an image.
             * ``--rm``: Remove the container once it is stopped or the command exits.
+            * | ``--volume ./superlink-certificates/ca.crt:/app/certificates/ca.crt:ro``:
+              | Mount the ``ca.crt`` file inside the container as read-only.
             * ``<serverapp-image>``: The name of your ServerApp image to be run.
-            * | ``--insecure``:  This flag tells the container to operate in an insecure mode, allowing
-              | unencrypted communication. Secure connections will be added in future releases.
+            * | ``--root-certificates certificates/ca.crt``: Use the CA certificate to
+              | verify the SuperLink's identity when connecting to its Runtime API.
 
         **SuperNode and ClientApp**
 
@@ -260,7 +275,7 @@ connection and save it:
     :caption: config.toml
 
     [superlink.local-deployment-tls]
-    address = "127.0.0.1:9093"
+    address = "127.0.0.1:8000"
     root-certificates = "/absolute/path/to/superlink-certificates/ca.crt"
 
 .. note::

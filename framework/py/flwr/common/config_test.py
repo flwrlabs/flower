@@ -70,9 +70,9 @@ def test_get_project_config_file_not_found() -> None:
 
 def test_fuse_dicts() -> None:
     """Test that fuse_dicts works correctly."""
-    dict1 = {"a": 1, "b": 2, "c": 3, "d": {"e": 4}}
+    dict1 = {"a": 1, "b": 2, "c": 3, "d": {"e": 4, "f": 5}}
     dict2 = {"b": 4, "c": 5, "d": {"e": 6}}
-    expected = {"a": 1, "b": 4, "c": 5, "d": {"e": 6}}
+    expected = {"a": 1, "b": 4, "c": 5, "d": {"e": 6, "f": 5}}
     assert fuse_dicts(dict1, dict2) == expected
 
 
