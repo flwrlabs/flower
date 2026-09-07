@@ -78,7 +78,7 @@ clearer naming.
     address = ":local:"
 
     [superlink.local-poc]
-    address = "127.0.0.1:9093"
+    address = "127.0.0.1:8000"
     insecure = true
 
 **Explanation**
@@ -93,7 +93,7 @@ clearer naming.
   will run simulations using the default configuration of the :doc:`Simulation Runtime
   <how-to-run-simulations>`.
 - ``[superlink.local-poc]`` defines a configuration for connecting to a locally running
-  SuperLink at address ``127.0.0.1:9093``
+  SuperLink at address ``127.0.0.1:8000``
 
 Connection configuration names must be unique and use the ``superlink.`` prefix.
 
@@ -187,11 +187,11 @@ configure connections that point to a remote SuperLink.
 **Explanation**
 
 - ``address`` (required): The address of the SuperLink Control API to connect to (e.g.,
-  ``my-server.example.com:9093``).
+  ``my-server.example.com:8000``).
 - ``root-certificates``: Path to the root certificate file for TLS encryption. This
   secures the communication between your CLI and the SuperLink. If omitted, Flower uses
-  the default gRPC root certificate. This field is ignored if ``insecure`` is set to
-  ``true``.
+  the default CA bundle configured by its HTTP client. This field is ignored if
+  ``insecure`` is set to ``true``.
 - ``insecure``: Set to ``true`` to disable TLS encryption (only use this for local
   testing, never in production). Defaults to ``false`` if omitted, meaning TLS is
   enabled by default.
