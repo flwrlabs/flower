@@ -18,7 +18,7 @@ import gzip
 import random
 import ssl
 from collections.abc import Generator, Iterator
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import httpx
 import pytest
@@ -267,18 +267,24 @@ def test_unary_stream_sends_and_receives_framed_protobuf() -> None:
 
 
 def test_unary_stream_sets_read_timeout() -> None:
-    """Apply the optional timeout while reading a successful stream."""
-    response = _stream_response(200, [])
-    read_timeout = None
+    """Apply the optional timeout while reading a stream."""
 
     def send(request: httpx.Request, **_kwargs: object) -> httpx.Response:
-        nonlocal read_timeout
-        read_timeout = request.extensions["timeout"]["read"]
-        return response
+        stream = MagicMock(spec=httpx.SyncByteStream)
 
-    with patch(
-        "flwr.supercore.protobuf.client.httpx.Client.send",
-        side_effect=send,
+        def timeout() -> None:
+            assert request.extensions["timeout"]["read"] == 5.0
+            raise httpx.ReadTimeout("Timed out", request=request)
+
+        stream.__iter__.side_effect = timeout
+        return httpx.Response(200, stream=stream, request=request)
+
+    with (
+        patch(
+            "flwr.supercore.protobuf.client.httpx.Client.send",
+            side_effect=send,
+        ),
+        pytest.raises(httpx.ReadTimeout),
     ):
         list(
             _stream_call(
@@ -286,8 +292,6 @@ def test_unary_stream_sets_read_timeout() -> None:
                 read_timeout=5.0,
             )
         )
-
-    assert read_timeout == 5.0
 
 
 @pytest.mark.parametrize(
