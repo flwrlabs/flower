@@ -295,13 +295,26 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
             backup_count=args.log_rotation_backup_count,
         )
 
+    explicit_args = {
+        arg.split("=")[0] for arg in sys.argv[1:] if arg.startswith("--")
+    }
+
     # The old opt-in flag is accepted for compatibility, but no longer needed.
-    if "--allow-runtime-dependency-installation" in sys.argv:
+    if "--allow-runtime-dependency-installation" in explicit_args:
         log(
             WARN,
             "The `--allow-runtime-dependency-installation` argument is deprecated. "
             "Runtime dependency installation is enabled by default for SuperLink. "
             "Use `--disable-runtime-dependency-installation` to disable it.",
+        )
+
+    control_api_set = "--control-api-address" in explicit_args
+
+    if control_api_set:
+        log(
+            WARN,
+            "The `--control-api-address` argument is deprecated. The Control API "
+            "now operates over HTTP. Use `--host` and `--port` instead.",
         )
 
     # Parse IP addresses
@@ -845,8 +858,8 @@ def _add_args_control_api(parser: argparse.ArgumentParser) -> None:
     """Add command line arguments for Control API."""
     parser.add_argument(
         "--control-api-address",
-        help="Control API server address (IPv4, IPv6, or a domain name) "
-        f"By default, it is set to {CONTROL_API_DEFAULT_SERVER_ADDRESS}.",
+        help="Deprecated. The Control API now operates over HTTP. Use `--host` and "
+        "`--port` instead.",
         default=CONTROL_API_DEFAULT_SERVER_ADDRESS,
     )
     parser.add_argument(  # To be removed in follow-up PRs
