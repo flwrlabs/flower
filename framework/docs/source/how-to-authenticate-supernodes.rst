@@ -93,21 +93,13 @@ To launch a SuperLink with SuperNode authentication enabled, you need to provide
 aditional files in addition to the certificates needed for the TLS connections. Recall
 that the authentication feature can only be enabled in the presence of TLS.
 
-.. note::
-
-    To enable TLS also for the Runtime API on SuperLink, please refer to :ref:`Launching
-    the SuperLink with TLS <launching-the-superlink-with-tls>`.
-
 .. code-block:: bash
-    :emphasize-lines: 8
+    :emphasize-lines: 5
 
     $ flower-superlink \
         --ssl-ca-certfile certificates/ca.crt \
         --ssl-certfile certificates/server.pem \
         --ssl-keyfile certificates/server.key \
-        --appio-ssl-ca-certfile certificates/ca.crt \
-        --appio-ssl-certfile certificates/server.pem \
-        --appio-ssl-keyfile certificates/server.key \
         --enable-supernode-auth
 
 .. dropdown:: Understand the command

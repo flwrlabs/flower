@@ -23,6 +23,7 @@ import sys
 import threading
 from collections.abc import Sequence
 from logging import INFO, WARN
+from pathlib import Path
 from time import sleep
 from typing import cast
 
@@ -81,9 +82,7 @@ from flwr.supercore.interceptors import (
 from flwr.supercore.logger import configure_superlink_log_file, console_handler
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
-from flwr.supercore.tls import (
-    get_client_tls_args,
-)
+from flwr.supercore.tls import get_client_tls_args
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.utils import get_popen_detach_kwargs
 from flwr.supercore.version import package_version
@@ -438,9 +437,21 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         ssl_certfile=args.ssl_certfile,
         database=args.database,
         isolation=args.isolation,
-        runtime_ssl_ca_certfile=args.ssl_ca_certfile,
-        runtime_ssl_certfile=args.ssl_certfile,
-        runtime_ssl_keyfile=args.ssl_keyfile,
+        runtime_ssl_ca_certfile=(
+            str(Path(args.ssl_ca_certfile).expanduser())
+            if certificates is not None
+            else None
+        ),
+        runtime_ssl_certfile=(
+            str(Path(args.ssl_certfile).expanduser())
+            if certificates is not None
+            else None
+        ),
+        runtime_ssl_keyfile=(
+            str(Path(args.ssl_keyfile).expanduser())
+            if certificates is not None
+            else None
+        ),
         runtime_dependency_install=args.runtime_dependency_install,
     )
 
@@ -774,36 +785,33 @@ def _add_args_http_api(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_args_runtime_api(parser: argparse.ArgumentParser) -> None:
-    # Deprecated: Runtime API now uses the same TLS certificates as Fleet/Control APIs
     parser.add_argument(
         "--appio-ssl-certfile",
         dest="runtime_ssl_certfile",
         help=argparse.SUPPRESS,
-        type=lambda v: _deprecated_appio_ssl_flag(v, "appio-ssl-certfile"),
+        type=_unsupported_appio_ssl_flag,
     )
     parser.add_argument(
         "--appio-ssl-keyfile",
         dest="runtime_ssl_keyfile",
         help=argparse.SUPPRESS,
-        type=lambda v: _deprecated_appio_ssl_flag(v, "appio-ssl-keyfile"),
+        type=_unsupported_appio_ssl_flag,
     )
     parser.add_argument(
         "--appio-ssl-ca-certfile",
         dest="runtime_ssl_ca_certfile",
         help=argparse.SUPPRESS,
-        type=lambda v: _deprecated_appio_ssl_flag(v, "appio-ssl-ca-certfile"),
+        type=_unsupported_appio_ssl_flag,
     )
 
 
-def _deprecated_appio_ssl_flag(value: str, flag_name: str) -> str:
-    """Reject a deprecated --appio-ssl-* flag."""
-    flwr_exit(
-        ExitCode.SUPERLINK_INVALID_ARGS,
-        f"The `--{flag_name}` flag no longer exists. Control API, Fleet API, and "
+def _unsupported_appio_ssl_flag(_value: str) -> str:
+    """Reject a removed --appio-ssl-* flag."""
+    raise argparse.ArgumentTypeError(
+        "this flag no longer exists; Control API, Fleet API, and "
         "Runtime API use the same TLS certificates. Use `--ssl-certfile`, "
-        "`--ssl-keyfile`, and `--ssl-ca-certfile` instead.",
+        "`--ssl-keyfile`, and `--ssl-ca-certfile` instead."
     )
-    return value  # Never reached
 
 
 def _positive_int(value: str) -> int:

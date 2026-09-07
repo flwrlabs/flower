@@ -17,6 +17,7 @@
 
 import argparse
 import importlib
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -123,6 +124,63 @@ def test_parse_superlink_lifespan_config_keeps_fleet_address_unset_for_simulatio
     assert config.fleet_api_address is None
 
 
+def test_parse_superlink_lifespan_config_disables_all_tls_when_insecure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The insecure flag should also disable Runtime API TLS."""
+    monkeypatch.setattr(
+        app_module.sys,
+        "argv",
+        [
+            "flower-superlink",
+            "--insecure",
+            "--ssl-ca-certfile",
+            "~/ca.pem",
+            "--ssl-certfile",
+            "~/cert.pem",
+            "--ssl-keyfile",
+            "~/key.pem",
+        ],
+    )
+
+    config = _parse_superlink_lifespan_config()
+
+    assert config.certificates is None
+    assert config.runtime_ssl_ca_certfile is None
+    assert config.runtime_ssl_certfile is None
+    assert config.runtime_ssl_keyfile is None
+
+
+def test_parse_superlink_lifespan_config_expands_runtime_tls_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Runtime API TLS paths should support the home-directory shorthand."""
+    monkeypatch.setattr(
+        app_module.sys,
+        "argv",
+        [
+            "flower-superlink",
+            "--ssl-ca-certfile",
+            "~/ca.pem",
+            "--ssl-certfile",
+            "~/cert.pem",
+            "--ssl-keyfile",
+            "~/key.pem",
+        ],
+    )
+    monkeypatch.setattr(
+        app_module,
+        "_obtain_superlink_certificates",
+        lambda _args: (b"ca", b"cert", b"key"),
+    )
+
+    config = _parse_superlink_lifespan_config()
+
+    assert config.runtime_ssl_ca_certfile == str(Path("~/ca.pem").expanduser())
+    assert config.runtime_ssl_certfile == str(Path("~/cert.pem").expanduser())
+    assert config.runtime_ssl_keyfile == str(Path("~/key.pem").expanduser())
+
+
 def test_parse_superlink_log_rotation_args_custom_values() -> None:
     """SuperLink log rotation args should parse explicit values."""
     # Execute
@@ -143,23 +201,19 @@ def test_parse_superlink_log_rotation_args_custom_values() -> None:
     assert args.log_rotation_backup_count == 14
 
 
-def test_parse_superlink_appio_tls_args_rejected() -> None:
-    """SuperLink should reject deprecated AppIO-named TLS args."""
-    # Test that --appio-ssl-certfile is rejected
-    with pytest.raises(SystemExit):
-        _parse_args_run_superlink().parse_args(
-            ["--appio-ssl-certfile", "appio-cert.pem"]
-        )
+@pytest.mark.parametrize(
+    "flag",
+    ["--appio-ssl-certfile", "--appio-ssl-keyfile", "--appio-ssl-ca-certfile"],
+)
+def test_parse_superlink_appio_tls_args_rejected(
+    flag: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """SuperLink should explain how to replace removed AppIO TLS args."""
+    with pytest.raises(SystemExit) as exc_info:
+        _parse_args_run_superlink().parse_args([flag, "certificate.pem"])
 
-    # Test that --appio-ssl-keyfile is rejected
-    with pytest.raises(SystemExit):
-        _parse_args_run_superlink().parse_args(["--appio-ssl-keyfile", "appio-key.pem"])
-
-    # Test that --appio-ssl-ca-certfile is rejected
-    with pytest.raises(SystemExit):
-        _parse_args_run_superlink().parse_args(
-            ["--appio-ssl-ca-certfile", "appio-ca.pem"]
-        )
+    assert exc_info.value.code == 2
+    assert f"argument {flag}: this flag no longer exists" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
