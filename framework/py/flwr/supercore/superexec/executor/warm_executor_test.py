@@ -12,19 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the inert idle TaskExecutor process."""
+"""Tests for the inert warm executor process."""
 
 from pathlib import Path
 from threading import Event
 from typing import cast
 from unittest.mock import Mock
 
-from .idle_taskexecutor import run_idle_taskexecutor
+from .warm_executor import run_warm_executor
 
 
-def test_run_idle_taskexecutor_reports_ready_and_cleans_up(
-    tmp_path: Path,
-) -> None:
+def test_run_warm_executor_reports_ready_and_cleans_up(tmp_path: Path) -> None:
     """Test the marker represents a live process waiting for termination."""
     ready_file = tmp_path / "ready"
     stop_event = Mock()
@@ -34,7 +32,7 @@ def test_run_idle_taskexecutor_reports_ready_and_cleans_up(
 
     stop_event.wait.side_effect = assert_ready
 
-    run_idle_taskexecutor(ready_file, cast(Event, stop_event))
+    run_warm_executor(ready_file, cast(Event, stop_event))
 
     stop_event.wait.assert_called_once_with()
     assert not ready_file.exists()

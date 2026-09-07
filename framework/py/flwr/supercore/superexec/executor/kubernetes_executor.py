@@ -14,6 +14,8 @@
 # ==============================================================================
 """Kubernetes executor for SuperExec TaskExecutor processes."""
 
+# pylint: disable=too-many-lines
+
 import importlib
 import re
 import time
@@ -31,17 +33,22 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.typing import JSONObject
 
-from .idle_taskexecutor import (
-    IDLE_TASKEXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION,
-    IDLE_TASKEXECUTOR_FAB_HASH_ANNOTATION,
-    IDLE_TASKEXECUTOR_LABEL,
-    IDLE_TASKEXECUTOR_MODULE,
-    IDLE_TASKEXECUTOR_READY_FILE,
-    IDLE_TASKEXECUTOR_RUNTIME_IMAGE_ANNOTATION,
-    TaskExecutorPoolKey,
-    new_idle_taskexecutor_id,
-)
 from .types import ExecutionSpec, LaunchResult
+from .warm_executor import (
+    WARM_EXECUTOR_MODULE,
+    WARM_EXECUTOR_READINESS_COMMAND,
+    WARM_EXECUTOR_READY_DIRECTORY,
+    WARM_EXECUTOR_READY_FILE,
+)
+from .warm_executor_pool import (
+    WARM_EXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION,
+    WARM_EXECUTOR_FAB_HASH_ANNOTATION,
+    WARM_EXECUTOR_LABEL,
+    WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION,
+    WarmExecutorPoolKey,
+    is_warm_executor,
+    new_warm_executor_id,
+)
 
 APPIO_CREDENTIALS_MOUNT_PATH = "/run/flwr/appio"
 APPIO_TOKEN_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/token"
@@ -60,9 +67,21 @@ _EXECUTOR_OWNED_LABELS = frozenset(
         _TASK_TYPE_LABEL,
         LAUNCH_ATTEMPT_LABEL,
         _RESOURCE_POOL_LABEL,
+        WARM_EXECUTOR_LABEL,
     }
 )
 _APPIO_CREDENTIAL_SECRET_SUFFIX = "-appio"
+_WARM_EXECUTOR_READY_VOLUME_NAME = "warm-executor-ready"
+_RESERVED_TASKEXECUTOR_VOLUME_NAMES = frozenset(
+    {"appio-credentials", _WARM_EXECUTOR_READY_VOLUME_NAME}
+)
+_RESERVED_TASKEXECUTOR_VOLUME_MOUNT_PATHS = frozenset(
+    {
+        APPIO_CREDENTIALS_MOUNT_PATH,
+        WARM_EXECUTOR_READY_DIRECTORY,
+        WARM_EXECUTOR_READY_FILE,
+    }
+)
 _COMPLETED_POD_SWEEP_INTERVAL_SECONDS = 60.0
 _FORBIDDEN_TASKEXECUTOR_ENV_NAMES = frozenset(
     {
@@ -333,11 +352,11 @@ class KubernetesExecutor:
 
         return LaunchResult.accepted()
 
-    def _launch_idle_taskexecutor(self, pool_key: TaskExecutorPoolKey) -> LaunchResult:
-        """Submit one idle TaskExecutor Pod for a fixed compatibility key."""
+    def _launch_warm_executor(self, pool_key: WarmExecutorPoolKey) -> LaunchResult:
+        """Submit one warm TaskExecutor Pod for a fixed compatibility key."""
         try:
-            pod = _build_idle_taskexecutor_pod(
-                pool_key, self._config, new_idle_taskexecutor_id()
+            pod = _build_warm_executor_pod(
+                pool_key, self._config, new_warm_executor_id()
             )
             self._client.create_namespaced_pod(self._config.namespace, pod)
         except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -389,7 +408,7 @@ class CompletedPodSweeper:
             pod_name = _object_name(pod)
             if (
                 pod_name is None
-                or not _has_task_id_label(pod)
+                or not (_has_task_id_label(pod) or is_warm_executor(pod))
                 or not _is_terminal_pod(pod)
             ):
                 continue
@@ -502,30 +521,41 @@ def _build_taskexecutor_pod(
     }
 
 
-def _build_idle_taskexecutor_pod(
-    pool_key: TaskExecutorPoolKey,
+def _build_warm_executor_pod(
+    pool_key: WarmExecutorPoolKey,
     config: KubernetesExecutorConfig,
     executor_id: str,
 ) -> JSONObject:
-    """Build an inert TaskExecutor Pod without task authority or credentials."""
+    """Build a warm TaskExecutor Pod without task authority or credentials."""
     container: JSONObject = {
         "name": "taskexecutor",
         "image": pool_key.runtime_image,
-        "command": ["python", "-m", IDLE_TASKEXECUTOR_MODULE],
+        "command": ["python", "-m", WARM_EXECUTOR_MODULE],
+        "volumeMounts": [
+            {
+                "name": _WARM_EXECUTOR_READY_VOLUME_NAME,
+                "mountPath": WARM_EXECUTOR_READY_DIRECTORY,
+            },
+            *(config.volume_mounts or []),
+        ],
         "readinessProbe": {
-            "exec": {"command": ["test", "-f", IDLE_TASKEXECUTOR_READY_FILE]},
+            "exec": {"command": list(WARM_EXECUTOR_READINESS_COMMAND)},
             "periodSeconds": 1,
         },
     }
-    if config.volume_mounts is not None:
-        container["volumeMounts"] = config.volume_mounts
     _apply_taskexecutor_container_config(container, config)
 
+    volumes: list[JSONObject] = [
+        {"name": _WARM_EXECUTOR_READY_VOLUME_NAME, "emptyDir": {}},
+        *(config.volumes or []),
+    ]
     return {
         "apiVersion": "v1",
         "kind": "Pod",
-        "metadata": _idle_pod_metadata(_idle_pod_name(executor_id), pool_key, config),
-        "spec": _taskexecutor_pod_spec(container, config.volumes or [], config),
+        "metadata": _warm_executor_metadata(
+            _warm_executor_pod_name(executor_id), pool_key, config
+        ),
+        "spec": _taskexecutor_pod_spec(container, volumes, config),
     }
 
 
@@ -644,10 +674,9 @@ def _taskexecutor_volumes(volumes: list[JSONObject]) -> list[JSONObject]:
     for entry in volumes:
         if not isinstance(entry, dict):
             raise ValueError("TaskExecutor volume entries must be mappings.")
-        if entry.get("name") == "appio-credentials":
-            raise ValueError(
-                "TaskExecutor volume name 'appio-credentials' is reserved."
-            )
+        volume_name = entry.get("name")
+        if volume_name in _RESERVED_TASKEXECUTOR_VOLUME_NAMES:
+            raise ValueError(f"TaskExecutor volume name {volume_name!r} is reserved.")
         if "secret" in entry:
             raise ValueError("TaskExecutor secret volumes are not supported.")
         if _has_rejected_projected_source(entry):
@@ -667,14 +696,15 @@ def _taskexecutor_volume_mounts(volume_mounts: list[JSONObject]) -> list[JSONObj
     for entry in volume_mounts:
         if not isinstance(entry, dict):
             raise ValueError("TaskExecutor volume mount entries must be mappings.")
-        if entry.get("name") == "appio-credentials":
+        volume_name = entry.get("name")
+        if volume_name in _RESERVED_TASKEXECUTOR_VOLUME_NAMES:
             raise ValueError(
-                "TaskExecutor volume mount name 'appio-credentials' is reserved."
+                f"TaskExecutor volume mount name {volume_name!r} is reserved."
             )
-        if entry.get("mountPath") == APPIO_CREDENTIALS_MOUNT_PATH:
+        mount_path = entry.get("mountPath")
+        if mount_path in _RESERVED_TASKEXECUTOR_VOLUME_MOUNT_PATHS:
             raise ValueError(
-                f"TaskExecutor volume mount path {APPIO_CREDENTIALS_MOUNT_PATH!r} "
-                "is reserved."
+                f"TaskExecutor volume mount path {mount_path!r} is reserved."
             )
         entries.append(entry)
     return entries
@@ -718,9 +748,9 @@ def _pod_name(spec: ExecutionSpec, launch_attempt_id: str) -> str:
     return f"flwr-taskexecutor-{spec.task_id}-{launch_attempt_id}"
 
 
-def _idle_pod_name(executor_id: str) -> str:
-    """Return the name of an idle TaskExecutor Pod."""
-    return f"flwr-taskexecutor-idle-{executor_id}"
+def _warm_executor_pod_name(executor_id: str) -> str:
+    """Return the name of a warm TaskExecutor Pod."""
+    return f"flwr-taskexecutor-warm-{executor_id}"
 
 
 def _credential_secret_name(spec: ExecutionSpec, launch_attempt_id: str) -> str:
@@ -760,12 +790,12 @@ def _metadata(
     return metadata
 
 
-def _idle_pod_metadata(
+def _warm_executor_metadata(
     name: str,
-    pool_key: TaskExecutorPoolKey,
+    pool_key: WarmExecutorPoolKey,
     config: KubernetesExecutorConfig,
 ) -> JSONObject:
-    """Return metadata identifying one compatible idle TaskExecutor Pod."""
+    """Return metadata identifying one compatible warm TaskExecutor Pod."""
     labels: JSONObject = {}
     labels.update(_caller_labels(config))
     labels.update(
@@ -773,7 +803,7 @@ def _idle_pod_metadata(
             _NAME_LABEL: "flower",
             _COMPONENT_LABEL: "taskexecutor",
             _TASK_TYPE_LABEL: pool_key.task_type.value,
-            IDLE_TASKEXECUTOR_LABEL: "true",
+            WARM_EXECUTOR_LABEL: "true",
         }
     )
     if config.resource_pool is not None:
@@ -783,13 +813,16 @@ def _idle_pod_metadata(
     annotations.update(config.annotations or {})
     annotations.update(
         {
-            IDLE_TASKEXECUTOR_FAB_HASH_ANNOTATION: pool_key.fab_hash,
-            IDLE_TASKEXECUTOR_RUNTIME_IMAGE_ANNOTATION: pool_key.runtime_image,
-            IDLE_TASKEXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION: (
+            WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION: pool_key.runtime_image,
+            WARM_EXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION: (
                 pool_key.dependency_environment_version
             ),
         }
     )
+    if pool_key.fab_hash is None:
+        annotations.pop(WARM_EXECUTOR_FAB_HASH_ANNOTATION, None)
+    else:
+        annotations[WARM_EXECUTOR_FAB_HASH_ANNOTATION] = pool_key.fab_hash
     return {
         "name": name,
         "namespace": config.namespace,
