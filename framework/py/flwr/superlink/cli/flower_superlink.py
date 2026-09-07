@@ -295,9 +295,7 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
             backup_count=args.log_rotation_backup_count,
         )
 
-    explicit_args = {
-        arg.split("=")[0] for arg in sys.argv[1:] if arg.startswith("--")
-    }
+    explicit_args = {arg.split("=")[0] for arg in sys.argv[1:] if arg.startswith("--")}
 
     # The old opt-in flag is accepted for compatibility, but no longer needed.
     if "--allow-runtime-dependency-installation" in explicit_args:
