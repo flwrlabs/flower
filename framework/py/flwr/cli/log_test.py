@@ -31,9 +31,7 @@ def _timeout_stream(path: str | None) -> MagicMock:
     """Return a stream which times out while being read."""
     stream = MagicMock()
     request = httpx.Request("POST", f"http://superlink{path}") if path else None
-    stream.__iter__.side_effect = httpx.ReadTimeout(
-        "Timed out", request=request
-    )
+    stream.__iter__.side_effect = httpx.ReadTimeout("Timed out", request=request)
     return stream
 
 
