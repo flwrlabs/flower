@@ -22,25 +22,61 @@ def _parse_round(value: str) -> int:
     return int(value.lstrip("*"))
 
 
-def _latest_run_dirs(log_dir: str) -> list[str]:
-    """Return one run directory per rn_seed: the most recent one.
+def _has_valid_history(run_dir: str) -> bool:
+    """Return True if `run_dir` contains a non-empty training_history_*.csv."""
+    for csv_path in glob.glob(os.path.join(run_dir, "training_history_*.csv")):
+        with open(csv_path, newline="", encoding="utf-8") as history_file:
+            if list(csv.DictReader(history_file)):
+                return True
+    return False
 
-    If multiple runs exist for the same seed (e.g. a rerun), only the most
-    recent run is kept.
+
+def _latest_valid_run_dir(log_dir: str, seed: str, entries: list[str]) -> str:
+    """Return the most recent run directory for `seed` with a valid history.
+
+    `entries` must be sorted ascending (oldest first). A run whose directory
+    was created but that crashed before writing a training history (e.g.
+    server_app.py creates the timestamped directory before starting the
+    strategy) is skipped in favor of an older, complete run, rather than
+    silently dropping the seed from the summary.
     """
-    latest_by_seed: dict[str, str] = {}
+    for entry in reversed(entries):
+        run_dir = os.path.join(log_dir, entry)
+        if _has_valid_history(run_dir):
+            if entry != entries[-1]:
+                print(
+                    f"Newest run for rn_seed={seed} ({entries[-1]}) has no valid "
+                    f"training history; falling back to {entry}."
+                )
+            elif len(entries) > 1:
+                print(
+                    f"Found {len(entries)} runs for rn_seed={seed}; "
+                    f"using the most recent one: {entry}"
+                )
+            return run_dir
+    raise ValueError(
+        f"No run with a valid training history found for rn_seed={seed} "
+        f"under {log_dir} (checked: {', '.join(entries)})."
+    )
+
+
+def _latest_run_dirs(log_dir: str) -> list[str]:
+    """Return one run directory per rn_seed: the most recent one with a valid history.
+
+    If multiple runs exist for the same seed (e.g. a rerun), only one run is
+    kept per seed.
+    """
+    entries_by_seed: dict[str, list[str]] = {}
     for entry in sorted(os.listdir(log_dir)):
         match = _RUN_DIR_PATTERN.match(entry)
         if not match:
             continue
-        seed = match.group("seed")
-        if seed in latest_by_seed:
-            print(
-                f"Found multiple runs for rn_seed={seed}; "
-                f"using the most recent one: {entry}"
-            )
-        latest_by_seed[seed] = entry
-    return [os.path.join(log_dir, entry) for entry in latest_by_seed.values()]
+        entries_by_seed.setdefault(match.group("seed"), []).append(entry)
+
+    return [
+        _latest_valid_run_dir(log_dir, seed, entries)
+        for seed, entries in entries_by_seed.items()
+    ]
 
 
 def summarize_experiments(log_dir: str) -> dict[str, float]:

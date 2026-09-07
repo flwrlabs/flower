@@ -191,6 +191,9 @@ class Flad(Strategy):
             if not isinstance(train_config[key], int):
                 raise TypeError(f"'{key}' in train_config must be an integer.")
 
+        if cast(int, train_config["patience"]) < 0:
+            raise ValueError("'patience' must be greater than or equal to zero.")
+
         for min_key, max_key in (
             ("min_epochs", "max_epochs"),
             ("min_steps", "max_steps"),
