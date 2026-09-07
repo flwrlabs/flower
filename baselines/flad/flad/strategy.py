@@ -100,8 +100,17 @@ class Flad(Strategy):
         grid: Grid,
     ) -> None:
         """Query clients to map client names to node IDs in the grid."""
-        # Wait until all clients are online
+        # Wait until all clients are online, bounded by mapping_clients_timeout
+        deadline = time.time() + self.mapping_clients_timeout
         while len(node_ids := list(grid.get_node_ids())) < len(self.clients):
+            if time.time() >= deadline:
+                raise InconsistentMessageReplies(
+                    reason=(
+                        f"Timed out after {self.mapping_clients_timeout}s waiting for "
+                        f"nodes to connect: {len(node_ids)}/{len(self.clients)} "
+                        "connected."
+                    )
+                )
             log(
                 INFO,
                 "Waiting for nodes to connect: %d connected (target: %d).",
