@@ -14,7 +14,6 @@
 # ==============================================================================
 """`flower-superexec` command."""
 
-
 import argparse
 import sys
 from logging import INFO, WARN
@@ -33,6 +32,7 @@ from flwr.supercore.auth import (
 from flwr.supercore.constant import EXEC_PLUGIN_SECTION, ExecutorType
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.observability.otlp_logs import otlp_logs_lifespan
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.superexec.executor.config import (
     ExecutorConfig,
@@ -52,6 +52,7 @@ from flwr.supercore.utils import disable_process_dumping
 from flwr.supercore.version import package_version
 
 
+@otlp_logs_lifespan(default_service_name="superexec")
 def flower_superexec() -> None:
     """Run `flower-superexec` command."""
     disable_process_dumping(strict=False)

@@ -14,18 +14,19 @@
 # ==============================================================================
 """`flwr-clientapp` command."""
 
-
 import argparse
 from logging import DEBUG, INFO
 
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.supercore import log
 from flwr.supercore.constant import SUPERNODE_DEFAULT_CLIENT_ADDRESS
+from flwr.supercore.observability.otlp_logs import otlp_logs_lifespan
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.supercore.utils import mask_string
 from flwr.supernode.runtime.run_clientapp import run_clientapp
 
 
+@otlp_logs_lifespan(default_service_name="clientapp")
 def flwr_clientapp() -> None:
     """Run process-isolated Flower ClientApp."""
     args = _parse_args_run_flwr_clientapp().parse_args()

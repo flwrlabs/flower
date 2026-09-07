@@ -14,7 +14,6 @@
 # ==============================================================================
 """`flwr-agentapp` command."""
 
-
 import argparse
 from logging import DEBUG, INFO
 from pathlib import Path
@@ -24,9 +23,11 @@ from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.supercore import log
 from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore.logger import mirror_output_to_queue, restore_output
+from flwr.supercore.observability.otlp_logs import otlp_logs_lifespan
 from flwr.supercore.task_process import run_agentapp
 
 
+@otlp_logs_lifespan(default_service_name="agentapp")
 def flwr_agentapp() -> None:
     """Run process-isolated Flower AgentApp."""
     args = _parse_args_run_flwr_agentapp().parse_args()

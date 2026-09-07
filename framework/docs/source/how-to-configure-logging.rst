@@ -39,6 +39,25 @@ example, to launch your ``SuperLink`` with ``DEBUG`` logs, use:
     :doc:`how-to-run-flower-with-deployment-engine`) or using the `flwr CLI
     <ref-api-cli.html>`_.
 
+*******************************
+ Export logs over OpenTelemetry
+*******************************
+
+The ``flower-superexec``, ``flwr-serverapp``, ``flwr-clientapp``, and
+``flwr-agentapp`` commands can export Flower log records over OTLP. Export is disabled
+unless ``OTEL_LOGS_ENABLED`` is set to ``1``, ``true``, ``yes``, or ``on``. Set
+``OTEL_SERVICE_NAME`` to identify the process in the observability backend; it defaults
+to the command's component name. The exporter reads the standard
+``OTEL_EXPORTER_OTLP_LOGS_*`` environment variables, including the endpoint and
+headers.
+
+OpenTelemetry is an optional dependency. Install the SDK and an OTLP exporter before
+enabling this integration:
+
+.. code-block:: shell
+
+    pip install opentelemetry-sdk opentelemetry-exporter-otlp
+
 ************************
  Configure gRPC logging
 ************************
