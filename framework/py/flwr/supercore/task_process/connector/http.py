@@ -22,8 +22,9 @@ import requests
 
 from flwr.supercore.typing import JSONObject
 
-ConnectorErrorFactory = Callable[[str, int | None], RuntimeError]
+ConnectorErrorFactory = Callable[[str, int | None, str | None], RuntimeError]
 HttpErrorCode = Callable[[requests.Response], str]
+HttpErrorDetails = Callable[[requests.Response], tuple[str, str | None]]
 
 
 class ConnectorApiError(RuntimeError):
@@ -31,10 +32,18 @@ class ConnectorApiError(RuntimeError):
 
     provider: str
 
-    def __init__(self, code: str, status_code: int | None = None) -> None:
+    def __init__(
+        self,
+        code: str,
+        status_code: int | None = None,
+        message: str | None = None,
+    ) -> None:
         self.code = code
         self.status_code = status_code
+        self.message = message
         detail = code if status_code is None else f"{code} ({status_code})"
+        if message:
+            detail = f"{detail}: {message}"
         super().__init__(f"{self.provider} API request failed: {detail}.")
 
 
@@ -49,6 +58,7 @@ def request_json_object(
     json: JSONObject | None = None,
     timeout: float = 30.0,
     http_error_code: HttpErrorCode | None = None,
+    http_error_details: HttpErrorDetails | None = None,
 ) -> JSONObject:
     """Send one request and return its JSON object response."""
     try:
@@ -61,14 +71,18 @@ def request_json_object(
             timeout=timeout,
         )
     except requests.RequestException:
-        raise error("request_failed", None) from None
+        raise error("request_failed", None, None) from None
     if response.status_code >= 400:
-        code = http_error_code(response) if http_error_code else "http_error"
-        raise error(code, response.status_code)
+        if http_error_details is not None:
+            code, message = http_error_details(response)
+        else:
+            code = http_error_code(response) if http_error_code else "http_error"
+            message = None
+        raise error(code, response.status_code, message)
     try:
         payload = response.json()
     except ValueError:
-        raise error("invalid_response", None) from None
+        raise error("invalid_response", None, None) from None
     if not isinstance(payload, dict):
-        raise error("invalid_response", None)
+        raise error("invalid_response", None, None)
     return cast(JSONObject, payload)
