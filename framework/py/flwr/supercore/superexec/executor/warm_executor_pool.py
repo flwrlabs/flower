@@ -62,6 +62,19 @@ class WarmExecutorPoolKey:
                 )
 
 
+@dataclass(frozen=True)
+class WarmExecutorPoolConfig:
+    """Configure a fixed number of compatible warm TaskExecutor Pods."""
+
+    key: WarmExecutorPoolKey
+    size: int
+
+    def __post_init__(self) -> None:
+        """Validate the configured capacity for one compatible pool."""
+        if not isinstance(self.size, int) or self.size < 1:
+            raise ValueError("Warm executor pool size must be a positive integer.")
+
+
 def new_warm_executor_id() -> str:
     """Return a DNS-label-safe identifier for one warm TaskExecutor Pod."""
     return uuid4().hex[:12]
@@ -69,7 +82,7 @@ def new_warm_executor_id() -> str:
 
 def is_warm_executor_ready(pod: object, pool_key: WarmExecutorPoolKey) -> bool:
     """Return true for a ready warm TaskExecutor Pod with the exact pool key."""
-    if not _is_compatible_warm_executor(pod, pool_key):
+    if not is_compatible_warm_executor(pod, pool_key):
         return False
 
     metadata = _object_field(pod, "metadata")
@@ -99,7 +112,7 @@ def is_warm_executor(pod: object) -> bool:
     return _object_field(labels, WARM_EXECUTOR_LABEL) == "true"
 
 
-def _is_compatible_warm_executor(pod: object, pool_key: WarmExecutorPoolKey) -> bool:
+def is_compatible_warm_executor(pod: object, pool_key: WarmExecutorPoolKey) -> bool:
     """Return true if a warm TaskExecutor Pod has the supplied pool key."""
     metadata = _object_field(pod, "metadata")
     labels = _object_field(metadata, "labels")

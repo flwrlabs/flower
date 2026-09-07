@@ -17,7 +17,7 @@
 from pathlib import Path
 from typing import Any
 
-from flwr.supercore.constant import ExecutorType
+from flwr.supercore.constant import ExecutorType, TaskType
 
 from .config import ExecutorConfig
 from .kubernetes_executor import (
@@ -27,6 +27,7 @@ from .kubernetes_executor import (
 )
 from .subprocess_executor import SubprocessExecutor
 from .types import Executor
+from .warm_executor_pool import WarmExecutorPoolConfig, WarmExecutorPoolKey
 
 _KUBERNETES_CONFIG_FIELD_MAP = {
     "image-pull-policy": "image_pull_policy",
@@ -47,6 +48,7 @@ _KUBERNETES_CONFIG_FIELD_MAP = {
     "pod-security-context": "pod_security_context",
     "container-security-context": "container_security_context",
     "service-account-name": "service_account_name",
+    "warm-executor-owner": "warm_executor_owner",
 }
 
 
@@ -99,6 +101,11 @@ def _kubernetes_executor_config_from_mapping(
             path_value
         )
 
+    if "warm-executor-pools" in config:
+        kwargs["warm_executor_pools"] = _warm_executor_pools_from_config(
+            config["warm-executor-pools"], image
+        )
+
     return KubernetesExecutorConfig(**kwargs)
 
 
@@ -122,3 +129,59 @@ def _read_runtime_root_certificates(path_value: str) -> str:
             "Failed to read Kubernetes executor config field "
             f"'appio-root-certificates-path' from '{path_value}': {message}."
         ) from err
+
+
+def _warm_executor_pools_from_config(
+    value: object, runtime_image: str
+) -> tuple[WarmExecutorPoolConfig, ...]:
+    """Parse AgentApp-only warm-executor pools from trusted executor YAML."""
+    if not isinstance(value, list):
+        raise ValueError(
+            "Kubernetes executor config field 'warm-executor-pools' must be a list."
+        )
+
+    pools: list[WarmExecutorPoolConfig] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise ValueError("Warm executor pool entries must be mappings.")
+        allowed_fields = {
+            "task-type",
+            "fab-hash",
+            "dependency-environment-version",
+            "size",
+        }
+        if set(entry) - allowed_fields:
+            raise ValueError("Warm executor pool entries contain an unknown field.")
+
+        if entry.get("task-type") != TaskType.AGENT_APP.value:
+            raise ValueError(
+                "Warm executor pools support only task-type 'flwr-agentapp'."
+            )
+        fab_hash = entry.get("fab-hash")
+        if not isinstance(fab_hash, str) or not fab_hash.strip():
+            raise ValueError("Warm executor pool requires non-empty string 'fab-hash'.")
+        dependency_environment_version = entry.get("dependency-environment-version")
+        if not isinstance(dependency_environment_version, str):
+            raise ValueError(
+                "Warm executor pool requires string 'dependency-environment-version'."
+            )
+        size = entry.get("size")
+        if isinstance(size, bool) or not isinstance(size, int):
+            raise ValueError("Warm executor pool requires integer 'size'.")
+
+        pools.append(
+            WarmExecutorPoolConfig(
+                key=WarmExecutorPoolKey(
+                    task_type=TaskType.AGENT_APP,
+                    fab_hash=fab_hash,
+                    runtime_image=runtime_image,
+                    dependency_environment_version=dependency_environment_version,
+                ),
+                size=size,
+            )
+        )
+
+    keys = [pool.key for pool in pools]
+    if len(keys) != len(set(keys)):
+        raise ValueError("Warm executor pools must not repeat a compatibility key.")
+    return tuple(pools)

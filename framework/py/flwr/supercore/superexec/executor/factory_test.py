@@ -93,6 +93,63 @@ def test_get_executor_builds_kubernetes_executor_from_config(
     create_client.assert_called_once_with()
 
 
+def test_get_executor_parses_agentapp_warm_executor_pool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A warm pool is AgentApp-only and carries exact compatibility metadata."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    monkeypatch.setattr(
+        factory_module,
+        "create_incluster_kubernetes_client",
+        Mock(return_value=client),
+    )
+
+    executor = get_executor(
+        ExecutorType.KUBERNETES,
+        executor_config={
+            "namespace": "flower-system",
+            "image": "ghcr.io/flwrlabs/taskexecutor:dev",
+            "warm-executor-owner": "superexec-a",
+            "warm-executor-pools": [
+                {
+                    "task-type": "flwr-agentapp",
+                    "fab-hash": "agent-fab-sha256",
+                    "dependency-environment-version": "agent-env-v1",
+                    "size": 2,
+                }
+            ],
+        },
+    )
+
+    pool = executor._config.warm_executor_pools[0]  # pylint: disable=protected-access
+    assert pool.key.task_type.value == "flwr-agentapp"
+    assert pool.key.fab_hash == "agent-fab-sha256"
+    assert pool.key.runtime_image == "ghcr.io/flwrlabs/taskexecutor:dev"
+    assert pool.key.dependency_environment_version == "agent-env-v1"
+    assert pool.size == 2
+
+
+def test_get_executor_rejects_non_agentapp_warm_pool() -> None:
+    """The first warm dispatch feature must not enable Model or Connector pools."""
+    with pytest.raises(ValueError, match="flwr-agentapp"):
+        factory_module._kubernetes_executor_config_from_mapping(  # pylint: disable=protected-access
+            {
+                "namespace": "flower-system",
+                "image": "ghcr.io/flwrlabs/taskexecutor:dev",
+                "warm-executor-owner": "superexec-a",
+                "warm-executor-pools": [
+                    {
+                        "task-type": "flwr-model",
+                        "fab-hash": "model-fab-sha256",
+                        "dependency-environment-version": "model-env-v1",
+                        "size": 1,
+                    }
+                ],
+            }
+        )
+
+
 @pytest.mark.parametrize("field_name", ["namespace", "image"])
 def test_get_executor_rejects_missing_required_kubernetes_field(
     field_name: str,

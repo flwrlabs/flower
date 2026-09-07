@@ -222,7 +222,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
         event_type=EventType.RUN_SUPEREXEC_LEAVE,
         exit_message="SuperExec terminated gracefully.",
         grpc_servers=grpc_servers,
-        exit_handlers=[client.close],
+        exit_handlers=[client.close, executor.close],
     )
 
     # Create the SuperExec plugin instance
@@ -286,3 +286,4 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             time.sleep(task_poll_interval)
     finally:
         client.close()
+        executor.close()

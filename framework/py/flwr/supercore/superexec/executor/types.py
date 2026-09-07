@@ -36,6 +36,7 @@ class ExecutionSpec:  # pylint: disable=too-many-instance-attributes
     parent_pid: int | None
     suppress_output: bool
     task_id: int
+    fab_hash: str | None = None
 
     def __post_init__(self) -> None:
         """Validate fields required by all executors."""
@@ -97,3 +98,6 @@ class Executor(Protocol):
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""
+
+    def close(self) -> None:
+        """Release executor-owned resources during SuperExec shutdown."""

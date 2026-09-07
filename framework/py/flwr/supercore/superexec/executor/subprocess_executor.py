@@ -63,3 +63,6 @@ class SubprocessExecutor:
         subprocess.Popen(args)  # pylint: disable=consider-using-with
 
         return LaunchResult.accepted()
+
+    def close(self) -> None:
+        """Release executor-owned resources during SuperExec shutdown."""
