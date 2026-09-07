@@ -12,15 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for federation selection in the CLI `chat` application."""
+"""Tests for the CLI `chat` application."""
 
+import asyncio
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
 
-from flwr.cli.chat.chat_app import ChatApplication, _ChatCompleter
+from flwr.cli.chat.chat_app import (
+    ChatApplication,
+    _ChatCompleter,
+    start_chat_run,
+)
+from flwr.cli.chat.chat_local_agent import LocalAgent
 from flwr.cli.constant import CHAT_AGENT_NAME, CHAT_DEFAULT_FEDERATION_NAME
+from flwr.proto.control_pb2 import StartRunResponse  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.supercore.constant import FLOWER_AGENT_APP_ID
 
@@ -78,3 +86,114 @@ def test_chat_selects_federation_from_dropdown() -> None:
     assert chat.series_id == 456
     assert chat.transcript == transcript
     application.invalidate.assert_not_called()
+
+
+def test_chat_loads_and_reloads_local_agent() -> None:
+    """Load should select a local FAB and reload should rebuild its path."""
+    application = Mock()
+    with patch.object(ChatApplication, "_create_application", return_value=application):
+        chat = ChatApplication(Mock(), [Federation(name=_CHAT_FED_ID)], Mock())
+    event = Mock(app=application)
+    first_agent = LocalAgent(
+        path=Path("/tmp/my agent"),
+        app_spec="@local/custom-agent",
+        fab_hash="first-hash",
+        fab_content=b"first-fab",
+        warnings=(),
+    )
+    reloaded_agent = LocalAgent(
+        path=first_agent.path,
+        app_spec=first_agent.app_spec,
+        fab_hash="second-hash",
+        fab_content=b"second-fab",
+        warnings=("Add a description.",),
+    )
+
+    with patch(
+        "flwr.cli.chat.chat_app.build_local_agent", return_value=first_agent
+    ) as mock_build:
+        assert chat._handle_command(  # pylint: disable=protected-access
+            event, '/load "/tmp/my agent"'
+        )
+        assert chat.busy
+        asyncio.run(event.app.create_background_task.call_args.args[0])
+    mock_build.assert_called_once_with(Path("/tmp/my agent"))
+    assert chat.agent_app_spec == first_agent.app_spec
+    assert chat.agent_fab_hash == first_agent.fab_hash
+    assert chat.agent_name == "@local/custom-agent (local)"
+    assert chat.local_agent == first_agent
+    assert not chat.local_agent_uploaded
+    assert (
+        "class:notice",
+        "Loaded @local/custom-agent from /tmp/my agent.\n\n",
+    ) in chat.transcript
+
+    chat.series_id = 123
+    event.app.create_background_task.reset_mock()
+    with patch(
+        "flwr.cli.chat.chat_app.build_local_agent", return_value=reloaded_agent
+    ) as mock_build:
+        assert chat._handle_command(  # pylint: disable=protected-access
+            event, "/reload"
+        )
+        asyncio.run(event.app.create_background_task.call_args.args[0])
+    mock_build.assert_called_once_with(first_agent.path)
+    assert chat.local_agent == reloaded_agent
+    assert chat.series_id is None
+    assert ("class:notice", "Warning: Add a description.\n\n") in chat.transcript
+    assert (
+        "class:notice",
+        "Reloaded @local/custom-agent.\n"
+        "Changes detected. Your next message will use the new build and start a "
+        "new conversation.\n\n",
+    ) in chat.transcript
+
+    chat.series_id = 456
+    chat.local_agent_uploaded = True
+    event.app.create_background_task.reset_mock()
+    with patch("flwr.cli.chat.chat_app.build_local_agent", return_value=reloaded_agent):
+        assert chat._handle_command(  # pylint: disable=protected-access
+            event, "/reload"
+        )
+        asyncio.run(event.app.create_background_task.call_args.args[0])
+    assert chat.series_id == 456
+    assert chat.local_agent_uploaded
+    assert chat.transcript[-1] == (
+        "class:notice",
+        "Reloaded @local/custom-agent.\n"
+        "No changes detected. The current conversation will continue.\n\n",
+    )
+
+
+def test_start_chat_run_uploads_local_fab_then_uses_hash() -> None:
+    """A local FAB should be uploaded once and subsequently selected by hash."""
+    stub = Mock()
+    stub.StartRun.return_value = StartRunResponse(run_id=1, series_id=2)
+
+    assert start_chat_run(
+        stub,
+        "Hello",
+        _CHAT_FED_ID,
+        None,
+        "@local/custom-agent",
+        "fab-hash",
+        b"fab-content",
+    ) == (1, 2)
+    request = stub.StartRun.call_args.args[0]
+    assert request.app_spec == ""
+    assert request.fab.hash_str == "fab-hash"
+    assert request.fab.content == b"fab-content"
+
+    start_chat_run(
+        stub,
+        "Hello again",
+        _CHAT_FED_ID,
+        2,
+        "@local/custom-agent",
+        "fab-hash",
+    )
+    request = stub.StartRun.call_args.args[0]
+    assert request.app_spec == "@local/custom-agent"
+    assert request.fab.hash_str == "fab-hash"
+    assert not request.fab.content
+    assert request.series_id == 2
