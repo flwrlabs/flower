@@ -26,7 +26,10 @@ from unittest.mock import Mock, patch
 import pytest
 
 from flwr.common.constant import FLWR_TASK_TOKEN_LENGTH
-from flwr.supercore.cli.flwr_agentapp import _parse_args_run_flwr_agentapp
+from flwr.supercore.cli.flwr_agentapp import (
+    _parse_args_run_flwr_agentapp,
+    _try_obtain_agentapp_token,
+)
 from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 
 flwr_agentapp_module = importlib.import_module("flwr.supercore.cli.flwr_agentapp")
@@ -186,7 +189,7 @@ def test_flwr_agentapp_rejects_invalid_stdin_without_disclosure(
     args = _parse_args_run_flwr_agentapp().parse_args(["--token-stdin"])
 
     with pytest.raises(SystemExit) as exc_info:
-        flwr_agentapp_module._try_obtain_agentapp_token(args)
+        _try_obtain_agentapp_token(args)
 
     assert token_stdin.closed
     assert not token_input or token_input not in str(exc_info.value)
