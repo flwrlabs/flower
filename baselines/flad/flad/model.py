@@ -54,10 +54,15 @@ def compile_model(
     model: Model, optimizer_type: str = "SGD", loss: str = "binary_crossentropy"
 ) -> None:
     """Compile the given model with the specified optimizer and loss."""
-    if optimizer_type == "Adam":
+    normalized_optimizer_type = optimizer_type.strip().upper()
+    if normalized_optimizer_type == "ADAM":
         optimizer = Adam(learning_rate=0.01, beta_1=0.9, beta_2=0.999)
-    else:
+    elif normalized_optimizer_type == "SGD":
         optimizer = SGD(learning_rate=0.1, momentum=0.0, nesterov=False)
+    else:
+        raise ValueError(
+            f"Unsupported optimizer '{optimizer_type}'; expected 'SGD' or 'Adam'."
+        )
 
     model.compile(loss=loss, optimizer=optimizer, metrics=["accuracy"])
 
