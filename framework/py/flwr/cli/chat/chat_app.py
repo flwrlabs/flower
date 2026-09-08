@@ -477,6 +477,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         )
         event.app.invalidate()
 
+    # pylint: disable-next=too-many-return-statements
     def _handle_command(self, event: KeyPressEvent, prompt: str) -> bool:
         """Handle a slash command and return whether the prompt was consumed."""
         command = prompt.lower()
@@ -716,6 +717,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             self.application.layout.focus(self.input_buffer)
             self.application.invalidate()
 
+    # pylint: disable-next=too-many-branches
     def _run_prompt_sync(
         self,
         prompt: str,
