@@ -20,6 +20,7 @@ import threading
 from collections.abc import Sequence
 from dataclasses import dataclass
 from logging import DEBUG, INFO, WARN
+from os.path import expanduser
 from pathlib import Path
 from time import sleep
 from typing import Any
@@ -304,38 +305,41 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
         help="Runtime API server TLS certificate file (as a path str) "
         "to create a secure connection. The certificate must include SANs for "
         "the Runtime API address used by SuperExec.",
-        type=str,
+        type=expanduser,
         default=None,
     )
     parser.add_argument(
         "--ssl-keyfile",
         help="Runtime API server TLS private key file (as a path str) "
         "to create a secure connection.",
-        type=str,
+        type=expanduser,
     )
     parser.add_argument(
         "--ssl-ca-certfile",
         help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
         "the Runtime API server certificate. This is not a client certificate "
         "for mTLS.",
-        type=str,
+        type=expanduser,
     )
     parser.add_argument(
         "--appio-ssl-certfile",
         dest="ssl_certfile",
         action=_DeprecatedAppioSslOption,
+        type=expanduser,
         help="Deprecated: use `--ssl-certfile` instead.",
     )
     parser.add_argument(
         "--appio-ssl-keyfile",
         dest="ssl_keyfile",
         action=_DeprecatedAppioSslOption,
+        type=expanduser,
         help="Deprecated: use `--ssl-keyfile` instead.",
     )
     parser.add_argument(
         "--appio-ssl-ca-certfile",
         dest="ssl_ca_certfile",
         action=_DeprecatedAppioSslOption,
+        type=expanduser,
         help="Deprecated: use `--ssl-ca-certfile` instead.",
     )
     parser.add_argument(

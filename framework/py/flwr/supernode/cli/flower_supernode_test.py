@@ -50,45 +50,47 @@ def test_parse_supernode_version_flag(
     assert captured.out == f"Flower version: {package_version}\n"
 
 
-def test_parse_supernode_tls_args() -> None:
+def test_parse_supernode_tls_args(monkeypatch: pytest.MonkeyPatch) -> None:
     """SuperNode should parse TLS args for its Runtime API."""
+    monkeypatch.setenv("HOME", "/home/flower")
     args = _parse_args_run_supernode().parse_args(
         [
             "--ssl-certfile",
-            "cert.pem",
+            "~/cert.pem",
             "--ssl-keyfile",
-            "key.pem",
+            "~/key.pem",
             "--ssl-ca-certfile",
-            "ca.pem",
+            "~/ca.pem",
         ]
     )
 
-    assert args.ssl_certfile == "cert.pem"
-    assert args.ssl_keyfile == "key.pem"
-    assert args.ssl_ca_certfile == "ca.pem"
+    assert args.ssl_certfile == "/home/flower/cert.pem"
+    assert args.ssl_keyfile == "/home/flower/key.pem"
+    assert args.ssl_ca_certfile == "/home/flower/ca.pem"
 
 
 def test_parse_supernode_deprecated_appio_tls_args(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Deprecated AppIO TLS args should warn and map to the new destinations."""
+    monkeypatch.setenv("HOME", "/home/flower")
     log = Mock()
     monkeypatch.setattr(flower_supernode_module, "log", log)
 
     args = _parse_args_run_supernode().parse_args(
         [
             "--appio-ssl-certfile",
-            "cert.pem",
+            "~/cert.pem",
             "--appio-ssl-keyfile",
-            "key.pem",
+            "~/key.pem",
             "--appio-ssl-ca-certfile",
-            "ca.pem",
+            "~/ca.pem",
         ]
     )
 
-    assert args.ssl_certfile == "cert.pem"
-    assert args.ssl_keyfile == "key.pem"
-    assert args.ssl_ca_certfile == "ca.pem"
+    assert args.ssl_certfile == "/home/flower/cert.pem"
+    assert args.ssl_keyfile == "/home/flower/key.pem"
+    assert args.ssl_ca_certfile == "/home/flower/ca.pem"
     assert log.call_count == 3
     assert all("deprecated" in call.args[1] for call in log.call_args_list)
 
