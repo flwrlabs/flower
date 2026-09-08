@@ -193,12 +193,11 @@ communicate with the SuperLink or SuperNode:
     - SuperNode + SuperExec + ``ClientApp`` process
 
     For SuperLink, ``--ssl-certfile``, ``--ssl-keyfile``, and ``--ssl-ca-certfile``
-    secure all APIs. For SuperNode, configure its Runtime API with
-    ``--appio-ssl-certfile``, ``--appio-ssl-keyfile``, and ``--appio-ssl-ca-certfile``.
-    Runtime API clients verify server certificates with ``--root-certificates``. In
-    ``subprocess`` isolation mode, the SuperLink and SuperNode pass the CA path to the
-    SuperExec processes they launch. This is not mTLS. See
-    :doc:`how-to-enable-tls-connections` for concrete commands.
+    secure all APIs. For SuperNode, the same options secure its Runtime API. Runtime API
+    clients verify server certificates with ``--root-certificates``. In ``subprocess``
+    isolation mode, the SuperLink and SuperNode pass the CA path to the SuperExec
+    processes they launch. This is not mTLS. See :doc:`how-to-enable-tls-connections`
+    for concrete commands.
 
 .. warning::
 

@@ -49,11 +49,11 @@ from flwr.supercore.constant import (
     TASK_TOKEN_HEADER,
     TaskType,
 )
+from flwr.supercore.dependencies.runtime import get_runtime_state
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
-from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.federation import NoOpFederationManager
 
 from .router import router
@@ -94,7 +94,7 @@ def fixture_client(state: LinkState) -> TestClient:
     app.include_router(router)
     app.add_middleware(ProtobufTranslationMiddleware)
     app.middleware("http")(http_error_translator)
-    app.dependency_overrides[get_linkstate] = lambda: state
+    app.dependency_overrides[get_runtime_state] = lambda: state
     return TestClient(app)
 
 
