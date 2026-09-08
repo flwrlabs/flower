@@ -414,13 +414,14 @@ class _WarmExecutorPoolManager:
             "Warm executor did not acknowledge task token delivery."
         )
 
-    def ensure_capacity(self) -> None:
+    def ensure_capacity(self, reserved_pod_capacity: int = 0) -> None:
         """Create missing idle Pods for every configured compatible pool."""
         with self._lock:
             if self._closed:
                 return
+            self._reconcile_owned_pods()
             for pool in self._pools.values():
-                self._ensure_pool_capacity(pool)
+                self._ensure_pool_capacity(pool, reserved_pod_capacity)
 
     def has_ready_pod(self, task_type: TaskType, fab_hash: str | None) -> bool:
         """Return whether a matching warm Pod can take a task without new capacity."""
@@ -441,18 +442,17 @@ class _WarmExecutorPoolManager:
             )
 
     def close(self) -> None:
-        """Delete idle Pods owned by this SuperExec instance."""
+        """Delete all Pods owned by this SuperExec instance."""
         with self._lock:
             if self._closed:
                 return
             self._closed = True
-            busy_pods = set(self._busy_pods)
         pods = self._owned_warm_pods()
         if pods is None:
             return
         for pod in pods:
             pod_name = _object_name(pod)
-            if pod_name is not None and pod_name not in busy_pods:
+            if pod_name is not None:
                 self._delete_pod(pod_name)
 
     def _pool_for_spec(self, spec: ExecutionSpec) -> WarmExecutorPoolConfig | None:
@@ -520,6 +520,37 @@ class _WarmExecutorPoolManager:
             except Exception:  # pylint: disable=broad-exception-caught
                 log(WARNING, "Failed to create a warm TaskExecutor Pod.", exc_info=True)
                 return
+
+    def _reconcile_owned_pods(self) -> None:
+        """Delete owned Pods that are obsolete or exceed configured capacity."""
+        pods = self._owned_warm_pods()
+        if pods is None:
+            return
+
+        compatible_pods: dict[WarmExecutorPoolKey, list[object]] = {
+            pool.key: [] for pool in self._pools.values()
+        }
+        for pod in pods:
+            pod_name = _object_name(pod)
+            pool = next(
+                (
+                    candidate
+                    for candidate in self._pools.values()
+                    if _is_active_warm_executor(pod, candidate.key)
+                ),
+                None,
+            )
+            if pool is None:
+                if pod_name is not None and pod_name not in self._busy_pods:
+                    self._delete_pod(pod_name)
+                continue
+            compatible_pods[pool.key].append(pod)
+
+        for pool in self._pools.values():
+            for pod in compatible_pods[pool.key][pool.size :]:
+                pod_name = _object_name(pod)
+                if pod_name is not None and pod_name not in self._busy_pods:
+                    self._delete_pod(pod_name)
 
     def _owned_warm_pods(self) -> list[object] | None:
         try:
@@ -638,7 +669,15 @@ class KubernetesExecutor:
         """Wait for cold capacity, or allow an already-ready warm dispatch."""
         self._sweep_completed_pods_if_due()
         if allow_warm_dispatch and self._warm_executor_pool_manager is not None:
-            self._warm_executor_pool_manager.ensure_capacity()
+            has_ready_warm_pod = (
+                task_type is not None
+                and self._warm_executor_pool_manager.has_ready_pod(task_type, fab_hash)
+            )
+            self._warm_executor_pool_manager.ensure_capacity(
+                reserved_pod_capacity=0 if has_ready_warm_pod else 1
+            )
+            if has_ready_warm_pod:
+                return
         if self._config.active_pod_budget is None:
             return
 

@@ -566,8 +566,8 @@ def test_launch_returns_unknown_after_unacknowledged_warm_token_delivery(
     client.create_namespaced_pod.assert_not_called()
 
 
-def test_warm_pool_replaces_consumed_pod_and_cleans_up_idle_pods() -> None:
-    """Consumed Pods are replaced, while shutdown deletes only idle capacity."""
+def test_warm_pool_replaces_consumed_pod_and_cleans_up_owned_pods() -> None:
+    """Consumed Pods are replaced, while shutdown deletes all owned capacity."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     pool_key = _warm_executor_pool_key(
@@ -604,9 +604,14 @@ def test_warm_pool_replaces_consumed_pod_and_cleans_up_idle_pods() -> None:
 
     pool.close()
 
-    client.delete_namespaced_pod.assert_called_once_with(
-        name="idle", namespace="flower-system", grace_period_seconds=0
+    client.delete_namespaced_pod.assert_has_calls(
+        [
+            call(name="idle", namespace="flower-system", grace_period_seconds=0),
+            call(name="busy", namespace="flower-system", grace_period_seconds=0),
+        ],
+        any_order=True,
     )
+    assert client.delete_namespaced_pod.call_count == 2
 
 
 def test_warm_pool_keeps_consumed_pod_busy_when_deletion_fails() -> None:
@@ -663,6 +668,45 @@ def test_warm_pool_reserves_capacity_for_cold_fallback() -> None:
     client.create_namespaced_pod.assert_not_called()
 
 
+def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
+    """Reconciliation removes stale and excess idle Pods from a previous config."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+    )
+    pool = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
+        client, config, lambda: 0
+    )
+    client.reset_mock()
+    client.list_namespaced_pod.return_value = {
+        "items": [
+            _ready_warm_pod(pool_key, config, name="keep"),
+            _ready_warm_pod(pool_key, config, name="excess"),
+            _ready_warm_pod(
+                _warm_executor_pool_key(fab_hash="obsolete-fab"),
+                config,
+                name="obsolete",
+            ),
+        ]
+    }
+
+    pool.ensure_capacity()
+
+    client.delete_namespaced_pod.assert_has_calls(
+        [
+            call(name="excess", namespace="flower-system", grace_period_seconds=0),
+            call(name="obsolete", namespace="flower-system", grace_period_seconds=0),
+        ],
+        any_order=True,
+    )
+    client.create_namespaced_pod.assert_not_called()
+
+
 def test_wait_for_capacity_allows_a_ready_warm_pod_at_the_budget() -> None:
     """A matching warm dispatch should not wait for capacity it does not consume."""
     client = Mock()
@@ -689,6 +733,38 @@ def test_wait_for_capacity_allows_a_ready_warm_pod_at_the_budget() -> None:
 
     executor.wait_for_capacity(TaskType.AGENT_APP, "fab-sha256")
 
+    sleep.assert_not_called()
+
+
+def test_wait_for_capacity_reserves_space_for_a_cold_task() -> None:
+    """Reconciling warm capacity must not consume the cold task's last slot."""
+    client = Mock()
+    sleep = Mock()
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        active_pod_budget=3,
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+        sleep=sleep,
+    )
+    active_pod_count = 3
+
+    def _list_pods(_namespace: str, label_selector: str) -> dict[str, Any]:
+        if "warm-executor-owner" in label_selector:
+            return {"items": []}
+        return {"items": [_pod("Running")] * active_pod_count}
+
+    client.list_namespaced_pod.side_effect = _list_pods
+    client.list_namespaced_secret.return_value = {"items": []}
+    executor = KubernetesExecutor(client=client, config=config)
+    client.create_namespaced_pod.reset_mock()
+    active_pod_count = 2
+
+    executor.wait_for_capacity(TaskType.MODEL, None)
+
+    client.create_namespaced_pod.assert_not_called()
     sleep.assert_not_called()
 
 
