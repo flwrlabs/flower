@@ -1491,9 +1491,17 @@ def list_nodes(
 
 def _get_federation_member_count(federation: FederationInfo) -> int:
     """Return the explicit member count or fall back to the member list size."""
-    if federation.member_count is not None:
-        return federation.member_count
-    return len(federation.members)
+    count = (
+        federation.member_count
+        if federation.member_count is not None
+        else len(federation.members)
+    )
+    if count < 0 or count > 0xFFFFFFFF:
+        raise FlowerError(
+            ApiErrorCode.INVALID_HANDLER_RESPONSE,
+            f"Invalid federation member_count={count} for federation_id={federation.id}.",
+        )
+    return count
 
 
 def list_federations(
