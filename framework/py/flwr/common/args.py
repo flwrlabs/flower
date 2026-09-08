@@ -65,7 +65,9 @@ def add_args_runtime_dependency_install(
     )
 
 
-def add_args_flwr_app_common(parser: argparse.ArgumentParser) -> None:
+def add_args_flwr_app_common(
+    parser: argparse.ArgumentParser, *, include_token_stdin: bool = False
+) -> None:
     """Add common Flower arguments for flwr-*app to the provided parser."""
     token_group = parser.add_mutually_exclusive_group(required=True)
     token_group.add_argument(
@@ -81,6 +83,12 @@ def add_args_flwr_app_common(parser: argparse.ArgumentParser) -> None:
             "for each app execution"
         ),
     )
+    if include_token_stdin:
+        token_group.add_argument(
+            "--token-stdin",
+            action="store_true",
+            help=argparse.SUPPRESS,
+        )
     parser.add_argument(
         "--insecure",
         action="store_true",
