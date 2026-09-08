@@ -27,7 +27,7 @@ from typing import cast
 from google.protobuf.json_format import ParseDict
 
 from flwr.agentapp import AgentConnectors, AgentEvents, AgentResponses, AgentSession
-from flwr.app import Context, Message
+from flwr.app import Message
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
@@ -54,8 +54,6 @@ from flwr.supercore.task_process.connector.registry import (
 )
 from flwr.supercore.typing import JSONObject, JSONValue
 from flwr.supercore.utils import strict_json_dumps
-
-from .context_items import append_items
 
 _DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
 _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
@@ -223,12 +221,10 @@ class RuntimeAgentResponses(AgentResponses):
         stub: RuntimeHttpClient,
         run_id: int,
         task_id: int,
-        context: Context,
         start_run_request: StartRunRequest,
         events: AgentEvents,
     ) -> None:
         self._stub = stub
-        self._context = context
         self._run_id = run_id
         self._task_id = task_id
         self._start_run_request = start_run_request
@@ -236,12 +232,7 @@ class RuntimeAgentResponses(AgentResponses):
 
     def create(self, request: JSONObject) -> JSONObject:
         """Create a model response through a child model task."""
-        response_payload = self._create_model_response(request)
-
-        output = response_payload.get("output")
-        if _is_json_object_list(output):
-            append_items(self._context, cast(list[JSONObject], output))
-        return response_payload
+        return self._create_model_response(request)
 
     def _create_model_response(self, request: JSONObject) -> JSONObject:
         """Create one model response through a child model task."""
@@ -319,7 +310,7 @@ class RuntimeAgentResponses(AgentResponses):
             "name": name,
             "arguments": strict_json_dumps(arguments, compact=True),
         }
-        self.append_and_push_run_events([function_call])
+        self.push_run_events([function_call])
 
         try:
             output = self.create_connector_response(
@@ -334,7 +325,7 @@ class RuntimeAgentResponses(AgentResponses):
                     "message": "Connector execution failed.",
                 }
             }
-            self.append_and_push_run_events(
+            self.push_run_events(
                 [
                     {
                         "type": "function_call_output",
@@ -350,7 +341,7 @@ class RuntimeAgentResponses(AgentResponses):
             "call_id": call_id,
             "output": strict_json_dumps(output, compact=True),
         }
-        self.append_and_push_run_events([output_item])
+        self.push_run_events([output_item])
         return output_item
 
     def call_automation_with_events(
@@ -363,7 +354,7 @@ class RuntimeAgentResponses(AgentResponses):
             "name": START_AUTOMATION_TOOL_NAME,
             "arguments": strict_json_dumps(arguments, compact=True),
         }
-        self.append_and_push_run_events([function_call])
+        self.push_run_events([function_call])
         try:
             input_value = arguments.get("input")
             if not isinstance(input_value, str) or not input_value.strip():
@@ -395,7 +386,7 @@ class RuntimeAgentResponses(AgentResponses):
                     "message": "Automation execution failed.",
                 }
             }
-            self.append_and_push_run_events(
+            self.push_run_events(
                 [
                     {
                         "type": "function_call_output",
@@ -411,20 +402,13 @@ class RuntimeAgentResponses(AgentResponses):
             "call_id": call_id,
             "output": strict_json_dumps(output, compact=True),
         }
-        self.append_and_push_run_events([output_item])
+        self.push_run_events([output_item])
         return output_item
 
     def push_run_events(self, events: Sequence[JSONObject]) -> None:
         """Queue structured run events for `StreamRunEvents` clients."""
         for event in events:
             self._events.emit(event)
-
-    def append_and_push_run_events(self, events: list[JSONObject]) -> None:
-        """Append run events to context and push them to `StreamRunEvents` clients."""
-        if not events:
-            return
-        append_items(self._context, events)
-        self.push_run_events(events)
 
     def _push_task_message(self, message: Message) -> None:
         """Push one task message and return its message ID."""
@@ -472,8 +456,3 @@ class RuntimeAgentResponses(AgentResponses):
                 raise TimeoutError("Timed out waiting for model response.")
 
             time.sleep(min(_DEFAULT_MODEL_REPLY_POLL_INTERVAL, remaining))
-
-
-def _is_json_object_list(obj: JSONValue) -> bool:
-    """Check if the given object is a list of JSON objects."""
-    return isinstance(obj, list) and all(isinstance(item, dict) for item in obj)
