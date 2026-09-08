@@ -31,7 +31,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE
 from flwr.supercore import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
-from flwr.supercore.error import http_error_translator
+from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.http_logging import configure_uvicorn_logging
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health
@@ -182,6 +182,11 @@ def create_app(  # pylint: disable=too-many-statements
     )
     fastapi_app.state.superlink_lifespan = superlink_lifespan
     fastapi_app.state.linkstate_factory = linkstate_factory
+    fastapi_app.state.runtime_state_factory = linkstate_factory
+    fastapi_app.state.runtime_state_factory_error = (
+        ApiErrorCode.LINKSTATE_NOT_INITIALIZED,
+        "SuperLink LinkStateFactory is not initialized.",
+    )
     fastapi_app.state.superexec_auth_secret = superexec_auth_secret
     fastapi_app.state.artifact_provider = artifact_provider
     fastapi_app.state.fleet_api_type = fleet_api_type

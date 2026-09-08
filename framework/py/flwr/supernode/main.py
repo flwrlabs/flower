@@ -25,7 +25,7 @@ from fastapi import FastAPI
 
 from flwr import __version__
 from flwr.supercore import log
-from flwr.supercore.error import http_error_translator
+from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health
 from flwr.supernode.nodestate import NodeStateFactory
@@ -51,7 +51,11 @@ def create_app(
         redoc_url=None,
         lifespan=lifespan,
     )
-    fastapi_app.state.nodestate_factory = state_factory
+    fastapi_app.state.runtime_state_factory = state_factory
+    fastapi_app.state.runtime_state_factory_error = (
+        ApiErrorCode.NODESTATE_NOT_INITIALIZED,
+        "SuperNode NodeStateFactory is not initialized.",
+    )
     fastapi_app.state.superexec_auth_secret = superexec_auth_secret
 
     # Core APIs

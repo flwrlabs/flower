@@ -37,6 +37,7 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
+from flwr.supercore.dependencies.runtime import get_runtime_state, get_task
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import (
@@ -44,8 +45,6 @@ from flwr.supercore.protobuf.translation import (
     ProtobufTranslationMiddleware,
 )
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
-from flwr.superlink.dependencies.linkstate import get_linkstate
-from flwr.superlink.dependencies.task import get_task
 from flwr.superlink.servicer.runtime import runtime_handlers
 
 from .router import router
@@ -68,7 +67,7 @@ def _create_app(
     app.include_router(router)
     app.add_middleware(ProtobufTranslationMiddleware)
     app.middleware("http")(http_error_translator)
-    app.dependency_overrides[get_linkstate] = lambda: state
+    app.dependency_overrides[get_runtime_state] = lambda: state
     if task is not None:
         app.dependency_overrides[get_task] = lambda: task
     return app
