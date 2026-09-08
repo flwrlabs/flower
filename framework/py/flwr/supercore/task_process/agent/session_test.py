@@ -116,7 +116,6 @@ def test_agent_events_and_connector_items_use_same_publisher() -> None:
         stub=stub,
         run_id=123,
         task_id=789,
-        context=Mock(),
         start_run_request=StartRunRequest(),
         events=events,
     )
@@ -148,7 +147,6 @@ def test_pull_task_messages_filters_by_child_task() -> None:
         stub=stub,
         run_id=123,
         task_id=789,
-        context=Mock(),
         start_run_request=StartRunRequest(),
         events=Mock(),
     )
@@ -207,7 +205,6 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         stub=stub,
         run_id=123,
         task_id=789,
-        context=Mock(),
         start_run_request=start_run_request,
         events=Mock(),
     )
@@ -219,9 +216,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     }
 
     # Execute
-    with patch.object(
-        responses, "append_and_push_run_events"
-    ) as append_and_push_run_events:
+    with patch.object(responses, "push_run_events") as push_run_events:
         responses.call_automation_with_events(call_id="call-1", arguments=arguments)
 
     # Assert
@@ -239,7 +234,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
             series_id=2,
         ),
     )
-    items = [item.args[0][0] for item in append_and_push_run_events.call_args_list]
+    items = [item.args[0][0] for item in push_run_events.call_args_list]
     assert [item["type"] for item in items] == [
         "function_call",
         "function_call_output",
@@ -253,7 +248,6 @@ def test_connector_call_emits_standard_items() -> None:
         stub=Mock(),
         run_id=123,
         task_id=789,
-        context=Mock(),
         start_run_request=StartRunRequest(),
         events=Mock(),
     )
@@ -263,9 +257,7 @@ def test_connector_call_emits_standard_items() -> None:
         patch.object(
             responses, "create_connector_response", return_value={"results": []}
         ),
-        patch.object(
-            responses, "append_and_push_run_events"
-        ) as append_and_push_run_events,
+        patch.object(responses, "push_run_events") as push_run_events,
     ):
         output = responses.call_connector_with_events(
             name="notion_search", call_id="call-1", arguments=arguments
@@ -276,7 +268,7 @@ def test_connector_call_emits_standard_items() -> None:
         "call_id": "call-1",
         "output": '{"results":[]}',
     }
-    assert append_and_push_run_events.call_args_list == [
+    assert push_run_events.call_args_list == [
         call(
             [
                 {
@@ -299,7 +291,6 @@ def test_create_connector_response_resolves_canonical_name() -> None:
         stub=stub,
         run_id=123,
         task_id=789,
-        context=Mock(),
         start_run_request=StartRunRequest(),
         events=Mock(),
     )
