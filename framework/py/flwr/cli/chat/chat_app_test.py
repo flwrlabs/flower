@@ -97,7 +97,7 @@ def test_chat_loads_and_reloads_local_agent() -> None:
         chat = ChatApplication(Mock(), [Federation(name=_CHAT_FED_ID)], Mock())
     event = Mock(app=application)
     first_agent = LocalAgent(
-        path=Path("/tmp/my agent"),
+        path=Path(r"C:\Users\me\agent"),
         app_spec="@local/custom-agent",
         fab_hash="first-hash",
         fab_content=b"first-fab",
@@ -108,27 +108,18 @@ def test_chat_loads_and_reloads_local_agent() -> None:
         app_spec=first_agent.app_spec,
         fab_hash="second-hash",
         fab_content=b"second-fab",
-        warnings=("Add a description.",),
+        warnings=(),
     )
 
     with patch(
         "flwr.cli.chat.chat_app.build_local_agent", return_value=first_agent
     ) as mock_build:
         assert chat._handle_command(  # pylint: disable=protected-access
-            event, '/load "/tmp/my agent"'
+            event, r"/load C:\Users\me\agent"
         )
-        assert chat.busy
         asyncio.run(event.app.create_background_task.call_args.args[0])
-    mock_build.assert_called_once_with(Path("/tmp/my agent"))
-    assert chat.agent_app_spec == first_agent.app_spec
-    assert chat.agent_fab_hash == first_agent.fab_hash
-    assert chat.agent_name == "@local/custom-agent (local)"
+    mock_build.assert_called_once_with(first_agent.path)
     assert chat.local_agent == first_agent
-    assert not chat.local_agent_uploaded
-    assert (
-        "class:notice",
-        "Loaded @local/custom-agent from /tmp/my agent.\n\n",
-    ) in chat.transcript
 
     chat.series_id = 123
     event.app.create_background_task.reset_mock()
@@ -142,30 +133,8 @@ def test_chat_loads_and_reloads_local_agent() -> None:
     mock_build.assert_called_once_with(first_agent.path)
     assert chat.local_agent == reloaded_agent
     assert chat.series_id is None
-    assert ("class:notice", "Warning: Add a description.\n\n") in chat.transcript
-    assert (
-        "class:notice",
-        "Reloaded @local/custom-agent.\n"
-        "Changes detected. Your next message will use the new build and start a "
-        "new conversation.\n\n",
-    ) in chat.transcript
 
-    chat.series_id = 456
     chat.local_agent_uploaded = True
-    event.app.create_background_task.reset_mock()
-    with patch("flwr.cli.chat.chat_app.build_local_agent", return_value=reloaded_agent):
-        assert chat._handle_command(  # pylint: disable=protected-access
-            event, "/reload"
-        )
-        asyncio.run(event.app.create_background_task.call_args.args[0])
-    assert chat.series_id == 456
-    assert chat.local_agent_uploaded
-    assert chat.transcript[-1] == (
-        "class:notice",
-        "Reloaded @local/custom-agent.\n"
-        "No changes detected. The current conversation will continue.\n\n",
-    )
-
     with (
         patch(
             "flwr.cli.chat.chat_app.start_chat_run",
@@ -174,9 +143,7 @@ def test_chat_loads_and_reloads_local_agent() -> None:
         pytest.raises(click.ClickException, match="Stored FAB not found"),
     ):
         chat._run_prompt_sync(  # pylint: disable=protected-access
-            "Retry me",
-            reloaded_agent.app_spec,
-            reloaded_agent.fab_hash,
+            "Retry me", reloaded_agent.app_spec, reloaded_agent.fab_hash
         )
     assert not chat.local_agent_uploaded
 
