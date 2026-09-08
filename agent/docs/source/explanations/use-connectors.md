@@ -89,7 +89,7 @@ Chat. Normally, pass the result to a final model request and publish that
 request's stream. If the AgentApp intentionally presents connector content
 directly, see {ref}`publish-agentapp-generated-text`.
 
-When `web_fetch` uses the runtime proxy, the caller waits up to 310 seconds by
+When `web_fetch` uses the runtime proxy, the caller uses a 60-second timeout by
 default. Set `FLWR_PROXY_REQUEST_TIMEOUT` to a positive number of seconds when
 the proxy has a different request deadline.
 
