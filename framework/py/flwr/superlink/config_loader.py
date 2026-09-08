@@ -77,8 +77,6 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     fleet_api_type: str
     fleet_api_address: str | None
     simulation: bool
-    ssl_keyfile: str | None
-    ssl_certfile: str | None
     database: str
     isolation: str
     runtime_ssl_ca_certfile: str | None

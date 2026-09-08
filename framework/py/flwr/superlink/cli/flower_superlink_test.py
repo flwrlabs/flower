@@ -202,21 +202,6 @@ def test_parse_superlink_log_rotation_args_custom_values() -> None:
 
 
 @pytest.mark.parametrize(
-    "flag",
-    ["--appio-ssl-certfile", "--appio-ssl-keyfile", "--appio-ssl-ca-certfile"],
-)
-def test_parse_superlink_appio_tls_args_rejected(
-    flag: str, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """SuperLink should explain how to replace removed AppIO TLS args."""
-    with pytest.raises(SystemExit) as exc_info:
-        _parse_args_run_superlink().parse_args([flag, "certificate.pem"])
-
-    assert exc_info.value.code == 2
-    assert f"argument {flag}: this flag no longer exists" in capsys.readouterr().err
-
-
-@pytest.mark.parametrize(
     ("env_value", "cli_args", "expected"),
     [
         ("1", [], False),

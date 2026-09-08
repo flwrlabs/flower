@@ -433,8 +433,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         fleet_api_type=args.fleet_api_type,
         fleet_api_address=fleet_api_address,
         simulation=args.simulation,
-        ssl_keyfile=args.ssl_keyfile,
-        ssl_certfile=args.ssl_certfile,
         database=args.database,
         isolation=args.isolation,
         runtime_ssl_ca_certfile=(
