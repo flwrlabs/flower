@@ -264,8 +264,8 @@ class Flad(Strategy):
         else:
             value_array = np.asarray([max_value] * len(self.round_participants))
 
-        for client in self.round_participants:
-            client[parameter] = int(value_array[self.round_participants.index(client)])
+        for idx, client in enumerate(self.round_participants):
+             client[parameter] = int(value_array[idx])    
 
     def _construct_messages(
         self,
@@ -279,7 +279,6 @@ class Flad(Strategy):
                 this_client_config = record[self.configrecord_key].copy()
                 this_client_config["epochs"] = client["epochs"]
                 this_client_config["steps_per_epoch"] = client["steps_per_epoch"]
-                record[self.configrecord_key] = this_client_config
                 client_record = RecordDict(
                     {
                         self.arrayrecord_key: record[self.arrayrecord_key],

@@ -31,7 +31,7 @@ N = 11
 P = 10
 
 
-# MPL model
+# MLP model
 def fc_model(
     model_name: str, input_shape: tf.TensorShape, units: int, classes: int = 1
 ) -> Model:

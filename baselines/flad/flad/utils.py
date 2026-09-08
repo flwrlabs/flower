@@ -47,7 +47,13 @@ def get_client_name(client_names: str, partition_id: int) -> str:
     run config (see pyproject.toml), the single source of truth for the
     partition-id-to-name mapping shared by ClientApp and ServerApp.
     """
-    return client_names.split(",")[partition_id]
+    names = [name.strip() for name in client_names.split(",") if name.strip()]
+    if partition_id < 0 or partition_id >= len(names):
+        raise ValueError(
+            f"Invalid partition_id={partition_id}; expected 0..{len(names) - 1} "
+            f"for client_names={client_names!r}"
+        )
+    return names[partition_id]
 
 
 def make_run_output_folder(output_folder: str, rn_seed: int) -> str:
