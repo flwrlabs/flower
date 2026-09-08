@@ -434,7 +434,10 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             return
 
         selected_agent, prompt = _extract_agent_selection(prompt)
-        if selected_agent is not None:
+        is_loaded_local_agent = (
+            self.local_agent is not None and selected_agent == self.local_agent.app_spec
+        )
+        if selected_agent is not None and not is_loaded_local_agent:
             try:
                 agents = self.completer.load_agents()
             except click.ClickException as exc:
