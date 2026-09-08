@@ -39,6 +39,9 @@ def test_parse_and_build_local_agent(tmp_path: Path) -> None:
     }
     fab_content = b"local-fab"
     assert parse_local_agent_path('/load "../my agent"') == Path("../my agent")
+    assert str(parse_local_agent_path(r"/load C:\Users\me\agent")) == (
+        r"C:\Users\me\agent"
+    )
 
     with (
         patch(

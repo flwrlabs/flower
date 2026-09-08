@@ -44,7 +44,11 @@ class LocalAgent:
 def parse_local_agent_path(prompt: str) -> Path:
     """Extract the local AgentApp path from a load command."""
     try:
-        parts = shlex.split(prompt)
+        lexer = shlex.shlex(prompt, posix=True)
+        lexer.whitespace_split = True
+        lexer.commenters = ""
+        lexer.escape = ""
+        parts = list(lexer)
     except ValueError as exc:
         raise click.ClickException(str(exc)) from None
     if len(parts) != 2:
