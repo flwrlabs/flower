@@ -91,8 +91,8 @@ directly, see {ref}`publish-agentapp-generated-text`.
 
 When `web_fetch` uses the runtime proxy, the caller uses a 60-second timeout by
 default. Set `FLWR_PROXY_REQUEST_TIMEOUT` to a positive number of seconds when
-the proxy has a different request deadline. The value must be less than 300
-seconds, which is the parent agent reply deadline.
+the proxy has a different request deadline. The value must be less than 295
+seconds to leave headroom before the parent agent's 300-second reply deadline.
 
 Account connector credentials are delivered to the runtime action, not returned
 to the AgentApp.

@@ -61,7 +61,10 @@ _READ_CHUNK_SIZE = 64 * 1024
 _REDIRECT_STATUS_CODES = frozenset({301, 302, 303, 307, 308})
 # Keep the existing request timeout unless explicitly overridden.
 _PROXY_REQUEST_TIMEOUT = 60.0
-_MAX_PROXY_REQUEST_TIMEOUT = 300.0
+# Reserve headroom for task launch, the connector poll, and reply polling before
+# the parent agent's fixed 300-second reply deadline.
+_PROXY_REQUEST_TIMEOUT_HEADROOM = 5.0
+_MAX_PROXY_REQUEST_TIMEOUT = 300.0 - _PROXY_REQUEST_TIMEOUT_HEADROOM
 _PROXY_WEB_FETCH_PROVIDER = "proxy"
 
 
