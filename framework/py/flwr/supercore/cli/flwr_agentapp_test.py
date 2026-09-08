@@ -178,6 +178,23 @@ def test_flwr_agentapp_reads_stdin_token_and_acknowledges_start(
     assert run_agentapp.call_args.kwargs["token"] == _VALID_TASK_TOKEN
 
 
+def test_flwr_agentapp_accumulates_split_stdin_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A valid token can arrive across multiple stdin reads."""
+    token_stdin = Mock()
+    token_stdin.buffer.read1.side_effect = [
+        _VALID_TASK_TOKEN[:128].encode("ascii"),
+        f"{_VALID_TASK_TOKEN[128:]}\n".encode("ascii"),
+    ]
+    monkeypatch.setattr(sys, "stdin", token_stdin)
+    args = _parse_args_run_flwr_agentapp().parse_args(["--token-stdin"])
+
+    assert _try_obtain_agentapp_token(args) == _VALID_TASK_TOKEN
+    assert token_stdin.buffer.read1.call_count == 2
+    token_stdin.close.assert_called_once()
+
+
 @pytest.mark.parametrize(
     "token_input",
     [
