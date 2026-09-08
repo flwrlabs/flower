@@ -262,7 +262,12 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                 except ValueError:
                     task_type = None
                 fab_hash = task.fab_hash if task.HasField("fab_hash") else None
-                executor.wait_for_capacity(task_type=task_type, fab_hash=fab_hash)
+                executor.wait_for_capacity(
+                    task_type=task_type,
+                    fab_hash=fab_hash,
+                    insecure=insecure,
+                    root_certificates_path=root_certificates_path,
+                )
 
                 claim_req = ClaimTaskRequest(task_id=task.task_id)
                 claim_res = client.ClaimTask(claim_req)

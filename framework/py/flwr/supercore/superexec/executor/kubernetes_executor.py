@@ -662,10 +662,22 @@ class KubernetesExecutor:
         )
 
     def wait_for_capacity(
-        self, task_type: TaskType | None = None, fab_hash: str | None = None
+        self,
+        task_type: TaskType | None = None,
+        fab_hash: str | None = None,
+        *,
+        insecure: bool = False,
+        root_certificates_path: str | None = None,
     ) -> None:
         """Wait until the configured resource pool is below its active Pod budget."""
-        self._wait_for_capacity(task_type, fab_hash, allow_warm_dispatch=True)
+        self._wait_for_capacity(
+            task_type,
+            fab_hash,
+            allow_warm_dispatch=self._can_dispatch_warm(
+                insecure, root_certificates_path
+            ),
+            reconcile_warm_pools=True,
+        )
 
     def _wait_for_capacity(
         self,
@@ -673,12 +685,14 @@ class KubernetesExecutor:
         fab_hash: str | None,
         *,
         allow_warm_dispatch: bool,
+        reconcile_warm_pools: bool,
     ) -> None:
         """Wait for cold capacity, or allow an already-ready warm dispatch."""
         self._sweep_completed_pods_if_due()
-        if allow_warm_dispatch and self._warm_executor_pool_manager is not None:
+        if reconcile_warm_pools and self._warm_executor_pool_manager is not None:
             has_ready_warm_pod = (
-                task_type is not None
+                allow_warm_dispatch
+                and task_type is not None
                 and self._warm_executor_pool_manager.has_ready_pod(task_type, fab_hash)
             )
             self._warm_executor_pool_manager.ensure_capacity(
@@ -772,7 +786,12 @@ class KubernetesExecutor:
                 )
                 if warm_result is not None:
                     return warm_result
-                self._wait_for_capacity(None, None, allow_warm_dispatch=False)
+                self._wait_for_capacity(
+                    None,
+                    None,
+                    allow_warm_dispatch=False,
+                    reconcile_warm_pools=False,
+                )
             launch_attempt_id = _new_launch_attempt_id()
             secret_name = _credential_secret_name(spec, launch_attempt_id)
             secret = _build_appio_credentials_secret(
@@ -801,6 +820,15 @@ class KubernetesExecutor:
         """Delete idle warm Pods owned by this SuperExec instance."""
         if self._warm_executor_pool_manager is not None:
             self._warm_executor_pool_manager.close()
+
+    def _can_dispatch_warm(
+        self, insecure: bool, root_certificates_path: str | None
+    ) -> bool:
+        """Return whether warm dispatch can use the task's Runtime transport."""
+        return insecure or (
+            self._config.runtime_root_certificates is None
+            and root_certificates_path is None
+        )
 
     def _launch_warm_executor(self, pool_key: WarmExecutorPoolKey) -> LaunchResult:
         """Submit one warm TaskExecutor Pod for a fixed compatibility key."""

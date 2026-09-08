@@ -756,9 +756,44 @@ def test_wait_for_capacity_allows_a_ready_warm_pod_at_the_budget() -> None:
     client.list_namespaced_secret.return_value = {"items": []}
     executor = KubernetesExecutor(client=client, config=config)
 
-    executor.wait_for_capacity(TaskType.AGENT_APP, "fab-sha256")
+    executor.wait_for_capacity(TaskType.AGENT_APP, "fab-sha256", insecure=True)
 
     sleep.assert_not_called()
+
+
+def test_wait_for_capacity_reserves_cold_capacity_for_a_secure_task() -> None:
+    """A warm Pod cannot bypass capacity when it cannot receive the Runtime CA."""
+    client = Mock()
+    sleep = Mock()
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        active_pod_budget=2,
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+        sleep=sleep,
+    )
+    warm_pod = _ready_warm_pod(pool_key, config)
+    active_pod_count = 2
+
+    def _list_pods(_namespace: str, label_selector: str) -> dict[str, Any]:
+        if "warm-executor-owner" in label_selector:
+            return {"items": [warm_pod]}
+        return {"items": [warm_pod, _pod("Running")][:active_pod_count]}
+
+    def _release_capacity(_interval: float) -> None:
+        nonlocal active_pod_count
+        active_pod_count = 1
+
+    sleep.side_effect = _release_capacity
+    client.list_namespaced_pod.side_effect = _list_pods
+    client.list_namespaced_secret.return_value = {"items": []}
+    executor = KubernetesExecutor(client=client, config=config)
+
+    executor.wait_for_capacity(TaskType.AGENT_APP, "fab-sha256", insecure=False)
+
+    sleep.assert_called_once_with(1.0)
 
 
 def test_wait_for_capacity_reserves_space_for_a_cold_task() -> None:

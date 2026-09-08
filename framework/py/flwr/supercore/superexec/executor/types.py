@@ -94,7 +94,12 @@ class Executor(Protocol):
     """
 
     def wait_for_capacity(
-        self, task_type: TaskType | None = None, fab_hash: str | None = None
+        self,
+        task_type: TaskType | None = None,
+        fab_hash: str | None = None,
+        *,
+        insecure: bool = False,
+        root_certificates_path: str | None = None,
     ) -> None:
         """Wait until the executor can accept one TaskExecutor launch."""
 
