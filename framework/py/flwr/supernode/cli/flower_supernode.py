@@ -326,21 +326,21 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
         dest="ssl_certfile",
         action=_DeprecatedAppioSslOption,
         type=expanduser,
-        help="Deprecated: use `--ssl-certfile` instead.",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--appio-ssl-keyfile",
         dest="ssl_keyfile",
         action=_DeprecatedAppioSslOption,
         type=expanduser,
-        help="Deprecated: use `--ssl-keyfile` instead.",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--appio-ssl-ca-certfile",
         dest="ssl_ca_certfile",
         action=_DeprecatedAppioSslOption,
         type=expanduser,
-        help="Deprecated: use `--ssl-ca-certfile` instead.",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--trusted-entities",

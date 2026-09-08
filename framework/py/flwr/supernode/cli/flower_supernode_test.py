@@ -95,15 +95,6 @@ def test_parse_supernode_deprecated_appio_tls_args(
     assert all("deprecated" in call.args[1] for call in log.call_args_list)
 
 
-def test_parse_supernode_help_marks_appio_tls_args_deprecated() -> None:
-    """Deprecated AppIO TLS args should point to their replacements in help."""
-    help_message = _parse_args_run_supernode().format_help()
-
-    assert "Deprecated: use `--ssl-certfile` instead." in help_message
-    assert "Deprecated: use `--ssl-keyfile` instead." in help_message
-    assert "Deprecated: use `--ssl-ca-certfile` instead." in help_message
-
-
 def test_parse_supernode_lifespan_config_returns_final_defaults(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
