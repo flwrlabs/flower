@@ -133,7 +133,9 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UnregisterNodeResponse,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
-from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
+from flwr.proto.federation_pb2 import (
+    Federation as FederationProto,  # pylint: disable=E0611
+)
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -177,6 +179,7 @@ from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
+from flwr.superlink.federation.typing import Federation
 from flwr.superlink.run_source import RunSource
 
 
@@ -1488,6 +1491,13 @@ def list_nodes(
     return ListNodesResponse(nodes_info=nodes_info, now=now().isoformat())
 
 
+def _get_federation_member_count(federation: Federation) -> int:
+    """Return the explicit member count or fall back to the member list size."""
+    if federation.member_count is not None:
+        return federation.member_count
+    return len(federation.members)
+
+
 def list_federations(
     request: ListFederationsRequest, account: AccountInfo, state: LinkState
 ) -> ListFederationsResponse:
@@ -1503,15 +1513,11 @@ def list_federations(
 
     return ListFederationsResponse(
         federations=[
-            Federation(
+            FederationProto(
                 name=fed.id,
                 description=fed.description,
                 members=fed.members,
-                member_count=(
-                    fed.member_count
-                    if fed.member_count is not None
-                    else len(fed.members)
-                ),
+                member_count=_get_federation_member_count(fed),
                 archived=fed.archived,
                 simulation=fed.simulation,
                 can_invite_members=fed.can_invite_members,
@@ -1606,11 +1612,11 @@ def show_federation(
     details = state.federation_manager.get_details(federation_id)
 
     # Build Federation proto object
-    federation_proto = Federation(
+    federation_proto = FederationProto(
         name=federation_id,
         description=details.description,
         members=details.members,
-        member_count=len(details.members),
+        member_count=_get_federation_member_count(details),
         nodes=details.nodes,
         runs=[run_to_proto(run) for run in details.runs],
         archived=details.archived,
@@ -1667,11 +1673,11 @@ def create_federation(
     )
 
     return CreateFederationResponse(
-        federation=Federation(
+        federation=FederationProto(
             name=federation.id,
             description=federation.description,
             members=federation.members,
-            member_count=len(federation.members),
+            member_count=_get_federation_member_count(federation),
             simulation=federation.simulation,
             can_invite_members=federation.can_invite_members,
             can_add_supernodes=federation.can_add_supernodes,
