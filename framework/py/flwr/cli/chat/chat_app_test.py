@@ -18,8 +18,6 @@ import asyncio
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import click
-import pytest
 from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
 
@@ -140,21 +138,10 @@ def test_chat_loads_and_rebuilds_local_agent_before_prompt() -> None:
     )
 
 
-def test_start_chat_run_requires_hash_for_local_fab() -> None:
-    """Uploading local FAB content should require and include its hash."""
+def test_start_chat_run_uploads_local_fab() -> None:
+    """Uploading local FAB content should omit the app spec."""
     stub = Mock()
     stub.StartRun.return_value = StartRunResponse(run_id=1, series_id=2)
-
-    with pytest.raises(click.ClickException, match="FAB hash must be provided"):
-        start_chat_run(
-            stub,
-            "Hello",
-            _CHAT_FED_ID,
-            None,
-            "@local/custom-agent",
-            fab_content=b"fab-content",
-        )
-    stub.StartRun.assert_not_called()
 
     assert start_chat_run(
         stub,
@@ -162,10 +149,8 @@ def test_start_chat_run_requires_hash_for_local_fab() -> None:
         _CHAT_FED_ID,
         None,
         "@local/custom-agent",
-        "fab-hash",
-        b"fab-content",
+        fab_content=b"fab-content",
     ) == (1, 2)
     request = stub.StartRun.call_args.args[0]
     assert request.app_spec == ""
-    assert request.fab.hash_str == "fab-hash"
     assert request.fab.content == b"fab-content"

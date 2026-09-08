@@ -1078,20 +1078,12 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
 ) -> tuple[int, int | None]:
     """Start one Flower AgentApp run."""
     req = StartRunRequest(
-        # SuperLink derives the app ID from a newly submitted local FAB. Once
-        # stored, later requests identify it using the app spec and FAB hash.
+        # SuperLink derives the app ID from submitted local FAB content.
         app_spec="" if fab_content is not None else app_spec,
         override_config=user_config_to_proto({CHAT_AGENT_INPUT_KEY: prompt}),
         federation=federation or "",
+        fab=Fab(hash_str=fab_hash or "", content=fab_content or b""),
     )
-    if fab_content is not None:
-        if not fab_hash:
-            raise click.ClickException(
-                "FAB hash must be provided when uploading FAB content."
-            )
-        req.fab.CopyFrom(Fab(hash_str=fab_hash, content=fab_content))
-    elif fab_hash is not None:
-        req.fab.CopyFrom(Fab(hash_str=fab_hash))
     if series_id is not None:
         req.series_id = series_id
 
