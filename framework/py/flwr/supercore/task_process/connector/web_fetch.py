@@ -57,7 +57,8 @@ _TIMEOUT = 30.0
 _MAX_REDIRECTS = 10
 _READ_CHUNK_SIZE = 64 * 1024
 _REDIRECT_STATUS_CODES = frozenset({301, 302, 303, 307, 308})
-_PROXY_REQUEST_TIMEOUT = 60.0
+# Allow the proxy's 300-second fetch deadline plus response overhead.
+_PROXY_REQUEST_TIMEOUT = 310.0
 _PROXY_WEB_FETCH_PROVIDER = "proxy"
 
 

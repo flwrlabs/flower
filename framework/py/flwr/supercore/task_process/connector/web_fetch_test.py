@@ -171,7 +171,7 @@ def test_invoke_web_fetch_provider_calls_proxy_endpoint_when_configured(
     post_mock.assert_called_once_with(
         _PROXY_ENDPOINT,
         json={"url": "https://example.com:443"},
-        timeout=60.0,
+        timeout=310.0,
     )
     get_mock.assert_not_called()
 
