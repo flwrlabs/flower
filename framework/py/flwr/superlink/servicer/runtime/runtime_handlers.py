@@ -47,6 +47,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -79,6 +81,43 @@ from flwr.superlink.servicer.control.control_handlers import (
 RUNTIME_ENDPOINT_UNAVAILABLE_MESSAGE = (
     "Some Runtime API endpoints are only available for Deployment Runtime runs."
 )
+
+
+def get_run_series_events(
+    request: GetRunSeriesEventsRequest,
+    state: LinkState,
+    task: Task,
+) -> GetRunSeriesEventsResponse:
+    """Get events from all runs in the authenticated AgentApp task's series."""
+    log(DEBUG, "Runtime.GetRunSeriesEvents")
+
+    runs = state.get_run_info(run_ids=[task.run_id])
+    if (
+        not runs
+        or task.type != TaskType.AGENT_APP
+        or task.task_id != runs[0].primary_task_id
+    ):
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_RUN_SERIES_EVENTS_NOT_ALLOWED,
+            "Only the primary AgentApp task can access run-series events.",
+        )
+
+    series = state.get_run_series(series_ids=[runs[0].series_id])
+    if not series:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_RUN_SERIES_CONTEXT_NOT_FOUND,
+            "Run series not found for the authenticated task.",
+        )
+
+    series_runs = state.get_run_info(run_ids=series[0].run_ids)
+    primary_task_ids = [
+        run.primary_task_id for run in series_runs if run.primary_task_id is not None
+    ]
+    events = state.get_task_events(
+        run_ids=series[0].run_ids,
+        task_ids=primary_task_ids,
+    )
+    return GetRunSeriesEventsResponse(events=events)
 
 
 def pull_pending_tasks(

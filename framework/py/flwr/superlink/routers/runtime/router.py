@@ -43,6 +43,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -218,6 +220,16 @@ def push_task_events(
 ) -> PushTaskEventsResponse:
     """Push task events."""
     return core_runtime_handlers.push_task_events(request, state, task)
+
+
+@router.post("/get-run-series-events")
+def get_run_series_events(
+    request: Annotated[GetRunSeriesEventsRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: LinkStateDependency,
+    task: TaskDependency,
+) -> GetRunSeriesEventsResponse:
+    """Get events from the authenticated AgentApp task's run series."""
+    return runtime_handlers.get_run_series_events(request, state, task)
 
 
 @router.post("/pull-task-message")
