@@ -82,10 +82,7 @@ from flwr.supercore.interceptors import (
 from flwr.supercore.logger import configure_superlink_log_file, console_handler
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
-from flwr.supercore.tls import (
-    get_client_tls_args,
-    try_obtain_optional_runtime_server_certificates,
-)
+from flwr.supercore.tls import get_client_tls_args
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.utils import get_popen_detach_kwargs
 from flwr.supercore.version import package_version
@@ -267,8 +264,8 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         runtime_address = resolve_bind_address(f"{runtime_host}:{config.port}")
         command = _get_superexec_command(
             runtime_address=runtime_address,
-            runtime_certificates=config.runtime_certificates,
-            runtime_root_certificates_path=config.runtime_ssl_ca_certfile,
+            runtime_certificates=config.certificates,
+            runtime_root_certificates_path=config.ssl_ca_certfile,
             parent_pid=os.getpid(),
             runtime_dependency_install=config.runtime_dependency_install,
         )
@@ -322,7 +319,7 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         health_server_address, _, _ = _format_address(args.health_server_address)
 
     # Obtain certificates
-    certificates, runtime_certificates = _obtain_superlink_certificates(args)
+    certificates = _obtain_superlink_certificates(args)
 
     # Load SuperExec auth secret
     superexec_auth_secret: bytes | None = None
@@ -427,7 +424,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         port=args.port,
         insecure=args.insecure,
         certificates=certificates,
-        runtime_certificates=runtime_certificates,
         superexec_auth_secret=superexec_auth_secret,
         authn_plugin=authn_plugin,
         event_log_plugin=event_log_plugin,
@@ -437,21 +433,23 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         fleet_api_type=args.fleet_api_type,
         fleet_api_address=fleet_api_address,
         simulation=args.simulation,
-        ssl_keyfile=args.ssl_keyfile,
-        ssl_certfile=args.ssl_certfile,
+        ssl_ca_certfile=(
+            str(Path(args.ssl_ca_certfile).expanduser())
+            if certificates is not None
+            else None
+        ),
+        ssl_certfile=(
+            str(Path(args.ssl_certfile).expanduser())
+            if certificates is not None
+            else None
+        ),
+        ssl_keyfile=(
+            str(Path(args.ssl_keyfile).expanduser())
+            if certificates is not None
+            else None
+        ),
         database=args.database,
         isolation=args.isolation,
-        runtime_ssl_ca_certfile=args.runtime_ssl_ca_certfile,
-        runtime_ssl_certfile=(
-            str(Path(args.runtime_ssl_certfile).expanduser())
-            if runtime_certificates is not None
-            else None
-        ),
-        runtime_ssl_keyfile=(
-            str(Path(args.runtime_ssl_keyfile).expanduser())
-            if runtime_certificates is not None
-            else None
-        ),
         runtime_dependency_install=args.runtime_dependency_install,
     )
 
@@ -513,16 +511,16 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
         reload=False,
         access_log=True,
         log_config=get_uvicorn_log_config(console_handler.level),
-        ssl_keyfile=lifespan_config.runtime_ssl_keyfile,
-        ssl_certfile=lifespan_config.runtime_ssl_certfile,
+        ssl_keyfile=lifespan_config.ssl_keyfile,
+        ssl_certfile=lifespan_config.ssl_certfile,
         workers=1,
     )
 
 
 def _obtain_superlink_certificates(
     args: argparse.Namespace,
-) -> tuple[tuple[bytes, bytes, bytes] | None, tuple[bytes, bytes, bytes] | None]:
-    """Return Fleet/Control and Runtime API certificate tuples."""
+) -> tuple[bytes, bytes, bytes] | None:
+    """Return TLS certificate tuple used by all APIs (Fleet, Control, and Runtime)."""
     if args.insecure:
         log(
             WARN,
@@ -530,10 +528,8 @@ def _obtain_superlink_certificates(
             "unencrypted communication (TLS disabled). Proceed only if you understand "
             "the risks.",
         )
-        return None, None
-    certificates = try_obtain_server_certificates(args)
-    runtime_certificates = try_obtain_optional_runtime_server_certificates(args)
-    return certificates, runtime_certificates
+        return None
+    return try_obtain_server_certificates(args)
 
 
 def _get_superexec_command(
@@ -790,26 +786,29 @@ def _add_args_runtime_api(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--appio-ssl-certfile",
         dest="runtime_ssl_certfile",
-        help="Runtime API server TLS certificate file (as a path str) "
-        "to create a secure connection. The certificate must include SANs for "
-        "the Runtime API address used by SuperExec.",
-        type=str,
-        default=None,
+        help=argparse.SUPPRESS,
+        type=_unsupported_appio_ssl_flag,
     )
     parser.add_argument(
         "--appio-ssl-keyfile",
         dest="runtime_ssl_keyfile",
-        help="Runtime API server TLS private key file (as a path str) "
-        "to create a secure connection.",
-        type=str,
+        help=argparse.SUPPRESS,
+        type=_unsupported_appio_ssl_flag,
     )
     parser.add_argument(
         "--appio-ssl-ca-certfile",
         dest="runtime_ssl_ca_certfile",
-        help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
-        "the Runtime API server certificate. This is not a client certificate "
-        "for mTLS.",
-        type=str,
+        help=argparse.SUPPRESS,
+        type=_unsupported_appio_ssl_flag,
+    )
+
+
+def _unsupported_appio_ssl_flag(_value: str) -> str:
+    """Reject a removed --appio-ssl-* flag."""
+    raise argparse.ArgumentTypeError(
+        "this flag no longer exists; Control API, Fleet API, and "
+        "Runtime API use the same TLS certificates. Use `--ssl-certfile`, "
+        "`--ssl-keyfile`, and `--ssl-ca-certfile` instead."
     )
 
 

@@ -21,6 +21,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import uuid
 from logging import DEBUG, ERROR, INFO, WARNING
 from pathlib import Path
@@ -144,7 +145,7 @@ def install_app_dependencies(
     log(DEBUG, "Using UV_PROJECT_ENVIRONMENT=%s", sync_env["UV_PROJECT_ENVIRONMENT"])
 
     installed_packages: set[str] = set()
-    log(INFO, "Starting uv sync.")
+    sync_start_time = time.monotonic()
     sync_error = _run_cmd(
         sync_cmd,
         cwd=project_dir,
@@ -152,7 +153,7 @@ def install_app_dependencies(
         log_output_level=DEBUG,
         installed_packages=installed_packages,
     )
-    log(INFO, "Finished uv sync.")
+    log(INFO, "uv sync took %.1f seconds.", time.monotonic() - sync_start_time)
     if sync_error is not None:
         raise RuntimeDependencyInstallationError(f"uv sync failed: {sync_error}")
 

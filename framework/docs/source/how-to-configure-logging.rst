@@ -18,10 +18,7 @@ example, to launch your ``SuperLink`` with ``DEBUG`` logs, use:
     FLWR_LOG_LEVEL=DEBUG flower-superlink \
         --ssl-ca-certfile certificates/ca.crt \
         --ssl-certfile certificates/server.pem \
-        --ssl-keyfile certificates/server.key \
-        --appio-ssl-ca-certfile certificates/ca.crt \
-        --appio-ssl-certfile certificates/server.pem \
-        --appio-ssl-keyfile certificates/server.key
+        --ssl-keyfile certificates/server.key
 
     WARNING 2025-08-20 17:13:30,391:   DEBUG logs enabled. Do not use this in production, as it may expose sensitive details.
     INFO 2025-08-20 17:13:31,360:      Starting Flower SuperLink
