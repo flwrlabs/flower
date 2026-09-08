@@ -93,7 +93,9 @@ class Executor(Protocol):
     status.
     """
 
-    def wait_for_capacity(self) -> None:
+    def wait_for_capacity(
+        self, task_type: TaskType | None = None, fab_hash: str | None = None
+    ) -> None:
         """Wait until the executor can accept one TaskExecutor launch."""
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:

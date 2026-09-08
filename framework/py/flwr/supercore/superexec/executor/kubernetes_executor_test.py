@@ -496,6 +496,33 @@ def test_launch_falls_back_to_cold_pod_when_no_ready_warm_pod_exists() -> None:
     assert cold_pod["spec"]["containers"][0]["command"] == ["flwr-agentapp"]
 
 
+def test_launch_falls_back_to_cold_pod_when_warm_pods_cannot_be_listed() -> None:
+    """A failed warm Pod list must not be treated as missing pool capacity."""
+    client = Mock()
+    client.list_namespaced_pod.side_effect = _KubernetesApiError(403, "forbidden")
+    client.list_namespaced_secret.return_value = {"items": []}
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        runtime_root_certificates=None,
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+    )
+
+    result = KubernetesExecutor(client=client, config=config).launch(
+        _execution_spec(
+            task_type=TaskType.AGENT_APP,
+            fab_hash="fab-sha256",
+            insecure=True,
+        )
+    )
+
+    assert result.status == LaunchResultStatus.ACCEPTED
+    cold_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
+    assert cold_pod["spec"]["containers"][0]["command"] == ["flwr-agentapp"]
+
+
 def test_launch_returns_unknown_after_unacknowledged_warm_token_delivery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -551,7 +578,7 @@ def test_warm_pool_replaces_consumed_pod_and_cleans_up_idle_pods() -> None:
         warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
     )
     pool = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
-        client, config
+        client, config, lambda: 0
     )
     client.reset_mock()
     pool._busy_pods.add("consumed")  # pylint: disable=protected-access
@@ -580,6 +607,89 @@ def test_warm_pool_replaces_consumed_pod_and_cleans_up_idle_pods() -> None:
     client.delete_namespaced_pod.assert_called_once_with(
         name="idle", namespace="flower-system", grace_period_seconds=0
     )
+
+
+def test_warm_pool_keeps_consumed_pod_busy_when_deletion_fails() -> None:
+    """A consumed Pod must never return to the ready pool after failed deletion."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+    )
+    pool = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
+        client, config, lambda: 0
+    )
+    client.reset_mock()
+    pool._busy_pods.add("consumed")  # pylint: disable=protected-access
+    client.delete_namespaced_pod.side_effect = _KubernetesApiError(500, "error")
+
+    pool._wait_for_task_and_replace(  # pylint: disable=protected-access
+        "consumed",
+        pool_key,
+        kube._KubernetesWarmExecutorDispatch(  # pylint: disable=protected-access
+            _WarmExecResponse(False)
+        ),
+    )
+
+    assert "consumed" in pool._busy_pods  # pylint: disable=protected-access
+    client.create_namespaced_pod.assert_not_called()
+
+
+def test_warm_pool_reserves_capacity_for_cold_fallback() -> None:
+    """Replacing a missing warm Pod leaves room for the cold task Pod."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        active_pod_budget=3,
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+    )
+    pool = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
+        client, config, lambda: 2
+    )
+    client.reset_mock()
+
+    pool._ensure_pool_capacity(  # pylint: disable=protected-access
+        WarmExecutorPoolConfig(key=pool_key, size=1), reserved_pod_capacity=1
+    )
+
+    client.create_namespaced_pod.assert_not_called()
+
+
+def test_wait_for_capacity_allows_a_ready_warm_pod_at_the_budget() -> None:
+    """A matching warm dispatch should not wait for capacity it does not consume."""
+    client = Mock()
+    sleep = Mock()
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        active_pod_budget=2,
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+        sleep=sleep,
+    )
+    warm_pod = _ready_warm_pod(pool_key, config)
+
+    def _list_pods(_namespace: str, label_selector: str) -> dict[str, Any]:
+        if "warm-executor-owner" in label_selector:
+            return {"items": [warm_pod]}
+        return {"items": [warm_pod, _pod("Running")]}
+
+    client.list_namespaced_pod.side_effect = _list_pods
+    client.list_namespaced_secret.return_value = {"items": []}
+    executor = KubernetesExecutor(client=client, config=config)
+
+    executor.wait_for_capacity(TaskType.AGENT_APP, "fab-sha256")
+
+    sleep.assert_not_called()
 
 
 def test_warm_pool_cannot_fill_the_active_pod_budget() -> None:

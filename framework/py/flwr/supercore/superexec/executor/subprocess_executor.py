@@ -20,6 +20,7 @@ import subprocess
 from flwr.supercore.constant import (
     TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
     TASK_TYPE_TO_COMMAND,
+    TaskType,
 )
 
 from .types import ExecutionSpec, LaunchResult
@@ -28,8 +29,11 @@ from .types import ExecutionSpec, LaunchResult
 class SubprocessExecutor:
     """Run TaskExecutor processes as local subprocesses."""
 
-    def wait_for_capacity(self) -> None:
+    def wait_for_capacity(
+        self, task_type: TaskType | None = None, fab_hash: str | None = None
+    ) -> None:
         """Return immediately because subprocess launches have no capacity gate."""
+        del task_type, fab_hash
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""
