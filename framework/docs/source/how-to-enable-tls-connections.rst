@@ -108,16 +108,16 @@ This section describes how to launch a SuperNode that works on TLS-enabled conne
 The code snippet below assumes the `certificates/` directory is in the same directory
 where you execute the command from. To secure the SuperNode ↔ SuperLink connection,
 replace ``--insecure`` with ``--root-certificates``. The same command can also provide
-AppIo-named certificates for the SuperNode's Runtime API.
+certificates for the SuperNode's Runtime API.
 
 .. code-block:: bash
     :emphasize-lines: 2,3,4,5
 
     $ flower-supernode \
         --root-certificates certificates/ca.crt \
-        --appio-ssl-ca-certfile certificates/ca.crt \
-        --appio-ssl-certfile certificates/server.pem \
-        --appio-ssl-keyfile certificates/server.key \
+        --ssl-ca-certfile certificates/ca.crt \
+        --ssl-certfile certificates/server.pem \
+        --ssl-keyfile certificates/server.key \
         --superlink 127.0.0.1:9092 \
         --host 127.0.0.1 \
         --port 9094 \
@@ -126,12 +126,12 @@ AppIo-named certificates for the SuperNode's Runtime API.
 .. dropdown:: Understand the command
 
     * ``--root-certificates``: This specifies the location of the CA certificate file. The ``ca.crt`` file is used to verify the identity of the SuperLink.
-    * | ``--appio-ssl-ca-certfile``: Specify the location of the CA certificate file used by SuperExec to verify the SuperNode's Runtime API server certificate.
-    * | ``--appio-ssl-certfile``: Specify the location of the Runtime API server TLS certificate file.
+    * | ``--ssl-ca-certfile``: Specify the location of the CA certificate file used by SuperExec to verify the SuperNode's Runtime API server certificate.
+    * | ``--ssl-certfile``: Specify the location of the Runtime API server TLS certificate file.
         The certificate must include Subject Alternative Names (SANs) for the Runtime API address used by
         SuperExec. When using an IP address such as ``127.0.0.1``, the certificate must include a
         matching IP SAN.
-    * | ``--appio-ssl-keyfile``: Specify the location of the Runtime API server TLS private key file.
+    * | ``--ssl-keyfile``: Specify the location of the Runtime API server TLS private key file.
 
 Follow the same procedure, i.e. replacing ``--insecure`` with ``--root-certificates``,
 to launch the second SuperNode.
@@ -141,9 +141,9 @@ to launch the second SuperNode.
 
     $ flower-supernode \
         --root-certificates certificates/ca.crt \
-        --appio-ssl-ca-certfile certificates/ca.crt \
-        --appio-ssl-certfile certificates/server.pem \
-        --appio-ssl-keyfile certificates/server.key \
+        --ssl-ca-certfile certificates/ca.crt \
+        --ssl-certfile certificates/server.pem \
+        --ssl-keyfile certificates/server.key \
         --superlink 127.0.0.1:9092 \
         --host 127.0.0.1 \
         --port 9095 \
@@ -154,11 +154,11 @@ TLS-enabled connections.
 
 .. note::
 
-    The ``--appio-ssl-*`` Runtime API TLS options configure server-authenticated TLS.
-    They do not configure mutual TLS. The ``--appio-ssl-ca-certfile`` file is used by
-    SuperExec and app processes to verify the Runtime API server certificate, not as a
-    client certificate. If Runtime API TLS is not configured, internal Runtime API
-    connections remain unencrypted and should stay inside a trusted network.
+    The ``--ssl-*`` Runtime API TLS options configure server-authenticated TLS. They do
+    not configure mutual TLS. The ``--ssl-ca-certfile`` file is used by SuperExec and
+    app processes to verify the Runtime API server certificate, not as a client
+    certificate. If Runtime API TLS is not configured, internal Runtime API connections
+    remain unencrypted and should stay inside a trusted network.
 
 *************************************************************
  TLS for Runtime API Connections in "Process" Isolation Mode
