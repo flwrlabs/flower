@@ -146,8 +146,6 @@ def _warm_executor_pools_from_config(
             raise ValueError("Warm executor pool entries must be mappings.")
         allowed_fields = {
             "task-type",
-            "fab-hash",
-            "dependency-environment-version",
             "size",
         }
         if set(entry) - allowed_fields:
@@ -157,14 +155,6 @@ def _warm_executor_pools_from_config(
             raise ValueError(
                 "Warm executor pools support only task-type 'flwr-agentapp'."
             )
-        fab_hash = entry.get("fab-hash")
-        if not isinstance(fab_hash, str) or not fab_hash.strip():
-            raise ValueError("Warm executor pool requires non-empty string 'fab-hash'.")
-        dependency_environment_version = entry.get("dependency-environment-version")
-        if not isinstance(dependency_environment_version, str):
-            raise ValueError(
-                "Warm executor pool requires string 'dependency-environment-version'."
-            )
         size = entry.get("size")
         if isinstance(size, bool) or not isinstance(size, int):
             raise ValueError("Warm executor pool requires integer 'size'.")
@@ -173,9 +163,7 @@ def _warm_executor_pools_from_config(
             WarmExecutorPoolConfig(
                 key=WarmExecutorPoolKey(
                     task_type=TaskType.AGENT_APP,
-                    fab_hash=fab_hash,
                     runtime_image=runtime_image,
-                    dependency_environment_version=dependency_environment_version,
                 ),
                 size=size,
             )

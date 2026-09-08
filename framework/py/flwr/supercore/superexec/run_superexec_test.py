@@ -145,6 +145,28 @@ def test_run_superexec_passes_executor_config_to_factory(
     )
 
 
+def test_run_superexec_closes_executor_when_runtime_client_setup_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Warm Pods are cleaned up when startup fails before handlers are installed."""
+    executor = Mock()
+    client_class = Mock()
+    client_class.from_server_address.side_effect = RuntimeError("Runtime unavailable")
+    monkeypatch.setattr(
+        run_superexec_module, "get_executor", Mock(return_value=executor)
+    )
+
+    with pytest.raises(RuntimeError, match="Runtime unavailable"):
+        run_superexec_module.run_superexec(
+            plugin_class=Mock(),
+            client_class=client_class,
+            runtime_api_address="127.0.0.1:9091",
+            insecure=True,
+        )
+
+    executor.close.assert_called_once_with()
+
+
 def test_run_superexec_preserves_accepted_launch_behavior(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

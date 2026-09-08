@@ -81,12 +81,11 @@ class BaseExecPlugin(ExecPlugin):
                 token=token,
                 task_type=task_type,
                 task_id=task.task_id,
-                fab_hash=task.fab_hash if task.HasField("fab_hash") else None,
             )
         )
 
     def _build_execution_spec(
-        self, token: str, task_type: TaskType, task_id: int, fab_hash: str | None
+        self, token: str, task_type: TaskType, task_id: int
     ) -> ExecutionSpec:
         """Build the execution spec for the selected task."""
         return ExecutionSpec(
@@ -101,7 +100,6 @@ class BaseExecPlugin(ExecPlugin):
                 self.suppress_output and task_type not in self.visible_output_task_types
             ),
             task_id=task_id,
-            fab_hash=fab_hash,
         )
 
     def _get_supported_task_type(self, task: Task) -> TaskType | None:

@@ -36,7 +36,6 @@ class ExecutionSpec:  # pylint: disable=too-many-instance-attributes
     parent_pid: int | None
     suppress_output: bool
     task_id: int
-    fab_hash: str | None = None
 
     def __post_init__(self) -> None:
         """Validate fields required by all executors."""
@@ -96,7 +95,6 @@ class Executor(Protocol):
     def wait_for_capacity(
         self,
         task_type: TaskType | None = None,
-        fab_hash: str | None = None,
         *,
         insecure: bool = False,
         root_certificates_path: str | None = None,

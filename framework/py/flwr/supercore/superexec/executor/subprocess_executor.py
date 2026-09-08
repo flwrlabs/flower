@@ -32,13 +32,12 @@ class SubprocessExecutor:
     def wait_for_capacity(
         self,
         task_type: TaskType | None = None,
-        fab_hash: str | None = None,
         *,
         insecure: bool = False,
         root_certificates_path: str | None = None,
     ) -> None:
         """Return immediately because subprocess launches have no capacity gate."""
-        del task_type, fab_hash, insecure, root_certificates_path
+        del task_type, insecure, root_certificates_path
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""

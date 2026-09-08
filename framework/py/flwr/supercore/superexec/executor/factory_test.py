@@ -96,7 +96,7 @@ def test_get_executor_builds_kubernetes_executor_from_config(
 def test_get_executor_parses_agentapp_warm_executor_pool(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A warm pool is AgentApp-only and carries exact compatibility metadata."""
+    """A warm pool is AgentApp-only and uses the configured runtime image."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     monkeypatch.setattr(
@@ -114,8 +114,6 @@ def test_get_executor_parses_agentapp_warm_executor_pool(
             "warm-executor-pools": [
                 {
                     "task-type": "flwr-agentapp",
-                    "fab-hash": "agent-fab-sha256",
-                    "dependency-environment-version": "agent-env-v1",
                     "size": 2,
                 }
             ],
@@ -125,9 +123,7 @@ def test_get_executor_parses_agentapp_warm_executor_pool(
     assert isinstance(executor, KubernetesExecutor)
     pool = executor._config.warm_executor_pools[0]  # pylint: disable=protected-access
     assert pool.key.task_type.value == "flwr-agentapp"
-    assert pool.key.fab_hash == "agent-fab-sha256"
     assert pool.key.runtime_image == "ghcr.io/flwrlabs/taskexecutor:dev"
-    assert pool.key.dependency_environment_version == "agent-env-v1"
     assert pool.size == 2
 
 
@@ -142,8 +138,6 @@ def test_get_executor_rejects_non_agentapp_warm_pool() -> None:
                 "warm-executor-pools": [
                     {
                         "task-type": "flwr-model",
-                        "fab-hash": "model-fab-sha256",
-                        "dependency-environment-version": "model-env-v1",
                         "size": 1,
                     }
                 ],

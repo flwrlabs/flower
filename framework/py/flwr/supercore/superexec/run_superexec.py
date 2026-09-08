@@ -207,15 +207,19 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
         health_server = run_health_server_grpc_no_tls(health_server_address)
         grpc_servers.append(health_server)
 
-    client = client_class.from_server_address(
-        server_address=runtime_api_address,
-        insecure=insecure,
-        root_certificates=validate_and_resolve_root_certificates(
-            root_certificates_path, insecure
-        ),
-        interceptors=interceptors,
-        retry_invoker=make_simple_http_retry_invoker(),
-    )
+    try:
+        client = client_class.from_server_address(
+            server_address=runtime_api_address,
+            insecure=insecure,
+            root_certificates=validate_and_resolve_root_certificates(
+                root_certificates_path, insecure
+            ),
+            interceptors=interceptors,
+            retry_invoker=make_simple_http_retry_invoker(),
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        executor.close()
+        raise
 
     # Register exit handlers to close the Runtime API client on exit
     register_signal_handlers(
@@ -261,10 +265,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                     task_type = TaskType(task.type)
                 except ValueError:
                     task_type = None
-                fab_hash = task.fab_hash if task.HasField("fab_hash") else None
                 executor.wait_for_capacity(
                     task_type=task_type,
-                    fab_hash=fab_hash,
                     insecure=insecure,
                     root_certificates_path=root_certificates_path,
                 )

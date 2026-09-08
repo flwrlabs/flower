@@ -50,8 +50,7 @@ from .warm_executor import (
     WARM_EXECUTOR_READY_FILE,
 )
 from .warm_executor_pool import (
-    WARM_EXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION,
-    WARM_EXECUTOR_FAB_HASH_ANNOTATION,
+    WARM_EXECUTOR_CONFIGURATION_ANNOTATION,
     WARM_EXECUTOR_LABEL,
     WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION,
     WarmExecutorPoolConfig,
@@ -105,9 +104,7 @@ def _executor_config(**overrides: Any) -> KubernetesExecutorConfig:
 def _warm_executor_pool_key(**overrides: Any) -> WarmExecutorPoolKey:
     base: dict[str, Any] = {
         "task_type": TaskType.AGENT_APP,
-        "fab_hash": "fab-sha256",
         "runtime_image": "ghcr.io/flwrlabs/taskexecutor:warm",
-        "dependency_environment_version": "agent-env-v1",
     }
     base.update(overrides)
     return WarmExecutorPoolKey(**base)
@@ -325,7 +322,7 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
     )
     config = _executor_config(
         labels={WARM_EXECUTOR_LABEL: "false"},
-        annotations={WARM_EXECUTOR_FAB_HASH_ANNOTATION: "caller-fab"},
+        annotations={"example.com/setting": "configured"},
         container_security_context={"readOnlyRootFilesystem": True},
     )
     executor = KubernetesExecutor(client=client, config=config)
@@ -348,11 +345,13 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
         "flower.ai/task-type": "flwr-agentapp",
         WARM_EXECUTOR_LABEL: "true",
     }
-    assert metadata["annotations"] == {
-        WARM_EXECUTOR_FAB_HASH_ANNOTATION: "fab-sha256",
-        WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION: ("ghcr.io/flwrlabs/taskexecutor:warm"),
-        WARM_EXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION: "agent-env-v1",
-    }
+    annotations = metadata["annotations"]
+    assert annotations["example.com/setting"] == "configured"
+    assert annotations[WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION] == (
+        "ghcr.io/flwrlabs/taskexecutor:warm"
+    )
+    assert len(annotations[WARM_EXECUTOR_CONFIGURATION_ANNOTATION]) == 64
+    assert len(annotations) == 3
     assert _TASK_ID_LABEL not in metadata["labels"]
     assert LAUNCH_ATTEMPT_LABEL not in metadata["labels"]
     assert container == {
@@ -383,27 +382,10 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
     assert is_warm_executor_ready(pod, pool_key)
 
     incompatible_keys = (
-        _warm_executor_pool_key(task_type=TaskType.MODEL, fab_hash=None),
-        _warm_executor_pool_key(fab_hash="another-fab-sha256"),
+        _warm_executor_pool_key(task_type=TaskType.MODEL),
         _warm_executor_pool_key(runtime_image="taskexecutor:other"),
-        _warm_executor_pool_key(dependency_environment_version="agent-env-v2"),
     )
     assert not any(is_warm_executor_ready(pod, key) for key in incompatible_keys)
-
-    fabless_key = _warm_executor_pool_key(task_type=TaskType.MODEL, fab_hash=None)
-    fabless_result = executor._launch_warm_executor(  # pylint: disable=protected-access
-        fabless_key
-    )
-    assert fabless_result.status == LaunchResultStatus.ACCEPTED
-    fabless_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
-    assert (
-        WARM_EXECUTOR_FAB_HASH_ANNOTATION not in fabless_pod["metadata"]["annotations"]
-    )
-    fabless_pod["status"] = {
-        "phase": "Running",
-        "conditions": [{"type": "Ready", "status": "True"}],
-    }
-    assert is_warm_executor_ready(fabless_pod, fabless_key)
 
     pod["status"]["phase"] = "Succeeded"
     client.list_namespaced_pod.return_value = {"items": [pod]}
@@ -458,11 +440,7 @@ def test_launch_dispatches_compatible_ready_pod_without_a_credential_secret(
     executor = KubernetesExecutor(client=client, config=config)
 
     result = executor.launch(
-        _execution_spec(
-            task_type=TaskType.AGENT_APP,
-            fab_hash="fab-sha256",
-            insecure=True,
-        )
+        _execution_spec(task_type=TaskType.AGENT_APP, insecure=True)
     )
 
     assert result.status == LaunchResultStatus.ACCEPTED
@@ -496,11 +474,7 @@ def test_launch_falls_back_to_cold_pod_when_no_ready_warm_pod_exists() -> None:
     executor = KubernetesExecutor(client=client, config=config)
 
     result = executor.launch(
-        _execution_spec(
-            task_type=TaskType.AGENT_APP,
-            fab_hash="fab-sha256",
-            insecure=True,
-        )
+        _execution_spec(task_type=TaskType.AGENT_APP, insecure=True)
     )
 
     assert result.status == LaunchResultStatus.ACCEPTED
@@ -524,11 +498,7 @@ def test_launch_falls_back_to_cold_pod_when_warm_pods_cannot_be_listed() -> None
     )
 
     result = KubernetesExecutor(client=client, config=config).launch(
-        _execution_spec(
-            task_type=TaskType.AGENT_APP,
-            fab_hash="fab-sha256",
-            insecure=True,
-        )
+        _execution_spec(task_type=TaskType.AGENT_APP, insecure=True)
     )
 
     assert result.status == LaunchResultStatus.ACCEPTED
@@ -559,11 +529,7 @@ def test_launch_retires_warm_pod_when_dispatch_cannot_open(
     executor = KubernetesExecutor(client=client, config=config)
 
     result = executor.launch(
-        _execution_spec(
-            task_type=TaskType.AGENT_APP,
-            fab_hash="fab-sha256",
-            insecure=True,
-        )
+        _execution_spec(task_type=TaskType.AGENT_APP, insecure=True)
     )
 
     assert result.status == LaunchResultStatus.ACCEPTED
@@ -606,11 +572,7 @@ def test_launch_returns_unknown_after_unacknowledged_warm_token_delivery(
     executor = KubernetesExecutor(client=client, config=config)
 
     result = executor.launch(
-        _execution_spec(
-            task_type=TaskType.AGENT_APP,
-            fab_hash="fab-sha256",
-            insecure=True,
-        )
+        _execution_spec(task_type=TaskType.AGENT_APP, insecure=True)
     )
 
     assert result.status == LaunchResultStatus.UNKNOWN
@@ -751,8 +713,12 @@ def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
             _ready_warm_pod(pool_key, config, name="keep"),
             _ready_warm_pod(pool_key, config, name="excess"),
             _ready_warm_pod(
-                _warm_executor_pool_key(fab_hash="obsolete-fab"),
-                config,
+                pool_key,
+                _executor_config(
+                    env=[{"name": "OLD_SETTING", "value": "1"}],
+                    warm_executor_owner="superexec-a",
+                    warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+                ),
                 name="obsolete",
             ),
         ]
@@ -794,7 +760,7 @@ def test_wait_for_capacity_allows_a_ready_warm_pod_at_the_budget() -> None:
     client.list_namespaced_secret.return_value = {"items": []}
     executor = KubernetesExecutor(client=client, config=config)
 
-    executor.wait_for_capacity(TaskType.AGENT_APP, "fab-sha256", insecure=True)
+    executor.wait_for_capacity(TaskType.AGENT_APP, insecure=True)
 
     sleep.assert_not_called()
 
@@ -829,7 +795,7 @@ def test_wait_for_capacity_reserves_cold_capacity_for_a_secure_task() -> None:
     client.list_namespaced_secret.return_value = {"items": []}
     executor = KubernetesExecutor(client=client, config=config)
 
-    executor.wait_for_capacity(TaskType.AGENT_APP, "fab-sha256", insecure=False)
+    executor.wait_for_capacity(TaskType.AGENT_APP, insecure=False)
 
     sleep.assert_called_once_with(1.0)
 
@@ -860,7 +826,7 @@ def test_wait_for_capacity_reserves_space_for_a_cold_task() -> None:
     client.create_namespaced_pod.reset_mock()
     active_pod_count = 2
 
-    executor.wait_for_capacity(TaskType.MODEL, None)
+    executor.wait_for_capacity(TaskType.MODEL)
 
     client.create_namespaced_pod.assert_not_called()
     sleep.assert_not_called()

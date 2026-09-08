@@ -16,7 +16,9 @@
 
 # pylint: disable=too-many-lines
 
+import hashlib
 import importlib
+import json
 import re
 import threading
 import time
@@ -43,8 +45,7 @@ from .warm_executor import (
     WARM_EXECUTOR_READY_FILE,
 )
 from .warm_executor_pool import (
-    WARM_EXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION,
-    WARM_EXECUTOR_FAB_HASH_ANNOTATION,
+    WARM_EXECUTOR_CONFIGURATION_ANNOTATION,
     WARM_EXECUTOR_LABEL,
     WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION,
     WarmExecutorPoolConfig,
@@ -267,12 +268,12 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
         if self.warm_executor_owner and not _is_dns_label(self.warm_executor_owner):
             raise ValueError("warm_executor_owner must be a DNS label.")
         identities = [
-            (pool.key.task_type, pool.key.fab_hash, pool.key.runtime_image)
+            (pool.key.task_type, pool.key.runtime_image)
             for pool in self.warm_executor_pools
         ]
         if len(identities) != len(set(identities)):
             raise ValueError(
-                "warm executor pools must not repeat a task type, FAB, and image."
+                "warm executor pools must not repeat a task type and image."
             )
         warm_pod_count = sum(pool.size for pool in self.warm_executor_pools)
         if (
@@ -431,9 +432,9 @@ class _WarmExecutorPoolManager:
             for pool in self._pools.values():
                 self._ensure_pool_capacity(pool, reserved_pod_capacity)
 
-    def has_ready_pod(self, task_type: TaskType, fab_hash: str | None) -> bool:
+    def has_ready_pod(self, task_type: TaskType) -> bool:
         """Return whether a matching warm Pod can take a task without new capacity."""
-        pool = self._pool_for_task(task_type, fab_hash)
+        pool = self._pool_for_task(task_type)
         if pool is None:
             return False
         with self._lock:
@@ -445,6 +446,7 @@ class _WarmExecutorPoolManager:
             return any(
                 (_object_name(pod) is not None)
                 and (_object_name(pod) not in self._busy_pods)
+                and _has_warm_executor_configuration(pod, self._config)
                 and is_warm_executor_ready(pod, pool.key)
                 for pod in pods
             )
@@ -464,15 +466,12 @@ class _WarmExecutorPoolManager:
                 self._delete_pod(pod_name)
 
     def _pool_for_spec(self, spec: ExecutionSpec) -> WarmExecutorPoolConfig | None:
-        return self._pool_for_task(spec.task_type, spec.fab_hash)
+        return self._pool_for_task(spec.task_type)
 
-    def _pool_for_task(
-        self, task_type: TaskType, fab_hash: str | None
-    ) -> WarmExecutorPoolConfig | None:
+    def _pool_for_task(self, task_type: TaskType) -> WarmExecutorPoolConfig | None:
         for pool in self._pools.values():
             if (
                 pool.key.task_type == task_type
-                and pool.key.fab_hash == fab_hash
                 and pool.key.runtime_image == self._config.image
             ):
                 return pool
@@ -487,6 +486,7 @@ class _WarmExecutorPoolManager:
             if (
                 pod_name is not None
                 and pod_name not in self._busy_pods
+                and _has_warm_executor_configuration(pod, self._config)
                 and is_warm_executor_ready(pod, key)
             ):
                 self._busy_pods.add(pod_name)
@@ -500,7 +500,7 @@ class _WarmExecutorPoolManager:
         if pods is None:
             return
         compatible_count = sum(
-            1 for pod in pods if _is_active_warm_executor(pod, pool.key)
+            1 for pod in pods if _is_active_warm_executor(pod, pool.key, self._config)
         )
         pods_to_create = max(pool.size - compatible_count, 0)
         if self._config.active_pod_budget is not None:
@@ -544,7 +544,7 @@ class _WarmExecutorPoolManager:
                 (
                     candidate
                     for candidate in self._pools.values()
-                    if _is_active_warm_executor(pod, candidate.key)
+                    if _is_active_warm_executor(pod, candidate.key, self._config)
                 ),
                 None,
             )
@@ -672,7 +672,6 @@ class KubernetesExecutor:
     def wait_for_capacity(
         self,
         task_type: TaskType | None = None,
-        fab_hash: str | None = None,
         *,
         insecure: bool = False,
         root_certificates_path: str | None = None,
@@ -680,7 +679,6 @@ class KubernetesExecutor:
         """Wait until the configured resource pool is below its active Pod budget."""
         self._wait_for_capacity(
             task_type,
-            fab_hash,
             allow_warm_dispatch=self._can_dispatch_warm(
                 insecure, root_certificates_path
             ),
@@ -690,7 +688,6 @@ class KubernetesExecutor:
     def _wait_for_capacity(
         self,
         task_type: TaskType | None,
-        fab_hash: str | None,
         *,
         allow_warm_dispatch: bool,
         reconcile_warm_pools: bool,
@@ -701,7 +698,7 @@ class KubernetesExecutor:
             has_ready_warm_pod = (
                 allow_warm_dispatch
                 and task_type is not None
-                and self._warm_executor_pool_manager.has_ready_pod(task_type, fab_hash)
+                and self._warm_executor_pool_manager.has_ready_pod(task_type)
             )
             self._warm_executor_pool_manager.ensure_capacity(
                 reserved_pod_capacity=0 if has_ready_warm_pod else 1
@@ -718,7 +715,7 @@ class KubernetesExecutor:
                 allow_warm_dispatch
                 and self._warm_executor_pool_manager is not None
                 and task_type is not None
-                and self._warm_executor_pool_manager.has_ready_pod(task_type, fab_hash)
+                and self._warm_executor_pool_manager.has_ready_pod(task_type)
             ):
                 return
             try:
@@ -795,7 +792,6 @@ class KubernetesExecutor:
                 if warm_result is not None:
                     return warm_result
                 self._wait_for_capacity(
-                    None,
                     None,
                     allow_warm_dispatch=False,
                     reconcile_warm_pools=False,
@@ -1323,21 +1319,52 @@ def _warm_executor_metadata(
     annotations.update(
         {
             WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION: pool_key.runtime_image,
-            WARM_EXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION: (
-                pool_key.dependency_environment_version
+            WARM_EXECUTOR_CONFIGURATION_ANNOTATION: (
+                _warm_executor_configuration_hash(config)
             ),
         }
     )
-    if pool_key.fab_hash is None:
-        annotations.pop(WARM_EXECUTOR_FAB_HASH_ANNOTATION, None)
-    else:
-        annotations[WARM_EXECUTOR_FAB_HASH_ANNOTATION] = pool_key.fab_hash
     return {
         "name": name,
         "namespace": config.namespace,
         "labels": labels,
         "annotations": annotations,
     }
+
+
+def _warm_executor_configuration_hash(config: KubernetesExecutorConfig) -> str:
+    """Return a stable fingerprint for the configured warm Pod environment."""
+    payload = {
+        "image": config.image,
+        "image_pull_policy": config.image_pull_policy,
+        "labels": _caller_labels(config),
+        "annotations": config.annotations,
+        "resource_pool": config.resource_pool,
+        "resources": config.resources,
+        "env": config.env,
+        "volumes": config.volumes,
+        "volume_mounts": config.volume_mounts,
+        "node_selector": config.node_selector,
+        "tolerations": config.tolerations,
+        "affinity": config.affinity,
+        "priority_class_name": config.priority_class_name,
+        "pod_security_context": config.pod_security_context,
+        "container_security_context": config.container_security_context,
+        "service_account_name": config.service_account_name,
+    }
+    serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode()).hexdigest()
+
+
+def _has_warm_executor_configuration(
+    pod: object, config: KubernetesExecutorConfig
+) -> bool:
+    """Return true when a warm Pod was created with the current configuration."""
+    metadata = _object_field(pod, "metadata")
+    annotations = _object_field(metadata, "annotations")
+    return _object_field(
+        annotations, WARM_EXECUTOR_CONFIGURATION_ANNOTATION
+    ) == _warm_executor_configuration_hash(config)
 
 
 def _labels(
@@ -1443,9 +1470,13 @@ def _is_active_pod(pod: object) -> bool:
     return _object_field(status, "phase") not in {"Succeeded", "Failed"}
 
 
-def _is_active_warm_executor(pod: object, pool_key: WarmExecutorPoolKey) -> bool:
+def _is_active_warm_executor(
+    pod: object, pool_key: WarmExecutorPoolKey, config: KubernetesExecutorConfig
+) -> bool:
     """Return true when a compatible warm Pod still occupies its pool slot."""
-    if not is_compatible_warm_executor(pod, pool_key):
+    if not is_compatible_warm_executor(
+        pod, pool_key
+    ) or not _has_warm_executor_configuration(pod, config):
         return False
     metadata = _object_field(pod, "metadata")
     deletion_timestamp = _object_field(metadata, "deletion_timestamp")
