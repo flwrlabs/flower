@@ -57,6 +57,11 @@ During the Endeavor 1.0 preview, access is available by request as we
 onboard a limited number of organizations and partners. To request access,
 use the `Endeavor 1.0 access form <https://flowerlabs.typeform.com/to/jlniHsuy>`_.
 
+Once you have a Flower API key, connect Endeavor to
+:doc:`ChatGPT/Codex <endeavor-chatgpt-codex>` or
+:doc:`OpenCode <endeavor-opencode>`. Both guides cover CLI and desktop use with
+the Flower-managed service.
+
 Preview interface and support
 -----------------------------
 
@@ -210,3 +215,12 @@ Next steps
   <https://flower.ai/models/endeavor/>`_.
 - For Flower Labs research, see `Flower Research
   <https://flower.ai/research/>`_.
+
+Endeavor 1.0 pages
+------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   endeavor-chatgpt-codex
+   endeavor-opencode
