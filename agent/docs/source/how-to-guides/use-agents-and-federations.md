@@ -123,22 +123,11 @@ for the next message:
 
 The path is resolved relative to the directory where you started `flwr chat`.
 Quote a path that contains spaces. Flower validates the project and builds its
-FAB locally; the first message uploads that FAB to the active federation, and
-later messages reuse the stored FAB by hash. A build failure leaves the
-currently selected agent unchanged.
-
-After editing the loaded AgentApp, rebuild and select the updated FAB without
-entering its path again:
-
-```text
-/reload
-```
-
-`/reload` rereads the project files, validates the project, and builds a new
-FAB. It does not run the AgentApp immediately. If the FAB changed, the next
-message uploads the new build and starts a new run series. If no changes are
-detected, the current conversation continues. A failed reload leaves the
-previous AgentApp build selected.
+FAB locally. Before each message, Flower rebuilds the AgentApp from the same
+directory and submits the resulting FAB. Changes made after `/load` are
+therefore applied automatically. If the FAB changes, the message starts a new
+run series. A build failure prevents the message from being submitted and
+leaves the previously loaded build selected.
 
 ## Select an agent in SuperGrid
 

@@ -77,7 +77,6 @@ from flwr.cli.constant import (
     CHAT_LOAD_COMMAND,
     CHAT_NEW_COMMAND,
     CHAT_REASONING_DELTA_EVENT,
-    CHAT_RELOAD_COMMAND,
     CHAT_SPINNER_FRAMES,
     CHAT_TERMINAL_EVENTS,
     CHAT_TEXT_DELTA_EVENT,
@@ -269,7 +268,6 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_fab_hash: str | None = None
         self.agent_name = CHAT_AGENT_NAME
         self.local_agent: LocalAgent | None = None
-        self.local_agent_uploaded = False
         self.completer = _ChatCompleter(auth_plugin, self.federation, federations)
         self.input_buffer = Buffer(
             completer=ThreadedCompleter(self.completer),
@@ -455,7 +453,6 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             self.agent_app_spec = selected_agent
             self.agent_fab_hash = selected_fab_hash
             self.local_agent = None
-            self.local_agent_uploaded = False
             self.agent_name = (
                 agent.display_name if agent is not None else selected_agent
             )
@@ -466,14 +463,9 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self._append_user_message(prompt)
         self.busy = True
         self.cancel_requested = False
-        self.status = "Thinking..."
-        fab_content = None
-        if self.local_agent is not None and not self.local_agent_uploaded:
-            fab_content = self.local_agent.fab_content
+        self.status = "Building AgentApp..." if self.local_agent else "Thinking..."
         event.app.create_background_task(
-            self._run_prompt(
-                prompt, self.agent_app_spec, self.agent_fab_hash, fab_content
-            )
+            self._run_prompt(prompt, self.agent_app_spec, self.agent_fab_hash)
         )
         event.app.invalidate()
 
@@ -493,16 +485,6 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             return True
         if command == CHAT_LOAD_COMMAND or command.startswith(f"{CHAT_LOAD_COMMAND} "):
             return self._handle_load_command(event, prompt)
-        if command == CHAT_RELOAD_COMMAND:
-            if self.local_agent is None:
-                self._append_transcript(
-                    "class:error",
-                    f"Error: Use {CHAT_LOAD_COMMAND} <path> before "
-                    f"{CHAT_RELOAD_COMMAND}.\n\n",
-                )
-                return True
-            self._start_local_agent_build(event, self.local_agent.path, is_reload=True)
-            return True
         if command == CHAT_HISTORY_COMMAND:
             self.history_loading = True
             event.app.create_background_task(self._show_history())
@@ -520,26 +502,24 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         except click.ClickException as exc:
             self._append_transcript("class:error", f"Error: {exc.format_message()}\n\n")
             return True
-        self._start_local_agent_build(event, path, is_reload=False)
+        self._start_local_agent_build(event, path)
         return True
 
-    def _start_local_agent_build(
-        self, event: KeyPressEvent, path: Path, *, is_reload: bool
-    ) -> None:
+    def _start_local_agent_build(self, event: KeyPressEvent, path: Path) -> None:
         """Build and select a local AgentApp without blocking the terminal UI."""
         self.busy = True
         self.status = "Building AgentApp..."
-        event.app.create_background_task(self._load_local_agent(path, is_reload))
+        event.app.create_background_task(self._load_local_agent(path))
         event.app.invalidate()
 
-    async def _load_local_agent(self, path: Path, is_reload: bool) -> None:
+    async def _load_local_agent(self, path: Path) -> None:
         """Build a local AgentApp and select it after a successful build."""
         try:
             local_agent = await asyncio.to_thread(build_local_agent, path)
         except click.ClickException as exc:
             self._append_transcript(
                 "class:error",
-                format_local_agent_failure(exc, is_reload=is_reload),
+                format_local_agent_failure(exc),
             )
         else:
             changed = (
@@ -548,9 +528,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             )
             if changed:
                 self.series_id = None
-            was_uploaded = self.local_agent_uploaded
             self.local_agent = local_agent
-            self.local_agent_uploaded = was_uploaded if not changed else False
             self.agent_app_spec = local_agent.app_spec
             self.agent_fab_hash = local_agent.fab_hash
             self.agent_name = f"{local_agent.app_spec} (local)"
@@ -558,9 +536,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 self._append_transcript("class:notice", f"Warning: {warning}\n\n")
             self._append_transcript(
                 "class:notice",
-                format_local_agent_success(
-                    local_agent, is_reload=is_reload, changed=changed
-                ),
+                format_local_agent_success(local_agent),
             )
         finally:
             self.busy = False
@@ -592,7 +568,6 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_fab_hash = None
         self.agent_name = CHAT_AGENT_NAME
         self.local_agent = None
-        self.local_agent_uploaded = False
         self.series_id = None
         self._clear_transcript()
         return True
@@ -694,10 +669,26 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         prompt: str,
         app_spec: str,
         fab_hash: str | None,
-        fab_content: bytes | None = None,
     ) -> None:
         """Run one blocking chat request outside the UI event loop."""
         try:
+            fab_content = None
+            if self.local_agent is not None:
+                local_agent = await asyncio.to_thread(
+                    build_local_agent, self.local_agent.path
+                )
+                if (
+                    local_agent.app_spec != self.agent_app_spec
+                    or local_agent.fab_hash != self.agent_fab_hash
+                ):
+                    self.series_id = None
+                self.local_agent = local_agent
+                self.agent_app_spec = app_spec = local_agent.app_spec
+                self.agent_fab_hash = fab_hash = local_agent.fab_hash
+                self.agent_name = f"{local_agent.app_spec} (local)"
+                fab_content = local_agent.fab_content
+                self.status = "Thinking..."
+                self.application.invalidate()
             await asyncio.to_thread(
                 self._run_prompt_sync, prompt, app_spec, fab_hash, fab_content
             )
@@ -717,7 +708,6 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             self.application.layout.focus(self.input_buffer)
             self.application.invalidate()
 
-    # pylint: disable-next=too-many-branches
     def _run_prompt_sync(
         self,
         prompt: str,
@@ -727,27 +717,15 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         """Start and stream one Flower AgentApp run."""
         # Start a run in the current conversation series.
-        try:
-            self.run_id, self.series_id = start_chat_run(
-                self.stub,
-                prompt,
-                self.federation,
-                self.series_id,
-                app_spec,
-                fab_hash,
-                fab_content,
-            )
-        except click.ClickException:
-            if (
-                fab_content is None
-                and self.local_agent is not None
-                and app_spec == self.local_agent.app_spec
-                and fab_hash == self.local_agent.fab_hash
-            ):
-                self.local_agent_uploaded = False
-            raise
-        if fab_content is not None:
-            self.local_agent_uploaded = True
+        self.run_id, self.series_id = start_chat_run(
+            self.stub,
+            prompt,
+            self.federation,
+            self.series_id,
+            app_spec,
+            fab_hash,
+            fab_content,
+        )
 
         if self.cancel_requested:
             self._stop_run(self.run_id)

@@ -86,8 +86,8 @@ def test_chat_selects_federation_from_dropdown() -> None:
     application.invalidate.assert_not_called()
 
 
-def test_chat_loads_and_reloads_local_agent() -> None:
-    """Load should select a local FAB and reload should rebuild its path."""
+def test_chat_loads_and_rebuilds_local_agent_before_prompt() -> None:
+    """A loaded local AgentApp should be rebuilt before each prompt."""
     application = Mock()
     with patch.object(ChatApplication, "_create_application", return_value=application):
         chat = ChatApplication(Mock(), [Federation(name=_CHAT_FED_ID)], Mock())
@@ -99,7 +99,7 @@ def test_chat_loads_and_reloads_local_agent() -> None:
         fab_content=b"first-fab",
         warnings=(),
     )
-    reloaded_agent = LocalAgent(
+    rebuilt_agent = LocalAgent(
         path=first_agent.path,
         app_spec=first_agent.app_spec,
         fab_hash="second-hash",
@@ -118,34 +118,30 @@ def test_chat_loads_and_reloads_local_agent() -> None:
     assert chat.local_agent == first_agent
 
     chat.series_id = 123
-    event.app.create_background_task.reset_mock()
-    with patch(
-        "flwr.cli.chat.chat_app.build_local_agent", return_value=reloaded_agent
-    ) as mock_build:
-        assert chat._handle_command(  # pylint: disable=protected-access
-            event, "/reload"
-        )
-        asyncio.run(event.app.create_background_task.call_args.args[0])
-    mock_build.assert_called_once_with(first_agent.path)
-    assert chat.local_agent == reloaded_agent
-    assert chat.series_id is None
-
-    chat.local_agent_uploaded = True
     with (
         patch(
-            "flwr.cli.chat.chat_app.start_chat_run",
-            side_effect=click.ClickException("Stored FAB not found"),
-        ),
-        pytest.raises(click.ClickException, match="Stored FAB not found"),
+            "flwr.cli.chat.chat_app.build_local_agent", return_value=rebuilt_agent
+        ) as mock_build,
+        patch.object(chat, "_run_prompt_sync") as mock_run,
     ):
-        chat._run_prompt_sync(  # pylint: disable=protected-access
-            "Retry me", reloaded_agent.app_spec, reloaded_agent.fab_hash
+        asyncio.run(
+            chat._run_prompt(  # pylint: disable=protected-access
+                "Hello", first_agent.app_spec, first_agent.fab_hash
+            )
         )
-    assert not chat.local_agent_uploaded
+    mock_build.assert_called_once_with(first_agent.path)
+    assert chat.local_agent == rebuilt_agent
+    assert chat.series_id is None
+    mock_run.assert_called_once_with(
+        "Hello",
+        rebuilt_agent.app_spec,
+        rebuilt_agent.fab_hash,
+        rebuilt_agent.fab_content,
+    )
 
 
-def test_start_chat_run_uploads_local_fab_then_uses_hash() -> None:
-    """A local FAB should be uploaded once and subsequently selected by hash."""
+def test_start_chat_run_requires_hash_for_local_fab() -> None:
+    """Uploading local FAB content should require and include its hash."""
     stub = Mock()
     stub.StartRun.return_value = StartRunResponse(run_id=1, series_id=2)
 
@@ -173,17 +169,3 @@ def test_start_chat_run_uploads_local_fab_then_uses_hash() -> None:
     assert request.app_spec == ""
     assert request.fab.hash_str == "fab-hash"
     assert request.fab.content == b"fab-content"
-
-    start_chat_run(
-        stub,
-        "Hello again",
-        _CHAT_FED_ID,
-        2,
-        "@local/custom-agent",
-        "fab-hash",
-    )
-    request = stub.StartRun.call_args.args[0]
-    assert request.app_spec == "@local/custom-agent"
-    assert request.fab.hash_str == "fab-hash"
-    assert not request.fab.content
-    assert request.series_id == 2

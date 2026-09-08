@@ -88,28 +88,14 @@ def build_local_agent(path: Path) -> LocalAgent:
     )
 
 
-def format_local_agent_success(
-    local_agent: LocalAgent, *, is_reload: bool, changed: bool
-) -> str:
-    """Describe a successfully loaded or reloaded local AgentApp."""
-    if is_reload:
-        state = (
-            "Changes detected. Your next message will use the new build "
-            "and start a new conversation."
-            if changed
-            else "No changes detected. The current conversation will continue."
-        )
-        return f"Reloaded {local_agent.app_spec}.\n{state}\n\n"
-
+def format_local_agent_success(local_agent: LocalAgent) -> str:
+    """Describe a successfully loaded local AgentApp."""
     return f"Loaded {local_agent.app_spec} from {local_agent.path}.\n\n"
 
 
-def format_local_agent_failure(error: click.ClickException, *, is_reload: bool) -> str:
-    """Describe a failed local AgentApp load or reload operation."""
-    operation = "Reload" if is_reload else "Load"
-    previous = (
-        "The previous AgentApp build remains selected."
-        if is_reload
-        else "The previously selected agent remains selected."
+def format_local_agent_failure(error: click.ClickException) -> str:
+    """Describe a failed local AgentApp load operation."""
+    return (
+        f"Load failed: {error.format_message()}\n"
+        "The previously selected agent remains selected.\n\n"
     )
-    return f"{operation} failed: {error.format_message()}\n{previous}\n\n"
