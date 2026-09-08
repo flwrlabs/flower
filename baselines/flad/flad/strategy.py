@@ -19,7 +19,7 @@ import io
 import math
 import time
 from collections.abc import Callable, Iterable
-from logging import INFO, WARNING
+from logging import INFO
 from typing import Any, cast
 
 import numpy as np
@@ -391,13 +391,9 @@ class Flad(Strategy):
         replies = list(replies)
         log(INFO, "aggregate_train: received %d replies from clients", len(replies))
         if len(replies) < len(self.round_participants):
-            log(
-                WARNING,
-                "aggregate_train: expected %d replies but received only %d; "
-                "%d client(s) did not respond this round.",
-                len(self.round_participants),
-                len(replies),
-                len(self.round_participants) - len(replies),
+            raise InconsistentMessageReplies(
+                f"aggregate_train: expected {len(self.round_participants)} replies "
+                f"but received only {len(replies)}."
             )
         for reply in replies:
             client = self._check_reply_from_client(reply)
@@ -468,7 +464,7 @@ class Flad(Strategy):
         if len(replies) < len(self.round_participants):
             raise InconsistentMessageReplies(
                 f"aggregate_evaluate: expected {len(self.round_participants)} replies "
-                f"but received only {len(replies)}; "
+                f"but received only {len(replies)}."
             )
         for reply in replies:
             client = self._check_reply_from_client(reply)
