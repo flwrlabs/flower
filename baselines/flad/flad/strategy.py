@@ -71,6 +71,9 @@ class Flad(Strategy):
         self.configrecord_key = configrecord_key
         clients: list[dict[str, Any]] = []
         for name in client_names.split(","):
+            name = name.strip()
+            if not name:
+                continue
             client: dict[str, Any] = {}
             client["name"] = name
             client["epochs"] = 0
