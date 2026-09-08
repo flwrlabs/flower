@@ -632,7 +632,7 @@ def test_warm_dispatch_drains_stderr_until_the_child_exits() -> None:
 
 
 def test_warm_pool_replaces_consumed_pod_and_cleans_up_owned_pods() -> None:
-    """Consumed Pods are replaced, while shutdown deletes all owned capacity."""
+    """Consumed Pods are replaced despite stream cleanup errors and shutdown."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     pool_key = _warm_executor_pool_key(
@@ -648,12 +648,10 @@ def test_warm_pool_replaces_consumed_pod_and_cleans_up_owned_pods() -> None:
     client.reset_mock()
     pool._busy_pods.add("consumed")  # pylint: disable=protected-access
 
+    dispatch = Mock()
+    dispatch.close.side_effect = RuntimeError
     pool._wait_for_task_and_replace(  # pylint: disable=protected-access
-        "consumed",
-        pool_key,
-        kube._KubernetesWarmExecutorDispatch(  # pylint: disable=protected-access
-            _WarmExecResponse(False)
-        ),
+        "consumed", pool_key, dispatch
     )
 
     client.delete_namespaced_pod.assert_called_once_with(

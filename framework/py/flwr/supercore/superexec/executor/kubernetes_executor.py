@@ -618,7 +618,10 @@ class _WarmExecutorPoolManager:
         try:
             dispatch.wait_for_close()
         finally:
-            dispatch.close()
+            try:
+                dispatch.close()
+            except Exception:  # pylint: disable=broad-exception-caught
+                log(WARNING, "Failed to close warm TaskExecutor exec stream.")
             if self._delete_pod(pod_name):
                 with self._lock:
                     self._busy_pods.discard(pod_name)
