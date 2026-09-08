@@ -63,9 +63,9 @@ def test_parse_supernode_tls_args() -> None:
         ]
     )
 
-    assert args.runtime_ssl_certfile == "cert.pem"
-    assert args.runtime_ssl_keyfile == "key.pem"
-    assert args.runtime_ssl_ca_certfile == "ca.pem"
+    assert args.ssl_certfile == "cert.pem"
+    assert args.ssl_keyfile == "key.pem"
+    assert args.ssl_ca_certfile == "ca.pem"
 
 
 def test_parse_supernode_deprecated_appio_tls_args(
@@ -86,9 +86,9 @@ def test_parse_supernode_deprecated_appio_tls_args(
         ]
     )
 
-    assert args.runtime_ssl_certfile == "cert.pem"
-    assert args.runtime_ssl_keyfile == "key.pem"
-    assert args.runtime_ssl_ca_certfile == "ca.pem"
+    assert args.ssl_certfile == "cert.pem"
+    assert args.ssl_keyfile == "key.pem"
+    assert args.ssl_ca_certfile == "ca.pem"
     assert log.call_count == 3
     assert all("deprecated" in call.args[1] for call in log.call_args_list)
 
@@ -151,7 +151,7 @@ def test_parse_supernode_lifespan_config_preserves_tls_args(
     obtain_certificates = Mock(return_value=runtime_certificates)
     monkeypatch.setattr(
         flower_supernode_module,
-        "try_obtain_optional_runtime_server_certificates",
+        "try_obtain_server_certificates",
         obtain_certificates,
     )
 

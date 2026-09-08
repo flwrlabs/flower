@@ -35,6 +35,7 @@ from flwr.app.user_config import UserConfig
 from flwr.common.args import (
     add_args_runtime_dependency_install,
     try_obtain_root_certificates,
+    try_obtain_server_certificates,
 )
 from flwr.common.config import parse_config_args
 from flwr.common.constant import (
@@ -59,7 +60,6 @@ from flwr.supercore.grpc_health import add_args_health
 from flwr.supercore.logger import console_handler
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
-from flwr.supercore.tls import try_obtain_optional_runtime_server_certificates
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.version import package_version
 from flwr.supernode.nodestate import NodeStateFactory
@@ -101,7 +101,9 @@ def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
     if trusted_entities:
         _validate_public_keys_ed25519(trusted_entities)
     root_certificates = try_obtain_root_certificates(args, args.superlink)
-    runtime_certificates = try_obtain_optional_runtime_server_certificates(args)
+    runtime_certificates = None
+    if args.ssl_certfile or args.ssl_keyfile or args.ssl_ca_certfile:
+        runtime_certificates = try_obtain_server_certificates(args)
     authentication_keys = _try_setup_client_authentication(args)
     superexec_auth_secret = None
     if args.superexec_auth_secret_file is not None:
@@ -145,7 +147,7 @@ def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
         isolation=args.isolation,
         runtime_certificates=runtime_certificates,
         runtime_root_certificates_path=(
-            str(Path(args.runtime_ssl_ca_certfile).expanduser())
+            str(Path(args.ssl_ca_certfile).expanduser())
             if runtime_certificates is not None
             else None
         ),
@@ -156,12 +158,12 @@ def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
         host=args.host,
         port=args.port,
         runtime_ssl_certfile=(
-            str(Path(args.runtime_ssl_certfile).expanduser())
+            str(Path(args.ssl_certfile).expanduser())
             if runtime_certificates is not None
             else None
         ),
         runtime_ssl_keyfile=(
-            str(Path(args.runtime_ssl_keyfile).expanduser())
+            str(Path(args.ssl_keyfile).expanduser())
             if runtime_certificates is not None
             else None
         ),
@@ -299,7 +301,6 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--ssl-certfile",
-        dest="runtime_ssl_certfile",
         help="Runtime API server TLS certificate file (as a path str) "
         "to create a secure connection. The certificate must include SANs for "
         "the Runtime API address used by SuperExec.",
@@ -308,14 +309,12 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--ssl-keyfile",
-        dest="runtime_ssl_keyfile",
         help="Runtime API server TLS private key file (as a path str) "
         "to create a secure connection.",
         type=str,
     )
     parser.add_argument(
         "--ssl-ca-certfile",
-        dest="runtime_ssl_ca_certfile",
         help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
         "the Runtime API server certificate. This is not a client certificate "
         "for mTLS.",
@@ -323,19 +322,19 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--appio-ssl-certfile",
-        dest="runtime_ssl_certfile",
+        dest="ssl_certfile",
         action=_DeprecatedAppioSslOption,
         help="Deprecated: use `--ssl-certfile` instead.",
     )
     parser.add_argument(
         "--appio-ssl-keyfile",
-        dest="runtime_ssl_keyfile",
+        dest="ssl_keyfile",
         action=_DeprecatedAppioSslOption,
         help="Deprecated: use `--ssl-keyfile` instead.",
     )
     parser.add_argument(
         "--appio-ssl-ca-certfile",
-        dest="runtime_ssl_ca_certfile",
+        dest="ssl_ca_certfile",
         action=_DeprecatedAppioSslOption,
         help="Deprecated: use `--ssl-ca-certfile` instead.",
     )
