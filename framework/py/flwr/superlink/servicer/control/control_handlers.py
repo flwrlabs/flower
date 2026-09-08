@@ -133,9 +133,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UnregisterNodeResponse,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
-from flwr.proto.federation_pb2 import (
-    Federation as FederationProto,  # pylint: disable=E0611
-)
+from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -179,7 +177,7 @@ from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
-from flwr.superlink.federation.typing import Federation
+from flwr.superlink.federation.typing import Federation as FederationInfo
 from flwr.superlink.run_source import RunSource
 
 
@@ -1491,7 +1489,7 @@ def list_nodes(
     return ListNodesResponse(nodes_info=nodes_info, now=now().isoformat())
 
 
-def _get_federation_member_count(federation: Federation) -> int:
+def _get_federation_member_count(federation: FederationInfo) -> int:
     """Return the explicit member count or fall back to the member list size."""
     if federation.member_count is not None:
         return federation.member_count
@@ -1513,7 +1511,7 @@ def list_federations(
 
     return ListFederationsResponse(
         federations=[
-            FederationProto(
+            Federation(
                 name=fed.id,
                 description=fed.description,
                 members=fed.members,
@@ -1612,7 +1610,7 @@ def show_federation(
     details = state.federation_manager.get_details(federation_id)
 
     # Build Federation proto object
-    federation_proto = FederationProto(
+    federation_proto = Federation(
         name=federation_id,
         description=details.description,
         members=details.members,
@@ -1673,7 +1671,7 @@ def create_federation(
     )
 
     return CreateFederationResponse(
-        federation=FederationProto(
+        federation=Federation(
             name=federation.id,
             description=federation.description,
             members=federation.members,
