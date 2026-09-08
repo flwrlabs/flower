@@ -397,7 +397,7 @@ class _WarmExecutorPoolManager:
                 runtime_root_certificates=runtime_root_certificates,
             )
         except _WarmExecutorUnavailable:
-            self._release_pod(pod_name)
+            self._retire_unavailable_pod(pod_name)
             return None
 
         try:
@@ -628,6 +628,11 @@ class _WarmExecutorPoolManager:
     def _release_pod(self, pod_name: str) -> None:
         with self._lock:
             self._busy_pods.discard(pod_name)
+
+    def _retire_unavailable_pod(self, pod_name: str) -> None:
+        """Delete a Pod that failed before task authority was delivered."""
+        if self._delete_pod(pod_name):
+            self._release_pod(pod_name)
 
     def _delete_pod(self, pod_name: str) -> bool:
         try:
@@ -1380,9 +1385,12 @@ def _taskexecutor_pool_labels(config: KubernetesExecutorConfig) -> dict[str, str
 def _warm_executor_owner_label_selector(config: KubernetesExecutorConfig) -> str:
     """Return a selector limited to warm Pods owned by this SuperExec instance."""
     assert config.warm_executor_owner is not None
-    labels = _taskexecutor_pool_labels(config)
-    labels[WARM_EXECUTOR_LABEL] = "true"
-    labels[_WARM_EXECUTOR_OWNER_LABEL] = config.warm_executor_owner
+    labels = {
+        _NAME_LABEL: "flower",
+        _COMPONENT_LABEL: "taskexecutor",
+        WARM_EXECUTOR_LABEL: "true",
+        _WARM_EXECUTOR_OWNER_LABEL: config.warm_executor_owner,
+    }
     return _label_selector(labels)
 
 

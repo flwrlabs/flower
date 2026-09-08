@@ -536,6 +536,46 @@ def test_launch_falls_back_to_cold_pod_when_warm_pods_cannot_be_listed() -> None
     assert cold_pod["spec"]["containers"][0]["command"] == ["flwr-agentapp"]
 
 
+def test_launch_retires_warm_pod_when_dispatch_cannot_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An unavailable warm Pod must not remain reusable before cold fallback."""
+    client = Mock()
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        runtime_root_certificates=None,
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+    )
+    warm_pod = _ready_warm_pod(pool_key, config)
+    client.list_namespaced_pod.return_value = {"items": [warm_pod]}
+    monkeypatch.setattr(
+        importlib,
+        "import_module",
+        Mock(return_value=SimpleNamespace(stream=Mock(side_effect=RuntimeError))),
+    )
+    executor = KubernetesExecutor(client=client, config=config)
+
+    result = executor.launch(
+        _execution_spec(
+            task_type=TaskType.AGENT_APP,
+            fab_hash="fab-sha256",
+            insecure=True,
+        )
+    )
+
+    assert result.status == LaunchResultStatus.ACCEPTED
+    client.delete_namespaced_pod.assert_called_once_with(
+        name=warm_pod["metadata"]["name"],
+        namespace="flower-system",
+        grace_period_seconds=0,
+    )
+    cold_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
+    assert cold_pod["spec"]["containers"][0]["command"] == ["flwr-agentapp"]
+
+
 def test_launch_returns_unknown_after_unacknowledged_warm_token_delivery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -840,6 +880,26 @@ def test_warm_pool_cannot_fill_the_active_pod_budget() -> None:
             warm_executor_owner="superexec-a",
             warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
         )
+
+
+def test_warm_executor_owner_selector_ignores_mutable_pool_labels() -> None:
+    """Warm ownership must survive caller-label and resource-pool changes."""
+    config = _executor_config(
+        labels={"flower.ai/team": "platform"},
+        resource_pool="gpu-pool",
+        warm_executor_owner="superexec-a",
+    )
+
+    selector = (
+        kube._warm_executor_owner_label_selector(  # pylint: disable=protected-access
+            config
+        )
+    )
+
+    assert selector == (
+        "app.kubernetes.io/component=taskexecutor,app.kubernetes.io/name=flower,"
+        "flower.ai/warm-executor=true,flower.ai/warm-executor-owner=superexec-a"
+    )
 
 
 def test_build_taskexecutor_pod_includes_configured_volumes() -> None:
