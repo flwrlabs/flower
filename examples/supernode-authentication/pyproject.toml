@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "supernode-authentication"
-version = "1.1.10"
+version = "1.1.11"
 description = "Federated Learning with PyTorch and authenticated Flower "
 license = {file = "LICENSE"}
 dependencies = [
-    "flwr>=1.28.0",
-    "flwr-datasets[vision]>=0.6.0",
+    "flwr>=1.36.0",
+    "flwr-datasets[vision]>=0.6.1",
     "torch>=2.10.0",
     "torchvision>=0.25.0",
     "cryptography>=44.0.1",

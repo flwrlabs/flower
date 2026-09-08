@@ -54,9 +54,6 @@ Transport Layer Security (TLS) for each Flower component to ensure secure commun
                 --ssl-ca-certfile certificates/ca.crt \
                 --ssl-certfile certificates/server.pem \
                 --ssl-keyfile certificates/server.key \
-                --appio-ssl-ca-certfile certificates/ca.crt \
-                --appio-ssl-certfile certificates/server.pem \
-                --appio-ssl-keyfile certificates/server.key \
                 <additional-args>
 
         .. dropdown:: Understanding the command
@@ -85,10 +82,6 @@ Transport Layer Security (TLS) for each Flower component to ensure secure commun
               |
               | The ``certificates/server.key`` file is used to decrypt the data that is transmitted over
               | the network.
-            * | ``--appio-ssl-ca-certfile``, ``--appio-ssl-certfile``, and
-              | ``--appio-ssl-keyfile``: Configure TLS for the shared Runtime and Control
-              | HTTP APIs.
-
         **SuperNode**
 
         .. note::
@@ -145,9 +138,6 @@ Transport Layer Security (TLS) for each Flower component to ensure secure commun
                 --ssl-ca-certfile certificates/ca.crt \
                 --ssl-certfile certificates/server.pem \
                 --ssl-keyfile certificates/server.key \
-                --appio-ssl-ca-certfile certificates/ca.crt \
-                --appio-ssl-certfile certificates/server.pem \
-                --appio-ssl-keyfile certificates/server.key \
                 --isolation process \
                 <additional-args>
 
@@ -178,9 +168,6 @@ Transport Layer Security (TLS) for each Flower component to ensure secure commun
               |
               | The ``certificates/server.key`` file is used to decrypt the data that is transmitted over
               | the network.
-            * | ``--appio-ssl-ca-certfile``, ``--appio-ssl-certfile``, and
-              | ``--appio-ssl-keyfile``: Configure TLS for the shared Runtime and Control
-              | HTTP APIs.
             * | ``--isolation process``: Tells the SuperLink that the ServerApp is created by separate
               | independent process. The SuperLink does not attempt to create it.
 
