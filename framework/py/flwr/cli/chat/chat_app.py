@@ -1095,7 +1095,11 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
         federation=federation or "",
     )
     if fab_content is not None:
-        req.fab.CopyFrom(Fab(hash_str=fab_hash or "", content=fab_content))
+        if not fab_hash:
+            raise click.ClickException(
+                "FAB hash must be provided when uploading FAB content."
+            )
+        req.fab.CopyFrom(Fab(hash_str=fab_hash, content=fab_content))
     elif fab_hash is not None:
         req.fab.CopyFrom(Fab(hash_str=fab_hash))
     if series_id is not None:

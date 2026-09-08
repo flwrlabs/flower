@@ -18,6 +18,8 @@ import asyncio
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import click
+import pytest
 from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
 
@@ -169,6 +171,17 @@ def test_start_chat_run_uploads_local_fab_then_uses_hash() -> None:
     """A local FAB should be uploaded once and subsequently selected by hash."""
     stub = Mock()
     stub.StartRun.return_value = StartRunResponse(run_id=1, series_id=2)
+
+    with pytest.raises(click.ClickException, match="FAB hash must be provided"):
+        start_chat_run(
+            stub,
+            "Hello",
+            _CHAT_FED_ID,
+            None,
+            "@local/custom-agent",
+            fab_content=b"fab-content",
+        )
+    stub.StartRun.assert_not_called()
 
     assert start_chat_run(
         stub,
