@@ -69,10 +69,11 @@ instructions below.
         .. code-block:: shell
 
             $ docker run --rm \
-                -p 9091:9091 -p 9092:9092 -p 9093:9093 \
+                -p 8000:8000 -p 9092:9092 \
                 --detach \
                 flwr_superlink:0.0.1 \
-                --insecure
+                --insecure \
+                --host 0.0.0.0
 
     .. tab-item:: ClientApp
 

@@ -29,7 +29,7 @@ Before you begin, make sure you have the following prerequisites:
 - The Docker daemon is running on your local machine and the remote machine.
 - Docker Compose V2 is installed on both your local machine and the remote machine.
 - You can connect to the remote machine from your local machine.
-- Ports ``9091`` and ``9093`` are accessible on the remote machine.
+- Ports ``8000`` and ``9092`` are accessible on the remote machine.
 
 .. note::
 
@@ -168,7 +168,7 @@ With the file located in your system, edit it and add a new connection named
     :caption: config.toml
 
     [superlink.remote-deployment]
-    address = "192.168.2.33:9093"
+    address = "192.168.2.33:8000"
     root-certificates = "/absolute/path/to/superlink-certificates/ca.crt"
 
 Run the project and follow the ``ServerApp`` logs:

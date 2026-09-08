@@ -84,7 +84,7 @@ SUPERNODE_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{SUPERNODE_UVICORN_DEFAULT_P
 MAX_PROTOBUF_STREAM_MESSAGE_LENGTH = 2_147_483_647  # 2 GiB - 1 byte
 
 # SuperGrid constants
-SUPERGRID_ADDRESS = os.getenv("FLWR_SUPERGRID_ADDRESS", "supergrid.flower.ai")
+SUPERGRID_ADDRESS = os.getenv("FLWR_SUPERGRID_ADDRESS", "api.flower.ai")
 
 # Control API constants
 OAUTH_SESSION_TTL = timedelta(minutes=10)

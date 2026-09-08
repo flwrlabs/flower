@@ -93,11 +93,6 @@ To launch a SuperLink with SuperNode authentication enabled, you need to provide
 aditional files in addition to the certificates needed for the TLS connections. Recall
 that the authentication feature can only be enabled in the presence of TLS.
 
-.. note::
-
-    To enable TLS also for the Runtime API on SuperLink, please refer to :ref:`Launching
-    the SuperLink with TLS <launching-the-superlink-with-tls>`.
-
 .. code-block:: bash
     :emphasize-lines: 5
 
@@ -129,7 +124,7 @@ the path to the CA certificate used to launch the SuperLink. For example:
     :emphasize-lines: 3
 
     [superlink.local-deployment]
-    address = "127.0.0.1:9093"
+    address = "127.0.0.1:8000"
     root-certificates = "/absolute/path/to/certificates/ca.crt"
 
 You can verify that your connection is correctly configured by running a ``flwr ls``

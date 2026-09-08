@@ -73,33 +73,30 @@ new``).
 This section describes how to launch a SuperLink that works on TLS-enabled connections.
 The code snippet below assumes the `certificates/` directory is in the same directory
 where you execute the command from. Edit the paths accordingly if that is not the case.
-When providing certificates for the Fleet API and Control API, the SuperLink expects a
-tuple of three certificates paths: CA certificate, server certificate and server private
-key. The same command can also provide AppIo-named certificates for the SuperLink's
-Runtime API.
+The SuperLink expects three certificate paths: CA certificate, server certificate, and
+server private key.
+
+.. note::
+
+    Since Flower 1.37, the Fleet, Control, and Runtime APIs share this TLS
+    configuration.
 
 .. code-block:: bash
-    :emphasize-lines: 2,3,4,5,6,7
+    :emphasize-lines: 2,3,4
 
     $ flower-superlink \
         --ssl-ca-certfile certificates/ca.crt \
         --ssl-certfile certificates/server.pem \
-        --ssl-keyfile certificates/server.key \
-        --appio-ssl-ca-certfile certificates/ca.crt \
-        --appio-ssl-certfile certificates/server.pem \
-        --appio-ssl-keyfile certificates/server.key
+        --ssl-keyfile certificates/server.key
 
 .. dropdown:: Understand the command
 
     * ``--ssl-ca-certfile``: Specify the location of the CA certificate file in your file. This file is a certificate that is used to verify the identity of the SuperLink.
     * | ``--ssl-certfile``: Specify the location of the SuperLink's TLS certificate file. This file is used to identify the SuperLink and to encrypt the packages that are transmitted over the network.
+      The certificate must include Subject Alternative Names (SANs) for the Runtime API
+      address used by SuperExec. When using an IP address such as ``127.0.0.1``, the
+      certificate must include a matching IP SAN.
     * | ``--ssl-keyfile``: Specify the location of the SuperLink's TLS private key file. This file is used to decrypt the packages that are transmitted over the network.
-    * | ``--appio-ssl-ca-certfile``: Specify the location of the CA certificate file used by SuperExec to verify the SuperLink's Runtime API server certificate.
-    * | ``--appio-ssl-certfile``: Specify the location of the Runtime API server TLS certificate file.
-        The certificate must include Subject Alternative Names (SANs) for the Runtime API address used by
-        SuperExec. When using an IP address such as ``127.0.0.1``, the certificate must include a
-        matching IP SAN.
-    * | ``--appio-ssl-keyfile``: Specify the location of the Runtime API server TLS private key file.
 
 .. _connecting-the-supernodes-with-tls:
 
@@ -189,13 +186,13 @@ API hosted by the SuperLink:
 
     $ flower-superexec \
         --root-certificates certificates/ca.crt \
-        --runtime-api-address 127.0.0.1:9091 \
+        --runtime-api-address 127.0.0.1:8000 \
         --plugin-type serverapp
 
 .. dropdown:: Understand the command
 
     * ``--root-certificates``: Specify the location of the CA certificate file. The ``ca.crt`` file is used by SuperExec to verify the Runtime API server certificate.
-    * | ``--runtime-api-address``: Specify the address of the Runtime API that SuperExec should connect to. In this example, ``127.0.0.1:9091`` is the SuperLink's Runtime API.
+    * | ``--runtime-api-address``: Specify the address of the Runtime API that SuperExec should connect to. In this example, ``127.0.0.1:8000`` is the SuperLink's Runtime API.
     * | ``--plugin-type``: Specify the type of app process SuperExec should launch. Use ``serverapp`` for a ``ServerApp`` SuperExec.
 
 Next, use the same procedure for a ``ClientApp`` SuperExec, but pass the SuperNode's
@@ -224,7 +221,7 @@ Configuration TOML file with a new field that reads the certificate:
     :emphasize-lines: 3,3
 
     [superlink.local-deployment]
-    address = "127.0.0.1:9093"
+    address = "127.0.0.1:8000"
     root-certificates = "/absolute/path/to/certificates/ca.crt"
 
 Note that the path to the ``root-certificates`` is relative to the root of the project.

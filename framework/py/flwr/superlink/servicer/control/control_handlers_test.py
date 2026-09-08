@@ -464,7 +464,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
     def test_list_apps_preserves_hub_flag_over_wire(self) -> None:
         """ListApps preserves Hub provenance through protobuf serialization."""
-        fab_hash = self.state.store_app(
+        self.state.store_app(
             fab=Fab("", b"hub fab", {}),
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
@@ -480,7 +480,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
         round_tripped = ListAppsResponse.FromString(response.SerializeToString())
 
-        self.assertEqual(round_tripped.apps[0].fab_hash, fab_hash)
+        self.assertEqual(round_tripped.apps[0].fab_hash, "")
         self.assertTrue(round_tripped.apps[0].is_hub_app)
 
     def test_list_apps_preserves_unknown_hub_origin_over_wire(self) -> None:
@@ -501,8 +501,8 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertFalse(round_tripped.apps[0].HasField("is_hub_app"))
 
-    def test_add_and_remove_app(self) -> None:
-        """AddApp stores the latest Hub FAB and RemoveApp removes the app."""
+    def test_add_and_remove_hub_app_metadata(self) -> None:
+        """AddApp stores Hub metadata without retaining the downloaded FAB."""
         fab_content = b"hub FAB"
         verification_dict = {"publisher-key": "verified"}
         with (
@@ -535,12 +535,12 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
-            [("@flwr/demo", fab_hash, TaskType.AGENT_APP)],
+            [("@flwr/demo", "", TaskType.AGENT_APP)],
         )
         self.assertTrue(apps[0].is_hub_app)
-        self.assertEqual(
-            self.state.get_app(NOOP_FEDERATION_ID, "@flwr/demo", fab_hash),
-            Fab(fab_hash, fab_content, verification_dict),
+        self.assertIsNone(self.state.get_fab(fab_hash))
+        self.assertIsNone(
+            self.state.get_app(NOOP_FEDERATION_ID, "@flwr/demo", fab_hash)
         )
 
         remove_response = remove_app(
@@ -615,6 +615,49 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Assert
         self.assertFalse(stored_automation.HasField("fixed_interval"))
         self.assertFalse(listed_automation.HasField("fixed_interval"))
+
+    def test_start_automation_stores_hub_app_without_fab(self) -> None:
+        """Store Hub automations by app ID so dispatch fetches the latest FAB."""
+        self.state.store_app(
+            fab=None,
+            federation_id=NOOP_FEDERATION_ID,
+            app_id="@flwr/agent",
+            app_type=TaskType.AGENT_APP,
+            added_by=self.account.flwr_aid,
+            is_hub_app=True,
+        )
+        fab_content = b"current Hub FAB"
+        request = StartAutomationRequest(
+            start_run_request=StartRunRequest(
+                federation=NOOP_FEDERATION_ID,
+                series_id=1,
+            )
+        )
+        request.start_run_request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
+        request.start_run_request.fab.content = fab_content
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/agent", "1.0.0"),
+            ),
+        ):
+            response = start_automation(request, self.account, self.state)
+
+        claimed = self.state.claim_automation(
+            response.automation_id,
+            previous_next_run_at=response.next_run_at,
+            next_run_at=None,
+        )
+        self.assertIsNotNone(claimed)
+        stored_request, _ = cast(tuple[StartRunRequest, str], claimed)
+        self.assertEqual(stored_request.app_spec, "@flwr/agent")
+        self.assertFalse(stored_request.HasField("fab"))
 
     def test_start_automation_rejects_start_at_without_timezone(self) -> None:
         """Reject a start time without timezone information."""

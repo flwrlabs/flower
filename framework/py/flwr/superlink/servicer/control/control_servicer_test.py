@@ -809,12 +809,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
         self.assertEqual(
             [(app.app_id, app.fab_hash) for app in apps],
-            [
-                (
-                    "@anne-dev/simple-legacy-127",
-                    hashlib.sha256(b"test FAB content 123456").hexdigest(),
-                )
-            ],
+            [("@anne-dev/simple-legacy-127", "")],
         )
         self.assertTrue(apps[0].is_hub_app)
 
