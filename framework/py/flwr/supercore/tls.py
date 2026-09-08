@@ -37,7 +37,6 @@ def get_client_tls_args(
 
 def try_obtain_optional_runtime_server_certificates(
     args: argparse.Namespace,
-    option_prefix: str = "appio-",
 ) -> ServerCertificates | None:
     """Load optional Runtime API server certificates from parsed arguments."""
     if (
@@ -51,20 +50,17 @@ def try_obtain_optional_runtime_server_certificates(
         if not runtime_ssl_ca_certfile.is_file():
             flwr_exit(
                 ExitCode.COMMON_PATH_INVALID,
-                f"Path argument `--{option_prefix}ssl-ca-certfile` does not point to a "
-                "file.",
+                "Path argument `--ssl-ca-certfile` does not point to a file.",
             )
         if not runtime_ssl_certfile.is_file():
             flwr_exit(
                 ExitCode.COMMON_PATH_INVALID,
-                f"Path argument `--{option_prefix}ssl-certfile` does not point to a "
-                "file.",
+                "Path argument `--ssl-certfile` does not point to a file.",
             )
         if not runtime_ssl_keyfile.is_file():
             flwr_exit(
                 ExitCode.COMMON_PATH_INVALID,
-                f"Path argument `--{option_prefix}ssl-keyfile` does not point to a "
-                "file.",
+                "Path argument `--ssl-keyfile` does not point to a file.",
             )
         return (
             runtime_ssl_ca_certfile.read_bytes(),
@@ -78,9 +74,8 @@ def try_obtain_optional_runtime_server_certificates(
     ):
         flwr_exit(
             ExitCode.COMMON_TLS_SERVER_CERTIFICATES_INVALID,
-            f"You need to provide valid file paths to `--{option_prefix}ssl-certfile`, "
-            f"`--{option_prefix}ssl-keyfile`, and "
-            f"`--{option_prefix}ssl-ca-certfile` to create a secure Runtime API "
+            "You need to provide valid file paths to `--ssl-certfile`, "
+            "`--ssl-keyfile`, and `--ssl-ca-certfile` to create a secure Runtime API "
             "connection.",
         )
     return None

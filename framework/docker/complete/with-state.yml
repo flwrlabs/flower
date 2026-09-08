@@ -21,9 +21,6 @@ services:
     # - --ssl-ca-certfile=certificates/ca.crt
     # - --ssl-certfile=certificates/server.pem
     # - --ssl-keyfile=certificates/server.key
-    # - --appio-ssl-ca-certfile=certificates/ca.crt
-    # - --appio-ssl-certfile=certificates/server.pem
-    # - --appio-ssl-keyfile=certificates/server.key
     # - --database=state/state.db
     volumes:
       - ./state/:/app/state/:rw

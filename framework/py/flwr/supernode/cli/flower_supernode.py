@@ -101,9 +101,7 @@ def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
     if trusted_entities:
         _validate_public_keys_ed25519(trusted_entities)
     root_certificates = try_obtain_root_certificates(args, args.superlink)
-    runtime_certificates = try_obtain_optional_runtime_server_certificates(
-        args, option_prefix=""
-    )
+    runtime_certificates = try_obtain_optional_runtime_server_certificates(args)
     authentication_keys = _try_setup_client_authentication(args)
     superexec_auth_secret = None
     if args.superexec_auth_secret_file is not None:

@@ -73,33 +73,30 @@ new``).
 This section describes how to launch a SuperLink that works on TLS-enabled connections.
 The code snippet below assumes the `certificates/` directory is in the same directory
 where you execute the command from. Edit the paths accordingly if that is not the case.
-When providing certificates for the Fleet API and Control API, the SuperLink expects a
-tuple of three certificates paths: CA certificate, server certificate and server private
-key. The same command can also provide AppIo-named certificates for the SuperLink's
-Runtime API.
+The SuperLink expects three certificate paths: CA certificate, server certificate, and
+server private key.
+
+.. note::
+
+    Since Flower 1.37, the Fleet, Control, and Runtime APIs share this TLS
+    configuration.
 
 .. code-block:: bash
-    :emphasize-lines: 2,3,4,5,6,7
+    :emphasize-lines: 2,3,4
 
     $ flower-superlink \
         --ssl-ca-certfile certificates/ca.crt \
         --ssl-certfile certificates/server.pem \
-        --ssl-keyfile certificates/server.key \
-        --appio-ssl-ca-certfile certificates/ca.crt \
-        --appio-ssl-certfile certificates/server.pem \
-        --appio-ssl-keyfile certificates/server.key
+        --ssl-keyfile certificates/server.key
 
 .. dropdown:: Understand the command
 
     * ``--ssl-ca-certfile``: Specify the location of the CA certificate file in your file. This file is a certificate that is used to verify the identity of the SuperLink.
     * | ``--ssl-certfile``: Specify the location of the SuperLink's TLS certificate file. This file is used to identify the SuperLink and to encrypt the packages that are transmitted over the network.
+      The certificate must include Subject Alternative Names (SANs) for the Runtime API
+      address used by SuperExec. When using an IP address such as ``127.0.0.1``, the
+      certificate must include a matching IP SAN.
     * | ``--ssl-keyfile``: Specify the location of the SuperLink's TLS private key file. This file is used to decrypt the packages that are transmitted over the network.
-    * | ``--appio-ssl-ca-certfile``: Specify the location of the CA certificate file used by SuperExec to verify the SuperLink's Runtime API server certificate.
-    * | ``--appio-ssl-certfile``: Specify the location of the Runtime API server TLS certificate file.
-        The certificate must include Subject Alternative Names (SANs) for the Runtime API address used by
-        SuperExec. When using an IP address such as ``127.0.0.1``, the certificate must include a
-        matching IP SAN.
-    * | ``--appio-ssl-keyfile``: Specify the location of the Runtime API server TLS private key file.
 
 .. _connecting-the-supernodes-with-tls:
 

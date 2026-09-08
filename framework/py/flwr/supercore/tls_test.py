@@ -150,9 +150,9 @@ def test_try_obtain_optional_runtime_server_certificates_rejects_partial_config(
     mock_exit.assert_called_once()
     input_code, message = mock_exit.call_args.args
     assert input_code == ExitCode.COMMON_TLS_SERVER_CERTIFICATES_INVALID
-    assert "--appio-ssl-certfile" in message
-    assert "--appio-ssl-keyfile" in message
-    assert "--appio-ssl-ca-certfile" in message
+    assert "--ssl-certfile" in message
+    assert "--ssl-keyfile" in message
+    assert "--ssl-ca-certfile" in message
 
 
 def test_try_obtain_optional_runtime_server_certificates_rejects_invalid_path() -> None:
@@ -171,4 +171,4 @@ def test_try_obtain_optional_runtime_server_certificates_rejects_invalid_path() 
     mock_exit.assert_called_once()
     input_code, message = mock_exit.call_args.args
     assert input_code == ExitCode.COMMON_PATH_INVALID
-    assert "--appio-ssl-ca-certfile" in message
+    assert "--ssl-ca-certfile" in message

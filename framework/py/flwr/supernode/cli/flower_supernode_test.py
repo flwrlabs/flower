@@ -159,7 +159,7 @@ def test_parse_supernode_lifespan_config_preserves_tls_args(
 
     assert config.runtime_certificates == runtime_certificates
     assert config.runtime_root_certificates_path == "ca.pem"
-    assert obtain_certificates.call_args.kwargs == {"option_prefix": ""}
+    obtain_certificates.assert_called_once()
 
 
 def test_flower_supernode_checks_for_update(
