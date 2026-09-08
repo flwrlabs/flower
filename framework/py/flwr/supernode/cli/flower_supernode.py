@@ -17,10 +17,13 @@
 
 import argparse
 import threading
+from collections.abc import Sequence
 from dataclasses import dataclass
 from logging import DEBUG, INFO, WARN
+from os.path import expanduser
 from pathlib import Path
 from time import sleep
+from typing import Any
 
 import uvicorn
 import yaml
@@ -33,6 +36,7 @@ from flwr.app.user_config import UserConfig
 from flwr.common.args import (
     add_args_runtime_dependency_install,
     try_obtain_root_certificates,
+    try_obtain_server_certificates,
 )
 from flwr.common.config import parse_config_args
 from flwr.common.constant import (
@@ -57,7 +61,6 @@ from flwr.supercore.grpc_health import add_args_health
 from flwr.supercore.logger import console_handler
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
-from flwr.supercore.tls import try_obtain_optional_runtime_server_certificates
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.version import package_version
 from flwr.supernode.nodestate import NodeStateFactory
@@ -99,7 +102,17 @@ def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
     if trusted_entities:
         _validate_public_keys_ed25519(trusted_entities)
     root_certificates = try_obtain_root_certificates(args, args.superlink)
-    runtime_certificates = try_obtain_optional_runtime_server_certificates(args)
+    runtime_certificates = None
+    if args.ssl_certfile or args.ssl_keyfile or args.ssl_ca_certfile:
+        try:
+            runtime_certificates = try_obtain_server_certificates(args)
+        except SystemExit as err:
+            code = (
+                ExitCode.COMMON_PATH_INVALID
+                if args.ssl_certfile and args.ssl_keyfile and args.ssl_ca_certfile
+                else ExitCode.COMMON_TLS_SERVER_CERTIFICATES_INVALID
+            )
+            flwr_exit(code, str(err))
     authentication_keys = _try_setup_client_authentication(args)
     superexec_auth_secret = None
     if args.superexec_auth_secret_file is not None:
@@ -143,7 +156,7 @@ def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
         isolation=args.isolation,
         runtime_certificates=runtime_certificates,
         runtime_root_certificates_path=(
-            str(Path(args.runtime_ssl_ca_certfile).expanduser())
+            str(Path(args.ssl_ca_certfile).expanduser())
             if runtime_certificates is not None
             else None
         ),
@@ -154,12 +167,12 @@ def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
         host=args.host,
         port=args.port,
         runtime_ssl_certfile=(
-            str(Path(args.runtime_ssl_certfile).expanduser())
+            str(Path(args.ssl_certfile).expanduser())
             if runtime_certificates is not None
             else None
         ),
         runtime_ssl_keyfile=(
-            str(Path(args.runtime_ssl_keyfile).expanduser())
+            str(Path(args.ssl_keyfile).expanduser())
             if runtime_certificates is not None
             else None
         ),
@@ -296,28 +309,46 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--appio-ssl-certfile",
-        dest="runtime_ssl_certfile",
+        "--ssl-certfile",
         help="Runtime API server TLS certificate file (as a path str) "
         "to create a secure connection. The certificate must include SANs for "
         "the Runtime API address used by SuperExec.",
-        type=str,
+        type=expanduser,
         default=None,
     )
     parser.add_argument(
-        "--appio-ssl-keyfile",
-        dest="runtime_ssl_keyfile",
+        "--ssl-keyfile",
         help="Runtime API server TLS private key file (as a path str) "
         "to create a secure connection.",
-        type=str,
+        type=expanduser,
     )
     parser.add_argument(
-        "--appio-ssl-ca-certfile",
-        dest="runtime_ssl_ca_certfile",
+        "--ssl-ca-certfile",
         help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
         "the Runtime API server certificate. This is not a client certificate "
         "for mTLS.",
-        type=str,
+        type=expanduser,
+    )
+    parser.add_argument(
+        "--appio-ssl-certfile",
+        dest="ssl_certfile",
+        action=_DeprecatedAppioSslOption,
+        type=expanduser,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--appio-ssl-keyfile",
+        dest="ssl_keyfile",
+        action=_DeprecatedAppioSslOption,
+        type=expanduser,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--appio-ssl-ca-certfile",
+        dest="ssl_ca_certfile",
+        action=_DeprecatedAppioSslOption,
+        type=expanduser,
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--trusted-entities",
@@ -336,6 +367,26 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
     add_args_health(parser)
 
     return parser
+
+
+class _DeprecatedAppioSslOption(argparse.Action):
+    """Route a deprecated AppIO TLS option to its replacement."""
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str | Sequence[Any] | None,
+        option_string: str | None = None,
+    ) -> None:
+        replacement = option_string.replace("--appio-", "--") if option_string else ""
+        log(
+            WARN,
+            "The `%s` flag is deprecated; use `%s` instead.",
+            option_string,
+            replacement,
+        )
+        setattr(namespace, self.dest, values)
 
 
 def _port_int(value: str) -> int:
