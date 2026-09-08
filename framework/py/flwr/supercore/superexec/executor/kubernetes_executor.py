@@ -309,6 +309,7 @@ class _KubernetesWarmExecutorDispatch:
         while time.monotonic() < deadline:
             if _AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT in self._read_stdout():
                 return True
+            self._read_stderr()
             if not self._is_open():
                 return False
             self._update(min(0.5, deadline - time.monotonic()))
@@ -319,6 +320,7 @@ class _KubernetesWarmExecutorDispatch:
         while self._is_open():
             self._update(1.0)
             self._read_stdout()
+            self._read_stderr()
 
     def close(self) -> None:
         """Close the Kubernetes exec stream best-effort."""
@@ -342,6 +344,12 @@ class _KubernetesWarmExecutorDispatch:
             return ""
         stdout = read_stdout()
         return stdout if isinstance(stdout, str) else ""
+
+    def _read_stderr(self) -> None:
+        peek_stderr = getattr(self._response, "peek_stderr", None)
+        read_stderr = getattr(self._response, "read_stderr", None)
+        if callable(read_stderr) and (not callable(peek_stderr) or peek_stderr()):
+            read_stderr()
 
 
 class _WarmExecutorPoolManager:

@@ -135,9 +135,11 @@ def _ready_warm_pod(
 class _WarmExecResponse:
     """Minimal Kubernetes exec response with one token acknowledgement."""
 
-    def __init__(self, acknowledge: bool = True) -> None:
+    def __init__(self, acknowledge: bool = True, stderr: str = "") -> None:
         self.written: list[str] = []
+        self.read_stderr_calls = 0
         self._acknowledge = acknowledge
+        self._stderr = stderr
         self._stdout = ""
         self._open = True
 
@@ -166,6 +168,17 @@ class _WarmExecResponse:
         stdout = self._stdout
         self._stdout = ""
         return stdout
+
+    def peek_stderr(self) -> bool:
+        """Return whether standard error is available."""
+        return bool(self._stderr)
+
+    def read_stderr(self) -> str:
+        """Discard standard error without retaining task output."""
+        self.read_stderr_calls += 1
+        stderr = self._stderr
+        self._stderr = ""
+        return stderr
 
     def close(self) -> None:
         """Close the response after one task."""
@@ -564,6 +577,18 @@ def test_launch_returns_unknown_after_unacknowledged_warm_token_delivery(
     assert response.written == ["task-token\n"]
     client.create_namespaced_secret.assert_not_called()
     client.create_namespaced_pod.assert_not_called()
+
+
+def test_warm_dispatch_drains_stderr_until_the_child_exits() -> None:
+    """Warm child stderr must not accumulate in the Kubernetes exec stream."""
+    response = _WarmExecResponse(acknowledge=False, stderr="diagnostic output")
+    dispatch = kube._KubernetesWarmExecutorDispatch(  # pylint: disable=protected-access
+        response
+    )
+
+    dispatch.wait_for_close()
+
+    assert response.read_stderr_calls == 1
 
 
 def test_warm_pool_replaces_consumed_pod_and_cleans_up_owned_pods() -> None:
