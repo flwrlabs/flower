@@ -61,6 +61,7 @@ _READ_CHUNK_SIZE = 64 * 1024
 _REDIRECT_STATUS_CODES = frozenset({301, 302, 303, 307, 308})
 # Keep the existing request timeout unless explicitly overridden.
 _PROXY_REQUEST_TIMEOUT = 60.0
+_MAX_PROXY_REQUEST_TIMEOUT = 300.0
 _PROXY_WEB_FETCH_PROVIDER = "proxy"
 
 
@@ -97,15 +98,17 @@ def _get_proxy_request_timeout() -> float:
         raise WebFetchProviderError(
             code="invalid_configuration",
             detail=(
-                f"{PROXY_REQUEST_TIMEOUT_ENV} must be a positive number of seconds."
+                f"{PROXY_REQUEST_TIMEOUT_ENV} must be greater than 0 and less than "
+                f"{_MAX_PROXY_REQUEST_TIMEOUT} seconds."
             ),
         ) from exc
 
-    if not math.isfinite(timeout) or timeout <= 0:
+    if not math.isfinite(timeout) or not 0 < timeout < _MAX_PROXY_REQUEST_TIMEOUT:
         raise WebFetchProviderError(
             code="invalid_configuration",
             detail=(
-                f"{PROXY_REQUEST_TIMEOUT_ENV} must be a positive number of seconds."
+                f"{PROXY_REQUEST_TIMEOUT_ENV} must be greater than 0 and less than "
+                f"{_MAX_PROXY_REQUEST_TIMEOUT} seconds."
             ),
         )
     return timeout

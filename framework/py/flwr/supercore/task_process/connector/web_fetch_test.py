@@ -200,7 +200,9 @@ def test_invoke_web_fetch_provider_uses_configured_proxy_timeout(
     )
 
 
-@pytest.mark.parametrize("invalid_timeout", ["not-a-number", "0", "-1", "inf"])
+@pytest.mark.parametrize(
+    "invalid_timeout", ["not-a-number", "0", "-1", "inf", "300", "301"]
+)
 def test_invoke_web_fetch_provider_rejects_invalid_proxy_timeout(
     monkeypatch: pytest.MonkeyPatch,
     invalid_timeout: str,
