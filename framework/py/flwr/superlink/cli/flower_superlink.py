@@ -38,6 +38,7 @@ from flwr.common.constant import (
     CONTROL_API_DEFAULT_SERVER_ADDRESS,
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
+    FLWR_INTERNAL_GRPC_CONTROL_API,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
@@ -81,10 +82,7 @@ from flwr.supercore.interceptors import (
 from flwr.supercore.logger import configure_superlink_log_file, console_handler
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
-from flwr.supercore.tls import (
-    get_client_tls_args,
-    try_obtain_optional_runtime_server_certificates,
-)
+from flwr.supercore.tls import get_client_tls_args
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.utils import get_popen_detach_kwargs
 from flwr.supercore.version import package_version
@@ -150,7 +148,8 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         # Force initialization before starting network servers
         self.state_factory.state()
 
-        self._start_control_api()
+        if os.getenv(FLWR_INTERNAL_GRPC_CONTROL_API) == "1":
+            self._start_control_api()
         self._start_fleet_api()
         self._start_superexec_if_needed()
         self._start_health_server_if_needed()
@@ -265,8 +264,8 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         runtime_address = resolve_bind_address(f"{runtime_host}:{config.port}")
         command = _get_superexec_command(
             runtime_address=runtime_address,
-            runtime_certificates=config.runtime_certificates,
-            runtime_root_certificates_path=config.runtime_ssl_ca_certfile,
+            runtime_certificates=config.certificates,
+            runtime_root_certificates_path=config.ssl_ca_certfile,
             parent_pid=os.getpid(),
             runtime_dependency_install=config.runtime_dependency_install,
         )
@@ -293,22 +292,7 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
             backup_count=args.log_rotation_backup_count,
         )
 
-    # Detect if `--executor*` arguments were set
-    if args.executor or args.executor_dir or args.executor_config:
-        flwr_exit(
-            ExitCode.SUPERLINK_INVALID_ARGS,
-            "The arguments `--executor`, `--executor-dir`, and `--executor-config` are "
-            "deprecated and will be removed in a future release. To run SuperLink with "
-            "the simulation runtime, please use `--simulation`.",
-        )
-
-    # Detect if both Control API and Exec API addresses were set explicitly
-    explicit_args = set()
-    for arg in sys.argv[1:]:
-        if arg.startswith("--"):
-            explicit_args.add(
-                arg.split("=")[0]
-            )  # handles both `--arg val` and `--arg=val`
+    explicit_args = {arg.split("=")[0] for arg in sys.argv[1:] if arg.startswith("--")}
 
     # The old opt-in flag is accepted for compatibility, but no longer needed.
     if "--allow-runtime-dependency-installation" in explicit_args:
@@ -320,24 +304,13 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         )
 
     control_api_set = "--control-api-address" in explicit_args
-    exec_api_set = "--exec-api-address" in explicit_args
 
-    if control_api_set and exec_api_set:
-        flwr_exit(
-            ExitCode.SUPERLINK_INVALID_ARGS,
-            "Both `--control-api-address` and `--exec-api-address` are set. "
-            "Please use only `--control-api-address` as `--exec-api-address` is "
-            "deprecated.",
-        )
-
-    # Warn deprecated `--exec-api-address` argument
-    if args.exec_api_address is not None:
+    if control_api_set:
         log(
             WARN,
-            "The `--exec-api-address` argument is deprecated and will be removed in a "
-            "future release. Use `--control-api-address` instead.",
+            "The `--control-api-address` argument is deprecated. The Control API "
+            "now operates over HTTP. Use `--host` and `--port` instead.",
         )
-        args.control_api_address = args.exec_api_address
 
     # Parse IP addresses
     control_address, _, _ = _format_address(args.control_api_address)
@@ -346,7 +319,7 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         health_server_address, _, _ = _format_address(args.health_server_address)
 
     # Obtain certificates
-    certificates, runtime_certificates = _obtain_superlink_certificates(args)
+    certificates = _obtain_superlink_certificates(args)
 
     # Load SuperExec auth secret
     superexec_auth_secret: bytes | None = None
@@ -451,7 +424,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         port=args.port,
         insecure=args.insecure,
         certificates=certificates,
-        runtime_certificates=runtime_certificates,
         superexec_auth_secret=superexec_auth_secret,
         authn_plugin=authn_plugin,
         event_log_plugin=event_log_plugin,
@@ -461,21 +433,23 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         fleet_api_type=args.fleet_api_type,
         fleet_api_address=fleet_api_address,
         simulation=args.simulation,
-        ssl_keyfile=args.ssl_keyfile,
-        ssl_certfile=args.ssl_certfile,
+        ssl_ca_certfile=(
+            str(Path(args.ssl_ca_certfile).expanduser())
+            if certificates is not None
+            else None
+        ),
+        ssl_certfile=(
+            str(Path(args.ssl_certfile).expanduser())
+            if certificates is not None
+            else None
+        ),
+        ssl_keyfile=(
+            str(Path(args.ssl_keyfile).expanduser())
+            if certificates is not None
+            else None
+        ),
         database=args.database,
         isolation=args.isolation,
-        runtime_ssl_ca_certfile=args.runtime_ssl_ca_certfile,
-        runtime_ssl_certfile=(
-            str(Path(args.runtime_ssl_certfile).expanduser())
-            if runtime_certificates is not None
-            else None
-        ),
-        runtime_ssl_keyfile=(
-            str(Path(args.runtime_ssl_keyfile).expanduser())
-            if runtime_certificates is not None
-            else None
-        ),
         runtime_dependency_install=args.runtime_dependency_install,
     )
 
@@ -490,8 +464,8 @@ def flower_superlink() -> None:
 
     event(EventType.RUN_SUPERLINK_ENTER)
 
-    # Blocking: FastAPI serves Runtime HTTP while its lifespan owns Control and
-    # Fleet gRPC servers.
+    # Blocking: FastAPI serves the Runtime and Control HTTP APIs while its lifespan
+    # owns the Fleet gRPC server and, when enabled, the gRPC Control API server.
     _run_superlink_http_api(lifespan_config=config)
 
 
@@ -520,10 +494,16 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
         lifespan_config.host,
         lifespan_config.port,
     )
+    log(
+        INFO,
+        "Starting the SuperLink Control HTTP API on %s:%s.",
+        lifespan_config.host,
+        lifespan_config.port,
+    )
 
     # Uvicorn workers must stay at 1 while the lifespan starts gRPC servers. With
-    # multiple workers, every worker process would try to bind the same Control,
-    # Fleet and Runtime API ports.
+    # multiple workers, every worker process would try to bind the same enabled
+    # gRPC API and Runtime API ports.
     uvicorn.run(
         app=fastapi_app,
         host=lifespan_config.host,
@@ -531,16 +511,16 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
         reload=False,
         access_log=True,
         log_config=get_uvicorn_log_config(console_handler.level),
-        ssl_keyfile=lifespan_config.runtime_ssl_keyfile,
-        ssl_certfile=lifespan_config.runtime_ssl_certfile,
+        ssl_keyfile=lifespan_config.ssl_keyfile,
+        ssl_certfile=lifespan_config.ssl_certfile,
         workers=1,
     )
 
 
 def _obtain_superlink_certificates(
     args: argparse.Namespace,
-) -> tuple[tuple[bytes, bytes, bytes] | None, tuple[bytes, bytes, bytes] | None]:
-    """Return Fleet/Control and Runtime API certificate tuples."""
+) -> tuple[bytes, bytes, bytes] | None:
+    """Return TLS certificate tuple used by all APIs (Fleet, Control, and Runtime)."""
     if args.insecure:
         log(
             WARN,
@@ -548,10 +528,8 @@ def _obtain_superlink_certificates(
             "unencrypted communication (TLS disabled). Proceed only if you understand "
             "the risks.",
         )
-        return None, None
-    certificates = try_obtain_server_certificates(args)
-    runtime_certificates = try_obtain_optional_runtime_server_certificates(args)
-    return certificates, runtime_certificates
+        return None
+    return try_obtain_server_certificates(args)
 
 
 def _get_superexec_command(
@@ -808,26 +786,29 @@ def _add_args_runtime_api(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--appio-ssl-certfile",
         dest="runtime_ssl_certfile",
-        help="Runtime API server TLS certificate file (as a path str) "
-        "to create a secure connection. The certificate must include SANs for "
-        "the Runtime API address used by SuperExec.",
-        type=str,
-        default=None,
+        help=argparse.SUPPRESS,
+        type=_unsupported_appio_ssl_flag,
     )
     parser.add_argument(
         "--appio-ssl-keyfile",
         dest="runtime_ssl_keyfile",
-        help="Runtime API server TLS private key file (as a path str) "
-        "to create a secure connection.",
-        type=str,
+        help=argparse.SUPPRESS,
+        type=_unsupported_appio_ssl_flag,
     )
     parser.add_argument(
         "--appio-ssl-ca-certfile",
         dest="runtime_ssl_ca_certfile",
-        help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
-        "the Runtime API server certificate. This is not a client certificate "
-        "for mTLS.",
-        type=str,
+        help=argparse.SUPPRESS,
+        type=_unsupported_appio_ssl_flag,
+    )
+
+
+def _unsupported_appio_ssl_flag(_value: str) -> str:
+    """Reject a removed --appio-ssl-* flag."""
+    raise argparse.ArgumentTypeError(
+        "this flag no longer exists; Control API, Fleet API, and "
+        "Runtime API use the same TLS certificates. Use `--ssl-certfile`, "
+        "`--ssl-keyfile`, and `--ssl-ca-certfile` instead."
     )
 
 
@@ -874,30 +855,9 @@ def _add_args_control_api(parser: argparse.ArgumentParser) -> None:
     """Add command line arguments for Control API."""
     parser.add_argument(
         "--control-api-address",
-        help="Control API server address (IPv4, IPv6, or a domain name) "
-        f"By default, it is set to {CONTROL_API_DEFAULT_SERVER_ADDRESS}.",
+        help="Deprecated. The Control API now operates over HTTP. Use `--host` and "
+        "`--port` instead.",
         default=CONTROL_API_DEFAULT_SERVER_ADDRESS,
-    )
-    parser.add_argument(
-        "--exec-api-address",
-        help="This argument is deprecated and will be removed in a future release. "
-        "Use `--control-api-address` instead.",
-        default=None,
-    )
-    parser.add_argument(
-        "--executor",
-        help="This argument is deprecated and will be removed in a future release.",
-        default=None,
-    )
-    parser.add_argument(
-        "--executor-dir",
-        help="This argument is deprecated and will be removed in a future release.",
-        default=None,
-    )
-    parser.add_argument(
-        "--executor-config",
-        help="This argument is deprecated and will be removed in a future release.",
-        default=None,
     )
     parser.add_argument(  # To be removed in follow-up PRs
         "--simulation",

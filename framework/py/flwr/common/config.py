@@ -101,7 +101,8 @@ def fuse_dicts(
         if key in main_dict:
             if isinstance(value, dict):
                 fused_dict[key] = fuse_dicts(main_dict[key], value)
-            fused_dict[key] = value
+            else:
+                fused_dict[key] = value
         elif check_keys:
             raise ValueError(f"Key '{key}' is not present in the main dictionary")
 
