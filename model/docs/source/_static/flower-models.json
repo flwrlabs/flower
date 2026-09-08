@@ -5,9 +5,6 @@
       "display_name": "Endeavor",
       "description": "Flower Endeavor through the Flower Labs Responses-compatible endpoint.",
       "base_instructions": "You are Flower Endeavor, a coding agent. Work with the user to complete the requested task. Inspect the workspace before making changes, use available tools when they are useful, and report the verified result concisely. Preserve unrelated user changes.",
-      "model_messages": {
-        "instructions_template": "You are Flower Endeavor, a coding agent. {{ personality }}"
-      },
       "context_window": 128000,
       "max_context_window": 128000,
       "auto_compact_token_limit": 96000,
