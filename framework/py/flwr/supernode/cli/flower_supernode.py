@@ -104,7 +104,15 @@ def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
     root_certificates = try_obtain_root_certificates(args, args.superlink)
     runtime_certificates = None
     if args.ssl_certfile or args.ssl_keyfile or args.ssl_ca_certfile:
-        runtime_certificates = try_obtain_server_certificates(args)
+        try:
+            runtime_certificates = try_obtain_server_certificates(args)
+        except SystemExit as err:
+            code = (
+                ExitCode.COMMON_PATH_INVALID
+                if args.ssl_certfile and args.ssl_keyfile and args.ssl_ca_certfile
+                else ExitCode.COMMON_TLS_SERVER_CERTIFICATES_INVALID
+            )
+            flwr_exit(code, str(err))
     authentication_keys = _try_setup_client_authentication(args)
     superexec_auth_secret = None
     if args.superexec_auth_secret_file is not None:
