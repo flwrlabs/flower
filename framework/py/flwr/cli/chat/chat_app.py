@@ -725,15 +725,25 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         """Start and stream one Flower AgentApp run."""
         # Start a run in the current conversation series.
-        self.run_id, self.series_id = start_chat_run(
-            self.stub,
-            prompt,
-            self.federation,
-            self.series_id,
-            app_spec,
-            fab_hash,
-            fab_content,
-        )
+        try:
+            self.run_id, self.series_id = start_chat_run(
+                self.stub,
+                prompt,
+                self.federation,
+                self.series_id,
+                app_spec,
+                fab_hash,
+                fab_content,
+            )
+        except click.ClickException:
+            if (
+                fab_content is None
+                and self.local_agent is not None
+                and app_spec == self.local_agent.app_spec
+                and fab_hash == self.local_agent.fab_hash
+            ):
+                self.local_agent_uploaded = False
+            raise
         if fab_content is not None:
             self.local_agent_uploaded = True
 

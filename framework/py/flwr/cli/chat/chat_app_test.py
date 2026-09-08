@@ -166,6 +166,20 @@ def test_chat_loads_and_reloads_local_agent() -> None:
         "No changes detected. The current conversation will continue.\n\n",
     )
 
+    with (
+        patch(
+            "flwr.cli.chat.chat_app.start_chat_run",
+            side_effect=click.ClickException("Stored FAB not found"),
+        ),
+        pytest.raises(click.ClickException, match="Stored FAB not found"),
+    ):
+        chat._run_prompt_sync(  # pylint: disable=protected-access
+            "Retry me",
+            reloaded_agent.app_spec,
+            reloaded_agent.fab_hash,
+        )
+    assert not chat.local_agent_uploaded
+
 
 def test_start_chat_run_uploads_local_fab_then_uses_hash() -> None:
     """A local FAB should be uploaded once and subsequently selected by hash."""
