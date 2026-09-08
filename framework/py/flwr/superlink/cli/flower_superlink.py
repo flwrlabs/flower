@@ -679,21 +679,21 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--ssl-certfile",
-        help="Server TLS certificate file for Fleet API and Control API "
-        "(as a path str) to create a secure connection.",
+        help="Server TLS certificate file for Fleet, Control, and Runtime APIs "
+        "(as a path str) to create secure connections.",
         type=str,
         default=None,
     )
     parser.add_argument(
         "--ssl-keyfile",
-        help="Server TLS private key file for Fleet API and Control API "
-        "(as a path str) to create a secure connection.",
+        help="Server TLS private key file for Fleet, Control, and Runtime APIs "
+        "(as a path str) to create secure connections.",
         type=str,
     )
     parser.add_argument(
         "--ssl-ca-certfile",
-        help="Server TLS CA certificate file for Fleet API and Control API "
-        "(as a path str) to create a secure connection.",
+        help="Server TLS CA certificate file for Fleet, Control, and Runtime APIs "
+        "(as a path str) to create secure connections.",
         type=str,
     )
     parser.add_argument(
