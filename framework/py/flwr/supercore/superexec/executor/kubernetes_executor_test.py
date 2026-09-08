@@ -570,8 +570,10 @@ def test_warm_pool_replaces_consumed_pod_and_cleans_up_idle_pods() -> None:
     client.create_namespaced_pod.assert_called_once()
 
     idle_pod = _ready_warm_pod(pool_key, config, name="idle")
+    busy_pod = _ready_warm_pod(pool_key, config, name="busy")
+    pool._busy_pods.add("busy")  # pylint: disable=protected-access
     client.reset_mock()
-    client.list_namespaced_pod.return_value = {"items": [idle_pod]}
+    client.list_namespaced_pod.return_value = {"items": [idle_pod, busy_pod]}
 
     pool.close()
 

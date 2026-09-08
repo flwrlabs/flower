@@ -421,9 +421,10 @@ class _WarmExecutorPoolManager:
             if self._closed:
                 return
             self._closed = True
+            busy_pods = set(self._busy_pods)
         for pod in self._owned_warm_pods():
             pod_name = _object_name(pod)
-            if pod_name is not None and pod_name not in self._busy_pods:
+            if pod_name is not None and pod_name not in busy_pods:
                 self._delete_pod(pod_name)
 
     def _pool_for_spec(self, spec: ExecutionSpec) -> WarmExecutorPoolConfig | None:
