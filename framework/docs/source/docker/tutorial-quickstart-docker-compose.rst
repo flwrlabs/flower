@@ -397,9 +397,6 @@ To run Flower with persisted SuperLink state and enabled TLS, a slight change in
              - --ssl-ca-certfile=certificates/ca.crt
              - --ssl-certfile=certificates/server.pem
              - --ssl-keyfile=certificates/server.key
-             - --appio-ssl-ca-certfile=certificates/ca.crt
-             - --appio-ssl-certfile=certificates/server.pem
-             - --appio-ssl-keyfile=certificates/server.key
              - --database=state/state.db
            volumes:
              - ./state/:/app/state/:rw

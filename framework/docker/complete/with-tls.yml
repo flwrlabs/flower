@@ -10,9 +10,6 @@ services:
       - --ssl-ca-certfile=certificates/ca.crt
       - --ssl-certfile=certificates/server.pem
       - --ssl-keyfile=certificates/server.key
-      - --appio-ssl-ca-certfile=certificates/ca.crt
-      - --appio-ssl-certfile=certificates/server.pem
-      - --appio-ssl-keyfile=certificates/server.key
     secrets:
       - source: superlink-ca-certfile
         target: /app/certificates/ca.crt
