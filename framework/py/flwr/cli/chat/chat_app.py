@@ -692,6 +692,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 fab_content = local_agent.fab_content
                 self.status = "Thinking..."
                 self.application.invalidate()
+            if self.cancel_requested:
+                return
             await asyncio.to_thread(
                 self._run_prompt_sync, prompt, app_spec, fab_hash, fab_content
             )
