@@ -23,11 +23,7 @@ import pytest
 from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
 
-from flwr.cli.chat.chat_app import (
-    ChatApplication,
-    _ChatCompleter,
-    start_chat_run,
-)
+from flwr.cli.chat.chat_app import ChatApplication, _ChatCompleter, start_chat_run
 from flwr.cli.chat.chat_local_agent import LocalAgent
 from flwr.cli.constant import CHAT_AGENT_NAME, CHAT_DEFAULT_FEDERATION_NAME
 from flwr.proto.control_pb2 import StartRunResponse  # pylint: disable=E0611
