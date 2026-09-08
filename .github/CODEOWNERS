@@ -18,19 +18,16 @@ README.md @jafermarq @tanertopal @danieljanes
 # Flower Examples
 /examples @yan-gao-GY @panh99 @chongshenng @jafermarq @tanertopal @danieljanes
 
-# Flower Framework Docs
-/framework/docs @panh99 @tanertopal @danieljanes
-
-# Flower Framework E2E Tests
-/framework/e2e @panh99 @tanertopal @danieljanes
+# Flower Framework
+/framework/ @panh99 @tanertopal @danieljanes
 
 # Changelog
-/framework/docs/source/ref-changelog.md @jafermarq @tanertopal @danieljanes
-/framework/docs/source/changelog/ @jafermarq @tanertopal @danieljanes
-/framework/docs/source/_templates/shared-changelog.md @jafermarq @tanertopal @danieljanes
+/framework/docs/source/ref-changelog.md @jafermarq @panh99 @tanertopal @danieljanes
+/framework/docs/source/changelog/ @jafermarq @panh99 @tanertopal @danieljanes
+/framework/docs/source/_templates/shared-changelog.md @jafermarq @panh99 @tanertopal @danieljanes
 
 # Translations
-/framework/docs/locales @charlesbvll @tanertopal @danieljanes
+/framework/docs/locales @charlesbvll @panh99 @tanertopal @danieljanes
 
 # GitHub Actions and Workflows
 /.github/actions @tanertopal @danieljanes
@@ -42,17 +39,7 @@ README.md @jafermarq @tanertopal @danieljanes
 **/*.Dockerfile @tanertopal @danieljanes
 **/Dockerfile @tanertopal @danieljanes
 /.devcontainer @tanertopal @danieljanes
-/framework/docker @tanertopal @danieljanes
+/framework/docker @panh99 @tanertopal @danieljanes
 
 # Flower `flwr` CLI
 /framework/py/flwr/cli/ @jafermarq @panh99 @tanertopal @danieljanes
-
-# Flower Framework Infrastructure
-/framework/py/flwr/supercore/ @panh99 @tanertopal @danieljanes
-/framework/py/flwr/superlink/ @panh99 @tanertopal @danieljanes
-/framework/py/flwr/supernode/ @panh99 @tanertopal @danieljanes
-
-# Override for `flower-` CLI
-/framework/py/flwr/supercore/cli/ @tanertopal @danieljanes
-/framework/py/flwr/superlink/cli/ @tanertopal @danieljanes
-/framework/py/flwr/supernode/cli/ @tanertopal @danieljanes
