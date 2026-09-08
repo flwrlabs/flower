@@ -368,7 +368,7 @@ class _WarmExecutorPoolManager:
         self._pools = {pool.key: pool for pool in config.warm_executor_pools}
         self._busy_pods: set[str] = set()
         self._closed = False
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self.ensure_capacity()
 
     # pylint: disable-next=too-many-return-statements
@@ -786,11 +786,12 @@ class KubernetesExecutor:
                 spec, self._config
             )
             if self._warm_executor_pool_manager is not None:
-                warm_result = self._warm_executor_pool_manager.launch(
-                    spec, runtime_root_certificates
-                )
-                if warm_result is not None:
-                    return warm_result
+                if self._can_dispatch_warm(spec.insecure, spec.root_certificates_path):
+                    warm_result = self._warm_executor_pool_manager.launch(
+                        spec, runtime_root_certificates
+                    )
+                    if warm_result is not None:
+                        return warm_result
                 self._wait_for_capacity(
                     None,
                     allow_warm_dispatch=False,
