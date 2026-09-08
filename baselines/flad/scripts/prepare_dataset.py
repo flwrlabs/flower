@@ -33,6 +33,7 @@ SPLITS = ("train", "val", "test")
 # when the Parquet files were uploaded (it normalizes "val" to "validation").
 HF_SPLIT_NAME = {"train": "train", "val": "validation", "test": "test"}
 HDF5_FILENAME = "10t-10n-DOS2019-dataset-{split}.hdf5"
+FEATURE_SHAPE = (10, 11)
 
 
 def reconstruct_arrays(
@@ -91,18 +92,8 @@ def main() -> None:
         default="./dataset/DOS2019_highly_unbalanced",
         help="Root folder under which per-client subfolders are created",
     )
-    parser.add_argument(
-        "--feature-shape",
-        nargs=2,
-        type=int,
-        default=(10, 11),
-        metavar=("P", "F"),
-        help="Per-sample feature shape (P, F) used at conversion time",
-    )
     args = parser.parse_args()
-    download_and_convert(
-        args.repo_id, args.output_folder, (args.feature_shape[0], args.feature_shape[1])
-    )
+    download_and_convert(args.repo_id, args.output_folder, FEATURE_SHAPE)
 
 
 if __name__ == "__main__":
