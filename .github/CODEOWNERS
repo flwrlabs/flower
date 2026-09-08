@@ -39,6 +39,7 @@ README.md @jafermarq @tanertopal @danieljanes
 **/*.Dockerfile @tanertopal @danieljanes
 **/Dockerfile @tanertopal @danieljanes
 /.devcontainer @tanertopal @danieljanes
+/framework/docker @panh99 @tanertopal @danieljanes
 
 # Flower `flwr` CLI
 /framework/py/flwr/cli/ @jafermarq @panh99 @tanertopal @danieljanes
