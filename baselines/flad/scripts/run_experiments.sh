@@ -16,9 +16,9 @@
 # ==============================================================================
 set -euo pipefail
 
-# Run a number of experiments with different random seeds
+# Run a number of experiments with different random seeds.
 
-# List of seeds to run experiments with
+# List of seeds to run experiments with.
 SEEDS=(8506 6369 5111 2697 3078 409 752 165 1752 8132)
 
 for seed in "${SEEDS[@]}"; do

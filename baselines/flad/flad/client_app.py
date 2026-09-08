@@ -67,13 +67,13 @@ def train(msg: Message, context: Context):
     client["steps_per_epoch"] = _as_int(msg.content["config"]["steps_per_epoch"])
     client["server_round"] = _as_int(msg.content["config"]["server_round"])
 
-    # Set the seed for reproducibility
+    # Set the seed for reproducibility.
     set_seed(client["rn_seed"])
 
-    # Load the data
+    # Load the data.
     load_data(client)
 
-    # Load the model and set its weights to the ones received from the server
+    # Load the model and set its weights to the ones received from the server.
     model = load_model()
     arrays = msg.content["arrays"]
     assert isinstance(arrays, ArrayRecord)
@@ -87,7 +87,7 @@ def train(msg: Message, context: Context):
     else:
         raise ValueError("Steps per epoch must be greater than zero.")
 
-    # Build a repeating dataset so that model.fit can always draw exactly
+    # Build a repeating dataset so that model.fit() can always draw exactly
     # `steps_per_epoch` batches, regardless of how batch_size * steps_per_epoch
     # relates to the number of local training samples.
     train_dataset = (
@@ -100,7 +100,7 @@ def train(msg: Message, context: Context):
         .prefetch(tf.data.AUTOTUNE)
     )
 
-    # Train the model. `shuffle=False` since train_dataset is already shuffled.
+    # Train the model.
     history = model.fit(
         train_dataset,
         validation_data=(client["validation"][0], client["validation"][1]),

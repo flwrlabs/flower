@@ -133,6 +133,7 @@ In order to run 10 experiments with different random seeds, you can use this scr
 ```bash
 ./scripts/run_experiments.sh
 ```
+Selected random seeds are provided in the `SEEDS` array within the `scripts/run_experiments.sh` script.
 
 ### Troubleshooting
 
