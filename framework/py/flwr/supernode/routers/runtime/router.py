@@ -64,13 +64,15 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
+from flwr.supercore.dependencies.runtime import (
+    SuperExecAuthDependency,
+    TaskDependency,
+    get_runtime_state,
+)
 from flwr.supercore.dependencies.runtime_version import RuntimeVersionDependency
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_DEPENDENCY
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
-from flwr.supernode.dependencies.nodestate import get_nodestate
-from flwr.supernode.dependencies.superexec import SuperExecAuthDependency
-from flwr.supernode.dependencies.task import TaskDependency
 from flwr.supernode.nodestate import NodeState
 from flwr.supernode.servicer.runtime import runtime_handlers
 
@@ -88,7 +90,7 @@ router = APIRouter(
     ],
 )
 
-NodeStateDependency = Annotated[NodeState, Depends(get_nodestate)]
+NodeStateDependency = Annotated[NodeState, Depends(get_runtime_state)]
 
 PullPendingTasksAuthDependency = Annotated[
     None,
