@@ -25,6 +25,7 @@ import pytest
 import requests
 
 from .web_fetch import (
+    PROXY_REQUEST_TIMEOUT_ENV,
     WEB_FETCH_ENDPOINT_ENV,
     WebFetchProviderError,
     invoke_web_fetch_provider,
@@ -174,6 +175,49 @@ def test_invoke_web_fetch_provider_calls_proxy_endpoint_when_configured(
         timeout=310.0,
     )
     get_mock.assert_not_called()
+
+
+def test_invoke_web_fetch_provider_uses_configured_proxy_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Proxy mode should use the configured request timeout."""
+    monkeypatch.setenv(WEB_FETCH_ENDPOINT_ENV, _PROXY_ENDPOINT)
+    monkeypatch.setenv(PROXY_REQUEST_TIMEOUT_ENV, "42.5")
+    response = Mock(status_code=200)
+    response.json.return_value = {"content": "Hello"}
+    post_mock = Mock(return_value=response)
+    monkeypatch.setattr(
+        "flwr.supercore.task_process.connector.web_fetch.requests.post",
+        post_mock,
+    )
+
+    invoke_web_fetch_provider("https://example.com", usage_recorder=Mock())
+
+    post_mock.assert_called_once_with(
+        _PROXY_ENDPOINT,
+        json={"url": "https://example.com"},
+        timeout=42.5,
+    )
+
+
+@pytest.mark.parametrize("invalid_timeout", ["not-a-number", "0", "-1", "inf"])
+def test_invoke_web_fetch_provider_rejects_invalid_proxy_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+    invalid_timeout: str,
+) -> None:
+    """Proxy mode should reject invalid timeout configuration."""
+    monkeypatch.setenv(WEB_FETCH_ENDPOINT_ENV, _PROXY_ENDPOINT)
+    monkeypatch.setenv(PROXY_REQUEST_TIMEOUT_ENV, invalid_timeout)
+    post_mock = Mock()
+    monkeypatch.setattr(
+        "flwr.supercore.task_process.connector.web_fetch.requests.post",
+        post_mock,
+    )
+
+    with pytest.raises(WebFetchProviderError, match=PROXY_REQUEST_TIMEOUT_ENV):
+        invoke_web_fetch_provider("https://example.com", usage_recorder=Mock())
+
+    post_mock.assert_not_called()
 
 
 @pytest.mark.parametrize(

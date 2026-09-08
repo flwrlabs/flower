@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import codecs
 import ipaddress
+import math
 import os
 import socket
 from typing import cast
@@ -30,6 +31,7 @@ from flwr.supercore.typing import JSONObject, JSONValue
 
 WEB_FETCH_CONNECTOR_NAME = "web_fetch"
 WEB_FETCH_ENDPOINT_ENV = "FLWR_WEB_FETCH_ENDPOINT"
+PROXY_REQUEST_TIMEOUT_ENV = "FLWR_PROXY_REQUEST_TIMEOUT"
 
 
 def make_web_fetch_tool() -> JSONObject:
@@ -83,6 +85,32 @@ class WebFetchProviderError(RuntimeError):
         super().__init__(f"Web fetch provider request failed: {formatted_detail}")
 
 
+def _get_proxy_request_timeout() -> float:
+    """Return the configured proxy request timeout in seconds."""
+    raw_timeout = os.getenv(PROXY_REQUEST_TIMEOUT_ENV, "").strip()
+    if not raw_timeout:
+        return _PROXY_REQUEST_TIMEOUT
+
+    try:
+        timeout = float(raw_timeout)
+    except ValueError as exc:
+        raise WebFetchProviderError(
+            code="invalid_configuration",
+            detail=(
+                f"{PROXY_REQUEST_TIMEOUT_ENV} must be a positive number of seconds."
+            ),
+        ) from exc
+
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise WebFetchProviderError(
+            code="invalid_configuration",
+            detail=(
+                f"{PROXY_REQUEST_TIMEOUT_ENV} must be a positive number of seconds."
+            ),
+        )
+    return timeout
+
+
 def invoke_web_fetch_provider(
     url: str, *, usage_recorder: TaskUsageRecorder
 ) -> JSONObject:
@@ -109,7 +137,7 @@ class ProxyWebFetchProvider:
             response = requests.post(
                 self._endpoint,
                 json={"url": url},
-                timeout=_PROXY_REQUEST_TIMEOUT,
+                timeout=_get_proxy_request_timeout(),
             )
         except requests.RequestException as exc:
             raise WebFetchProviderError(
