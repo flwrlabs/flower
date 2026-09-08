@@ -191,8 +191,7 @@ def try_obtain_server_certificates(
     if args.ssl_certfile or args.ssl_keyfile or args.ssl_ca_certfile:
         sys.exit(
             "You need to provide valid file paths to `--ssl-certfile`, "
-            "`--ssl-keyfile`, and `—-ssl-ca-certfile` to create secure "
-            "SSL connections."
+            "`--ssl-keyfile`, and `—-ssl-ca-certfile` to host an SSL-enabled server."
         )
     log(
         ERROR,
