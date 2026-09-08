@@ -146,15 +146,15 @@ def test_parse_superlink_lifespan_config_disables_all_tls_when_insecure(
     config = _parse_superlink_lifespan_config()
 
     assert config.certificates is None
-    assert config.runtime_ssl_ca_certfile is None
-    assert config.runtime_ssl_certfile is None
-    assert config.runtime_ssl_keyfile is None
+    assert config.ssl_ca_certfile is None
+    assert config.ssl_certfile is None
+    assert config.ssl_keyfile is None
 
 
-def test_parse_superlink_lifespan_config_expands_runtime_tls_paths(
+def test_parse_superlink_lifespan_config_expands_tls_paths(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Runtime API TLS paths should support the home-directory shorthand."""
+    """TLS paths should support the home-directory shorthand."""
     monkeypatch.setattr(
         app_module.sys,
         "argv",
@@ -176,9 +176,9 @@ def test_parse_superlink_lifespan_config_expands_runtime_tls_paths(
 
     config = _parse_superlink_lifespan_config()
 
-    assert config.runtime_ssl_ca_certfile == str(Path("~/ca.pem").expanduser())
-    assert config.runtime_ssl_certfile == str(Path("~/cert.pem").expanduser())
-    assert config.runtime_ssl_keyfile == str(Path("~/key.pem").expanduser())
+    assert config.ssl_ca_certfile == str(Path("~/ca.pem").expanduser())
+    assert config.ssl_certfile == str(Path("~/cert.pem").expanduser())
+    assert config.ssl_keyfile == str(Path("~/key.pem").expanduser())
 
 
 def test_parse_superlink_log_rotation_args_custom_values() -> None:

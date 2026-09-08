@@ -265,7 +265,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         command = _get_superexec_command(
             runtime_address=runtime_address,
             runtime_certificates=config.certificates,
-            runtime_root_certificates_path=config.runtime_ssl_ca_certfile,
+            runtime_root_certificates_path=config.ssl_ca_certfile,
             parent_pid=os.getpid(),
             runtime_dependency_install=config.runtime_dependency_install,
         )
@@ -433,23 +433,23 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         fleet_api_type=args.fleet_api_type,
         fleet_api_address=fleet_api_address,
         simulation=args.simulation,
-        database=args.database,
-        isolation=args.isolation,
-        runtime_ssl_ca_certfile=(
+        ssl_ca_certfile=(
             str(Path(args.ssl_ca_certfile).expanduser())
             if certificates is not None
             else None
         ),
-        runtime_ssl_certfile=(
+        ssl_certfile=(
             str(Path(args.ssl_certfile).expanduser())
             if certificates is not None
             else None
         ),
-        runtime_ssl_keyfile=(
+        ssl_keyfile=(
             str(Path(args.ssl_keyfile).expanduser())
             if certificates is not None
             else None
         ),
+        database=args.database,
+        isolation=args.isolation,
         runtime_dependency_install=args.runtime_dependency_install,
     )
 
@@ -511,8 +511,8 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
         reload=False,
         access_log=True,
         log_config=get_uvicorn_log_config(console_handler.level),
-        ssl_keyfile=lifespan_config.runtime_ssl_keyfile,
-        ssl_certfile=lifespan_config.runtime_ssl_certfile,
+        ssl_keyfile=lifespan_config.ssl_keyfile,
+        ssl_certfile=lifespan_config.ssl_certfile,
         workers=1,
     )
 
