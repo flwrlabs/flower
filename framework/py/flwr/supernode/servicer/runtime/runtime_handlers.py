@@ -43,6 +43,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -227,6 +229,19 @@ def get_nodes(
     raise FlowerError(
         ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
         "This endpoint is only available to ServerApp tasks.",
+    )
+
+
+def get_run_series_events(
+    request: GetRunSeriesEventsRequest,
+    state: NodeState,
+    task: Task,
+) -> GetRunSeriesEventsResponse:
+    """Reject run-series event requests in the Simulation Runtime."""
+    log(DEBUG, "Runtime.GetRunSeriesEvents")
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+        "This endpoint is only available for Deployment Runtime runs.",
     )
 
 

@@ -81,6 +81,10 @@ service Runtime {
   // Push task events
   rpc PushTaskEvents(PushTaskEventsRequest) returns (PushTaskEventsResponse) {}
 
+  // Get events for all runs in the authenticated AgentApp task's run series
+  rpc GetRunSeriesEvents(GetRunSeriesEventsRequest)
+      returns (GetRunSeriesEventsResponse) {}
+
   // Pull task messages
   rpc PullTaskMessage(PullTaskMessageRequest)
       returns (PullTaskMessageResponse) {}
@@ -150,6 +154,10 @@ message PushTaskMessageResponse { string message_id = 1; }
 // PushTaskEvents messages
 message PushTaskEventsRequest { repeated TaskEvent events = 1; }
 message PushTaskEventsResponse {}
+
+// GetRunSeriesEvents messages
+message GetRunSeriesEventsRequest {}
+message GetRunSeriesEventsResponse { repeated TaskEvent events = 1; }
 
 // PullTaskMessage messages
 message PullTaskMessageRequest {

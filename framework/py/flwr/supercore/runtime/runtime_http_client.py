@@ -39,6 +39,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -220,6 +222,17 @@ class RuntimeHttpClient(ProtobufClient):
             rpc_method="/flwr.proto.Runtime/PushTaskEvents",
             request=request,
             response_type=PushTaskEventsResponse,
+        )
+
+    def GetRunSeriesEvents(
+        self, request: GetRunSeriesEventsRequest
+    ) -> GetRunSeriesEventsResponse:
+        """Get events from the authenticated AgentApp task's run series."""
+        return self._unary_unary(
+            path="/v1/runtime/get-run-series-events",
+            rpc_method="/flwr.proto.Runtime/GetRunSeriesEvents",
+            request=request,
+            response_type=GetRunSeriesEventsResponse,
         )
 
     def PullTaskMessage(
