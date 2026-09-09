@@ -1502,7 +1502,8 @@ def _get_federation_member_count(federation: FederationInfo) -> int:
     if count < 0 or count > 0xFFFFFFFF:
         raise FlowerError(
             ApiErrorCode.INVALID_HANDLER_RESPONSE,
-            f"Invalid federation member_count={count} for federation_id={federation.id}.",
+            f"Invalid federation member_count={count} "
+            f"for federation_id={federation.id}.",
         )
     return count
 
