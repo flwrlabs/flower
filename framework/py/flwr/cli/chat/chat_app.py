@@ -21,6 +21,7 @@ import json
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from pathlib import Path
 from threading import Lock
 from time import monotonic
 from types import NoneType
@@ -73,6 +74,7 @@ from flwr.cli.constant import (
     CHAT_FLOWER_LOGO,
     CHAT_HELP_COMMAND,
     CHAT_HISTORY_COMMAND,
+    CHAT_LOAD_COMMAND,
     CHAT_NEW_COMMAND,
     CHAT_REASONING_DELTA_EVENT,
     CHAT_SPINNER_FRAMES,
@@ -105,6 +107,13 @@ from ..auth_plugin import CliAuthPlugin, OidcCliPlugin
 from ..utils import flwr_cli_exc_handler
 from .chat_federation import complete_federations, select_federation
 from .chat_history import HistoryBlock, load_conversation, load_history, render_history
+from .chat_local_agent import (
+    LocalAgent,
+    build_local_agent,
+    format_local_agent_failure,
+    format_local_agent_success,
+    parse_local_agent_path,
+)
 from .chat_transcript import MarkdownBlock, render_markdown
 
 
@@ -161,6 +170,11 @@ class _ChatCompleter(Completer):
         """Select a federation and clear cached agent completions."""
         with self._agents_lock:
             self.federation = federation
+            self.agents = None
+
+    def invalidate_agents(self) -> None:
+        """Clear cached agent completions."""
+        with self._agents_lock:
             self.agents = None
 
     def get_completions(  # pylint: disable=too-many-return-statements,too-many-branches
@@ -258,6 +272,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_app_spec = FLOWER_AGENT_APP_ID
         self.agent_fab_hash: str | None = None
         self.agent_name = CHAT_AGENT_NAME
+        self.local_agent: LocalAgent | None = None
         self.completer = _ChatCompleter(auth_plugin, self.federation, federations)
         self.input_buffer = Buffer(
             completer=ThreadedCompleter(self.completer),
@@ -424,7 +439,10 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             return
 
         selected_agent, prompt = _extract_agent_selection(prompt)
-        if selected_agent is not None:
+        is_loaded_local_agent = (
+            self.local_agent is not None and selected_agent == self.local_agent.app_spec
+        )
+        if selected_agent is not None and not is_loaded_local_agent:
             try:
                 agents = self.completer.load_agents()
             except click.ClickException as exc:
@@ -442,6 +460,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 self.series_id = None
             self.agent_app_spec = selected_agent
             self.agent_fab_hash = selected_fab_hash
+            self.local_agent = None
             self.agent_name = (
                 agent.display_name if agent is not None else selected_agent
             )
@@ -452,12 +471,13 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self._append_user_message(prompt)
         self.busy = True
         self.cancel_requested = False
-        self.status = "Thinking..."
+        self.status = "Building AgentApp..." if self.local_agent else "Thinking..."
         event.app.create_background_task(
             self._run_prompt(prompt, self.agent_app_spec, self.agent_fab_hash)
         )
         event.app.invalidate()
 
+    # pylint: disable-next=too-many-return-statements
     def _handle_command(self, event: KeyPressEvent, prompt: str) -> bool:
         """Handle a slash command and return whether the prompt was consumed."""
         command = prompt.lower()
@@ -471,6 +491,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             self.series_id = None
             self._clear_transcript()
             return True
+        if command == CHAT_LOAD_COMMAND or command.startswith(f"{CHAT_LOAD_COMMAND} "):
+            return self._handle_load_command(event, prompt)
         if command == CHAT_HISTORY_COMMAND:
             self.history_loading = True
             event.app.create_background_task(self._show_history())
@@ -480,6 +502,59 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         ):
             return self._handle_federation_command(event, prompt)
         return False
+
+    def _handle_load_command(self, event: KeyPressEvent, prompt: str) -> bool:
+        """Validate a load command and start building its local AgentApp."""
+        try:
+            path = parse_local_agent_path(prompt)
+        except click.ClickException as exc:
+            self._append_transcript("class:error", f"Error: {exc.format_message()}\n\n")
+            return True
+        self._start_local_agent_build(event, path)
+        return True
+
+    def _start_local_agent_build(self, event: KeyPressEvent, path: Path) -> None:
+        """Build and select a local AgentApp without blocking the terminal UI."""
+        self.busy = True
+        self.cancel_requested = False
+        self.status = "Building AgentApp..."
+        event.app.create_background_task(self._load_local_agent(path))
+        event.app.invalidate()
+
+    async def _load_local_agent(self, path: Path) -> None:
+        """Build a local AgentApp and select it after a successful build."""
+        try:
+            local_agent = await asyncio.to_thread(build_local_agent, path)
+        except click.ClickException as exc:
+            self._append_transcript(
+                "class:error",
+                format_local_agent_failure(exc),
+            )
+        else:
+            if self.cancel_requested:
+                return
+            changed = (
+                local_agent.app_spec != self.agent_app_spec
+                or local_agent.fab_hash != self.agent_fab_hash
+            )
+            if changed:
+                self.series_id = None
+            self.local_agent = local_agent
+            self.agent_app_spec = local_agent.app_spec
+            self.agent_fab_hash = local_agent.fab_hash
+            self.agent_name = f"{local_agent.app_spec} (local)"
+            for warning in local_agent.warnings:
+                self._append_transcript("class:notice", f"Warning: {warning}\n\n")
+            self._append_transcript(
+                "class:notice",
+                format_local_agent_success(local_agent),
+            )
+        finally:
+            self.busy = False
+            self.cancel_requested = False
+            self.status = ""
+            self.application.layout.focus(self.input_buffer)
+            self.application.invalidate()
 
     def _handle_federation_command(self, event: KeyPressEvent, prompt: str) -> bool:
         """Show the federation selector or apply its selection."""
@@ -504,6 +579,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_app_spec = FLOWER_AGENT_APP_ID
         self.agent_fab_hash = None
         self.agent_name = CHAT_AGENT_NAME
+        self.local_agent = None
         self.series_id = None
         self._clear_transcript()
         return True
@@ -601,11 +677,35 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             )
 
     async def _run_prompt(
-        self, prompt: str, app_spec: str, fab_hash: str | None
+        self,
+        prompt: str,
+        app_spec: str,
+        fab_hash: str | None,
     ) -> None:
         """Run one blocking chat request outside the UI event loop."""
         try:
-            await asyncio.to_thread(self._run_prompt_sync, prompt, app_spec, fab_hash)
+            fab_content = None
+            if self.local_agent is not None:
+                local_agent = await asyncio.to_thread(
+                    build_local_agent, self.local_agent.path
+                )
+                if (
+                    local_agent.app_spec != self.agent_app_spec
+                    or local_agent.fab_hash != self.agent_fab_hash
+                ):
+                    self.series_id = None
+                self.local_agent = local_agent
+                self.agent_app_spec = app_spec = local_agent.app_spec
+                self.agent_fab_hash = fab_hash = local_agent.fab_hash
+                self.agent_name = f"{local_agent.app_spec} (local)"
+                fab_content = local_agent.fab_content
+                self.status = "Thinking..."
+                self.application.invalidate()
+            if self.cancel_requested:
+                return
+            await asyncio.to_thread(
+                self._run_prompt_sync, prompt, app_spec, fab_hash, fab_content
+            )
         except click.ClickException as exc:
             self._append_transcript("class:error", f"Error: {exc.format_message()}\n\n")
         finally:
@@ -623,13 +723,25 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             self.application.invalidate()
 
     def _run_prompt_sync(
-        self, prompt: str, app_spec: str, fab_hash: str | None
+        self,
+        prompt: str,
+        app_spec: str,
+        fab_hash: str | None,
+        fab_content: bytes | None = None,
     ) -> None:
         """Start and stream one Flower AgentApp run."""
         # Start a run in the current conversation series.
         self.run_id, self.series_id = start_chat_run(
-            self.stub, prompt, self.federation, self.series_id, app_spec, fab_hash
+            self.stub,
+            prompt,
+            self.federation,
+            self.series_id,
+            app_spec,
+            fab_hash,
+            fab_content,
         )
+        if fab_content is not None:
+            self.completer.invalidate_agents()
 
         if self.cancel_requested:
             self._stop_run(self.run_id)
@@ -978,15 +1090,16 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
     series_id: int | None,
     app_spec: str = FLOWER_AGENT_APP_ID,
     fab_hash: str | None = None,
+    fab_content: bytes | None = None,
 ) -> tuple[int, int | None]:
     """Start one Flower AgentApp run."""
     req = StartRunRequest(
-        app_spec=app_spec,
+        # SuperLink derives the app ID from submitted local FAB content.
+        app_spec="" if fab_content is not None else app_spec,
         override_config=user_config_to_proto({CHAT_AGENT_INPUT_KEY: prompt}),
         federation=federation or "",
+        fab=Fab(hash_str=fab_hash or "", content=fab_content or b""),
     )
-    if fab_hash is not None:
-        req.fab.CopyFrom(Fab(hash_str=fab_hash))
     if series_id is not None:
         req.series_id = series_id
 

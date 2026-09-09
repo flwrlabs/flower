@@ -112,6 +112,23 @@ that agent for later messages. Selecting a different agent clears the current
 series ID, so the request starts a new run series. Use `/new` to start a new
 series without changing agents.
 
+## Load a local AgentApp in Flower Chat
+
+Use `/load` to build an AgentApp from a local project directory and select it
+for the next message:
+
+```text
+/load ./path/to/agent
+```
+
+The path is resolved relative to the directory where you started `flwr chat`.
+Quote a path that contains spaces. Flower validates the project and builds its
+FAB locally. Before each message, Flower rebuilds the AgentApp from the same
+directory and submits the resulting FAB. Changes made after `/load` are
+therefore applied automatically. If the FAB changes, the message starts a new
+run series. A build failure prevents the message from being submitted and
+leaves the previously loaded build selected.
+
 ## Select an agent in SuperGrid
 
 Open [Flower Agent](https://flower.ai/app). The sidebar pins your personal

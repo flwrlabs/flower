@@ -320,6 +320,6 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
     ) -> None:
         """Server-side endpoints should be unavailable to ClientApp tasks."""
         with self.assertRaises(FlowerError) as error:
-            handler(request)
+            handler(request, self.state, Task())
 
         self.assertEqual(error.exception.code, expected_code)
