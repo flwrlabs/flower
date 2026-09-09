@@ -58,13 +58,12 @@ def parse_local_agent_path(prompt: str) -> Path:
 
 def build_local_agent(path: Path) -> LocalAgent:
     """Build a local AgentApp for use in the current chat session."""
-    path = path.expanduser().resolve()
-    if not path.is_dir():
-        raise click.ClickException(
-            f"The path '{path}' is not a valid path to a Flower App."
-        )
-
     try:
+        path = path.expanduser().resolve()
+        if not path.is_dir():
+            raise click.ClickException(
+                f"The path '{path}' is not a valid path to a Flower App."
+            )
         config, warnings = load_and_validate(path / FAB_CONFIG_FILE, check_module=False)
         components = config["tool"]["flwr"]["app"].get("components", {})
         if "agentapp" not in components:
@@ -74,7 +73,7 @@ def build_local_agent(path: Path) -> LocalAgent:
         fab_content = build_fab_from_disk(path)
     except AppPathDepthError as exc:
         raise exc.to_click_exception() from None
-    except (OSError, ValueError) as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         raise click.ClickException(str(exc)) from None
 
     fab_hash = hashlib.sha256(fab_content).hexdigest()
