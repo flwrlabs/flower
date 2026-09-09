@@ -27978,7 +27978,7 @@ msgstr ""
 msgid ""
 "``--ssl-keyfile``: Specify the location of the Runtime API server TLS "
 "private key file."
-msgstr "使用策略"
+msgstr ""
 
 #: ../../source/how-to-enable-tls-connections.rst:136
 msgid ""
@@ -88474,4 +88474,3 @@ msgstr ""
 #~ "mTLS. See :doc:`how-to-enable-tls-"
 #~ "connections` for concrete commands."
 #~ msgstr ""
-

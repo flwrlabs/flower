@@ -32447,15 +32447,6 @@ msgid ""
 " three certificate paths: CA certificate, server certificate, and server "
 "private key."
 msgstr ""
-"Cette section décrit comment lancer un SuperLink qui fonctionne sur des "
-"connexions TLS activées. Le code snippet ci-dessous suppose que le "
-"répertoire `certificates/` est dans le même répertoire où vous exécutez "
-"la commande. Modifiez les chemins en conséquence si ce n'est pas le cas. "
-"Lorsque vous fournissez des certificats pour l'API Fleet et l'API de "
-"contrôle, SuperLink s'attend à une liste de trois chemins de certificat :"
-" certificat CA, certificat serveur et clé privée serveur. Le même "
-"commande peut également fournir des certificats AppIo pour l'API "
-"ServerAppIo interne."
 
 #: ../../source/how-to-enable-tls-connections.rst:81
 msgid ""
@@ -32490,11 +32481,6 @@ msgid ""
 "Runtime API address used by SuperExec. When using an IP address such as "
 "``127.0.0.1``, the certificate must include a matching IP SAN."
 msgstr ""
-"``--appio-ssl-certfile``: Spécifiez l'emplacement du fichier de "
-"certificat TLS ClientAppIo API serveur. Le certificat doit inclure des "
-"noms alternatifs de sujet (SAN) pour l'adresse AppIo API utilisée par "
-"SuperExec. Lorsque vous utilisez une adresse IP telle que ``127.0.0.1``, "
-"le certificat doit inclure un SAN correspondant."
 
 #: ../../source/how-to-enable-tls-connections.rst
 msgid ""
@@ -32520,12 +32506,6 @@ msgid ""
 " ``--root-certificates``. The same command can also provide certificates "
 "for the SuperNode's Runtime API."
 msgstr ""
-"Cette section décrit comment lancer un SuperNode qui fonctionne sur des "
-"connexions TLS activées. Le code snippet ci-dessous suppose que le "
-"répertoire `certificates/` est dans le même répertoire où vous exécutez "
-"la commande. Pour sécuriser la connexion SuperNode ↔ SuperLink, remplacez"
-" ``--insecure`` par ``--root-certificates``. Le même commande peut "
-"également fournir des certificats AppIo pour l'API ClientAppIo interne."
 
 #: ../../source/how-to-enable-tls-connections.rst:128
 msgid ""
@@ -32544,9 +32524,6 @@ msgid ""
 "used by SuperExec to verify the SuperNode's Runtime API server "
 "certificate."
 msgstr ""
-"``--appio-ssl-ca-certfile``: Spécifiez l'emplacement du fichier de "
-"certificat CA utilisé par SuperExec pour vérifier le certificat serveur "
-"API ClientAppIo du SuperNode."
 
 #: ../../source/how-to-enable-tls-connections.rst
 #, fuzzy
@@ -32557,11 +32534,6 @@ msgid ""
 "address such as ``127.0.0.1``, the certificate must include a matching IP"
 " SAN."
 msgstr ""
-"``--appio-ssl-certfile``: Spécifiez l'emplacement du fichier de "
-"certificat TLS ClientAppIo API serveur. Le certificat doit inclure des "
-"noms alternatifs de sujet (SAN) pour l'adresse AppIo API utilisée par "
-"SuperExec. Lorsque vous utilisez une adresse IP telle que ``127.0.0.1``, "
-"le certificat doit inclure un SAN correspondant."
 
 #: ../../source/how-to-enable-tls-connections.rst
 #, fuzzy
@@ -32569,8 +32541,6 @@ msgid ""
 "``--ssl-keyfile``: Specify the location of the Runtime API server TLS "
 "private key file."
 msgstr ""
-"``--appio-ssl-keyfile``: Spécifiez l'emplacement du fichier de clé privée"
-" TLS ClientAppIo API serveur."
 
 #: ../../source/how-to-enable-tls-connections.rst:136
 msgid ""
@@ -32598,13 +32568,6 @@ msgid ""
 "configured, internal Runtime API connections remain unencrypted and "
 "should stay inside a trusted network."
 msgstr ""
-"L'option TLS AppIo configure les connexions authentifiées par le serveur."
-" Elles ne configureraient pas la mutualisation de TLS. Le fichier "
-"``--appio-ssl-ca-certfile`` est utilisé par SuperExec et processus "
-"d'applications pour vérifier le certificat du serveur AppIo, et non comme"
-" un certificat client. Si l'option TLS AppIo n'est pas configurée, les "
-"connexions internes AppIo restent non chiffrées et devraient rester à "
-"l'intérieur d'un réseau de confiance."
 
 #: ../../source/how-to-enable-tls-connections.rst:165
 #, fuzzy
@@ -59168,10 +59131,6 @@ msgid ""
 "server-authenticated TLS. Without the relevant TLS options, these links "
 "remain unencrypted and should stay inside a trusted network:"
 msgstr ""
-"Les liens AppIo ci-dessus peuvent fonctionner avec une communication en "
-"clair ou avec un TLS authentifié par le serveur. Sans les options "
-"``--appio-ssl-*``, ces liens restent non chiffrés et devraient rester à "
-"l'intérieur d'un réseau de confiance:"
 
 #: ../../source/ref-flower-network-communication.rst:192
 msgid "SuperLink + SuperExec + ``ServerApp`` process"
@@ -59192,13 +59151,6 @@ msgid ""
 "This is not mTLS. See :doc:`how-to-enable-tls-connections` for concrete "
 "commands."
 msgstr ""
-"Pour sécuriser ces liens, configurez les serveurs ServerAppIo et "
-"ClientAppIo API avec ``--appio-ssl-certfile``, ``--appio-ssl-keyfile``, "
-"et ``--appio-ssl-ca-certfile``. Les clients AppIo vérifient les "
-"certificats de serveur avec ``--root-certificates``. Dans le mode "
-"d'isolement ``subprocess``, le SuperLink et SuperNode passent la voie CA "
-"au processus SuperExec qu'ils lancent. Cela n'est pas mTLS. Consultez "
-":doc:`how-to-enable-tls-connections` pour des commandes concretes."
 
 #: ../../source/ref-flower-network-communication.rst:204
 msgid ""
@@ -66446,4 +66398,3 @@ msgstr ""
 
 #~ msgid ":py:obj:`locked <flwr.server.LegacyContext.locked>`\\ \\(\\)"
 #~ msgstr ""
-
