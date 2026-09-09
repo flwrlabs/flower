@@ -159,10 +159,7 @@ def test_get_run_series_events_uses_authenticated_task_series() -> None:
     assert isinstance(response, GetRunSeriesEventsResponse)
     assert list(response.events) == [expected_event]
     state.get_run_series.assert_called_once_with(series_ids=[456])
-    state.get_task_events.assert_called_once_with(
-        run_ids=[120, 123],
-        task_ids=[780, 789],
-    )
+    state.get_task_events.assert_called_once_with(task_ids=[780, 789])
 
 
 def _create_shared_runtime(
