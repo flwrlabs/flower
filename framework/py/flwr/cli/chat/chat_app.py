@@ -172,6 +172,11 @@ class _ChatCompleter(Completer):
             self.federation = federation
             self.agents = None
 
+    def invalidate_agents(self) -> None:
+        """Clear cached agent completions."""
+        with self._agents_lock:
+            self.agents = None
+
     def get_completions(  # pylint: disable=too-many-return-statements,too-many-branches
         self, document: Document, _complete_event: CompleteEvent
     ) -> Iterable[Completion]:
@@ -511,6 +516,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
     def _start_local_agent_build(self, event: KeyPressEvent, path: Path) -> None:
         """Build and select a local AgentApp without blocking the terminal UI."""
         self.busy = True
+        self.cancel_requested = False
         self.status = "Building AgentApp..."
         event.app.create_background_task(self._load_local_agent(path))
         event.app.invalidate()
@@ -525,6 +531,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 format_local_agent_failure(exc),
             )
         else:
+            if self.cancel_requested:
+                return
             changed = (
                 local_agent.app_spec != self.agent_app_spec
                 or local_agent.fab_hash != self.agent_fab_hash
@@ -543,6 +551,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             )
         finally:
             self.busy = False
+            self.cancel_requested = False
             self.status = ""
             self.application.layout.focus(self.input_buffer)
             self.application.invalidate()
@@ -731,6 +740,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             fab_hash,
             fab_content,
         )
+        if fab_content is not None:
+            self.completer.invalidate_agents()
 
         if self.cancel_requested:
             self._stop_run(self.run_id)
