@@ -630,10 +630,14 @@ def test_launch_returns_unknown_after_unacknowledged_warm_token_delivery(
         "import_module",
         Mock(return_value=SimpleNamespace(stream=Mock(return_value=response))),
     )
+
+    def _raise_runtime_error() -> None:
+        raise RuntimeError
+
     monkeypatch.setattr(
         threading,
         "Thread",
-        lambda **_kwargs: SimpleNamespace(start=lambda: None),
+        lambda **_kwargs: SimpleNamespace(start=_raise_runtime_error),
     )
     executor = KubernetesExecutor(client=client, config=config)
 
@@ -645,6 +649,11 @@ def test_launch_returns_unknown_after_unacknowledged_warm_token_delivery(
     assert response.written == ["task-token\n"]
     client.create_namespaced_secret.assert_not_called()
     client.create_namespaced_pod.assert_called_once()
+    client.delete_namespaced_pod.assert_called_once_with(
+        name="flwr-taskexecutor-warm-ready",
+        namespace="flower-system",
+        grace_period_seconds=0,
+    )
 
 
 def test_warm_dispatch_drains_stderr_until_the_child_exits() -> None:
@@ -831,20 +840,21 @@ def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
     pool = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
         client, config, lambda: 0
     )
+    obsolete_pod = _ready_warm_pod(
+        pool_key,
+        _executor_config(
+            env=[{"name": "OLD_SETTING", "value": "1"}],
+            warm_executor_owner="superexec-a",
+            warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+        ),
+        name="obsolete",
+    )
     client.reset_mock()
     client.list_namespaced_pod.return_value = {
         "items": [
             _ready_warm_pod(pool_key, config, name="keep"),
             _ready_warm_pod(pool_key, config, name="excess"),
-            _ready_warm_pod(
-                pool_key,
-                _executor_config(
-                    env=[{"name": "OLD_SETTING", "value": "1"}],
-                    warm_executor_owner="superexec-a",
-                    warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
-                ),
-                name="obsolete",
-            ),
+            obsolete_pod,
         ]
     }
 
@@ -857,6 +867,14 @@ def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
         ],
         any_order=True,
     )
+    client.create_namespaced_pod.assert_not_called()
+
+    client.reset_mock()
+    client.list_namespaced_pod.return_value = {"items": [obsolete_pod]}
+    client.delete_namespaced_pod.side_effect = _KubernetesApiError(500, "error")
+    pool.ensure_capacity()
+
+    assert "obsolete" in pool._retiring_pods  # pylint: disable=protected-access
     client.create_namespaced_pod.assert_not_called()
 
 

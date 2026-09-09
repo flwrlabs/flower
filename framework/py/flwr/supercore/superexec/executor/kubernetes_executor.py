@@ -474,6 +474,8 @@ class _WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
     def _ensure_pool_capacity(
         self, pool: WarmExecutorPoolConfig, reserved_pod_capacity: int = 0
     ) -> None:
+        if self._retiring_pods:
+            return
         pods = self._owned_warm_pods()
         if pods is None:
             return
@@ -547,7 +549,7 @@ class _WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             )
             if pool is None:
                 if pod_name is not None and pod_name not in self._busy_pods:
-                    self._delete_pod(pod_name)
+                    self._retire_pod(pod_name)
                 continue
             compatible_pods[pool.key].append(pod)
 
@@ -560,7 +562,7 @@ class _WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             for pod in idle_pods[pool.size :]:
                 pod_name = _object_name(pod)
                 if pod_name is not None:
-                    self._delete_pod(pod_name)
+                    self._retire_pod(pod_name)
 
     def _retry_retiring_pods(self, pods: list[object]) -> None:
         """Retry deletion of consumed Pods without making them dispatchable."""
@@ -636,11 +638,15 @@ class _WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
         key: WarmExecutorPoolKey,
         dispatch: KubernetesWarmAgentAppDispatch,
     ) -> None:
-        threading.Thread(
+        cleanup_thread = threading.Thread(
             target=self._wait_for_task_and_replace,
             args=(pod_name, key, dispatch),
             daemon=True,
-        ).start()
+        )
+        try:
+            cleanup_thread.start()
+        except RuntimeError:
+            self._wait_for_task_and_replace(pod_name, key, dispatch)
 
     def _wait_for_task_and_replace(
         self,
