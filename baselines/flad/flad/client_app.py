@@ -119,7 +119,10 @@ def train(msg: Message, context: Context):
     metrics = MetricRecord({"train_loss": train_loss, "val_loss": val_loss})
     content = RecordDict({"arrays": model_record, "metrics": metrics})
 
+    # Drop references to the large objects before trimming.
+    del model, client, train_dataset, history, arrays
     trim_memory()
+
     return Message(content=content, reply_to=msg)
 
 
@@ -154,7 +157,10 @@ def evaluate(msg: Message, context: Context):
     metrics = MetricRecord({"f1_score": float(client_f1)})
     content = RecordDict({"metrics": metrics})
 
+    # Drop references to the large objects before trimming.
+    del model, client, arrays, x_val, y_val, y_pred
     trim_memory()
+    
     return Message(content=content, reply_to=msg)
 
 

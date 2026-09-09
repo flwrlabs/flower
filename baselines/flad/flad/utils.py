@@ -17,6 +17,7 @@
 
 import csv
 import ctypes
+import gc
 import os
 import platform
 import time
@@ -32,7 +33,9 @@ _USE_MALLOC_TRIM = hasattr(_GLOBAL_SCOPE, "malloc_trim")
 
 
 def trim_memory() -> None:
-    """Release freed memory back to the OS."""
+    """Collect garbage and release freed memory back to the OS.
+    """
+    gc.collect()
     if platform.system() == "Linux":
         if _USE_TCMALLOC:
             _GLOBAL_SCOPE.MallocExtension_ReleaseFreeMemory()
