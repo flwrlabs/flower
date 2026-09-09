@@ -25,14 +25,16 @@ from fastapi import Depends, FastAPI
 
 from flwr import __version__
 from flwr.supercore import log
+from flwr.supercore.dependencies.runtime import RuntimeHandlers
 from flwr.supercore.dependencies.runtime_version import RuntimeVersionDependency
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health
 from flwr.supercore.routers.runtime import router as runtime_router
-from flwr.supernode.nodestate import NodeStateFactory
+from flwr.supernode.nodestate import NodeState, NodeStateFactory
 from flwr.supernode.servicer.runtime import runtime_handlers
 
+_RUNTIME_HANDLERS: RuntimeHandlers[NodeState] = runtime_handlers
 _RUNTIME_VERSION_DEPENDENCY = Depends(
     RuntimeVersionDependency(
         component_name="SuperNode",
@@ -65,7 +67,7 @@ def create_app(
         ApiErrorCode.NODESTATE_NOT_INITIALIZED,
         "SuperNode NodeStateFactory is not initialized.",
     )
-    fastapi_app.state.runtime_handlers = runtime_handlers
+    fastapi_app.state.runtime_handlers = _RUNTIME_HANDLERS
     fastapi_app.state.superexec_auth_secret = superexec_auth_secret
 
     # Core APIs
