@@ -230,13 +230,18 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     )
 
     # Create the SuperExec plugin instance
-    plugin = plugin_class(
-        runtime_api_address=runtime_api_address,
-        insecure=insecure,
-        root_certificates_path=root_certificates_path,
-        runtime_dependency_install=runtime_dependency_install,
-        executor=executor,
-    )
+    try:
+        plugin = plugin_class(
+            runtime_api_address=runtime_api_address,
+            insecure=insecure,
+            root_certificates_path=root_certificates_path,
+            runtime_dependency_install=runtime_dependency_install,
+            executor=executor,
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        client.close()
+        executor.close()
+        raise
 
     # Load plugin configuration from file if provided
     try:
