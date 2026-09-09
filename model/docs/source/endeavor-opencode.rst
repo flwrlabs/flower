@@ -58,7 +58,7 @@ setup. See the `OpenCode provider documentation
 
 Run this in your terminal, paste your key at the prompt, and press Enter:
 
-.. code-block:: zsh
+.. code-block:: console
 
    read -rs 'FLOWER_API_KEY?Flower API key: '
    echo
