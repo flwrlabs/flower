@@ -50,7 +50,7 @@
         "limit": 10000
       },
       "supported_in_api": true,
-      "minimal_client_version": "0.145.0",
+      "minimal_client_version": "0.153.4",
       "availability_nux": {
         "message": ""
       },
