@@ -97,10 +97,7 @@ def get_run_series_events(
     primary_task_ids = [
         run.primary_task_id for run in series_runs if run.primary_task_id is not None
     ]
-    events = state.get_task_events(
-        run_ids=series.run_ids,
-        task_ids=primary_task_ids,
-    )
+    events = state.get_task_events(task_ids=primary_task_ids)
     return GetRunSeriesEventsResponse(events=events)
 
 
