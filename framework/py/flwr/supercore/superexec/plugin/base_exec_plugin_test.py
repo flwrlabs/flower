@@ -25,18 +25,11 @@ from flwr.supercore.superexec.plugin.clientapp_exec_plugin import ClientAppExecP
 from .serverapp_exec_plugin import ServerAppExecPlugin
 
 
-def _get_task(
-    *,
-    task_id: int = 1,
-    task_type: str = TaskType.CLIENT_APP,
-    fab_hash: str | None = None,
-) -> Mock:
+def _get_task(*, task_id: int = 1, task_type: str = TaskType.CLIENT_APP) -> Mock:
     """Return a minimal dummy task-like object."""
     task = Mock()
     task.task_id = task_id
     task.type = task_type
-    task.fab_hash = fab_hash or ""
-    task.HasField.return_value = fab_hash is not None
     return task
 
 
@@ -153,23 +146,6 @@ def test_launch_task_forwards_runtime_dependency_install_flag() -> None:
     assert spec.runtime_dependency_install is True
     assert spec.parent_pid == 1234
     assert spec.task_id == 7
-
-
-def test_launch_task_forwards_task_fab_hash() -> None:
-    """Ensure a claimed task's FAB identity reaches the executor."""
-    executor = Mock()
-    plugin = DummyExecPlugin(
-        runtime_api_address="127.0.0.1:9091",
-        insecure=True,
-        root_certificates_path=None,
-        executor=executor,
-    )
-
-    plugin.launch_task(
-        token="token-123", task=_get_task(task_id=7, fab_hash="agent-fab-sha256")
-    )
-
-    assert _execution_spec_from_executor(executor).fab_hash == "agent-fab-sha256"
 
 
 def test_launch_task_skips_optional_runtime_flags_by_default() -> None:

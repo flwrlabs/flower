@@ -499,10 +499,9 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     if insecure:
         client.create_namespaced_secret.assert_not_called()
     else:
-        root_certificates_secret = _as_dict(
-            client.create_namespaced_secret.call_args.args[1]
-        )
-        assert root_certificates_secret["stringData"] == {"ca.crt": "root-ca"}
+        assert _as_dict(client.create_namespaced_secret.call_args.args[1])[
+            "stringData"
+        ] == {"ca.crt": "root-ca"}
     client.patch_namespaced_pod.assert_called_once_with(
         name="flwr-taskexecutor-warm-ready",
         namespace="flower-system",
