@@ -88,8 +88,8 @@ class Executor(Protocol):
     """SuperExec component that starts TaskExecutor processes from an ExecutionSpec.
 
     An executor gates capacity, starts processes, and reports the immediate
-    launch outcome; it does not monitor, terminate, reconcile, or report task
-    status.
+    launch outcome. It owns backend resource cleanup, but task status remains
+    the responsibility of the Runtime API.
     """
 
     def wait_for_capacity(
@@ -103,6 +103,9 @@ class Executor(Protocol):
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""
+
+    def reconcile(self) -> None:
+        """Maintain executor-owned resources between task polls."""
 
     def close(self) -> None:
         """Release executor-owned resources during SuperExec shutdown."""

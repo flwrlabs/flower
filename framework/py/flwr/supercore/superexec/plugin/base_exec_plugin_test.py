@@ -25,11 +25,7 @@ from flwr.supercore.superexec.plugin.clientapp_exec_plugin import ClientAppExecP
 from .serverapp_exec_plugin import ServerAppExecPlugin
 
 
-def _get_task(
-    *,
-    task_id: int = 1,
-    task_type: str = TaskType.CLIENT_APP,
-) -> Mock:
+def _get_task(*, task_id: int = 1, task_type: str = TaskType.CLIENT_APP) -> Mock:
     """Return a minimal dummy task-like object."""
     task = Mock()
     task.task_id = task_id

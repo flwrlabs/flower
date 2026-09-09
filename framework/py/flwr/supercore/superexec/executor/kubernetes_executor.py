@@ -104,7 +104,6 @@ _FORBIDDEN_TASKEXECUTOR_ENV_NAMES = frozenset(
 )
 _KUBERNETES_ENV_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _DNS_LABEL_PATTERN = re.compile(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
-_WARM_EXECUTOR_ACK_TIMEOUT_SECONDS = 5.0
 
 
 class KubernetesList(Protocol):
@@ -368,6 +367,12 @@ class KubernetesExecutor:
             reconcile_warm_pools=True,
         )
 
+    def reconcile(self) -> None:
+        """Maintain warm capacity even when there are no pending tasks."""
+        if self._warm_executor_pool_manager is not None:
+            self._sweep_completed_pods_if_due()
+            self._warm_executor_pool_manager.ensure_capacity()
+
     def _wait_for_capacity(
         self,
         task_type: TaskType | None,
@@ -388,14 +393,13 @@ class KubernetesExecutor:
             )
             if has_ready_warm_pod:
                 return
-        if not reconcile_warm_pools and self._warm_executor_pool_manager is not None:
-            self._warm_executor_pool_manager.retry_retiring_pods()
-        if self._config.active_pod_budget is None:
-            return
-
         last_log_at: float | None = None
         waited_for_capacity = False
         while True:
+            if self._warm_executor_pool_manager is not None:
+                self._warm_executor_pool_manager.retry_retiring_pods()
+            if self._config.active_pod_budget is None:
+                return
             if (
                 allow_warm_dispatch
                 and self._warm_executor_pool_manager is not None
@@ -537,7 +541,21 @@ class KubernetesExecutor:
             self._config.namespace,
             label_selector=_capacity_label_selector(self._config),
         )
-        return sum(1 for pod in _pod_items(pod_list) if _is_active_pod(pod))
+        pods = _pod_items(pod_list)
+        if self._config.warm_executor_owner:
+            # Surviving busy Pods still consume this owner's capacity after
+            # caller labels or resource-pool settings change on restart.
+            pod_names = {_object_name(pod) for pod in pods}
+            owned_pods = self._client.list_namespaced_pod(
+                self._config.namespace,
+                label_selector=_warm_executor_owner_label_selector(self._config),
+            )
+            pods.extend(
+                pod
+                for pod in _pod_items(owned_pods)
+                if _object_name(pod) not in pod_names
+            )
+        return sum(1 for pod in pods if _is_active_pod(pod))
 
 
 class CompletedPodSweeper:
@@ -1031,13 +1049,6 @@ def _has_warm_executor_configuration(
     return _object_field(
         annotations, WARM_EXECUTOR_CONFIGURATION_ANNOTATION
     ) == _warm_executor_configuration_hash(config)
-
-
-def _is_consumed_warm_executor(pod: object) -> bool:
-    """Return true when a Pod was reserved for a task before this process started."""
-    metadata = _object_field(pod, "metadata")
-    annotations = _object_field(metadata, "annotations")
-    return _object_field(annotations, _WARM_EXECUTOR_CONSUMED_ANNOTATION) == "true"
 
 
 def _labels(

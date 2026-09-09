@@ -74,3 +74,6 @@ class SubprocessExecutor:
 
     def close(self) -> None:
         """Release executor-owned resources during SuperExec shutdown."""
+
+    def reconcile(self) -> None:
+        """Local subprocess execution has no pool to maintain."""

@@ -143,6 +143,8 @@ def test_run_superexec_passes_executor_config_to_factory(
     get_executor.assert_called_once_with(
         ExecutorType.KUBERNETES, executor_config=executor_config
     )
+    get_executor.return_value.reconcile.assert_called_once_with()
+    get_executor.return_value.close.assert_called_once_with()
 
 
 def test_run_superexec_closes_executor_when_runtime_client_setup_fails(
