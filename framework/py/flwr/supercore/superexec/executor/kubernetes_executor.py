@@ -326,6 +326,7 @@ class _WarmExecutorPoolManager:
             if pod_name is None:
                 self._ensure_pool_capacity(pool, reserved_pod_capacity=1)
                 return None
+            self._ensure_pool_capacity(pool)
 
         try:
             dispatch = self._open_dispatch(
@@ -436,7 +437,10 @@ class _WarmExecutorPoolManager:
         if pods is None:
             return
         compatible_count = sum(
-            1 for pod in pods if _is_active_warm_executor(pod, pool.key, self._config)
+            1
+            for pod in pods
+            if _is_active_warm_executor(pod, pool.key, self._config)
+            and _object_name(pod) not in self._busy_pods
         )
         pods_to_create = max(pool.size - compatible_count, 0)
         if self._config.active_pod_budget is not None:
@@ -491,9 +495,14 @@ class _WarmExecutorPoolManager:
             compatible_pods[pool.key].append(pod)
 
         for pool in self._pools.values():
-            for pod in compatible_pods[pool.key][pool.size :]:
+            idle_pods = [
+                pod
+                for pod in compatible_pods[pool.key]
+                if _object_name(pod) not in self._busy_pods
+            ]
+            for pod in idle_pods[pool.size :]:
                 pod_name = _object_name(pod)
-                if pod_name is not None and pod_name not in self._busy_pods:
+                if pod_name is not None:
                     self._delete_pod(pod_name)
 
     def _owned_warm_pods(self) -> list[object] | None:

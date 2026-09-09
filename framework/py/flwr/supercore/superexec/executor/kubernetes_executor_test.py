@@ -408,10 +408,10 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
     )
 
 
-def test_launch_dispatches_compatible_ready_pod_without_a_credential_secret(
+def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A compatible idle Pod should receive the task token only over stdin."""
+    """A dispatched warm Pod should be replaced before its child exits."""
     client = Mock()
     pool_key = _warm_executor_pool_key(
         runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
@@ -447,7 +447,13 @@ def test_launch_dispatches_compatible_ready_pod_without_a_credential_secret(
     assert result.status == LaunchResultStatus.ACCEPTED
     assert response.written == ["task-token\n"]
     client.create_namespaced_secret.assert_not_called()
-    client.create_namespaced_pod.assert_not_called()
+    client.create_namespaced_pod.assert_called_once()
+    replacement_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
+    assert replacement_pod["spec"]["containers"][0]["command"] == [
+        "python",
+        "-m",
+        WARM_EXECUTOR_MODULE,
+    ]
     command = stream.call_args.kwargs["command"]
     assert command == [
         "flwr-agentapp",
@@ -579,7 +585,7 @@ def test_launch_returns_unknown_after_unacknowledged_warm_token_delivery(
     assert result.status == LaunchResultStatus.UNKNOWN
     assert response.written == ["task-token\n"]
     client.create_namespaced_secret.assert_not_called()
-    client.create_namespaced_pod.assert_not_called()
+    client.create_namespaced_pod.assert_called_once()
 
 
 def test_warm_dispatch_drains_stderr_until_the_child_exits() -> None:
