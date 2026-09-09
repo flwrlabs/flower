@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower Docs\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-06 00:11+0000\n"
+"POT-Creation-Date: 2026-09-09 00:10+0000\n"
 "PO-Revision-Date: 2026-05-23 06:55+0000\n"
 "Last-Translator: lco <Leandro.COLLIER@student.umons.ac.be>\n"
 "Language: fr\n"
@@ -21175,7 +21175,7 @@ msgstr ""
 " Vous pouvez en savoir plus sur les différents modes de processus ici : "
 ":doc:`run-as-subprocess`."
 
-#: ../../source/docker/enable-tls.rst:41 ../../source/docker/enable-tls.rst:132
+#: ../../source/docker/enable-tls.rst:41 ../../source/docker/enable-tls.rst:125
 msgid ""
 "To enable TLS between the SuperLink and SuperNode, as well as between the"
 " SuperLink and the ``flwr`` CLI, you will need a PEM-encoded root "
@@ -21204,11 +21204,11 @@ msgstr ""
 msgid "Understanding the command"
 msgstr "Comprendre la commande"
 
-#: ../../source/docker/enable-tls.rst:64 ../../source/docker/enable-tls.rst:109
-#: ../../source/docker/enable-tls.rst:156
-#: ../../source/docker/enable-tls.rst:199
-#: ../../source/docker/enable-tls.rst:228
-#: ../../source/docker/enable-tls.rst:253
+#: ../../source/docker/enable-tls.rst:61 ../../source/docker/enable-tls.rst:102
+#: ../../source/docker/enable-tls.rst:146
+#: ../../source/docker/enable-tls.rst:186
+#: ../../source/docker/enable-tls.rst:215
+#: ../../source/docker/enable-tls.rst:240
 #: ../../source/docker/tutorial-quickstart-docker.rst:84
 #: ../../source/docker/tutorial-quickstart-docker.rst:129
 #: ../../source/docker/tutorial-quickstart-docker.rst:246
@@ -21218,11 +21218,11 @@ msgstr ""
 "``docker run``: Cela dit à Docker de lancer un conteneur à partir d'une "
 "image. "
 
-#: ../../source/docker/enable-tls.rst:65 ../../source/docker/enable-tls.rst:110
-#: ../../source/docker/enable-tls.rst:157
-#: ../../source/docker/enable-tls.rst:200
-#: ../../source/docker/enable-tls.rst:229
-#: ../../source/docker/enable-tls.rst:254
+#: ../../source/docker/enable-tls.rst:62 ../../source/docker/enable-tls.rst:103
+#: ../../source/docker/enable-tls.rst:147
+#: ../../source/docker/enable-tls.rst:187
+#: ../../source/docker/enable-tls.rst:216
+#: ../../source/docker/enable-tls.rst:241
 #: ../../source/docker/tutorial-quickstart-docker.rst:85
 #: ../../source/docker/tutorial-quickstart-docker.rst:130
 #: ../../source/docker/tutorial-quickstart-docker.rst:247
@@ -21264,7 +21264,7 @@ msgstr ""
 msgid "directory."
 msgstr "répertoire."
 
-#: ../../source/docker/enable-tls.rst:72
+#: ../../source/docker/enable-tls.rst:69
 msgid "``<superlink-image>``: The name of your SuperLink image to be run."
 msgstr "``<superlink-image>``: Le nom de votre image SuperLink à exécuter. "
 
@@ -21340,23 +21340,11 @@ msgstr ""
 msgid "the network."
 msgstr "le réseau."
 
-#: ../../source/docker/enable-tls.rst
-msgid "``--appio-ssl-ca-certfile``, ``--appio-ssl-certfile``, and"
-msgstr ""
-
-#: ../../source/docker/enable-tls.rst
-msgid "``--appio-ssl-keyfile``: Configure TLS for the shared Runtime and Control"
-msgstr ""
-
-#: ../../source/docker/enable-tls.rst
-msgid "HTTP APIs."
-msgstr ""
-
-#: ../../source/docker/enable-tls.rst:92
+#: ../../source/docker/enable-tls.rst:85
 msgid "**SuperNode**"
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:96 ../../source/docker/enable-tls.rst:211
+#: ../../source/docker/enable-tls.rst:89 ../../source/docker/enable-tls.rst:198
 msgid ""
 "If you're generating self-signed certificates and the ``ca.crt`` "
 "certificate doesn't exist on the SuperNode, you can copy it over after "
@@ -21386,7 +21374,7 @@ msgstr ""
 msgid "volume at the ``/app/ca.crt`` directory inside the container."
 msgstr "volume dans le dossier ``/app/ca.crt`` à l'intérieur du conteneur. "
 
-#: ../../source/docker/enable-tls.rst:114
+#: ../../source/docker/enable-tls.rst:107
 msgid "``<supernode-image>``: The name of your SuperNode image to be run."
 msgstr "``<supernode-image>``: Le nom de votre image SuperNode à exécuter. "
 
@@ -21406,7 +21394,7 @@ msgstr "Le fichier ``ca.crt`` est utilisé pour vérifier l'identité du SuperLi
 msgid "Isolation Mode ``process``"
 msgstr "Mode d'isolement ``process``"
 
-#: ../../source/docker/enable-tls.rst:122
+#: ../../source/docker/enable-tls.rst:115
 msgid ""
 "In isolation mode ``process``, the ServerApp and ClientApp run in their "
 "own processes. Unlike in isolation mode ``subprocess``, the SuperLink or "
@@ -21419,7 +21407,7 @@ msgstr ""
 "créer les processus respectifs; au lieu de cela, ils doivent être créés à"
 " l'extérieur."
 
-#: ../../source/docker/enable-tls.rst:126
+#: ../../source/docker/enable-tls.rst:119
 msgid ""
 "It is possible to run only the SuperLink in isolation mode ``subprocess``"
 " and the SuperNode in isolation mode ``process``, or vice versa, or even "
@@ -21429,11 +21417,11 @@ msgstr ""
 "``subprocess`` et le SuperNode en mode d'isolement ``process``, ou vice "
 "versa, ou même les deux avec un mode d'isolement ``process``."
 
-#: ../../source/docker/enable-tls.rst:130
+#: ../../source/docker/enable-tls.rst:123
 msgid "**SuperLink and ServerApp**"
 msgstr "**SuperLink et ServerApp**"
 
-#: ../../source/docker/enable-tls.rst:135
+#: ../../source/docker/enable-tls.rst:128
 msgid ""
 "Assuming all files we need are in the local ``superlink-certificates`` "
 "directory, we can use the flag ``--volume`` to mount the local directory "
@@ -21492,7 +21480,7 @@ msgstr ""
 msgid "independent process. The SuperLink does not attempt to create it."
 msgstr "processus indépendant. Le SuperLink ne tente pas de le créer."
 
-#: ../../source/docker/enable-tls.rst:187
+#: ../../source/docker/enable-tls.rst:174
 msgid "Start the ServerApp container:"
 msgstr "Lancer le conteneur ServerApp :"
 
@@ -21516,7 +21504,7 @@ msgstr ""
 msgid "Mount the ``ca.crt`` file inside the container as read-only."
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:203
+#: ../../source/docker/enable-tls.rst:190
 msgid "``<serverapp-image>``: The name of your ServerApp image to be run."
 msgstr "``<serverapp-image>``: Le nom de votre image ServerApp à exécuter."
 
@@ -21529,11 +21517,11 @@ msgstr ""
 msgid "verify the SuperLink's identity when connecting to its Runtime API."
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:207
+#: ../../source/docker/enable-tls.rst:194
 msgid "**SuperNode and ClientApp**"
 msgstr "**SuperNode et ClientApp**"
 
-#: ../../source/docker/enable-tls.rst:214
+#: ../../source/docker/enable-tls.rst:201
 msgid "Start the SuperNode container:"
 msgstr "Lancez le conteneur SuperNode :"
 
@@ -21577,11 +21565,11 @@ msgstr ""
 msgid "independent process. The SuperNode does not attempt to create it."
 msgstr "processus indépendant. Le SuperNode ne tente pas de le créer."
 
-#: ../../source/docker/enable-tls.rst:242
+#: ../../source/docker/enable-tls.rst:229
 msgid "Start the ClientApp container:"
 msgstr "Lancez le conteneur ClientApp :"
 
-#: ../../source/docker/enable-tls.rst:255
+#: ../../source/docker/enable-tls.rst:242
 msgid "``<clientapp-image>``: The name of your ClientApp image to be run."
 msgstr "``<clientapp-image>``: Le nom de votre ClientApp image à lancer."
 
@@ -21601,12 +21589,12 @@ msgstr ""
 "communication non chiffrée. Les connexions sécurisées seront ajoutées "
 "dans les futures versions."
 
-#: ../../source/docker/enable-tls.rst:259
+#: ../../source/docker/enable-tls.rst:246
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:61
 msgid "Locate the Flower Configuration TOML file in your machine."
 msgstr "Localisez le fichier de configuration Flower TOML sur votre machine."
 
-#: ../../source/docker/enable-tls.rst:271
+#: ../../source/docker/enable-tls.rst:258
 msgid ""
 "Append the following lines to the end of the ``config.toml`` file to add "
 "a new SuperLink connection and save it:"
@@ -21614,15 +21602,15 @@ msgstr ""
 "Ajoutez les lignes suivantes à la fin du fichier ``config.toml`` pour "
 "ajouter une nouvelle connexion SuperLink et la sauvegarder:"
 
-#: ../../source/docker/enable-tls.rst:274
+#: ../../source/docker/enable-tls.rst:261
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:75
 #: ../../source/docker/tutorial-deploy-on-multiple-machines.rst:167
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:110
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:250
 #: ../../source/docker/tutorial-quickstart-docker.rst:331
 #: ../../source/how-to-authenticate-accounts.rst:71
-#: ../../source/how-to-authenticate-supernodes.rst:130
-#: ../../source/how-to-enable-tls-connections.rst:222
+#: ../../source/how-to-authenticate-supernodes.rst:122
+#: ../../source/how-to-enable-tls-connections.rst:219
 #: ../../source/how-to-run-flower-on-azure.rst:230
 #: ../../source/how-to-run-flower-on-gcp.rst:625
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:684
@@ -21632,7 +21620,7 @@ msgstr ""
 msgid "config.toml"
 msgstr ""
 
-#: ../../source/docker/enable-tls.rst:283
+#: ../../source/docker/enable-tls.rst:270
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:84
 msgid ""
 "You can customize the string that follows ``superlink.`` to fit your "
@@ -21642,7 +21630,7 @@ msgstr ""
 " à vos besoins. Cependant, veuillez noter que la chaîne ne peut pas "
 "contenir un point (``.``)."
 
-#: ../../source/docker/enable-tls.rst:286
+#: ../../source/docker/enable-tls.rst:273
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:87
 msgid ""
 "In this example, ``local-deployment`` has been used. Just remember to "
@@ -23143,7 +23131,7 @@ msgstr "Étape 8 : Nettoyage"
 msgid "Remove the containers and the bridge network:"
 msgstr "Supprimer les conteneurs et le réseau de pont :"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:447
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:444
 #: ../../source/docker/tutorial-quickstart-docker.rst:430
 msgid "Where to Go Next"
 msgstr "Où aller ensuite ?"
@@ -23414,7 +23402,7 @@ msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:208
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:263
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:413
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:410
 msgid "Rerun the ``quickstart-pytorch`` project:"
 msgstr "Reexécutez le projet ``quickstart-pytorch``: "
 
@@ -23519,15 +23507,15 @@ msgstr ""
 msgid "with-state.yml"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:407
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:404
 msgid "Restart the services:"
 msgstr "Redémarrez les services :"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:421
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:418
 msgid "Step 9: Merge Multiple Compose Files"
 msgstr "Étape 9 : Fusionner plusieurs fichiers Compose"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:423
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:420
 msgid ""
 "You can merge multiple Compose files into a single file. For instance, if"
 " you wish to combine the basic configuration with the TLS configuration, "
@@ -23537,7 +23525,7 @@ msgstr ""
 "exemple, si vous souhaitez combiner la configuration de base avec la "
 "configuration TLS, exécutez la commande suivante :"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:432
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:429
 msgid ""
 "This will merge the contents of ``compose.yml`` and ``with-tls.yml`` into"
 " a new file called ``my_compose.yml``."
@@ -23545,15 +23533,15 @@ msgstr ""
 "Cela fusionnera les contenus de ``compose.yml`` et ``with-tls.yml`` dans "
 "un nouveau fichier appelé ``my_compose.yml``."
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:437
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:434
 msgid "Step 10: Clean Up"
 msgstr "Étape 10 : Nettoyage"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:439
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:436
 msgid "Remove all services and volumes:"
 msgstr "Supprimez tous les services et volumes :"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:449
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:446
 msgid ":doc:`run-quickstart-examples-docker-compose`"
 msgstr ""
 
@@ -29865,18 +29853,7 @@ msgstr ""
 " nécessaires pour les connexions TLS. Rappelez-vous que la fonction "
 "d'authentification ne peut être activée qu'en présence de TLS."
 
-#: ../../source/how-to-authenticate-supernodes.rst:98
-#, fuzzy
-msgid ""
-"To enable TLS also for the Runtime API on SuperLink, please refer to "
-":ref:`Launching the SuperLink with TLS <launching-the-superlink-with-"
-"tls>`."
-msgstr ""
-"Pour activer également TLS pour l'API AppIo sur SuperLink, veuillez "
-"consulter :ref:`Launching the SuperLink with TLS <launching-the-"
-"superlink-with-tls>`."
-
-#: ../../source/how-to-authenticate-supernodes.rst:115
+#: ../../source/how-to-authenticate-supernodes.rst:107
 msgid ""
 "``--enable-supernode-auth``: Enables SuperNode authentication therefore "
 "only Supernodes that are first register on the SuperLink will be able to "
@@ -29886,11 +29863,11 @@ msgstr ""
 "seuls les Supernodes qui s'enregistrent en premier sur le SuperLink "
 "pourront établir une connexion."
 
-#: ../../source/how-to-authenticate-supernodes.rst:119
+#: ../../source/how-to-authenticate-supernodes.rst:111
 msgid "Register SuperNodes"
 msgstr "Inscrire des SuperNodes"
 
-#: ../../source/how-to-authenticate-supernodes.rst:121
+#: ../../source/how-to-authenticate-supernodes.rst:113
 msgid ""
 "Once your SuperLink is running, the next step is to register the "
 "SuperNodes that will be allowed to connect to it. This process is handled"
@@ -29904,7 +29881,7 @@ msgstr ""
 "publiques générées précédemment pour chaque SuperNode que vous prévoyez "
 "de connecter au SuperLink."
 
-#: ../../source/how-to-authenticate-supernodes.rst:126
+#: ../../source/how-to-authenticate-supernodes.rst:118
 msgid ""
 "First, ensure your Flower configuration file has a SuperLink connection "
 "profile that points to your running SuperLink and that includes a ``root-"
@@ -29916,7 +29893,7 @@ msgstr ""
 "SuperLink et qui inclut un champ ``root-certificates`` avec la voie du "
 "certificat CA utilisé pour lancer le SuperLink. Par exemple :"
 
-#: ../../source/how-to-authenticate-supernodes.rst:138
+#: ../../source/how-to-authenticate-supernodes.rst:130
 msgid ""
 "You can verify that your connection is correctly configured by running a "
 "``flwr ls`` command:"
@@ -29924,8 +29901,8 @@ msgstr ""
 "Vous pouvez vérifier que votre connexion est correctement configurée en "
 "exécutant une commande ``flwr ls`` : "
 
-#: ../../source/how-to-authenticate-supernodes.rst:153
-#: ../../source/how-to-enable-tls-connections.rst:239
+#: ../../source/how-to-authenticate-supernodes.rst:145
+#: ../../source/how-to-enable-tls-connections.rst:236
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:242
 msgid ""
 "You can setup your ``local-deployment`` profile as the default so you "
@@ -29941,7 +29918,7 @@ msgstr ""
 "veuillez consulter le guide :doc:`the Flower Configuration <ref-flower-"
 "configuration>`."
 
-#: ../../source/how-to-authenticate-supernodes.rst:158
+#: ../../source/how-to-authenticate-supernodes.rst:150
 msgid ""
 "With a correctly configured Flower CLI, let's proceed to register two "
 "SuperNodes:"
@@ -29949,17 +29926,17 @@ msgstr ""
 "Avec un CLI Flower correctement configuré, passons à l'inscription des "
 "deux SuperNodes :"
 
-#: ../../source/how-to-authenticate-supernodes.rst:165
+#: ../../source/how-to-authenticate-supernodes.rst:157
 msgid "Next, let's register the second SuperNode as well:"
 msgstr "Ensuite, inscrivez également le deuxième SuperNode :"
 
-#: ../../source/how-to-authenticate-supernodes.rst:171
+#: ../../source/how-to-authenticate-supernodes.rst:163
 msgid "You can list the registered SuperNodes using the following command:"
 msgstr ""
 "Vous pouvez lister les SuperNodes enregistrés à l'aide de la commande "
 "suivante :"
 
-#: ../../source/how-to-authenticate-supernodes.rst:178
+#: ../../source/how-to-authenticate-supernodes.rst:170
 msgid ""
 "This will display the IDs of the SuperNodes you just registered as well "
 "as their status. You should see a table similar to the following:"
@@ -29967,7 +29944,7 @@ msgstr ""
 "Cela affichera les ID des SuperNodes que vous venez d'enregistrer ainsi "
 "que leur statut. Vous devriez voir une table similaire à celle-ci :"
 
-#: ../../source/how-to-authenticate-supernodes.rst:191
+#: ../../source/how-to-authenticate-supernodes.rst:183
 msgid ""
 "The status of the SuperNodes will change after they connect to the "
 "SuperLink. Let's proceed and laucnh the SuperNodes."
@@ -29975,11 +29952,11 @@ msgstr ""
 "Le statut des SuperNodes changera après qu'ils se seront connectés au "
 "SuperLink. Passons et lançons les SuperNodes."
 
-#: ../../source/how-to-authenticate-supernodes.rst:196
+#: ../../source/how-to-authenticate-supernodes.rst:188
 msgid "Enable node authentication in SuperNode"
 msgstr "Activer l'authentification des nœuds dans SuperNode"
 
-#: ../../source/how-to-authenticate-supernodes.rst:198
+#: ../../source/how-to-authenticate-supernodes.rst:190
 msgid ""
 "Connecting a SuperNode to a SuperLink that has node authentication "
 "enabled requires passing one additional argument (i.e. the private key of"
@@ -29989,7 +29966,7 @@ msgstr ""
 "nœuds activée nécessite de passer un argument supplémentaire "
 "(c'est-à-dire la clé privée du SuperNode) en plus du certificat TLS."
 
-#: ../../source/how-to-authenticate-supernodes.rst:204
+#: ../../source/how-to-authenticate-supernodes.rst:196
 #, fuzzy
 msgid ""
 "To enable TLS also for the Runtime API on SuperNodes, please refer to "
@@ -30000,11 +29977,11 @@ msgstr ""
 "consulter :ref:`Launching the SuperNodes with TLS <connecting-the-"
 "supernodes-with-tls>`."
 
-#: ../../source/how-to-authenticate-supernodes.rst:220
+#: ../../source/how-to-authenticate-supernodes.rst:212
 msgid "``--auth-supernode-private-key``: the private key of this SuperNode."
 msgstr "``--auth-supernode-private-key``: La clé privée de ce SuperNode."
 
-#: ../../source/how-to-authenticate-supernodes.rst:222
+#: ../../source/how-to-authenticate-supernodes.rst:214
 msgid ""
 "Follow the same procedure to launch the second SuperNode by passing its "
 "corresponding private key:"
@@ -30012,7 +29989,7 @@ msgstr ""
 "Suivez la même procédure pour lancer le deuxième SuperNode en passant sa "
 "clé privée correspondante :"
 
-#: ../../source/how-to-authenticate-supernodes.rst:236
+#: ../../source/how-to-authenticate-supernodes.rst:228
 msgid ""
 "After connecting both SuperNodes, you can check the status of the "
 "SuperNodes again. You will notice their status is now ``online``:"
@@ -30021,11 +29998,11 @@ msgstr ""
 "des Supernodes à nouveau. Vous remarquerez que leur statut est maintenant"
 " ``online`` :"
 
-#: ../../source/how-to-authenticate-supernodes.rst:253
+#: ../../source/how-to-authenticate-supernodes.rst:245
 msgid "Unregister SuperNodes"
 msgstr "Désinscrire des SuperNodes"
 
-#: ../../source/how-to-authenticate-supernodes.rst:257
+#: ../../source/how-to-authenticate-supernodes.rst:249
 msgid ""
 "This is a destructive operation. Unregistering a SuperNode is permanent "
 "and cannot be undone. If you wish to connect a SuperNode again, a new key"
@@ -30035,7 +30012,7 @@ msgstr ""
 "permanente et ne peut pas être annulée. Si vous souhaitez reconnecter un "
 "SuperNode, un nouveau paquet de clés est nécessaire."
 
-#: ../../source/how-to-authenticate-supernodes.rst:260
+#: ../../source/how-to-authenticate-supernodes.rst:252
 msgid ""
 "At anypoint you can unregister a SuperNode from the SuperLink (even if it"
 " has never connected). This will prevent the SuperNode from making future"
@@ -30051,7 +30028,7 @@ msgstr ""
 " La désinscription d'un SuperNode peut être effectuée via le "
 "|flower_cli_supernode_link|_ comme suit :"
 
-#: ../../source/how-to-authenticate-supernodes.rst:271
+#: ../../source/how-to-authenticate-supernodes.rst:263
 msgid ""
 "The above command unregisters the first SuperNode. You can verify this by"
 " listing the SuperNodes again:"
@@ -30059,7 +30036,7 @@ msgstr ""
 "Le commande ci-dessus désinscrit le premier SuperNode. Vous pouvez "
 "vérifier cela en listant les SuperNodes à nouveau :"
 
-#: ../../source/how-to-authenticate-supernodes.rst:285
+#: ../../source/how-to-authenticate-supernodes.rst:277
 msgid ""
 "If you pass the ``--verbose`` flag to the previous command you'll see "
 "that the status of the unregistered SuperNode has changed to "
@@ -30074,11 +30051,11 @@ msgstr ""
 "vous souhaitez reconnecter un deuxième SuperNode, un nouveau paquet de "
 "clés EC est nécessaire.**"
 
-#: ../../source/how-to-authenticate-supernodes.rst:305
+#: ../../source/how-to-authenticate-supernodes.rst:297
 msgid "Security notice"
 msgstr "Avertissement de sécurité"
 
-#: ../../source/how-to-authenticate-supernodes.rst:307
+#: ../../source/how-to-authenticate-supernodes.rst:299
 msgid ""
 "The system's security relies on the credentials of the SuperLink and each"
 " SuperNode. Therefore, it is imperative to safeguard and safely store the"
@@ -30097,14 +30074,14 @@ msgstr ""
 "communications sont effectuées dans un cadre sécurisé en utilisant des "
 "méthodes de communication fiables."
 
-#: ../../source/how-to-authenticate-supernodes.rst:315
-#: ../../source/how-to-enable-tls-connections.rst:246
+#: ../../source/how-to-authenticate-supernodes.rst:307
+#: ../../source/how-to-enable-tls-connections.rst:243
 #: ../../source/how-to-use-built-in-mods.rst:175
 #: ../../source/tutorial-series-what-is-federated-learning.rst:291
 msgid "Conclusion"
 msgstr "Conclusion"
 
-#: ../../source/how-to-authenticate-supernodes.rst:317
+#: ../../source/how-to-authenticate-supernodes.rst:309
 msgid ""
 "You should now have learned how to start a long-running Flower SuperLink "
 "and SuperNode with node authentication enabled. You should also know the "
@@ -30115,8 +30092,8 @@ msgstr ""
 "Vous devriez également connaître l'importance de la clé privée et la "
 "stocker en toute sécurité pour minimiser les risques."
 
-#: ../../source/how-to-authenticate-supernodes.rst:323
-#: ../../source/how-to-enable-tls-connections.rst:256
+#: ../../source/how-to-authenticate-supernodes.rst:315
+#: ../../source/how-to-enable-tls-connections.rst:253
 msgid ""
 "Refer to the :doc:`docker/index` documentation to learn how to setup a "
 "federation where each component runs in its own Docker container. You can"
@@ -30539,7 +30516,7 @@ msgstr ""
 "supporte. Par exemple, pour lancer votre ``SuperLink`` avec des journaux "
 "``DEBUG``, utilisez:"
 
-#: ../../source/how-to-configure-logging.rst:37
+#: ../../source/how-to-configure-logging.rst:34
 msgid ""
 "You can make use of the ``FLWR_LOG_LEVEL`` environment variable when "
 "executing other Flower commands to provision the different components in "
@@ -30552,11 +30529,11 @@ msgstr ""
 "flower-with-deployment-engine`) ou en utilisant le `flwr CLI <ref-api-"
 "cli.html>`_."
 
-#: ../../source/how-to-configure-logging.rst:44
+#: ../../source/how-to-configure-logging.rst:41
 msgid "Configure gRPC logging"
 msgstr "Configurez la journalisation gRPC"
 
-#: ../../source/how-to-configure-logging.rst:46
+#: ../../source/how-to-configure-logging.rst:43
 #, fuzzy
 msgid ""
 "Flower uses `gRPC <https://grpc.io/>`_ for the Fleet API and other gRPC-"
@@ -32466,21 +32443,16 @@ msgid ""
 "This section describes how to launch a SuperLink that works on TLS-"
 "enabled connections. The code snippet below assumes the `certificates/` "
 "directory is in the same directory where you execute the command from. "
-"Edit the paths accordingly if that is not the case. When providing "
-"certificates for the Fleet API and Control API, the SuperLink expects a "
-"tuple of three certificates paths: CA certificate, server certificate and"
-" server private key. The same command can also provide AppIo-named "
-"certificates for the SuperLink's Runtime API."
+"Edit the paths accordingly if that is not the case. The SuperLink expects"
+" three certificate paths: CA certificate, server certificate, and server "
+"private key."
 msgstr ""
-"Cette section décrit comment lancer un SuperLink qui fonctionne sur des "
-"connexions TLS activées. Le code snippet ci-dessous suppose que le "
-"répertoire `certificates/` est dans le même répertoire où vous exécutez "
-"la commande. Modifiez les chemins en conséquence si ce n'est pas le cas. "
-"Lorsque vous fournissez des certificats pour l'API Fleet et l'API de "
-"contrôle, SuperLink s'attend à une liste de trois chemins de certificat :"
-" certificat CA, certificat serveur et clé privée serveur. Le même "
-"commande peut également fournir des certificats AppIo pour l'API "
-"ServerAppIo interne."
+
+#: ../../source/how-to-enable-tls-connections.rst:81
+msgid ""
+"Since Flower 1.37, the Fleet, Control, and Runtime APIs share this TLS "
+"configuration."
+msgstr ""
 
 #: ../../source/how-to-enable-tls-connections.rst:94
 msgid ""
@@ -32502,6 +32474,14 @@ msgstr ""
 "du SuperLink. Ce fichier est utilisé pour identifier le SuperLink et "
 "chiffrer les paquets transmis sur le réseau."
 
+#: ../../source/how-to-enable-tls-connections.rst:96
+#, fuzzy
+msgid ""
+"The certificate must include Subject Alternative Names (SANs) for the "
+"Runtime API address used by SuperExec. When using an IP address such as "
+"``127.0.0.1``, the certificate must include a matching IP SAN."
+msgstr ""
+
 #: ../../source/how-to-enable-tls-connections.rst
 msgid ""
 "``--ssl-keyfile``: Specify the location of the SuperLink's TLS private "
@@ -32512,63 +32492,22 @@ msgstr ""
 "du SuperLink. Ce fichier est utilisé pour déchiffrer les paquets transmis"
 " sur le réseau."
 
-#: ../../source/how-to-enable-tls-connections.rst
-#, fuzzy
-msgid ""
-"``--appio-ssl-ca-certfile``: Specify the location of the CA certificate "
-"file used by SuperExec to verify the SuperLink's Runtime API server "
-"certificate."
-msgstr ""
-"``--appio-ssl-ca-certfile``: Spécifiez l'emplacement du fichier de "
-"certificat CA utilisé par SuperExec pour vérifier le certificat serveur "
-"API ServerAppIo du SuperLink."
-
-#: ../../source/how-to-enable-tls-connections.rst
-#, fuzzy
-msgid ""
-"``--appio-ssl-certfile``: Specify the location of the Runtime API server "
-"TLS certificate file. The certificate must include Subject Alternative "
-"Names (SANs) for the Runtime API address used by SuperExec. When using an"
-" IP address such as ``127.0.0.1``, the certificate must include a "
-"matching IP SAN."
-msgstr ""
-"``--appio-ssl-certfile``: Spécifiez l'emplacement du fichier de "
-"certificat TLS ClientAppIo API serveur. Le certificat doit inclure des "
-"noms alternatifs de sujet (SAN) pour l'adresse AppIo API utilisée par "
-"SuperExec. Lorsque vous utilisez une adresse IP telle que ``127.0.0.1``, "
-"le certificat doit inclure un SAN correspondant."
-
-#: ../../source/how-to-enable-tls-connections.rst
-#, fuzzy
-msgid ""
-"``--appio-ssl-keyfile``: Specify the location of the Runtime API server "
-"TLS private key file."
-msgstr ""
-"``--appio-ssl-keyfile``: Spécifiez l'emplacement du fichier de clé privée"
-" TLS ClientAppIo API serveur."
-
-#: ../../source/how-to-enable-tls-connections.rst:108
+#: ../../source/how-to-enable-tls-connections.rst:105
 msgid "Connecting the SuperNodes with TLS"
 msgstr "Connexion des SuperNodes avec TLS"
 
-#: ../../source/how-to-enable-tls-connections.rst:110
+#: ../../source/how-to-enable-tls-connections.rst:107
 #, fuzzy
 msgid ""
 "This section describes how to launch a SuperNode that works on TLS-"
 "enabled connections. The code snippet below assumes the `certificates/` "
 "directory is in the same directory where you execute the command from. To"
 " secure the SuperNode ↔ SuperLink connection, replace ``--insecure`` with"
-" ``--root-certificates``. The same command can also provide AppIo-named "
-"certificates for the SuperNode's Runtime API."
+" ``--root-certificates``. The same command can also provide certificates "
+"for the SuperNode's Runtime API."
 msgstr ""
-"Cette section décrit comment lancer un SuperNode qui fonctionne sur des "
-"connexions TLS activées. Le code snippet ci-dessous suppose que le "
-"répertoire `certificates/` est dans le même répertoire où vous exécutez "
-"la commande. Pour sécuriser la connexion SuperNode ↔ SuperLink, remplacez"
-" ``--insecure`` par ``--root-certificates``. Le même commande peut "
-"également fournir des certificats AppIo pour l'API ClientAppIo interne."
 
-#: ../../source/how-to-enable-tls-connections.rst:131
+#: ../../source/how-to-enable-tls-connections.rst:128
 msgid ""
 "``--root-certificates``: This specifies the location of the CA "
 "certificate file. The ``ca.crt`` file is used to verify the identity of "
@@ -32581,15 +32520,29 @@ msgstr ""
 #: ../../source/how-to-enable-tls-connections.rst
 #, fuzzy
 msgid ""
-"``--appio-ssl-ca-certfile``: Specify the location of the CA certificate "
-"file used by SuperExec to verify the SuperNode's Runtime API server "
+"``--ssl-ca-certfile``: Specify the location of the CA certificate file "
+"used by SuperExec to verify the SuperNode's Runtime API server "
 "certificate."
 msgstr ""
-"``--appio-ssl-ca-certfile``: Spécifiez l'emplacement du fichier de "
-"certificat CA utilisé par SuperExec pour vérifier le certificat serveur "
-"API ClientAppIo du SuperNode."
 
-#: ../../source/how-to-enable-tls-connections.rst:139
+#: ../../source/how-to-enable-tls-connections.rst
+#, fuzzy
+msgid ""
+"``--ssl-certfile``: Specify the location of the Runtime API server TLS "
+"certificate file. The certificate must include Subject Alternative Names "
+"(SANs) for the Runtime API address used by SuperExec. When using an IP "
+"address such as ``127.0.0.1``, the certificate must include a matching IP"
+" SAN."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst
+#, fuzzy
+msgid ""
+"``--ssl-keyfile``: Specify the location of the Runtime API server TLS "
+"private key file."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst:136
 msgid ""
 "Follow the same procedure, i.e. replacing ``--insecure`` with ``--root-"
 "certificates``, to launch the second SuperNode."
@@ -32597,7 +32550,7 @@ msgstr ""
 "Suivez la même procédure, c'est-à-dire en remplaçant ``--insecure`` par "
 "``--root-certificates``, pour lancer le deuxième SuperNode."
 
-#: ../../source/how-to-enable-tls-connections.rst:155
+#: ../../source/how-to-enable-tls-connections.rst:152
 msgid ""
 "At this point, you have successfully launched a SuperLink and two "
 "SuperNodes with TLS-enabled connections."
@@ -32605,30 +32558,23 @@ msgstr ""
 "À ce stade, vous avez réussi à lancer un SuperLink et deux SuperNodes "
 "avec des connexions TLS activées."
 
-#: ../../source/how-to-enable-tls-connections.rst:160
+#: ../../source/how-to-enable-tls-connections.rst:157
 #, fuzzy
 msgid ""
-"The ``--appio-ssl-*`` Runtime API TLS options configure server-"
-"authenticated TLS. They do not configure mutual TLS. The ``--appio-ssl-"
-"ca-certfile`` file is used by SuperExec and app processes to verify the "
-"Runtime API server certificate, not as a client certificate. If Runtime "
-"API TLS is not configured, internal Runtime API connections remain "
-"unencrypted and should stay inside a trusted network."
+"The ``--ssl-*`` Runtime API TLS options configure server-authenticated "
+"TLS. They do not configure mutual TLS. The ``--ssl-ca-certfile`` file is "
+"used by SuperExec and app processes to verify the Runtime API server "
+"certificate, not as a client certificate. If Runtime API TLS is not "
+"configured, internal Runtime API connections remain unencrypted and "
+"should stay inside a trusted network."
 msgstr ""
-"L'option TLS AppIo configure les connexions authentifiées par le serveur."
-" Elles ne configureraient pas la mutualisation de TLS. Le fichier "
-"``--appio-ssl-ca-certfile`` est utilisé par SuperExec et processus "
-"d'applications pour vérifier le certificat du serveur AppIo, et non comme"
-" un certificat client. Si l'option TLS AppIo n'est pas configurée, les "
-"connexions internes AppIo restent non chiffrées et devraient rester à "
-"l'intérieur d'un réseau de confiance."
 
-#: ../../source/how-to-enable-tls-connections.rst:168
+#: ../../source/how-to-enable-tls-connections.rst:165
 #, fuzzy
 msgid "TLS for Runtime API Connections in \"Process\" Isolation Mode"
 msgstr "TLS pour les Connexions AppIo dans « Process » Isolation Mode"
 
-#: ../../source/how-to-enable-tls-connections.rst:170
+#: ../../source/how-to-enable-tls-connections.rst:167
 msgid ""
 "For details about SuperExec, \"process\" isolation mode, and "
 "\"subprocess\" isolation mode, see :doc:`ref-flower-network-"
@@ -32638,7 +32584,7 @@ msgstr ""
 "le mode d'isolement « subprocess », voir :doc:`ref-flower-network-"
 "communication`."
 
-#: ../../source/how-to-enable-tls-connections.rst:173
+#: ../../source/how-to-enable-tls-connections.rst:170
 #, fuzzy
 msgid ""
 "So far, we've been showing you how to enable TLS for Runtime API "
@@ -32656,7 +32602,7 @@ msgstr ""
 "process », vous devez faire quelques choses différemment pour activer TLS"
 " pour les connexions AppIo."
 
-#: ../../source/how-to-enable-tls-connections.rst:179
+#: ../../source/how-to-enable-tls-connections.rst:176
 #, fuzzy
 msgid ""
 "First, we need to launch the SuperLink and SuperNode with "
@@ -32677,7 +32623,7 @@ msgstr ""
 "SuperExecs. Voici un exemple de commande pour lancer une SuperExec qui "
 "peut établir des connexions TLS avec le ServerAppIo API du SuperLink:"
 
-#: ../../source/how-to-enable-tls-connections.rst:197
+#: ../../source/how-to-enable-tls-connections.rst:194
 #, fuzzy
 msgid ""
 "``--root-certificates``: Specify the location of the CA certificate file."
@@ -32705,7 +32651,7 @@ msgstr ""
 "SuperExec doit lancer. Utilisez ``serverapp`` pour un ``ServerApp`` "
 "SuperExec."
 
-#: ../../source/how-to-enable-tls-connections.rst:201
+#: ../../source/how-to-enable-tls-connections.rst:198
 #, fuzzy
 msgid ""
 "Next, use the same procedure for a ``ClientApp`` SuperExec, but pass the "
@@ -32716,7 +32662,7 @@ msgstr ""
 " passez l'adresse API ClientAppIo du SuperNode, par exemple "
 "``127.0.0.1:9094``, et définissez ``--plugin-type clientapp``."
 
-#: ../../source/how-to-enable-tls-connections.rst:204
+#: ../../source/how-to-enable-tls-connections.rst:201
 #, fuzzy
 msgid ""
 "Now your SuperLink-side SuperExec and SuperNode-side SuperExec can "
@@ -32737,11 +32683,11 @@ msgstr ""
 "commandes ou la configuration utilisées par votre système "
 "d'orchestration."
 
-#: ../../source/how-to-enable-tls-connections.rst:213
+#: ../../source/how-to-enable-tls-connections.rst:210
 msgid "TLS-enabled Flower CLI"
 msgstr "Flower CLI avec TLS activé"
 
-#: ../../source/how-to-enable-tls-connections.rst:215
+#: ../../source/how-to-enable-tls-connections.rst:212
 msgid ""
 "The `Flower CLI <ref-api-cli.html>`_ (e.g. ``flwr run`` command) is the "
 "way a user (e.g. a data scientist) can interact with a deployed "
@@ -32761,7 +32707,7 @@ msgstr ""
 "faire, remplacez le champ ``insecure = true`` dans votre fichier de "
 "configuration TOML Flower avec un nouveau champ qui lit le certificat:"
 
-#: ../../source/how-to-enable-tls-connections.rst:230
+#: ../../source/how-to-enable-tls-connections.rst:227
 msgid ""
 "Note that the path to the ``root-certificates`` is relative to the root "
 "of the project. Now, you can run the example by executing ``flwr run``:"
@@ -32770,7 +32716,7 @@ msgstr ""
 " du projet. Vous pouvez maintenant exécuter l'exemple en exécutant ``flwr"
 " run``:"
 
-#: ../../source/how-to-enable-tls-connections.rst:248
+#: ../../source/how-to-enable-tls-connections.rst:245
 #, fuzzy
 msgid ""
 "You should now have learned how to generate self-signed certificates "
@@ -32788,11 +32734,11 @@ msgstr ""
 "connexions internes AppIo. Toutes les autres commandes dans le `Flower "
 "CLI <ref-api-cli.html>`_ seront également TLS-activées."
 
-#: ../../source/how-to-enable-tls-connections.rst:263
+#: ../../source/how-to-enable-tls-connections.rst:260
 msgid "Additional resources"
 msgstr "Ressources supplémentaires"
 
-#: ../../source/how-to-enable-tls-connections.rst:265
+#: ../../source/how-to-enable-tls-connections.rst:262
 msgid ""
 "These additional sources might be relevant if you would like to dive "
 "deeper into the topic of certificates:"
@@ -32800,11 +32746,11 @@ msgstr ""
 "Ces sources supplémentaires peuvent être pertinentes si tu souhaites "
 "approfondir le sujet des certificats :"
 
-#: ../../source/how-to-enable-tls-connections.rst:268
+#: ../../source/how-to-enable-tls-connections.rst:265
 msgid "`Let's Encrypt <https://letsencrypt.org/docs/>`_"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:269
+#: ../../source/how-to-enable-tls-connections.rst:266
 msgid "`certbot <https://certbot.eff.org/>`_"
 msgstr ""
 
@@ -42047,7 +41993,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.app.Array.rst:43
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:79
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:64
-#: ../../source/ref-api/flwr.app.Context.rst:28
+#: ../../source/ref-api/flwr.app.Context.rst:25
 #: ../../source/ref-api/flwr.app.Error.rst:25
 #: ../../source/ref-api/flwr.app.Message.rst:43
 #: ../../source/ref-api/flwr.app.MessageType.rst:25
@@ -42060,7 +42006,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.common.Code.rst:19
 #: ../../source/ref-api/flwr.common.ConfigRecord.rst:64
 #: ../../source/ref-api/flwr.common.ConfigsRecord.rst:64
-#: ../../source/ref-api/flwr.common.Context.rst:28
+#: ../../source/ref-api/flwr.common.Context.rst:25
 #: ../../source/ref-api/flwr.common.DisconnectRes.rst:25
 #: ../../source/ref-api/flwr.common.Error.rst:25
 #: ../../source/ref-api/flwr.common.EvaluateIns.rst:25
@@ -42087,7 +42033,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.common.Status.rst:25
 #: ../../source/ref-api/flwr.server.Driver.rst:43
 #: ../../source/ref-api/flwr.server.Grid.rst:43
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:28
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:25
 #: ../../source/ref-api/flwr.server.ServerAppComponents.rst:25
 #: ../../source/ref-api/flwr.server.ServerConfig.rst:25
 #: ../../source/ref-api/flwr.serverapp.GaussianPrivacyEvent.rst:25
@@ -43283,39 +43229,27 @@ msgstr ""
 "L'ID qui identifie la série d'exécution, si cette exécution appartient à "
 "une."
 
-#: ../../source/ref-api/flwr.app.Context.rst:26:<autosummary>:1
-#, fuzzy
-msgid ":py:obj:`locked <flwr.app.Context.locked>`\\ \\(\\)"
-msgstr ""
-
-#: ../../source/ref-api/flwr.app.Context.rst:26:<autosummary>:1
-#: ../../source/ref-api/flwr.common.Context.rst:26:<autosummary>:1
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:26:<autosummary>:1
-#: flwr.app.message.context.Context.locked:1 of
-msgid "Lock this context for an atomic in-process operation."
-msgstr ""
-
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 msgid ":py:obj:`run_id <flwr.app.Context.run_id>`\\"
 msgstr ""
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 msgid ":py:obj:`node_id <flwr.app.Context.node_id>`\\"
 msgstr ""
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 msgid ":py:obj:`node_config <flwr.app.Context.node_config>`\\"
 msgstr ""
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 msgid ":py:obj:`state <flwr.app.Context.state>`\\"
 msgstr ""
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 msgid ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
 msgstr ""
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 msgid ":py:obj:`series_id <flwr.app.Context.series_id>`\\"
 msgstr ""
 
@@ -46176,37 +46110,32 @@ msgstr ":py:obj:`is_dirty <flwr.app.ConfigRecord.is_dirty>`\\"
 msgid ":py:obj:`object_id <flwr.common.ConfigsRecord.object_id>`\\"
 msgstr ":py:obj:`object_id <flwr.app.ConfigRecord.object_id>`\\"
 
-#: ../../source/ref-api/flwr.common.Context.rst:26:<autosummary>:1
-#, fuzzy
-msgid ":py:obj:`locked <flwr.common.Context.locked>`\\ \\(\\)"
-msgstr ""
-
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`run_id <flwr.common.Context.run_id>`\\"
 msgstr ":py:obj:`run_id <flwr.app.Context.run_id>`\\"
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`node_id <flwr.common.Context.node_id>`\\"
 msgstr ":py:obj:`node_id <flwr.app.Context.node_id>`\\"
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`node_config <flwr.common.Context.node_config>`\\"
 msgstr ":py:obj:`node_config <flwr.app.Context.node_config>`\\"
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`state <flwr.common.Context.state>`\\"
 msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`run_config <flwr.common.Context.run_config>`\\"
 msgstr ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.common.Context.rst:33:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`series_id <flwr.common.Context.series_id>`\\"
 msgstr ":py:obj:`series_id <flwr.app.Context.series_id>`\\"
@@ -49126,57 +49055,52 @@ msgstr "Context"
 msgid "Bases: :py:class:`~flwr.app.message.context.Context`"
 msgstr "Bases : :py:class:`~flwr.serverapp.strategy.fedopt.FedOpt`"
 
-#: ../../source/ref-api/flwr.server.LegacyContext.rst:26:<autosummary>:1
-#, fuzzy
-msgid ":py:obj:`locked <flwr.server.LegacyContext.locked>`\\ \\(\\)"
-msgstr ""
-
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`config <flwr.server.LegacyContext.config>`\\"
 msgstr ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`strategy <flwr.server.LegacyContext.strategy>`\\"
 msgstr ":py:obj:`strategy <flwr.serverapp.strategy>`\\"
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`client_manager <flwr.server.LegacyContext.client_manager>`\\"
 msgstr ":py:obj:`clientapp <flwr.clientapp>`\\"
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`history <flwr.server.LegacyContext.history>`\\"
 msgstr ":py:obj:`strategy <flwr.serverapp.strategy>`\\"
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`run_id <flwr.server.LegacyContext.run_id>`\\"
 msgstr ":py:obj:`run_id <flwr.app.Context.run_id>`\\"
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`node_id <flwr.server.LegacyContext.node_id>`\\"
 msgstr ":py:obj:`node_id <flwr.app.Context.node_id>`\\"
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`node_config <flwr.server.LegacyContext.node_config>`\\"
 msgstr ":py:obj:`node_config <flwr.app.Context.node_config>`\\"
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`state <flwr.server.LegacyContext.state>`\\"
 msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`run_config <flwr.server.LegacyContext.run_config>`\\"
 msgstr ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
 
-#: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
+#: ../../source/ref-api/flwr.server.LegacyContext.rst:37:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`series_id <flwr.server.LegacyContext.series_id>`\\"
 msgstr ":py:obj:`series_id <flwr.app.Context.series_id>`\\"
@@ -59204,13 +59128,9 @@ msgstr ""
 #, fuzzy
 msgid ""
 "The Runtime API links above can run with plaintext communication or with "
-"server-authenticated TLS. Without the ``--appio-ssl-*`` options, these "
-"links remain unencrypted and should stay inside a trusted network:"
+"server-authenticated TLS. Without the relevant TLS options, these links "
+"remain unencrypted and should stay inside a trusted network:"
 msgstr ""
-"Les liens AppIo ci-dessus peuvent fonctionner avec une communication en "
-"clair ou avec un TLS authentifié par le serveur. Sans les options "
-"``--appio-ssl-*``, ces liens restent non chiffrés et devraient rester à "
-"l'intérieur d'un réseau de confiance:"
 
 #: ../../source/ref-flower-network-communication.rst:192
 msgid "SuperLink + SuperExec + ``ServerApp`` process"
@@ -59223,21 +59143,14 @@ msgstr "Processus SuperNode + SuperExec + ``ClientApp``"
 #: ../../source/ref-flower-network-communication.rst:195
 #, fuzzy
 msgid ""
-"To secure these links, configure the SuperLink and SuperNode Runtime API "
-"servers with ``--appio-ssl-certfile``, ``--appio-ssl-keyfile``, and "
-"``--appio-ssl-ca-certfile``. Runtime API clients verify server "
-"certificates with ``--root-certificates``. In ``subprocess`` isolation "
-"mode, the SuperLink and SuperNode pass the CA path to the SuperExec "
-"processes they launch. This is not mTLS. See :doc:`how-to-enable-tls-"
-"connections` for concrete commands."
+"For SuperLink, ``--ssl-certfile``, ``--ssl-keyfile``, and ``--ssl-ca-"
+"certfile`` secure all APIs. For SuperNode, the same options secure its "
+"Runtime API. Runtime API clients verify server certificates with "
+"``--root-certificates``. In ``subprocess`` isolation mode, the SuperLink "
+"and SuperNode pass the CA path to the SuperExec processes they launch. "
+"This is not mTLS. See :doc:`how-to-enable-tls-connections` for concrete "
+"commands."
 msgstr ""
-"Pour sécuriser ces liens, configurez les serveurs ServerAppIo et "
-"ClientAppIo API avec ``--appio-ssl-certfile``, ``--appio-ssl-keyfile``, "
-"et ``--appio-ssl-ca-certfile``. Les clients AppIo vérifient les "
-"certificats de serveur avec ``--root-certificates``. Dans le mode "
-"d'isolement ``subprocess``, le SuperLink et SuperNode passent la voie CA "
-"au processus SuperExec qu'ils lancent. Cela n'est pas mTLS. Consultez "
-":doc:`how-to-enable-tls-connections` pour des commandes concretes."
 
 #: ../../source/ref-flower-network-communication.rst:204
 msgid ""
@@ -66439,3 +66352,49 @@ msgstr ""
 
 #~ msgid "TLS-enabled gRPC."
 #~ msgstr "gRPC avec chiffrement TLS."
+
+#~ msgid "``--appio-ssl-ca-certfile``, ``--appio-ssl-certfile``, and"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``--appio-ssl-keyfile``: Configure TLS "
+#~ "for the shared Runtime and Control"
+#~ msgstr ""
+
+#~ msgid "HTTP APIs."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "To enable TLS also for the Runtime"
+#~ " API on SuperLink, please refer to"
+#~ " :ref:`Launching the SuperLink with TLS "
+#~ "<launching-the-superlink-with-tls>`."
+#~ msgstr ""
+#~ "Pour activer également TLS pour l'API"
+#~ " AppIo sur SuperLink, veuillez consulter"
+#~ " :ref:`Launching the SuperLink with TLS "
+#~ "<launching-the-superlink-with-tls>`."
+
+#~ msgid ""
+#~ "``--appio-ssl-ca-certfile``: Specify the"
+#~ " location of the CA certificate file"
+#~ " used by SuperExec to verify the "
+#~ "SuperLink's Runtime API server certificate."
+#~ msgstr ""
+#~ "``--appio-ssl-ca-certfile``: Spécifiez "
+#~ "l'emplacement du fichier de certificat "
+#~ "CA utilisé par SuperExec pour vérifier"
+#~ " le certificat serveur API ServerAppIo "
+#~ "du SuperLink."
+
+#~ msgid ":py:obj:`locked <flwr.app.Context.locked>`\\ \\(\\)"
+#~ msgstr ""
+
+#~ msgid "Lock this context for an atomic in-process operation."
+#~ msgstr ""
+
+#~ msgid ":py:obj:`locked <flwr.common.Context.locked>`\\ \\(\\)"
+#~ msgstr ""
+
+#~ msgid ":py:obj:`locked <flwr.server.LegacyContext.locked>`\\ \\(\\)"
+#~ msgstr ""
