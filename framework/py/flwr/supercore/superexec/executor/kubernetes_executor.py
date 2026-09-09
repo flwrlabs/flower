@@ -644,7 +644,9 @@ class _WarmExecutorPoolManager:
                 namespace=self._config.namespace,
                 grace_period_seconds=0,
             )
-        except Exception:  # pylint: disable=broad-exception-caught
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            if _exception_status(exc) == 404:
+                return True
             log(WARNING, "Failed to delete warm TaskExecutor Pod %s.", pod_name)
             return False
         return True

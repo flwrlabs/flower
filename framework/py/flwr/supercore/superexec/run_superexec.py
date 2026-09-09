@@ -203,11 +203,11 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
     # Launch gRPC health server
     grpc_servers = []
-    if health_server_address is not None:
-        health_server = run_health_server_grpc_no_tls(health_server_address)
-        grpc_servers.append(health_server)
-
     try:
+        if health_server_address is not None:
+            health_server = run_health_server_grpc_no_tls(health_server_address)
+            grpc_servers.append(health_server)
+
         client = client_class.from_server_address(
             server_address=runtime_api_address,
             insecure=insecure,
