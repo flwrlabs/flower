@@ -39,9 +39,9 @@ from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
+from flwr.supercore.routers.runtime import router
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
-
-from .router import router
+from flwr.supernode.servicer.runtime import runtime_handlers
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
 _PULL_PENDING_TASKS_METHOD = "/flwr.proto.Runtime/PullPendingTasks"
@@ -57,6 +57,7 @@ def _create_app(state: NodeState, secret: bytes | None) -> FastAPI:
     """Create the Runtime HTTP application with real dependencies."""
     app = FastAPI()
     app.state.superexec_auth_secret = secret
+    app.state.runtime_handlers = runtime_handlers
     app.include_router(router)
     app.add_middleware(ProtobufTranslationMiddleware)
     app.middleware("http")(http_error_translator)
