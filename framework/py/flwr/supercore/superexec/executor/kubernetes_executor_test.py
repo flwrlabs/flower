@@ -32,6 +32,7 @@ from . import warm_agentapp_executor
 from .kubernetes_executor import (
     _COMPLETED_POD_SWEEP_INTERVAL_SECONDS,
     _TASK_ID_LABEL,
+    _WARM_EXECUTOR_CONSUMED_ANNOTATION,
     APPIO_CREDENTIALS_MOUNT_PATH,
     APPIO_ROOT_CERTIFICATES_FILE_PATH,
     APPIO_TOKEN_FILE_PATH,
@@ -331,7 +332,7 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
         labels={WARM_EXECUTOR_LABEL: "false"},
         annotations={
             "example.com/setting": "configured",
-            kube._WARM_EXECUTOR_CONSUMED_ANNOTATION: "true",  # pylint: disable=protected-access
+            _WARM_EXECUTOR_CONSUMED_ANNOTATION: "true",
         },
         container_security_context={"readOnlyRootFilesystem": True},
     )
@@ -362,9 +363,7 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
     )
     assert len(annotations[WARM_EXECUTOR_CONFIGURATION_ANNOTATION]) == 64
     assert len(annotations) == 3
-    assert (
-        kube._WARM_EXECUTOR_CONSUMED_ANNOTATION not in annotations
-    )  # pylint: disable=protected-access
+    assert _WARM_EXECUTOR_CONSUMED_ANNOTATION not in annotations
     assert _TASK_ID_LABEL not in metadata["labels"]
     assert LAUNCH_ATTEMPT_LABEL not in metadata["labels"]
     assert container == {
