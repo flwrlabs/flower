@@ -71,6 +71,7 @@ _COMPONENT_LABEL = "app.kubernetes.io/component"
 _TASK_TYPE_LABEL = "flower.ai/task-type"
 _RESOURCE_POOL_LABEL = "flower.ai/resource-pool"
 _WARM_EXECUTOR_OWNER_LABEL = "flower.ai/warm-executor-owner"
+_WARM_EXECUTOR_CONSUMED_ANNOTATION = "flower.ai/warm-executor-consumed"
 _EXECUTOR_OWNED_LABELS = frozenset(
     {
         _NAME_LABEL,
@@ -142,6 +143,11 @@ class KubernetesClient(Protocol):
     ) -> KubernetesList:
         """List Kubernetes Pods in the selected namespace."""
 
+    def patch_namespaced_pod(
+        self, name: str, namespace: str, body: JSONObject
+    ) -> object:
+        """Update Pod metadata before dispatching a warm task."""
+
     def connect_get_namespaced_pod_exec(
         self, *args: object, **kwargs: object
     ) -> object:
@@ -150,6 +156,19 @@ class KubernetesClient(Protocol):
 
 def create_incluster_kubernetes_client() -> KubernetesClient:
     """Create a KubernetesClient backed by in-cluster ServiceAccount auth."""
+    return _create_incluster_kubernetes_clients(1)[0]
+
+
+def create_incluster_kubernetes_clients() -> tuple[KubernetesClient, KubernetesClient]:
+    """Create separate Kubernetes clients for API and WebSocket exec calls."""
+    clients = _create_incluster_kubernetes_clients(2)
+    return clients[0], clients[1]
+
+
+def _create_incluster_kubernetes_clients(
+    count: int,
+) -> tuple[KubernetesClient, ...]:
+    """Create one or more independently transported in-cluster clients."""
     try:
         kubernetes_client = importlib.import_module("kubernetes.client")
         kubernetes_config = importlib.import_module("kubernetes.config")
@@ -172,8 +191,7 @@ def create_incluster_kubernetes_client() -> KubernetesClient:
             "credentials."
         ) from exc
 
-    client: KubernetesClient = kubernetes_client.CoreV1Api()
-    return client
+    return tuple(kubernetes_client.CoreV1Api() for _ in range(count))
 
 
 @dataclass
@@ -260,6 +278,10 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
             self.volumes = _taskexecutor_volumes(self.volumes)
         if self.volume_mounts is not None:
             self.volume_mounts = _taskexecutor_volume_mounts(self.volume_mounts)
+        if self.warm_executor_owner is not None and not isinstance(
+            self.warm_executor_owner, str
+        ):
+            raise ValueError("warm_executor_owner must be a string.")
         if self.warm_executor_pools and not self.warm_executor_owner:
             raise ValueError(
                 "warm_executor_owner is required when warm_executor_pools are set."
@@ -297,8 +319,10 @@ class _WarmExecutorPoolManager:
         client: KubernetesClient,
         config: KubernetesExecutorConfig,
         active_pod_count: Callable[[], int],
+        exec_client: KubernetesClient | None = None,
     ) -> None:
         self._client = client
+        self._exec_client = exec_client or client
         self._config = config
         self._active_pod_count = active_pod_count
         self._pools = {pool.key: pool for pool in config.warm_executor_pools}
@@ -382,13 +406,14 @@ class _WarmExecutorPoolManager:
             return any(
                 (_object_name(pod) is not None)
                 and (_object_name(pod) not in self._busy_pods)
+                and not _is_consumed_warm_executor(pod)
                 and _has_warm_executor_configuration(pod, self._config)
                 and is_warm_executor_ready(pod, pool.key)
                 for pod in pods
             )
 
     def close(self) -> None:
-        """Delete all Pods owned by this SuperExec instance."""
+        """Stop dispatch and delete only idle Pods owned by this SuperExec."""
         with self._lock:
             if self._closed:
                 return
@@ -398,7 +423,7 @@ class _WarmExecutorPoolManager:
             return
         for pod in pods:
             pod_name = _object_name(pod)
-            if pod_name is not None:
+            if pod_name is not None and pod_name not in self._busy_pods:
                 self._delete_pod(pod_name)
 
     def _pool_for_spec(self, spec: ExecutionSpec) -> WarmExecutorPoolConfig | None:
@@ -422,9 +447,11 @@ class _WarmExecutorPoolManager:
             if (
                 pod_name is not None
                 and pod_name not in self._busy_pods
+                and not _is_consumed_warm_executor(pod)
                 and _has_warm_executor_configuration(pod, self._config)
                 and is_warm_executor_ready(pod, key)
             ):
+                self._mark_pod_consumed(pod_name)
                 self._busy_pods.add(pod_name)
                 return pod_name
         return None
@@ -436,7 +463,13 @@ class _WarmExecutorPoolManager:
         if pods is None:
             return
         compatible_count = sum(
-            1 for pod in pods if _is_active_warm_executor(pod, pool.key, self._config)
+            1
+            for pod in pods
+            if _is_active_warm_executor(pod, pool.key, self._config)
+            and (
+                _object_name(pod) in self._busy_pods
+                or not _is_consumed_warm_executor(pod)
+            )
         )
         pods_to_create = max(pool.size - compatible_count, 0)
         if self._config.active_pod_budget is not None:
@@ -476,6 +509,13 @@ class _WarmExecutorPoolManager:
         }
         for pod in pods:
             pod_name = _object_name(pod)
+            if (
+                pod_name is not None
+                and pod_name not in self._busy_pods
+                and _is_consumed_warm_executor(pod)
+            ):
+                self._delete_pod(pod_name)
+                continue
             pool = next(
                 (
                     candidate
@@ -517,7 +557,7 @@ class _WarmExecutorPoolManager:
         try:
             stream = importlib.import_module("kubernetes.stream").stream
             response = stream(
-                self._client.connect_get_namespaced_pod_exec,
+                self._exec_client.connect_get_namespaced_pod_exec,
                 pod_name,
                 self._config.namespace,
                 command=warm_agentapp_command(spec, runtime_root_certificates),
@@ -532,6 +572,24 @@ class _WarmExecutorPoolManager:
                 "Warm TaskExecutor Pod is unavailable for dispatch."
             ) from err
         return KubernetesWarmAgentAppDispatch(response)
+
+    def _mark_pod_consumed(self, pod_name: str) -> None:
+        try:
+            self._client.patch_namespaced_pod(
+                name=pod_name,
+                namespace=self._config.namespace,
+                body={
+                    "metadata": {
+                        "annotations": {
+                            _WARM_EXECUTOR_CONSUMED_ANNOTATION: "true",
+                        }
+                    }
+                },
+            )
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            raise WarmAgentAppUnavailable(
+                "Failed to persist warm TaskExecutor Pod consumption."
+            ) from err
 
     def _retire_after_dispatch(
         self,
@@ -596,13 +654,16 @@ class KubernetesExecutor:
         *,
         client: KubernetesClient,
         config: KubernetesExecutorConfig,
+        exec_client: KubernetesClient | None = None,
     ) -> None:
         self._client = client
         self._config = config
         self._completed_pod_sweeper = CompletedPodSweeper(client=client, config=config)
         self._last_completed_pod_sweep_at: float | None = None
         self._warm_executor_pool_manager = (
-            _WarmExecutorPoolManager(client, config, self._active_pod_count)
+            _WarmExecutorPoolManager(
+                client, config, self._active_pod_count, exec_client
+            )
             if config.warm_executor_pools
             else None
         )
@@ -1283,6 +1344,13 @@ def _has_warm_executor_configuration(
     return _object_field(
         annotations, WARM_EXECUTOR_CONFIGURATION_ANNOTATION
     ) == _warm_executor_configuration_hash(config)
+
+
+def _is_consumed_warm_executor(pod: object) -> bool:
+    """Return true when a Pod was reserved for a task before this process started."""
+    metadata = _object_field(pod, "metadata")
+    annotations = _object_field(metadata, "annotations")
+    return _object_field(annotations, _WARM_EXECUTOR_CONSUMED_ANNOTATION) == "true"
 
 
 def _labels(

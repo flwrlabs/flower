@@ -50,9 +50,11 @@ class KubernetesWarmAgentAppDispatch:
         """Return whether the task child acknowledged consuming the token."""
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            if _TOKEN_STDIN_ACKNOWLEDGEMENT in self._read_stdout():
-                return True
+            stdout = self._read_stdout()
             self._read_stderr()
+            self._read_all()
+            if _TOKEN_STDIN_ACKNOWLEDGEMENT in stdout:
+                return True
             if not self._is_open():
                 return False
             self._update(min(0.5, deadline - time.monotonic()))
@@ -64,6 +66,7 @@ class KubernetesWarmAgentAppDispatch:
             self._update(1.0)
             self._read_stdout()
             self._read_stderr()
+            self._read_all()
 
     def close(self) -> None:
         """Close the Kubernetes exec stream best-effort."""
@@ -93,6 +96,11 @@ class KubernetesWarmAgentAppDispatch:
         read_stderr = getattr(self._response, "read_stderr", None)
         if callable(read_stderr) and (not callable(peek_stderr) or peek_stderr()):
             read_stderr()
+
+    def _read_all(self) -> None:
+        read_all = getattr(self._response, "read_all", None)
+        if callable(read_all):
+            read_all()
 
 
 def warm_agentapp_command(
