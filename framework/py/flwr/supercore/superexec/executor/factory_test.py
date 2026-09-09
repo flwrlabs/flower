@@ -40,9 +40,10 @@ def test_get_executor_builds_kubernetes_executor_from_config(
     root_certificates_path = tmp_path / "ca.pem"
     root_certificates_path.write_text("root-ca", encoding="utf-8")
     client = Mock()
-    create_client = Mock(return_value=client)
+    exec_client = Mock()
+    create_clients = Mock(return_value=(client, exec_client))
     monkeypatch.setattr(
-        factory_module, "create_incluster_kubernetes_client", create_client
+        factory_module, "create_incluster_kubernetes_clients", create_clients
     )
 
     executor = get_executor(
@@ -90,7 +91,7 @@ def test_get_executor_builds_kubernetes_executor_from_config(
     assert config.resources == {"requests": {"cpu": "1"}}
     assert config.node_selector == {"kubernetes.io/os": "linux"}
     assert not hasattr(config, "unknown_field")
-    create_client.assert_called_once_with()
+    create_clients.assert_called_once_with()
 
 
 def test_get_executor_parses_agentapp_warm_executor_pool(
@@ -98,11 +99,12 @@ def test_get_executor_parses_agentapp_warm_executor_pool(
 ) -> None:
     """A warm pool is AgentApp-only and uses the configured runtime image."""
     client = Mock()
+    exec_client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     monkeypatch.setattr(
         factory_module,
-        "create_incluster_kubernetes_client",
-        Mock(return_value=client),
+        "create_incluster_kubernetes_clients",
+        Mock(return_value=(client, exec_client)),
     )
 
     executor = get_executor(
@@ -125,6 +127,27 @@ def test_get_executor_parses_agentapp_warm_executor_pool(
     assert pool.key.task_type.value == "flwr-agentapp"
     assert pool.key.runtime_image == "ghcr.io/flwrlabs/taskexecutor:dev"
     assert pool.size == 2
+    manager = executor._warm_executor_pool_manager  # pylint: disable=protected-access
+    assert manager is not None
+    assert manager._exec_client is exec_client  # pylint: disable=protected-access
+
+
+def test_get_executor_rejects_non_string_warm_executor_owner() -> None:
+    """Warm executor owners must reach the normal invalid-config error path."""
+    with pytest.raises(ValueError, match="warm_executor_owner must be a string"):
+        factory_module._kubernetes_executor_config_from_mapping(  # pylint: disable=protected-access
+            {
+                "namespace": "flower-system",
+                "image": "ghcr.io/flwrlabs/taskexecutor:dev",
+                "warm-executor-owner": 1,
+                "warm-executor-pools": [
+                    {
+                        "task-type": "flwr-agentapp",
+                        "size": 1,
+                    }
+                ],
+            }
+        )
 
 
 def test_get_executor_rejects_non_agentapp_warm_pool() -> None:
@@ -165,9 +188,9 @@ def test_get_executor_rejects_unreadable_appio_root_certificates_path(
 ) -> None:
     """Test Runtime API root certificate load failures do not reach client
     creation."""
-    create_client = Mock()
+    create_clients = Mock()
     monkeypatch.setattr(
-        factory_module, "create_incluster_kubernetes_client", create_client
+        factory_module, "create_incluster_kubernetes_clients", create_clients
     )
 
     with pytest.raises(ValueError) as exc_info:
@@ -181,7 +204,7 @@ def test_get_executor_rejects_unreadable_appio_root_certificates_path(
         )
 
     assert "appio-root-certificates-path" in str(exc_info.value)
-    create_client.assert_not_called()
+    create_clients.assert_not_called()
 
 
 def test_get_executor_wraps_kubernetes_client_construction_errors(
@@ -190,7 +213,7 @@ def test_get_executor_wraps_kubernetes_client_construction_errors(
     """Test Kubernetes dependency/auth failures surface as config failures."""
     monkeypatch.setattr(
         factory_module,
-        "create_incluster_kubernetes_client",
+        "create_incluster_kubernetes_clients",
         Mock(side_effect=RuntimeError("in-cluster auth unavailable")),
     )
 

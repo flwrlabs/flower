@@ -54,9 +54,9 @@ from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
+from flwr.supercore.routers.runtime import router
 from flwr.superlink.federation import NoOpFederationManager
-
-from .router import router
+from flwr.superlink.servicer.runtime import runtime_handlers
 
 _SERVERAPP_ONLY_CASES: list[tuple[str, Message]] = [
     ("get-nodes", GetNodesRequest()),
@@ -91,6 +91,7 @@ def fixture_client(state: LinkState) -> TestClient:
     """Create the Runtime HTTP application with real dependencies."""
     app = FastAPI()
     app.state.superexec_auth_secret = b"test-superexec-secret"
+    app.state.runtime_handlers = runtime_handlers
     app.include_router(router)
     app.add_middleware(ProtobufTranslationMiddleware)
     app.middleware("http")(http_error_translator)

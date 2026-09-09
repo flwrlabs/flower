@@ -23,7 +23,7 @@ from .config import ExecutorConfig
 from .kubernetes_executor import (
     KubernetesExecutor,
     KubernetesExecutorConfig,
-    create_incluster_kubernetes_client,
+    create_incluster_kubernetes_clients,
 )
 from .subprocess_executor import SubprocessExecutor
 from .types import Executor
@@ -64,12 +64,13 @@ def get_executor(
             raise ValueError("Kubernetes executor requires --executor-config.")
         config = _kubernetes_executor_config_from_mapping(executor_config)
         try:
-            client = create_incluster_kubernetes_client()
+            client, exec_client = create_incluster_kubernetes_clients()
         except RuntimeError as err:
             raise ValueError(str(err)) from err
         return KubernetesExecutor(
             client=client,
             config=config,
+            exec_client=exec_client,
         )
 
     raise ValueError(f"Unsupported executor selection: {executor_type}")

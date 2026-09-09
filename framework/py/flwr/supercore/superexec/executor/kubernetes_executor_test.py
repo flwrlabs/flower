@@ -32,6 +32,7 @@ from . import warm_agentapp_executor
 from .kubernetes_executor import (
     _COMPLETED_POD_SWEEP_INTERVAL_SECONDS,
     _TASK_ID_LABEL,
+    _WARM_EXECUTOR_CONSUMED_ANNOTATION,
     APPIO_CREDENTIALS_MOUNT_PATH,
     APPIO_ROOT_CERTIFICATES_FILE_PATH,
     APPIO_TOKEN_FILE_PATH,
@@ -135,6 +136,7 @@ class _WarmExecResponse:
 
     def __init__(self, acknowledge: bool = True, stderr: str = "") -> None:
         self.written: list[str] = []
+        self.read_all_calls = 0
         self.read_stderr_calls = 0
         self._acknowledge = acknowledge
         self._stderr = stderr
@@ -177,6 +179,11 @@ class _WarmExecResponse:
         stderr = self._stderr
         self._stderr = ""
         return stderr
+
+    def read_all(self) -> str:
+        """Discard the Kubernetes client's combined output buffer."""
+        self.read_all_calls += 1
+        return ""
 
     def close(self) -> None:
         """Close the response after one task."""
@@ -323,7 +330,10 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
     )
     config = _executor_config(
         labels={WARM_EXECUTOR_LABEL: "false"},
-        annotations={"example.com/setting": "configured"},
+        annotations={
+            "example.com/setting": "configured",
+            _WARM_EXECUTOR_CONSUMED_ANNOTATION: "true",
+        },
         container_security_context={"readOnlyRootFilesystem": True},
     )
     executor = KubernetesExecutor(client=client, config=config)
@@ -353,6 +363,7 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
     )
     assert len(annotations[WARM_EXECUTOR_CONFIGURATION_ANNOTATION]) == 64
     assert len(annotations) == 3
+    assert _WARM_EXECUTOR_CONSUMED_ANNOTATION not in annotations
     assert _TASK_ID_LABEL not in metadata["labels"]
     assert LAUNCH_ATTEMPT_LABEL not in metadata["labels"]
     assert container == {
@@ -413,6 +424,7 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
 ) -> None:
     """A dispatched warm Pod should be replaced before its child exits."""
     client = Mock()
+    exec_client = Mock()
     pool_key = _warm_executor_pool_key(
         runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
@@ -438,7 +450,11 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
         return SimpleNamespace(start=lambda: started.append((target, args)))
 
     monkeypatch.setattr(threading, "Thread", _thread)
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = KubernetesExecutor(
+        client=client,
+        config=config,
+        exec_client=exec_client,
+    )
 
     result = executor.launch(
         _execution_spec(task_type=TaskType.AGENT_APP, insecure=True)
@@ -446,7 +462,19 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
 
     assert result.status == LaunchResultStatus.ACCEPTED
     assert response.written == ["task-token\n"]
+    assert response.read_all_calls == 1
     client.create_namespaced_secret.assert_not_called()
+    client.patch_namespaced_pod.assert_called_once_with(
+        name="flwr-taskexecutor-warm-ready",
+        namespace="flower-system",
+        body={
+            "metadata": {
+                "annotations": {
+                    _WARM_EXECUTOR_CONSUMED_ANNOTATION: "true",
+                }
+            }
+        },
+    )
     client.create_namespaced_pod.assert_called_once()
     replacement_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
     assert replacement_pod["spec"]["containers"][0]["command"] == [
@@ -455,6 +483,7 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
         WARM_EXECUTOR_MODULE,
     ]
     command = stream.call_args.kwargs["command"]
+    assert stream.call_args.args[0] is exec_client.connect_get_namespaced_pod_exec
     assert command == [
         "flwr-agentapp",
         "--runtime-api-address",
@@ -596,10 +625,11 @@ def test_warm_dispatch_drains_stderr_until_the_child_exits() -> None:
     dispatch.wait_for_close()
 
     assert response.read_stderr_calls == 1
+    assert response.read_all_calls == 1
 
 
-def test_warm_pool_replaces_consumed_pod_and_cleans_up_owned_pods() -> None:
-    """Consumed Pods are replaced despite stream cleanup errors and shutdown."""
+def test_warm_pool_replaces_consumed_pod_and_cleans_up_idle_pods() -> None:
+    """Consumed Pods are replaced without deleting active work during shutdown."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     pool_key = _warm_executor_pool_key(
@@ -637,11 +667,39 @@ def test_warm_pool_replaces_consumed_pod_and_cleans_up_owned_pods() -> None:
     client.delete_namespaced_pod.assert_has_calls(
         [
             call(name="idle", namespace="flower-system", grace_period_seconds=0),
-            call(name="busy", namespace="flower-system", grace_period_seconds=0),
-        ],
-        any_order=True,
+        ]
     )
-    assert client.delete_namespaced_pod.call_count == 2
+    assert client.delete_namespaced_pod.call_count == 1
+
+
+def test_warm_pool_retires_consumed_pod_from_a_previous_manager() -> None:
+    """A restarted manager must not dispatch into a previously consumed Pod."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+    )
+    pool = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
+        client, config, lambda: 0
+    )
+    consumed_pod = _ready_warm_pod(pool_key, config, name="consumed")
+    consumed_pod["metadata"]["annotations"][
+        kube._WARM_EXECUTOR_CONSUMED_ANNOTATION  # pylint: disable=protected-access
+    ] = "true"
+    client.reset_mock()
+    client.list_namespaced_pod.return_value = {"items": [consumed_pod]}
+
+    assert pool._take_ready_pod(pool_key) is None  # pylint: disable=protected-access
+    pool.ensure_capacity()
+
+    client.delete_namespaced_pod.assert_called_once_with(
+        name="consumed", namespace="flower-system", grace_period_seconds=0
+    )
+    client.create_namespaced_pod.assert_called_once()
 
 
 def test_warm_pool_retries_retirement_without_replacing_pending_pod() -> None:
