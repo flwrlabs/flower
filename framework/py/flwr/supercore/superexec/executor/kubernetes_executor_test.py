@@ -419,10 +419,10 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
     )
 
 
-def test_launch_dispatches_compatible_ready_pod_without_a_credential_secret(
+def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A compatible idle Pod should receive the task token only over stdin."""
+    """A dispatched warm Pod should be replaced before its child exits."""
     client = Mock()
     exec_client = Mock()
     pool_key = _warm_executor_pool_key(
@@ -470,12 +470,18 @@ def test_launch_dispatches_compatible_ready_pod_without_a_credential_secret(
         body={
             "metadata": {
                 "annotations": {
-                    kube._WARM_EXECUTOR_CONSUMED_ANNOTATION: "true",  # pylint: disable=protected-access
+                    _WARM_EXECUTOR_CONSUMED_ANNOTATION: "true",
                 }
             }
         },
     )
-    client.create_namespaced_pod.assert_not_called()
+    client.create_namespaced_pod.assert_called_once()
+    replacement_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
+    assert replacement_pod["spec"]["containers"][0]["command"] == [
+        "python",
+        "-m",
+        WARM_EXECUTOR_MODULE,
+    ]
     command = stream.call_args.kwargs["command"]
     assert stream.call_args.args[0] is exec_client.connect_get_namespaced_pod_exec
     assert command == [
@@ -608,7 +614,7 @@ def test_launch_returns_unknown_after_unacknowledged_warm_token_delivery(
     assert result.status == LaunchResultStatus.UNKNOWN
     assert response.written == ["task-token\n"]
     client.create_namespaced_secret.assert_not_called()
-    client.create_namespaced_pod.assert_not_called()
+    client.create_namespaced_pod.assert_called_once()
 
 
 def test_warm_dispatch_drains_stderr_until_the_child_exits() -> None:
@@ -696,8 +702,8 @@ def test_warm_pool_retires_consumed_pod_from_a_previous_manager() -> None:
     client.create_namespaced_pod.assert_called_once()
 
 
-def test_warm_pool_keeps_consumed_pod_busy_when_deletion_fails() -> None:
-    """A consumed Pod must never return to the ready pool after failed deletion."""
+def test_warm_pool_retries_retirement_without_replacing_pending_pod() -> None:
+    """A failed retirement is retried without creating more warm Pods."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     pool_key = _warm_executor_pool_key(
@@ -721,7 +727,22 @@ def test_warm_pool_keeps_consumed_pod_busy_when_deletion_fails() -> None:
     )
 
     assert "consumed" in pool._busy_pods  # pylint: disable=protected-access
+    assert "consumed" in pool._retiring_pods  # pylint: disable=protected-access
     client.create_namespaced_pod.assert_not_called()
+
+    client.list_namespaced_pod.return_value = {
+        "items": [_ready_warm_pod(pool_key, config, name="consumed")]
+    }
+    pool.ensure_capacity()
+
+    assert client.delete_namespaced_pod.call_count == 2
+    client.create_namespaced_pod.assert_not_called()
+
+    client.delete_namespaced_pod.side_effect = None
+    pool.ensure_capacity()
+
+    assert "consumed" not in pool._busy_pods  # pylint: disable=protected-access
+    assert "consumed" not in pool._retiring_pods  # pylint: disable=protected-access
 
 
 def test_warm_pool_reserves_capacity_for_cold_fallback() -> None:
@@ -853,6 +874,27 @@ def test_wait_for_capacity_reserves_cold_capacity_for_a_secure_task() -> None:
     executor.wait_for_capacity(TaskType.AGENT_APP, insecure=False)
 
     sleep.assert_called_once_with(1.0)
+
+
+def test_cold_fallback_wait_retries_pending_warm_pod_retirement() -> None:
+    """Cold fallback retries retirement before waiting at the Pod budget."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    client.list_namespaced_secret.return_value = {"items": []}
+    executor = KubernetesExecutor(
+        client=client,
+        config=_executor_config(active_pod_budget=1),
+    )
+    manager = Mock()
+    executor._warm_executor_pool_manager = manager  # pylint: disable=protected-access
+
+    executor._wait_for_capacity(  # pylint: disable=protected-access
+        None,
+        allow_warm_dispatch=False,
+        reconcile_warm_pools=False,
+    )
+
+    manager.retry_retiring_pods.assert_called_once_with()
 
 
 def test_wait_for_capacity_reserves_space_for_a_cold_task() -> None:

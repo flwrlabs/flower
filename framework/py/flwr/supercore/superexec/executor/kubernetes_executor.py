@@ -327,6 +327,7 @@ class _WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
         self._active_pod_count = active_pod_count
         self._pools = {pool.key: pool for pool in config.warm_executor_pools}
         self._busy_pods: set[str] = set()
+        self._retiring_pods: set[str] = set()
         self._closed = False
         self._lock = threading.RLock()
         self.ensure_capacity()
@@ -350,6 +351,7 @@ class _WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             if pod_name is None:
                 self._ensure_pool_capacity(pool, reserved_pod_capacity=1)
                 return None
+            self._ensure_pool_capacity(pool)
 
         try:
             dispatch = self._open_dispatch(
@@ -391,6 +393,15 @@ class _WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             self._reconcile_owned_pods()
             for pool in self._pools.values():
                 self._ensure_pool_capacity(pool, reserved_pod_capacity)
+
+    def retry_retiring_pods(self) -> None:
+        """Retry Pod retirement without changing warm pool capacity."""
+        with self._lock:
+            if self._closed:
+                return
+            pods = self._owned_warm_pods()
+            if pods is not None:
+                self._retry_retiring_pods(pods)
 
     def has_ready_pod(self, task_type: TaskType) -> bool:
         """Return whether a matching warm Pod can take a task without new capacity."""
@@ -467,8 +478,11 @@ class _WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             for pod in pods
             if _is_active_warm_executor(pod, pool.key, self._config)
             and (
-                _object_name(pod) in self._busy_pods
-                or not _is_consumed_warm_executor(pod)
+                (
+                    _object_name(pod) not in self._busy_pods
+                    and not _is_consumed_warm_executor(pod)
+                )
+                or _object_name(pod) in self._retiring_pods
             )
         )
         pods_to_create = max(pool.size - compatible_count, 0)
@@ -503,6 +517,7 @@ class _WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
         pods = self._owned_warm_pods()
         if pods is None:
             return
+        self._retry_retiring_pods(pods)
 
         compatible_pods: dict[WarmExecutorPoolKey, list[object]] = {
             pool.key: [] for pool in self._pools.values()
@@ -514,7 +529,9 @@ class _WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
                 and pod_name not in self._busy_pods
                 and _is_consumed_warm_executor(pod)
             ):
-                self._delete_pod(pod_name)
+                self._retire_pod(pod_name)
+                continue
+            if pod_name in self._retiring_pods:
                 continue
             pool = next(
                 (
@@ -531,10 +548,28 @@ class _WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             compatible_pods[pool.key].append(pod)
 
         for pool in self._pools.values():
-            for pod in compatible_pods[pool.key][pool.size :]:
+            idle_pods = [
+                pod
+                for pod in compatible_pods[pool.key]
+                if _object_name(pod) not in self._busy_pods
+            ]
+            for pod in idle_pods[pool.size :]:
                 pod_name = _object_name(pod)
-                if pod_name is not None and pod_name not in self._busy_pods:
+                if pod_name is not None:
                     self._delete_pod(pod_name)
+
+    def _retry_retiring_pods(self, pods: list[object]) -> None:
+        """Retry deletion of consumed Pods without making them dispatchable."""
+        pod_names = {
+            pod_name for pod in pods if (pod_name := _object_name(pod)) is not None
+        }
+        for pod_name in self._retiring_pods - pod_names:
+            self._release_pod(pod_name)
+        for pod in pods:
+            pod_name = _object_name(pod)
+            if pod_name is not None and pod_name in self._retiring_pods:
+                if self._delete_pod(pod_name):
+                    self._release_pod(pod_name)
 
     def _owned_warm_pods(self) -> list[object] | None:
         try:
@@ -616,20 +651,27 @@ class _WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
                 dispatch.close()
             except Exception:  # pylint: disable=broad-exception-caught
                 log(WARNING, "Failed to close warm TaskExecutor exec stream.")
-            if self._delete_pod(pod_name):
+            if self._retire_pod(pod_name):
                 with self._lock:
-                    self._busy_pods.discard(pod_name)
                     if not self._closed:
                         self._ensure_pool_capacity(self._pools[key])
 
     def _release_pod(self, pod_name: str) -> None:
         with self._lock:
             self._busy_pods.discard(pod_name)
+            self._retiring_pods.discard(pod_name)
 
     def _retire_unavailable_pod(self, pod_name: str) -> None:
         """Delete a Pod that failed before task authority was delivered."""
+        self._retire_pod(pod_name)
+
+    def _retire_pod(self, pod_name: str) -> bool:
+        with self._lock:
+            self._retiring_pods.add(pod_name)
         if self._delete_pod(pod_name):
             self._release_pod(pod_name)
+            return True
+        return False
 
     def _delete_pod(self, pod_name: str) -> bool:
         try:
@@ -710,6 +752,11 @@ class KubernetesExecutor:
         last_log_at: float | None = None
         waited_for_capacity = False
         while True:
+            if (
+                not reconcile_warm_pools
+                and self._warm_executor_pool_manager is not None
+            ):
+                self._warm_executor_pool_manager.retry_retiring_pods()
             if (
                 allow_warm_dispatch
                 and self._warm_executor_pool_manager is not None
