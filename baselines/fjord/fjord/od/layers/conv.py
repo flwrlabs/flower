@@ -49,7 +49,7 @@ def get_slice(layer: Module, in_dim: int, out_dim: int) -> Tuple[Tensor, Tensor]
     :param out_dim: The output dimension.
     :return: The slice of weights and bias.
     """
-    weight_slice = layer.weight[:in_dim, :out_dim]
+    weight_slice = layer.weight[:out_dim, :in_dim]
     bias_slice = layer.bias[:out_dim] if layer.bias is not None else None
     return weight_slice, bias_slice
 
