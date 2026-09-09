@@ -222,7 +222,7 @@ def push_messages(
 def get_nodes(
     request: GetNodesRequest, state: NodeState, task: Task
 ) -> GetNodesResponse:
-    """Get available nodes."""
+    """Reject requests for nodes from ClientApp tasks."""
     log(DEBUG, "Runtime.GetNodes")
     raise FlowerError(
         ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
