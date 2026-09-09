@@ -14,6 +14,7 @@
 # ==============================================================================
 """FastAPI dependencies for the shared Runtime API."""
 
+from types import ModuleType
 from typing import Annotated, Protocol, cast
 
 from fastapi import Depends, Request, Security
@@ -48,7 +49,19 @@ def get_runtime_state(request: Request) -> CoreState:
     return factory.state()
 
 
+def get_runtime_handlers(request: Request) -> ModuleType:
+    """Return the handlers configured for the Runtime API."""
+    handlers = cast(
+        ModuleType | None,
+        getattr(request.app.state, "runtime_handlers", None),
+    )
+    if handlers is None:
+        raise RuntimeError("Runtime handlers are not initialized.")
+    return handlers
+
+
 RuntimeStateDependency = Annotated[CoreState, Depends(get_runtime_state)]
+RuntimeHandlersDependency = Annotated[ModuleType, Depends(get_runtime_handlers)]
 
 
 def get_task(
