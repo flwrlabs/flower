@@ -14,16 +14,18 @@
 # ==============================================================================
 """Executor factory for SuperExec TaskExecutor processes."""
 
+from logging import WARNING
 from pathlib import Path
 from typing import Any
 
+from flwr.supercore import log
 from flwr.supercore.constant import ExecutorType, TaskType
 
 from .config import ExecutorConfig
 from .kubernetes_executor import (
     KubernetesExecutor,
     KubernetesExecutorConfig,
-    create_incluster_kubernetes_client,
+    create_incluster_kubernetes_clients,
 )
 from .subprocess_executor import SubprocessExecutor
 from .types import Executor
@@ -53,7 +55,11 @@ _KUBERNETES_CONFIG_FIELD_MAP = {
 
 
 def get_executor(
-    executor_type: ExecutorType, executor_config: ExecutorConfig | None = None
+    executor_type: ExecutorType,
+    executor_config: ExecutorConfig | None = None,
+    *,
+    insecure: bool = False,
+    root_certificates_path: str | None = None,
 ) -> Executor:
     """Return the executor for the configured executor type."""
     if executor_type == ExecutorType.SUBPROCESS:
@@ -63,13 +69,27 @@ def get_executor(
         if executor_config is None:
             raise ValueError("Kubernetes executor requires --executor-config.")
         config = _kubernetes_executor_config_from_mapping(executor_config)
+        if (
+            config.warm_executor_pools
+            and not insecure
+            and config.runtime_root_certificates is None
+            and root_certificates_path is not None
+        ):
+            log(
+                WARNING,
+                "Warm executor pools are disabled because task-specific Runtime CA "
+                "certificates require cold dispatch.",
+            )
+            # Retain the owner so reconciliation can clean up surviving idle Pods.
+            config.warm_executor_pools = ()
         try:
-            client = create_incluster_kubernetes_client()
+            client, exec_client = create_incluster_kubernetes_clients()
         except RuntimeError as err:
             raise ValueError(str(err)) from err
         return KubernetesExecutor(
             client=client,
             config=config,
+            exec_client=exec_client,
         )
 
     raise ValueError(f"Unsupported executor selection: {executor_type}")
@@ -146,8 +166,6 @@ def _warm_executor_pools_from_config(
             raise ValueError("Warm executor pool entries must be mappings.")
         allowed_fields = {
             "task-type",
-            "fab-hash",
-            "dependency-environment-version",
             "size",
         }
         if set(entry) - allowed_fields:
@@ -157,14 +175,6 @@ def _warm_executor_pools_from_config(
             raise ValueError(
                 "Warm executor pools support only task-type 'flwr-agentapp'."
             )
-        fab_hash = entry.get("fab-hash")
-        if not isinstance(fab_hash, str) or not fab_hash.strip():
-            raise ValueError("Warm executor pool requires non-empty string 'fab-hash'.")
-        dependency_environment_version = entry.get("dependency-environment-version")
-        if not isinstance(dependency_environment_version, str):
-            raise ValueError(
-                "Warm executor pool requires string 'dependency-environment-version'."
-            )
         size = entry.get("size")
         if isinstance(size, bool) or not isinstance(size, int):
             raise ValueError("Warm executor pool requires integer 'size'.")
@@ -173,9 +183,7 @@ def _warm_executor_pools_from_config(
             WarmExecutorPoolConfig(
                 key=WarmExecutorPoolKey(
                     task_type=TaskType.AGENT_APP,
-                    fab_hash=fab_hash,
                     runtime_image=runtime_image,
-                    dependency_environment_version=dependency_environment_version,
                 ),
                 size=size,
             )

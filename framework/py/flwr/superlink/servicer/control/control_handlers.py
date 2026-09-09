@@ -177,6 +177,7 @@ from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
+from flwr.superlink.federation.typing import Federation as FederationInfo
 from flwr.superlink.run_source import RunSource
 
 
@@ -1205,9 +1206,12 @@ def get_run_series(
     # Run series context is created atomically by LinkState.create_run(...)
     # and should never be None.
     series_context = state.get_run_series_context(request.series_id)
+    run_series = series_matches[0]
+    runs = [run_to_proto(run) for run in state.get_run_info(run_ids=run_series.run_ids)]
     response = GetRunSeriesResponse(
-        series=_with_last_run_statuses(state, series_matches)[0],
+        series=_with_last_run_statuses(state, [run_series])[0],
         context=context_to_proto(series_context) if series_context else None,
+        runs=runs,
     )
     return response
 
@@ -1488,6 +1492,22 @@ def list_nodes(
     return ListNodesResponse(nodes_info=nodes_info, now=now().isoformat())
 
 
+def _get_federation_member_count(federation: FederationInfo) -> int:
+    """Return the explicit member count or fall back to the member list size."""
+    count = (
+        federation.member_count
+        if federation.member_count is not None
+        else len(federation.members)
+    )
+    if count < 0 or count > 0xFFFFFFFF:
+        raise FlowerError(
+            ApiErrorCode.INVALID_HANDLER_RESPONSE,
+            f"Invalid federation member_count={count} "
+            f"for federation_id={federation.id}.",
+        )
+    return count
+
+
 def list_federations(
     request: ListFederationsRequest, account: AccountInfo, state: LinkState
 ) -> ListFederationsResponse:
@@ -1506,6 +1526,8 @@ def list_federations(
             Federation(
                 name=fed.id,
                 description=fed.description,
+                members=fed.members,
+                member_count=_get_federation_member_count(fed),
                 archived=fed.archived,
                 simulation=fed.simulation,
                 can_invite_members=fed.can_invite_members,
@@ -1604,6 +1626,7 @@ def show_federation(
         name=federation_id,
         description=details.description,
         members=details.members,
+        member_count=_get_federation_member_count(details),
         nodes=details.nodes,
         runs=[run_to_proto(run) for run in details.runs],
         archived=details.archived,
@@ -1664,6 +1687,7 @@ def create_federation(
             name=federation.id,
             description=federation.description,
             members=federation.members,
+            member_count=_get_federation_member_count(federation),
             simulation=federation.simulation,
             can_invite_members=federation.can_invite_members,
             can_add_supernodes=federation.can_add_supernodes,

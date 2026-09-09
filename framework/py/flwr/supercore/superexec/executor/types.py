@@ -36,7 +36,6 @@ class ExecutionSpec:  # pylint: disable=too-many-instance-attributes
     parent_pid: int | None
     suppress_output: bool
     task_id: int
-    fab_hash: str | None = None
 
     def __post_init__(self) -> None:
         """Validate fields required by all executors."""
@@ -89,15 +88,24 @@ class Executor(Protocol):
     """SuperExec component that starts TaskExecutor processes from an ExecutionSpec.
 
     An executor gates capacity, starts processes, and reports the immediate
-    launch outcome; it does not monitor, terminate, reconcile, or report task
-    status.
+    launch outcome. It owns backend resource cleanup, but task status remains
+    the responsibility of the Runtime API.
     """
 
-    def wait_for_capacity(self) -> None:
+    def wait_for_capacity(
+        self,
+        task_type: TaskType | None = None,
+        *,
+        insecure: bool = False,
+        root_certificates_path: str | None = None,
+    ) -> None:
         """Wait until the executor can accept one TaskExecutor launch."""
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""
+
+    def reconcile(self) -> None:
+        """Maintain executor-owned resources between task polls."""
 
     def close(self) -> None:
         """Release executor-owned resources during SuperExec shutdown."""
