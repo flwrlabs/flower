@@ -110,3 +110,10 @@ selector. Send a prompt to begin.
 Repeat step 3 and the ``launchctl`` command after signing out of or restarting
 macOS. To remove the key from the desktop environment, quit the app and run
 ``launchctl unsetenv FLOWER_API_KEY``.
+
+Get help
+--------
+
+If you encounter any issues, feel free to post on
+`Flower Discuss <https://discuss.flower.ai>`_. The Flower team will get back to
+you soon.
