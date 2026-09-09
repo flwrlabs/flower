@@ -113,10 +113,15 @@ def test_run_superexec_adds_runtime_version_interceptor(
     )
 
 
+@pytest.mark.parametrize(
+    ("insecure", "root_certificates_path"), [(True, None), (False, "runtime-ca.pem")]
+)
 def test_run_superexec_passes_executor_config_to_factory(
     monkeypatch: pytest.MonkeyPatch,
+    insecure: bool,
+    root_certificates_path: str | None,
 ) -> None:
-    """SuperExec should pass selected executor config to the factory."""
+    """SuperExec should pass executor config and Runtime transport to the factory."""
     client = Mock()
     client.PullPendingTasks.side_effect = KeyboardInterrupt()
     client_class = Mock()
@@ -129,20 +134,51 @@ def test_run_superexec_passes_executor_config_to_factory(
 
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
     monkeypatch.setattr(run_superexec_module, "get_executor", get_executor)
+    monkeypatch.setattr(
+        run_superexec_module, "validate_and_resolve_root_certificates", Mock()
+    )
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
             plugin_class=Mock(),
             client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
-            insecure=True,
+            insecure=insecure,
+            root_certificates_path=root_certificates_path,
             executor_type=ExecutorType.KUBERNETES,
             executor_config=executor_config,
         )
 
     get_executor.assert_called_once_with(
-        ExecutorType.KUBERNETES, executor_config=executor_config
+        ExecutorType.KUBERNETES,
+        executor_config=executor_config,
+        insecure=insecure,
+        root_certificates_path=root_certificates_path,
     )
+    get_executor.return_value.reconcile.assert_called_once_with()
+    get_executor.return_value.close.assert_called_once_with()
+
+
+def test_run_superexec_closes_executor_when_runtime_client_setup_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Warm Pods are cleaned up when startup fails before handlers are installed."""
+    executor = Mock()
+    client_class = Mock()
+    client_class.from_server_address.side_effect = RuntimeError("Runtime unavailable")
+    monkeypatch.setattr(
+        run_superexec_module, "get_executor", Mock(return_value=executor)
+    )
+
+    with pytest.raises(RuntimeError, match="Runtime unavailable"):
+        run_superexec_module.run_superexec(
+            plugin_class=Mock(),
+            client_class=client_class,
+            runtime_api_address="127.0.0.1:9091",
+            insecure=True,
+        )
+
+    executor.close.assert_called_once_with()
 
 
 def test_run_superexec_preserves_accepted_launch_behavior(
