@@ -18,6 +18,7 @@
 
 import importlib
 import threading
+from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -324,8 +325,11 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
 
     assert result.status == LaunchResultStatus.ACCEPTED
     client.create_namespaced_pod.assert_called_once()
-    client.create_namespaced_secret.assert_not_called()
+    client.create_namespaced_secret.assert_called_once()
     pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
+    root_certificates_secret = _as_dict(
+        client.create_namespaced_secret.call_args.args[1]
+    )
     metadata = pod["metadata"]
     container = pod["spec"]["containers"][0]
 
@@ -339,9 +343,16 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
         WARM_EXECUTOR_FAB_HASH_ANNOTATION: "fab-sha256",
         WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION: ("ghcr.io/flwrlabs/taskexecutor:warm"),
         WARM_EXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION: "agent-env-v1",
+        "flower.ai/warm-executor-runtime-root-certificates-sha256": (
+            sha256(b"root-ca").hexdigest()
+        ),
     }
     assert _TASK_ID_LABEL not in metadata["labels"]
     assert LAUNCH_ATTEMPT_LABEL not in metadata["labels"]
+    assert root_certificates_secret["stringData"] == {"ca.crt": "root-ca"}
+    assert root_certificates_secret["metadata"]["labels"] == metadata["labels"]
+    assert "task-token" not in repr(pod)
+    assert "task-token" not in repr(root_certificates_secret)
     assert container == {
         "name": "taskexecutor",
         "image": "ghcr.io/flwrlabs/taskexecutor:warm",
@@ -350,7 +361,12 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
             {
                 "name": "warm-executor-ready",
                 "mountPath": WARM_EXECUTOR_READY_DIRECTORY,
-            }
+            },
+            {
+                "name": "warm-executor-root-certificates",
+                "mountPath": "/run/flwr/runtime-ca",
+                "readOnly": True,
+            },
         ],
         "readinessProbe": {
             "exec": {"command": list(WARM_EXECUTOR_READINESS_COMMAND)},
@@ -358,7 +374,16 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
         },
         "securityContext": {"readOnlyRootFilesystem": True},
     }
-    assert pod["spec"]["volumes"] == [{"name": "warm-executor-ready", "emptyDir": {}}]
+    assert pod["spec"]["volumes"] == [
+        {"name": "warm-executor-ready", "emptyDir": {}},
+        {
+            "name": "warm-executor-root-certificates",
+            "secret": {
+                "secretName": "flwr-taskexecutor-warm-executor123-runtime-ca",
+                "defaultMode": 0o444,
+            },
+        },
+    ]
     assert pod["spec"]["automountServiceAccountToken"] is False
 
     pod["status"] = {
@@ -412,16 +437,25 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
     )
 
 
+@pytest.mark.parametrize(
+    ("insecure", "transport_args"),
+    [
+        (True, ["--insecure"]),
+        (False, ["--root-certificates", "/run/flwr/runtime-ca/ca.crt"]),
+    ],
+)
 def test_launch_dispatches_compatible_ready_pod_without_a_credential_secret(
     monkeypatch: pytest.MonkeyPatch,
+    insecure: bool,
+    transport_args: list[str],
 ) -> None:
-    """A compatible idle Pod should receive the task token only over stdin."""
+    """A compatible idle Pod receives only the task token over standard input."""
     client = Mock()
     pool_key = _warm_executor_pool_key(
         runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
     config = _executor_config(
-        runtime_root_certificates=None,
+        runtime_root_certificates=None if insecure else "root-ca",
         warm_executor_owner="superexec-a",
         warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
     )
@@ -448,7 +482,7 @@ def test_launch_dispatches_compatible_ready_pod_without_a_credential_secret(
         _execution_spec(
             task_type=TaskType.AGENT_APP,
             fab_hash="fab-sha256",
-            insecure=True,
+            insecure=insecure,
         )
     )
 
@@ -462,7 +496,7 @@ def test_launch_dispatches_compatible_ready_pod_without_a_credential_secret(
         "--runtime-api-address",
         "appio.example.com:9092",
         "--token-stdin",
-        "--insecure",
+        *transport_args,
     ]
     assert "task-token" not in command
     assert len(started) == 1
