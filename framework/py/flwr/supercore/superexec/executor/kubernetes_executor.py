@@ -746,10 +746,7 @@ class KubernetesExecutor:
             )
             if has_ready_warm_pod:
                 return
-        if (
-            not reconcile_warm_pools
-            and self._warm_executor_pool_manager is not None
-        ):
+        if not reconcile_warm_pools and self._warm_executor_pool_manager is not None:
             self._warm_executor_pool_manager.retry_retiring_pods()
         if self._config.active_pod_budget is None:
             return

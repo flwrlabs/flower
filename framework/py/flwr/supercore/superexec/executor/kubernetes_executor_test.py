@@ -894,8 +894,9 @@ def test_wait_for_capacity_reserves_cold_capacity_for_a_secure_task() -> None:
     sleep.assert_called_once_with(1.0)
 
 
-def test_cold_fallback_retries_pending_warm_pod_retirement_without_a_pod_budget(
-) -> None:
+def test_cold_fallback_retries_pending_warm_pod_retirement_without_a_pod_budget() -> (
+    None
+):
     """Cold fallback retries retirement before returning without a Pod budget."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
