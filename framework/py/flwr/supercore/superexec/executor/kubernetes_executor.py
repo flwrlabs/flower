@@ -706,7 +706,7 @@ class KubernetesExecutor:
             _WarmExecutorPoolManager(
                 client, config, self._active_pod_count, exec_client
             )
-            if config.warm_executor_pools
+            if config.warm_executor_owner
             else None
         )
 
@@ -746,17 +746,17 @@ class KubernetesExecutor:
             )
             if has_ready_warm_pod:
                 return
+        if (
+            not reconcile_warm_pools
+            and self._warm_executor_pool_manager is not None
+        ):
+            self._warm_executor_pool_manager.retry_retiring_pods()
         if self._config.active_pod_budget is None:
             return
 
         last_log_at: float | None = None
         waited_for_capacity = False
         while True:
-            if (
-                not reconcile_warm_pools
-                and self._warm_executor_pool_manager is not None
-            ):
-                self._warm_executor_pool_manager.retry_retiring_pods()
             if (
                 allow_warm_dispatch
                 and self._warm_executor_pool_manager is not None

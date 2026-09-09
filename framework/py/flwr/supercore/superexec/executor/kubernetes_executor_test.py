@@ -702,6 +702,24 @@ def test_warm_pool_retires_consumed_pod_from_a_previous_manager() -> None:
     client.create_namespaced_pod.assert_called_once()
 
 
+def test_disabled_warm_pools_retire_owned_pods() -> None:
+    """An owner cleans up its Pods after warm pools are disabled."""
+    client = Mock()
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(warm_executor_owner="superexec-a")
+    client.list_namespaced_pod.return_value = {
+        "items": [_ready_warm_pod(pool_key, config, name="obsolete")]
+    }
+
+    KubernetesExecutor(client=client, config=config)
+
+    client.delete_namespaced_pod.assert_called_once_with(
+        name="obsolete", namespace="flower-system", grace_period_seconds=0
+    )
+
+
 def test_warm_pool_retries_retirement_without_replacing_pending_pod() -> None:
     """A failed retirement is retried without creating more warm Pods."""
     client = Mock()
@@ -876,14 +894,15 @@ def test_wait_for_capacity_reserves_cold_capacity_for_a_secure_task() -> None:
     sleep.assert_called_once_with(1.0)
 
 
-def test_cold_fallback_wait_retries_pending_warm_pod_retirement() -> None:
-    """Cold fallback retries retirement before waiting at the Pod budget."""
+def test_cold_fallback_retries_pending_warm_pod_retirement_without_a_pod_budget(
+) -> None:
+    """Cold fallback retries retirement before returning without a Pod budget."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     client.list_namespaced_secret.return_value = {"items": []}
     executor = KubernetesExecutor(
         client=client,
-        config=_executor_config(active_pod_budget=1),
+        config=_executor_config(),
     )
     manager = Mock()
     executor._warm_executor_pool_manager = manager  # pylint: disable=protected-access
