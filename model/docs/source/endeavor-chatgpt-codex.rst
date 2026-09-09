@@ -36,7 +36,7 @@ Copy the printed ``model_catalog_json`` line for the next step.
 The CLI and desktop app share ``~/.codex/config.toml``. Create the file if
 needed, back it up, and open it:
 
-.. code-block:: zsh
+.. code-block:: console
 
    touch "$HOME/.codex/config.toml"
    cp -p "$HOME/.codex/config.toml" \
