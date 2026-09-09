@@ -451,18 +451,22 @@ class GetRunSeriesResponse(google.protobuf.message.Message):
 
     SERIES_FIELD_NUMBER: builtins.int
     CONTEXT_FIELD_NUMBER: builtins.int
+    RUNS_FIELD_NUMBER: builtins.int
     @property
     def series(self) -> flwr.proto.runseries_pb2.RunSeries: ...
     @property
     def context(self) -> flwr.proto.message_pb2.Context: ...
+    @property
+    def runs(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.run_pb2.Run]: ...
     def __init__(
         self,
         *,
         series: flwr.proto.runseries_pb2.RunSeries | None = ...,
         context: flwr.proto.message_pb2.Context | None = ...,
+        runs: collections.abc.Iterable[flwr.proto.run_pb2.Run] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["context", b"context", "series", b"series"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["context", b"context", "series", b"series"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["context", b"context", "runs", b"runs", "series", b"series"]) -> None: ...
 
 global___GetRunSeriesResponse = GetRunSeriesResponse
 

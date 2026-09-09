@@ -1035,8 +1035,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual([entry.series_id for entry in agent_response.entries], [1])
         self.assertEqual([entry.series_id for entry in non_agent_response.entries], [2])
 
-    def test_get_run_series_returns_context(self) -> None:
-        """Test GetRunSeries returns series metadata and shared Context."""
+    def test_get_run_series_returns_context_and_runs(self) -> None:
+        """Test GetRunSeries returns its context and runs."""
         # Prepare
         series_id = 10
         run_id = self._create_dummy_run(self.aid)
@@ -1061,6 +1061,12 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(response.series.last_run_status.status, Status.PENDING)
         self.assertTrue(response.HasField("context"))
         self.assertEqual(response.context.series_id, series_id)
+        self.assertEqual(len(response.runs), 1)
+        self.assertEqual(response.runs[0].run_id, run_id)
+        self.assertTrue(response.runs[0].pending_at)
+        self.assertFalse(response.runs[0].starting_at)
+        self.assertFalse(response.runs[0].running_at)
+        self.assertFalse(response.runs[0].finished_at)
 
     def test_get_run_series_raises_for_unknown_series(self) -> None:
         """Test GetRunSeries raises for unknown RunSeries IDs."""
