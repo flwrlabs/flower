@@ -12,19 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Kubernetes exec handoff for one-task warm AgentApp executors."""
+"""Kubernetes dispatch and pool lifecycle for one-task warm AgentApp executors."""
 
+from __future__ import annotations
 
+import importlib
+import threading
 import time
+from collections.abc import Callable, Mapping, Sequence
+from logging import WARNING
+from typing import TYPE_CHECKING
 
+from flwr.supercore import log
 from flwr.supercore.constant import (
     TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
     TASK_TYPE_TO_COMMAND,
+    TaskType,
+)
+from flwr.supercore.typing import JSONObject
+
+from .types import ExecutionSpec, LaunchResult
+from .warm_executor_pool import (
+    WarmExecutorPoolConfig,
+    WarmExecutorPoolKey,
+    is_warm_executor_ready,
+    new_warm_executor_id,
 )
 
-from .types import ExecutionSpec
+if TYPE_CHECKING:
+    from .kubernetes_executor import KubernetesClient, KubernetesExecutorConfig
 
 _TOKEN_STDIN_ACKNOWLEDGEMENT = "FLWR_AGENTAPP_TOKEN_ACCEPTED"
+WARM_EXECUTOR_CONSUMED_ANNOTATION = "flower.ai/warm-executor-consumed"
+_WARM_EXECUTOR_ACK_TIMEOUT_SECONDS = 5.0
 
 
 class WarmAgentAppUnavailable(RuntimeError):
@@ -122,3 +142,441 @@ def warm_agentapp_command(
     if spec.runtime_dependency_install:
         command.append("--allow-runtime-dependency-installation")
     return command
+
+
+class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,too-many-arguments
+    """Own and dispatch a fixed set of compatible, one-task warm AgentApp Pods."""
+
+    def __init__(
+        self,
+        client: KubernetesClient,
+        config: KubernetesExecutorConfig,
+        active_pod_count: Callable[[], int],
+        exec_client: KubernetesClient | None = None,
+        *,
+        build_warm_executor_pod: Callable[
+            [WarmExecutorPoolKey, KubernetesExecutorConfig, str], JSONObject
+        ],
+        has_warm_executor_configuration: Callable[
+            [object, KubernetesExecutorConfig], bool
+        ],
+        is_active_warm_executor: Callable[
+            [object, WarmExecutorPoolKey, KubernetesExecutorConfig], bool
+        ],
+        warm_executor_owner_label_selector: Callable[[KubernetesExecutorConfig], str],
+    ) -> None:
+        self._client = client
+        self._exec_client = exec_client or client
+        self._config = config
+        self._active_pod_count = active_pod_count
+        self._build_warm_executor_pod = build_warm_executor_pod
+        self._has_warm_executor_configuration = has_warm_executor_configuration
+        self._is_active_warm_executor = is_active_warm_executor
+        self._warm_executor_owner_label_selector = warm_executor_owner_label_selector
+        self._pools = {pool.key: pool for pool in config.warm_executor_pools}
+        self._busy_pods: set[str] = set()
+        self._retiring_pods: set[str] = set()
+        self._closed = False
+        self._lock = threading.RLock()
+        self.ensure_capacity()
+
+    # pylint: disable-next=too-many-return-statements
+    def launch(
+        self, spec: ExecutionSpec, runtime_root_certificates: str | None
+    ) -> LaunchResult | None:
+        """Dispatch a compatible task to a ready Pod or use the cold fallback."""
+        pool = self._pool_for_spec(spec)
+        if pool is None:
+            return None
+
+        with self._lock:
+            if self._closed:
+                return None
+            try:
+                pod_name = self._take_ready_pod(pool.key)
+            except WarmAgentAppUnavailable:
+                return None
+            if pod_name is None:
+                self._ensure_pool_capacity(pool, reserved_pod_capacity=1)
+                return None
+            self._ensure_pool_capacity(pool)
+
+        try:
+            dispatch = self._open_dispatch(
+                pod_name=pod_name,
+                spec=spec,
+                runtime_root_certificates=runtime_root_certificates,
+            )
+        except WarmAgentAppUnavailable:
+            self._retire_unavailable_pod(pod_name)
+            return None
+
+        try:
+            dispatch.send_token(spec.token)
+        except Exception:  # pylint: disable=broad-exception-caught
+            self._retire_after_dispatch(pod_name, pool.key, dispatch)
+            return LaunchResult.unknown(
+                "Warm executor token delivery outcome was unknown."
+            )
+
+        try:
+            accepted = dispatch.wait_for_acceptance(_WARM_EXECUTOR_ACK_TIMEOUT_SECONDS)
+        except Exception:  # pylint: disable=broad-exception-caught
+            self._retire_after_dispatch(pod_name, pool.key, dispatch)
+            return LaunchResult.unknown(
+                "Warm executor token acknowledgement outcome was unknown."
+            )
+        self._retire_after_dispatch(pod_name, pool.key, dispatch)
+        if accepted:
+            return LaunchResult.accepted()
+        return LaunchResult.unknown(
+            "Warm executor did not acknowledge task token delivery."
+        )
+
+    def ensure_capacity(self, reserved_pod_capacity: int = 0) -> None:
+        """Create missing idle Pods for every configured compatible pool."""
+        with self._lock:
+            if self._closed:
+                return
+            self._reconcile_owned_pods()
+            for pool in self._pools.values():
+                self._ensure_pool_capacity(pool, reserved_pod_capacity)
+
+    def retry_retiring_pods(self) -> None:
+        """Retry Pod retirement without changing warm pool capacity."""
+        with self._lock:
+            if self._closed:
+                return
+            pods = self._owned_warm_pods()
+            if pods is not None:
+                self._retry_retiring_pods(pods)
+
+    def has_ready_pod(self, task_type: TaskType) -> bool:
+        """Return whether a matching warm Pod can take a task without new capacity."""
+        pool = self._pool_for_task(task_type)
+        if pool is None:
+            return False
+        with self._lock:
+            if self._closed:
+                return False
+            pods = self._owned_warm_pods()
+            if pods is None:
+                return False
+            return any(
+                (_object_name(pod) is not None)
+                and (_object_name(pod) not in self._busy_pods)
+                and not _is_consumed_warm_executor(pod)
+                and self._has_warm_executor_configuration(pod, self._config)
+                and is_warm_executor_ready(pod, pool.key)
+                for pod in pods
+            )
+
+    def close(self) -> None:
+        """Stop dispatch and delete only idle Pods owned by this SuperExec."""
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+        pods = self._owned_warm_pods()
+        if pods is None:
+            return
+        for pod in pods:
+            pod_name = _object_name(pod)
+            if pod_name is not None and pod_name not in self._busy_pods:
+                self._delete_pod(pod_name)
+
+    def _pool_for_spec(self, spec: ExecutionSpec) -> WarmExecutorPoolConfig | None:
+        return self._pool_for_task(spec.task_type)
+
+    def _pool_for_task(self, task_type: TaskType) -> WarmExecutorPoolConfig | None:
+        for pool in self._pools.values():
+            if (
+                pool.key.task_type == task_type
+                and pool.key.runtime_image == self._config.image
+            ):
+                return pool
+        return None
+
+    def _take_ready_pod(self, key: WarmExecutorPoolKey) -> str | None:
+        pods = self._owned_warm_pods()
+        if pods is None:
+            raise WarmAgentAppUnavailable("Warm executor Pods could not be listed.")
+        for pod in pods:
+            pod_name = _object_name(pod)
+            if (
+                pod_name is not None
+                and pod_name not in self._busy_pods
+                and not _is_consumed_warm_executor(pod)
+                and self._has_warm_executor_configuration(pod, self._config)
+                and is_warm_executor_ready(pod, key)
+            ):
+                try:
+                    self._mark_pod_consumed(pod_name)
+                except WarmAgentAppUnavailable:
+                    self._retire_unavailable_pod(pod_name)
+                    raise
+                self._busy_pods.add(pod_name)
+                return pod_name
+        return None
+
+    def _ensure_pool_capacity(
+        self, pool: WarmExecutorPoolConfig, reserved_pod_capacity: int = 0
+    ) -> None:
+        if self._retiring_pods:
+            return
+        pods = self._owned_warm_pods()
+        if pods is None:
+            return
+        compatible_count = sum(
+            1
+            for pod in pods
+            if self._is_active_warm_executor(pod, pool.key, self._config)
+            and (
+                (
+                    _object_name(pod) not in self._busy_pods
+                    and not _is_consumed_warm_executor(pod)
+                )
+                or _object_name(pod) in self._retiring_pods
+            )
+        )
+        pods_to_create = max(pool.size - compatible_count, 0)
+        if self._config.active_pod_budget is not None:
+            try:
+                available_pod_capacity = (
+                    self._config.active_pod_budget
+                    - self._active_pod_count()
+                    - reserved_pod_capacity
+                    - reserved_pod_capacity
+                )
+            except Exception:  # pylint: disable=broad-exception-caught
+                log(
+                    WARNING,
+                    "Warm executor capacity check failed; "
+                    "not creating replacement Pods.",
+                    exc_info=True,
+                )
+                return
+            pods_to_create = min(pods_to_create, max(available_pod_capacity, 0))
+        for _ in range(pods_to_create):
+            try:
+                pod = self._build_warm_executor_pod(
+                    pool.key, self._config, new_warm_executor_id()
+                )
+                self._client.create_namespaced_pod(self._config.namespace, pod)
+            except Exception:  # pylint: disable=broad-exception-caught
+                log(WARNING, "Failed to create a warm TaskExecutor Pod.", exc_info=True)
+                return
+
+    def _reconcile_owned_pods(self) -> None:
+        """Delete owned Pods that are obsolete or exceed configured capacity."""
+        pods = self._owned_warm_pods()
+        if pods is None:
+            return
+        self._retry_retiring_pods(pods)
+
+        compatible_pods: dict[WarmExecutorPoolKey, list[object]] = {
+            pool.key: [] for pool in self._pools.values()
+        }
+        for pod in pods:
+            pod_name = _object_name(pod)
+            if (
+                pod_name is not None
+                and pod_name not in self._busy_pods
+                and _is_consumed_warm_executor(pod)
+            ):
+                self._retire_pod(pod_name)
+                continue
+            if pod_name in self._retiring_pods:
+                continue
+            pool = next(
+                (
+                    candidate
+                    for candidate in self._pools.values()
+                    if self._is_active_warm_executor(pod, candidate.key, self._config)
+                ),
+                None,
+            )
+            if pool is None:
+                if pod_name is not None and pod_name not in self._busy_pods:
+                    self._retire_pod(pod_name)
+                continue
+            compatible_pods[pool.key].append(pod)
+
+        for pool in self._pools.values():
+            idle_pods = [
+                pod
+                for pod in compatible_pods[pool.key]
+                if _object_name(pod) not in self._busy_pods
+            ]
+            for pod in idle_pods[pool.size :]:
+                pod_name = _object_name(pod)
+                if pod_name is not None:
+                    self._retire_pod(pod_name)
+
+    def _retry_retiring_pods(self, pods: list[object]) -> None:
+        """Retry deletion of consumed Pods without making them dispatchable."""
+        pod_names = {
+            pod_name for pod in pods if (pod_name := _object_name(pod)) is not None
+        }
+        for pod_name in self._retiring_pods - pod_names:
+            self._release_pod(pod_name)
+        for pod in pods:
+            pod_name = _object_name(pod)
+            if pod_name is not None and pod_name in self._retiring_pods:
+                if self._delete_pod(pod_name):
+                    self._release_pod(pod_name)
+
+    def _owned_warm_pods(self) -> list[object] | None:
+        try:
+            pod_list = self._client.list_namespaced_pod(
+                self._config.namespace,
+                label_selector=self._warm_executor_owner_label_selector(self._config),
+            )
+        except Exception:  # pylint: disable=broad-exception-caught
+            log(WARNING, "Failed to list warm TaskExecutor Pods.", exc_info=True)
+            return None
+        return _pod_items(pod_list)
+
+    def _open_dispatch(
+        self,
+        *,
+        pod_name: str,
+        spec: ExecutionSpec,
+        runtime_root_certificates: str | None,
+    ) -> KubernetesWarmAgentAppDispatch:
+        try:
+            stream = importlib.import_module("kubernetes.stream").stream
+            response = stream(
+                self._exec_client.connect_get_namespaced_pod_exec,
+                pod_name,
+                self._config.namespace,
+                command=warm_agentapp_command(spec, runtime_root_certificates),
+                stderr=True,
+                stdin=True,
+                stdout=True,
+                tty=False,
+                _preload_content=False,
+            )
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            raise WarmAgentAppUnavailable(
+                "Warm TaskExecutor Pod is unavailable for dispatch."
+            ) from err
+        return KubernetesWarmAgentAppDispatch(response)
+
+    def _mark_pod_consumed(self, pod_name: str) -> None:
+        try:
+            self._client.patch_namespaced_pod(
+                name=pod_name,
+                namespace=self._config.namespace,
+                body={
+                    "metadata": {
+                        "annotations": {WARM_EXECUTOR_CONSUMED_ANNOTATION: "true"}
+                    }
+                },
+            )
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            raise WarmAgentAppUnavailable(
+                "Failed to persist warm TaskExecutor Pod consumption."
+            ) from err
+
+    def _retire_after_dispatch(
+        self,
+        pod_name: str,
+        key: WarmExecutorPoolKey,
+        dispatch: KubernetesWarmAgentAppDispatch,
+    ) -> None:
+        cleanup_thread = threading.Thread(
+            target=self._wait_for_task_and_replace,
+            args=(pod_name, key, dispatch),
+            daemon=True,
+        )
+        try:
+            cleanup_thread.start()
+        except RuntimeError:
+            self._wait_for_task_and_replace(pod_name, key, dispatch)
+
+    def _wait_for_task_and_replace(
+        self,
+        pod_name: str,
+        key: WarmExecutorPoolKey,
+        dispatch: KubernetesWarmAgentAppDispatch,
+    ) -> None:
+        try:
+            dispatch.wait_for_close()
+        finally:
+            try:
+                dispatch.close()
+            except Exception:  # pylint: disable=broad-exception-caught
+                log(WARNING, "Failed to close warm TaskExecutor exec stream.")
+            if self._retire_pod(pod_name):
+                with self._lock:
+                    if not self._closed:
+                        self._ensure_pool_capacity(self._pools[key])
+
+    def _release_pod(self, pod_name: str) -> None:
+        with self._lock:
+            self._busy_pods.discard(pod_name)
+            self._retiring_pods.discard(pod_name)
+
+    def _retire_unavailable_pod(self, pod_name: str) -> None:
+        """Delete a Pod that failed before task authority was delivered."""
+        self._retire_pod(pod_name)
+
+    def _retire_pod(self, pod_name: str) -> bool:
+        with self._lock:
+            self._retiring_pods.add(pod_name)
+        if self._delete_pod(pod_name):
+            self._release_pod(pod_name)
+            return True
+        return False
+
+    def _delete_pod(self, pod_name: str) -> bool:
+        try:
+            self._client.delete_namespaced_pod(
+                name=pod_name,
+                namespace=self._config.namespace,
+                grace_period_seconds=0,
+            )
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            if _exception_status(exc) == 404:
+                return True
+            log(WARNING, "Failed to delete warm TaskExecutor Pod %s.", pod_name)
+            return False
+        return True
+
+
+def _is_consumed_warm_executor(pod: object) -> bool:
+    """Return true when a Pod was reserved for a task before this process started."""
+    metadata = _object_field(pod, "metadata")
+    annotations = _object_field(metadata, "annotations")
+    return _object_field(annotations, WARM_EXECUTOR_CONSUMED_ANNOTATION) == "true"
+
+
+def _pod_items(pod_list: object) -> list[object]:
+    """Return Pod items from a Kubernetes list response."""
+    items = _object_field(pod_list, "items")
+    if isinstance(items, Sequence) and not isinstance(items, str):
+        return list(items)
+    return []
+
+
+def _object_name(value: object) -> str | None:
+    """Return an object's metadata name."""
+    metadata = _object_field(value, "metadata")
+    name = _object_field(metadata, "name")
+    if isinstance(name, str) and name.strip():
+        return name
+    return None
+
+
+def _object_field(value: object, field_name: str) -> object | None:
+    """Return a field from a Kubernetes dict or model object."""
+    if isinstance(value, Mapping):
+        return value.get(field_name)
+    return getattr(value, field_name, None)
+
+
+def _exception_status(exc: Exception) -> int | None:
+    """Return a Kubernetes API status code when exposed by an exception."""
+    status = getattr(exc, "status", None)
+    return status if isinstance(status, int) else None
