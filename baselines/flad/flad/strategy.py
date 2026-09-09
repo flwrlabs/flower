@@ -82,6 +82,18 @@ class Flad(Strategy):
             client[self.arrayrecord_key] = None
             clients.append(client)
 
+        # Ensure there are no duplicate client names.
+        seen_names = set()
+        duplicate_names = set()
+        for client in clients:
+            if client["name"] in seen_names:
+                duplicate_names.add(client["name"])
+            seen_names.add(client["name"])
+        if duplicate_names:
+            raise ValueError(
+                f"Duplicate client name(s) in client_names: {sorted(duplicate_names)}."
+            )
+
         self.clients = clients
         self.last_round_average_f1 = 1.0
         self.best_average_f1 = 0.0
