@@ -462,7 +462,11 @@ class _WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
                 and _has_warm_executor_configuration(pod, self._config)
                 and is_warm_executor_ready(pod, key)
             ):
-                self._mark_pod_consumed(pod_name)
+                try:
+                    self._mark_pod_consumed(pod_name)
+                except WarmAgentAppUnavailable:
+                    self._retire_unavailable_pod(pod_name)
+                    raise
                 self._busy_pods.add(pod_name)
                 return pod_name
         return None

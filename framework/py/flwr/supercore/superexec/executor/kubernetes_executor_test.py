@@ -542,6 +542,36 @@ def test_launch_falls_back_to_cold_pod_when_warm_pods_cannot_be_listed() -> None
     assert cold_pod["spec"]["containers"][0]["command"] == ["flwr-agentapp"]
 
 
+def test_launch_retires_warm_pod_when_consumption_cannot_be_persisted() -> None:
+    """A Pod without a persisted reservation must not remain dispatchable."""
+    client = Mock()
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        runtime_root_certificates=None,
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+    )
+    warm_pod = _ready_warm_pod(pool_key, config)
+    client.list_namespaced_pod.return_value = {"items": [warm_pod]}
+    client.patch_namespaced_pod.side_effect = _KubernetesApiError(403, "forbidden")
+    executor = KubernetesExecutor(client=client, config=config)
+
+    result = executor.launch(
+        _execution_spec(task_type=TaskType.AGENT_APP, insecure=True)
+    )
+
+    assert result.status == LaunchResultStatus.ACCEPTED
+    client.delete_namespaced_pod.assert_called_once_with(
+        name=warm_pod["metadata"]["name"],
+        namespace="flower-system",
+        grace_period_seconds=0,
+    )
+    cold_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
+    assert cold_pod["spec"]["containers"][0]["command"] == ["flwr-agentapp"]
+
+
 def test_launch_retires_warm_pod_when_dispatch_cannot_open(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
