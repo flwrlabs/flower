@@ -5,14 +5,17 @@
 Use Endeavor with ChatGPT/Codex
 ===============================
 
-You need a Flower API key with Endeavor access. Request access by filling out
-the `Endeavor 1.0 access form <https://flowerlabs.typeform.com/to/jlniHsuy>`_.
+.. note::
+
+    You need a Flower API key with Endeavor access. Request access by filling out
+    the `Endeavor 1.0 access form <https://flowerlabs.typeform.com/to/jlniHsuy>`_.
 
 This guide connects Codex CLI and local Codex tasks in the ChatGPT/Codex
 desktop app to ``flower-endeavor`` at ``https://api.flower.ai/v1``. The commands
-below use macOS and its default shell, zsh. Install your preferred client
-using the `Codex setup guide <https://developers.openai.com/codex/quickstart/>`_
-before continuing.
+below use macOS and its default shell, zsh. Before continuing, install your
+preferred client using the `Codex CLI installation guide
+<https://learn.chatgpt.com/docs/codex/cli>`_ or the `desktop app setup guide
+<https://learn.chatgpt.com/docs/quickstart>`_.
 
 For model details, see :doc:`endeavor`. To use OpenCode instead, see
 :doc:`endeavor-opencode`.

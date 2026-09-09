@@ -5,8 +5,10 @@
 Use Endeavor with OpenCode
 ==========================
 
-You need a Flower API key with Endeavor access. Request access by filling out
-the `Endeavor 1.0 access form <https://flowerlabs.typeform.com/to/jlniHsuy>`_.
+.. note::
+
+    You need a Flower API key with Endeavor access. Request access by filling out
+    the `Endeavor 1.0 access form <https://flowerlabs.typeform.com/to/jlniHsuy>`_.
 
 This guide connects OpenCode CLI and OpenCode Desktop to ``flower-endeavor``
 at ``https://api.flower.ai/v1``. The commands below use macOS and its default
