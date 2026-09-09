@@ -25,7 +25,7 @@ dataset: [DOS2019_highly_unbalanced]
 
 *Iman Sharafaldin, Arash Habibi Lashkari, Saqib Hakak, and Ali A. Ghorbani, "Developing Realistic Distributed Denial of Service (DDoS) Attack Dataset and Taxonomy", IEEE 53rd International Carnahan Conference on Security Technology, Chennai, India, 2019.*
 
-This derived version, named `DOS2019_highly_unbalanced`, is available on the [Hugging Face Hub](https://huggingface.co/datasets/sbrk03/DOS2019_highly_unbalanced). 
+This derived version, named `DOS2019_highly_unbalanced`, is available on the [Hugging Face Hub](https://huggingface.co/datasets/silviocretti/DOS2019_highly_unbalanced). 
 
 **Hardware Setup:** The experiments were run on a server-class computer equipped with two 8-core Intel Xeon Silver 4110 @2.1 GHz CPUs and 64 GB of RAM. Each run took approximately 30 minutes to complete. No GPU is required since the experiments run on CPU only.
 
@@ -49,7 +49,7 @@ For more details please check section 7.2 of the paper.
 
 The output of the model is a number between 0 and 1, which represents the probability of the network flow being malicious.
 
-**Dataset:** The [`DOS2019_highly_unbalanced`](https://huggingface.co/datasets/sbrk03/DOS2019_highly_unbalanced) dataset contains network flows partitioned per attack-type/client_id, converted from HDF5 to Parquet, and consolidated into three splits (`train`, `val`, `test`).
+**Dataset:** The [`DOS2019_highly_unbalanced`](https://huggingface.co/datasets/silviocretti/DOS2019_highly_unbalanced) dataset contains network flows partitioned per attack-type/client_id, converted from HDF5 to Parquet, and consolidated into three splits (`train`, `val`, `test`).
 Each split (`train.parquet` - ~80% of the whole dataset, `val.parquet` - ~10%, `test.parquet` - ~10%) contains one row per network flow sample, with the following columns:
 
 | Column      | Type            | Description                                                    |
@@ -104,7 +104,7 @@ pip install -e .
 To download and reconstruct the dataset in HDF5 format, use the following command:
 
 ```bash
-python scripts/prepare_dataset.py --repo-id sbrk03/DOS2019_highly_unbalanced
+python scripts/prepare_dataset.py --repo-id silviocretti/DOS2019_highly_unbalanced
 ```
 By default, the dataset will be saved in `./dataset/DOS2019_highly_unbalanced`. You can also specify a different output folder with the `--output-folder` parameter but recall to keep it coherent with the `dataset-folder` parameter in `./pyproject.toml`:
 
