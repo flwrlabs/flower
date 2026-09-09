@@ -182,7 +182,12 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     task_poll_interval = _get_task_poll_interval()
 
     try:
-        executor = get_executor(executor_type, executor_config=executor_config)
+        executor = get_executor(
+            executor_type,
+            executor_config=executor_config,
+            insecure=insecure,
+            root_certificates_path=root_certificates_path,
+        )
     except ValueError as err:
         flwr_exit(ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG, str(err))
 

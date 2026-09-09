@@ -14,9 +14,11 @@
 # ==============================================================================
 """Executor factory for SuperExec TaskExecutor processes."""
 
+from logging import WARNING
 from pathlib import Path
 from typing import Any
 
+from flwr.supercore import log
 from flwr.supercore.constant import ExecutorType, TaskType
 
 from .config import ExecutorConfig
@@ -53,7 +55,11 @@ _KUBERNETES_CONFIG_FIELD_MAP = {
 
 
 def get_executor(
-    executor_type: ExecutorType, executor_config: ExecutorConfig | None = None
+    executor_type: ExecutorType,
+    executor_config: ExecutorConfig | None = None,
+    *,
+    insecure: bool = False,
+    root_certificates_path: str | None = None,
 ) -> Executor:
     """Return the executor for the configured executor type."""
     if executor_type == ExecutorType.SUBPROCESS:
@@ -63,6 +69,21 @@ def get_executor(
         if executor_config is None:
             raise ValueError("Kubernetes executor requires --executor-config.")
         config = _kubernetes_executor_config_from_mapping(executor_config)
+        if (
+            config.warm_executor_pools
+            and not insecure
+            and (
+                config.runtime_root_certificates is not None
+                or root_certificates_path is not None
+            )
+        ):
+            log(
+                WARNING,
+                "Warm executor pools are disabled because custom Runtime CA "
+                "certificates require cold dispatch.",
+            )
+            # Retain the owner so reconciliation can clean up surviving idle Pods.
+            config.warm_executor_pools = ()
         try:
             client, exec_client = create_incluster_kubernetes_clients()
         except RuntimeError as err:
