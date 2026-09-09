@@ -227,10 +227,7 @@ def get_run_series_events(
     task: TaskDependency,
 ) -> GetRunSeriesEventsResponse:
     """Get events from the authenticated task's run series."""
-    return cast(
-        GetRunSeriesEventsResponse,
-        handlers.get_run_series_events(request, state, task),
-    )
+    return handlers.get_run_series_events(request, state, task)
 
 
 @router.post("/pull-task-message")
