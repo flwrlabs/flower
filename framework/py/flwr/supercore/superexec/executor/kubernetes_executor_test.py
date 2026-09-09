@@ -28,6 +28,7 @@ import pytest
 from flwr.supercore.constant import TaskType
 
 from . import kubernetes_executor as kube
+from . import warm_agentapp_executor
 from .kubernetes_executor import (
     _COMPLETED_POD_SWEEP_INTERVAL_SECONDS,
     _TASK_ID_LABEL,
@@ -584,9 +585,7 @@ def test_launch_returns_unknown_after_unacknowledged_warm_token_delivery(
 def test_warm_dispatch_drains_stderr_until_the_child_exits() -> None:
     """Warm child stderr must not accumulate in the Kubernetes exec stream."""
     response = _WarmExecResponse(acknowledge=False, stderr="diagnostic output")
-    dispatch = kube._KubernetesWarmExecutorDispatch(  # pylint: disable=protected-access
-        response
-    )
+    dispatch = warm_agentapp_executor.KubernetesWarmAgentAppDispatch(response)
 
     dispatch.wait_for_close()
 
@@ -660,9 +659,7 @@ def test_warm_pool_keeps_consumed_pod_busy_when_deletion_fails() -> None:
     pool._wait_for_task_and_replace(  # pylint: disable=protected-access
         "consumed",
         pool_key,
-        kube._KubernetesWarmExecutorDispatch(  # pylint: disable=protected-access
-            _WarmExecResponse(False)
-        ),
+        warm_agentapp_executor.KubernetesWarmAgentAppDispatch(_WarmExecResponse(False)),
     )
 
     assert "consumed" in pool._busy_pods  # pylint: disable=protected-access

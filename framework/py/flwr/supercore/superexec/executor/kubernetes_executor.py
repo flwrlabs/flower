@@ -38,6 +38,11 @@ from flwr.supercore.constant import (
 from flwr.supercore.typing import JSONObject
 
 from .types import ExecutionSpec, LaunchResult
+from .warm_agentapp_executor import (
+    KubernetesWarmAgentAppDispatch,
+    WarmAgentAppUnavailable,
+    warm_agentapp_command,
+)
 from .warm_executor import (
     WARM_EXECUTOR_MODULE,
     WARM_EXECUTOR_READINESS_COMMAND,
@@ -102,7 +107,6 @@ _FORBIDDEN_TASKEXECUTOR_ENV_NAMES = frozenset(
 _KUBERNETES_ENV_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _DNS_LABEL_PATTERN = re.compile(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
 _WARM_EXECUTOR_ACK_TIMEOUT_SECONDS = 5.0
-_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT = "FLWR_AGENTAPP_TOKEN_ACCEPTED"
 
 
 class KubernetesList(Protocol):
@@ -285,74 +289,6 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
             )
 
 
-class _WarmExecutorUnavailable(RuntimeError):
-    """Raised before a task token is sent to a warm executor Pod."""
-
-
-class _KubernetesWarmExecutorDispatch:
-    """Interact with one Kubernetes exec stream without logging task authority."""
-
-    def __init__(self, response: object) -> None:
-        self._response = response
-
-    def send_token(self, token: str) -> None:
-        """Send one token over stdin without retaining it in Pod metadata."""
-        write_stdin = getattr(self._response, "write_stdin", None)
-        if not callable(write_stdin):
-            raise _WarmExecutorUnavailable(
-                "Kubernetes exec stream does not support standard input."
-            )
-        write_stdin(f"{token}\n")
-
-    def wait_for_acceptance(self, timeout: float) -> bool:
-        """Return whether the task child acknowledged consuming the token."""
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            if _AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT in self._read_stdout():
-                return True
-            self._read_stderr()
-            if not self._is_open():
-                return False
-            self._update(min(0.5, deadline - time.monotonic()))
-        return False
-
-    def wait_for_close(self) -> None:
-        """Wait for the one-task child to exit or the exec stream to close."""
-        while self._is_open():
-            self._update(1.0)
-            self._read_stdout()
-            self._read_stderr()
-
-    def close(self) -> None:
-        """Close the Kubernetes exec stream best-effort."""
-        close = getattr(self._response, "close", None)
-        if callable(close):
-            close()
-
-    def _is_open(self) -> bool:
-        is_open = getattr(self._response, "is_open", None)
-        return bool(is_open()) if callable(is_open) else False
-
-    def _update(self, timeout: float) -> None:
-        update = getattr(self._response, "update", None)
-        if callable(update):
-            update(timeout=max(timeout, 0.0))
-
-    def _read_stdout(self) -> str:
-        peek_stdout = getattr(self._response, "peek_stdout", None)
-        read_stdout = getattr(self._response, "read_stdout", None)
-        if not callable(read_stdout) or (callable(peek_stdout) and not peek_stdout()):
-            return ""
-        stdout = read_stdout()
-        return stdout if isinstance(stdout, str) else ""
-
-    def _read_stderr(self) -> None:
-        peek_stderr = getattr(self._response, "peek_stderr", None)
-        read_stderr = getattr(self._response, "read_stderr", None)
-        if callable(read_stderr) and (not callable(peek_stderr) or peek_stderr()):
-            read_stderr()
-
-
 class _WarmExecutorPoolManager:
     """Own and dispatch a fixed set of compatible, one-task warm Pods."""
 
@@ -385,7 +321,7 @@ class _WarmExecutorPoolManager:
                 return None
             try:
                 pod_name = self._take_ready_pod(pool.key)
-            except _WarmExecutorUnavailable:
+            except WarmAgentAppUnavailable:
                 return None
             if pod_name is None:
                 self._ensure_pool_capacity(pool, reserved_pod_capacity=1)
@@ -397,7 +333,7 @@ class _WarmExecutorPoolManager:
                 spec=spec,
                 runtime_root_certificates=runtime_root_certificates,
             )
-        except _WarmExecutorUnavailable:
+        except WarmAgentAppUnavailable:
             self._retire_unavailable_pod(pod_name)
             return None
 
@@ -480,7 +416,7 @@ class _WarmExecutorPoolManager:
     def _take_ready_pod(self, key: WarmExecutorPoolKey) -> str | None:
         pods = self._owned_warm_pods()
         if pods is None:
-            raise _WarmExecutorUnavailable("Warm executor Pods could not be listed.")
+            raise WarmAgentAppUnavailable("Warm executor Pods could not be listed.")
         for pod in pods:
             pod_name = _object_name(pod)
             if (
@@ -577,14 +513,14 @@ class _WarmExecutorPoolManager:
         pod_name: str,
         spec: ExecutionSpec,
         runtime_root_certificates: str | None,
-    ) -> _KubernetesWarmExecutorDispatch:
+    ) -> KubernetesWarmAgentAppDispatch:
         try:
             stream = importlib.import_module("kubernetes.stream").stream
             response = stream(
                 self._client.connect_get_namespaced_pod_exec,
                 pod_name,
                 self._config.namespace,
-                command=_warm_taskexecutor_command(spec, runtime_root_certificates),
+                command=warm_agentapp_command(spec, runtime_root_certificates),
                 stderr=True,
                 stdin=True,
                 stdout=True,
@@ -592,16 +528,16 @@ class _WarmExecutorPoolManager:
                 _preload_content=False,
             )
         except Exception as err:  # pylint: disable=broad-exception-caught
-            raise _WarmExecutorUnavailable(
+            raise WarmAgentAppUnavailable(
                 "Warm TaskExecutor Pod is unavailable for dispatch."
             ) from err
-        return _KubernetesWarmExecutorDispatch(response)
+        return KubernetesWarmAgentAppDispatch(response)
 
     def _retire_after_dispatch(
         self,
         pod_name: str,
         key: WarmExecutorPoolKey,
-        dispatch: _KubernetesWarmExecutorDispatch,
+        dispatch: KubernetesWarmAgentAppDispatch,
     ) -> None:
         threading.Thread(
             target=self._wait_for_task_and_replace,
@@ -613,7 +549,7 @@ class _WarmExecutorPoolManager:
         self,
         pod_name: str,
         key: WarmExecutorPoolKey,
-        dispatch: _KubernetesWarmExecutorDispatch,
+        dispatch: KubernetesWarmAgentAppDispatch,
     ) -> None:
         try:
             dispatch.wait_for_close()
@@ -1107,27 +1043,6 @@ def _taskexecutor_args(
         args.append("--allow-runtime-dependency-installation")
 
     return args
-
-
-def _warm_taskexecutor_command(
-    spec: ExecutionSpec, runtime_root_certificates: str | None
-) -> list[str]:
-    """Build a one-task child command that receives authority on standard input."""
-    command = [
-        TASK_TYPE_TO_COMMAND[spec.task_type],
-        TASK_TYPE_TO_APPIO_API_ADDRESS_ARG[spec.task_type],
-        spec.runtime_api_address,
-        "--token-stdin",
-    ]
-    if spec.insecure:
-        command.append("--insecure")
-    elif runtime_root_certificates is not None:
-        raise _WarmExecutorUnavailable(
-            "Warm executor dispatch cannot safely deliver Runtime API certificates."
-        )
-    if spec.runtime_dependency_install:
-        command.append("--allow-runtime-dependency-installation")
-    return command
 
 
 def _taskexecutor_env(env: list[JSONObject]) -> list[JSONObject]:
