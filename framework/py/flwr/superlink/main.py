@@ -23,7 +23,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from logging import INFO
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -31,10 +31,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE
 from flwr.supercore import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
+from flwr.supercore.dependencies.runtime_version import RuntimeVersionDependency
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.http_logging import configure_uvicorn_logging
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health
+from flwr.supercore.routers.runtime import router as runtime_router
 from flwr.supercore.version import package_version
 from flwr.superlink import extensions
 from flwr.superlink.config_loader import (
@@ -53,7 +55,7 @@ from flwr.superlink.routers.control.middlewares import (
     ControlSensitiveResponseMiddleware,
 )
 from flwr.superlink.routers.runtime import responses_router
-from flwr.superlink.routers.runtime import router as runtime_router
+from flwr.superlink.servicer.runtime import runtime_handlers
 
 try:
     from flwr.ee import get_ee_linkstate_db as get_ee_linkstate_db
@@ -68,6 +70,13 @@ except ModuleNotFoundError as exc:
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
+
+_RUNTIME_VERSION_DEPENDENCY = Depends(
+    RuntimeVersionDependency(
+        component_name="SuperLink",
+        connection_name="Caller <-> SuperLink Runtime API",
+    )
+)
 
 
 def generate_unique_route_id(route: APIRoute) -> str:
@@ -187,6 +196,7 @@ def create_app(  # pylint: disable=too-many-statements
         ApiErrorCode.LINKSTATE_NOT_INITIALIZED,
         "SuperLink LinkStateFactory is not initialized.",
     )
+    fastapi_app.state.runtime_handlers = runtime_handlers
     fastapi_app.state.superexec_auth_secret = superexec_auth_secret
     fastapi_app.state.artifact_provider = artifact_provider
     fastapi_app.state.fleet_api_type = fleet_api_type
@@ -198,7 +208,9 @@ def create_app(  # pylint: disable=too-many-statements
 
     # SuperLink APIs
     fastapi_app.include_router(control_router)
-    fastapi_app.include_router(runtime_router)
+    fastapi_app.include_router(
+        runtime_router, dependencies=[_RUNTIME_VERSION_DEPENDENCY]
+    )
     fastapi_app.include_router(responses_router)
 
     # Extension hooks

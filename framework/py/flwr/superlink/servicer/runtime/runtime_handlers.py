@@ -88,7 +88,7 @@ def get_run_series_events(
     state: LinkState,
     task: Task,
 ) -> GetRunSeriesEventsResponse:
-    """Get events from all runs in the authenticated AgentApp task's series."""
+    """Get events from all runs in the authenticated task's series."""
     log(DEBUG, "Runtime.GetRunSeriesEvents")
 
     run = state.get_run_info(run_ids=[task.run_id])[0]

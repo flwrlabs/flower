@@ -17,7 +17,7 @@
 from typing import cast
 from unittest.mock import Mock
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 from google.protobuf.message import Message
@@ -37,17 +37,17 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
 from flwr.supercore.dependencies.runtime import get_runtime_state, get_task
+from flwr.supercore.dependencies.runtime_version import RuntimeVersionDependency
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import (
     PROTOBUF_REQUEST_TYPES,
     ProtobufTranslationMiddleware,
 )
+from flwr.supercore.routers.runtime import router
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.supernode.nodestate import NodeState
 from flwr.supernode.servicer.runtime import runtime_handlers
-
-from .router import router
 
 _SUPEREXEC_PATHS = {
     "/v1/runtime/pull-pending-tasks",
@@ -64,7 +64,18 @@ def _create_app(
     """Create a minimal app containing the Runtime API stack."""
     app = FastAPI()
     app.state.superexec_auth_secret = superexec_auth_secret
-    app.include_router(router)
+    app.state.runtime_handlers = runtime_handlers
+    app.include_router(
+        router,
+        dependencies=[
+            Depends(
+                RuntimeVersionDependency(
+                    component_name="SuperNode",
+                    connection_name="Caller <-> SuperNode Runtime API",
+                )
+            )
+        ],
+    )
     app.add_middleware(ProtobufTranslationMiddleware)
     app.middleware("http")(http_error_translator)
     app.dependency_overrides[get_runtime_state] = lambda: state
