@@ -407,6 +407,10 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 for pod in compatible_pods[pool.key]
                 if _object_name(pod) not in self._busy_pods
             ]
+            # Pylint cannot infer that list.sort invokes its key synchronously.
+            # pylint: disable=cell-var-from-loop
+            idle_pods.sort(key=lambda pod: not is_warm_executor_ready(pod, pool.key))
+            # pylint: enable=cell-var-from-loop
             for pod in idle_pods[pool.size :]:
                 pod_name = _object_name(pod)
                 if pod_name is not None:

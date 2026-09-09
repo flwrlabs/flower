@@ -851,7 +851,7 @@ def test_warm_pool_replaces_missing_pod_with_reserved_cold_capacity() -> None:
 
 
 def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
-    """Reconciliation removes stale and excess idle Pods from a previous config."""
+    """Reconciliation removes stale Pods and retains Ready excess-pool Pods."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     pool_key = _warm_executor_pool_key(
@@ -874,10 +874,12 @@ def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
         name="obsolete",
     )
     client.reset_mock()
+    pending_pod = _ready_warm_pod(pool_key, config, name="pending")
+    pending_pod["status"] = {"phase": "Pending", "conditions": []}
     client.list_namespaced_pod.return_value = {
         "items": [
+            pending_pod,
             _ready_warm_pod(pool_key, config, name="keep"),
-            _ready_warm_pod(pool_key, config, name="excess"),
             obsolete_pod,
         ]
     }
@@ -886,7 +888,7 @@ def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
 
     client.delete_namespaced_pod.assert_has_calls(
         [
-            call(name="excess", namespace="flower-system", grace_period_seconds=0),
+            call(name="pending", namespace="flower-system", grace_period_seconds=0),
             call(name="obsolete", namespace="flower-system", grace_period_seconds=0),
         ],
         any_order=True,
