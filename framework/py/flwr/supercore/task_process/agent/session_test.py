@@ -130,9 +130,7 @@ def test_get_trace_gets_current_run_series_events() -> None:
     trace = events.get_trace()
     events.close()
 
-    stub.GetRunSeriesEvents.assert_called_once_with(
-        GetRunSeriesEventsRequest()
-    )
+    stub.GetRunSeriesEvents.assert_called_once_with(GetRunSeriesEventsRequest())
     assert trace == [
         {
             "id": 12,

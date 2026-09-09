@@ -223,11 +223,11 @@ def get_nodes(request: GetNodesRequest) -> GetNodesResponse:
 def get_run_series_events(
     request: GetRunSeriesEventsRequest,
 ) -> GetRunSeriesEventsResponse:
-    """Reject run-series event requests from ClientApp tasks."""
+    """Reject run-series event requests in the Simulation Runtime."""
     log(DEBUG, "Runtime.GetRunSeriesEvents")
     raise FlowerError(
-        ApiErrorCode.RUNTIME_RUN_SERIES_EVENTS_NOT_ALLOWED,
-        "Only the primary AgentApp task can access run-series events.",
+        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+        "This endpoint is only available for Deployment Runtime runs.",
     )
 
 

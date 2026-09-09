@@ -424,9 +424,4 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_403_FORBIDDEN,
         public_message="Message run ID does not match the authenticated task.",
     ),
-    ApiErrorCode.RUNTIME_RUN_SERIES_EVENTS_NOT_ALLOWED: ApiErrorSpec(
-        status_code=StatusCode.PERMISSION_DENIED,
-        http_status_code=status.HTTP_403_FORBIDDEN,
-        public_message="Only the primary AgentApp task can access run-series events.",
-    ),
 }
