@@ -13,7 +13,7 @@ Use Endeavor with OpenCode
 This guide connects OpenCode CLI and OpenCode Desktop to ``flower-endeavor``
 at ``https://api.flower.ai/v1``. The commands below use macOS and its default
 shell, zsh. Install your preferred client using the `OpenCode setup guide
-<https://opencode.ai/docs/>`_ before continuing.
+<https://opencode.ai/download>`_ before continuing.
 
 For model details, see :doc:`endeavor`. To use ChatGPT/Codex instead, see
 :doc:`endeavor-chatgpt-codex`.
@@ -64,7 +64,7 @@ setup. See the `OpenCode provider documentation
 
 Run this in your terminal, paste your key at the prompt, and press Enter:
 
-.. code-block:: zsh
+.. code-block:: console
 
    read -rs 'FLOWER_API_KEY?Flower API key: '
    echo
