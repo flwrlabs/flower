@@ -1345,7 +1345,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         response.federations.add()
         federation_with_count = response.federations.add(member_count=300)
 
-        serialized_federation = federation_with_count.SerializeToString(deterministic=True)
+        serialized_federation = federation_with_count.SerializeToString(
+            deterministic=True
+        )
         round_tripped = ListFederationsResponse.FromString(response.SerializeToString())
 
         self.assertEqual(serialized_federation, b"\x58\xac\x02")
