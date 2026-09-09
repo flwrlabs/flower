@@ -1,3 +1,7 @@
+.. meta::
+    :description: Set up Flower Endeavor 1.0 with Codex CLI and the ChatGPT/Codex desktop app on macOS using a Flower API key and model catalog.
+    :property=og:description: Set up Flower Endeavor 1.0 with Codex CLI and the ChatGPT/Codex desktop app on macOS using a Flower API key and model catalog.
+
 Use Endeavor with ChatGPT/Codex
 ===============================
 
