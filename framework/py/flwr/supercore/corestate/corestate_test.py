@@ -105,6 +105,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             app_type=TaskType.AGENT_APP,
             added_by="account-a",
             is_hub_app=True,
+            display_name="Agent",
+            description="Agent description",
+            color="sky",
         )
         state.store_app(
             fab=Fab("", b"other", {}),
@@ -123,6 +126,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             ],
         )
         self.assertIsNotNone(state.get_fab(agent_hash))
+        self.assertEqual(apps[0].display_name, "Agent")
+        self.assertEqual(apps[0].description, "Agent description")
+        self.assertEqual(apps[0].color, "sky")
         self.assertEqual(
             state.get_app("@me/fed-a", "@me/server", server_hash),
             Fab(server_hash, b"server", {}),
@@ -149,6 +155,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(updated), 2)
         self.assertEqual(updated[1].fab_hash, "")
         self.assertTrue(updated[1].is_hub_app)
+        self.assertEqual(updated[0].display_name, "Agent")
+        self.assertEqual(updated[0].description, "Agent description")
+        self.assertEqual(updated[0].color, "sky")
         self.assertIsNone(state.get_app("@me/fed-a", "@me/server", server_hash))
         self.assertIsNone(state.get_app("@me/fed-a", "@me/server", updated_hash))
 

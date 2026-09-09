@@ -56,6 +56,9 @@ erDiagram
     TIMESTAMP added_at
     VARCHAR added_by
     VARCHAR app_type
+    VARCHAR color "nullable"
+    VARCHAR description "nullable"
+    VARCHAR display_name "nullable"
     VARCHAR fab_hash "nullable"
     BOOLEAN is_hub_app "nullable"
   }

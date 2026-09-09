@@ -649,6 +649,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 app_type=app_type,
                 added_by=flwr_aid,
                 is_hub_app=is_hub_app,
+                **_get_app_presentation_metadata(fab_config),
             )
 
         series_id = request.series_id if request.HasField("series_id") else None
@@ -1546,6 +1547,9 @@ def list_apps(
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
     limit = request.limit if request.HasField("limit") else None
     apps = list(state.list_apps(federation_id, limit))
+    for app in apps:
+        if app.app_id == FLOWER_AGENT_APP_ID:
+            _set_flower_agent_metadata(app)
     if (limit is None or limit > 0) and not any(
         app.app_id == FLOWER_AGENT_APP_ID for app in apps
     ):
@@ -1554,6 +1558,7 @@ def list_apps(
             app_type=TaskType.AGENT_APP,
             is_hub_app=True,
         )
+        _set_flower_agent_metadata(agent)
         if limit is not None:
             apps = apps[: limit - 1]
         apps.append(agent)
@@ -1571,7 +1576,8 @@ def add_app(
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
     fab_file, _, _ = _get_remote_fab(fleet_api_type, request.app_id)
     try:
-        app_type = _get_app_type(get_fab_config(fab_file))
+        fab_config = get_fab_config(fab_file)
+        app_type = _get_app_type(fab_config)
     except ValueError as e:
         raise FlowerError(
             ApiErrorCode.INVALID_APP_SPEC,
@@ -1585,6 +1591,7 @@ def add_app(
         app_type=app_type,
         added_by=account.flwr_aid,
         is_hub_app=True,
+        **_get_app_presentation_metadata(fab_config),
     )
 
     return AddAppResponse()
@@ -2054,6 +2061,33 @@ def _get_app_type(fab_config: dict[str, Any]) -> str:
     """Derive the app type from FAB configuration."""
     components = fab_config["tool"]["flwr"]["app"].get("components", {})
     return TaskType.AGENT_APP if "agentapp" in components else TaskType.SERVER_APP
+
+
+def _get_app_presentation_metadata(
+    fab_config: dict[str, Any],
+) -> dict[str, str | None]:
+    """Extract presentation metadata from FAB configuration."""
+    app_config = fab_config["tool"]["flwr"]["app"]
+    project_config = fab_config.get("project", {})
+
+    def optional_string(value: Any) -> str | None:
+        return value if isinstance(value, str) and value else None
+
+    return {
+        "display_name": optional_string(app_config.get("display-name")),
+        "description": optional_string(project_config.get("description")),
+        "color": optional_string(app_config.get("color")),
+    }
+
+
+def _set_flower_agent_metadata(app: AppInfo) -> None:
+    """Set package defaults for the built-in Flower Agent when absent."""
+    if not app.HasField("display_name"):
+        app.display_name = "Flower Agent"
+    if not app.HasField("description"):
+        app.description = "Chat with Flower Agent"
+    if not app.HasField("color"):
+        app.color = "yellow"
 
 
 def _get_remote_fab(
