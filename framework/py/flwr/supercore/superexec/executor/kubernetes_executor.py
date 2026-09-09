@@ -303,6 +303,7 @@ class _WarmExecutorPoolManager:
         self._active_pod_count = active_pod_count
         self._pools = {pool.key: pool for pool in config.warm_executor_pools}
         self._busy_pods: set[str] = set()
+        self._retiring_pods: set[str] = set()
         self._closed = False
         self._lock = threading.RLock()
         self.ensure_capacity()
@@ -440,7 +441,10 @@ class _WarmExecutorPoolManager:
             1
             for pod in pods
             if _is_active_warm_executor(pod, pool.key, self._config)
-            and _object_name(pod) not in self._busy_pods
+            and (
+                _object_name(pod) not in self._busy_pods
+                or _object_name(pod) in self._retiring_pods
+            )
         )
         pods_to_create = max(pool.size - compatible_count, 0)
         if self._config.active_pod_budget is not None:
@@ -474,12 +478,21 @@ class _WarmExecutorPoolManager:
         pods = self._owned_warm_pods()
         if pods is None:
             return
+        pod_names = {
+            pod_name for pod in pods if (pod_name := _object_name(pod)) is not None
+        }
+        for pod_name in self._retiring_pods - pod_names:
+            self._release_pod(pod_name)
 
         compatible_pods: dict[WarmExecutorPoolKey, list[object]] = {
             pool.key: [] for pool in self._pools.values()
         }
         for pod in pods:
             pod_name = _object_name(pod)
+            if pod_name is not None and pod_name in self._retiring_pods:
+                if self._delete_pod(pod_name):
+                    self._release_pod(pod_name)
+                continue
             pool = next(
                 (
                     candidate
@@ -567,20 +580,27 @@ class _WarmExecutorPoolManager:
                 dispatch.close()
             except Exception:  # pylint: disable=broad-exception-caught
                 log(WARNING, "Failed to close warm TaskExecutor exec stream.")
-            if self._delete_pod(pod_name):
+            if self._retire_pod(pod_name):
                 with self._lock:
-                    self._busy_pods.discard(pod_name)
                     if not self._closed:
                         self._ensure_pool_capacity(self._pools[key])
 
     def _release_pod(self, pod_name: str) -> None:
         with self._lock:
             self._busy_pods.discard(pod_name)
+            self._retiring_pods.discard(pod_name)
 
     def _retire_unavailable_pod(self, pod_name: str) -> None:
         """Delete a Pod that failed before task authority was delivered."""
+        self._retire_pod(pod_name)
+
+    def _retire_pod(self, pod_name: str) -> bool:
+        with self._lock:
+            self._retiring_pods.add(pod_name)
         if self._delete_pod(pod_name):
             self._release_pod(pod_name)
+            return True
+        return False
 
     def _delete_pod(self, pod_name: str) -> bool:
         try:

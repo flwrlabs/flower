@@ -644,8 +644,8 @@ def test_warm_pool_replaces_consumed_pod_and_cleans_up_owned_pods() -> None:
     assert client.delete_namespaced_pod.call_count == 2
 
 
-def test_warm_pool_keeps_consumed_pod_busy_when_deletion_fails() -> None:
-    """A consumed Pod must never return to the ready pool after failed deletion."""
+def test_warm_pool_retries_retirement_without_replacing_pending_pod() -> None:
+    """A failed retirement is retried without creating more warm Pods."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     pool_key = _warm_executor_pool_key(
@@ -669,7 +669,22 @@ def test_warm_pool_keeps_consumed_pod_busy_when_deletion_fails() -> None:
     )
 
     assert "consumed" in pool._busy_pods  # pylint: disable=protected-access
+    assert "consumed" in pool._retiring_pods  # pylint: disable=protected-access
     client.create_namespaced_pod.assert_not_called()
+
+    client.list_namespaced_pod.return_value = {
+        "items": [_ready_warm_pod(pool_key, config, name="consumed")]
+    }
+    pool.ensure_capacity()
+
+    assert client.delete_namespaced_pod.call_count == 2
+    client.create_namespaced_pod.assert_not_called()
+
+    client.delete_namespaced_pod.side_effect = None
+    pool.ensure_capacity()
+
+    assert "consumed" not in pool._busy_pods  # pylint: disable=protected-access
+    assert "consumed" not in pool._retiring_pods  # pylint: disable=protected-access
 
 
 def test_warm_pool_reserves_capacity_for_cold_fallback() -> None:
