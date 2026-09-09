@@ -329,7 +329,10 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
     )
     config = _executor_config(
         labels={WARM_EXECUTOR_LABEL: "false"},
-        annotations={"example.com/setting": "configured"},
+        annotations={
+            "example.com/setting": "configured",
+            kube._WARM_EXECUTOR_CONSUMED_ANNOTATION: "true",  # pylint: disable=protected-access
+        },
         container_security_context={"readOnlyRootFilesystem": True},
     )
     executor = KubernetesExecutor(client=client, config=config)
@@ -359,6 +362,9 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
     )
     assert len(annotations[WARM_EXECUTOR_CONFIGURATION_ANNOTATION]) == 64
     assert len(annotations) == 3
+    assert (
+        kube._WARM_EXECUTOR_CONSUMED_ANNOTATION not in annotations
+    )  # pylint: disable=protected-access
     assert _TASK_ID_LABEL not in metadata["labels"]
     assert LAUNCH_ATTEMPT_LABEL not in metadata["labels"]
     assert container == {

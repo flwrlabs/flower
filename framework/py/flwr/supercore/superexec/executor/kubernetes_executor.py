@@ -311,7 +311,7 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
             )
 
 
-class _WarmExecutorPoolManager:
+class _WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
     """Own and dispatch a fixed set of compatible, one-task warm Pods."""
 
     def __init__(
@@ -1295,6 +1295,7 @@ def _warm_executor_metadata(
 
     annotations: JSONObject = {}
     annotations.update(config.annotations or {})
+    annotations.pop(_WARM_EXECUTOR_CONSUMED_ANNOTATION, None)
     annotations.update(
         {
             WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION: pool_key.runtime_image,
