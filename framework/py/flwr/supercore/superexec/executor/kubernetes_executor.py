@@ -370,6 +370,15 @@ class _WarmExecutorPoolManager:
             for pool in self._pools.values():
                 self._ensure_pool_capacity(pool, reserved_pod_capacity)
 
+    def retry_retiring_pods(self) -> None:
+        """Retry Pod retirement without changing warm pool capacity."""
+        with self._lock:
+            if self._closed:
+                return
+            pods = self._owned_warm_pods()
+            if pods is not None:
+                self._retry_retiring_pods(pods)
+
     def has_ready_pod(self, task_type: TaskType) -> bool:
         """Return whether a matching warm Pod can take a task without new capacity."""
         pool = self._pool_for_task(task_type)
@@ -478,20 +487,14 @@ class _WarmExecutorPoolManager:
         pods = self._owned_warm_pods()
         if pods is None:
             return
-        pod_names = {
-            pod_name for pod in pods if (pod_name := _object_name(pod)) is not None
-        }
-        for pod_name in self._retiring_pods - pod_names:
-            self._release_pod(pod_name)
+        self._retry_retiring_pods(pods)
 
         compatible_pods: dict[WarmExecutorPoolKey, list[object]] = {
             pool.key: [] for pool in self._pools.values()
         }
         for pod in pods:
             pod_name = _object_name(pod)
-            if pod_name is not None and pod_name in self._retiring_pods:
-                if self._delete_pod(pod_name):
-                    self._release_pod(pod_name)
+            if pod_name in self._retiring_pods:
                 continue
             pool = next(
                 (
@@ -517,6 +520,19 @@ class _WarmExecutorPoolManager:
                 pod_name = _object_name(pod)
                 if pod_name is not None:
                     self._delete_pod(pod_name)
+
+    def _retry_retiring_pods(self, pods: list[object]) -> None:
+        """Retry deletion of consumed Pods without making them dispatchable."""
+        pod_names = {
+            pod_name for pod in pods if (pod_name := _object_name(pod)) is not None
+        }
+        for pod_name in self._retiring_pods - pod_names:
+            self._release_pod(pod_name)
+        for pod in pods:
+            pod_name = _object_name(pod)
+            if pod_name is not None and pod_name in self._retiring_pods:
+                if self._delete_pod(pod_name):
+                    self._release_pod(pod_name)
 
     def _owned_warm_pods(self) -> list[object] | None:
         try:
@@ -678,6 +694,11 @@ class KubernetesExecutor:
         last_log_at: float | None = None
         waited_for_capacity = False
         while True:
+            if (
+                not reconcile_warm_pools
+                and self._warm_executor_pool_manager is not None
+            ):
+                self._warm_executor_pool_manager.retry_retiring_pods()
             if (
                 allow_warm_dispatch
                 and self._warm_executor_pool_manager is not None

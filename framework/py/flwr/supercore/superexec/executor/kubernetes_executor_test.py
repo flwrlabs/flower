@@ -818,6 +818,27 @@ def test_wait_for_capacity_reserves_cold_capacity_for_a_secure_task() -> None:
     sleep.assert_called_once_with(1.0)
 
 
+def test_cold_fallback_wait_retries_pending_warm_pod_retirement() -> None:
+    """Cold fallback retries retirement before waiting at the Pod budget."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    client.list_namespaced_secret.return_value = {"items": []}
+    executor = KubernetesExecutor(
+        client=client,
+        config=_executor_config(active_pod_budget=1),
+    )
+    manager = Mock()
+    executor._warm_executor_pool_manager = manager  # pylint: disable=protected-access
+
+    executor._wait_for_capacity(  # pylint: disable=protected-access
+        None,
+        allow_warm_dispatch=False,
+        reconcile_warm_pools=False,
+    )
+
+    manager.retry_retiring_pods.assert_called_once_with()
+
+
 def test_wait_for_capacity_reserves_space_for_a_cold_task() -> None:
     """Reconciling warm capacity must not consume the cold task's last slot."""
     client = Mock()
