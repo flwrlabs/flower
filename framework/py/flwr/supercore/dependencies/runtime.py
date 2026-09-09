@@ -14,11 +14,38 @@
 # ==============================================================================
 """FastAPI dependencies for the shared Runtime API."""
 
-from types import ModuleType
-from typing import Annotated, Protocol, cast
+from typing import Annotated, Any, Protocol, TypeVar, cast
 
 from fastapi import Depends, Request, Security
 
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
+)
+from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    ConfirmMessageReceivedRequest,
+    ConfirmMessageReceivedResponse,
+    PullObjectRequest,
+    PullObjectResponse,
+    PushObjectRequest,
+    PushObjectResponse,
+)
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    GetConnectorRequest,
+    GetConnectorResponse,
+    GetNodesRequest,
+    GetNodesResponse,
+    PullAppMessagesRequest,
+    PullAppMessagesResponse,
+    PullPendingTasksRequest,
+    PullPendingTasksResponse,
+    PullTaskInputRequest,
+    PullTaskInputResponse,
+    PushAppMessagesRequest,
+    PushAppMessagesResponse,
+    PushTaskOutputRequest,
+    PushTaskOutputResponse,
+)
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -32,6 +59,71 @@ class RuntimeStateFactory(Protocol):
 
     def state(self) -> CoreState:
         """Return the Runtime state."""
+
+
+StateT_contra = TypeVar("StateT_contra", bound=CoreState, contravariant=True)
+
+
+class RuntimeHandlers(Protocol[StateT_contra]):
+    """Component-specific handlers used by the shared Runtime API router."""
+
+    def pull_pending_tasks(
+        self, request: PullPendingTasksRequest, state: StateT_contra
+    ) -> PullPendingTasksResponse:
+        """Pull pending tasks."""
+
+    def pull_task_input(
+        self, request: PullTaskInputRequest, state: StateT_contra, task: Task
+    ) -> PullTaskInputResponse:
+        """Pull task input."""
+
+    def push_task_output(
+        self, request: PushTaskOutputRequest, state: StateT_contra, task: Task
+    ) -> PushTaskOutputResponse:
+        """Push task output."""
+
+    def push_object(
+        self, request: PushObjectRequest, state: StateT_contra, task: Task
+    ) -> PushObjectResponse:
+        """Push an object."""
+
+    def pull_object(
+        self, request: PullObjectRequest, state: StateT_contra, task: Task
+    ) -> PullObjectResponse:
+        """Pull an object."""
+
+    def confirm_message_received(
+        self,
+        request: ConfirmMessageReceivedRequest,
+        state: StateT_contra,
+        task: Task,
+    ) -> ConfirmMessageReceivedResponse:
+        """Confirm message receipt."""
+
+    def start_automation(
+        self, request: StartAutomationRequest, state: StateT_contra, task: Task
+    ) -> StartAutomationResponse:
+        """Start an automation."""
+
+    def get_connector(
+        self, request: GetConnectorRequest, state: StateT_contra, task: Task
+    ) -> GetConnectorResponse:
+        """Get connector credentials."""
+
+    def push_messages(
+        self, request: PushAppMessagesRequest, state: StateT_contra, task: Task
+    ) -> PushAppMessagesResponse:
+        """Push app messages."""
+
+    def pull_messages(
+        self, request: PullAppMessagesRequest, state: StateT_contra, task: Task
+    ) -> PullAppMessagesResponse:
+        """Pull app messages."""
+
+    def get_nodes(
+        self, request: GetNodesRequest, state: StateT_contra, task: Task
+    ) -> GetNodesResponse:
+        """Get available nodes."""
 
 
 def get_runtime_state(request: Request) -> CoreState:
@@ -49,10 +141,10 @@ def get_runtime_state(request: Request) -> CoreState:
     return factory.state()
 
 
-def get_runtime_handlers(request: Request) -> ModuleType:
+def get_runtime_handlers(request: Request) -> RuntimeHandlers[Any]:
     """Return the handlers configured for the Runtime API."""
     handlers = cast(
-        ModuleType | None,
+        RuntimeHandlers[Any] | None,
         getattr(request.app.state, "runtime_handlers", None),
     )
     if handlers is None:
@@ -61,7 +153,9 @@ def get_runtime_handlers(request: Request) -> ModuleType:
 
 
 RuntimeStateDependency = Annotated[CoreState, Depends(get_runtime_state)]
-RuntimeHandlersDependency = Annotated[ModuleType, Depends(get_runtime_handlers)]
+RuntimeHandlersDependency = Annotated[
+    RuntimeHandlers[Any], Depends(get_runtime_handlers)
+]
 
 
 def get_task(

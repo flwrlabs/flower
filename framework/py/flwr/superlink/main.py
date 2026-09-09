@@ -31,6 +31,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE
 from flwr.supercore import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
+from flwr.supercore.dependencies.runtime import RuntimeHandlers
 from flwr.supercore.dependencies.runtime_version import RuntimeVersionDependency
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.http_logging import configure_uvicorn_logging
@@ -69,8 +70,10 @@ except ModuleNotFoundError as exc:
 
 
 if TYPE_CHECKING:
+    from flwr.server.superlink.linkstate import LinkState
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
 
+_RUNTIME_HANDLERS: RuntimeHandlers[LinkState] = runtime_handlers
 _RUNTIME_VERSION_DEPENDENCY = Depends(
     RuntimeVersionDependency(
         component_name="SuperLink",
@@ -196,7 +199,7 @@ def create_app(  # pylint: disable=too-many-statements
         ApiErrorCode.LINKSTATE_NOT_INITIALIZED,
         "SuperLink LinkStateFactory is not initialized.",
     )
-    fastapi_app.state.runtime_handlers = runtime_handlers
+    fastapi_app.state.runtime_handlers = _RUNTIME_HANDLERS
     fastapi_app.state.superexec_auth_secret = superexec_auth_secret
     fastapi_app.state.artifact_provider = artifact_provider
     fastapi_app.state.fleet_api_type = fleet_api_type

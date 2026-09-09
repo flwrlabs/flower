@@ -14,7 +14,7 @@
 # ==============================================================================
 """Shared Runtime API router."""
 
-from typing import Annotated, cast
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
@@ -98,7 +98,7 @@ def pull_pending_tasks(
     _auth: PullPendingTasksAuthDependency,
 ) -> PullPendingTasksResponse:
     """Pull pending tasks."""
-    return cast(PullPendingTasksResponse, handlers.pull_pending_tasks(request, state))
+    return handlers.pull_pending_tasks(request, state)
 
 
 @router.post("/claim-task")
@@ -129,7 +129,7 @@ def pull_task_input(
     task: TaskDependency,
 ) -> PullTaskInputResponse:
     """Pull app process inputs."""
-    return cast(PullTaskInputResponse, handlers.pull_task_input(request, state, task))
+    return handlers.pull_task_input(request, state, task)
 
 
 @router.post("/push-task-output")
@@ -140,7 +140,7 @@ def push_task_output(
     task: TaskDependency,
 ) -> PushTaskOutputResponse:
     """Push app process outputs."""
-    return cast(PushTaskOutputResponse, handlers.push_task_output(request, state, task))
+    return handlers.push_task_output(request, state, task)
 
 
 @router.post("/push-object")
@@ -151,7 +151,7 @@ def push_object(
     task: TaskDependency,
 ) -> PushObjectResponse:
     """Push an object to the ObjectStore."""
-    return cast(PushObjectResponse, handlers.push_object(request, state, task))
+    return handlers.push_object(request, state, task)
 
 
 @router.post("/pull-object")
@@ -162,7 +162,7 @@ def pull_object(
     task: TaskDependency,
 ) -> PullObjectResponse:
     """Pull an object from the ObjectStore."""
-    return cast(PullObjectResponse, handlers.pull_object(request, state, task))
+    return handlers.pull_object(request, state, task)
 
 
 @router.post("/confirm-message-received")
@@ -173,10 +173,7 @@ def confirm_message_received(
     task: TaskDependency,
 ) -> ConfirmMessageReceivedResponse:
     """Confirm message receipt."""
-    return cast(
-        ConfirmMessageReceivedResponse,
-        handlers.confirm_message_received(request, state, task),
-    )
+    return handlers.confirm_message_received(request, state, task)
 
 
 @router.post("/create-task")
@@ -197,9 +194,7 @@ def runtime_start_automation(
     task: TaskDependency,
 ) -> StartAutomationResponse:
     """Start an automation from a Runtime task."""
-    return cast(
-        StartAutomationResponse, handlers.start_automation(request, state, task)
-    )
+    return handlers.start_automation(request, state, task)
 
 
 @router.post("/push-task-message")
@@ -250,7 +245,7 @@ def get_connector(
     task: TaskDependency,
 ) -> GetConnectorResponse:
     """Get connector credentials."""
-    return cast(GetConnectorResponse, handlers.get_connector(request, state, task))
+    return handlers.get_connector(request, state, task)
 
 
 @router.post("/push-logs")
@@ -271,7 +266,7 @@ def push_messages(
     task: TaskDependency,
 ) -> PushAppMessagesResponse:
     """Push app messages."""
-    return cast(PushAppMessagesResponse, handlers.push_messages(request, state, task))
+    return handlers.push_messages(request, state, task)
 
 
 @router.post("/pull-messages")
@@ -282,7 +277,7 @@ def pull_messages(
     task: TaskDependency,
 ) -> PullAppMessagesResponse:
     """Pull app messages."""
-    return cast(PullAppMessagesResponse, handlers.pull_messages(request, state, task))
+    return handlers.pull_messages(request, state, task)
 
 
 @router.post("/get-nodes")
@@ -293,4 +288,4 @@ def get_nodes(
     task: TaskDependency,
 ) -> GetNodesResponse:
     """Get available nodes."""
-    return cast(GetNodesResponse, handlers.get_nodes(request, state, task))
+    return handlers.get_nodes(request, state, task)
