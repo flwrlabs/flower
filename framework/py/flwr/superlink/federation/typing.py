@@ -37,3 +37,4 @@ class Federation:  # pylint: disable=R0902
     config: SimulationConfig | None
     can_invite_members: bool
     can_add_supernodes: bool
+    member_count: int | None = None
