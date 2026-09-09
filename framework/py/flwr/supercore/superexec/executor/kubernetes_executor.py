@@ -20,6 +20,7 @@ import hashlib
 import importlib
 import json
 import re
+import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -327,16 +328,33 @@ class _WarmExecutorPoolManager(WarmAgentAppPoolManager):
         active_pod_count: Callable[[], int],
         exec_client: KubernetesClient | None = None,
     ) -> None:
+        self._lifecycle_lock = threading.RLock()
         super().__init__(
             client,
             config,
             active_pod_count,
             exec_client,
-            create_warm_executor=_create_warm_executor,
+            create_warm_executor=self._create_warm_executor_with_lifecycle_lock,
             has_warm_executor_configuration=_has_warm_executor_configuration,
             is_active_warm_executor=_is_active_warm_executor,
             warm_executor_owner_label_selector=_warm_executor_owner_label_selector,
         )
+
+    def _create_warm_executor_with_lifecycle_lock(
+        self,
+        client: KubernetesClient,
+        pool_key: WarmExecutorPoolKey,
+        config: KubernetesExecutorConfig,
+        executor_id: str,
+    ) -> None:
+        """Create a warm Pod without racing completed-Pod cleanup."""
+        with self._lifecycle_lock:
+            _create_warm_executor(client, pool_key, config, executor_id)
+
+    def sweep_completed_pods(self, sweep: Callable[[], None]) -> None:
+        """Run completed-Pod cleanup without racing warm Pod creation."""
+        with self._lifecycle_lock:
+            sweep()
 
     def _delete_pod(self, pod_name: str) -> bool:
         """Delete a warm Pod and its token-free Runtime API trust Secret."""
@@ -480,7 +498,12 @@ class KubernetesExecutor:
     def _sweep_completed_pods(self) -> None:
         """Run best-effort completed Pod cleanup."""
         try:
-            self._completed_pod_sweeper.sweep()
+            if self._warm_executor_pool_manager is None:
+                self._completed_pod_sweeper.sweep()
+            else:
+                self._warm_executor_pool_manager.sweep_completed_pods(
+                    self._completed_pod_sweeper.sweep
+                )
         except Exception:  # pylint: disable=broad-exception-caught
             log(
                 WARNING,
@@ -614,6 +637,26 @@ class CompletedPodSweeper:
                 self._config.namespace, label_selector=selector
             )
         )
+        if self._config.warm_executor_owner is not None:
+            # Caller labels and resource pools can change across restarts. Warm
+            # resources are instead owned by a stable SuperExec identity.
+            pods = [pod for pod in pods if not is_warm_executor(pod)]
+            secrets = [secret for secret in secrets if not is_warm_executor(secret)]
+            warm_selector = _warm_executor_owner_label_selector(self._config)
+            pods.extend(
+                _pod_items(
+                    self._client.list_namespaced_pod(
+                        self._config.namespace, label_selector=warm_selector
+                    )
+                )
+            )
+            secrets.extend(
+                _secret_items(
+                    self._client.list_namespaced_secret(
+                        self._config.namespace, label_selector=warm_selector
+                    )
+                )
+            )
         pod_names = {name for pod in pods if (name := _object_name(pod)) is not None}
         task_secret_names = {
             name

@@ -1197,6 +1197,7 @@ def test_cold_fallback_retries_retirement_while_waiting_for_capacity(
         config=_executor_config(active_pod_budget=budget, sleep=Mock()),
     )
     manager = Mock()
+    manager.sweep_completed_pods.side_effect = lambda sweep: sweep()
     executor._warm_executor_pool_manager = manager  # pylint: disable=protected-access
     client.list_namespaced_pod.side_effect = [
         {"items": []},  # Completed-Pod sweep
@@ -1294,6 +1295,97 @@ def test_warm_executor_owner_selector_ignores_mutable_pool_labels() -> None:
         "app.kubernetes.io/component=taskexecutor,app.kubernetes.io/name=flower,"
         "flower.ai/warm-executor=true,flower.ai/warm-executor-owner=superexec-a"
     )
+
+
+def test_sweeper_cleans_orphaned_warm_secret_after_labels_change() -> None:
+    """Warm trust cleanup must use the stable owner selector after a restart."""
+    client = Mock()
+    pool_key = _warm_executor_pool_key()
+    previous_config = _executor_config(
+        labels={"flower.ai/team": "previous"},
+        resource_pool="previous-pool",
+        warm_executor_owner="superexec-a",
+    )
+    config = _executor_config(
+        labels={"flower.ai/team": "current"},
+        resource_pool="current-pool",
+        warm_executor_owner="superexec-a",
+    )
+    secret = kube._build_warm_executor_root_certificates_secret(  # pylint: disable=protected-access
+        pool_key, previous_config, "orphan"
+    )
+    client.list_namespaced_pod.return_value = {"items": []}
+    client.list_namespaced_secret.side_effect = [
+        {"items": []},
+        {"items": [secret]},
+    ]
+
+    CompletedPodSweeper(client=client, config=config).sweep()
+
+    client.delete_namespaced_secret.assert_called_once_with(
+        name="flwr-taskexecutor-warm-orphan-runtime-ca",
+        namespace="flower-system",
+    )
+
+
+# pylint: disable=too-many-locals
+def test_sweeper_waits_for_warm_pod_creation() -> None:
+    """Completed-Pod cleanup must not observe a half-created warm Pod."""
+    client = Mock()
+    objects: dict[str, list[dict[str, Any]]] = {"pods": [], "secrets": []}
+    creation_started = threading.Event()
+    release_creation = threading.Event()
+    sweep_started = threading.Event()
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+    )
+
+    def _list_pods(_namespace: str, **_kwargs: object) -> dict[str, object]:
+        return {"items": objects["pods"]}
+
+    def _list_secrets(_namespace: str, **_kwargs: object) -> dict[str, object]:
+        sweep_started.set()
+        return {"items": objects["secrets"]}
+
+    def _create_secret(_namespace: str, secret: object) -> None:
+        objects["secrets"].append(_as_dict(secret))
+        creation_started.set()
+        assert release_creation.wait(timeout=1.0)
+
+    def _create_pod(_namespace: str, pod: object) -> None:
+        objects["pods"].append(_as_dict(pod))
+
+    client.list_namespaced_pod.side_effect = _list_pods
+    client.list_namespaced_secret.side_effect = _list_secrets
+    client.create_namespaced_secret.side_effect = _create_secret
+    client.create_namespaced_pod.side_effect = _create_pod
+    executor = KubernetesExecutor(client=client, config=config)
+    manager = executor._warm_executor_pool_manager  # pylint: disable=protected-access
+    assert manager is not None
+    creator = threading.Thread(target=manager.ensure_capacity)
+    sweeper = threading.Thread(
+        target=executor._sweep_completed_pods  # pylint: disable=protected-access
+    )
+
+    creator.start()
+    try:
+        assert creation_started.wait(timeout=1.0)
+        sweeper.start()
+        assert not sweep_started.wait(timeout=0.1)
+    finally:
+        release_creation.set()
+        creator.join(timeout=1.0)
+        if sweeper.ident is not None:
+            sweeper.join(timeout=1.0)
+
+    assert not creator.is_alive()
+    assert not sweeper.is_alive()
+    assert sweep_started.is_set()
+    client.delete_namespaced_secret.assert_not_called()
 
 
 def test_build_taskexecutor_pod_includes_configured_volumes() -> None:
