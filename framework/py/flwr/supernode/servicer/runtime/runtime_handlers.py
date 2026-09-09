@@ -45,6 +45,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
+    PullPendingTasksRequest,
+    PullPendingTasksResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushAppMessagesRequest,
@@ -55,7 +57,15 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.supernode.nodestate import NodeState
+
+
+def pull_pending_tasks(
+    request: PullPendingTasksRequest, state: NodeState
+) -> PullPendingTasksResponse:
+    """Pull pending tasks."""
+    return core_runtime_handlers.pull_pending_tasks(request, state)
 
 
 def pull_task_input(
@@ -209,8 +219,10 @@ def push_messages(
     )
 
 
-def get_nodes(request: GetNodesRequest) -> GetNodesResponse:
-    """Get available nodes."""
+def get_nodes(
+    request: GetNodesRequest, state: NodeState, task: Task
+) -> GetNodesResponse:
+    """Reject requests for nodes from ClientApp tasks."""
     log(DEBUG, "Runtime.GetNodes")
     raise FlowerError(
         ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
@@ -220,6 +232,8 @@ def get_nodes(request: GetNodesRequest) -> GetNodesResponse:
 
 def start_automation(
     request: StartAutomationRequest,
+    state: NodeState,
+    task: Task,
 ) -> StartAutomationResponse:
     """Reject automation requests from ClientApp tasks."""
     log(DEBUG, "Runtime.StartAutomation")
@@ -231,6 +245,8 @@ def start_automation(
 
 def get_connector(
     request: GetConnectorRequest,
+    state: NodeState,
+    task: Task,
 ) -> GetConnectorResponse:
     """Reject connector credential requests from ClientApp tasks."""
     log(DEBUG, "Runtime.GetConnector")
@@ -282,6 +298,7 @@ def pull_object(
 def confirm_message_received(
     request: ConfirmMessageReceivedRequest,
     state: NodeState,
+    task: Task,
 ) -> ConfirmMessageReceivedResponse:
     """Confirm message received."""
     log(DEBUG, "Runtime.ConfirmMessageReceived")

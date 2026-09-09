@@ -12,4 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""FastAPI dependencies for SuperNode."""
+"""Shared Runtime API router."""
+
+from .router import router
+
+__all__ = ["router"]
