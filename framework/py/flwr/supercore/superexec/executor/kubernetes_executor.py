@@ -379,8 +379,8 @@ class KubernetesExecutor:
         *,
         allow_warm_dispatch: bool,
         reconcile_warm_pools: bool,
-    ) -> None:
-        """Wait for cold capacity, or allow an already-ready warm dispatch."""
+    ) -> bool:
+        """Wait for capacity and return True for warm dispatch or False for cold."""
         self._sweep_completed_pods_if_due()
         if reconcile_warm_pools and self._warm_executor_pool_manager is not None:
             has_ready_warm_pod = (
@@ -392,21 +392,21 @@ class KubernetesExecutor:
                 reserved_pod_capacity=0 if has_ready_warm_pod else 1
             )
             if has_ready_warm_pod:
-                return
+                return True
         last_log_at: float | None = None
         waited_for_capacity = False
         while True:
             if self._warm_executor_pool_manager is not None:
                 self._warm_executor_pool_manager.retry_retiring_pods()
             if self._config.active_pod_budget is None:
-                return
+                return False
             if (
                 allow_warm_dispatch
                 and self._warm_executor_pool_manager is not None
                 and task_type is not None
                 and self._warm_executor_pool_manager.has_ready_pod(task_type)
             ):
-                return
+                return True
             try:
                 active_pod_count = self._active_pod_count()
             except Exception:  # pylint: disable=broad-exception-caught
@@ -417,12 +417,12 @@ class KubernetesExecutor:
                     _capacity_label_selector(self._config),
                     exc_info=True,
                 )
-                return
+                return False
             if active_pod_count < self._config.active_pod_budget:
                 if waited_for_capacity:
                     self._last_completed_pod_sweep_at = self._config.monotonic()
                     self._sweep_completed_pods()
-                return
+                return False
 
             if self._config.capacity_log_interval is not None:
                 now = self._config.monotonic()
@@ -475,17 +475,24 @@ class KubernetesExecutor:
                 spec, self._config
             )
             if self._warm_executor_pool_manager is not None:
-                if self._can_dispatch_warm(spec.insecure, spec.root_certificates_path):
-                    warm_result = self._warm_executor_pool_manager.launch(
-                        spec, runtime_root_certificates
-                    )
-                    if warm_result is not None:
-                        return warm_result
-                self._wait_for_capacity(
-                    None,
-                    allow_warm_dispatch=False,
-                    reconcile_warm_pools=False,
+                allow_warm_dispatch = self._can_dispatch_warm(
+                    spec.insecure, spec.root_certificates_path
                 )
+                while True:
+                    if allow_warm_dispatch:
+                        warm_result = self._warm_executor_pool_manager.launch(
+                            spec, runtime_root_certificates
+                        )
+                        if warm_result is not None:
+                            return warm_result
+                    # Before token delivery, a warm Pod may recover while cold
+                    # capacity is full. Retry reservation when that happens.
+                    if not self._wait_for_capacity(
+                        spec.task_type,
+                        allow_warm_dispatch=allow_warm_dispatch,
+                        reconcile_warm_pools=False,
+                    ):
+                        break
             launch_attempt_id = _new_launch_attempt_id()
             secret_name = _credential_secret_name(spec, launch_attempt_id)
             secret = _build_appio_credentials_secret(

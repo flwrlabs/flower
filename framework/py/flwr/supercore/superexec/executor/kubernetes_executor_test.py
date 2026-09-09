@@ -1053,8 +1053,10 @@ def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
     client.create_namespaced_pod.assert_not_called()
 
 
-def test_wait_for_capacity_allows_a_ready_warm_pod_at_the_budget() -> None:
-    """A matching warm dispatch should not wait for capacity it does not consume."""
+def test_launch_retries_warm_dispatch_after_readiness_recovers_at_the_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Readiness recovery must unblock a task admitted before readiness was lost."""
     client = Mock()
     sleep = Mock()
     pool_key = _warm_executor_pool_key(
@@ -1080,6 +1082,31 @@ def test_wait_for_capacity_allows_a_ready_warm_pod_at_the_budget() -> None:
     executor.wait_for_capacity(TaskType.AGENT_APP, insecure=True)
 
     sleep.assert_not_called()
+    warm_pod["status"]["conditions"][0]["status"] = "False"
+
+    def _restore_readiness(_interval: float) -> None:
+        assert sleep.call_count == 1, "Launch kept waiting after readiness recovered"
+        warm_pod["status"]["conditions"][0]["status"] = "True"
+
+    sleep.side_effect = _restore_readiness
+    response = _WarmExecResponse()
+    stream = Mock(return_value=response)
+    monkeypatch.setattr(
+        importlib, "import_module", Mock(return_value=SimpleNamespace(stream=stream))
+    )
+    monkeypatch.setattr(threading, "Thread", Mock())
+
+    result = executor.launch(
+        _execution_spec(task_type=TaskType.AGENT_APP, insecure=True)
+    )
+
+    assert result.status == LaunchResultStatus.ACCEPTED
+    sleep.assert_called_once_with(1.0)
+    stream.assert_called_once()
+    assert response.written == ["task-token\n"]
+    client.create_namespaced_pod.assert_not_called()
+    client.create_namespaced_secret.assert_not_called()
+    client.delete_namespaced_pod.assert_not_called()
 
 
 def test_wait_for_capacity_reserves_cold_capacity_for_a_secure_task() -> None:
