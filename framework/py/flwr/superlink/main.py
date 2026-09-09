@@ -71,6 +71,13 @@ except ModuleNotFoundError as exc:
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
 
+_RUNTIME_VERSION_DEPENDENCY = Depends(
+    RuntimeVersionDependency(
+        component_name="SuperLink",
+        connection_name="Caller <-> SuperLink Runtime API",
+    )
+)
+
 
 def generate_unique_route_id(route: APIRoute) -> str:
     """Generate stable route IDs from route handler names."""
@@ -202,15 +209,7 @@ def create_app(  # pylint: disable=too-many-statements
     # SuperLink APIs
     fastapi_app.include_router(control_router)
     fastapi_app.include_router(
-        runtime_router,
-        dependencies=[
-            Depends(
-                RuntimeVersionDependency(
-                    component_name="SuperLink",
-                    connection_name="Caller <-> SuperLink Runtime API",
-                )
-            )
-        ],
+        runtime_router, dependencies=[_RUNTIME_VERSION_DEPENDENCY]
     )
     fastapi_app.include_router(responses_router)
 

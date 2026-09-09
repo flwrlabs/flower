@@ -33,6 +33,13 @@ from flwr.supercore.routers.runtime import router as runtime_router
 from flwr.supernode.nodestate import NodeStateFactory
 from flwr.supernode.servicer.runtime import runtime_handlers
 
+_RUNTIME_VERSION_DEPENDENCY = Depends(
+    RuntimeVersionDependency(
+        component_name="SuperNode",
+        connection_name="Caller <-> SuperNode Runtime API",
+    )
+)
+
 
 def create_app(
     state_factory: NodeStateFactory | None = None,
@@ -66,15 +73,7 @@ def create_app(
 
     # SuperNode APIs
     fastapi_app.include_router(
-        runtime_router,
-        dependencies=[
-            Depends(
-                RuntimeVersionDependency(
-                    component_name="SuperNode",
-                    connection_name="Caller <-> SuperNode Runtime API",
-                )
-            )
-        ],
+        runtime_router, dependencies=[_RUNTIME_VERSION_DEPENDENCY]
     )
 
     fastapi_app.add_middleware(ProtobufTranslationMiddleware)
