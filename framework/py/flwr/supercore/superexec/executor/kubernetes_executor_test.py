@@ -826,6 +826,30 @@ def test_warm_pool_reserves_capacity_for_cold_fallback() -> None:
     client.create_namespaced_pod.assert_not_called()
 
 
+def test_warm_pool_replaces_missing_pod_with_reserved_cold_capacity() -> None:
+    """A cold reservation still leaves capacity for a missing warm Pod."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        active_pod_budget=2,
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+    )
+    pool = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
+        client, config, lambda: 0
+    )
+    client.reset_mock()
+
+    pool._ensure_pool_capacity(  # pylint: disable=protected-access
+        WarmExecutorPoolConfig(key=pool_key, size=1), reserved_pod_capacity=1
+    )
+
+    client.create_namespaced_pod.assert_called_once()
+
+
 def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
     """Reconciliation removes stale and excess idle Pods from a previous config."""
     client = Mock()

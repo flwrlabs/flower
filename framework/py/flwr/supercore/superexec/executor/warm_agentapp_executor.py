@@ -346,7 +346,6 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
                     self._config.active_pod_budget
                     - self._active_pod_count()
                     - reserved_pod_capacity
-                    - reserved_pod_capacity
                 )
             except Exception:  # pylint: disable=broad-exception-caught
                 log(
