@@ -34,11 +34,11 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore.auth import create_superexec_auth_metadata, derive_auth_secret
 from flwr.supercore.constant import TASK_TOKEN_HEADER, TaskType
+from flwr.supercore.dependencies.runtime import get_runtime_state
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
-from flwr.supernode.dependencies.nodestate import get_nodestate
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 
 from .router import router
@@ -60,7 +60,7 @@ def _create_app(state: NodeState, secret: bytes | None) -> FastAPI:
     app.include_router(router)
     app.add_middleware(ProtobufTranslationMiddleware)
     app.middleware("http")(http_error_translator)
-    app.dependency_overrides[get_nodestate] = lambda: state
+    app.dependency_overrides[get_runtime_state] = lambda: state
     return app
 
 

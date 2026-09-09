@@ -15,7 +15,6 @@
 """Tests for TLS helpers in supercore."""
 
 
-import argparse
 from pathlib import Path
 from unittest.mock import patch
 
@@ -23,11 +22,7 @@ import pytest
 
 from flwr.supercore.exit import ExitCode
 
-from .tls import (
-    get_client_tls_args,
-    try_obtain_optional_runtime_server_certificates,
-    validate_and_resolve_root_certificates,
-)
+from .tls import get_client_tls_args, validate_and_resolve_root_certificates
 
 
 def test_load_root_certificates_returns_none_when_insecure() -> None:
@@ -97,78 +92,3 @@ def test_get_client_tls_args_returns_root_certificates() -> None:
 def test_get_client_tls_args_omits_flags_for_system_trust() -> None:
     """Client processes should use system trust roots when no CA path is provided."""
     assert not get_client_tls_args(insecure=False, root_certificates_path=None)
-
-
-def test_try_obtain_optional_runtime_server_certificates_returns_none() -> None:
-    """Optional Runtime API server certificates should be omitted by default."""
-    args = argparse.Namespace(
-        runtime_ssl_ca_certfile=None,
-        runtime_ssl_certfile=None,
-        runtime_ssl_keyfile=None,
-    )
-
-    assert try_obtain_optional_runtime_server_certificates(args) is None
-
-
-def test_try_obtain_optional_runtime_server_certificates_reads_files(
-    tmp_path: Path,
-) -> None:
-    """Optional Runtime API certificates should be read when all paths are provided."""
-    cert_dir = tmp_path
-    ca_cert = cert_dir / "ca.pem"
-    server_cert = cert_dir / "server.pem"
-    server_key = cert_dir / "server.key"
-    ca_cert.write_bytes(b"ca")
-    server_cert.write_bytes(b"cert")
-    server_key.write_bytes(b"key")
-    args = argparse.Namespace(
-        runtime_ssl_ca_certfile=str(ca_cert),
-        runtime_ssl_certfile=str(server_cert),
-        runtime_ssl_keyfile=str(server_key),
-    )
-
-    certificates = try_obtain_optional_runtime_server_certificates(args)
-
-    assert certificates == (b"ca", b"cert", b"key")
-
-
-def test_try_obtain_optional_runtime_server_certificates_rejects_partial_config() -> (
-    None
-):
-    """Optional Runtime API certificates should reject partial TLS config."""
-    args = argparse.Namespace(
-        runtime_ssl_ca_certfile="/tmp/ca.pem",
-        runtime_ssl_certfile=None,
-        runtime_ssl_keyfile=None,
-    )
-
-    with patch("flwr.supercore.tls.flwr_exit") as mock_exit:
-        mock_exit.side_effect = RuntimeError
-        with pytest.raises(RuntimeError):
-            try_obtain_optional_runtime_server_certificates(args)
-
-    mock_exit.assert_called_once()
-    input_code, message = mock_exit.call_args.args
-    assert input_code == ExitCode.COMMON_TLS_SERVER_CERTIFICATES_INVALID
-    assert "--appio-ssl-certfile" in message
-    assert "--appio-ssl-keyfile" in message
-    assert "--appio-ssl-ca-certfile" in message
-
-
-def test_try_obtain_optional_runtime_server_certificates_rejects_invalid_path() -> None:
-    """Optional Runtime API certificates should reject invalid paths."""
-    args = argparse.Namespace(
-        runtime_ssl_ca_certfile="/tmp/missing-ca.pem",
-        runtime_ssl_certfile="/tmp/missing-cert.pem",
-        runtime_ssl_keyfile="/tmp/missing-key.pem",
-    )
-
-    with patch("flwr.supercore.tls.flwr_exit") as mock_exit:
-        mock_exit.side_effect = RuntimeError
-        with pytest.raises(RuntimeError):
-            try_obtain_optional_runtime_server_certificates(args)
-
-    mock_exit.assert_called_once()
-    input_code, message = mock_exit.call_args.args
-    assert input_code == ExitCode.COMMON_PATH_INVALID
-    assert "--appio-ssl-ca-certfile" in message
