@@ -93,7 +93,7 @@ class AutomationRecord:
 
 
 @dataclass(frozen=True)
-class FederationAppRecord:
+class FederationAppRecord:  # pylint: disable=too-many-instance-attributes
     """Record containing a federation app and its association metadata."""
 
     federation_id: str
