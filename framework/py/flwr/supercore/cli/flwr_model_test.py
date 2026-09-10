@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for ModelApp process CLI parsing and wiring."""
 
-
 import importlib
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -58,6 +57,16 @@ def test_parse_flwr_model_parses_tokenized_invocation() -> None:
     assert args.insecure is True
     assert args.parent_pid == 1234
     assert args.runtime_dependency_install is True
+
+
+def test_parse_flwr_model_accepts_only_one_token_source() -> None:
+    """The private stdin mode should be mutually exclusive with other sources."""
+    parser = _parse_args_run_flwr_model()
+
+    assert parser.parse_args(["--token-stdin"]).token_stdin is True
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--token", "test-token", "--token-stdin"])
 
 
 def test_flwr_model_forwards_cli_args() -> None:

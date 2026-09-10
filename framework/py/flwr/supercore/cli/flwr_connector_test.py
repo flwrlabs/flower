@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for connector process CLI parsing and wiring."""
 
-
 import importlib
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -49,6 +48,16 @@ def test_parse_flwr_connector_parses_tokenized_invocation() -> None:
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
+
+
+def test_parse_flwr_connector_accepts_only_one_token_source() -> None:
+    """The private stdin mode should be mutually exclusive with other sources."""
+    parser = _parse_args_run_flwr_connector()
+
+    assert parser.parse_args(["--token-stdin"]).token_stdin is True
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--token", "test-token", "--token-stdin"])
 
 
 def test_flwr_connector_parses_args_before_runtime_side_effects() -> None:

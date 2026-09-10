@@ -23,6 +23,7 @@ from collections.abc import Callable, Mapping, Sequence
 from logging import WARNING
 from typing import TYPE_CHECKING
 
+from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
 from flwr.supercore import log
 from flwr.supercore.constant import (
     TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
@@ -41,7 +42,11 @@ from .warm_executor_pool import (
 if TYPE_CHECKING:
     from .kubernetes_executor import KubernetesClient, KubernetesExecutorConfig
 
-_TOKEN_STDIN_ACKNOWLEDGEMENT = "FLWR_AGENTAPP_TOKEN_ACCEPTED"
+_TOKEN_STDIN_ACKNOWLEDGEMENTS = (
+    FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
+    # Accept ready Pods created by the earlier AgentApp-only implementation.
+    "FLWR_AGENTAPP_TOKEN_ACCEPTED",
+)
 WARM_EXECUTOR_CONSUMED_ANNOTATION = "flower.ai/warm-executor-consumed"
 WARM_AGENTAPP_ROOT_CERTIFICATES_MOUNT_PATH = "/run/flwr/runtime-ca"
 WARM_AGENTAPP_ROOT_CERTIFICATES_FILE_PATH = (
@@ -95,9 +100,12 @@ class KubernetesWarmAgentAppDispatch:
             stdout += self._read_stdout()
             self._read_stderr()
             self._discard_combined_output()
-            if _TOKEN_STDIN_ACKNOWLEDGEMENT in stdout:
+            if any(
+                acknowledgement in stdout
+                for acknowledgement in _TOKEN_STDIN_ACKNOWLEDGEMENTS
+            ):
                 return True
-            stdout = stdout[-len(_TOKEN_STDIN_ACKNOWLEDGEMENT) :]
+            stdout = stdout[-max(map(len, _TOKEN_STDIN_ACKNOWLEDGEMENTS)) :]
             if not self._is_open():
                 return False
             self._update(min(0.5, deadline - time.monotonic()))
