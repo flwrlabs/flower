@@ -64,10 +64,10 @@ from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.superlink.grid import HttpGrid
 
 from .session import (
+    AgentRuntime,
     RuntimeAgentConnectors,
     RuntimeAgentEvents,
     RuntimeAgentSession,
-    RuntimeAgentTaskHandler,
 )
 
 _AGENT_INPUT_KEY = "agent.input"
@@ -240,7 +240,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
                 f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
             ) from None
         agent_events = RuntimeAgentEvents(grid._runtime_client)
-        task_handler = RuntimeAgentTaskHandler(
+        agent_runtime = AgentRuntime(
             stub=grid._runtime_client,
             run_id=context.run_id,
             task_id=task_id,
@@ -254,7 +254,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             events=agent_events,
         )
         agent = RuntimeAgentSession(
-            connectors=RuntimeAgentConnectors(task_handler),
+            connectors=RuntimeAgentConnectors(agent_runtime),
             events=agent_events,
         )
         agent_app(agent=agent, context=context)

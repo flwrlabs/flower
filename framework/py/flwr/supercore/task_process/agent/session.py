@@ -191,8 +191,8 @@ class RuntimeAgentSession(AgentSession):
 class RuntimeAgentConnectors(AgentConnectors):
     """AgentConnectors implementation for model tools."""
 
-    def __init__(self, task_handler: RuntimeAgentTaskHandler) -> None:
-        self._task_handler = task_handler
+    def __init__(self, agent_runtime: AgentRuntime) -> None:
+        self._agent_runtime = agent_runtime
 
     def tools(self, names: Sequence[str]) -> list[JSONObject]:
         """Return model-facing tool schemas for the requested connectors."""
@@ -209,19 +209,19 @@ class RuntimeAgentConnectors(AgentConnectors):
         arguments_obj = cast(JSONObject, arguments)
 
         if name == START_AUTOMATION_TOOL_NAME:
-            return self._task_handler.call_automation_with_events(
+            return self._agent_runtime.call_automation_with_events(
                 call_id=call_id,
                 arguments=arguments_obj,
             )
-        return self._task_handler.call_connector_with_events(
+        return self._agent_runtime.call_connector_with_events(
             name=name,
             call_id=call_id,
             arguments=arguments_obj,
         )
 
 
-class RuntimeAgentTaskHandler:
-    """Handle child tasks used by AgentApp connectors."""
+class AgentRuntime:
+    """Coordinate AgentApp operations with Runtime services."""
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
