@@ -29,6 +29,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskResponse,
     GetNodesRequest,
     GetNodesResponse,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
@@ -129,7 +131,7 @@ def test_all_runtime_routes_have_protobuf_request_types() -> None:
         if route_key[1].startswith("/v1/runtime/")
     }
 
-    assert len(route_keys) == 19
+    assert len(route_keys) == 20
     assert route_keys == runtime_request_types
 
 
@@ -177,6 +179,25 @@ def test_get_nodes_delegates_with_authenticated_task(
 
     assert response.status_code == 200
     assert GetNodesResponse.FromString(response.content) == expected
+    handler.assert_called_once_with(request, state, task)
+
+
+def test_get_run_series_events_delegates_with_authenticated_task(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Run-series event requests should pass the authenticated task."""
+    state = Mock(spec=LinkState)
+    task = Task(task_id=123)
+    expected = GetRunSeriesEventsResponse()
+    handler = Mock(return_value=expected)
+    monkeypatch.setattr(runtime_handlers, "get_run_series_events", handler)
+    client = TestClient(_create_app(state, task=task))
+    request = GetRunSeriesEventsRequest()
+
+    response = _post(client, "/v1/runtime/get-run-series-events", request)
+
+    assert response.status_code == 200
+    assert GetRunSeriesEventsResponse.FromString(response.content) == expected
     handler.assert_called_once_with(request, state, task)
 
 

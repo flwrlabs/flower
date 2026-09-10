@@ -59,6 +59,10 @@ class AgentEvents(ABC):
     """Abstract base class for AgentApp run events."""
 
     @abstractmethod
+    def get_trace(self) -> list[JSONObject]:
+        """Get events from all runs in the current run series."""
+
+    @abstractmethod
     def emit(self, event: JSONObject) -> None:
         """Emit one structured run event."""
 

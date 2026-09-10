@@ -35,6 +35,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
+    GetRunSeriesEventsRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskMessageRequest,
@@ -53,7 +54,7 @@ from flwr.supercore.task_process.connector.registry import (
     get_connector_tools,
 )
 from flwr.supercore.typing import JSONObject, JSONValue
-from flwr.supercore.utils import strict_json_dumps
+from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
 _DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
 _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
@@ -80,6 +81,21 @@ class RuntimeAgentEvents(AgentEvents):
             daemon=True,
         )
         self._worker.start()
+
+    def get_trace(self) -> list[JSONObject]:
+        """Get events from all runs in the current run series."""
+        response = self._stub.GetRunSeriesEvents(GetRunSeriesEventsRequest())
+        return [
+            {
+                "id": event.id,
+                "timestamp": event.timestamp,
+                "run_id": event.run_id,
+                "task_id": event.task_id,
+                "event": event.event,
+                "data": strict_json_loads(event.data),
+            }
+            for event in response.events
+        ]
 
     def emit(self, event: JSONObject) -> None:
         """Queue one event for publication to run-event subscribers."""

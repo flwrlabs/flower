@@ -28,6 +28,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     CreateTaskResponse,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
     PushTaskEventsRequest,
@@ -106,6 +108,39 @@ def test_emit_event_requires_type() -> None:
     events.close()
 
     stub.PushTaskEvents.assert_not_called()
+
+
+def test_get_trace_gets_current_run_series_events() -> None:
+    """Get trace should return parsed event envelopes from the Runtime API."""
+    stub = Mock()
+    stub.GetRunSeriesEvents.return_value = GetRunSeriesEventsResponse(
+        events=[
+            TaskEvent(
+                id=12,
+                timestamp="2026-09-08T12:00:00+00:00",
+                run_id=34,
+                task_id=56,
+                event="response.completed",
+                data='{"type":"response.completed","response":{"id":"resp_1"}}',
+            )
+        ]
+    )
+    events = RuntimeAgentEvents(stub)
+
+    trace = events.get_trace()
+    events.close()
+
+    stub.GetRunSeriesEvents.assert_called_once_with(GetRunSeriesEventsRequest())
+    assert trace == [
+        {
+            "id": 12,
+            "timestamp": "2026-09-08T12:00:00+00:00",
+            "run_id": 34,
+            "task_id": 56,
+            "event": "response.completed",
+            "data": {"type": "response.completed", "response": {"id": "resp_1"}},
+        }
+    ]
 
 
 def test_agent_events_and_connector_items_use_same_publisher() -> None:
