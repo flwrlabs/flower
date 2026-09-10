@@ -66,8 +66,8 @@ from flwr.superlink.grid import HttpGrid
 from .session import (
     RuntimeAgentConnectors,
     RuntimeAgentEvents,
-    RuntimeAgentResponses,
     RuntimeAgentSession,
+    RuntimeAgentTaskHandler,
 )
 
 _AGENT_INPUT_KEY = "agent.input"
@@ -240,7 +240,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
                 f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
             ) from None
         agent_events = RuntimeAgentEvents(grid._runtime_client)
-        responses = RuntimeAgentResponses(
+        task_handler = RuntimeAgentTaskHandler(
             stub=grid._runtime_client,
             run_id=context.run_id,
             task_id=task_id,
@@ -254,8 +254,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             events=agent_events,
         )
         agent = RuntimeAgentSession(
-            responses=responses,
-            connectors=RuntimeAgentConnectors(responses),
+            connectors=RuntimeAgentConnectors(task_handler),
             events=agent_events,
         )
         agent_app(agent=agent, context=context)
