@@ -637,11 +637,11 @@ class CompletedPodSweeper:
                 self._config.namespace, label_selector=selector
             )
         )
+        pods = [pod for pod in pods if not is_warm_executor(pod)]
+        secrets = [secret for secret in secrets if not is_warm_executor(secret)]
         if self._config.warm_executor_owner is not None:
             # Caller labels and resource pools can change across restarts. Warm
             # resources are instead owned by a stable SuperExec identity.
-            pods = [pod for pod in pods if not is_warm_executor(pod)]
-            secrets = [secret for secret in secrets if not is_warm_executor(secret)]
             warm_selector = _warm_executor_owner_label_selector(self._config)
             pods.extend(
                 _pod_items(

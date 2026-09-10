@@ -333,6 +333,7 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
     )
     config = _executor_config(
         labels={WARM_EXECUTOR_LABEL: "false"},
+        warm_executor_owner="superexec-a",
         annotations={
             "example.com/setting": "configured",
             _WARM_EXECUTOR_CONSUMED_ANNOTATION: "true",
@@ -361,6 +362,7 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
         "app.kubernetes.io/component": "taskexecutor",
         "flower.ai/task-type": "flwr-agentapp",
         WARM_EXECUTOR_LABEL: "true",
+        "flower.ai/warm-executor-owner": "superexec-a",
     }
     annotations = metadata["annotations"]
     assert annotations["example.com/setting"] == "configured"
@@ -435,10 +437,11 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
         grace_period_seconds=0,
     )
     client.delete_namespaced_secret.assert_not_called()
-    client.list_namespaced_pod.assert_called_once_with(
+    client.list_namespaced_pod.assert_called_with(
         "flower-system",
         label_selector=(
-            "app.kubernetes.io/component=taskexecutor,app.kubernetes.io/name=flower"
+            "app.kubernetes.io/component=taskexecutor,app.kubernetes.io/name=flower,"
+            "flower.ai/warm-executor=true,flower.ai/warm-executor-owner=superexec-a"
         ),
     )
 
@@ -1295,6 +1298,24 @@ def test_warm_executor_owner_selector_ignores_mutable_pool_labels() -> None:
         "app.kubernetes.io/component=taskexecutor,app.kubernetes.io/name=flower,"
         "flower.ai/warm-executor=true,flower.ai/warm-executor-owner=superexec-a"
     )
+
+
+def test_ownerless_sweeper_keeps_warm_secret_before_pod_creation() -> None:
+    """A cold-only sweeper must leave another owner's pending warm creation alone."""
+    client = Mock()
+    secret = kube._build_warm_executor_root_certificates_secret(  # pylint: disable=protected-access
+        _warm_executor_pool_key(),
+        _executor_config(warm_executor_owner="superexec-a"),
+        "creating",
+    )
+    client.list_namespaced_pod.return_value = {"items": []}
+    client.list_namespaced_secret.return_value = {"items": [secret]}
+
+    CompletedPodSweeper(
+        client=client, config=_executor_config(warm_executor_owner=None)
+    ).sweep()
+
+    client.delete_namespaced_secret.assert_not_called()
 
 
 def test_sweeper_cleans_orphaned_warm_secret_after_labels_change() -> None:
