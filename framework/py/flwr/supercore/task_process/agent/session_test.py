@@ -44,7 +44,7 @@ from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TO
 from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject
 
-from .session import RuntimeAgentConnectors, RuntimeAgentEvents, RuntimeAgentResponses
+from .session import AgentRuntime, RuntimeAgentConnectors, RuntimeAgentEvents
 
 
 def test_emit_event_pushes_task_event() -> None:
@@ -147,7 +147,7 @@ def test_agent_events_and_connector_items_use_same_publisher() -> None:
     """Publish explicit AgentApp events and connector items through one publisher."""
     stub = Mock()
     events = Mock()
-    responses = RuntimeAgentResponses(
+    agent_runtime = AgentRuntime(
         stub=stub,
         run_id=123,
         task_id=789,
@@ -166,7 +166,7 @@ def test_agent_events_and_connector_items_use_same_publisher() -> None:
     }
 
     events.emit(model_event)
-    responses.push_run_events([connector_event])
+    agent_runtime.push_run_events([connector_event])
 
     assert events.emit.call_args_list == [
         call(model_event),
@@ -178,7 +178,7 @@ def test_pull_task_messages_filters_by_child_task() -> None:
     """Claim only messages sent by the expected child task."""
     stub = Mock()
     stub.PullTaskMessage.return_value = PullTaskMessageResponse()
-    responses = RuntimeAgentResponses(
+    agent_runtime = AgentRuntime(
         stub=stub,
         run_id=123,
         task_id=789,
@@ -186,7 +186,7 @@ def test_pull_task_messages_filters_by_child_task() -> None:
         events=Mock(),
     )
 
-    assert responses._pull_task_messages(456) == []  # pylint: disable=W0212
+    assert agent_runtime._pull_task_messages(456) == []  # pylint: disable=W0212
     stub.PullTaskMessage.assert_called_once_with(
         PullTaskMessageRequest(limit=1, src_task_id=456)
     )
@@ -236,7 +236,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         federation="@account/federation",
         series_id=2,
     )
-    responses = RuntimeAgentResponses(
+    agent_runtime = AgentRuntime(
         stub=stub,
         run_id=123,
         task_id=789,
@@ -251,8 +251,8 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     }
 
     # Execute
-    with patch.object(responses, "push_run_events") as push_run_events:
-        responses.call_automation_with_events(call_id="call-1", arguments=arguments)
+    with patch.object(agent_runtime, "push_run_events") as push_run_events:
+        agent_runtime.call_automation_with_events(call_id="call-1", arguments=arguments)
 
     # Assert
     request = stub.StartAutomation.call_args.args[0]
@@ -279,7 +279,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
 
 def test_connector_call_emits_standard_items() -> None:
     """Emit standard function call and output items."""
-    responses = RuntimeAgentResponses(
+    agent_runtime = AgentRuntime(
         stub=Mock(),
         run_id=123,
         task_id=789,
@@ -290,11 +290,11 @@ def test_connector_call_emits_standard_items() -> None:
 
     with (
         patch.object(
-            responses, "create_connector_response", return_value={"results": []}
+            agent_runtime, "create_connector_response", return_value={"results": []}
         ),
-        patch.object(responses, "push_run_events") as push_run_events,
+        patch.object(agent_runtime, "push_run_events") as push_run_events,
     ):
-        output = responses.call_connector_with_events(
+        output = agent_runtime.call_connector_with_events(
             name="notion_search", call_id="call-1", arguments=arguments
         )
 
@@ -322,7 +322,7 @@ def test_create_connector_response_resolves_canonical_name() -> None:
     """Task creation should resolve the canonical tool name to its connector."""
     stub = Mock()
     stub.CreateTask.return_value = CreateTaskResponse(task_id=456)
-    responses = RuntimeAgentResponses(
+    agent_runtime = AgentRuntime(
         stub=stub,
         run_id=123,
         task_id=789,
@@ -344,10 +344,10 @@ def test_create_connector_response_resolves_canonical_name() -> None:
             return_value="notion",
         ) as get_connector_ref,
         patch.object(
-            responses, "_send_and_receive", return_value=reply
+            agent_runtime, "_send_and_receive", return_value=reply
         ) as send_and_receive,
     ):
-        output = responses.create_connector_response(
+        output = agent_runtime.create_connector_response(
             name=" NoTiOn_Search ",
             call_id="call-1",
             arguments={},

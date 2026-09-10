@@ -14,6 +14,7 @@
 # ==============================================================================
 """Abstract base class CoreState."""
 
+# pylint: disable=too-many-lines
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -381,6 +382,20 @@ class CoreState(ABC):  # pylint: disable=R0904
         -------
         Sequence[RunSeries]
             RunSeries records ordered by `updated_at` descending.
+        """
+
+    @abstractmethod
+    def set_run_series_description(self, series_id: int, description: str) -> None:
+        """Set the description of an existing RunSeries.
+
+        Empty descriptions are ignored and do not update the RunSeries.
+
+        Parameters
+        ----------
+        series_id : int
+            The ID of the RunSeries to update.
+        description : str
+            The non-empty description to store.
         """
 
     @abstractmethod

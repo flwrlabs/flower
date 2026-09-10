@@ -808,6 +808,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     )
         return list(series_by_id.values())
 
+    def set_run_series_description(self, series_id: int, description: str) -> None:
+        """Set the description of an existing RunSeries."""
+        normalized = description.strip()
+        if not normalized:
+            return
+        stmt = (
+            update(RunSeriesModel)
+            .where(RunSeriesModel.series_id == uint64_to_int64(series_id))
+            .values(description=normalized)
+        )
+        with self.session() as session:
+            session.execute(stmt)
+
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
         with self.session() as session:

@@ -24,25 +24,6 @@ from flwr.app import Context
 from flwr.supercore.typing import JSONObject
 
 
-class AgentResponses(ABC):
-    """Abstract base class for AgentApp model response creation."""
-
-    @abstractmethod
-    def create(self, request: JSONObject) -> JSONObject:
-        """Create a model response.
-
-        Parameters
-        ----------
-        request : JSONObject
-            Open Responses-compatible create request.
-
-        Returns
-        -------
-        response : JSONObject
-            Open Responses-compatible response.
-        """
-
-
 class AgentConnectors(ABC):
     """Abstract base class for AgentApp connector execution."""
 
@@ -69,11 +50,6 @@ class AgentEvents(ABC):
 
 class AgentSession(ABC):
     """Abstract base class for AgentApp runtime capabilities."""
-
-    @property
-    @abstractmethod
-    def responses(self) -> AgentResponses:
-        """Model response creation API."""
 
     @property
     @abstractmethod
