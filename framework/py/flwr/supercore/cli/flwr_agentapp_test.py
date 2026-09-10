@@ -23,7 +23,10 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from flwr.common.constant import FLWR_TASK_TOKEN_LENGTH
+from flwr.common.constant import (
+    FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
+    FLWR_TASK_TOKEN_LENGTH,
+)
 from flwr.supercore.cli.flwr_agentapp import _parse_args_run_flwr_agentapp
 from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 
@@ -168,7 +171,7 @@ def test_flwr_agentapp_reads_stdin_token_and_acknowledges_start(
         token_writer.close()
 
     assert token_stdin.closed
-    assert capsys.readouterr().out == "FLWR_TASK_TOKEN_ACCEPTED\n"
+    assert capsys.readouterr().out == f"{FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT}\n"
     run_agentapp.assert_called_once()
     assert run_agentapp.call_args.kwargs["token"] == _VALID_TASK_TOKEN
 
