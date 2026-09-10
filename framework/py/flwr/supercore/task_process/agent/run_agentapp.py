@@ -16,6 +16,7 @@
 
 
 import os
+from concurrent.futures import Future
 from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
@@ -63,6 +64,10 @@ from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.superlink.grid import HttpGrid
 
+from .conversation_title import (
+    generate_series_description_in_background,
+    resolve_series_description,
+)
 from .session import (
     RuntimeAgentConnectors,
     RuntimeAgentEvents,
@@ -108,6 +113,8 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     context: Context | None = None
     runtime_env_dir: Path | None = None
     agent_events: RuntimeAgentEvents | None = None
+    title_future: Future[str] | None = None
+    series_description: str | None = None
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
@@ -129,6 +136,8 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             sub_status=sub_status,
             details=details,
         )
+        if series_description is not None:
+            pushoutput_req.series_description = series_description
         try:
             grid._runtime_client.PushTaskOutput(pushoutput_req)
         except httpx.HTTPError as err:
@@ -258,8 +267,15 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             connectors=RuntimeAgentConnectors(responses),
             events=agent_events,
         )
-        agent_app(agent=agent, context=context)
-        agent_events.close()
+        if res.should_generate_series_description and agent_input:
+            title_future = generate_series_description_in_background(
+                responses, agent_input
+            )
+        try:
+            agent_app(agent=agent, context=context)
+        finally:
+            series_description = resolve_series_description(title_future)
+            agent_events.close()
 
         # Set sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED
