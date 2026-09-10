@@ -180,6 +180,8 @@ from flwr.superlink.federation.noop_federation_manager import NoOpFederationMana
 from flwr.superlink.federation.typing import Federation as FederationInfo
 from flwr.superlink.run_source import RunSource
 
+from .conversation_title import start_title_generation
+
 
 class InvalidConnectorRequestError(FlowerError):
     """Exception raised when a connector request is invalid."""
@@ -652,16 +654,21 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             )
 
         series_id = request.series_id if request.HasField("series_id") else None
+        should_generate_title = (
+            primary_task_type == TaskType.AGENT_APP and series_id is None
+        )
         series_description: str | None = None
-        if primary_task_type == TaskType.AGENT_APP and series_id is None:
+        if should_generate_title:
             series_description = (
                 _derive_run_series_description(fused_run_config) or None
             )
 
         initial_task_event = None
+        agent_input: str | None = None
         if primary_task_type == TaskType.AGENT_APP:
-            agent_input = fused_run_config.get("agent.input")
-            if isinstance(agent_input, str) and agent_input:
+            configured_input = fused_run_config.get("agent.input")
+            if isinstance(configured_input, str) and configured_input:
+                agent_input = configured_input
                 input_item: JSONObject = {
                     "type": "message",
                     "role": "user",
@@ -698,6 +705,11 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
         run = state.get_run_info(run_ids=[run_id])[0]
         series_id = run.series_id
+        if should_generate_title and agent_input and series_id:
+            try:
+                start_title_generation(state, run_id, series_id, agent_input)
+            except Exception as ex:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to start RunSeries title generation: %s", ex)
 
     except ValueError as e:
         log(ERROR, "Could not start run: %s", str(e))

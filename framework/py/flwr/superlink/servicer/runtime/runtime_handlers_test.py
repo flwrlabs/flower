@@ -957,63 +957,6 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.RUNNING
 
-    def test_agent_run_series_description_flow(self) -> None:
-        """The first AgentApp run should generate and persist a title."""
-        fab_content = b"mock fab content"
-        fab_hash = self.state.store_fab(
-            Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
-        )
-        first_run_id = self.state.create_run(
-            "",
-            "",
-            fab_hash,
-            {},
-            NOOP_FEDERATION_ID,
-            None,
-            "",
-            TaskType.AGENT_APP,
-        )
-        first_run = self.state.get_run_info(run_ids=[first_run_id])[0]
-        assert first_run.primary_task_id is not None
-        assert self.state.claim_task(first_run.primary_task_id) is not None
-        first_task = self.state.get_tasks(task_ids=[first_run.primary_task_id])[0]
-
-        first_response = runtime_handlers.pull_task_input(
-            PullTaskInputRequest(), self.state, first_task
-        )
-        assert first_response.should_generate_series_description
-        runtime_handlers.push_task_output(
-            PushTaskOutputRequest(
-                sub_status=SubStatus.COMPLETED,
-                series_description="Generated title",
-            ),
-            self.state,
-            first_task,
-        )
-        series = self.state.get_run_series(series_ids=[first_run.series_id])
-        assert series[0].description == "Generated title"
-
-        second_run_id = self.state.create_run(
-            "",
-            "",
-            fab_hash,
-            {},
-            NOOP_FEDERATION_ID,
-            None,
-            "",
-            TaskType.AGENT_APP,
-            series_id=first_run.series_id,
-        )
-        second_run = self.state.get_run_info(run_ids=[second_run_id])[0]
-        assert second_run.primary_task_id is not None
-        assert self.state.claim_task(second_run.primary_task_id) is not None
-        second_task = self.state.get_tasks(task_ids=[second_run.primary_task_id])[0]
-
-        second_response = runtime_handlers.pull_task_input(
-            PullTaskInputRequest(), self.state, second_task
-        )
-        assert not second_response.should_generate_series_description
-
 
 def test_ha_pull_task_input_claim_is_unique_across_replicas() -> None:
     """Ensure only one replica can claim STARTING -> RUNNING via PullTaskInput."""

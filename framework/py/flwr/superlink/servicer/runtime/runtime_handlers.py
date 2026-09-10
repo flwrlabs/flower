@@ -277,19 +277,12 @@ def pull_task_input(
         series_context = state.get_run_series_context(run.series_id)
     if run and fab and series_context and state.activate_task(task.task_id):
         log(INFO, "Started task %d of run %d", task.task_id, run_id)
-        series = state.get_run_series(series_ids=[run.series_id])
-        should_generate_series_description = bool(
-            task.type == TaskType.AGENT_APP
-            and run.primary_task_id == task.task_id
-            and series[0].run_ids[0] == run_id
-        )
         return PullTaskInputResponse(
             context=context_to_proto(series_context),
             run=run_to_proto(run),
             fab=fab_to_proto(fab),
             federation_config=state.get_federation_config(run_id),
             task_id=task.task_id,
-            should_generate_series_description=should_generate_series_description,
         )
 
     raise FlowerError(
@@ -321,13 +314,6 @@ def push_task_output(
                 state.set_run_series_context(
                     run.series_id,
                     context_from_proto(request.context),
-                )
-            if task.type == TaskType.AGENT_APP and request.HasField(
-                "series_description"
-            ):
-                state.set_run_series_description(
-                    run.series_id,
-                    request.series_description,
                 )
     else:
         log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)

@@ -332,6 +332,10 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 "flwr.superlink.servicer.control.control_handlers._get_app_type",
                 return_value=TaskType.AGENT_APP,
             ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".start_title_generation"
+            ) as start_title,
         ):
             response = start_run(request, self.account, self.state, None)
 
@@ -344,6 +348,12 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 "message",
                 '{"type":"message","role":"user","content":"Hello"}',
             ),
+        )
+        start_title.assert_called_once_with(
+            self.state,
+            response.run_id,
+            run.series_id,
+            "Hello",
         )
 
     def test_start_run_notifies_extension_after_persisting_run(self) -> None:
