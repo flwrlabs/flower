@@ -123,6 +123,12 @@ class RuntimeStub:
     ]
     """Push task events"""
 
+    GetRunSeriesEvents: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.runtime_pb2.GetRunSeriesEventsRequest,
+        flwr.proto.runtime_pb2.GetRunSeriesEventsResponse,
+    ]
+    """Get events for all runs in the authenticated AgentApp task's run series"""
+
     PullTaskMessage: grpc.UnaryUnaryMultiCallable[
         flwr.proto.runtime_pb2.PullTaskMessageRequest,
         flwr.proto.runtime_pb2.PullTaskMessageResponse,
@@ -257,6 +263,12 @@ class RuntimeAsyncStub:
         flwr.proto.runtime_pb2.PushTaskEventsResponse,
     ]
     """Push task events"""
+
+    GetRunSeriesEvents: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.runtime_pb2.GetRunSeriesEventsRequest,
+        flwr.proto.runtime_pb2.GetRunSeriesEventsResponse,
+    ]
+    """Get events for all runs in the authenticated AgentApp task's run series"""
 
     PullTaskMessage: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.runtime_pb2.PullTaskMessageRequest,
@@ -416,6 +428,14 @@ class RuntimeServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.runtime_pb2.PushTaskEventsResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.PushTaskEventsResponse]]:
         """Push task events"""
+
+    @abc.abstractmethod
+    def GetRunSeriesEvents(
+        self,
+        request: flwr.proto.runtime_pb2.GetRunSeriesEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.runtime_pb2.GetRunSeriesEventsResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.GetRunSeriesEventsResponse]]:
+        """Get events for all runs in the authenticated AgentApp task's run series"""
 
     @abc.abstractmethod
     def PullTaskMessage(

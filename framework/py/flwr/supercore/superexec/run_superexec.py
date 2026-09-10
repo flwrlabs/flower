@@ -29,7 +29,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import ExecutorType
+from flwr.supercore.constant import ExecutorType, TaskType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import (
@@ -182,7 +182,12 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     task_poll_interval = _get_task_poll_interval()
 
     try:
-        executor = get_executor(executor_type, executor_config=executor_config)
+        executor = get_executor(
+            executor_type,
+            executor_config=executor_config,
+            insecure=insecure,
+            root_certificates_path=root_certificates_path,
+        )
     except ValueError as err:
         flwr_exit(ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG, str(err))
 
@@ -203,36 +208,45 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
     # Launch gRPC health server
     grpc_servers = []
-    if health_server_address is not None:
-        health_server = run_health_server_grpc_no_tls(health_server_address)
-        grpc_servers.append(health_server)
+    try:
+        if health_server_address is not None:
+            health_server = run_health_server_grpc_no_tls(health_server_address)
+            grpc_servers.append(health_server)
 
-    client = client_class.from_server_address(
-        server_address=runtime_api_address,
-        insecure=insecure,
-        root_certificates=validate_and_resolve_root_certificates(
-            root_certificates_path, insecure
-        ),
-        interceptors=interceptors,
-        retry_invoker=make_simple_http_retry_invoker(),
-    )
+        client = client_class.from_server_address(
+            server_address=runtime_api_address,
+            insecure=insecure,
+            root_certificates=validate_and_resolve_root_certificates(
+                root_certificates_path, insecure
+            ),
+            interceptors=interceptors,
+            retry_invoker=make_simple_http_retry_invoker(),
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        executor.close()
+        raise
 
     # Register exit handlers to close the Runtime API client on exit
     register_signal_handlers(
         event_type=EventType.RUN_SUPEREXEC_LEAVE,
         exit_message="SuperExec terminated gracefully.",
         grpc_servers=grpc_servers,
-        exit_handlers=[client.close],
+        exit_handlers=[client.close, executor.close],
     )
 
     # Create the SuperExec plugin instance
-    plugin = plugin_class(
-        runtime_api_address=runtime_api_address,
-        insecure=insecure,
-        root_certificates_path=root_certificates_path,
-        runtime_dependency_install=runtime_dependency_install,
-        executor=executor,
-    )
+    try:
+        plugin = plugin_class(
+            runtime_api_address=runtime_api_address,
+            insecure=insecure,
+            root_certificates_path=root_certificates_path,
+            runtime_dependency_install=runtime_dependency_install,
+            executor=executor,
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        client.close()
+        executor.close()
+        raise
 
     # Load plugin configuration from file if provided
     try:
@@ -247,6 +261,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     # Start the main loop
     try:
         while True:
+            executor.reconcile()
             # Fetch pending tasks
             tasks_res = client.PullPendingTasks(request=PullPendingTasksRequest())
 
@@ -257,7 +272,15 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
             # If a task was selected, claim it
             if task is not None:
-                executor.wait_for_capacity()
+                try:
+                    task_type = TaskType(task.type)
+                except ValueError:
+                    task_type = None
+                executor.wait_for_capacity(
+                    task_type=task_type,
+                    insecure=insecure,
+                    root_certificates_path=root_certificates_path,
+                )
 
                 claim_req = ClaimTaskRequest(task_id=task.task_id)
                 claim_res = client.ClaimTask(claim_req)
@@ -286,3 +309,4 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             time.sleep(task_poll_interval)
     finally:
         client.close()
+        executor.close()

@@ -26,7 +26,7 @@ from flwr.supercore.constant import RUN_SERIES_DESCRIPTION_MAX_LENGTH
 from flwr.supercore.typing import JSONObject
 
 if TYPE_CHECKING:
-    from .session import RuntimeAgentResponses
+    from .session import AgentRuntime
 
 _TITLE_DEFAULT = "New conversation"
 _TITLE_MODEL = "openai/gpt-5-nano"
@@ -37,14 +37,14 @@ _TITLE_INSTRUCTIONS = (
 
 
 def generate_series_description_in_background(
-    responses: RuntimeAgentResponses, prompt: str
+    runtime: AgentRuntime, prompt: str
 ) -> Future[str]:
     """Generate a RunSeries description in a daemon thread."""
     future: Future[str] = Future()
 
     def generate() -> None:
         try:
-            future.set_result(generate_series_description(responses, prompt))
+            future.set_result(generate_series_description(runtime, prompt))
         except Exception as ex:  # pylint: disable=broad-exception-caught
             future.set_exception(ex)
 
@@ -67,12 +67,12 @@ def resolve_series_description(future: Future[str] | None) -> str | None:
         return None
 
 
-def generate_series_description(responses: RuntimeAgentResponses, prompt: str) -> str:
+def generate_series_description(runtime: AgentRuntime, prompt: str) -> str:
     """Generate a title, falling back to a prompt excerpt on failure."""
     fallback = " ".join(prompt.split()[:4]) or _TITLE_DEFAULT
     title = ""
     try:
-        response = responses.create(
+        response = runtime.create_model_response(
             {
                 "model": _TITLE_MODEL,
                 "instructions": _TITLE_INSTRUCTIONS,

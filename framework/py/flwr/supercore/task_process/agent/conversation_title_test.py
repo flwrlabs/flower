@@ -25,29 +25,31 @@ from .conversation_title import (
 
 def test_generate_series_description_and_fallback() -> None:
     """Model output is normalized and provider errors use a prompt excerpt."""
-    responses = Mock()
-    responses.create.return_value = {
+    runtime = Mock()
+    runtime.create_model_response.return_value = {
         "output": [{"content": [{"type": "output_text", "text": " 'Model title' "}]}]
     }
 
     assert (
-        generate_series_description(responses, "A prompt with several words")
+        generate_series_description(runtime, "A prompt with several words")
         == "Model title"
     )
-    responses.create.side_effect = RuntimeError("provider failed")
+    runtime.create_model_response.side_effect = RuntimeError("provider failed")
 
-    assert generate_series_description(responses, "one two three four five") == (
+    assert generate_series_description(runtime, "one two three four five") == (
         "one two three four"
     )
 
 
 def test_generate_series_description_in_background() -> None:
     """Background generation runs in a daemon thread."""
-    responses = Mock()
-    responses.create.return_value = {"output": [{"content": [{"text": "Model title"}]}]}
+    runtime = Mock()
+    runtime.create_model_response.return_value = {
+        "output": [{"content": [{"text": "Model title"}]}]
+    }
 
     with patch("flwr.supercore.task_process.agent.conversation_title.Thread") as thread:
-        future = generate_series_description_in_background(responses, "Prompt")
+        future = generate_series_description_in_background(runtime, "Prompt")
         thread.call_args.kwargs["target"]()
 
     thread.assert_called_once_with(

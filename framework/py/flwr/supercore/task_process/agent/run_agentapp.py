@@ -69,9 +69,9 @@ from .conversation_title import (
     resolve_series_description,
 )
 from .session import (
+    AgentRuntime,
     RuntimeAgentConnectors,
     RuntimeAgentEvents,
-    RuntimeAgentResponses,
     RuntimeAgentSession,
 )
 
@@ -249,7 +249,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
                 f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
             ) from None
         agent_events = RuntimeAgentEvents(grid._runtime_client)
-        responses = RuntimeAgentResponses(
+        agent_runtime = AgentRuntime(
             stub=grid._runtime_client,
             run_id=context.run_id,
             task_id=task_id,
@@ -263,19 +263,18 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             events=agent_events,
         )
         agent = RuntimeAgentSession(
-            responses=responses,
-            connectors=RuntimeAgentConnectors(responses),
+            connectors=RuntimeAgentConnectors(agent_runtime),
             events=agent_events,
         )
         if res.should_generate_series_description and agent_input:
             title_future = generate_series_description_in_background(
-                responses, agent_input
+                agent_runtime, agent_input
             )
         try:
             agent_app(agent=agent, context=context)
         finally:
             series_description = resolve_series_description(title_future)
-            agent_events.close()
+        agent_events.close()
 
         # Set sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED
