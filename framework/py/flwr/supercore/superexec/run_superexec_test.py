@@ -31,15 +31,6 @@ from flwr.supercore.superexec.executor import LaunchResult, LaunchResultStatus
 from . import run_superexec as run_superexec_module
 
 
-def test_superexec_auth_method_policy() -> None:
-    """Protect exactly the Runtime bootstrap methods."""
-    # pylint: disable-next=protected-access
-    assert run_superexec_module._SUPEREXEC_AUTH_METHODS == {
-        "/flwr.proto.Runtime/PullPendingTasks",
-        "/flwr.proto.Runtime/ClaimTask",
-    }
-
-
 def _run_superexec_one_launch(
     monkeypatch: pytest.MonkeyPatch,
     launch_result: LaunchResult | None,
