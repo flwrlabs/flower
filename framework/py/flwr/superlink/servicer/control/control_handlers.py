@@ -654,21 +654,16 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             )
 
         series_id = request.series_id if request.HasField("series_id") else None
-        should_generate_title = (
-            primary_task_type == TaskType.AGENT_APP and series_id is None
-        )
         series_description: str | None = None
-        if should_generate_title:
+        if primary_task_type == TaskType.AGENT_APP and series_id is None:
             series_description = (
                 _derive_run_series_description(fused_run_config) or None
             )
 
         initial_task_event = None
-        agent_input: str | None = None
+        agent_input = fused_run_config.get("agent.input")
         if primary_task_type == TaskType.AGENT_APP:
-            configured_input = fused_run_config.get("agent.input")
-            if isinstance(configured_input, str) and configured_input:
-                agent_input = configured_input
+            if isinstance(agent_input, str) and agent_input:
                 input_item: JSONObject = {
                     "type": "message",
                     "role": "user",
@@ -705,7 +700,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
         run = state.get_run_info(run_ids=[run_id])[0]
         series_id = run.series_id
-        if should_generate_title and agent_input and series_id:
+        if series_description and isinstance(agent_input, str) and series_id:
             try:
                 start_title_generation(state, run_id, series_id, agent_input)
             except Exception as ex:  # pylint: disable=broad-exception-caught
