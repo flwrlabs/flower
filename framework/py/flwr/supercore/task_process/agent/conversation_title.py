@@ -16,9 +16,9 @@
 
 from __future__ import annotations
 
+import os
 from concurrent.futures import Future
 from logging import ERROR
-import os
 from threading import Thread
 from typing import cast
 
