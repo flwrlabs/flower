@@ -21,6 +21,7 @@ import subprocess
 import sys
 import threading
 from io import StringIO
+from logging import INFO
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -530,9 +531,14 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
         config=config,
         exec_client=exec_client,
     )
+    suppress_output = task_type == TaskType.AGENT_APP
 
     result = executor.launch(
-        _execution_spec(task_type=task_type, insecure=insecure)
+        _execution_spec(
+            task_type=task_type,
+            insecure=insecure,
+            suppress_output=suppress_output,
+        )
     )
 
     assert result.status == LaunchResultStatus.ACCEPTED
@@ -574,6 +580,7 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     ]
     assert "task-token" not in command
     assert len(started) == 1
+    assert started[0][1][-1] is not suppress_output
 
 
 @pytest.mark.parametrize(
@@ -788,6 +795,44 @@ def test_warm_dispatch_drains_stderr_until_the_child_exits() -> None:
     assert dispatch.wait_for_close()
 
     assert response.read_stderr_calls == 1
+    assert response._all.getvalue() == ""  # pylint: disable=protected-access
+
+
+@pytest.mark.parametrize(
+    ("forward_output", "expected_calls"),
+    [
+        (
+            True,
+            [
+                call(INFO, "%s", "visible standard output"),
+                call(INFO, "%s", "visible standard error"),
+            ],
+        ),
+        (False, []),
+    ],
+)
+def test_warm_dispatch_forwards_only_visible_output_after_acceptance(
+    monkeypatch: pytest.MonkeyPatch,
+    forward_output: bool,
+    expected_calls: list[Any],
+) -> None:
+    """Warm dispatch should mirror only post-acknowledgement visible output."""
+    response = _WarmExecResponse()
+    log = Mock()
+    monkeypatch.setattr(warm_agentapp_executor, "log", log)
+    dispatch = warm_agentapp_executor.KubernetesWarmAgentAppDispatch(response)
+
+    dispatch.send_token("task-token")
+    assert dispatch.wait_for_acceptance(1.0)
+    response._stdout = "visible standard output"  # pylint: disable=protected-access
+    response._stderr = "visible standard error"  # pylint: disable=protected-access
+    response._acknowledge = False  # pylint: disable=protected-access
+
+    assert dispatch.wait_for_close(forward_output=forward_output)
+
+    assert log.call_args_list == expected_calls
+    assert all("TOKEN_ACCEPTED" not in str(log_call) for log_call in log.call_args_list)
+    assert all("task-token" not in str(log_call) for log_call in log.call_args_list)
     assert response._all.getvalue() == ""  # pylint: disable=protected-access
 
 

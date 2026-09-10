@@ -20,7 +20,7 @@ import importlib
 import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
-from logging import WARNING
+from logging import INFO, WARNING
 from typing import TYPE_CHECKING
 
 from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
@@ -111,12 +111,15 @@ class KubernetesWarmAgentAppDispatch:
             self._update(min(0.5, deadline - time.monotonic()))
         return False
 
-    def wait_for_close(self) -> bool:
-        """Return whether stream closure confirms that the child exited."""
+    def wait_for_close(self, *, forward_output: bool = False) -> bool:
+        """Return whether stream closure confirms that the child exited.
+
+        Forward child output only after token acceptance when the task opted in.
+        This keeps the token acknowledgement out of the SuperExec logs.
+        """
         while self._is_open():
             self._update(1.0)
-            self._read_stdout()
-            self._read_stderr()
+            self._drain_output(forward_output)
             self._discard_combined_output()
         # A disconnected socket is not proof of process exit. Kubernetes sends
         # the exit status on a separate channel, which must not be discarded.
@@ -148,11 +151,19 @@ class KubernetesWarmAgentAppDispatch:
         stdout = read_stdout()
         return stdout if isinstance(stdout, str) else ""
 
-    def _read_stderr(self) -> None:
+    def _read_stderr(self) -> str:
         peek_stderr = getattr(self._response, "peek_stderr", None)
         read_stderr = getattr(self._response, "read_stderr", None)
         if callable(read_stderr) and (not callable(peek_stderr) or peek_stderr()):
-            read_stderr()
+            stderr = read_stderr()
+            return stderr if isinstance(stderr, str) else ""
+        return ""
+
+    def _drain_output(self, forward_output: bool) -> None:
+        """Consume exec output and optionally mirror it through SuperExec logs."""
+        for output in (self._read_stdout(), self._read_stderr()):
+            if forward_output and output:
+                log(INFO, "%s", output.rstrip())
 
     def _discard_combined_output(self) -> None:
         # WSClient.read_all() also clears unread channels, including the exit
@@ -276,7 +287,12 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
             )
         if not accepted:
             dispatch.close()
-        self._retire_after_dispatch(pod_name, pool.key, dispatch)
+        self._retire_after_dispatch(
+            pod_name,
+            pool.key,
+            dispatch,
+            forward_output=accepted and not spec.suppress_output,
+        )
         if accepted:
             return LaunchResult.accepted()
         return LaunchResult.unknown(
@@ -580,11 +596,13 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         pod_name: str,
         key: WarmExecutorPoolKey,
         dispatch: KubernetesWarmAgentAppDispatch,
+        *,
+        forward_output: bool = False,
     ) -> None:
         try:
             cleanup_thread = threading.Thread(
                 target=self._wait_for_task_and_replace,
-                args=(pod_name, key, dispatch),
+                args=(pod_name, key, dispatch, forward_output),
                 daemon=True,
             )
             cleanup_thread.start()
@@ -604,10 +622,11 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         pod_name: str,
         key: WarmExecutorPoolKey,
         dispatch: KubernetesWarmAgentAppDispatch,
+        forward_output: bool = False,
     ) -> None:
         completed = False
         try:
-            completed = dispatch.wait_for_close()
+            completed = dispatch.wait_for_close(forward_output=forward_output)
         except Exception:  # pylint: disable=broad-exception-caught
             log(WARNING, "Warm TaskExecutor exec stream ended without an exit status.")
         finally:
