@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-09 00:10+0000\n"
+"POT-Creation-Date: 2026-09-10 00:09+0000\n"
 "PO-Revision-Date: 2026-06-11 04:01+0000\n"
 "Last-Translator: reducedradius <feixiang512@outlook.com>\n"
 "Language: zh_Hans\n"
@@ -17538,10 +17538,8 @@ msgstr "在这个例子中，你可以看到请求将我分叉的版本库中的
 msgid ""
 "The title should be changed to adhere to the :ref:`pr_title_format` "
 "guidelines, otherwise it won't be possible to merge the PR. So in this "
-"case, a correct title might be ``docs(framework:skip) Fix typos``."
+"case, a correct title might be ``docs(framework:skip): Fix typos``."
 msgstr ""
-"应该修改标题以符合 :ref:`pr_title_format` 准则，否则将无法合并 PR。因此，在这种情况下，正确的标题可能是 "
-"``docs(framework:skip)修复错字``。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:218
 msgid ""
@@ -17791,9 +17789,9 @@ msgstr "将更改推送到分叉"
 #: ../../source/contributor-tutorial-contribute-on-github.rst:348
 #, fuzzy
 msgid ""
-"Open a PR (as shown above) with title ``docs(framework) Update how-to "
+"Open a PR (as shown above) with title ``docs(framework): Update how-to "
 "guide title``"
-msgstr "打开一个 PR（如上图所示），标题为\"`docs(framework) Update how-to guide title```\"。"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:349
 msgid "Wait for it to be approved!"
@@ -17847,81 +17845,77 @@ msgstr "我们执行以下 PR 标题格式："
 #: ../../source/contributor-tutorial-contribute-on-github.rst:377
 #, fuzzy
 msgid ""
-"(or ``<type>(<project>:skip) <subject>`` to ignore the PR in the "
+"(or ``<type>(<project>:skip): <subject>`` to ignore the PR in the "
 "changelog)"
-msgstr "(或 ``<type>(<project>:skip) <subject>`` 忽略更新日志中的 PR）。"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:379
 #, fuzzy, python-brace-format
 msgid ""
 "Where ``<type>`` needs to be in ``{ci, fix, feat, docs, refactor, "
-"break}``, ``<project>`` should be in ``{framework, baselines, datasets, "
-"examples, or '*' when modifying multiple projects which requires the "
-"':skip' flag to be used}``, and ``<subject>`` starts with a capitalised "
-"verb in the imperative mood."
+"break}``, ``<project>`` should be in ``{devtool, framework, agent, "
+"baselines, datasets, examples, benchmarks, glossary, intelligence, hub, "
+"model, or '*' when modifying multiple projects which requires the ':skip'"
+" flag to be used}``, and ``<subject>`` starts with a capitalised verb in "
+"the imperative mood."
 msgstr ""
-"其中 ``<type>`` 需要使用 ``{ci, fix, feat, docs, refactor, break}``, "
-"``<project>`` 应该使用 ``{framework, baselines, datasets, examples, 或者 '*' "
-"当修改多个项目时需要使用 ':skip'标记}``, 并且 ``<subject>`` 应该以一个大写的动词开始。"
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:384
+#: ../../source/contributor-tutorial-contribute-on-github.rst:385
 #, fuzzy
 msgid "Valid examples:"
 msgstr "实例"
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:386
-#, fuzzy
-msgid "``feat(framework) Add flwr build CLI command``"
-msgstr "`feat(框架) 添加 flwr build CLI 命令```"
-
 #: ../../source/contributor-tutorial-contribute-on-github.rst:387
 #, fuzzy
-msgid "``refactor(examples:skip) Improve quickstart-pytorch logging``"
-msgstr "``refactor(examples:skip) Improve quickstart-pytorch logging``."
+msgid "``feat(framework): Add flwr build CLI command``"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:388
 #, fuzzy
-msgid "``ci(*:skip) Enforce PR title format``"
-msgstr "`ci(*:skip)执行 PR 标题格式``。"
+msgid "``refactor(examples:skip): Improve quickstart-pytorch logging``"
+msgstr ""
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:390
+#: ../../source/contributor-tutorial-contribute-on-github.rst:389
+#, fuzzy
+msgid "``ci(*:skip): Enforce PR title format``"
+msgstr ""
+
+#: ../../source/contributor-tutorial-contribute-on-github.rst:391
 #, fuzzy
 msgid "Invalid examples:"
 msgstr "模拟示例"
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:392
-#, fuzzy
-msgid "``feat(framework): Add flwr build CLI command`` (extra ``:``)"
-msgstr "`feat(框架)： 添加 flwr build CLI 命令``（额外的``:``)"
-
 #: ../../source/contributor-tutorial-contribute-on-github.rst:393
 #, fuzzy
-msgid ""
-"``feat(*) Add flwr build CLI command`` (missing ``skip`` flag along with "
-"``*``)"
-msgstr "`feat(*)添加flwr构建CLI命令``（缺少``skip``标志和``*``）。"
+msgid "``feat(framework) Add flwr build CLI command`` (missing ``:``)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:394
 #, fuzzy
-msgid "``feat(skip) Add flwr build CLI command`` (missing ``<project>``)"
-msgstr "`feat(skip)添加flwr构建CLI命令``（缺少``<project>`）。"
+msgid ""
+"``feat(*): Add flwr build CLI command`` (missing ``skip`` flag along with"
+" ``*``)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:395
 #, fuzzy
-msgid "``feat(framework) add flwr build CLI command`` (non capitalised verb)"
-msgstr "`feat(framework)添加 flwr 构建 CLI 命令``（非大写动词）"
+msgid "``feat(skip): Add flwr build CLI command`` (missing ``<project>``)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:396
 #, fuzzy
-msgid "``feat(framework) Add flwr build CLI command.`` (dot at the end)"
-msgstr "feat(框架) 添加 flwr 构建 CLI 命令。"
+msgid "``feat(framework): add flwr build CLI command`` (non capitalised verb)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:397
 #, fuzzy
-msgid "``Add flwr build CLI command.`` (missing ``<type>(<project>)``)"
+msgid "``feat(framework): Add flwr build CLI command.`` (dot at the end)"
 msgstr ""
-"``添加 flwr build CLI 命令.``（缺少``<type>(<project>)``） ``Add flwr build CLI "
-"command.`` (missing ``<type>(<project>)``)"
+
+#: ../../source/contributor-tutorial-contribute-on-github.rst:398
+#, fuzzy
+msgid "``Add flwr build CLI command.`` (missing ``<type>(<project>):``)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:3
 msgid "Get started as a contributor"
@@ -35430,6 +35424,16 @@ msgstr ""
 #: flwr.agentapp.base.AgentEvents.emit:1
 #: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
 msgid "Emit one structured run event."
+msgstr ""
+
+#: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`get_trace <flwr.agentapp.AgentEvents.get_trace>`\\ \\(\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1
+#: flwr.agentapp.base.AgentEvents.get_trace:1 of
+msgid "Get events from all runs in the current run series."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:2
