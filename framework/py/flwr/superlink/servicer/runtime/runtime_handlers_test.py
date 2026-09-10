@@ -50,6 +50,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -60,7 +62,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputRequest,
     PushTaskOutputResponse,
 )
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
@@ -129,6 +131,35 @@ def test_raise_if_true() -> None:
         assert str(err) == "Malformed DummyRequest: test"
     except Exception as err:
         raise AssertionError() from err
+
+
+def test_get_run_series_events_uses_authenticated_task_series() -> None:
+    """GetRunSeriesEvents should derive the series from task authentication."""
+    state = Mock(spec=LinkState)
+    current_run = Mock(run_id=123, series_id=456, primary_task_id=789)
+    series_runs = [Mock(run_id=120, primary_task_id=780), current_run]
+    state.get_run_info.side_effect = [[current_run], series_runs]
+    state.get_run_series.return_value = [Mock(run_ids=[120, 123])]
+    expected_event = TaskEvent(
+        id=11,
+        run_id=120,
+        task_id=780,
+        event="response.completed",
+        data='{"type":"response.completed"}',
+    )
+    state.get_task_events.return_value = [expected_event]
+    request = GetRunSeriesEventsRequest()
+
+    response = runtime_handlers.get_run_series_events(
+        request,
+        state,
+        Task(task_id=790, run_id=123, type=TaskType.MODEL),
+    )
+
+    assert isinstance(response, GetRunSeriesEventsResponse)
+    assert list(response.events) == [expected_event]
+    state.get_run_series.assert_called_once_with(series_ids=[456])
+    state.get_task_events.assert_called_once_with(task_ids=[780, 789])
 
 
 def _create_shared_runtime(
