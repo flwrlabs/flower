@@ -627,6 +627,24 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(state.get_run_series(is_agent=True), run_series)
         self.assertEqual(state.get_run_series(is_agent=False), [])
 
+    def test_set_run_series_description(self) -> None:
+        """A valid RunSeries description can be changed."""
+        state = self.state_factory()
+        series_id = state.store_run_in_series(
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=True,
+            series_id=None,
+            description="Initial description",
+        )
+        assert series_id is not None
+
+        self.assertIsNone(
+            state.set_run_series_description(series_id, "  Generated title  ")
+        )
+        updated = state.get_run_series(series_ids=[series_id])[0]
+        self.assertEqual(updated.description, "Generated title")
+
     def test_store_run_in_series_returns_none_for_unknown_id(self) -> None:
         """Unknown caller-provided run series IDs return None."""
         state = self.state_factory()
