@@ -87,12 +87,6 @@ class ControlStub:
     ]
     """Get run series"""
 
-    RenameRunSeries: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.control_pb2.RenameRunSeriesRequest,
-        flwr.proto.control_pb2.RenameRunSeriesResponse,
-    ]
-    """Rename run series"""
-
     ListRunSeriesEvents: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ListRunSeriesEventsRequest,
         flwr.proto.control_pb2.ListRunSeriesEventsResponse,
@@ -320,12 +314,6 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.GetRunSeriesResponse,
     ]
     """Get run series"""
-
-    RenameRunSeries: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.control_pb2.RenameRunSeriesRequest,
-        flwr.proto.control_pb2.RenameRunSeriesResponse,
-    ]
-    """Rename run series"""
 
     ListRunSeriesEvents: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ListRunSeriesEventsRequest,
@@ -572,14 +560,6 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.GetRunSeriesResponse, collections.abc.Awaitable[flwr.proto.control_pb2.GetRunSeriesResponse]]:
         """Get run series"""
-
-    @abc.abstractmethod
-    def RenameRunSeries(
-        self,
-        request: flwr.proto.control_pb2.RenameRunSeriesRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.control_pb2.RenameRunSeriesResponse, collections.abc.Awaitable[flwr.proto.control_pb2.RenameRunSeriesResponse]]:
-        """Rename run series"""
 
     @abc.abstractmethod
     def ListRunSeriesEvents(

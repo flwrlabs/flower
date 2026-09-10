@@ -79,11 +79,6 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesResponse.FromString,
                 _registered_method=True)
-        self.RenameRunSeries = channel.unary_unary(
-                '/flwr.proto.Control/RenameRunSeries',
-                request_serializer=flwr_dot_proto_dot_control__pb2.RenameRunSeriesRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_control__pb2.RenameRunSeriesResponse.FromString,
-                _registered_method=True)
         self.ListRunSeriesEvents = channel.unary_unary(
                 '/flwr.proto.Control/ListRunSeriesEvents',
                 request_serializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsRequest.SerializeToString,
@@ -287,13 +282,6 @@ class ControlServicer(object):
 
     def GetRunSeries(self, request, context):
         """Get run series
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def RenameRunSeries(self, request, context):
-        """Rename run series
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -546,11 +534,6 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.GetRunSeries,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesResponse.SerializeToString,
-            ),
-            'RenameRunSeries': grpc.unary_unary_rpc_method_handler(
-                    servicer.RenameRunSeries,
-                    request_deserializer=flwr_dot_proto_dot_control__pb2.RenameRunSeriesRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_control__pb2.RenameRunSeriesResponse.SerializeToString,
             ),
             'ListRunSeriesEvents': grpc.unary_unary_rpc_method_handler(
                     servicer.ListRunSeriesEvents,
@@ -936,33 +919,6 @@ class Control(object):
             '/flwr.proto.Control/GetRunSeries',
             flwr_dot_proto_dot_control__pb2.GetRunSeriesRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.GetRunSeriesResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def RenameRunSeries(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.Control/RenameRunSeries',
-            flwr_dot_proto_dot_control__pb2.RenameRunSeriesRequest.SerializeToString,
-            flwr_dot_proto_dot_control__pb2.RenameRunSeriesResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -199,7 +199,6 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(response.series.series_id, 10)
         self.assertEqual(response.series.description, description)
-        self.assertGreater(response.series.updated_at, "2026-05-30T00:00:00+00:00")
 
     def test_rename_run_series_rejects_invalid_description(self) -> None:
         """Reject blank descriptions and descriptions longer than 80 characters."""

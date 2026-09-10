@@ -57,10 +57,6 @@ service Control {
   // Get run series
   rpc GetRunSeries(GetRunSeriesRequest) returns (GetRunSeriesResponse) {}
 
-  // Rename run series
-  rpc RenameRunSeries(RenameRunSeriesRequest)
-      returns (RenameRunSeriesResponse) {}
-
   // List events for all runs in a run series
   rpc ListRunSeriesEvents(ListRunSeriesEventsRequest)
       returns (ListRunSeriesEventsResponse) {}

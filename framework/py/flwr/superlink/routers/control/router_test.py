@@ -56,6 +56,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     PullArtifactsResponse,
     RefreshAuthTokensRequest,
     RefreshAuthTokensResponse,
+    RenameRunSeriesRequest,
     StartRunRequest,
     StartRunResponse,
     StreamLogsRequest,
@@ -125,7 +126,7 @@ def test_all_control_routes_have_protobuf_request_types() -> None:
 
 
 def test_control_http_routes_cover_all_grpc_methods() -> None:
-    """Expose every Control gRPC request type plus HTTP-only token refresh."""
+    """Expose every Control gRPC request type plus HTTP-only methods."""
     grpc_request_types = Counter(
         method.input_type.full_name
         for method in control_pb2.DESCRIPTOR.services_by_name["Control"].methods
@@ -135,7 +136,8 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
         for (method, path), request_type in PROTOBUF_REQUEST_TYPES.items()
         if method == "POST" and path.startswith("/v1/control/")
     )
-    grpc_request_types[RefreshAuthTokensRequest.DESCRIPTOR.full_name] += 1
+    for request_type in (RefreshAuthTokensRequest, RenameRunSeriesRequest):
+        grpc_request_types[request_type.DESCRIPTOR.full_name] += 1
 
     assert http_request_types == grpc_request_types
 

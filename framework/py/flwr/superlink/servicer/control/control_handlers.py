@@ -1245,12 +1245,7 @@ def rename_run_series(
             f"{RUN_SERIES_DESCRIPTION_MAX_LENGTH} characters.",
         )
 
-    if not state.set_run_series_description(series_id, description):
-        raise FlowerError(
-            ApiErrorCode.RUN_SERIES_ID_NOT_FOUND,
-            f"Run series {series_id} could not be renamed.",
-        )
-
+    state.set_run_series_description(series_id, description)
     updated = state.get_run_series(series_ids=[series_id])
     assert updated
     return RenameRunSeriesResponse(series=_with_last_run_statuses(state, updated)[0])
