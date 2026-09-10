@@ -32,14 +32,12 @@ from flwr.supercore.constant import (
     SUPEREXEC_AUTH_SIGNATURE_HEADER,
     SUPEREXEC_AUTH_TIMESTAMP_HEADER,
 )
-from flwr.supercore.interceptors.superexec_auth_interceptor import (
-    RUNTIME_SUPEREXEC_METHODS,
-)
 from flwr.supercore.protobuf.client import ProtobufRequestContext
 
 from .superexec_auth import SuperExecAuthHttpInterceptor
 
 _RPC_METHOD = "/flwr.proto.Runtime/PullPendingTasks"
+_PROTECTED_METHODS = frozenset({_RPC_METHOD})
 _TIMESTAMP = 1000
 _NONCE = "nonce"
 
@@ -66,7 +64,7 @@ def test_signs_protected_request(_token_hex: Mock, _now: Mock) -> None:
     call_next = Mock(return_value=response)
     interceptor = SuperExecAuthHttpInterceptor(
         master_secret=master_secret,
-        protected_methods=RUNTIME_SUPEREXEC_METHODS,
+        protected_methods=_PROTECTED_METHODS,
     )
 
     assert interceptor.intercept(context, call_next) is response
@@ -92,7 +90,7 @@ def test_skips_unprotected_request() -> None:
     context = _context("/flwr.proto.Runtime/Other")
     interceptor = SuperExecAuthHttpInterceptor(
         master_secret=b"master-secret",
-        protected_methods=RUNTIME_SUPEREXEC_METHODS,
+        protected_methods=_PROTECTED_METHODS,
     )
 
     interceptor.intercept(context, Mock(return_value=httpx.Response(200)))
@@ -106,7 +104,7 @@ def test_rejects_duplicate_headers() -> None:
     context.request.headers[SUPEREXEC_AUTH_TIMESTAMP_HEADER] = "existing"
     interceptor = SuperExecAuthHttpInterceptor(
         master_secret=b"master-secret",
-        protected_methods=RUNTIME_SUPEREXEC_METHODS,
+        protected_methods=_PROTECTED_METHODS,
     )
 
     with pytest.raises(RuntimeError, match=SUPEREXEC_AUTH_TIMESTAMP_HEADER):

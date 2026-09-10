@@ -36,9 +36,6 @@ from flwr.supercore.interceptors import (
     RuntimeVersionHttpInterceptor,
     SuperExecAuthHttpInterceptor,
 )
-from flwr.supercore.interceptors.superexec_auth_interceptor import (
-    RUNTIME_SUPEREXEC_METHODS,
-)
 from flwr.supercore.protobuf.client import ProtobufClientInterceptor
 from flwr.supercore.retry import make_simple_http_retry_invoker
 from flwr.supercore.runtime import RuntimeHttpClient
@@ -54,6 +51,12 @@ _TASK_POLL_INTERVAL_ENV = "FLWR_SUPEREXEC_TASK_POLL_INTERVAL"
 _MIN_TASK_POLL_INTERVAL_SECONDS = 0.01
 _MAX_TASK_POLL_INTERVAL_SECONDS = 60.0
 _DEFAULT_TASK_POLL_INTERVAL_SECONDS = 1.0
+_SUPEREXEC_AUTH_METHODS = frozenset(
+    {
+        "/flwr.proto.Runtime/PullPendingTasks",
+        "/flwr.proto.Runtime/ClaimTask",
+    }
+)
 
 
 def _get_task_poll_interval() -> float:
@@ -198,7 +201,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     if superexec_auth_secret:
         auth_interceptor = SuperExecAuthHttpInterceptor(
             master_secret=superexec_auth_secret,
-            protected_methods=RUNTIME_SUPEREXEC_METHODS,
+            protected_methods=_SUPEREXEC_AUTH_METHODS,
         )
         interceptors.append(auth_interceptor)
 
