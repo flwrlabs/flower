@@ -252,9 +252,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
 
     # Execute
     with patch.object(task_handler, "push_run_events") as push_run_events:
-        task_handler.call_automation_with_events(
-            call_id="call-1", arguments=arguments
-        )
+        task_handler.call_automation_with_events(call_id="call-1", arguments=arguments)
 
     # Assert
     request = stub.StartAutomation.call_args.args[0]
