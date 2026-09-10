@@ -143,6 +143,7 @@ class FederationApp(FlwrBase):
     fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     app_type: Mapped[str] = mapped_column(String, nullable=False)
     is_hub_app: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    hub_resolution_note: Mapped[str | None] = mapped_column(String, nullable=True)
     added_by: Mapped[str] = mapped_column(String, nullable=False)
     added_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 

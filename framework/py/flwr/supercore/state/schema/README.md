@@ -57,6 +57,7 @@ erDiagram
     VARCHAR added_by
     VARCHAR app_type
     VARCHAR fab_hash "nullable"
+    VARCHAR hub_resolution_note "nullable"
     BOOLEAN is_hub_app "nullable"
   }
 
