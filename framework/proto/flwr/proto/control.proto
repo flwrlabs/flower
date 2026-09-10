@@ -57,6 +57,10 @@ service Control {
   // Get run series
   rpc GetRunSeries(GetRunSeriesRequest) returns (GetRunSeriesResponse) {}
 
+  // Rename run series
+  rpc RenameRunSeries(RenameRunSeriesRequest)
+      returns (RenameRunSeriesResponse) {}
+
   // List events for all runs in a run series
   rpc ListRunSeriesEvents(ListRunSeriesEventsRequest)
       returns (ListRunSeriesEventsResponse) {}
@@ -411,3 +415,9 @@ message StreamRunEventsRequest {
   optional uint64 after_task_event_id = 2;
 }
 message StreamRunEventsResponse { TaskEvent task_event = 1; }
+
+message RenameRunSeriesRequest {
+  uint64 series_id = 1;
+  string description = 2;
+}
+message RenameRunSeriesResponse { RunSeries series = 1; }

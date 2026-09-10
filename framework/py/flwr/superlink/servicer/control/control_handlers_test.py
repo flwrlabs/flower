@@ -37,6 +37,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RefreshAuthTokensRequest,
     RemoveAppRequest,
     RemoveAppResponse,
+    RenameRunSeriesRequest,
     StartAutomationRequest,
     StartRunRequest,
     StopAutomationRequest,
@@ -65,6 +66,7 @@ from .control_handlers import (
     list_run_series_events,
     refresh_auth_tokens,
     remove_app,
+    rename_run_series,
     start_automation,
     start_run,
     stop_automation,
@@ -183,6 +185,71 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             )
 
         self.assertEqual(error.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND)
+
+    def test_rename_run_series_returns_updated_series(self) -> None:
+        """Normalize and persist a description at the maximum length."""
+        self._create_dummy_run_series(10)
+        description = "a" * 80
+
+        response = rename_run_series(
+            RenameRunSeriesRequest(series_id=10, description=f"  {description}  "),
+            self.account,
+            self.state,
+        )
+
+        self.assertEqual(response.series.series_id, 10)
+        self.assertEqual(response.series.description, description)
+        self.assertGreater(response.series.updated_at, "2026-05-30T00:00:00+00:00")
+
+    def test_rename_run_series_rejects_invalid_description(self) -> None:
+        """Reject blank descriptions and descriptions longer than 80 characters."""
+        self._create_dummy_run_series(10)
+
+        for description in ("  ", "a" * 81):
+            with (
+                self.subTest(description=description),
+                self.assertRaises(FlowerError) as error,
+            ):
+                rename_run_series(
+                    RenameRunSeriesRequest(series_id=10, description=description),
+                    self.account,
+                    self.state,
+                )
+
+            self.assertEqual(
+                error.exception.code,
+                ApiErrorCode.INVALID_RUN_SERIES_DESCRIPTION,
+            )
+
+    def test_rename_run_series_hides_missing_and_unauthorized_series(self) -> None:
+        """Return the same not-found error for missing and inaccessible series."""
+        self._create_dummy_run_series(10)
+
+        with self.assertRaises(FlowerError) as missing_error:
+            rename_run_series(
+                RenameRunSeriesRequest(series_id=11, description="Title"),
+                self.account,
+                self.state,
+            )
+
+        with (
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=False
+            ),
+            self.assertRaises(FlowerError) as unauthorized_error,
+        ):
+            rename_run_series(
+                RenameRunSeriesRequest(series_id=10, description="Title"),
+                self.account,
+                self.state,
+            )
+
+        self.assertEqual(
+            missing_error.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND
+        )
+        self.assertEqual(
+            unauthorized_error.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND
+        )
 
     def test_refresh_auth_tokens_returns_rotated_tokens(self) -> None:
         """Return both tokens produced by the authentication plugin."""

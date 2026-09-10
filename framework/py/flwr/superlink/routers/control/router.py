@@ -78,6 +78,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
+    RenameRunSeriesRequest,
+    RenameRunSeriesResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
     ShowFederationRequest,
@@ -173,6 +175,16 @@ def get_run_series(
 ) -> GetRunSeriesResponse:
     """Get a run series."""
     return control_handlers.get_run_series(request, account, linkstate)
+
+
+@router.post("/rename-run-series")
+def rename_run_series(
+    request: Annotated[RenameRunSeriesRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> RenameRunSeriesResponse:
+    """Rename a run series."""
+    return control_handlers.rename_run_series(request, account, linkstate)
 
 
 @router.post("/list-run-series-events")

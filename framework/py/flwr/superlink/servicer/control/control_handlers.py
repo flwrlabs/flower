@@ -113,6 +113,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
+    RenameRunSeriesRequest,
+    RenameRunSeriesResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
     ShowFederationRequest,
@@ -1214,6 +1216,44 @@ def get_run_series(
         runs=runs,
     )
     return response
+
+
+def rename_run_series(
+    request: RenameRunSeriesRequest, account: AccountInfo, state: LinkState
+) -> RenameRunSeriesResponse:
+    """Rename a run series."""
+    log(INFO, "ControlServicer.RenameRunSeries")
+
+    series_id = request.series_id
+    series_matches = state.get_run_series(series_ids=[series_id])
+
+    # The caller must be a member of the federation. Return the same error for
+    # missing and inaccessible series to avoid revealing their existence.
+    if not series_matches or not state.federation_manager.has_member(
+        account.flwr_aid, series_matches[0].federation
+    ):
+        raise FlowerError(
+            ApiErrorCode.RUN_SERIES_ID_NOT_FOUND,
+            f"Run series {series_id} not found for {account.flwr_aid}.",
+        )
+
+    description = request.description.strip()
+    if not description or len(description) > RUN_SERIES_DESCRIPTION_MAX_LENGTH:
+        raise FlowerError(
+            ApiErrorCode.INVALID_RUN_SERIES_DESCRIPTION,
+            "Run series description must contain between 1 and "
+            f"{RUN_SERIES_DESCRIPTION_MAX_LENGTH} characters.",
+        )
+
+    if not state.set_run_series_description(series_id, description):
+        raise FlowerError(
+            ApiErrorCode.RUN_SERIES_ID_NOT_FOUND,
+            f"Run series {series_id} could not be renamed.",
+        )
+
+    updated = state.get_run_series(series_ids=[series_id])
+    assert updated
+    return RenameRunSeriesResponse(series=_with_last_run_statuses(state, updated)[0])
 
 
 def list_run_series_events(
