@@ -22,11 +22,11 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from flwr.supercore.cli.flwr_connector import _parse_args_run_flwr_connector
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
 )
+from flwr.supercore.cli.flwr_connector import _parse_args_run_flwr_connector
 from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 
 flwr_connector_module = importlib.import_module("flwr.supercore.cli.flwr_connector")
@@ -74,9 +74,7 @@ def test_flwr_connector_reads_stdin_token_and_acknowledges_start(
     """The private handoff should consume one token before acknowledging it."""
     token_stdin = io.TextIOWrapper(io.BytesIO(f"{_VALID_TASK_TOKEN}\n".encode()))
     monkeypatch.setattr(sys, "stdin", token_stdin)
-    monkeypatch.setattr(
-        sys, "argv", ["flwr-connector", "--token-stdin", "--insecure"]
-    )
+    monkeypatch.setattr(sys, "argv", ["flwr-connector", "--token-stdin", "--insecure"])
 
     with (
         patch.object(flwr_connector_module, "restore_output"),
