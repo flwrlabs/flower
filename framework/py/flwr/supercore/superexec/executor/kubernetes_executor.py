@@ -56,6 +56,7 @@ from .warm_executor_pool import (
     WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION,
     WarmExecutorPoolConfig,
     WarmExecutorPoolKey,
+    WARM_EXECUTOR_TASK_TYPES,
     is_compatible_warm_executor,
     is_warm_executor,
     new_warm_executor_id,
@@ -294,10 +295,12 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
                 "warm_executor_owner is required when warm_executor_pools are set."
             )
         if any(
-            pool.key.task_type != TaskType.AGENT_APP
+            pool.key.task_type not in WARM_EXECUTOR_TASK_TYPES
             for pool in self.warm_executor_pools
         ):
-            raise ValueError("warm executor pools support only AgentApp tasks.")
+            raise ValueError(
+                "warm executor pools support only AgentApp, Model, and Connector tasks."
+            )
         if self.warm_executor_owner and not _is_dns_label(self.warm_executor_owner):
             raise ValueError("warm_executor_owner must be a DNS label.")
         identities = [

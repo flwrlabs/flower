@@ -29,7 +29,11 @@ from .kubernetes_executor import (
 )
 from .subprocess_executor import SubprocessExecutor
 from .types import Executor
-from .warm_executor_pool import WarmExecutorPoolConfig, WarmExecutorPoolKey
+from .warm_executor_pool import (
+    WARM_EXECUTOR_TASK_TYPES,
+    WarmExecutorPoolConfig,
+    WarmExecutorPoolKey,
+)
 
 _KUBERNETES_CONFIG_FIELD_MAP = {
     "image-pull-policy": "image_pull_policy",
@@ -154,7 +158,7 @@ def _read_runtime_root_certificates(path_value: str) -> str:
 def _warm_executor_pools_from_config(
     value: object, runtime_image: str
 ) -> tuple[WarmExecutorPoolConfig, ...]:
-    """Parse AgentApp-only warm-executor pools from trusted executor YAML."""
+    """Parse typed warm-executor pools from trusted executor YAML."""
     if not isinstance(value, list):
         raise ValueError(
             "Kubernetes executor config field 'warm-executor-pools' must be a list."
@@ -171,9 +175,17 @@ def _warm_executor_pools_from_config(
         if set(entry) - allowed_fields:
             raise ValueError("Warm executor pool entries contain an unknown field.")
 
-        if entry.get("task-type") != TaskType.AGENT_APP.value:
+        task_type_value = entry.get("task-type")
+        try:
+            task_type = (
+                TaskType(task_type_value) if isinstance(task_type_value, str) else None
+            )
+        except ValueError:
+            task_type = None
+        if task_type not in WARM_EXECUTOR_TASK_TYPES:
             raise ValueError(
-                "Warm executor pools support only task-type 'flwr-agentapp'."
+                "Warm executor pools support only task types 'flwr-agentapp', "
+                "'flwr-model', and 'flwr-connector'."
             )
         size = entry.get("size")
         if isinstance(size, bool) or not isinstance(size, int):
@@ -182,7 +194,7 @@ def _warm_executor_pools_from_config(
         pools.append(
             WarmExecutorPoolConfig(
                 key=WarmExecutorPoolKey(
-                    task_type=TaskType.AGENT_APP,
+                    task_type=task_type,
                     runtime_image=runtime_image,
                 ),
                 size=size,

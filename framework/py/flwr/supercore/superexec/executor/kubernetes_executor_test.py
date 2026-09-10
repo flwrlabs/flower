@@ -115,6 +115,34 @@ def _warm_executor_pool_key(**overrides: Any) -> WarmExecutorPoolKey:
     return WarmExecutorPoolKey(**base)
 
 
+@pytest.mark.parametrize("task_type", [TaskType.MODEL, TaskType.CONNECTOR])
+def test_kubernetes_executor_config_allows_model_and_connector_pools(
+    task_type: TaskType,
+) -> None:
+    """Trusted Model and Connector pools should pass executor validation."""
+    pool_key = _warm_executor_pool_key(task_type=task_type)
+
+    config = _executor_config(
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+    )
+
+    assert config.warm_executor_pools == (
+        WarmExecutorPoolConfig(key=pool_key, size=1),
+    )
+
+
+def test_kubernetes_executor_config_rejects_unsupported_warm_pool() -> None:
+    """Task types without a shared token handoff should remain unavailable."""
+    pool_key = _warm_executor_pool_key(task_type=TaskType.SERVER_APP)
+
+    with pytest.raises(ValueError, match="only AgentApp, Model, and Connector"):
+        _executor_config(
+            warm_executor_owner="superexec-a",
+            warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+        )
+
+
 def _ready_warm_pod(
     pool_key: WarmExecutorPoolKey,
     config: KubernetesExecutorConfig,
@@ -453,15 +481,26 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
         (False, ["--root-certificates", "/run/flwr/runtime-ca/ca.crt"]),
     ],
 )
+@pytest.mark.parametrize(
+    ("task_type", "task_command"),
+    [
+        (TaskType.AGENT_APP, "flwr-agentapp"),
+        (TaskType.MODEL, "flwr-model"),
+        (TaskType.CONNECTOR, "flwr-connector"),
+    ],
+)
 def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     monkeypatch: pytest.MonkeyPatch,
     insecure: bool,
     transport_args: list[str],
+    task_type: TaskType,
+    task_command: str,
 ) -> None:
     """A dispatched warm Pod should be replaced before its child exits."""
     client = Mock()
     exec_client = Mock()
     pool_key = _warm_executor_pool_key(
+        task_type=task_type,
         runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
     config = _executor_config(
@@ -493,7 +532,7 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     )
 
     result = executor.launch(
-        _execution_spec(task_type=TaskType.AGENT_APP, insecure=insecure)
+        _execution_spec(task_type=task_type, insecure=insecure)
     )
 
     assert result.status == LaunchResultStatus.ACCEPTED
@@ -527,7 +566,7 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     assert stream.call_args.args[0] is exec_client.connect_get_namespaced_pod_exec
     assert stream.call_args.kwargs["container"] == "taskexecutor"
     assert command == [
-        "flwr-agentapp",
+        task_command,
         "--runtime-api-address",
         "appio.example.com:9092",
         "--token-stdin",
@@ -537,11 +576,22 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     assert len(started) == 1
 
 
-def test_launch_falls_back_to_cold_pod_when_no_ready_warm_pod_exists() -> None:
+@pytest.mark.parametrize(
+    ("task_type", "task_command"),
+    [
+        (TaskType.MODEL, "flwr-model"),
+        (TaskType.CONNECTOR, "flwr-connector"),
+    ],
+)
+def test_launch_falls_back_to_cold_pod_when_no_ready_warm_pod_exists(
+    task_type: TaskType,
+    task_command: str,
+) -> None:
     """No token should be delivered to a missing Pod before cold fallback."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     pool_key = _warm_executor_pool_key(
+        task_type=task_type,
         runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
     config = _executor_config(
@@ -552,13 +602,13 @@ def test_launch_falls_back_to_cold_pod_when_no_ready_warm_pod_exists() -> None:
     executor = KubernetesExecutor(client=client, config=config)
 
     result = executor.launch(
-        _execution_spec(task_type=TaskType.AGENT_APP, insecure=True)
+        _execution_spec(task_type=task_type, insecure=True)
     )
 
     assert result.status == LaunchResultStatus.ACCEPTED
     client.create_namespaced_secret.assert_called_once()
     cold_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
-    assert cold_pod["spec"]["containers"][0]["command"] == ["flwr-agentapp"]
+    assert cold_pod["spec"]["containers"][0]["command"] == [task_command]
 
 
 def test_launch_falls_back_to_cold_pod_when_warm_pods_cannot_be_listed() -> None:
@@ -626,12 +676,22 @@ def test_launch_retires_warm_pod_when_consumption_cannot_be_persisted(
     assert cold_pod["spec"]["containers"][0]["command"] == ["flwr-agentapp"]
 
 
+@pytest.mark.parametrize(
+    ("task_type", "task_command"),
+    [
+        (TaskType.MODEL, "flwr-model"),
+        (TaskType.CONNECTOR, "flwr-connector"),
+    ],
+)
 def test_launch_retires_warm_pod_when_dispatch_cannot_open(
     monkeypatch: pytest.MonkeyPatch,
+    task_type: TaskType,
+    task_command: str,
 ) -> None:
     """An unavailable warm Pod must not remain reusable before cold fallback."""
     client = Mock()
     pool_key = _warm_executor_pool_key(
+        task_type=task_type,
         runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
     config = _executor_config(
@@ -649,7 +709,7 @@ def test_launch_retires_warm_pod_when_dispatch_cannot_open(
     executor = KubernetesExecutor(client=client, config=config)
 
     result = executor.launch(
-        _execution_spec(task_type=TaskType.AGENT_APP, insecure=True)
+        _execution_spec(task_type=task_type, insecure=True)
     )
 
     assert result.status == LaunchResultStatus.ACCEPTED
@@ -659,7 +719,7 @@ def test_launch_retires_warm_pod_when_dispatch_cannot_open(
         grace_period_seconds=0,
     )
     cold_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
-    assert cold_pod["spec"]["containers"][0]["command"] == ["flwr-agentapp"]
+    assert cold_pod["spec"]["containers"][0]["command"] == [task_command]
 
 
 @pytest.mark.parametrize(
