@@ -42,10 +42,7 @@ def generate_series_description_in_background(prompt: str) -> Future[str]:
     future: Future[str] = Future()
 
     def generate() -> None:
-        try:
-            future.set_result(generate_series_description(prompt))
-        except Exception as ex:  # pylint: disable=broad-exception-caught
-            future.set_exception(ex)
+        future.set_result(generate_series_description(prompt))
 
     Thread(
         target=generate,
@@ -53,17 +50,6 @@ def generate_series_description_in_background(prompt: str) -> Future[str]:
         daemon=True,
     ).start()
     return future
-
-
-def resolve_series_description(future: Future[str] | None) -> str | None:
-    """Return the generated description if it is ready."""
-    if future is None or not future.done():
-        return None
-    try:
-        return future.result()
-    except Exception as ex:  # pylint: disable=broad-exception-caught
-        log(ERROR, "Failed to resolve RunSeries description: %s", ex)
-        return None
 
 
 def generate_series_description(prompt: str) -> str:

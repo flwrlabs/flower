@@ -20,7 +20,6 @@ from unittest.mock import Mock, patch
 from .conversation_title import (
     generate_series_description,
     generate_series_description_in_background,
-    resolve_series_description,
 )
 
 
@@ -70,4 +69,4 @@ def test_generate_series_description_in_background() -> None:
         name="flwr-conversation-title",
         daemon=True,
     )
-    assert resolve_series_description(future) == "Model title"
+    assert future.result() == "Model title"
