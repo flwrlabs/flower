@@ -30,7 +30,13 @@ import grpc
 from parameterized import parameterized
 
 from flwr.app import ConfigRecord, Context, RecordDict
-from flwr.common.constant import NOOP_ACCOUNT_NAME, SUPERLINK_NODE_ID, Status, SubStatus
+from flwr.common.constant import (
+    NOOP_ACCOUNT_NAME,
+    NOOP_FLWR_AID,
+    SUPERLINK_NODE_ID,
+    Status,
+    SubStatus,
+)
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -1270,9 +1276,16 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         """Test ShowFederation method of ControlServicer."""
         # Prepare
         request = ShowFederationRequest(federation_name=NOOP_FEDERATION_ID)
+        details = self.state.federation_manager.get_details(NOOP_FEDERATION_ID)
+        details.member_count = 7
 
         # Execute
-        response: ShowFederationResponse = self.servicer.ShowFederation(request, Mock())
+        with patch.object(
+            self.state.federation_manager, "get_details", return_value=details
+        ):
+            response: ShowFederationResponse = self.servicer.ShowFederation(
+                request, Mock()
+            )
         retrieved_timestamp = datetime.fromisoformat(response.now).timestamp()
 
         # Assert
@@ -1281,9 +1294,24 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(response.federation.simulation)
         self.assertFalse(response.federation.can_invite_members)
         self.assertFalse(response.federation.can_add_supernodes)
+        self.assertEqual(response.federation.member_count, 7)
 
-    def test_list_federations_includes_simulation_flag(self) -> None:
-        """Test ListFederations surfaces the federation simulation flag."""
+    def test_show_federation_falls_back_to_preview_size(self) -> None:
+        """Test ShowFederation derives a count when the manager omits one."""
+        details = self.state.federation_manager.get_details(NOOP_FEDERATION_ID)
+        details.member_count = None
+
+        with patch.object(
+            self.state.federation_manager, "get_details", return_value=details
+        ):
+            response = self.servicer.ShowFederation(
+                ShowFederationRequest(federation_name=NOOP_FEDERATION_ID), Mock()
+            )
+
+        self.assertEqual(response.federation.member_count, len(details.members))
+
+    def test_list_federations_includes_summary_fields(self) -> None:
+        """Test ListFederations surfaces federation summary fields."""
         objectstore_factory = Mock(store=Mock(return_value=self.store))
         servicer = ControlServicer(
             linkstate_factory=LinkStateFactory(
@@ -1300,9 +1328,32 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         )
 
         self.assertEqual(len(response.federations), 1)
+        self.assertEqual(len(response.federations[0].members), 1)
+        self.assertEqual(
+            response.federations[0].members[0].account.name, NOOP_ACCOUNT_NAME
+        )
+        self.assertEqual(response.federations[0].members[0].account.id, NOOP_FLWR_AID)
+        self.assertEqual(response.federations[0].members[0].role, "owner")
+        self.assertEqual(response.federations[0].member_count, 1)
         self.assertTrue(response.federations[0].simulation)
         self.assertFalse(response.federations[0].can_invite_members)
         self.assertFalse(response.federations[0].can_add_supernodes)
+
+    def test_federation_member_count_wire_round_trip(self) -> None:
+        """Test member count presence and value survive protobuf serialization."""
+        response = ListFederationsResponse()
+        response.federations.add()
+        federation_with_count = response.federations.add(member_count=300)
+
+        serialized_federation = federation_with_count.SerializeToString(
+            deterministic=True
+        )
+        round_tripped = ListFederationsResponse.FromString(response.SerializeToString())
+
+        self.assertEqual(serialized_federation, b"\x58\xac\x02")
+        self.assertFalse(round_tripped.federations[0].HasField("member_count"))
+        self.assertTrue(round_tripped.federations[1].HasField("member_count"))
+        self.assertEqual(round_tripped.federations[1].member_count, 300)
 
     def test_create_federation_success(self) -> None:
         """Test CreateFederation succeeds when federation_manager.create_federation
@@ -1323,6 +1374,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             id=expected_fed_id,
             description=description,
             members=mock_members,
+            member_count=7,
             simulation=True,
             can_invite_members=True,
             can_add_supernodes=True,
@@ -1375,6 +1427,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(response.federation.members), 1)
         self.assertEqual(response.federation.members[0].account.id, self.aid)
         self.assertEqual(response.federation.members[0].role, "owner")
+        self.assertEqual(response.federation.member_count, 7)
         self.assertTrue(response.federation.simulation)
         self.assertTrue(response.federation.can_invite_members)
         self.assertTrue(response.federation.can_add_supernodes)

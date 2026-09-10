@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-09 00:10+0000\n"
+"POT-Creation-Date: 2026-09-10 00:09+0000\n"
 "PO-Revision-Date: 2026-05-23 06:53+0000\n"
 "Last-Translator: Seulki Yun <icstuckyi@gmail.com>\n"
 "Language: ko\n"
@@ -13956,13 +13956,12 @@ msgstr ""
 " 요청을 볼 수 있습니다."
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:214
+#, fuzzy
 msgid ""
 "The title should be changed to adhere to the :ref:`pr_title_format` "
 "guidelines, otherwise it won't be possible to merge the PR. So in this "
-"case, a correct title might be ``docs(framework:skip) Fix typos``."
+"case, a correct title might be ``docs(framework:skip): Fix typos``."
 msgstr ""
-"제목은 :ref:`pr_title_format` 가이드라인을 준수하도록 변경해야 하며, 그렇지 않으면 PR을 병합할 수 없습니다. "
-"따라서 이 경우 올바른 제목은 ``docs(framework:skip) Fix typos``이 될 수 있습니다."
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:218
 msgid ""
@@ -14206,10 +14205,11 @@ msgid "Push the changes to your fork"
 msgstr "변경 사항을 포크에 푸시합니다"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:348
+#, fuzzy
 msgid ""
-"Open a PR (as shown above) with title ``docs(framework) Update how-to "
+"Open a PR (as shown above) with title ``docs(framework): Update how-to "
 "guide title``"
-msgstr "``docs(framework) Update how-to guide title`` 제목으로 PR(위와 같이)을 엽니다"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:349
 msgid "Wait for it to be approved!"
@@ -14259,70 +14259,77 @@ msgid "We enforce the following PR title format:"
 msgstr "다음과 같은 PR 제목 형식을 적용합니다:"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:377
+#, fuzzy
 msgid ""
-"(or ``<type>(<project>:skip) <subject>`` to ignore the PR in the "
+"(or ``<type>(<project>:skip): <subject>`` to ignore the PR in the "
 "changelog)"
-msgstr "(또는 ``<type>(<project>:skip) <subject>``를 사용하면 변경 로그에서 PR을 무시합니다.)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:379
-#, python-brace-format
+#, fuzzy, python-brace-format
 msgid ""
 "Where ``<type>`` needs to be in ``{ci, fix, feat, docs, refactor, "
-"break}``, ``<project>`` should be in ``{framework, baselines, datasets, "
-"examples, or '*' when modifying multiple projects which requires the "
-"':skip' flag to be used}``, and ``<subject>`` starts with a capitalised "
-"verb in the imperative mood."
+"break}``, ``<project>`` should be in ``{devtool, framework, agent, "
+"baselines, datasets, examples, benchmarks, glossary, intelligence, hub, "
+"model, or '*' when modifying multiple projects which requires the ':skip'"
+" flag to be used}``, and ``<subject>`` starts with a capitalised verb in "
+"the imperative mood."
 msgstr ""
-"여기서 ``<type>``은 ``{ci, fix, feat, docs, refactor, break}``, "
-"``<project>``는 ``{framework, baselines, datasets, examples, or '*' "
-"':skip' 플래그를 사용해야 하는 여러 프로젝트를 수정하는 경우}``로 입력해야 하며, ``<subject>``는 대문자로 "
-"시작해야 합니다."
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:384
+#: ../../source/contributor-tutorial-contribute-on-github.rst:385
 msgid "Valid examples:"
 msgstr "유효한 예시입니다:"
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:386
-msgid "``feat(framework) Add flwr build CLI command``"
-msgstr "``feat(framework) Add flwr build CLI command``"
-
 #: ../../source/contributor-tutorial-contribute-on-github.rst:387
-msgid "``refactor(examples:skip) Improve quickstart-pytorch logging``"
-msgstr "``refactor(examples:skip) Improve quickstart-pytorch logging``"
+#, fuzzy
+msgid "``feat(framework): Add flwr build CLI command``"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:388
-msgid "``ci(*:skip) Enforce PR title format``"
-msgstr "``ci(*:skip) Enforce PR title format``"
+#, fuzzy
+msgid "``refactor(examples:skip): Improve quickstart-pytorch logging``"
+msgstr ""
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:390
+#: ../../source/contributor-tutorial-contribute-on-github.rst:389
+#, fuzzy
+msgid "``ci(*:skip): Enforce PR title format``"
+msgstr ""
+
+#: ../../source/contributor-tutorial-contribute-on-github.rst:391
 msgid "Invalid examples:"
 msgstr "잘못된 예시입니다:"
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:392
-msgid "``feat(framework): Add flwr build CLI command`` (extra ``:``)"
-msgstr "``feat(framework): Add flwr build CLI command`` ( ``:``제외)"
-
 #: ../../source/contributor-tutorial-contribute-on-github.rst:393
-msgid ""
-"``feat(*) Add flwr build CLI command`` (missing ``skip`` flag along with "
-"``*``)"
-msgstr "``feat(*) Add flwr build CLI command`` (``skip`` flag와 함께 ``*``누락)"
+#, fuzzy
+msgid "``feat(framework) Add flwr build CLI command`` (missing ``:``)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:394
-msgid "``feat(skip) Add flwr build CLI command`` (missing ``<project>``)"
-msgstr "``feat(skip) Add flwr build CLI command`` (``<project>``누락)"
+#, fuzzy
+msgid ""
+"``feat(*): Add flwr build CLI command`` (missing ``skip`` flag along with"
+" ``*``)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:395
-msgid "``feat(framework) add flwr build CLI command`` (non capitalised verb)"
-msgstr "``feat(framework) add flwr build CLI command`` (대문자로 표기되지 않은 동사)"
+#, fuzzy
+msgid "``feat(skip): Add flwr build CLI command`` (missing ``<project>``)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:396
-msgid "``feat(framework) Add flwr build CLI command.`` (dot at the end)"
-msgstr "``feat(framework) Add flwr build CLI command.`` (끝에 마침표)"
+#, fuzzy
+msgid "``feat(framework): add flwr build CLI command`` (non capitalised verb)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:397
-msgid "``Add flwr build CLI command.`` (missing ``<type>(<project>)``)"
-msgstr "``Add flwr build CLI command.`` ( ``<type>(<project>)``누락)"
+#, fuzzy
+msgid "``feat(framework): Add flwr build CLI command.`` (dot at the end)"
+msgstr ""
+
+#: ../../source/contributor-tutorial-contribute-on-github.rst:398
+#, fuzzy
+msgid "``Add flwr build CLI command.`` (missing ``<type>(<project>):``)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:3
 msgid "Get started as a contributor"
@@ -31840,6 +31847,16 @@ msgstr ""
 #: flwr.agentapp.base.AgentEvents.emit:1
 #: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
 msgid "Emit one structured run event."
+msgstr ""
+
+#: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`get_trace <flwr.agentapp.AgentEvents.get_trace>`\\ \\(\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1
+#: flwr.agentapp.base.AgentEvents.get_trace:1 of
+msgid "Get events from all runs in the current run series."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:2

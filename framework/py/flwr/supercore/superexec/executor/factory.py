@@ -14,19 +14,22 @@
 # ==============================================================================
 """Executor factory for SuperExec TaskExecutor processes."""
 
+from logging import WARNING
 from pathlib import Path
 from typing import Any
 
-from flwr.supercore.constant import ExecutorType
+from flwr.supercore import log
+from flwr.supercore.constant import ExecutorType, TaskType
 
 from .config import ExecutorConfig
 from .kubernetes_executor import (
     KubernetesExecutor,
     KubernetesExecutorConfig,
-    create_incluster_kubernetes_client,
+    create_incluster_kubernetes_clients,
 )
 from .subprocess_executor import SubprocessExecutor
 from .types import Executor
+from .warm_executor_pool import WarmExecutorPoolConfig, WarmExecutorPoolKey
 
 _KUBERNETES_CONFIG_FIELD_MAP = {
     "image-pull-policy": "image_pull_policy",
@@ -47,11 +50,16 @@ _KUBERNETES_CONFIG_FIELD_MAP = {
     "pod-security-context": "pod_security_context",
     "container-security-context": "container_security_context",
     "service-account-name": "service_account_name",
+    "warm-executor-owner": "warm_executor_owner",
 }
 
 
 def get_executor(
-    executor_type: ExecutorType, executor_config: ExecutorConfig | None = None
+    executor_type: ExecutorType,
+    executor_config: ExecutorConfig | None = None,
+    *,
+    insecure: bool = False,
+    root_certificates_path: str | None = None,
 ) -> Executor:
     """Return the executor for the configured executor type."""
     if executor_type == ExecutorType.SUBPROCESS:
@@ -61,13 +69,29 @@ def get_executor(
         if executor_config is None:
             raise ValueError("Kubernetes executor requires --executor-config.")
         config = _kubernetes_executor_config_from_mapping(executor_config)
+        if (
+            config.warm_executor_pools
+            and not insecure
+            and (
+                config.runtime_root_certificates is not None
+                or root_certificates_path is not None
+            )
+        ):
+            log(
+                WARNING,
+                "Warm executor pools are disabled because custom Runtime CA "
+                "certificates require cold dispatch.",
+            )
+            # Retain the owner so reconciliation can clean up surviving idle Pods.
+            config.warm_executor_pools = ()
         try:
-            client = create_incluster_kubernetes_client()
+            client, exec_client = create_incluster_kubernetes_clients()
         except RuntimeError as err:
             raise ValueError(str(err)) from err
         return KubernetesExecutor(
             client=client,
             config=config,
+            exec_client=exec_client,
         )
 
     raise ValueError(f"Unsupported executor selection: {executor_type}")
@@ -99,6 +123,11 @@ def _kubernetes_executor_config_from_mapping(
             path_value
         )
 
+    if "warm-executor-pools" in config:
+        kwargs["warm_executor_pools"] = _warm_executor_pools_from_config(
+            config["warm-executor-pools"], image
+        )
+
     return KubernetesExecutorConfig(**kwargs)
 
 
@@ -122,3 +151,47 @@ def _read_runtime_root_certificates(path_value: str) -> str:
             "Failed to read Kubernetes executor config field "
             f"'appio-root-certificates-path' from '{path_value}': {message}."
         ) from err
+
+
+def _warm_executor_pools_from_config(
+    value: object, runtime_image: str
+) -> tuple[WarmExecutorPoolConfig, ...]:
+    """Parse AgentApp-only warm-executor pools from trusted executor YAML."""
+    if not isinstance(value, list):
+        raise ValueError(
+            "Kubernetes executor config field 'warm-executor-pools' must be a list."
+        )
+
+    pools: list[WarmExecutorPoolConfig] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise ValueError("Warm executor pool entries must be mappings.")
+        allowed_fields = {
+            "task-type",
+            "size",
+        }
+        if set(entry) - allowed_fields:
+            raise ValueError("Warm executor pool entries contain an unknown field.")
+
+        if entry.get("task-type") != TaskType.AGENT_APP.value:
+            raise ValueError(
+                "Warm executor pools support only task-type 'flwr-agentapp'."
+            )
+        size = entry.get("size")
+        if isinstance(size, bool) or not isinstance(size, int):
+            raise ValueError("Warm executor pool requires integer 'size'.")
+
+        pools.append(
+            WarmExecutorPoolConfig(
+                key=WarmExecutorPoolKey(
+                    task_type=TaskType.AGENT_APP,
+                    runtime_image=runtime_image,
+                ),
+                size=size,
+            )
+        )
+
+    keys = [pool.key for pool in pools]
+    if len(keys) != len(set(keys)):
+        raise ValueError("Warm executor pools must not repeat a compatibility key.")
+    return tuple(pools)

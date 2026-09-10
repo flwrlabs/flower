@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-09 00:10+0000\n"
+"POT-Creation-Date: 2026-09-10 00:09+0000\n"
 "PO-Revision-Date: 2026-05-23 06:54+0000\n"
 "Last-Translator: Gustavo Bertoli <gubertoli@gmail.com>\n"
 "Language: pt_BR\n"
@@ -13857,7 +13857,7 @@ msgstr ""
 msgid ""
 "The title should be changed to adhere to the :ref:`pr_title_format` "
 "guidelines, otherwise it won't be possible to merge the PR. So in this "
-"case, a correct title might be ``docs(framework:skip) Fix typos``."
+"case, a correct title might be ``docs(framework:skip): Fix typos``."
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:218
@@ -14085,7 +14085,7 @@ msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:348
 msgid ""
-"Open a PR (as shown above) with title ``docs(framework) Update how-to "
+"Open a PR (as shown above) with title ``docs(framework): Update how-to "
 "guide title``"
 msgstr ""
 
@@ -14135,7 +14135,7 @@ msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:377
 msgid ""
-"(or ``<type>(<project>:skip) <subject>`` to ignore the PR in the "
+"(or ``<type>(<project>:skip): <subject>`` to ignore the PR in the "
 "changelog)"
 msgstr ""
 
@@ -14143,57 +14143,58 @@ msgstr ""
 #, python-brace-format
 msgid ""
 "Where ``<type>`` needs to be in ``{ci, fix, feat, docs, refactor, "
-"break}``, ``<project>`` should be in ``{framework, baselines, datasets, "
-"examples, or '*' when modifying multiple projects which requires the "
-"':skip' flag to be used}``, and ``<subject>`` starts with a capitalised "
-"verb in the imperative mood."
+"break}``, ``<project>`` should be in ``{devtool, framework, agent, "
+"baselines, datasets, examples, benchmarks, glossary, intelligence, hub, "
+"model, or '*' when modifying multiple projects which requires the ':skip'"
+" flag to be used}``, and ``<subject>`` starts with a capitalised verb in "
+"the imperative mood."
 msgstr ""
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:384
+#: ../../source/contributor-tutorial-contribute-on-github.rst:385
 #, fuzzy
 msgid "Valid examples:"
 msgstr "Exemplo"
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:386
-msgid "``feat(framework) Add flwr build CLI command``"
-msgstr ""
-
 #: ../../source/contributor-tutorial-contribute-on-github.rst:387
-msgid "``refactor(examples:skip) Improve quickstart-pytorch logging``"
+msgid "``feat(framework): Add flwr build CLI command``"
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:388
-msgid "``ci(*:skip) Enforce PR title format``"
+msgid "``refactor(examples:skip): Improve quickstart-pytorch logging``"
 msgstr ""
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:390
+#: ../../source/contributor-tutorial-contribute-on-github.rst:389
+msgid "``ci(*:skip): Enforce PR title format``"
+msgstr ""
+
+#: ../../source/contributor-tutorial-contribute-on-github.rst:391
 msgid "Invalid examples:"
 msgstr ""
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:392
-msgid "``feat(framework): Add flwr build CLI command`` (extra ``:``)"
-msgstr ""
-
 #: ../../source/contributor-tutorial-contribute-on-github.rst:393
-msgid ""
-"``feat(*) Add flwr build CLI command`` (missing ``skip`` flag along with "
-"``*``)"
+msgid "``feat(framework) Add flwr build CLI command`` (missing ``:``)"
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:394
-msgid "``feat(skip) Add flwr build CLI command`` (missing ``<project>``)"
+msgid ""
+"``feat(*): Add flwr build CLI command`` (missing ``skip`` flag along with"
+" ``*``)"
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:395
-msgid "``feat(framework) add flwr build CLI command`` (non capitalised verb)"
+msgid "``feat(skip): Add flwr build CLI command`` (missing ``<project>``)"
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:396
-msgid "``feat(framework) Add flwr build CLI command.`` (dot at the end)"
+msgid "``feat(framework): add flwr build CLI command`` (non capitalised verb)"
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:397
-msgid "``Add flwr build CLI command.`` (missing ``<type>(<project>)``)"
+msgid "``feat(framework): Add flwr build CLI command.`` (dot at the end)"
+msgstr ""
+
+#: ../../source/contributor-tutorial-contribute-on-github.rst:398
+msgid "``Add flwr build CLI command.`` (missing ``<type>(<project>):``)"
 msgstr ""
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:3
@@ -30883,6 +30884,15 @@ msgstr ""
 #: flwr.agentapp.base.AgentEvents.emit:1
 #: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
 msgid "Emit one structured run event."
+msgstr ""
+
+#: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
+msgid ":py:obj:`get_trace <flwr.agentapp.AgentEvents.get_trace>`\\ \\(\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1
+#: flwr.agentapp.base.AgentEvents.get_trace:1 of
+msgid "Get events from all runs in the current run series."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:2
@@ -92158,4 +92168,66 @@ msgstr ""
 #~ "processes they launch. This is not "
 #~ "mTLS. See :doc:`how-to-enable-tls-"
 #~ "connections` for concrete commands."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The title should be changed to "
+#~ "adhere to the :ref:`pr_title_format` "
+#~ "guidelines, otherwise it won't be "
+#~ "possible to merge the PR. So in"
+#~ " this case, a correct title might "
+#~ "be ``docs(framework:skip) Fix typos``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Open a PR (as shown above) with"
+#~ " title ``docs(framework) Update how-to "
+#~ "guide title``"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "(or ``<type>(<project>:skip) <subject>`` to "
+#~ "ignore the PR in the changelog)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Where ``<type>`` needs to be in "
+#~ "``{ci, fix, feat, docs, refactor, "
+#~ "break}``, ``<project>`` should be in "
+#~ "``{framework, baselines, datasets, examples, "
+#~ "or '*' when modifying multiple projects"
+#~ " which requires the ':skip' flag to"
+#~ " be used}``, and ``<subject>`` starts "
+#~ "with a capitalised verb in the "
+#~ "imperative mood."
+#~ msgstr ""
+
+#~ msgid "``feat(framework) Add flwr build CLI command``"
+#~ msgstr ""
+
+#~ msgid "``refactor(examples:skip) Improve quickstart-pytorch logging``"
+#~ msgstr ""
+
+#~ msgid "``ci(*:skip) Enforce PR title format``"
+#~ msgstr ""
+
+#~ msgid "``feat(framework): Add flwr build CLI command`` (extra ``:``)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``feat(*) Add flwr build CLI command``"
+#~ " (missing ``skip`` flag along with "
+#~ "``*``)"
+#~ msgstr ""
+
+#~ msgid "``feat(skip) Add flwr build CLI command`` (missing ``<project>``)"
+#~ msgstr ""
+
+#~ msgid "``feat(framework) add flwr build CLI command`` (non capitalised verb)"
+#~ msgstr ""
+
+#~ msgid "``feat(framework) Add flwr build CLI command.`` (dot at the end)"
+#~ msgstr ""
+
+#~ msgid "``Add flwr build CLI command.`` (missing ``<type>(<project>)``)"
 #~ msgstr ""

@@ -18,33 +18,32 @@ from __future__ import annotations
 
 from concurrent.futures import Future
 from logging import ERROR
+import os
 from threading import Thread
-from typing import TYPE_CHECKING, cast
+from typing import cast
+
+import httpx
 
 from flwr.supercore import log
 from flwr.supercore.constant import RUN_SERIES_DESCRIPTION_MAX_LENGTH
 from flwr.supercore.typing import JSONObject
 
-if TYPE_CHECKING:
-    from .session import RuntimeAgentResponses
-
 _TITLE_DEFAULT = "New conversation"
 _TITLE_MODEL = "openai/gpt-5-nano"
+_TITLE_TIMEOUT = 300.0
 _TITLE_INSTRUCTIONS = (
     "Create a concise title for this conversation. "
     "Return only the title, without quotes or Markdown, using at most four words."
 )
 
 
-def generate_series_description_in_background(
-    responses: RuntimeAgentResponses, prompt: str
-) -> Future[str]:
+def generate_series_description_in_background(prompt: str) -> Future[str]:
     """Generate a RunSeries description in a daemon thread."""
     future: Future[str] = Future()
 
     def generate() -> None:
         try:
-            future.set_result(generate_series_description(responses, prompt))
+            future.set_result(generate_series_description(prompt))
         except Exception as ex:  # pylint: disable=broad-exception-caught
             future.set_exception(ex)
 
@@ -67,22 +66,26 @@ def resolve_series_description(future: Future[str] | None) -> str | None:
         return None
 
 
-def generate_series_description(responses: RuntimeAgentResponses, prompt: str) -> str:
+def generate_series_description(prompt: str) -> str:
     """Generate a title, falling back to a prompt excerpt on failure."""
     fallback = " ".join(prompt.split()[:4]) or _TITLE_DEFAULT
     title = ""
     try:
-        response = responses.create(
-            {
+        response = httpx.post(
+            f"{os.environ['FLWR_RUNTIME_BASE_URL'].rstrip('/')}/responses",
+            headers={"Authorization": f"Bearer {os.environ['FLWR_RUNTIME_API_KEY']}"},
+            json={
                 "model": _TITLE_MODEL,
                 "instructions": _TITLE_INSTRUCTIONS,
                 "input": prompt,
                 "stream": False,
                 "max_output_tokens": 32,
                 "reasoning": {"effort": "minimal"},
-            }
+            },
+            timeout=_TITLE_TIMEOUT,
         )
-        output = cast(list[JSONObject], response["output"])
+        response.raise_for_status()
+        output = cast(list[JSONObject], response.json()["output"])
         content = cast(list[JSONObject], output[-1]["content"])
         title = cast(str, content[0]["text"])
     except Exception as ex:  # pylint: disable=broad-exception-caught

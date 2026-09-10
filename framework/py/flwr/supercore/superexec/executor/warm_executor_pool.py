@@ -20,14 +20,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from uuid import uuid4
 
-from flwr.supercore.constant import TASK_TYPES_REQUIRING_FAB_HASH, TaskType
+from flwr.supercore.constant import TaskType
 
 WARM_EXECUTOR_LABEL = "flower.ai/warm-executor"
-WARM_EXECUTOR_FAB_HASH_ANNOTATION = "flower.ai/warm-executor-fab-hash"
 WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION = "flower.ai/warm-executor-runtime-image"
-WARM_EXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION = (
-    "flower.ai/warm-executor-dependency-environment"
-)
+WARM_EXECUTOR_CONFIGURATION_ANNOTATION = "flower.ai/warm-executor-config-sha256"
 _TASK_ID_LABEL = "flower.ai/superexec-task-id"
 _TASK_TYPE_LABEL = "flower.ai/task-type"
 
@@ -37,29 +34,29 @@ class WarmExecutorPoolKey:
     """Identify the task environment served by a warm executor pool."""
 
     task_type: TaskType
-    fab_hash: str | None
     runtime_image: str
-    dependency_environment_version: str
 
     def __post_init__(self) -> None:
         """Validate values persisted on a warm TaskExecutor Pod."""
         if not isinstance(self.task_type, TaskType):
             raise ValueError("Warm executor pool key requires a TaskType.")
-        if self.fab_hash is None:
-            if self.task_type in TASK_TYPES_REQUIRING_FAB_HASH:
-                raise ValueError(
-                    f"Warm executor pool key requires a fab_hash for {self.task_type}."
-                )
-        elif not isinstance(self.fab_hash, str) or not self.fab_hash.strip():
+        if not isinstance(self.runtime_image, str) or not self.runtime_image.strip():
             raise ValueError(
-                "Warm executor pool key requires a non-empty fab_hash when provided."
+                "Warm executor pool key requires a non-empty runtime_image."
             )
-        for field_name in ("runtime_image", "dependency_environment_version"):
-            value = getattr(self, field_name)
-            if not isinstance(value, str) or not value.strip():
-                raise ValueError(
-                    f"Warm executor pool key requires a non-empty {field_name}."
-                )
+
+
+@dataclass(frozen=True)
+class WarmExecutorPoolConfig:
+    """Configure a fixed number of compatible warm TaskExecutor Pods."""
+
+    key: WarmExecutorPoolKey
+    size: int
+
+    def __post_init__(self) -> None:
+        """Validate the configured capacity for one compatible pool."""
+        if not isinstance(self.size, int) or self.size < 1:
+            raise ValueError("Warm executor pool size must be a positive integer.")
 
 
 def new_warm_executor_id() -> str:
@@ -69,7 +66,7 @@ def new_warm_executor_id() -> str:
 
 def is_warm_executor_ready(pod: object, pool_key: WarmExecutorPoolKey) -> bool:
     """Return true for a ready warm TaskExecutor Pod with the exact pool key."""
-    if not _is_compatible_warm_executor(pod, pool_key):
+    if not is_compatible_warm_executor(pod, pool_key):
         return False
 
     metadata = _object_field(pod, "metadata")
@@ -99,7 +96,7 @@ def is_warm_executor(pod: object) -> bool:
     return _object_field(labels, WARM_EXECUTOR_LABEL) == "true"
 
 
-def _is_compatible_warm_executor(pod: object, pool_key: WarmExecutorPoolKey) -> bool:
+def is_compatible_warm_executor(pod: object, pool_key: WarmExecutorPoolKey) -> bool:
     """Return true if a warm TaskExecutor Pod has the supplied pool key."""
     metadata = _object_field(pod, "metadata")
     labels = _object_field(metadata, "labels")
@@ -109,19 +106,8 @@ def _is_compatible_warm_executor(pod: object, pool_key: WarmExecutorPoolKey) -> 
         (_object_field(labels, _TASK_TYPE_LABEL), pool_key.task_type.value),
         (_object_field(labels, _TASK_ID_LABEL), None),
         (
-            _object_field(annotations, WARM_EXECUTOR_FAB_HASH_ANNOTATION),
-            pool_key.fab_hash,
-        ),
-        (
             _object_field(annotations, WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION),
             pool_key.runtime_image,
-        ),
-        (
-            _object_field(
-                annotations,
-                WARM_EXECUTOR_DEPENDENCY_ENVIRONMENT_ANNOTATION,
-            ),
-            pool_key.dependency_environment_version,
         ),
     )
     if any(actual != expected for actual, expected in expected_fields):

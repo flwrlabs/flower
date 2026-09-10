@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower Docs\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-09 00:10+0000\n"
+"POT-Creation-Date: 2026-09-10 00:09+0000\n"
 "PO-Revision-Date: 2026-05-23 06:55+0000\n"
 "Last-Translator: lco <Leandro.COLLIER@student.umons.ac.be>\n"
 "Language: fr\n"
@@ -20370,15 +20370,12 @@ msgstr ""
 "Flower."
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:214
+#, fuzzy
 msgid ""
 "The title should be changed to adhere to the :ref:`pr_title_format` "
 "guidelines, otherwise it won't be possible to merge the PR. So in this "
-"case, a correct title might be ``docs(framework:skip) Fix typos``."
+"case, a correct title might be ``docs(framework:skip): Fix typos``."
 msgstr ""
-"Le titre doit être modifié pour se conformer aux lignes directrices "
-":ref:`pr_title_format`, sinon il ne sera pas possible de fusionner la PR."
-" Donc dans ce cas, un bon titre pourrait être ``docs(framework:skip) Fix "
-"typos``."
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:218
 msgid ""
@@ -20665,12 +20662,11 @@ msgid "Push the changes to your fork"
 msgstr "Poussez les changements vers votre fork"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:348
+#, fuzzy
 msgid ""
-"Open a PR (as shown above) with title ``docs(framework) Update how-to "
+"Open a PR (as shown above) with title ``docs(framework): Update how-to "
 "guide title``"
 msgstr ""
-"Ouvrez une PR (comme ci-dessus) avec un titre ``docs(framework) Update "
-"how-to guide title``"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:349
 msgid "Wait for it to be approved!"
@@ -20723,74 +20719,75 @@ msgid "We enforce the following PR title format:"
 msgstr "Nous imposons le format suivant du titre PR :"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:377
+#, fuzzy
 msgid ""
-"(or ``<type>(<project>:skip) <subject>`` to ignore the PR in the "
+"(or ``<type>(<project>:skip): <subject>`` to ignore the PR in the "
 "changelog)"
 msgstr ""
-"(ou ``<type>(<project>:skip) <subject>`` pour ignorer la PR dans le "
-"changelog)"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:379
-#, python-brace-format
+#, fuzzy, python-brace-format
 msgid ""
 "Where ``<type>`` needs to be in ``{ci, fix, feat, docs, refactor, "
-"break}``, ``<project>`` should be in ``{framework, baselines, datasets, "
-"examples, or '*' when modifying multiple projects which requires the "
-"':skip' flag to be used}``, and ``<subject>`` starts with a capitalised "
-"verb in the imperative mood."
+"break}``, ``<project>`` should be in ``{devtool, framework, agent, "
+"baselines, datasets, examples, benchmarks, glossary, intelligence, hub, "
+"model, or '*' when modifying multiple projects which requires the ':skip'"
+" flag to be used}``, and ``<subject>`` starts with a capitalised verb in "
+"the imperative mood."
 msgstr ""
-"Où ``<type>`` doit être en ``{ci, fix, feat, docs, refactor, break}``, "
-"``<project>`` devrait être en ``{framework, baselines, datasets, "
-"examples, or '*' when modifying multiple projects which requires the "
-"':skip' flag to be used}``, et ``<subject>`` commence par un verbe "
-"impératif au mode conjugué."
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:384
+#: ../../source/contributor-tutorial-contribute-on-github.rst:385
 msgid "Valid examples:"
 msgstr "Exemples valides :"
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:386
-msgid "``feat(framework) Add flwr build CLI command``"
-msgstr ""
-
 #: ../../source/contributor-tutorial-contribute-on-github.rst:387
-msgid "``refactor(examples:skip) Improve quickstart-pytorch logging``"
+#, fuzzy
+msgid "``feat(framework): Add flwr build CLI command``"
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:388
-msgid "``ci(*:skip) Enforce PR title format``"
+msgid "``refactor(examples:skip): Improve quickstart-pytorch logging``"
 msgstr ""
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:390
+#: ../../source/contributor-tutorial-contribute-on-github.rst:389
+#, fuzzy
+msgid "``ci(*:skip): Enforce PR title format``"
+msgstr ""
+
+#: ../../source/contributor-tutorial-contribute-on-github.rst:391
 msgid "Invalid examples:"
 msgstr "Exemples invalides :"
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:392
-msgid "``feat(framework): Add flwr build CLI command`` (extra ``:``)"
-msgstr ""
-
 #: ../../source/contributor-tutorial-contribute-on-github.rst:393
-msgid ""
-"``feat(*) Add flwr build CLI command`` (missing ``skip`` flag along with "
-"``*``)"
+#, fuzzy
+msgid "``feat(framework) Add flwr build CLI command`` (missing ``:``)"
 msgstr ""
-"``feat(*) Add flwr build CLI command`` (drapeau ``skip`` manquant ainsi "
-"que ``*``)"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:394
-msgid "``feat(skip) Add flwr build CLI command`` (missing ``<project>``)"
+#, fuzzy
+msgid ""
+"``feat(*): Add flwr build CLI command`` (missing ``skip`` flag along with"
+" ``*``)"
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:395
-msgid "``feat(framework) add flwr build CLI command`` (non capitalised verb)"
+#, fuzzy
+msgid "``feat(skip): Add flwr build CLI command`` (missing ``<project>``)"
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:396
-msgid "``feat(framework) Add flwr build CLI command.`` (dot at the end)"
-msgstr "``feat(framework) Add flwr build CLI command.`` (point à la fin)"
+#, fuzzy
+msgid "``feat(framework): add flwr build CLI command`` (non capitalised verb)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:397
-msgid "``Add flwr build CLI command.`` (missing ``<type>(<project>)``)"
+#, fuzzy
+msgid "``feat(framework): Add flwr build CLI command.`` (dot at the end)"
+msgstr ""
+
+#: ../../source/contributor-tutorial-contribute-on-github.rst:398
+#, fuzzy
+msgid "``Add flwr build CLI command.`` (missing ``<type>(<project>):``)"
 msgstr ""
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:3
@@ -41853,6 +41850,16 @@ msgstr ""
 #: flwr.agentapp.base.AgentEvents.emit:1
 #: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
 msgid "Emit one structured run event."
+msgstr ""
+
+#: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`get_trace <flwr.agentapp.AgentEvents.get_trace>`\\ \\(\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1
+#: flwr.agentapp.base.AgentEvents.get_trace:1 of
+msgid "Get events from all runs in the current run series."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:2
@@ -66397,4 +66404,25 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid ":py:obj:`locked <flwr.server.LegacyContext.locked>`\\ \\(\\)"
+#~ msgstr ""
+
+#~ msgid "``feat(framework) Add flwr build CLI command``"
+#~ msgstr ""
+
+#~ msgid "``refactor(examples:skip) Improve quickstart-pytorch logging``"
+#~ msgstr ""
+
+#~ msgid "``ci(*:skip) Enforce PR title format``"
+#~ msgstr ""
+
+#~ msgid "``feat(framework): Add flwr build CLI command`` (extra ``:``)"
+#~ msgstr ""
+
+#~ msgid "``feat(skip) Add flwr build CLI command`` (missing ``<project>``)"
+#~ msgstr ""
+
+#~ msgid "``feat(framework) add flwr build CLI command`` (non capitalised verb)"
+#~ msgstr ""
+
+#~ msgid "``Add flwr build CLI command.`` (missing ``<type>(<project>)``)"
 #~ msgstr ""

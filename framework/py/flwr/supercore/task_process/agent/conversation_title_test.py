@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for AgentApp RunSeries title generation."""
 
+import os
 from unittest.mock import Mock, patch
 
 from .conversation_title import (
@@ -25,29 +26,43 @@ from .conversation_title import (
 
 def test_generate_series_description_and_fallback() -> None:
     """Model output is normalized and provider errors use a prompt excerpt."""
-    responses = Mock()
-    responses.create.return_value = {
+    response = Mock()
+    response.json.return_value = {
         "output": [{"content": [{"type": "output_text", "text": " 'Model title' "}]}]
     }
+    env = {
+        "FLWR_RUNTIME_BASE_URL": "http://runtime/v1/runtime",
+        "FLWR_RUNTIME_API_KEY": "token",
+    }
 
-    assert (
-        generate_series_description(responses, "A prompt with several words")
-        == "Model title"
-    )
-    responses.create.side_effect = RuntimeError("provider failed")
+    with (
+        patch.dict(os.environ, env),
+        patch(
+            "flwr.supercore.task_process.agent.conversation_title.httpx.post",
+            return_value=response,
+        ) as post,
+    ):
+        assert generate_series_description("A prompt with several words") == (
+            "Model title"
+        )
+        post.side_effect = RuntimeError("provider failed")
+        assert generate_series_description("one two three four five") == (
+            "one two three four"
+        )
 
-    assert generate_series_description(responses, "one two three four five") == (
-        "one two three four"
-    )
+    response.raise_for_status.assert_called_once()
 
 
 def test_generate_series_description_in_background() -> None:
     """Background generation runs in a daemon thread."""
-    responses = Mock()
-    responses.create.return_value = {"output": [{"content": [{"text": "Model title"}]}]}
-
-    with patch("flwr.supercore.task_process.agent.conversation_title.Thread") as thread:
-        future = generate_series_description_in_background(responses, "Prompt")
+    with (
+        patch(
+            "flwr.supercore.task_process.agent.conversation_title.generate_series_description",
+            return_value="Model title",
+        ),
+        patch("flwr.supercore.task_process.agent.conversation_title.Thread") as thread,
+    ):
+        future = generate_series_description_in_background("Prompt")
         thread.call_args.kwargs["target"]()
 
     thread.assert_called_once_with(
