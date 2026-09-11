@@ -1247,8 +1247,10 @@ def update_run_series_description(
             f"{RUN_SERIES_DESCRIPTION_MAX_LENGTH} characters.",
         )
 
+    run_series = RunSeries()
+    run_series.CopyFrom(series_matches[0])
+
     state.set_run_series_description(series_id, description)
-    run_series = series_matches[0]
     run_series.description = description
     return UpdateRunSeriesDescriptionResponse(
         series=_with_last_run_statuses(state, [run_series])[0]
