@@ -22,6 +22,7 @@ from flwr.supercore.constant import (
     TASK_TYPE_TO_COMMAND,
     TaskType,
 )
+from flwr.supercore.superexec.environment import task_process_env
 
 from .types import ExecutionSpec, LaunchResult
 
@@ -60,15 +61,18 @@ class SubprocessExecutor:
         if spec.runtime_dependency_install:
             args.append("--allow-runtime-dependency-installation")
 
+        env = task_process_env(spec.task_type)
+
         if spec.suppress_output:
             subprocess.Popen(  # pylint: disable=consider-using-with
                 args,
+                env=env,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
             return LaunchResult.accepted()
 
-        subprocess.Popen(args)  # pylint: disable=consider-using-with
+        subprocess.Popen(args, env=env)  # pylint: disable=consider-using-with
 
         return LaunchResult.accepted()
 
