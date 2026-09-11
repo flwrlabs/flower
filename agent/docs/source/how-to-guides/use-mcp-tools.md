@@ -14,112 +14,78 @@ Flower connectors and MCP tools therefore follow different execution paths:
 
 ## Add an MCP client
 
-Add the MCP Python SDK version used by Flower to the AgentApp dependencies:
+Add the MCP Python SDK to the AgentApp dependencies. This example targets its
+1.x API:
 
 ```console
 $ uv add 'mcp>=1.26.0,<2.0'
 ```
 
-Bridge Flower's synchronous entry point to the asynchronous MCP client and keep
-the client lifecycle inside context managers:
+## Implement the AgentApp
+
+The following AgentApp performs one bounded MCP tool round and then streams the
+final model response:
 
 ```python
+from __future__ import annotations
+
 import asyncio
+import json
 import os
+from typing import Any, cast
 
 from flwr.agentapp import AgentApp, AgentSession
 from flwr.app import Context
-from mcp import ClientSession
+from mcp import CallToolResult, ClientSession, Tool
 from mcp.client.streamable_http import streamable_http_client
+from mcp.types import PaginatedRequestParams
+from openai import AsyncOpenAI
+
+MODEL = "openai/gpt-5.6-sol"
+ALLOWED_MCP_TOOLS = {"search_documents", "read_document"}
 
 app = AgentApp()
 
 
-async def run_mcp(agent: AgentSession, context: Context) -> None:
-    async with streamable_http_client(os.environ["MCP_ENDPOINT"]) as (
-        read,
-        write,
-        _,
-    ):
-        async with ClientSession(read, write) as mcp_client:
-            await mcp_client.initialize()
-            await use_mcp_tools(mcp_client, agent, context)
-
-
-@app.main()
-def main(agent: AgentSession, context: Context) -> None:
-    asyncio.run(run_mcp(agent, context))
-```
-
-Set `MCP_ENDPOINT` to the URL of a running Streamable HTTP MCP server. The
-following sections build `use_mcp_tools`.
-
-## Discover and allowlist tools
-
-Inside the asynchronous helper, list the server's tools and select an explicit
-set of tool names:
-
-```python
-ALLOWED_MCP_TOOLS = {
-    "search_documents",
-    "read_document",
-}
-
-
-async def use_mcp_tools(
-    mcp_client: ClientSession,
-    agent: AgentSession,
-    context: Context,
-) -> None:
-    list_result = await mcp_client.list_tools()
-    selected_tools = [
-        tool for tool in list_result.tools if tool.name in ALLOWED_MCP_TOOLS
-    ]
-    model_tools = [as_response_tool(tool) for tool in selected_tools]
-    # Pass model_tools to the model and dispatch any returned tool calls.
-```
-
-The exact client setup and result container depend on the MCP library and
-transport. The important boundary is that a server advertising a new tool does
-not make that tool model-accessible automatically.
-
-## Convert definitions to Open Responses tools
-
-Define the schema converter at module scope. `use_mcp_tools` calls it while
-`selected_tools` is still in scope:
-
-```python
-def as_response_tool(tool: object) -> dict[str, object]:
+def as_response_tool(tool: Tool) -> dict[str, Any]:
+    """Convert an MCP tool definition to an Open Responses function tool."""
     return {
         "type": "function",
         "name": tool.name,
         "description": tool.description or "",
         "parameters": tool.inputSchema,
     }
-```
 
-Some MCP clients expose the schema as `input_schema` instead of `inputSchema`.
-Use the field provided by your client without otherwise changing the JSON
-Schema. Pass `model_tools` through the `tools` field of
-`client.responses.create(...)`.
 
-## Dispatch function calls back to MCP
+def serialize_mcp_result(result: CallToolResult) -> str:
+    """Serialize an MCP result for a function_call_output item."""
+    return result.model_dump_json(by_alias=True, exclude_none=True)
 
-When the OpenAI SDK returns a `function_call`, first convert it with
-`function_call.to_dict()`. Then reject any name outside the allowlist, parse its
-arguments, call the matching MCP tool, and create a `function_call_output` item
-with the same `call_id`:
 
-```python
-import json
+async def list_all_tools(mcp_client: ClientSession) -> list[Tool]:
+    """List every tool exposed by a paginated MCP server."""
+    tools = []
+    cursor = None
+    while True:
+        params = (
+            PaginatedRequestParams(cursor=cursor)
+            if cursor is not None
+            else None
+        )
+        page = await mcp_client.list_tools(params=params)
+        tools.extend(page.tools)
+        cursor = page.nextCursor
+        if cursor is None:
+            return tools
 
 
 async def call_mcp_tool(
     mcp_client: ClientSession,
-    tool_call: dict[str, object],
-) -> dict[str, object]:
+    tool_call: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate and execute one model-requested MCP tool call."""
     name = tool_call.get("name")
-    if name not in ALLOWED_MCP_TOOLS:
+    if not isinstance(name, str) or name not in ALLOWED_MCP_TOOLS:
         raise RuntimeError(f"MCP tool {name!r} was not exposed")
 
     raw_arguments = tool_call.get("arguments", "{}")
@@ -128,22 +94,110 @@ async def call_mcp_tool(
         if isinstance(raw_arguments, str)
         else raw_arguments
     )
+    if not isinstance(arguments, dict):
+        raise ValueError("MCP tool arguments must be a JSON object")
+
+    call_id = tool_call.get("call_id")
+    if not isinstance(call_id, str):
+        raise ValueError("MCP tool call requires a string call_id")
+
     result = await mcp_client.call_tool(name, arguments)
     return {
         "type": "function_call_output",
-        "call_id": tool_call["call_id"],
+        "call_id": call_id,
         "output": serialize_mcp_result(result),
     }
+
+
+async def run_mcp(agent: AgentSession, context: Context) -> None:
+    """Discover MCP tools, execute one tool round, and publish the answer."""
+    prompt = context.run_config.get("agent.input")
+    if not isinstance(prompt, str) or not prompt.strip():
+        raise ValueError("agent.input must be a non-empty string")
+
+    async with AsyncOpenAI(
+        base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
+        api_key=os.environ["FLWR_RUNTIME_API_KEY"],
+        max_retries=0,
+    ) as client:
+        input_items: list[dict[str, Any]] = [
+            {"type": "message", "role": "user", "content": prompt.strip()}
+        ]
+
+        async with streamable_http_client(os.environ["MCP_ENDPOINT"]) as (
+            read,
+            write,
+            _,
+        ):
+            async with ClientSession(read, write) as mcp_client:
+                await mcp_client.initialize()
+                selected_tools = [
+                    tool
+                    for tool in await list_all_tools(mcp_client)
+                    if tool.name in ALLOWED_MCP_TOOLS
+                ]
+                if not selected_tools:
+                    raise RuntimeError("The MCP server exposed no allowed tools")
+                model_tools = [as_response_tool(tool) for tool in selected_tools]
+
+                response = await client.responses.create(
+                    model=MODEL,
+                    input=input_items,
+                    tools=model_tools,
+                    tool_choice="required",
+                )
+                response_output = [
+                    cast(dict[str, Any], item.to_dict())
+                    for item in response.output
+                ]
+                tool_calls = [
+                    item
+                    for item in response_output
+                    if item.get("type") == "function_call"
+                ]
+                if not tool_calls:
+                    raise RuntimeError("The model did not request an MCP tool")
+
+                function_outputs = [
+                    await call_mcp_tool(mcp_client, tool_call)
+                    for tool_call in tool_calls
+                ]
+                input_items.extend(response_output)
+                input_items.extend(function_outputs)
+
+        stream = await client.responses.create(
+            model=MODEL,
+            input=input_items,
+            stream=True,
+        )
+        output_text = []
+        async for event in stream:
+            agent.events.emit(event.to_dict())
+            if event.type in {
+                "error",
+                "response.failed",
+                "response.incomplete",
+            }:
+                raise RuntimeError(f"Model response did not complete: {event}")
+            if event.type in {
+                "response.output_text.delta",
+                "response.refusal.delta",
+            }:
+                output_text.append(event.delta)
+
+        print("".join(output_text))
+
+
+@app.main()
+def main(agent: AgentSession, context: Context) -> None:
+    """Run the asynchronous MCP workflow from Flower's synchronous entry point."""
+    asyncio.run(run_mcp(agent, context))
 ```
 
-`serialize_mcp_result` represents application-specific normalization. Serialize
-the MCP result's text, structured content, or error to a string accepted by your
-model provider. Do not pass client-library objects directly to the model
-request.
-
-Append both the model's original function-call item and the corresponding
-function output to the next request. Bound the loop exactly as you would for
-Flower connectors; see {ref}`bound-connector-tool-loop`.
+Set `MCP_ENDPOINT` to a running Streamable HTTP MCP server and replace the model
+and allowlist with values for your deployment. Only allowlisted MCP definitions
+are exposed to the model, and the final request omits tools so the workflow
+cannot start another tool round.
 
 ## Current limitations
 
