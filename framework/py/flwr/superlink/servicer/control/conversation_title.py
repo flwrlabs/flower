@@ -43,13 +43,15 @@ def start_title_generation(
     prompt: str,
 ) -> None:
     """Generate and persist a title in a daemon thread."""
-    thread = Thread(
-        target=_generate_and_persist_title,
-        args=(state, series_id, prompt),
-        name="flwr-conversation-title",
-        daemon=True,
-    )
-    thread.start()
+    try:
+        Thread(
+            target=_generate_and_persist_title,
+            args=(state, series_id, prompt),
+            name="flwr-conversation-title",
+            daemon=True,
+        ).start()
+    except Exception as ex:  # pylint: disable=broad-exception-caught
+        log(ERROR, "Failed to start RunSeries title generation: %s", ex)
 
 
 def _generate_and_persist_title(
