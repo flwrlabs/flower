@@ -1,0 +1,75 @@
+services:
+  # Builds the C++ client binary and Python server dependencies
+  cpp-build:
+    build:
+      context: ../..
+      dockerfile: examples/quickstart-cpp/Dockerfile
+    image: flower-quickstart-cpp
+
+  # Flower SuperLink (manages FL lifecycle, runs ServerApp as subprocess)
+  superlink:
+    image: flower-quickstart-cpp
+    depends_on:
+      cpp-build:
+        condition: service_completed_successfully
+    command: flower-superlink --insecure
+    ports:
+      - "9091:9091"
+      - "9092:9092"
+      - "9093:9093"
+    working_dir: /app/examples/quickstart-cpp
+    networks:
+      - flwr-network
+
+  # C++ SuperNode client 0
+  client-0:
+    image: flower-quickstart-cpp
+    depends_on:
+      superlink:
+        condition: service_started
+    command: >
+      bash -c "sleep 4 && ./build/flower-supernode 0 superlink:9092"
+    working_dir: /app/examples/quickstart-cpp
+    networks:
+      - flwr-network
+
+  # C++ SuperNode client 1
+  client-1:
+    image: flower-quickstart-cpp
+    depends_on:
+      superlink:
+        condition: service_started
+    command: >
+      bash -c "sleep 8 && ./build/flower-supernode 1 superlink:9092"
+    working_dir: /app/examples/quickstart-cpp
+    networks:
+      - flwr-network
+
+  # Submit the ServerApp run to the SuperLink
+  runner:
+    image: flower-quickstart-cpp
+    depends_on:
+      superlink:
+        condition: service_started
+      client-0:
+        condition: service_started
+      client-1:
+        condition: service_started
+    command:
+      - bash
+      - -c
+      - |
+        mkdir -p /root/.flwr
+        cat > /root/.flwr/config.toml << 'EOF'
+        [superlink.local-deployment]
+        address = "superlink:9093"
+        insecure = true
+        EOF
+        sleep 12 && flwr run . local-deployment
+    working_dir: /app/examples/quickstart-cpp
+    networks:
+      - flwr-network
+
+networks:
+  flwr-network:
+    driver: bridge

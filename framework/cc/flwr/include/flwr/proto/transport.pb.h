@@ -2994,6 +2994,7 @@ class Scalar final :
   }
   enum ScalarCase {
     kDouble = 1,
+    kUint64 = 6,
     kSint64 = 8,
     kBool = 13,
     kString = 14,
@@ -3078,6 +3079,7 @@ class Scalar final :
 
   enum : int {
     kDoubleFieldNumber = 1,
+    kUint64FieldNumber = 6,
     kSint64FieldNumber = 8,
     kBoolFieldNumber = 13,
     kStringFieldNumber = 14,
@@ -3094,6 +3096,19 @@ class Scalar final :
   private:
   double _internal_double_() const;
   void _internal_set_double_(double value);
+  public:
+
+  // uint64 uint64 = 6;
+  bool has_uint64() const;
+  private:
+  bool _internal_has_uint64() const;
+  public:
+  void clear_uint64();
+  ::PROTOBUF_NAMESPACE_ID::uint64 uint64() const;
+  void set_uint64(::PROTOBUF_NAMESPACE_ID::uint64 value);
+  private:
+  ::PROTOBUF_NAMESPACE_ID::uint64 _internal_uint64() const;
+  void _internal_set_uint64(::PROTOBUF_NAMESPACE_ID::uint64 value);
   public:
 
   // sint64 sint64 = 8;
@@ -3164,6 +3179,7 @@ class Scalar final :
  private:
   class _Internal;
   void set_has_double_();
+  void set_has_uint64();
   void set_has_sint64();
   void set_has_bool_();
   void set_has_string();
@@ -3179,6 +3195,7 @@ class Scalar final :
     constexpr ScalarUnion() : _constinit_{} {}
       ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized _constinit_;
     double double__;
+    ::PROTOBUF_NAMESPACE_ID::uint64 uint64_;
     ::PROTOBUF_NAMESPACE_ID::int64 sint64_;
     bool bool__;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr string_;
@@ -5274,6 +5291,44 @@ inline double Scalar::double_() const {
 inline void Scalar::set_double_(double value) {
   _internal_set_double_(value);
   // @@protoc_insertion_point(field_set:flwr.proto.Scalar.double)
+}
+
+// uint64 uint64 = 6;
+inline bool Scalar::_internal_has_uint64() const {
+  return scalar_case() == kUint64;
+}
+inline bool Scalar::has_uint64() const {
+  return _internal_has_uint64();
+}
+inline void Scalar::set_has_uint64() {
+  _oneof_case_[0] = kUint64;
+}
+inline void Scalar::clear_uint64() {
+  if (_internal_has_uint64()) {
+    scalar_.uint64_ = uint64_t{0u};
+    clear_has_scalar();
+  }
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint64 Scalar::_internal_uint64() const {
+  if (_internal_has_uint64()) {
+    return scalar_.uint64_;
+  }
+  return uint64_t{0u};
+}
+inline void Scalar::_internal_set_uint64(::PROTOBUF_NAMESPACE_ID::uint64 value) {
+  if (!_internal_has_uint64()) {
+    clear_scalar();
+    set_has_uint64();
+  }
+  scalar_.uint64_ = value;
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint64 Scalar::uint64() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.Scalar.uint64)
+  return _internal_uint64();
+}
+inline void Scalar::set_uint64(::PROTOBUF_NAMESPACE_ID::uint64 value) {
+  _internal_set_uint64(value);
+  // @@protoc_insertion_point(field_set:flwr.proto.Scalar.uint64)
 }
 
 // sint64 sint64 = 8;

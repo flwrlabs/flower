@@ -1,4 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
+# Allow CMake 4.x to configure dependencies built with older cmake_minimum_required
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 project(SimpleCppFlowerClient VERSION 0.10
   DESCRIPTION "Creates a Simple C++ Flower client that trains a linear model on synthetic data."
   LANGUAGES CXX)
@@ -6,7 +8,7 @@ set(CMAKE_CXX_STANDARD 17)
 option(USE_LOCAL_FLWR "Use local Flower directory instead of fetching from GitHub" OFF)
 
 ######################
-### Download gRPC 
+### Download gRPC
 
 include(FetchContent)
 FetchContent_Declare(
@@ -58,16 +60,19 @@ target_link_libraries(flwr
   ${_REFLECTION}
   ${_GRPC_GRPCPP}
   ${_PROTOBUF_LIBPROTOBUF}
+  ssl
+  crypto
 )
 
 target_include_directories(flwr PUBLIC
   ${FLWR_INCLUDE_DIR}
+  ${grpc_SOURCE_DIR}/third_party/boringssl-with-bazel/src/include
 )
 
 ######################
 ### FLWR_CLIENT
 file(GLOB FLWR_CLIENT_SRCS src/*.cc)
-set(EXECUTABLE_NAME flwr_client)
+set(EXECUTABLE_NAME flower-supernode)
 add_executable(${EXECUTABLE_NAME} ${FLWR_CLIENT_SRCS})
 
 target_include_directories(${EXECUTABLE_NAME} PUBLIC

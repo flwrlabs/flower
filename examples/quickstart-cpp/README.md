@@ -4,10 +4,7 @@ dataset: [Synthetic]
 framework: [C++]
 ---
 
-# Flower Clients in C++ (under development)
-
-> [!WARNING]\
-> This example is compatible with `flwr<1.13.0`. We are currently updating it to the newer `flwr run` way of running Flower Apps.
+# Flower Clients in C++
 
 In this example you will train a linear model on synthetic data using C++ clients.
 
@@ -19,31 +16,49 @@ Many thanks to the original contributors to this code:
 - Francisco José Solís (code re-organization)
 - Andreea Zaharia (training algorithm and data generation)
 
-## Install requirements
+## Option 1: Run with Docker (recommended)
 
-You'll need CMake and Python with `flwr` installed.
+The easiest way to test the C++ client is with Docker Compose, which builds the
+client and runs the full federated learning setup automatically.
+
+```bash
+cd examples/quickstart-cpp
+docker compose up --build
+```
+
+This starts the SuperLink, two C++ SuperNode clients, and the Python ServerApp.
+
+To clean up:
+
+```bash
+docker compose down
+```
+
+## Option 2: Run locally
+
+### Install requirements
+
+You'll need CMake, a C++17 compiler, and Python with `flwr` and `numpy` installed.
 
 ### Building the example
 
-This example provides you with a `CMakeLists.txt` file to configure and build the client. Feel free to take a look inside it to see what is happening under the hood.
-
 ```bash
-cmake -S . -B build
+cmake -S . -B build -DUSE_LOCAL_FLWR=ON
 cmake --build build
 ```
 
-## Run the `Flower SuperLink`, the two clients, and the `Flower ServerApp` in separate terminals
+### Run the SuperLink, two clients, and the ServerApp in separate terminals
 
 ```bash
 flwr-superlink --insecure
 ```
 
 ```bash
-build/flwr_client 0 127.0.0.1:9092
+build/flower-supernode 0 127.0.0.1:9092
 ```
 
 ```bash
-build/flwr_client 1 127.0.0.1:9092
+build/flower-supernode 1 127.0.0.1:9092
 ```
 
 ```bash

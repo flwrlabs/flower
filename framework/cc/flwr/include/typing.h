@@ -13,6 +13,7 @@
  * ********************************************************************************************************/
 
 #pragma once
+#include <cstdint>
 #include <list>
 #include <map>
 #include <optional>
@@ -239,55 +240,96 @@ struct Array {
   std::string data; // use string to represent bytes
 };
 
-using ParametersRecord = std::map<std::string, Array>;
-using MetricsRecord =
-    std::map<std::string,
-             std::variant<int, double, std::vector<int>, std::vector<double>>>;
+// Wrapper to distinguish bytes from string in ConfigRecord variants
+struct Bytes {
+  std::string data;
+};
 
-using ConfigsRecord =
-    std::map<std::string,
-             std::variant<int, double, std::string, bool, std::vector<int>,
-                          std::vector<double>, std::vector<std::string>,
-                          std::vector<bool>>>;
+using ArrayRecord = std::map<std::string, Array>;
 
-class RecordSet {
+using MetricRecordValue =
+    std::variant<int64_t, uint64_t, double, std::vector<int64_t>,
+                 std::vector<uint64_t>, std::vector<double>>;
+using MetricRecord = std::map<std::string, MetricRecordValue>;
+
+using ConfigRecordValue =
+    std::variant<int64_t, uint64_t, double, bool, std::string, Bytes,
+                 std::vector<int64_t>, std::vector<uint64_t>,
+                 std::vector<double>, std::vector<bool>,
+                 std::vector<std::string>, std::vector<Bytes>>;
+using ConfigRecord = std::map<std::string, ConfigRecordValue>;
+
+using RecordDictValue = std::variant<ArrayRecord, MetricRecord, ConfigRecord>;
+
+class RecordDict {
 public:
-  RecordSet(
-      const std::map<std::string, ParametersRecord> &parametersRecords = {},
-      const std::map<std::string, MetricsRecord> &metricsRecords = {},
-      const std::map<std::string, ConfigsRecord> &configsRecords = {})
-      : _parametersRecords(parametersRecords), _metricsRecords(metricsRecords),
-        _configsRecords(configsRecords) {}
+  RecordDict() = default;
+  RecordDict(const std::map<std::string, RecordDictValue> &items)
+      : _items(items) {}
 
-  const std::map<std::string, ParametersRecord> &getParametersRecords() const {
-    return _parametersRecords;
+  const std::map<std::string, RecordDictValue> &getItems() const {
+    return _items;
   }
-  const std::map<std::string, MetricsRecord> &getMetricsRecords() const {
-    return _metricsRecords;
-  }
-  const std::map<std::string, ConfigsRecord> &getConfigsRecords() const {
-    return _configsRecords;
+  void setItems(const std::map<std::string, RecordDictValue> &items) {
+    _items = items;
   }
 
-  void setParametersRecords(
-      const std::map<std::string, ParametersRecord> &parametersRecords) {
-    _parametersRecords = parametersRecords;
+  // Convenience accessors that filter by type
+  std::map<std::string, ArrayRecord> getArrayRecords() const {
+    std::map<std::string, ArrayRecord> result;
+    for (const auto &[key, value] : _items) {
+      if (std::holds_alternative<ArrayRecord>(value)) {
+        result[key] = std::get<ArrayRecord>(value);
+      }
+    }
+    return result;
   }
 
-  void setMetricsRecords(
-      const std::map<std::string, MetricsRecord> &metricsRecords) {
-    _metricsRecords = metricsRecords;
+  std::map<std::string, MetricRecord> getMetricRecords() const {
+    std::map<std::string, MetricRecord> result;
+    for (const auto &[key, value] : _items) {
+      if (std::holds_alternative<MetricRecord>(value)) {
+        result[key] = std::get<MetricRecord>(value);
+      }
+    }
+    return result;
   }
 
-  void setConfigsRecords(
-      const std::map<std::string, ConfigsRecord> &configsRecords) {
-    _configsRecords = configsRecords;
+  std::map<std::string, ConfigRecord> getConfigRecords() const {
+    std::map<std::string, ConfigRecord> result;
+    for (const auto &[key, value] : _items) {
+      if (std::holds_alternative<ConfigRecord>(value)) {
+        result[key] = std::get<ConfigRecord>(value);
+      }
+    }
+    return result;
   }
 
 private:
-  std::map<std::string, ParametersRecord> _parametersRecords;
-  std::map<std::string, MetricsRecord> _metricsRecords;
-  std::map<std::string, ConfigsRecord> _configsRecords;
+  std::map<std::string, RecordDictValue> _items;
+};
+
+struct Error {
+  int64_t code = 0;
+  std::string reason;
+};
+
+struct Metadata {
+  uint64_t run_id = 0;
+  std::string message_id;
+  uint64_t src_node_id = 0;
+  uint64_t dst_node_id = 0;
+  std::string reply_to_message_id;
+  std::string group_id;
+  double ttl = 0.0;
+  std::string message_type;
+  double created_at = 0.0;
+};
+
+struct Message {
+  Metadata metadata;
+  std::optional<RecordDict> content;
+  std::optional<Error> error;
 };
 
 } // namespace flwr_local
