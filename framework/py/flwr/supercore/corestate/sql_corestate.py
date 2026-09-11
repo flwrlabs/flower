@@ -791,7 +791,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 SeriesRunsModel,
                 SeriesRunsModel.series_id == RunSeriesModel.series_id,
             )
-            .order_by(RunSeriesModel.updated_at.desc())
+            .order_by(
+                RunSeriesModel.updated_at.desc(),
+                SeriesRunsModel.id.asc(),
+            )
             .execution_options(populate_existing=True)
         )
 

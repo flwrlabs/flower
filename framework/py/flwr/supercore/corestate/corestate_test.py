@@ -624,6 +624,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         run_series = state.get_run_series(series_ids=[series_id])
         self.assertEqual(run_series[0].description, "Initial description")
+        self.assertEqual(run_series[0].run_ids, [123, 456])
         self.assertEqual(state.get_run_series(is_agent=True), run_series)
         self.assertEqual(state.get_run_series(is_agent=False), [])
 
