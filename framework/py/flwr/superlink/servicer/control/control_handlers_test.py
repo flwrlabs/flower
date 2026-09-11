@@ -351,7 +351,6 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
         start_title.assert_called_once_with(
             self.state,
-            response.run_id,
             run.series_id,
             "Hello",
         )

@@ -702,7 +702,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         series_id = run.series_id
         if series_description and isinstance(agent_input, str) and series_id:
             try:
-                start_title_generation(state, run_id, series_id, agent_input)
+                start_title_generation(state, series_id, agent_input)
             except Exception as ex:  # pylint: disable=broad-exception-caught
                 log(ERROR, "Failed to start RunSeries title generation: %s", ex)
 

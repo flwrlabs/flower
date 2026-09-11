@@ -14,47 +14,33 @@
 # ==============================================================================
 """Tests for RunSeries title generation."""
 
+import os
 from unittest.mock import Mock, patch
 
-from flwr.common.constant import Status
-from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
-from flwr.supercore.constant import TaskType
-from flwr.supercore.json_message.model_message import ModelResponse
 
 from .conversation_title import start_title_generation
 
 
 def test_start_title_generation() -> None:
-    """Create a model task and persist its response in a daemon thread."""
+    """Call the model provider and persist its response in a daemon thread."""
     state = Mock(spec=LinkState)
-    state.create_task.return_value = 22
-    state.store_task_message.return_value = True
-    state.get_tasks.return_value = [Task(status=TaskStatus(status=Status.FINISHED))]
-    state.get_task_message.return_value = [
-        ModelResponse(
-            dst_task_id=22,
-            response={
-                "object": "response",
-                "output": [
-                    {"content": [{"type": "output_text", "text": " Model title "}]}
-                ],
-            },
-            reply_to_message_id="request-id",
-        )
-    ]
+    response = Mock()
+    response.json.return_value = {
+        "output": [{"content": [{"type": "output_text", "text": " Model title "}]}]
+    }
 
-    with patch("flwr.superlink.servicer.control.conversation_title.Thread") as thread:
-        start_title_generation(state, 1, 33, "Prompt")
+    with (
+        patch.dict(os.environ, {"FLWR_MODEL_API_KEY": "key"}),
+        patch(
+            "flwr.superlink.servicer.control.conversation_title.requests.post",
+            return_value=response,
+        ) as post,
+        patch("flwr.superlink.servicer.control.conversation_title.Thread") as thread,
+    ):
+        start_title_generation(state, 33, "Prompt")
         thread.call_args.kwargs["target"](*thread.call_args.kwargs["args"])
 
-    state.create_task.assert_called_once_with(
-        TaskType.MODEL,
-        1,
-        model_ref="openai/gpt-5-nano",
-    )
-    request = state.store_task_message.call_args.args[0]
-    assert request.metadata.src_task_id == 22
-    assert request.metadata.dst_task_id == 22
+    assert post.call_args.kwargs["json"]["input"] == "Prompt"
     state.set_run_series_description.assert_called_once_with(33, "Model title")
     assert thread.call_args.kwargs["daemon"] is True
