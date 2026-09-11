@@ -38,6 +38,7 @@ from .types import ExecutionSpec, LaunchResult
 from .warm_executor_pool import (
     WarmExecutorPoolConfig,
     WarmExecutorPoolKey,
+    is_compatible_warm_executor,
     is_warm_executor_ready,
     new_warm_executor_id,
 )
@@ -265,7 +266,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         self._warm_executor_owner_label_selector = warm_executor_owner_label_selector
         self._pools = {pool.key: pool for pool in config.warm_executor_pools}
         self._busy_pods: set[str] = set()
-        self._retiring_pods: set[str] = set()
+        self._retiring_pods: dict[str, WarmExecutorPoolKey | None] = {}
         self._closed = False
         self._lock = threading.RLock()
 
@@ -300,7 +301,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 runtime_root_certificates=runtime_root_certificates,
             )
         except WarmAgentAppUnavailable:
-            self._retire_unavailable_pod(pod_name)
+            self._retire_unavailable_pod(pod_name, pool.key)
             self._log_dispatch(pool, "setup_unavailable")
             return None
 
@@ -435,7 +436,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 try:
                     self._mark_pod_consumed(pod_name)
                 except WarmAgentAppUnavailable:
-                    self._retire_unavailable_pod(pod_name)
+                    self._retire_unavailable_pod(pod_name, key)
                     raise
                 self._busy_pods.add(pod_name)
                 return pod_name
@@ -444,7 +445,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
     def _ensure_pool_capacity(
         self, pool: WarmExecutorPoolConfig, reserved_pod_capacity: int = 0
     ) -> None:
-        if self._closed or self._retiring_pods:
+        if self._closed or pool.key in self._retiring_pods.values():
             return
         pods = self._owned_warm_pods()
         if pods is None:
@@ -497,16 +498,14 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         }
         for pod in pods:
             pod_name = _object_name(pod)
-            if (
-                pod_name is not None
-                and pod_name not in self._busy_pods
-                and _is_consumed_warm_executor(pod)
-            ):
-                if self._consumed_pod_has_finished(pod):
-                    self._retire_pod(pod_name)
-                continue
-            if pod_name in self._retiring_pods:
-                continue
+            retiring_pool = next(
+                (
+                    candidate
+                    for candidate in self._pools.values()
+                    if is_compatible_warm_executor(pod, candidate.key)
+                ),
+                None,
+            )
             pool = next(
                 (
                     candidate
@@ -515,9 +514,25 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 ),
                 None,
             )
+            if (
+                pod_name is not None
+                and pod_name not in self._busy_pods
+                and _is_consumed_warm_executor(pod)
+            ):
+                if self._consumed_pod_has_finished(pod):
+                    self._retire_pod(
+                        pod_name,
+                        retiring_pool.key if retiring_pool is not None else None,
+                    )
+                continue
+            if pod_name in self._retiring_pods:
+                continue
             if pool is None:
                 if pod_name is not None and pod_name not in self._busy_pods:
-                    self._retire_pod(pod_name)
+                    self._retire_pod(
+                        pod_name,
+                        retiring_pool.key if retiring_pool is not None else None,
+                    )
                 continue
             compatible_pods[pool.key].append(pod)
 
@@ -534,7 +549,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
             for pod in idle_pods[pool.size :]:
                 pod_name = _object_name(pod)
                 if pod_name is not None:
-                    self._retire_pod(pod_name)
+                    self._retire_pod(pod_name, pool.key)
         return True
 
     def _retry_retiring_pods(self, pods: list[object]) -> None:
@@ -542,7 +557,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         pod_names = {
             pod_name for pod in pods if (pod_name := _object_name(pod)) is not None
         }
-        for pod_name in self._retiring_pods - pod_names:
+        for pod_name in self._retiring_pods.keys() - pod_names:
             self._release_pod(pod_name)
         for pod in pods:
             pod_name = _object_name(pod)
@@ -686,7 +701,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
             dispatch.close()
             with self._lock:
                 if completed:
-                    self._retire_pod(pod_name)
+                    self._retire_pod(pod_name, key)
                 else:
                     self._busy_pods.discard(pod_name)
                 if not self._closed:
@@ -695,15 +710,17 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
     def _release_pod(self, pod_name: str) -> None:
         with self._lock:
             self._busy_pods.discard(pod_name)
-            self._retiring_pods.discard(pod_name)
+            self._retiring_pods.pop(pod_name, None)
 
-    def _retire_unavailable_pod(self, pod_name: str) -> None:
+    def _retire_unavailable_pod(self, pod_name: str, key: WarmExecutorPoolKey) -> None:
         """Delete a Pod that failed before task authority was delivered."""
-        self._retire_pod(pod_name)
+        self._retire_pod(pod_name, key)
 
-    def _retire_pod(self, pod_name: str) -> bool:
+    def _retire_pod(
+        self, pod_name: str, key: WarmExecutorPoolKey | None = None
+    ) -> bool:
         with self._lock:
-            self._retiring_pods.add(pod_name)
+            self._retiring_pods[pod_name] = key
         if self._delete_pod(pod_name):
             self._release_pod(pod_name)
             return True

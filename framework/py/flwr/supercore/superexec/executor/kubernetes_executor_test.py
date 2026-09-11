@@ -581,7 +581,7 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     ]
     assert "task-token" not in command
     assert len(started) == 1
-    assert started[0][1][-1] is not suppress_output
+    assert started[0][1][-1] is (not suppress_output)
 
 
 @pytest.mark.parametrize(
@@ -1065,16 +1065,23 @@ def test_disabled_warm_pools_retire_owned_pods() -> None:
     )
 
 
-def test_warm_pool_retries_retirement_without_replacing_pending_pod() -> None:
-    """A failed retirement is retried without creating more warm Pods."""
+def test_warm_pool_retirement_does_not_block_other_pools() -> None:
+    """A failed Model retirement should not block Connector capacity."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
-    pool_key = _warm_executor_pool_key(
-        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    model_pool_key = _warm_executor_pool_key(
+        task_type=TaskType.MODEL, runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    connector_pool_key = _warm_executor_pool_key(
+        task_type=TaskType.CONNECTOR,
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev",
     )
     config = _executor_config(
         warm_executor_owner="superexec-a",
-        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+        warm_executor_pools=(
+            WarmExecutorPoolConfig(key=model_pool_key, size=1),
+            WarmExecutorPoolConfig(key=connector_pool_key, size=1),
+        ),
     )
     pool = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
         client, config, lambda: 0
@@ -1085,7 +1092,7 @@ def test_warm_pool_retries_retirement_without_replacing_pending_pod() -> None:
 
     pool._wait_for_task_and_replace(  # pylint: disable=protected-access
         "consumed",
-        pool_key,
+        model_pool_key,
         warm_agentapp_executor.KubernetesWarmAgentAppDispatch(_WarmExecResponse(False)),
     )
 
@@ -1094,12 +1101,16 @@ def test_warm_pool_retries_retirement_without_replacing_pending_pod() -> None:
     client.create_namespaced_pod.assert_not_called()
 
     client.list_namespaced_pod.return_value = {
-        "items": [_ready_warm_pod(pool_key, config, name="consumed")]
+        "items": [_ready_warm_pod(model_pool_key, config, name="consumed")]
     }
     pool.ensure_capacity()
 
     assert client.delete_namespaced_pod.call_count == 2
-    client.create_namespaced_pod.assert_not_called()
+    client.create_namespaced_pod.assert_called_once()
+    connector_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
+    assert connector_pod["metadata"]["labels"]["flower.ai/task-type"] == (
+        TaskType.CONNECTOR.value
+    )
 
     client.delete_namespaced_pod.side_effect = None
     pool.ensure_capacity()
