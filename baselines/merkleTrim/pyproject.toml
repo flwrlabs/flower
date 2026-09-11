@@ -1,0 +1,53 @@
+# =====================================================================
+# For a full TOML configuration guide, check the Flower docs:
+# https://flower.ai/docs/framework/how-to-configure-pyproject-toml.html
+# =====================================================================
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "merkle-trim"
+version = "1.0.0"
+description = "Verifiable and Byzantine-Robust Federated Learning Framework"
+license = "Apache-2.0"
+# Flower App Dependencies
+dependencies = [
+    "flwr[simulation]>=1.23.0",
+    "flwr-datasets[vision]>=0.5.0",
+    "scikit-learn>=1.6.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.flwr.app]
+publisher = "sinouar"
+
+# ServerApp and ClientApp entry points
+# Format: "<module>:<object>"
+[tool.flwr.app.components]
+serverapp = "merkleTrim.server_app:app"
+clientapp = "merkleTrim.client_app:app"
+
+[tool.flwr.app.config]
+num-server-rounds = 3
+penalty = "l2"
+local-epochs = 1
+beta = 0.2
+malicious-fraction = 0.0
+
+# Default federation to use when running the app
+[tool.flwr.federations]
+default = "local-simulation"
+
+# Local simulation federation with 10 virtual SuperNodes
+[tool.flwr.federations.local-simulation]
+options.num-supernodes = 10
+
+# Remote federation example for use with SuperLink
+[tool.flwr.federations.remote-federation]
+address = "<SUPERLINK-ADDRESS>:<PORT>"
+insecure = true  # Remove this line to enable TLS
+# root-certificates = "<PATH/TO/ca.crt>"  # For TLS setup
