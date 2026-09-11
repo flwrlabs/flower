@@ -93,16 +93,17 @@ class AutomationRecord:
 
 
 @dataclass(frozen=True)
-class FederationAppRecord:
+class FederationAppRecord:  # pylint: disable=too-many-instance-attributes
     """Record containing a federation app and its association metadata."""
 
     federation_id: str
     app_id: str
-    fab_hash: str | None
+    fab_hash: str
     app_type: str
     is_hub_app: bool
     added_by: str
     added_at: datetime
+    updated_at: datetime
 
 
 @dataclass
@@ -331,48 +332,45 @@ class InMemoryCoreState(
 
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab | None,
+        fab: Fab,
         federation_id: str,
         app_id: str,
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
     ) -> str:
-        """Store an optional FAB and associate its app with a federation."""
+        """Store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
             raise ValueError(
                 "Federation ID, app ID, app type, and added by are required"
             )
-        if fab is None and not is_hub_app:
-            raise ValueError("A FAB is required for custom apps")
-        fab_hash = None
-        if fab is not None:
-            fab_hash = hashlib.sha256(fab.content).hexdigest()
-            if fab.hash_str and fab.hash_str != fab_hash:
-                raise ValueError(
-                    f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
-                )
+        fab_hash = hashlib.sha256(fab.content).hexdigest()
+        if fab.hash_str and fab.hash_str != fab_hash:
+            raise ValueError(
+                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+            )
         key = (federation_id, app_id)
+        current_time = now()
         with self.lock_fab_store, self.lock_federation_app_store:
-            if fab is not None and fab_hash is not None:
-                # Keep launch behavior: last write wins for metadata under the same
-                # content hash.
-                self.fab_store[fab_hash] = Fab(
-                    hash_str=fab_hash,
-                    content=fab.content,
-                    verifications=dict(fab.verifications),
-                )
+            # Keep launch behavior: last write wins for metadata under the same
+            # content hash.
+            self.fab_store[fab_hash] = Fab(
+                hash_str=fab_hash,
+                content=fab.content,
+                verifications=dict(fab.verifications),
+            )
             existing = self.federation_app_store.get(key)
             self.federation_app_store[key] = FederationAppRecord(
                 federation_id=federation_id,
                 app_id=app_id,
-                fab_hash=None if is_hub_app else fab_hash,
+                fab_hash=fab_hash,
                 app_type=app_type,
                 is_hub_app=is_hub_app,
                 added_by=existing.added_by if existing else added_by,
-                added_at=existing.added_at if existing else now(),
+                added_at=existing.added_at if existing else current_time,
+                updated_at=current_time,
             )
-        return fab_hash or ""
+        return fab_hash
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
@@ -402,6 +400,44 @@ class InMemoryCoreState(
                 verifications=dict(fab.verifications),
             )
 
+    def get_hub_app(
+        self, federation_id: str, app_id: str
+    ) -> tuple[Fab, datetime] | None:
+        """Return the cached Hub FAB and its last update time, if present."""
+        with self.lock_fab_store, self.lock_federation_app_store:
+            app = self.federation_app_store.get((federation_id, app_id))
+            fab = self.fab_store.get(app.fab_hash) if app else None
+            if app is None or not app.is_hub_app or fab is None:
+                return None
+            return (
+                Fab(fab.hash_str, fab.content, dict(fab.verifications)),
+                app.updated_at,
+            )
+
+    def update_hub_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        federation_id: str,
+        app_id: str,
+        expected_fab_hash: str,
+        fab_hash: str,
+        app_type: str,
+    ) -> bool:
+        """Update a Hub app if it still points to the expected FAB."""
+        key = (federation_id, app_id)
+        with self.lock_fab_store, self.lock_federation_app_store:
+            app = self.federation_app_store.get(key)
+            if (
+                app is None
+                or not app.is_hub_app
+                or app.fab_hash != expected_fab_hash
+                or fab_hash not in self.fab_store
+            ):
+                return False
+            self.federation_app_store[key] = replace(
+                app, fab_hash=fab_hash, app_type=app_type, updated_at=now()
+            )
+            return True
+
     def list_apps(
         self, federation_id: str, limit: int | None = None
     ) -> Sequence[AppInfo]:
@@ -424,7 +460,7 @@ class InMemoryCoreState(
             return [
                 AppInfo(
                     app_id=record.app_id,
-                    fab_hash=record.fab_hash or "",
+                    fab_hash=record.fab_hash,
                     app_type=record.app_type,
                     is_hub_app=record.is_hub_app,
                 )
