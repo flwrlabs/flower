@@ -241,9 +241,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                     self.state,
                 )
 
-            self.assertEqual(
-                error.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND
-            )
+            self.assertEqual(error.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND)
 
     def test_refresh_auth_tokens_returns_rotated_tokens(self) -> None:
         """Return both tokens produced by the authentication plugin."""
