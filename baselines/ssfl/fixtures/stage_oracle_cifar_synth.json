@@ -1,0 +1,8 @@
+{
+  "seed": 550,
+  "n_clients": 2,
+  "dense_ratio": 0.5,
+  "mask_digest": "3097a5ed680817eb",
+  "active_params": 5582176,
+  "note": "Regenerate full tensors in tests via generate_stage_oracle()."
+}
