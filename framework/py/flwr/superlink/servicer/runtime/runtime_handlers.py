@@ -307,10 +307,10 @@ def push_task_output(
         task.task_id, sub_status=request.sub_status, details=request.details
     ):
         log(INFO, "Finished task %d of run %d", task.task_id, run_id)
-        runs = state.get_run_info(run_ids=[run_id])
-        run = runs[0] if runs else None
-        if run and run.series_id and run.primary_task_id == task.task_id:
-            if request.HasField("context"):
+        if request.HasField("context"):
+            runs = state.get_run_info(run_ids=[run_id])
+            run = runs[0] if runs else None
+            if run and run.series_id and run.primary_task_id == task.task_id:
                 state.set_run_series_context(
                     run.series_id,
                     context_from_proto(request.context),

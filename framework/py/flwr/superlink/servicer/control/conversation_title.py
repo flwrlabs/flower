@@ -30,6 +30,7 @@ from flwr.supercore.task_process.model.provider import DEFAULT_MODEL_API_ENDPOIN
 from flwr.supercore.typing import JSONObject
 
 _MODEL = "openai/gpt-5-nano"
+_MAX_PROMPT_LENGTH = 4096
 _TIMEOUT = 60.0
 _INSTRUCTIONS = (
     "Create a concise title for this conversation. "
@@ -63,15 +64,20 @@ def _generate_and_persist_title(
     try:
         headers = {"Content-Type": "application/json"}
         api_key = os.getenv("FLWR_MODEL_API_KEY", "").strip()
+        endpoint = os.getenv("FLWR_MODEL_API_ENDPOINT", "").strip()
+        if not endpoint:
+            if not api_key:
+                raise RuntimeError("Model API key is not set (FLWR_MODEL_API_KEY).")
+            endpoint = DEFAULT_MODEL_API_ENDPOINT
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
         response = requests.post(
-            os.getenv("FLWR_MODEL_API_ENDPOINT", DEFAULT_MODEL_API_ENDPOINT),
+            endpoint,
             headers=headers,
             json={
                 "model": _MODEL,
                 "instructions": _INSTRUCTIONS,
-                "input": prompt,
+                "input": prompt[:_MAX_PROMPT_LENGTH],
                 "stream": False,
                 "max_output_tokens": 32,
                 "reasoning": {"effort": "minimal"},
