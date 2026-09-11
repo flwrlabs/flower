@@ -20,7 +20,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from flwr.supercore.constant import ExecutorType
+from flwr.supercore.constant import ExecutorType, TaskType
 
 from . import factory as factory_module
 from .factory import get_executor
@@ -96,11 +96,15 @@ def test_get_executor_builds_kubernetes_executor_from_config(
 
 @pytest.mark.parametrize("insecure", [False, True])
 @pytest.mark.parametrize("ca_source", [None, "executor", "task"])
-def test_get_executor_configures_usable_agentapp_warm_executor_pool(
+@pytest.mark.parametrize(
+    "task_type", [TaskType.AGENT_APP, TaskType.MODEL, TaskType.CONNECTOR]
+)
+def test_get_executor_configures_usable_typed_warm_executor_pool(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     insecure: bool,
     ca_source: str | None,
+    task_type: TaskType,
 ) -> None:
     """Provision warm pools when their Runtime API trust is known at Pod creation."""
     client = Mock()
@@ -117,7 +121,7 @@ def test_get_executor_configures_usable_agentapp_warm_executor_pool(
         "namespace": "flower-system",
         "image": "ghcr.io/flwrlabs/taskexecutor:dev",
         "warm-executor-owner": "superexec-a",
-        "warm-executor-pools": [{"task-type": "flwr-agentapp", "size": 2}],
+        "warm-executor-pools": [{"task-type": task_type.value, "size": 2}],
     }
     ca_path = tmp_path / "ca.pem"
     ca_path.write_text("root-ca", encoding="utf-8")
@@ -137,7 +141,7 @@ def test_get_executor_configures_usable_agentapp_warm_executor_pool(
     assert bool(config.warm_executor_pools) == enabled
     if enabled:
         pool = config.warm_executor_pools[0]
-        assert pool.key.task_type.value == "flwr-agentapp"
+        assert pool.key.task_type == task_type
         assert pool.key.runtime_image == "ghcr.io/flwrlabs/taskexecutor:dev"
         assert pool.size == 2
     assert config.warm_executor_owner == "superexec-a"
@@ -172,9 +176,9 @@ def test_get_executor_rejects_non_string_warm_executor_owner() -> None:
         )
 
 
-def test_get_executor_rejects_non_agentapp_warm_pool() -> None:
-    """The first warm dispatch feature must not enable Model or Connector pools."""
-    with pytest.raises(ValueError, match="flwr-agentapp"):
+def test_get_executor_rejects_unsupported_warm_pool() -> None:
+    """Warm pools should reject task types without a shared token handoff."""
+    with pytest.raises(ValueError, match="only task types"):
         factory_module._kubernetes_executor_config_from_mapping(  # pylint: disable=protected-access
             {
                 "namespace": "flower-system",
@@ -182,7 +186,7 @@ def test_get_executor_rejects_non_agentapp_warm_pool() -> None:
                 "warm-executor-owner": "superexec-a",
                 "warm-executor-pools": [
                     {
-                        "task-type": "flwr-model",
+                        "task-type": "flwr-serverapp",
                         "size": 1,
                     }
                 ],
