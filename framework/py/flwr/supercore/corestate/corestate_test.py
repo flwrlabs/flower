@@ -639,11 +639,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         assert series_id is not None
 
-        self.assertIsNone(
-            state.set_run_series_description(series_id, "  Generated title  ")
-        )
+        renamed_at = now() + timedelta(seconds=1)
+        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = renamed_at
+            self.assertIsNone(
+                state.set_run_series_description(series_id, "  Generated title  ")
+            )
         updated = state.get_run_series(series_ids=[series_id])[0]
         self.assertEqual(updated.description, "Generated title")
+        self.assertEqual(updated.updated_at, renamed_at.isoformat())
 
     def test_store_run_in_series_returns_none_for_unknown_id(self) -> None:
         """Unknown caller-provided run series IDs return None."""

@@ -816,7 +816,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         stmt = (
             update(RunSeriesModel)
             .where(RunSeriesModel.series_id == uint64_to_int64(series_id))
-            .values(description=normalized)
+            .values(description=normalized, updated_at=now())
         )
         with self.session() as session:
             session.execute(stmt)

@@ -615,6 +615,7 @@ class InMemoryCoreState(
             if run_series is None:
                 return
             run_series.description = normalized
+            run_series.updated_at = now().isoformat()
 
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
