@@ -43,3 +43,11 @@ taplo fmt --check ../benchmarks ../examples
 echo "- taplo: done"
 
 echo "- All TOML checks passed"
+
+if [ "${RUN_SPLIT_LEARNING_TESTS}" = "1" ]; then
+    echo "- split_learning example: installing test dependencies"
+    pip install -e ../examples/split_learning[dev]
+    echo "- split_learning example: running pytest"
+    python -m pytest ../examples/split_learning/tests
+    echo "- split_learning example tests passed"
+fi
