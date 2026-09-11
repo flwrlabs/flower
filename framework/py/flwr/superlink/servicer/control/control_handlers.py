@@ -1252,9 +1252,7 @@ def update_run_series_description(
 
     state.set_run_series_description(series_id, description)
     run_series.description = description
-    return UpdateRunSeriesDescriptionResponse(
-        series=_with_last_run_statuses(state, [run_series])[0]
-    )
+    return UpdateRunSeriesDescriptionResponse(series=run_series)
 
 
 def list_run_series_events(
