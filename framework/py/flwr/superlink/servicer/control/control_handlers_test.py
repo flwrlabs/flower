@@ -191,14 +191,20 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         self._create_dummy_run_series(10)
         description = "a" * 80
 
-        response = update_run_series_description(
-            UpdateRunSeriesDescriptionRequest(
-                series_id=10, description=f"  {description}  "
-            ),
-            self.account,
+        with patch.object(
             self.state,
-        )
+            "set_run_series_description",
+            wraps=self.state.set_run_series_description,
+        ) as set_description:
+            response = update_run_series_description(
+                UpdateRunSeriesDescriptionRequest(
+                    series_id=10, description=f"  {description}  "
+                ),
+                self.account,
+                self.state,
+            )
 
+        set_description.assert_called_once_with(10, description)
         self.assertEqual(response.series.series_id, 10)
         self.assertEqual(response.series.description, description)
 
