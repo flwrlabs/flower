@@ -800,6 +800,7 @@ def test_warm_dispatch_drains_stderr_until_the_child_exits() -> None:
             True,
             [
                 call(INFO, "%s", "visible output with acknowledgement"),
+                call(INFO, "%s", "visible error before acknowledgement"),
                 call(INFO, "%s", "visible error with acknowledgement"),
                 call(INFO, "%s", "visible output after acknowledgement"),
                 call(INFO, "%s", "visible error after acknowledgement"),
@@ -814,26 +815,30 @@ def test_warm_dispatch_forwards_only_visible_output_after_acceptance(
     expected_calls: list[Any],
 ) -> None:
     """Warm dispatch should mirror only post-acknowledgement visible output."""
-    response = _WarmExecResponse()
+    response = Mock(returncode=0)
+    response._all = StringIO()  # pylint: disable=protected-access
+    response.read_stdout.side_effect = [
+        "",
+        (
+            f"{FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT}\n"
+            "visible output with acknowledgement"
+        ),
+        "visible output after acknowledgement",
+        "",
+    ]
+    response.read_stderr.side_effect = [
+        "visible error before acknowledgement",
+        "visible error with acknowledgement",
+        "visible error after acknowledgement",
+        "",
+    ]
+    response.is_open.side_effect = [True, True, False]
     log = Mock()
     monkeypatch.setattr(warm_agentapp_executor, "log", log)
     dispatch = warm_agentapp_executor.KubernetesWarmAgentAppDispatch(response)
 
     dispatch.send_token("task-token")
-    response._stdout += (
-        "visible output with acknowledgement"  # pylint: disable=protected-access
-    )
-    response._stderr = (
-        "visible error with acknowledgement"  # pylint: disable=protected-access
-    )
     assert dispatch.wait_for_acceptance(1.0)
-    response._stdout = (
-        "visible output after acknowledgement"  # pylint: disable=protected-access
-    )
-    response._stderr = (
-        "visible error after acknowledgement"  # pylint: disable=protected-access
-    )
-    response._acknowledge = False  # pylint: disable=protected-access
 
     assert dispatch.wait_for_close(forward_output=forward_output)
 

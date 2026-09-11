@@ -63,6 +63,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsRequest,
     StreamRunEventsRequest,
     UnregisterNodeRequest,
+    UpdateRunSeriesDescriptionRequest,
 )
 from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
@@ -106,6 +107,10 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/control/list-runs"): ListRunsRequest,
     ("POST", "/v1/control/list-run-series"): ListRunSeriesRequest,
     ("POST", "/v1/control/get-run-series"): GetRunSeriesRequest,
+    (
+        "POST",
+        "/v1/control/update-run-series-description",
+    ): UpdateRunSeriesDescriptionRequest,
     ("POST", "/v1/control/list-run-series-events"): ListRunSeriesEventsRequest,
     ("POST", "/v1/control/stop-run"): StopRunRequest,
     ("POST", "/v1/control/start-automation"): StartAutomationRequest,
