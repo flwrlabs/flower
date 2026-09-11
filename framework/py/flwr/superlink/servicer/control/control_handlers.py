@@ -113,8 +113,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
-    UpdateRunSeriesDescriptionRequest,
-    UpdateRunSeriesDescriptionResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
     ShowFederationRequest,
@@ -133,6 +131,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611

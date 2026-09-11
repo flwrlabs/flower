@@ -56,14 +56,14 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     PullArtifactsResponse,
     RefreshAuthTokensRequest,
     RefreshAuthTokensResponse,
-    UpdateRunSeriesDescriptionRequest,
-    UpdateRunSeriesDescriptionResponse,
     StartRunRequest,
     StartRunResponse,
     StreamLogsRequest,
     StreamLogsResponse,
     StreamRunEventsRequest,
     StreamRunEventsResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
 )
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611

@@ -37,10 +37,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RefreshAuthTokensRequest,
     RemoveAppRequest,
     RemoveAppResponse,
-    UpdateRunSeriesDescriptionRequest,
     StartAutomationRequest,
     StartRunRequest,
     StopAutomationRequest,
+    UpdateRunSeriesDescriptionRequest,
 )
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -66,10 +66,10 @@ from .control_handlers import (
     list_run_series_events,
     refresh_auth_tokens,
     remove_app,
-    update_run_series_description,
     start_automation,
     start_run,
     stop_automation,
+    update_run_series_description,
 )
 
 

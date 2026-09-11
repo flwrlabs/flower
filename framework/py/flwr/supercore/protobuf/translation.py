@@ -54,7 +54,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveAccountFromFederationRequest,
     RemoveAppRequest,
     RemoveNodeFromFederationRequest,
-    UpdateRunSeriesDescriptionRequest,
     RevokeInvitationRequest,
     ShowFederationRequest,
     StartAutomationRequest,
@@ -64,6 +63,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsRequest,
     StreamRunEventsRequest,
     UnregisterNodeRequest,
+    UpdateRunSeriesDescriptionRequest,
 )
 from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611

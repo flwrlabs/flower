@@ -78,8 +78,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
-    UpdateRunSeriesDescriptionRequest,
-    UpdateRunSeriesDescriptionResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
     ShowFederationRequest,
@@ -98,6 +96,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
