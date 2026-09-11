@@ -123,7 +123,7 @@ def gen_evaluate_fn(
         # determine device
         net = model.Net()
         params_dict = zip(net.state_dict().keys(), parameters_ndarrays)
-        state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+        state_dict = OrderedDict({k: torch.from_numpy(v) for k, v in params_dict})
         net.load_state_dict(state_dict, strict=True)
         net.to(device)
 
