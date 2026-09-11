@@ -23,7 +23,11 @@ from flwr.app import Context, Message
 from flwr.app.error import Error
 from flwr.app.message import remove_content_from_message
 from flwr.cli.install import install_from_fab
-from flwr.clientapp.client_app import ClientApp, LoadClientAppError
+from flwr.clientapp.client_app import (
+    ClientApp,
+    LoadClientAppError,
+    format_load_client_app_error_reason,
+)
 from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common.config import get_project_dir
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode, SubStatus
@@ -198,7 +202,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         reason = str(type(ex)) + ":<'" + str(ex) + "'>"
         exc_entity = "ClientApp"
         if isinstance(ex, LoadClientAppError):
-            reason = "An exception was raised when attempting to load `ClientApp`"
+            reason = format_load_client_app_error_reason(ex)
             e_code = ErrorCode.LOAD_CLIENT_APP_EXCEPTION
 
         log(ERROR, "%s raised an exception", exc_entity, exc_info=ex)
