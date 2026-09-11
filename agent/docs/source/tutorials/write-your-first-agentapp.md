@@ -87,7 +87,11 @@ def main(agent: AgentSession, context: Context) -> None:
 
 Flower also injects `FLWR_RUNTIME_BASE_URL` and `FLWR_RUNTIME_API_KEY` into the
 AgentApp process. The OpenAI client uses them to send the request through
-Flower, so the project does not need a model-provider API key.
+Flower. This tutorial runs on SuperGrid, where Flower configures upstream model
+access, so the project does not need a model-provider API key. When you run the
+same app on a self-hosted SuperLink, configure the model provider in the
+SuperLink environment as described in [Run an AgentApp with a local
+SuperLink](../how-to-guides/run-with-local-superlink.md).
 
 The SDK yields typed streaming events. The loop republishes each event through
 `agent.events.emit` so Flower Chat and other run-event clients can render the
