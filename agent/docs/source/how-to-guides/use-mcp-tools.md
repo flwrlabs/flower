@@ -12,15 +12,12 @@ Flower connectors and MCP tools therefore follow different execution paths:
 - An MCP client created by your AgentApp connects to the MCP server, discovers
   its tools, and executes its calls.
 
-Both kinds of tools can be passed to the same Open Responses model request after
-the AgentApp converts the MCP definitions to function-tool schemas.
-
 ## Add an MCP client
 
-Add the MCP Python SDK to the AgentApp dependencies:
+Add the MCP Python SDK version used by Flower to the AgentApp dependencies:
 
 ```console
-$ uv add mcp
+$ uv add 'mcp>=1.26.0,<2.0'
 ```
 
 Bridge Flower's synchronous entry point to the asynchronous MCP client and keep
@@ -32,14 +29,21 @@ import os
 
 from flwr.agentapp import AgentApp, AgentSession
 from flwr.app import Context
-from mcp import Client
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
 
 app = AgentApp()
 
 
 async def run_mcp(agent: AgentSession, context: Context) -> None:
-    async with Client(os.environ["MCP_ENDPOINT"]) as mcp_client:
-        await use_mcp_tools(mcp_client, agent, context)
+    async with streamable_http_client(os.environ["MCP_ENDPOINT"]) as (
+        read,
+        write,
+        _,
+    ):
+        async with ClientSession(read, write) as mcp_client:
+            await mcp_client.initialize()
+            await use_mcp_tools(mcp_client, agent, context)
 
 
 @app.main()
@@ -63,7 +67,7 @@ ALLOWED_MCP_TOOLS = {
 
 
 async def use_mcp_tools(
-    mcp_client: Client,
+    mcp_client: ClientSession,
     agent: AgentSession,
     context: Context,
 ) -> None:
@@ -71,7 +75,8 @@ async def use_mcp_tools(
     selected_tools = [
         tool for tool in list_result.tools if tool.name in ALLOWED_MCP_TOOLS
     ]
-    # Convert selected_tools, pass them to the model, and dispatch tool calls.
+    model_tools = [as_response_tool(tool) for tool in selected_tools]
+    # Pass model_tools to the model and dispatch any returned tool calls.
 ```
 
 The exact client setup and result container depend on the MCP library and
@@ -80,8 +85,8 @@ not make that tool model-accessible automatically.
 
 ## Convert definitions to Open Responses tools
 
-For each selected MCP tool, map its name, description, and JSON input schema to
-an Open Responses function tool:
+Define the schema converter at module scope. `use_mcp_tools` calls it while
+`selected_tools` is still in scope:
 
 ```python
 def as_response_tool(tool: object) -> dict[str, object]:
@@ -91,9 +96,6 @@ def as_response_tool(tool: object) -> dict[str, object]:
         "description": tool.description or "",
         "parameters": tool.inputSchema,
     }
-
-
-model_tools = [as_response_tool(tool) for tool in selected_tools]
 ```
 
 Some MCP clients expose the schema as `input_schema` instead of `inputSchema`.
@@ -112,7 +114,10 @@ with the same `call_id`:
 import json
 
 
-async def call_mcp_tool(tool_call: dict[str, object]) -> dict[str, object]:
+async def call_mcp_tool(
+    mcp_client: ClientSession,
+    tool_call: dict[str, object],
+) -> dict[str, object]:
     name = tool_call.get("name")
     if name not in ALLOWED_MCP_TOOLS:
         raise RuntimeError(f"MCP tool {name!r} was not exposed")
