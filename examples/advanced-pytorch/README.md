@@ -54,7 +54,12 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 
 When you run the project, the strategy will create a directory structure in the form of `outputs/date/time` and store two `JSON` files: `config.json` containing the `run-config` that the `ServerApp` receives; and `results.json` containing the results (accuracies, losses) that are generated at the strategy.
 
-By default, the metrics: {`centralized_accuracy`, `centralized_loss`, `federated_evaluate_accuracy`, `federated_evaluate_loss`} will be logged to Weights & Biases (they are also stored to the `results.json` previously mentioned). Upon executing `flwr run` you'll see a URL linking to your Weight&Biases dashboard where you can see the metrics.
+By default, the strategy logs train and evaluation metrics to Weights & Biases (these are also stored in `results.json`). This includes:
+
+- ClientApp-side metrics such as `train_loss`, `eval_loss`, `eval_acc`, `eval_acc_top3`, and `eval_acc_class_0` ... `eval_acc_class_9`
+- ServerApp-side metrics such as `loss`, `accuracy`, `accuracy_top3`, and `accuracy_class_0` ... `accuracy_class_9`
+
+Upon executing `flwr run` you'll see a URL linking to your Weights & Biases dashboard where you can inspect these metrics.
 
 ![](_static/wandb_plots.png)
 
@@ -69,10 +74,18 @@ The `results.json` would look along the lines of:
         },
         "evaluate_metrics_clientapp": {
             "eval_loss": 2.303316633324679,
-            "eval_acc": 0.11882631674867869
+            "eval_acc": 0.11882631674867869,
+            "eval_acc_top3": 0.35142118863049095,
+            "eval_acc_class_0": 0.0,
+            "eval_acc_class_1": 0.021739130434782608,
+            "eval_acc_class_2": 0.0
         },
         "evaluate_metrics_serverapp": {
             "accuracy": 0.1,
+            "accuracy_top3": 0.3012,
+            "accuracy_class_0": 0.0,
+            "accuracy_class_1": 0.0,
+            "accuracy_class_2": 0.998,
             "loss": 2.3280856304656203
         }
     },
@@ -83,10 +96,18 @@ The `results.json` would look along the lines of:
         },
         "evaluate_metrics_clientapp": {
             "eval_loss": 2.1314486836388467,
-            "eval_acc": 0.19826539462272333
+            "eval_acc": 0.19826539462272333,
+            "eval_acc_top3": 0.4854715191260137,
+            "eval_acc_class_0": 0.06976744186046512,
+            "eval_acc_class_1": 0.10204081632653061,
+            "eval_acc_class_2": 0.0
         },
         "evaluate_metrics_serverapp": {
             "accuracy": 0.1,
+            "accuracy_top3": 0.3006,
+            "accuracy_class_0": 0.0,
+            "accuracy_class_1": 0.0,
+            "accuracy_class_2": 1.0,
             "loss": 2.2980988307501944
         }
     },
