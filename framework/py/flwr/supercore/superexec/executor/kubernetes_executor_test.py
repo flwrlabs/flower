@@ -501,7 +501,6 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
 ) -> None:
     """A dispatched warm Pod should be replaced before its child exits."""
     client = Mock()
-    exec_client = Mock()
     pool_key = _warm_executor_pool_key(
         task_type=task_type, runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
@@ -513,8 +512,7 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     client.list_namespaced_pod.return_value = {
         "items": [_ready_warm_pod(pool_key, config)]
     }
-    response = _WarmExecResponse()
-    stream = Mock(return_value=response)
+    stream = Mock(return_value=_WarmExecResponse())
     monkeypatch.setattr(
         importlib,
         "import_module",
@@ -530,7 +528,7 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     executor = KubernetesExecutor(
         client=client,
         config=config,
-        exec_client=exec_client,
+        exec_client=client,
     )
     suppress_output = task_type == TaskType.AGENT_APP
 
@@ -543,8 +541,8 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     )
 
     assert result.status == LaunchResultStatus.ACCEPTED
-    assert response.written == ["task-token\n"]
-    assert response.is_open()
+    assert stream.return_value.written == ["task-token\n"]
+    assert stream.return_value.is_open()
     if insecure:
         client.create_namespaced_secret.assert_not_called()
     else:
@@ -563,23 +561,23 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
         },
     )
     client.create_namespaced_pod.assert_called_once()
-    replacement_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
-    assert replacement_pod["spec"]["containers"][0]["command"] == [
+    assert _as_dict(client.create_namespaced_pod.call_args.args[1])["spec"][
+        "containers"
+    ][0]["command"] == [
         "python",
         "-m",
         WARM_EXECUTOR_MODULE,
     ]
-    command = stream.call_args.kwargs["command"]
-    assert stream.call_args.args[0] is exec_client.connect_get_namespaced_pod_exec
+    assert stream.call_args.args[0] is client.connect_get_namespaced_pod_exec
     assert stream.call_args.kwargs["container"] == "taskexecutor"
-    assert command == [
+    assert stream.call_args.kwargs["command"] == [
         task_command,
         "--runtime-api-address",
         "appio.example.com:9092",
         "--token-stdin",
         *transport_args,
     ]
-    assert "task-token" not in command
+    assert "task-token" not in stream.call_args.kwargs["command"]
     assert len(started) == 1
     assert started[0][1][-1] is (not suppress_output)
 
