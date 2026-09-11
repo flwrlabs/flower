@@ -1,0 +1,109 @@
+# Use tools from an MCP server
+
+Connect a Flower AgentApp to tools exposed by a Model Context Protocol (MCP)
+server. This integration currently runs inside your AgentApp; Flower does not
+provide a first-class MCP client or register arbitrary MCP servers with
+`agent.connectors`.
+
+Flower connectors and MCP tools therefore follow different execution paths:
+
+- `agent.connectors.tools(...)` and `agent.connectors.call(...)` use tools
+  registered and hosted by the Flower runtime.
+- An MCP client created by your AgentApp connects to the MCP server, discovers
+  its tools, and executes its calls.
+
+Both kinds of tools can be passed to the same Open Responses model request after
+the AgentApp converts the MCP definitions to function-tool schemas.
+
+## Add an MCP client
+
+Declare an MCP client dependency and manage its connection in the AgentApp.
+Discover the server's tools, then expose only an explicit allowlist.
+
+## Discover and allowlist tools
+
+First list the server's tools, then select an explicit set of tool names:
+
+```python
+ALLOWED_MCP_TOOLS = {
+    "search_documents",
+    "read_document",
+}
+
+list_result = await mcp_client.list_tools()
+discovered_tools = list_result.tools
+selected_tools = [
+    tool for tool in discovered_tools if tool.name in ALLOWED_MCP_TOOLS
+]
+```
+
+The exact client setup and result container depend on the MCP library and
+transport. The important boundary is that a server advertising a new tool does
+not make that tool model-accessible automatically.
+
+## Convert definitions to Open Responses tools
+
+For each selected MCP tool, map its name, description, and JSON input schema to
+an Open Responses function tool:
+
+```python
+def as_response_tool(tool: object) -> dict[str, object]:
+    return {
+        "type": "function",
+        "name": tool.name,
+        "description": tool.description or "",
+        "parameters": tool.inputSchema,
+    }
+
+
+model_tools = [as_response_tool(tool) for tool in selected_tools]
+```
+
+Some MCP clients expose the schema as `input_schema` instead of `inputSchema`.
+Use the field provided by your client without otherwise changing the JSON
+Schema. Pass `model_tools` through the `tools` field of
+`client.responses.create(...)`.
+
+## Dispatch function calls back to MCP
+
+When the model returns a `function_call`, reject any name outside the allowlist,
+parse its arguments, call the matching MCP tool, and create a
+`function_call_output` item with the same `call_id`:
+
+```python
+import json
+
+
+async def call_mcp_tool(tool_call: dict[str, object]) -> dict[str, object]:
+    name = tool_call.get("name")
+    if name not in ALLOWED_MCP_TOOLS:
+        raise RuntimeError(f"MCP tool {name!r} was not exposed")
+
+    raw_arguments = tool_call.get("arguments", "{}")
+    arguments = (
+        json.loads(raw_arguments)
+        if isinstance(raw_arguments, str)
+        else raw_arguments
+    )
+    result = await mcp_client.call_tool(name, arguments)
+    return {
+        "type": "function_call_output",
+        "call_id": tool_call["call_id"],
+        "output": serialize_mcp_result(result),
+    }
+```
+
+`serialize_mcp_result` represents application-specific normalization. Serialize
+the MCP result's text, structured content, or error to a string accepted by your
+model provider. Do not pass client-library objects directly to the model
+request.
+
+Append both the model's original function-call item and the corresponding
+function output to the next request. Bound the loop exactly as you would for
+Flower connectors; see {ref}`bound-connector-tool-loop`.
+
+## Current limitations
+
+Flower does not manage the MCP server, its credentials, or its activity events.
+The AgentApp must close the client, handle failures and timeouts, and receive
+secrets through the deployment rather than through `agent.input`.

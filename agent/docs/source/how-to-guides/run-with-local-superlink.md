@@ -15,10 +15,25 @@ This guide disables TLS and is intended for local development only. Do not
 expose the insecure SuperLink ports to an untrusted network.
 ```
 
+(configure-local-model-provider)=
+
 ## Configure a model provider
 
 The local runtime needs an Open Responses-compatible model endpoint. Set the
 provider configuration in the terminal where you'll start SuperLink.
+
+The deployment determines where upstream model access is configured:
+
+| Deployment                                          | Required model configuration                                  |
+| --------------------------------------------------- | ------------------------------------------------------------- |
+| SuperGrid                                           | None in the AgentApp; Flower configures upstream model access |
+| Self-hosted with Flower's default endpoint          | `FLWR_MODEL_API_KEY`                                          |
+| Self-hosted with an authenticated custom endpoint   | `FLWR_MODEL_API_ENDPOINT` and `FLWR_MODEL_API_KEY`            |
+| Self-hosted with an unauthenticated custom endpoint | `FLWR_MODEL_API_ENDPOINT` only                                |
+
+`FLWR_RUNTIME_BASE_URL` and `FLWR_RUNTIME_API_KEY` are injected into the
+AgentApp in all of these cases. They authenticate the AgentApp to Flower and do
+not configure the upstream provider used by SuperLink.
 
 To use Flower's default model endpoint, provide a Flower API key:
 
@@ -37,6 +52,27 @@ $ export FLWR_MODEL_API_KEY="<your-provider-api-key>"
 You can omit `FLWR_MODEL_API_KEY` when the custom endpoint does not require
 authentication. The model and AgentApp subprocesses inherit these variables
 from SuperLink.
+
+Without either variable, model requests through a self-hosted SuperLink fail
+with:
+
+```text
+HTTP 502 {"message":"Model API key is not set (FLWR_MODEL_API_KEY)."}
+```
+
+### Use a fully on-premises model
+
+A local inference server is a drop-in model provider only when it implements the
+Open Responses protocol at a URL ending in `/responses`. An endpoint that only
+implements the OpenAI-compatible `/chat/completions` API is not directly
+compatible with Flower's model plane.
+
+For a fully local supported example, follow [Run an AgentApp with a local
+SuperLink and Ollama](run-with-ollama.md). For another inference server, point
+`FLWR_MODEL_API_ENDPOINT` at its Open Responses endpoint. If the server only
+supports Chat Completions, you must either provide your own protocol adapter or
+connect to it directly from the AgentApp. Flower does not currently provide a
+Chat Completions-to-Open Responses adapter.
 
 Account connectors configured in SuperGrid are not available to this local
 unauthenticated runtime. Built-in connectors depend on the local runtime and
@@ -100,6 +136,14 @@ $ uv run flwr stop <run-id> local-agent
 ```
 
 Press {kbd}`Ctrl+C` in the SuperLink terminal when you're finished.
+
+This guide starts a foreground, user-managed SuperLink. `flwr stop` stops a run;
+it does not stop the SuperLink process. A SuperLink started automatically for a
+`:local:` connection is a different, background-managed process. There is
+currently no dedicated `flwr` command or PID file for stopping that process; see
+[Run Flower locally with a managed
+SuperLink](https://flower.ai/docs/framework/how-to-run-flower-locally.html#stop-the-background-local-superlink)
+for the documented process-inspection procedure.
 
 ## Troubleshoot the local runtime
 
