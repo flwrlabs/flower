@@ -56,8 +56,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     PullArtifactsResponse,
     RefreshAuthTokensRequest,
     RefreshAuthTokensResponse,
-    RenameRunSeriesRequest,
-    RenameRunSeriesResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
     StartRunRequest,
     StartRunResponse,
     StreamLogsRequest,
@@ -143,18 +143,37 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
     assert http_request_types == grpc_request_types
 
 
+def test_update_run_series_description_returns_protobuf_response() -> None:
+    """Forward an authenticated description update and serialize its response."""
+    request = UpdateRunSeriesDescriptionRequest(series_id=10, description="Title")
+    expected = UpdateRunSeriesDescriptionResponse(
+        series=RunSeries(series_id=10, description="Title")
+    )
+    linkstate = Mock(spec=LinkState)
+    app = _create_app()
+    app.dependency_overrides[get_linkstate] = lambda: linkstate
+
+    with patch.object(
+        control_handlers, "update_run_series_description", return_value=expected
+    ) as handler:
+        response = TestClient(app).post(
+            "/v1/control/update-run-series-description",
+            content=request.SerializeToString(),
+            headers={
+                "authorization": "Bearer access-token",
+                "content-type": PROTOBUF_MEDIA_TYPE,
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
+    assert UpdateRunSeriesDescriptionResponse.FromString(response.content) == expected
+    handler.assert_called_once_with(request, _ACCOUNT, linkstate)
+
+
 @pytest.mark.parametrize(
     ("path", "protobuf_request", "parse_response", "expected", "handler_name"),
     [
-        (
-            "/v1/control/rename-run-series",
-            RenameRunSeriesRequest(series_id=10, description="Title"),
-            RenameRunSeriesResponse.FromString,
-            RenameRunSeriesResponse(
-                series=RunSeries(series_id=10, description="Title")
-            ),
-            "rename_run_series",
-        ),
         (
             "/v1/control/list-connectors",
             ListConnectorsRequest(federation="agent"),
@@ -206,14 +225,14 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
         ),
     ],
 )
-def test_authenticated_routes_return_protobuf_responses(
+def test_connector_routes_return_protobuf_responses(
     path: str,
     protobuf_request: Message,
     parse_response: Callable[[bytes], Message],
     expected: Message,
     handler_name: str,
 ) -> None:
-    """Forward authenticated requests and serialize their responses."""
+    """Forward authenticated connector requests and serialize their responses."""
     linkstate = Mock(spec=LinkState)
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate

@@ -75,8 +75,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
-    RenameRunSeriesRequest,
-    RenameRunSeriesResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
     ShowFederationRequest,
@@ -191,15 +191,15 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             response_type=GetRunSeriesResponse,
         )
 
-    def RenameRunSeries(
-        self, request: RenameRunSeriesRequest
-    ) -> RenameRunSeriesResponse:
-        """Rename a run series."""
+    def UpdateRunSeriesDescription(
+        self, request: UpdateRunSeriesDescriptionRequest
+    ) -> UpdateRunSeriesDescriptionResponse:
+        """Update a run series description."""
         return self._unary_unary(
-            path="/v1/control/rename-run-series",
-            rpc_method="/flwr.proto.Control/RenameRunSeries",
+            path="/v1/control/update-run-series-description",
+            rpc_method="/flwr.proto.Control/UpdateRunSeriesDescription",
             request=request,
-            response_type=RenameRunSeriesResponse,
+            response_type=UpdateRunSeriesDescriptionResponse,
         )
 
     def ListRunSeriesEvents(

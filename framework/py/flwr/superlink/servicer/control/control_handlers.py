@@ -113,8 +113,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
-    RenameRunSeriesRequest,
-    RenameRunSeriesResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
     ShowFederationRequest,
@@ -1218,11 +1218,13 @@ def get_run_series(
     return response
 
 
-def rename_run_series(
-    request: RenameRunSeriesRequest, account: AccountInfo, state: LinkState
-) -> RenameRunSeriesResponse:
-    """Rename a run series."""
-    log(INFO, "ControlServicer.RenameRunSeries")
+def update_run_series_description(
+    request: UpdateRunSeriesDescriptionRequest,
+    account: AccountInfo,
+    state: LinkState,
+) -> UpdateRunSeriesDescriptionResponse:
+    """Update a run series description."""
+    log(INFO, "ControlServicer.UpdateRunSeriesDescription")
 
     series_id = request.series_id
     series_matches = state.get_run_series(series_ids=[series_id])
@@ -1248,7 +1250,7 @@ def rename_run_series(
     state.set_run_series_description(series_id, description)
     run_series = series_matches[0]
     run_series.description = description
-    return RenameRunSeriesResponse(
+    return UpdateRunSeriesDescriptionResponse(
         series=_with_last_run_statuses(state, [run_series])[0]
     )
 

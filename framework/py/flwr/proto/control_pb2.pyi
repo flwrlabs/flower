@@ -1450,7 +1450,7 @@ class StreamRunEventsResponse(google.protobuf.message.Message):
 global___StreamRunEventsResponse = StreamRunEventsResponse
 
 @typing.final
-class RenameRunSeriesRequest(google.protobuf.message.Message):
+class UpdateRunSeriesDescriptionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SERIES_ID_FIELD_NUMBER: builtins.int
@@ -1465,10 +1465,10 @@ class RenameRunSeriesRequest(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["description", b"description", "series_id", b"series_id"]) -> None: ...
 
-global___RenameRunSeriesRequest = RenameRunSeriesRequest
+global___UpdateRunSeriesDescriptionRequest = UpdateRunSeriesDescriptionRequest
 
 @typing.final
-class RenameRunSeriesResponse(google.protobuf.message.Message):
+class UpdateRunSeriesDescriptionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SERIES_FIELD_NUMBER: builtins.int
@@ -1482,4 +1482,4 @@ class RenameRunSeriesResponse(google.protobuf.message.Message):
     def HasField(self, field_name: typing.Literal["series", b"series"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing.Literal["series", b"series"]) -> None: ...
 
-global___RenameRunSeriesResponse = RenameRunSeriesResponse
+global___UpdateRunSeriesDescriptionResponse = UpdateRunSeriesDescriptionResponse

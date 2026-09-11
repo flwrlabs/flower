@@ -87,11 +87,11 @@ class ControlStub:
     ]
     """Get run series"""
 
-    RenameRunSeries: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.control_pb2.RenameRunSeriesRequest,
-        flwr.proto.control_pb2.RenameRunSeriesResponse,
+    UpdateRunSeriesDescription: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionRequest,
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse,
     ]
-    """Rename run series"""
+    """Update run series description"""
 
     ListRunSeriesEvents: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ListRunSeriesEventsRequest,
@@ -321,11 +321,11 @@ class ControlAsyncStub:
     ]
     """Get run series"""
 
-    RenameRunSeries: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.control_pb2.RenameRunSeriesRequest,
-        flwr.proto.control_pb2.RenameRunSeriesResponse,
+    UpdateRunSeriesDescription: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionRequest,
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse,
     ]
-    """Rename run series"""
+    """Update run series description"""
 
     ListRunSeriesEvents: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ListRunSeriesEventsRequest,
@@ -574,12 +574,12 @@ class ControlServicer(metaclass=abc.ABCMeta):
         """Get run series"""
 
     @abc.abstractmethod
-    def RenameRunSeries(
+    def UpdateRunSeriesDescription(
         self,
-        request: flwr.proto.control_pb2.RenameRunSeriesRequest,
+        request: flwr.proto.control_pb2.UpdateRunSeriesDescriptionRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.control_pb2.RenameRunSeriesResponse, collections.abc.Awaitable[flwr.proto.control_pb2.RenameRunSeriesResponse]]:
-        """Rename run series"""
+    ) -> typing.Union[flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse, collections.abc.Awaitable[flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse]]:
+        """Update run series description"""
 
     @abc.abstractmethod
     def ListRunSeriesEvents(

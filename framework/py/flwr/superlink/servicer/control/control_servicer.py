@@ -76,8 +76,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
-    RenameRunSeriesRequest,
-    RenameRunSeriesResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
     ShowFederationRequest,
@@ -184,11 +184,13 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             request, _get_account(), self.linkstate_factory.state()
         )
 
-    def RenameRunSeries(
-        self, request: RenameRunSeriesRequest, context: grpc.ServicerContext
-    ) -> RenameRunSeriesResponse:
-        """Rename a run series."""
-        return control_handlers.rename_run_series(
+    def UpdateRunSeriesDescription(
+        self,
+        request: UpdateRunSeriesDescriptionRequest,
+        context: grpc.ServicerContext,
+    ) -> UpdateRunSeriesDescriptionResponse:
+        """Update a run series description."""
+        return control_handlers.update_run_series_description(
             request, _get_account(), self.linkstate_factory.state()
         )
 

@@ -37,7 +37,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RefreshAuthTokensRequest,
     RemoveAppRequest,
     RemoveAppResponse,
-    RenameRunSeriesRequest,
+    UpdateRunSeriesDescriptionRequest,
     StartAutomationRequest,
     StartRunRequest,
     StopAutomationRequest,
@@ -66,7 +66,7 @@ from .control_handlers import (
     list_run_series_events,
     refresh_auth_tokens,
     remove_app,
-    rename_run_series,
+    update_run_series_description,
     start_automation,
     start_run,
     stop_automation,
@@ -186,13 +186,15 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(error.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND)
 
-    def test_rename_run_series_returns_updated_series(self) -> None:
+    def test_update_run_series_description_returns_updated_series(self) -> None:
         """Normalize and persist a description at the maximum length."""
         self._create_dummy_run_series(10)
         description = "a" * 80
 
-        response = rename_run_series(
-            RenameRunSeriesRequest(series_id=10, description=f"  {description}  "),
+        response = update_run_series_description(
+            UpdateRunSeriesDescriptionRequest(
+                series_id=10, description=f"  {description}  "
+            ),
             self.account,
             self.state,
         )
@@ -200,7 +202,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(response.series.series_id, 10)
         self.assertEqual(response.series.description, description)
 
-    def test_rename_run_series_rejects_invalid_description(self) -> None:
+    def test_update_run_series_description_rejects_invalid_description(self) -> None:
         """Reject blank descriptions and descriptions longer than 80 characters."""
         self._create_dummy_run_series(10)
 
@@ -209,8 +211,10 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 self.subTest(description=description),
                 self.assertRaises(FlowerError) as error,
             ):
-                rename_run_series(
-                    RenameRunSeriesRequest(series_id=10, description=description),
+                update_run_series_description(
+                    UpdateRunSeriesDescriptionRequest(
+                        series_id=10, description=description
+                    ),
                     self.account,
                     self.state,
                 )
@@ -220,7 +224,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 ApiErrorCode.INVALID_RUN_SERIES_DESCRIPTION,
             )
 
-    def test_rename_run_series_hides_missing_and_unauthorized_series(self) -> None:
+    def test_update_run_series_description_hides_missing_and_unauthorized(self) -> None:
         """Return the same not-found error for missing and inaccessible series."""
         self._create_dummy_run_series(10)
 
@@ -234,8 +238,10 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 ),
                 self.assertRaises(FlowerError) as error,
             ):
-                rename_run_series(
-                    RenameRunSeriesRequest(series_id=series_id, description="Title"),
+                update_run_series_description(
+                    UpdateRunSeriesDescriptionRequest(
+                        series_id=series_id, description="Title"
+                    ),
                     self.account,
                     self.state,
                 )
