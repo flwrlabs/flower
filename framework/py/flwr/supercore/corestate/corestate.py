@@ -127,6 +127,9 @@ class CoreState(ABC):  # pylint: disable=R0904
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
+        display_name: str | None = None,
+        description: str | None = None,
+        color: str | None = None,
     ) -> str:
         """Store an optional FAB and associate its app with a federation.
 
@@ -150,6 +153,12 @@ class CoreState(ABC):  # pylint: disable=R0904
         is_hub_app : bool, default=False
             Whether the app was fetched from Flower Hub. Hub app associations do
             not retain a FAB hash so future runs resolve the latest version.
+        display_name : str | None, default=None
+            Human-readable app name from the FAB configuration.
+        description : str | None, default=None
+            App description from the FAB project metadata.
+        color : str | None, default=None
+            App color theme from the FAB configuration.
 
         Returns
         -------
