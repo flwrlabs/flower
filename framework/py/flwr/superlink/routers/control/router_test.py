@@ -56,6 +56,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     PullArtifactsResponse,
     RefreshAuthTokensRequest,
     RefreshAuthTokensResponse,
+    RenameRunSeriesRequest,
+    RenameRunSeriesResponse,
     StartRunRequest,
     StartRunResponse,
     StreamLogsRequest,
@@ -63,6 +65,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsRequest,
     StreamRunEventsResponse,
 )
+from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import (
@@ -144,6 +147,15 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
     ("path", "protobuf_request", "parse_response", "expected", "handler_name"),
     [
         (
+            "/v1/control/rename-run-series",
+            RenameRunSeriesRequest(series_id=10, description="Title"),
+            RenameRunSeriesResponse.FromString,
+            RenameRunSeriesResponse(
+                series=RunSeries(series_id=10, description="Title")
+            ),
+            "rename_run_series",
+        ),
+        (
             "/v1/control/list-connectors",
             ListConnectorsRequest(federation="agent"),
             ListConnectorsResponse.FromString,
@@ -194,14 +206,14 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
         ),
     ],
 )
-def test_connector_routes_return_protobuf_responses(
+def test_authenticated_routes_return_protobuf_responses(
     path: str,
     protobuf_request: Message,
     parse_response: Callable[[bytes], Message],
     expected: Message,
     handler_name: str,
 ) -> None:
-    """Forward authenticated connector requests and serialize their responses."""
+    """Forward authenticated requests and serialize their responses."""
     linkstate = Mock(spec=LinkState)
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
