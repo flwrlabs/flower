@@ -132,9 +132,7 @@ def test_kubernetes_executor_config_allows_model_and_connector_pools(
         warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
     )
 
-    assert config.warm_executor_pools == (
-        WarmExecutorPoolConfig(key=pool_key, size=1),
-    )
+    assert config.warm_executor_pools == (WarmExecutorPoolConfig(key=pool_key, size=1),)
 
 
 def test_kubernetes_executor_config_rejects_unsupported_warm_pool() -> None:
@@ -505,8 +503,7 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     client = Mock()
     exec_client = Mock()
     pool_key = _warm_executor_pool_key(
-        task_type=task_type,
-        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+        task_type=task_type, runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
     config = _executor_config(
         runtime_root_certificates=None if insecure else "root-ca",
@@ -602,8 +599,7 @@ def test_launch_falls_back_to_cold_pod_when_no_ready_warm_pod_exists(
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     pool_key = _warm_executor_pool_key(
-        task_type=task_type,
-        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+        task_type=task_type, runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
     config = _executor_config(
         runtime_root_certificates=None,
@@ -612,9 +608,7 @@ def test_launch_falls_back_to_cold_pod_when_no_ready_warm_pod_exists(
     )
     executor = KubernetesExecutor(client=client, config=config)
 
-    result = executor.launch(
-        _execution_spec(task_type=task_type, insecure=True)
-    )
+    result = executor.launch(_execution_spec(task_type=task_type, insecure=True))
 
     assert result.status == LaunchResultStatus.ACCEPTED
     client.create_namespaced_secret.assert_called_once()
@@ -702,8 +696,7 @@ def test_launch_retires_warm_pod_when_dispatch_cannot_open(
     """An unavailable warm Pod must not remain reusable before cold fallback."""
     client = Mock()
     pool_key = _warm_executor_pool_key(
-        task_type=task_type,
-        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+        task_type=task_type, runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
     config = _executor_config(
         runtime_root_certificates=None,
@@ -719,9 +712,7 @@ def test_launch_retires_warm_pod_when_dispatch_cannot_open(
     )
     executor = KubernetesExecutor(client=client, config=config)
 
-    result = executor.launch(
-        _execution_spec(task_type=task_type, insecure=True)
-    )
+    result = executor.launch(_execution_spec(task_type=task_type, insecure=True))
 
     assert result.status == LaunchResultStatus.ACCEPTED
     client.delete_namespaced_pod.assert_called_once_with(
@@ -808,8 +799,10 @@ def test_warm_dispatch_drains_stderr_until_the_child_exits() -> None:
         (
             True,
             [
-                call(INFO, "%s", "visible standard output"),
-                call(INFO, "%s", "visible standard error"),
+                call(INFO, "%s", "visible output with acknowledgement"),
+                call(INFO, "%s", "visible error with acknowledgement"),
+                call(INFO, "%s", "visible output after acknowledgement"),
+                call(INFO, "%s", "visible error after acknowledgement"),
             ],
         ),
         (False, []),
@@ -827,9 +820,19 @@ def test_warm_dispatch_forwards_only_visible_output_after_acceptance(
     dispatch = warm_agentapp_executor.KubernetesWarmAgentAppDispatch(response)
 
     dispatch.send_token("task-token")
+    response._stdout += (
+        "visible output with acknowledgement"  # pylint: disable=protected-access
+    )
+    response._stderr = (
+        "visible error with acknowledgement"  # pylint: disable=protected-access
+    )
     assert dispatch.wait_for_acceptance(1.0)
-    response._stdout = "visible standard output"  # pylint: disable=protected-access
-    response._stderr = "visible standard error"  # pylint: disable=protected-access
+    response._stdout = (
+        "visible output after acknowledgement"  # pylint: disable=protected-access
+    )
+    response._stderr = (
+        "visible error after acknowledgement"  # pylint: disable=protected-access
+    )
     response._acknowledge = False  # pylint: disable=protected-access
 
     assert dispatch.wait_for_close(forward_output=forward_output)

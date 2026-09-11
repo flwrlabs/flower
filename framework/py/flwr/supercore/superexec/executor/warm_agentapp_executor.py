@@ -85,6 +85,7 @@ class KubernetesWarmAgentAppDispatch:
 
     def __init__(self, response: object) -> None:
         self._response = response
+        self._output_after_acceptance: list[str] = []
 
     def send_token(self, token: str) -> None:
         """Send one token over stdin without retaining it in Pod metadata."""
@@ -101,12 +102,15 @@ class KubernetesWarmAgentAppDispatch:
         stdout = ""
         while time.monotonic() < deadline:
             stdout += self._read_stdout()
-            self._read_stderr()
+            stderr = self._read_stderr()
             self._discard_combined_output()
-            if any(
-                acknowledgement in stdout
-                for acknowledgement in _TOKEN_STDIN_ACKNOWLEDGEMENTS
-            ):
+            acknowledgement_end = self._acknowledgement_end(stdout)
+            if acknowledgement_end is not None:
+                self._output_after_acceptance.extend(
+                    output
+                    for output in (stdout[acknowledgement_end:].lstrip("\r\n"), stderr)
+                    if output
+                )
                 return True
             stdout = stdout[-_TOKEN_STDIN_ACKNOWLEDGEMENT_BUFFER_SIZE:]
             if not self._is_open():
@@ -162,9 +166,29 @@ class KubernetesWarmAgentAppDispatch:
             return stderr if isinstance(stderr, str) else ""
         return ""
 
+    @staticmethod
+    def _acknowledgement_end(stdout: str) -> int | None:
+        """Return the end of the first complete token acknowledgement."""
+        acknowledgement_start: int | None = None
+        acknowledgement_end: int | None = None
+        for acknowledgement in _TOKEN_STDIN_ACKNOWLEDGEMENTS:
+            start = stdout.find(acknowledgement)
+            if start >= 0 and (
+                acknowledgement_start is None or start < acknowledgement_start
+            ):
+                acknowledgement_start = start
+                acknowledgement_end = start + len(acknowledgement)
+        return acknowledgement_end
+
     def _drain_output(self, forward_output: bool) -> None:
         """Consume exec output and optionally mirror it through SuperExec logs."""
-        for output in (self._read_stdout(), self._read_stderr()):
+        output_after_acceptance = self._output_after_acceptance
+        self._output_after_acceptance = []
+        for output in (
+            *output_after_acceptance,
+            self._read_stdout(),
+            self._read_stderr(),
+        ):
             if forward_output and output:
                 log(INFO, "%s", output.rstrip())
 
