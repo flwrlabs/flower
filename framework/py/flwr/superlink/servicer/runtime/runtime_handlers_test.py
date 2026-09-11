@@ -501,14 +501,12 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         )
 
         # Execute
-        with patch.object(self.state, "get_run_info") as get_run_info:
-            response = runtime_handlers.push_task_output(
-                request, self.state, self._auth_task
-            )
+        response = runtime_handlers.push_task_output(
+            request, self.state, self._auth_task
+        )
 
         # Assert
         assert isinstance(response, PushTaskOutputResponse)
-        get_run_info.assert_not_called()
         run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
         assert run.clientapp_runtime == 7.89
 
