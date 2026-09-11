@@ -624,7 +624,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         run_series = state.get_run_series(series_ids=[series_id])
         self.assertEqual(run_series[0].description, "Initial description")
-        self.assertEqual(run_series[0].run_ids, [123, 456])
         self.assertEqual(state.get_run_series(is_agent=True), run_series)
         self.assertEqual(state.get_run_series(is_agent=False), [])
 
@@ -640,15 +639,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         assert series_id is not None
 
-        renamed_at = now() + timedelta(seconds=1)
-        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
-            mock_datetime.now.return_value = renamed_at
-            self.assertIsNone(
-                state.set_run_series_description(series_id, "  Generated title  ")
-            )
+        self.assertIsNone(
+            state.set_run_series_description(series_id, "  Generated title  ")
+        )
         updated = state.get_run_series(series_ids=[series_id])[0]
         self.assertEqual(updated.description, "Generated title")
-        self.assertEqual(updated.updated_at, renamed_at.isoformat())
 
     def test_store_run_in_series_returns_none_for_unknown_id(self) -> None:
         """Unknown caller-provided run series IDs return None."""

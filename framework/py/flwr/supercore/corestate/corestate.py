@@ -388,8 +388,7 @@ class CoreState(ABC):  # pylint: disable=R0904
     def set_run_series_description(self, series_id: int, description: str) -> None:
         """Set the description of an existing RunSeries.
 
-        Successful updates also refresh `updated_at`. Empty descriptions are ignored
-        and do not update the RunSeries.
+        Empty descriptions are ignored and do not update the RunSeries.
 
         Parameters
         ----------

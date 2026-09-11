@@ -791,10 +791,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 SeriesRunsModel,
                 SeriesRunsModel.series_id == RunSeriesModel.series_id,
             )
-            .order_by(
-                RunSeriesModel.updated_at.desc(),
-                SeriesRunsModel.id.asc(),
-            )
+            .order_by(RunSeriesModel.updated_at.desc())
             .execution_options(populate_existing=True)
         )
 
@@ -819,7 +816,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         stmt = (
             update(RunSeriesModel)
             .where(RunSeriesModel.series_id == uint64_to_int64(series_id))
-            .values(description=normalized, updated_at=now())
+            .values(description=normalized)
         )
         with self.session() as session:
             session.execute(stmt)
