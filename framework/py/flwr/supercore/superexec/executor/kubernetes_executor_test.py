@@ -893,7 +893,7 @@ def test_disconnected_warm_stream_does_not_kill_an_unconfirmed_task(
     """A missing exit status leaves retirement to process-aware reconciliation."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
-    pool_key = _warm_executor_pool_key()
+    pool_key = _warm_executor_pool_key(task_type=TaskType.MODEL)
     config = _executor_config(
         warm_executor_owner="superexec-a",
         warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
@@ -980,6 +980,99 @@ def test_warm_pool_replaces_consumed_pod_and_cleans_up_idle_pods() -> None:
         ]
     )
     assert client.delete_namespaced_pod.call_count == 1
+
+
+@pytest.mark.parametrize("task_type", [TaskType.MODEL, TaskType.CONNECTOR])
+def test_warm_pool_reuses_clean_model_and_connector_pods(
+    monkeypatch: pytest.MonkeyPatch, task_type: TaskType
+) -> None:
+    """Only clean Model and Connector tasks should release their Pod for reuse."""
+    client = Mock()
+    pool_key = _warm_executor_pool_key(
+        task_type=task_type, runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+    )
+    warm_pod = _ready_warm_pod(pool_key, config, name="reusable")
+    warm_pod["metadata"]["annotations"][_WARM_EXECUTOR_CONSUMED_ANNOTATION] = "true"
+    client.list_namespaced_pod.return_value = {"items": [warm_pod]}
+
+    def _patch_pod(*, name: str, namespace: str, body: dict[str, object]) -> None:
+        assert name == "reusable"
+        assert namespace == "flower-system"
+        annotations = _as_dict(_as_dict(body["metadata"])["annotations"])
+        if annotations[_WARM_EXECUTOR_CONSUMED_ANNOTATION] is None:
+            warm_pod["metadata"]["annotations"].pop(_WARM_EXECUTOR_CONSUMED_ANNOTATION)
+
+    client.patch_namespaced_pod.side_effect = _patch_pod
+    pool = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
+        client, config, lambda: 0
+    )
+    pool._busy_pods.add("reusable")  # pylint: disable=protected-access
+    idle = Mock(return_value=True)
+    monkeypatch.setattr(pool, "_is_warm_executor_idle", idle)
+    response = Mock(returncode=0)
+    response.is_open.return_value = False
+
+    pool._wait_for_task_and_replace(  # pylint: disable=protected-access
+        "reusable",
+        pool_key,
+        warm_agentapp_executor.KubernetesWarmAgentAppDispatch(response),
+    )
+
+    client.patch_namespaced_pod.assert_called_once_with(
+        name="reusable",
+        namespace="flower-system",
+        body={"metadata": {"annotations": {_WARM_EXECUTOR_CONSUMED_ANNOTATION: None}}},
+    )
+    client.delete_namespaced_pod.assert_not_called()
+    client.create_namespaced_pod.assert_not_called()
+    idle.assert_called_once_with("reusable")
+    assert pool.has_ready_pod(task_type)
+
+
+@pytest.mark.parametrize(
+    ("exit_code", "idle", "release_error"),
+    [(1, True, False), (0, False, False), (0, True, True)],
+)
+def test_warm_model_pool_retires_pod_when_reuse_cannot_be_established(
+    monkeypatch: pytest.MonkeyPatch,
+    exit_code: int,
+    idle: bool,
+    release_error: bool,
+) -> None:
+    """Any failed reuse gate must retain the consume-and-replace lifecycle."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    pool_key = _warm_executor_pool_key(
+        task_type=TaskType.MODEL, runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+    )
+    pool = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
+        client, config, lambda: 0
+    )
+    pool._busy_pods.add("consumed")  # pylint: disable=protected-access
+    monkeypatch.setattr(pool, "_is_warm_executor_idle", Mock(return_value=idle))
+    if release_error:
+        client.patch_namespaced_pod.side_effect = _KubernetesApiError(500, "error")
+    response = Mock(returncode=exit_code)
+    response.is_open.return_value = False
+
+    pool._wait_for_task_and_replace(  # pylint: disable=protected-access
+        "consumed",
+        pool_key,
+        warm_agentapp_executor.KubernetesWarmAgentAppDispatch(response),
+    )
+
+    client.delete_namespaced_pod.assert_called_once_with(
+        name="consumed", namespace="flower-system", grace_period_seconds=0
+    )
+    client.create_namespaced_pod.assert_called_once()
 
 
 def test_warm_pool_preserves_surviving_tasks_until_their_processes_exit(

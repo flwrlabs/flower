@@ -131,7 +131,17 @@ class KubernetesWarmAgentAppDispatch:
             self._discard_combined_output()
         # A disconnected socket is not proof of process exit. Kubernetes sends
         # the exit status on a separate channel, which must not be discarded.
-        return isinstance(getattr(self._response, "returncode", None), int)
+        exit_code = getattr(self._response, "returncode", None)
+        return isinstance(exit_code, int) and not isinstance(exit_code, bool)
+
+    def has_successful_exit(self) -> bool:
+        """Return whether the child exited successfully after stream closure."""
+        exit_code = getattr(self._response, "returncode", None)
+        return (
+            isinstance(exit_code, int)
+            and not isinstance(exit_code, bool)
+            and exit_code == 0
+        )
 
     def close(self) -> None:
         """Close the Kubernetes exec stream best-effort."""
@@ -574,13 +584,18 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
             "Failed",
         }:
             return True
+        pod_name = _object_name(pod)
+        return pod_name is not None and self._is_warm_executor_idle(pod_name)
+
+    def _is_warm_executor_idle(self, pod_name: str) -> bool:
+        """Return whether the idle parent has no remaining child processes."""
         response = None
         try:
             stream = importlib.import_module("kubernetes.stream").stream
             with self._lock:
                 response = stream(
                     self._exec_client.connect_get_namespaced_pod_exec,
-                    _object_name(pod),
+                    pod_name,
                     self._config.namespace,
                     container="taskexecutor",
                     command=["python", "-c", _WARM_EXECUTOR_IDLE_CHECK],
@@ -619,6 +634,25 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 "Failed to persist warm TaskExecutor Pod consumption."
             ) from err
 
+    def _release_reusable_pod(self, pod_name: str) -> bool:
+        """Make a cleanly exited Model or Connector Pod dispatchable again."""
+        with self._lock:
+            try:
+                self._client.patch_namespaced_pod(
+                    name=pod_name,
+                    namespace=self._config.namespace,
+                    body={
+                        "metadata": {
+                            "annotations": {WARM_EXECUTOR_CONSUMED_ANNOTATION: None}
+                        }
+                    },
+                )
+            except Exception:  # pylint: disable=broad-exception-caught
+                log(WARNING, "Failed to release warm TaskExecutor Pod for reuse.")
+                return False
+            self._busy_pods.discard(pod_name)
+            return True
+
     def _retire_after_dispatch(
         self,
         pod_name: str,
@@ -653,16 +687,25 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         forward_output: bool = False,
     ) -> None:
         completed = False
+        successful_exit = False
         try:
             completed = dispatch.wait_for_close(forward_output=forward_output)
+            successful_exit = completed and dispatch.has_successful_exit()
         except Exception:  # pylint: disable=broad-exception-caught
             log(WARNING, "Warm TaskExecutor exec stream ended without an exit status.")
         finally:
             dispatch.close()
+            reusable = (
+                completed
+                and key.task_type in {TaskType.MODEL, TaskType.CONNECTOR}
+                and successful_exit
+                and self._is_warm_executor_idle(pod_name)
+            )
             with self._lock:
-                if completed:
+                reused = reusable and self._release_reusable_pod(pod_name)
+                if completed and not reused:
                     self._retire_pod(pod_name)
-                else:
+                elif not completed:
                     self._busy_pods.discard(pod_name)
                 if not self._closed:
                     self._ensure_pool_capacity(self._pools[key])
