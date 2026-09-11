@@ -227,16 +227,16 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
 
         with self._lock:
             if self._closed:
-                self._log_dispatch(pool, "setup_cold_fallback")
+                self._log_dispatch(pool, "setup_unavailable")
                 return None
             try:
                 pod_name = self._take_ready_pod(pool.key)
             except WarmAgentAppUnavailable:
-                self._log_dispatch(pool, "setup_cold_fallback")
+                self._log_dispatch(pool, "setup_unavailable")
                 return None
             if pod_name is None:
                 self._ensure_pool_capacity(pool, reserved_pod_capacity=1)
-                self._log_dispatch(pool, "capacity_cold_fallback")
+                self._log_dispatch(pool, "capacity_unavailable")
                 return None
             self._ensure_pool_capacity(pool)
 
@@ -248,7 +248,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
             )
         except WarmAgentAppUnavailable:
             self._retire_unavailable_pod(pod_name)
-            self._log_dispatch(pool, "setup_cold_fallback")
+            self._log_dispatch(pool, "setup_unavailable")
             return None
 
         try:
