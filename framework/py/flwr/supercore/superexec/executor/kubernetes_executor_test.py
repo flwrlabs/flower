@@ -36,7 +36,7 @@ from flwr.common.constant import (
 from flwr.supercore.constant import TaskType
 
 from . import kubernetes_executor as kube
-from . import warm_agentapp_executor
+from . import warm_executor_dispatch
 from .kubernetes_executor import (
     _COMPLETED_POD_SWEEP_INTERVAL_SECONDS,
     _TASK_ID_LABEL,
@@ -783,7 +783,7 @@ def test_warm_dispatch_drains_stderr_until_the_child_exits() -> None:
     """Warm child stderr must not accumulate in the Kubernetes exec stream."""
     response = _WarmExecResponse(acknowledge=False, stderr="diagnostic output")
     response._all.write("x" * 1_000_000)  # pylint: disable=protected-access
-    dispatch = warm_agentapp_executor.KubernetesWarmAgentAppDispatch(response)
+    dispatch = warm_executor_dispatch.KubernetesWarmExecutorDispatch(response)
 
     assert dispatch.wait_for_close()
 
@@ -832,8 +832,8 @@ def test_warm_dispatch_forwards_only_visible_output_after_acceptance(
     ]
     response.is_open.side_effect = [True, True, False]
     log = Mock()
-    monkeypatch.setattr(warm_agentapp_executor, "log", log)
-    dispatch = warm_agentapp_executor.KubernetesWarmAgentAppDispatch(response)
+    monkeypatch.setattr(warm_executor_dispatch, "log", log)
+    dispatch = warm_executor_dispatch.KubernetesWarmExecutorDispatch(response)
 
     dispatch.send_token("task-token")
     assert dispatch.wait_for_acceptance(1.0)
@@ -852,8 +852,8 @@ def test_warm_dispatch_flushes_buffered_output_after_child_exit(
     """Buffered visible output should survive a child exiting after acceptance."""
     response = _WarmExecResponse()
     log = Mock()
-    monkeypatch.setattr(warm_agentapp_executor, "log", log)
-    dispatch = warm_agentapp_executor.KubernetesWarmAgentAppDispatch(response)
+    monkeypatch.setattr(warm_executor_dispatch, "log", log)
+    dispatch = warm_executor_dispatch.KubernetesWarmExecutorDispatch(response)
 
     dispatch.send_token("task-token")
     response._stdout += (
@@ -882,7 +882,7 @@ def test_warm_dispatch_accepts_fragmented_acknowledgement(
     """Current and rollout-compatible acknowledgements can span stdout frames."""
     response = Mock()
     response.read_stdout.side_effect = [acknowledgement[:8], acknowledgement[8:]]
-    dispatch = warm_agentapp_executor.KubernetesWarmAgentAppDispatch(response)
+    dispatch = warm_executor_dispatch.KubernetesWarmExecutorDispatch(response)
 
     assert dispatch.wait_for_acceptance(1.0)
     assert response.read_stdout.call_count == 2
@@ -930,7 +930,7 @@ def test_warm_idle_probe_requires_all_task_processes_to_have_exited(
         (process / "stat").write_text(
             f"42 (task (child)) {state} 1 0 0", encoding="utf-8"
         )
-    probe = warm_agentapp_executor._WARM_EXECUTOR_IDLE_CHECK.replace(  # pylint: disable=protected-access
+    probe = warm_executor_dispatch._WARM_EXECUTOR_IDLE_CHECK.replace(  # pylint: disable=protected-access
         "Path('/proc')", f"Path({str(tmp_path)!r})"
     )
     result = subprocess.run(
@@ -959,7 +959,7 @@ def test_warm_pool_replaces_consumed_pod_and_cleans_up_idle_pods() -> None:
     response = Mock(returncode=0)
     response.is_open.return_value = False
     response.close.side_effect = RuntimeError
-    dispatch = warm_agentapp_executor.KubernetesWarmAgentAppDispatch(response)
+    dispatch = warm_executor_dispatch.KubernetesWarmExecutorDispatch(response)
     pool._wait_for_task_and_replace(  # pylint: disable=protected-access
         "consumed", pool_key, dispatch
     )
@@ -1091,7 +1091,7 @@ def test_warm_pool_retirement_does_not_block_other_pools() -> None:
     pool._wait_for_task_and_replace(  # pylint: disable=protected-access
         "consumed",
         model_pool_key,
-        warm_agentapp_executor.KubernetesWarmAgentAppDispatch(_WarmExecResponse(False)),
+        warm_executor_dispatch.KubernetesWarmExecutorDispatch(_WarmExecResponse(False)),
     )
 
     assert "consumed" in pool._busy_pods  # pylint: disable=protected-access

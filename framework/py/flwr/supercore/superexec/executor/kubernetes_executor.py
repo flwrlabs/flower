@@ -38,11 +38,11 @@ from flwr.supercore.constant import (
 from flwr.supercore.typing import JSONObject
 
 from .types import ExecutionSpec, LaunchResult
-from .warm_agentapp_executor import (
-    WARM_AGENTAPP_ROOT_CERTIFICATES_FILE_PATH,
-    WARM_AGENTAPP_ROOT_CERTIFICATES_MOUNT_PATH,
+from .warm_executor_dispatch import (
+    WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH,
+    WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH,
     WARM_EXECUTOR_CONSUMED_ANNOTATION,
-    WarmAgentAppPoolManager,
+    WarmExecutorPoolManager,
 )
 from .warm_executor import (
     WARM_EXECUTOR_MODULE,
@@ -101,8 +101,8 @@ _RESERVED_TASKEXECUTOR_VOLUME_MOUNT_PATHS = frozenset(
         APPIO_CREDENTIALS_MOUNT_PATH,
         WARM_EXECUTOR_READY_DIRECTORY,
         WARM_EXECUTOR_READY_FILE,
-        WARM_AGENTAPP_ROOT_CERTIFICATES_MOUNT_PATH,
-        WARM_AGENTAPP_ROOT_CERTIFICATES_FILE_PATH,
+        WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH,
+        WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH,
     }
 )
 _COMPLETED_POD_SWEEP_INTERVAL_SECONDS = 60.0
@@ -321,8 +321,8 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
             )
 
 
-class _WarmExecutorPoolManager(WarmAgentAppPoolManager):
-    """Wire the warm AgentApp pool lifecycle to Kubernetes executor helpers."""
+class _WarmExecutorPoolManager(WarmExecutorPoolManager):
+    """Wire the warm executor pool lifecycle to Kubernetes executor helpers."""
 
     def __init__(
         self,
@@ -828,7 +828,7 @@ def _build_warm_executor_pod(
         volume_mounts.append(
             {
                 "name": _WARM_EXECUTOR_ROOT_CERTIFICATES_VOLUME_NAME,
-                "mountPath": WARM_AGENTAPP_ROOT_CERTIFICATES_MOUNT_PATH,
+                "mountPath": WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH,
                 "readOnly": True,
             }
         )
