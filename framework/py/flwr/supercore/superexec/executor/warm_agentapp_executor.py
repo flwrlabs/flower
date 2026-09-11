@@ -274,13 +274,16 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
 
         with self._lock:
             if self._closed:
+                self._log_dispatch(pool, "setup_cold_fallback")
                 return None
             try:
                 pod_name = self._take_ready_pod(pool.key)
             except WarmAgentAppUnavailable:
+                self._log_dispatch(pool, "setup_cold_fallback")
                 return None
             if pod_name is None:
                 self._ensure_pool_capacity(pool, reserved_pod_capacity=1)
+                self._log_dispatch(pool, "capacity_cold_fallback")
                 return None
             self._ensure_pool_capacity(pool)
 
@@ -292,6 +295,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
             )
         except WarmAgentAppUnavailable:
             self._retire_unavailable_pod(pod_name)
+            self._log_dispatch(pool, "setup_cold_fallback")
             return None
 
         try:
@@ -301,6 +305,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
             # preserve the Pod if a task nevertheless started.
             dispatch.close()
             self._retire_after_dispatch(pod_name, pool.key, dispatch)
+            self._log_dispatch(pool, "unknown")
             return LaunchResult.unknown(
                 "Warm executor token delivery outcome was unknown."
             )
@@ -310,6 +315,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         except Exception:  # pylint: disable=broad-exception-caught
             dispatch.close()
             self._retire_after_dispatch(pod_name, pool.key, dispatch)
+            self._log_dispatch(pool, "unknown")
             return LaunchResult.unknown(
                 "Warm executor token acknowledgement outcome was unknown."
             )
@@ -322,9 +328,22 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
             forward_output=accepted and not spec.suppress_output,
         )
         if accepted:
+            self._log_dispatch(pool, "warm_claimed")
             return LaunchResult.accepted()
+        self._log_dispatch(pool, "unknown")
         return LaunchResult.unknown(
             "Warm executor did not acknowledge task token delivery."
+        )
+
+    @staticmethod
+    def _log_dispatch(pool: WarmExecutorPoolConfig, outcome: str) -> None:
+        """Log one configured warm-pool dispatch decision."""
+        log(
+            INFO,
+            "warm_executor_dispatch task_type=%s pool_size=%s outcome=%s",
+            pool.key.task_type.value,
+            pool.size,
+            outcome,
         )
 
     def ensure_capacity(self, reserved_pod_capacity: int = 0) -> None:
