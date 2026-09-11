@@ -30,7 +30,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
-from flwr.common.constant import Status, SubStatus
+from flwr.common.constant import SUPERLINK_NODE_ID, Status, SubStatus
 from flwr.proto.runtime_pb2 import CreateTaskRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
@@ -194,6 +194,8 @@ def _start_exchange(
     model_task_id = response.task_id
     request.metadata.dst_task_id = model_task_id
     request.metadata.__dict__["_run_id"] = task.run_id
+    request.metadata.__dict__["_src_node_id"] = SUPERLINK_NODE_ID
+    request.metadata.dst_node_id = SUPERLINK_NODE_ID
     request.metadata.src_task_id = task.task_id
     request.metadata.__dict__["_message_id"] = request.object_id
     if not state.store_task_message(request):

@@ -24,8 +24,8 @@ from flwr.app.constants import DEFAULT_TTL
 from flwr.app.message import ConfigRecord, Message, RecordDict
 from flwr.app.message_type import MessageType
 from flwr.app.metadata import Metadata
-from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.supercore.date import now
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
@@ -152,15 +152,16 @@ def _build_metadata_and_content(
 ) -> tuple[Metadata, RecordDict]:
     """Build task message metadata and content from a JSON object payload."""
     metadata = Metadata(
-        run_id=0,
+        run_id=TaskIdentity.run_id or 0,
         message_id="",
-        src_node_id=SUPERLINK_NODE_ID,
-        dst_node_id=SUPERLINK_NODE_ID,
+        src_node_id=TaskIdentity.node_id or 0,
+        dst_node_id=TaskIdentity.node_id or 0,
         reply_to_message_id=reply_to_message_id,
         group_id="",
         created_at=now().timestamp(),
         ttl=ttl,
         message_type=MessageType.QUERY,
+        src_task_id=TaskIdentity.task_id,
         dst_task_id=dst_task_id,
     )
     return metadata, _payload_to_content(payload)

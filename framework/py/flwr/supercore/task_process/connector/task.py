@@ -62,8 +62,6 @@ def handle_task(
             error=cast(JSONObject | None, response["error"]),
             reply_to_message_id=request_message.metadata.message_id,
         )
-        message.metadata.__dict__["_run_id"] = run_id
-        message.metadata.src_task_id = task_id
         message.metadata.__dict__["_message_id"] = message.object_id
         client.PushTaskMessage(
             PushTaskMessageRequest(message=message_to_proto(message))
