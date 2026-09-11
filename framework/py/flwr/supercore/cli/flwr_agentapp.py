@@ -20,7 +20,7 @@ from pathlib import Path
 from queue import Queue
 
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
-from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
+from flwr.common.constant import FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT
 from flwr.supercore import log
 from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore.logger import mirror_output_to_queue, restore_output
@@ -33,7 +33,8 @@ def flwr_agentapp() -> None:
     token = try_obtain_flwr_app_token(args)
 
     if bool(getattr(args, "token_stdin", False)):
-        print(FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT, flush=True)
+        # Older SuperExec instances recognize this AgentApp-specific value only.
+        print(FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT, flush=True)
 
     # Capture stdout/stderr
     log_queue: Queue[str | None] = Queue()

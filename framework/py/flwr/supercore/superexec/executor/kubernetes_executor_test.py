@@ -29,6 +29,10 @@ from unittest.mock import Mock, call
 
 import pytest
 
+from flwr.common.constant import (
+    FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
+    FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
+)
 from flwr.supercore.constant import TaskType
 
 from . import kubernetes_executor as kube
@@ -838,7 +842,10 @@ def test_warm_dispatch_forwards_only_visible_output_after_acceptance(
 
 @pytest.mark.parametrize(
     "acknowledgement",
-    ["FLWR_TASK_TOKEN_ACCEPTED", "FLWR_AGENTAPP_TOKEN_ACCEPTED"],
+    [
+        FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
+        FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
+    ],
 )
 def test_warm_dispatch_accepts_fragmented_acknowledgement(
     acknowledgement: str,
