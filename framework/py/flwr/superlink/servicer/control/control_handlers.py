@@ -131,6 +131,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
@@ -1214,6 +1216,43 @@ def get_run_series(
         runs=runs,
     )
     return response
+
+
+def update_run_series_description(
+    request: UpdateRunSeriesDescriptionRequest,
+    account: AccountInfo,
+    state: LinkState,
+) -> UpdateRunSeriesDescriptionResponse:
+    """Update a run series description."""
+    log(INFO, "ControlServicer.UpdateRunSeriesDescription")
+
+    series_id = request.series_id
+    series_matches = state.get_run_series(series_ids=[series_id])
+
+    # The caller must be a member of the federation. Return the same error for
+    # missing and inaccessible series to avoid revealing their existence.
+    if not series_matches or not state.federation_manager.has_member(
+        account.flwr_aid, series_matches[0].federation
+    ):
+        raise FlowerError(
+            ApiErrorCode.RUN_SERIES_ID_NOT_FOUND,
+            f"Run series {series_id} not found for {account.flwr_aid}.",
+        )
+
+    description = request.description.strip()
+    if not description or len(description) > RUN_SERIES_DESCRIPTION_MAX_LENGTH:
+        raise FlowerError(
+            ApiErrorCode.INVALID_RUN_SERIES_DESCRIPTION,
+            "Run series description must contain between 1 and "
+            f"{RUN_SERIES_DESCRIPTION_MAX_LENGTH} characters.",
+        )
+
+    run_series = RunSeries()
+    run_series.CopyFrom(series_matches[0])
+
+    state.set_run_series_description(series_id, description)
+    run_series.description = description
+    return UpdateRunSeriesDescriptionResponse(series=run_series)
 
 
 def list_run_series_events(

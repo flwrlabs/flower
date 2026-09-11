@@ -40,6 +40,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
     StartRunRequest,
     StopAutomationRequest,
+    UpdateRunSeriesDescriptionRequest,
 )
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -68,6 +69,7 @@ from .control_handlers import (
     start_automation,
     start_run,
     stop_automation,
+    update_run_series_description,
 )
 
 
@@ -183,6 +185,74 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             )
 
         self.assertEqual(error.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND)
+
+    def test_update_run_series_description_returns_updated_series(self) -> None:
+        """Normalize and persist a description at the maximum length."""
+        self._create_dummy_run_series(10)
+        description = "a" * 80
+
+        with patch.object(
+            self.state,
+            "set_run_series_description",
+            wraps=self.state.set_run_series_description,
+        ) as set_description:
+            response = update_run_series_description(
+                UpdateRunSeriesDescriptionRequest(
+                    series_id=10, description=f"  {description}  "
+                ),
+                self.account,
+                self.state,
+            )
+
+        set_description.assert_called_once_with(10, description)
+        self.assertEqual(response.series.series_id, 10)
+        self.assertEqual(response.series.description, description)
+
+    def test_update_run_series_description_rejects_invalid_description(self) -> None:
+        """Reject blank descriptions and descriptions longer than 80 characters."""
+        self._create_dummy_run_series(10)
+
+        for description in ("  ", "a" * 81):
+            with (
+                self.subTest(description=description),
+                self.assertRaises(FlowerError) as error,
+            ):
+                update_run_series_description(
+                    UpdateRunSeriesDescriptionRequest(
+                        series_id=10, description=description
+                    ),
+                    self.account,
+                    self.state,
+                )
+
+            self.assertEqual(
+                error.exception.code,
+                ApiErrorCode.INVALID_RUN_SERIES_DESCRIPTION,
+            )
+
+    def test_update_run_series_description_hides_missing_and_unauthorized(self) -> None:
+        """Return the same not-found error for missing and inaccessible series."""
+        self._create_dummy_run_series(10)
+
+        for series_id, is_member in ((11, True), (10, False)):
+            with (
+                self.subTest(series_id=series_id, is_member=is_member),
+                patch.object(
+                    self.state.federation_manager,
+                    "has_member",
+                    return_value=is_member,
+                ),
+                self.assertRaises(FlowerError) as error,
+            ):
+                update_run_series_description(
+                    UpdateRunSeriesDescriptionRequest(
+                        series_id=series_id, description="Title"
+                    ),
+                    self.account,
+                    self.state,
+                )
+
+            self.assertEqual(error.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND)
 
     def test_refresh_auth_tokens_returns_rotated_tokens(self) -> None:
         """Return both tokens produced by the authentication plugin."""

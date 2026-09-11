@@ -28,6 +28,10 @@ from unittest.mock import Mock, call
 
 import pytest
 
+from flwr.common.constant import (
+    FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
+    FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
+)
 from flwr.supercore.constant import TaskType
 
 from . import kubernetes_executor as kube
@@ -731,14 +735,23 @@ def test_warm_dispatch_drains_stderr_until_the_child_exits() -> None:
     assert response._all.getvalue() == ""  # pylint: disable=protected-access
 
 
-def test_warm_dispatch_accepts_fragmented_acknowledgement() -> None:
-    """A token acknowledgement can span multiple WebSocket stdout frames."""
+@pytest.mark.parametrize(
+    "acknowledgement",
+    [
+        FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
+        FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
+    ],
+)
+def test_warm_dispatch_accepts_fragmented_acknowledgement(
+    acknowledgement: str,
+) -> None:
+    """Current and rollout-compatible acknowledgements can span stdout frames."""
     response = Mock()
-    response.read_stdout.side_effect = ["FLWR_AGENT", "APP_TOKEN_", "ACCEPTED\n"]
+    response.read_stdout.side_effect = [acknowledgement[:8], acknowledgement[8:]]
     dispatch = warm_agentapp_executor.KubernetesWarmAgentAppDispatch(response)
 
     assert dispatch.wait_for_acceptance(1.0)
-    assert response.read_stdout.call_count == 3
+    assert response.read_stdout.call_count == 2
     response.read_all.assert_not_called()
 
 

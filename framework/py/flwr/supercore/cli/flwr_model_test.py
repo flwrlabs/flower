@@ -14,18 +14,24 @@
 # ==============================================================================
 """Tests for ModelApp process CLI parsing and wiring."""
 
-
 import importlib
+import io
+import sys
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
 
+from flwr.common.constant import (
+    FLWR_TASK_TOKEN_LENGTH,
+    FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
+)
 from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 
 from .flwr_model import _parse_args_run_flwr_model
 
 flwr_model_module = importlib.import_module("flwr.supercore.cli.flwr_model")
+_VALID_TASK_TOKEN = "a" * (FLWR_TASK_TOKEN_LENGTH * 2)
 
 
 def test_parse_flwr_model_requires_token() -> None:
@@ -58,6 +64,36 @@ def test_parse_flwr_model_parses_tokenized_invocation() -> None:
     assert args.insecure is True
     assert args.parent_pid == 1234
     assert args.runtime_dependency_install is True
+
+
+def test_parse_flwr_model_accepts_only_one_token_source() -> None:
+    """The private stdin mode should be mutually exclusive with other sources."""
+    parser = _parse_args_run_flwr_model()
+
+    assert parser.parse_args(["--token-stdin"]).token_stdin is True
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--token", "test-token", "--token-stdin"])
+
+
+def test_flwr_model_reads_stdin_token_and_acknowledges_start(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The private handoff should consume one token before acknowledging it."""
+    token_stdin = io.TextIOWrapper(io.BytesIO(f"{_VALID_TASK_TOKEN}\n".encode()))
+    monkeypatch.setattr(sys, "stdin", token_stdin)
+    monkeypatch.setattr(sys, "argv", ["flwr-model", "--token-stdin", "--insecure"])
+
+    with (
+        patch.object(flwr_model_module, "restore_output"),
+        patch.object(flwr_model_module, "run_model") as run_model,
+    ):
+        flwr_model_module.flwr_model()
+
+    assert token_stdin.closed
+    assert FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT in capsys.readouterr().out
+    assert run_model.call_args.kwargs["token"] == _VALID_TASK_TOKEN
 
 
 def test_flwr_model_forwards_cli_args() -> None:
