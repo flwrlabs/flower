@@ -250,6 +250,23 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             unauthorized_error.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND
         )
 
+    def test_rename_run_series_handles_missing_updated_series(self) -> None:
+        """Return not found if the series disappears while being renamed."""
+        self._create_dummy_run_series(10)
+        series = self.state.get_run_series(series_ids=[10])
+
+        with (
+            patch.object(self.state, "get_run_series", side_effect=[series, []]),
+            self.assertRaises(FlowerError) as error,
+        ):
+            rename_run_series(
+                RenameRunSeriesRequest(series_id=10, description="Title"),
+                self.account,
+                self.state,
+            )
+
+        self.assertEqual(error.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND)
+
     def test_refresh_auth_tokens_returns_rotated_tokens(self) -> None:
         """Return both tokens produced by the authentication plugin."""
         authn_plugin = Mock(spec=ControlAuthnPlugin)

@@ -1247,7 +1247,11 @@ def rename_run_series(
 
     state.set_run_series_description(series_id, description)
     updated = state.get_run_series(series_ids=[series_id])
-    assert updated
+    if not updated:
+        raise FlowerError(
+            ApiErrorCode.RUN_SERIES_ID_NOT_FOUND,
+            f"Run series {series_id} not found for {account.flwr_aid}.",
+        )
     return RenameRunSeriesResponse(series=_with_last_run_statuses(state, updated)[0])
 
 
