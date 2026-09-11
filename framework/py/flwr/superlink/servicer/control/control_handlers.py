@@ -24,7 +24,7 @@ import time
 from collections.abc import Callable, Generator, Sequence
 from datetime import UTC, datetime, timedelta
 from logging import ERROR, INFO, WARNING
-from threading import Thread
+from threading import Lock, Thread
 from typing import Any, cast
 
 import requests
@@ -181,6 +181,8 @@ from flwr.superlink.federation.noop_federation_manager import NoOpFederationMana
 from flwr.superlink.run_source import RunSource
 
 HUB_APP_REFRESH_INTERVAL = timedelta(minutes=5)
+_hub_app_refreshes: set[tuple[str, str]] = set()
+_hub_app_refreshes_lock = Lock()
 
 
 class InvalidConnectorRequestError(FlowerError):
@@ -531,6 +533,41 @@ def _refresh_hub_app(
         log(WARNING, "Failed to refresh Hub app %s: %s", app_id, exc)
 
 
+def _schedule_hub_app_refresh(
+    state: LinkState,
+    federation_id: str,
+    app_id: str,
+    expected_fab_hash: str,
+    fleet_api_type: str | None,
+) -> None:
+    """Schedule a refresh unless one is already running for the Hub app."""
+    refresh_key = (federation_id, app_id)
+    with _hub_app_refreshes_lock:
+        if refresh_key in _hub_app_refreshes:
+            return
+        _hub_app_refreshes.add(refresh_key)
+
+    def refresh() -> None:
+        try:
+            _refresh_hub_app(
+                state,
+                federation_id,
+                app_id,
+                expected_fab_hash,
+                fleet_api_type,
+            )
+        finally:
+            with _hub_app_refreshes_lock:
+                _hub_app_refreshes.discard(refresh_key)
+
+    try:
+        Thread(target=refresh, daemon=True).start()
+    except Exception:
+        with _hub_app_refreshes_lock:
+            _hub_app_refreshes.discard(refresh_key)
+        raise
+
+
 def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
@@ -762,17 +799,13 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     if cached_hub_app is not None:
         cached_fab, updated_at = cached_hub_app
         if updated_at < now() - HUB_APP_REFRESH_INTERVAL:
-            Thread(
-                target=_refresh_hub_app,
-                args=(
-                    state,
-                    federation_id,
-                    app_id,
-                    cached_fab.hash_str,
-                    fleet_api_type,
-                ),
-                daemon=True,
-            ).start()
+            _schedule_hub_app_refresh(
+                state,
+                federation_id,
+                app_id,
+                cached_fab.hash_str,
+                fleet_api_type,
+            )
     return response
 
 

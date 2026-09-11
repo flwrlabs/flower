@@ -60,6 +60,7 @@ from flwr.superlink.extensions import RESULT_DELIVERY_CHANNEL_CHAT
 from flwr.superlink.federation import NoOpFederationManager
 
 from .control_handlers import (
+    _schedule_hub_app_refresh,
     add_app,
     list_apps,
     list_automations,
@@ -337,7 +338,10 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 ".HUB_APP_REFRESH_INTERVAL",
                 timedelta(seconds=-1),
             ),
-            patch("flwr.superlink.servicer.control.control_handlers.Thread") as thread,
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                "._schedule_hub_app_refresh"
+            ) as schedule_hub_app_refresh,
             patch(
                 "flwr.superlink.servicer.control.control_handlers._get_remote_fab"
             ) as get_remote_fab,
@@ -345,9 +349,44 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             response = start_run(request, self.account, self.state, None)
 
         get_remote_fab.assert_not_called()
-        thread.return_value.start.assert_called_once()
+        schedule_hub_app_refresh.assert_called_once_with(
+            self.state,
+            NOOP_FEDERATION_ID,
+            "@flwr/demo",
+            fab_hash,
+            None,
+        )
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         self.assertEqual(run.fab_hash, fab_hash)
+
+    def test_hub_app_refresh_is_single_flight(self) -> None:
+        """Schedule only one refresh at a time for each cached Hub app."""
+        with (
+            patch("flwr.superlink.servicer.control.control_handlers.Thread") as thread,
+            patch(
+                "flwr.superlink.servicer.control.control_handlers._refresh_hub_app"
+            ) as refresh_hub_app,
+        ):
+            args = (
+                self.state,
+                NOOP_FEDERATION_ID,
+                "@flwr/demo",
+                "cached-hash",
+                None,
+            )
+            _schedule_hub_app_refresh(*args)
+            _schedule_hub_app_refresh(*args)
+            thread.assert_called_once()
+
+            refresh = thread.call_args.kwargs["target"]
+            refresh()
+
+            refresh_hub_app.assert_called_once_with(*args)
+            _schedule_hub_app_refresh(*args)
+            self.assertEqual(thread.call_count, 2)
+
+            # Run the second scheduled refresh to release the process-wide guard.
+            thread.call_args.kwargs["target"]()
 
     def test_start_run_persists_agent_input_event(self) -> None:
         """Persist agent input as a primary-task message item."""
