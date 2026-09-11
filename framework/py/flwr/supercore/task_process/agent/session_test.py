@@ -19,6 +19,7 @@ from unittest.mock import Mock, call, patch
 
 import pytest
 
+from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
@@ -44,7 +45,12 @@ from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TO
 from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject
 
-from .session import AgentRuntime, RuntimeAgentConnectors, RuntimeAgentEvents
+from .session import (
+    AgentRuntime,
+    RuntimeAgentConnectors,
+    RuntimeAgentEvents,
+    RuntimeAgentGrid,
+)
 
 
 def test_emit_event_pushes_task_event() -> None:
@@ -223,6 +229,73 @@ def test_runtime_connectors_expand_one_connector_into_multiple_tools() -> None:
         assert connectors.tools(["example"]) == tools
 
     get_connector_tools.assert_called_once_with("example")
+
+
+def test_runtime_agent_grid_tools() -> None:
+    """Grid tools should sample nodes, send content, and return serialized replies."""
+    grid = Mock()
+    grid.get_node_ids.return_value = [11, 22]
+    grid.push_messages.return_value = ["message-1"]
+    reply = Message(
+        RecordDict({"result": ConfigRecord({"answer": "done"})}),
+        dst_node_id=0,
+        message_type="query",
+    )
+    reply.metadata.__dict__["_reply_to_message_id"] = "message-1"
+    grid.pull_messages.return_value = [reply]
+    events = Mock()
+    agent_grid = RuntimeAgentGrid(grid, events)
+
+    assert [tool["name"] for tool in agent_grid.tools()] == [
+        "get_nodes",
+        "push_message",
+        "pull_messages",
+    ]
+    get_nodes = agent_grid.call(
+        {
+            "name": "get_nodes",
+            "call_id": "call-1",
+            "arguments": '{"sample_size":1}',
+        }
+    )
+    assert get_nodes["output"] in (
+        '{"node_ids":["11"],"num_available":2}',
+        '{"node_ids":["22"],"num_available":2}',
+    )
+
+    pushed = agent_grid.call(
+        {
+            "name": "push_message",
+            "call_id": "call-2",
+            "arguments": {
+                "dst_node_id": "11",
+                "message_type": "query",
+                "payload": {"prompt": "hi", "values": [[1, 2], [3, 4]]},
+            },
+        }
+    )
+    assert pushed["output"] == '{"message_id":"message-1"}'
+    grid.create_message.assert_not_called()
+    sent = list(grid.push_messages.call_args.args[0])[0]
+    assert sent.metadata.dst_node_id == 11
+    assert sent.metadata.message_type == "query"
+    assert sent.metadata.group_id == ""
+    assert sent.content["payload"]["payload"] == (
+        b'{"prompt":"hi","values":[[1,2],[3,4]]}'
+    )
+
+    pulled = agent_grid.call(
+        {
+            "name": "pull_messages",
+            "call_id": "call-3",
+            "arguments": {"message_ids": ["message-1"], "timeout": 0},
+        }
+    )
+    pulled_output = pulled["output"]
+    assert isinstance(pulled_output, str)
+    assert '"replyToMessageId":"message-1"' in pulled_output
+    assert '"pending_message_ids":[]' in pulled_output
+    assert events.emit.call_count == 6
 
 
 def test_call_automation_embeds_input_in_control_request() -> None:

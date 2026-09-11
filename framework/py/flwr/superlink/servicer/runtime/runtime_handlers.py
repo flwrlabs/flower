@@ -121,7 +121,7 @@ def get_nodes(
 ) -> GetNodesResponse:
     """Get available nodes."""
     log(DEBUG, "Runtime.GetNodes")
-    run_id = _get_authenticated_serverapp_run_id(task)
+    run_id = _get_authenticated_grid_run_id(task)
     all_ids: set[int] = state.get_nodes(run_id)
     nodes: list[Node] = [Node(node_id=node_id) for node_id in all_ids]
     return GetNodesResponse(nodes=nodes)
@@ -134,7 +134,7 @@ def push_messages(
 ) -> PushAppMessagesResponse:
     """Push a set of Messages."""
     log(DEBUG, "Runtime.PushMessages")
-    run_id = _get_authenticated_serverapp_run_id(task)
+    run_id = _get_authenticated_grid_run_id(task)
 
     _raise_if(
         validation_error=len(request.messages_list) == 0,
@@ -183,7 +183,7 @@ def pull_messages(  # pylint: disable=R0914
 ) -> PullAppMessagesResponse:
     """Pull a set of Messages."""
     log(DEBUG, "Runtime.PullMessages")
-    run_id = _get_authenticated_serverapp_run_id(task)
+    run_id = _get_authenticated_grid_run_id(task)
     messages_res: list[Message] = state.get_message_res(
         message_ids=set(request.message_ids)
     )
@@ -354,7 +354,7 @@ def push_object(
 ) -> PushObjectResponse:
     """Push an object to the ObjectStore."""
     log(DEBUG, "Runtime.PushObject")
-    run_id = _get_authenticated_serverapp_run_id(task)
+    run_id = _get_authenticated_grid_run_id(task)
     if request.node.node_id != SUPERLINK_NODE_ID:
         raise FlowerError(
             ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID, "Unexpected node ID."
@@ -375,7 +375,7 @@ def pull_object(
 ) -> PullObjectResponse:
     """Pull an object from the ObjectStore."""
     log(DEBUG, "Runtime.PullObject")
-    run_id = _get_authenticated_serverapp_run_id(task)
+    run_id = _get_authenticated_grid_run_id(task)
     if request.node.node_id != SUPERLINK_NODE_ID:
         raise FlowerError(
             ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID, "Unexpected node ID."
@@ -398,14 +398,14 @@ def confirm_message_received(
 ) -> ConfirmMessageReceivedResponse:
     """Confirm message received."""
     log(DEBUG, "Runtime.ConfirmMessageReceived")
-    _ = _get_authenticated_serverapp_run_id(task)
+    _ = _get_authenticated_grid_run_id(task)
     state.object_store.delete(request.message_object_id)
     return ConfirmMessageReceivedResponse()
 
 
-def _get_authenticated_serverapp_run_id(task: Task) -> int:
+def _get_authenticated_grid_run_id(task: Task) -> int:
     """Return the authenticated run ID if it can use these Runtime endpoints."""
-    if task.type != TaskType.SERVER_APP:
+    if task.type not in (TaskType.AGENT_APP, TaskType.SERVER_APP):
         raise FlowerError(
             ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
             RUNTIME_ENDPOINT_UNAVAILABLE_MESSAGE,

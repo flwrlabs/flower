@@ -18,29 +18,32 @@
 from __future__ import annotations
 
 import json
+import random
 import time
 from collections.abc import Sequence
 from queue import Empty, Queue
 from threading import Lock, Thread
 from typing import cast
 
-from google.protobuf.json_format import ParseDict
+from google.protobuf.json_format import MessageToDict, ParseDict
 
-from flwr.agentapp import AgentConnectors, AgentEvents, AgentSession
-from flwr.app import Message
+from flwr.agentapp import AgentConnectors, AgentEvents, AgentGrid, AgentSession
+from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    StartAutomationRequest,
-    StartRunRequest,
-)
-from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+
+# pylint: disable=E0611
+from flwr.proto.control_pb2 import StartAutomationRequest, StartRunRequest
+from flwr.proto.runtime_pb2 import (
     CreateTaskRequest,
     GetRunSeriesEventsRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskMessageRequest,
 )
-from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent
+
+# pylint: enable=E0611
+from flwr.serverapp import Grid
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
@@ -52,6 +55,10 @@ from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
     get_connector_tools,
 )
+from flwr.supercore.task_process.connector.tool_schema import (
+    function_tool,
+    string_property,
+)
 from flwr.supercore.typing import JSONObject, JSONValue
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
@@ -61,6 +68,70 @@ _EVENT_PUBLISH_BATCH_SIZE = 16
 _EVENT_PUBLISH_QUEUE_SIZE = 256
 _EVENT_PUBLISH_BATCH_WAIT = 0.05
 _EVENT_PUBLISH_STOP = object()
+_GRID_TOOL_NAMES = {"get_nodes", "push_message", "pull_messages"}
+
+
+def _grid_tools() -> list[JSONObject]:
+    """Return model-facing federation Grid tool schemas."""
+    return [
+        function_tool(
+            "get_nodes",
+            "Sample currently available SuperNodes from the federation.",
+            properties={
+                "sample_size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Maximum number of SuperNodes to return.",
+                }
+            },
+            required=["sample_size"],
+        ),
+        function_tool(
+            "push_message",
+            (
+                "Send one message to a SuperNode and return its message ID. "
+                "If a reply is required, pass that ID to pull_messages."
+            ),
+            properties={
+                "dst_node_id": string_property(
+                    "Destination SuperNode ID as a decimal string."
+                ),
+                "message_type": string_property(
+                    "Message type handled by the ClientApp."
+                ),
+                "payload": {
+                    "type": "object",
+                    "description": "JSON object to send to the SuperNode.",
+                },
+                "group_id": {"type": "string", "description": "Optional group ID."},
+                "ttl": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Optional round-trip time-to-live in seconds.",
+                },
+            },
+            required=["dst_node_id", "message_type", "payload"],
+        ),
+        function_tool(
+            "pull_messages",
+            "Wait for replies to message IDs returned by push_message.",
+            properties={
+                "message_ids": {
+                    "type": "array",
+                    "items": string_property("Message ID returned by push_message."),
+                    "minItems": 1,
+                    "description": "Message IDs whose replies are awaited.",
+                },
+                "timeout": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 300,
+                    "description": "Maximum wait in seconds; zero checks once.",
+                },
+            },
+            required=["message_ids", "timeout"],
+        ),
+    ]
 
 
 class RuntimeAgentEvents(AgentEvents):
@@ -173,9 +244,11 @@ class RuntimeAgentSession(AgentSession):
         self,
         connectors: AgentConnectors,
         events: AgentEvents,
+        grid: AgentGrid,
     ) -> None:
         self._connectors = connectors
         self._events = events
+        self._grid = grid
 
     @property
     def connectors(self) -> AgentConnectors:
@@ -186,6 +259,111 @@ class RuntimeAgentSession(AgentSession):
     def events(self) -> AgentEvents:
         """Frontend-visible structured run event API."""
         return self._events
+
+    @property
+    def grid(self) -> AgentGrid:
+        """Model-facing federation Grid API."""
+        return self._grid
+
+
+class RuntimeAgentGrid(AgentGrid):
+    """Expose selected Grid operations as model tools."""
+
+    def __init__(self, grid: Grid, events: AgentEvents) -> None:
+        self._grid = grid
+        self._events = events
+
+    def tools(self) -> list[JSONObject]:
+        """Return model-facing Grid tool schemas."""
+        return _grid_tools()
+
+    def call(self, tool_call: JSONObject) -> JSONObject:
+        """Execute one Grid function_call and return a function_call_output item."""
+        arguments = tool_call["arguments"]
+        if isinstance(arguments, str):
+            arguments = strict_json_loads(arguments)
+        name = cast(str, tool_call["name"])
+        call_id = cast(str, tool_call["call_id"])
+        if name not in _GRID_TOOL_NAMES:
+            raise ValueError(f"Unsupported Grid tool '{name}'.")
+
+        arguments_obj = cast(JSONObject, arguments)
+        self._events.emit(
+            {
+                "type": "function_call",
+                "call_id": call_id,
+                "name": name,
+                "arguments": strict_json_dumps(arguments_obj, compact=True),
+            }
+        )
+        output = cast(JSONObject, getattr(self, f"_{name}")(**arguments_obj))
+        output_item: JSONObject = {
+            "type": "function_call_output",
+            "call_id": call_id,
+            "output": strict_json_dumps(output, compact=True),
+        }
+        self._events.emit(output_item)
+        return output_item
+
+    def _get_nodes(self, sample_size: int) -> JSONObject:
+        node_ids = list(self._grid.get_node_ids())
+        return {
+            "node_ids": [
+                str(node_id)
+                for node_id in random.sample(node_ids, min(sample_size, len(node_ids)))
+            ],
+            "num_available": len(node_ids),
+        }
+
+    def _push_message(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        dst_node_id: str,
+        message_type: str,
+        payload: JSONObject,
+        group_id: str = "",
+        ttl: float | None = None,
+    ) -> JSONObject:
+        message = Message(
+            RecordDict(
+                {
+                    "payload": ConfigRecord(
+                        {"payload": strict_json_dumps(payload, compact=True).encode()}
+                    )
+                }
+            ),
+            int(dst_node_id),
+            message_type,
+            group_id=group_id,
+            ttl=ttl,
+        )
+        message_ids = list(self._grid.push_messages([message]))
+        if len(message_ids) != 1:
+            raise RuntimeError("Grid did not accept the message.")
+        return {"message_id": message_ids[0]}
+
+    def _pull_messages(self, message_ids: list[str], timeout: float) -> JSONObject:
+        if not 0 <= timeout <= 300:
+            raise ValueError("Grid pull timeout must be between 0 and 300 seconds.")
+        pending = set(message_ids)
+        replies: list[Message] = []
+        deadline = time.monotonic() + timeout
+        while pending:
+            pulled = list(self._grid.pull_messages(pending))
+            replies.extend(pulled)
+            pending.difference_update(
+                message.metadata.reply_to_message_id for message in pulled
+            )
+            remaining = deadline - time.monotonic()
+            if not pending or remaining <= 0:
+                break
+            time.sleep(min(0.25, remaining))
+        return {
+            "messages": [
+                cast(JSONObject, MessageToDict(message_to_proto(message)))
+                for message in replies
+            ],
+            "pending_message_ids": sorted(pending),
+        }
 
 
 class RuntimeAgentConnectors(AgentConnectors):

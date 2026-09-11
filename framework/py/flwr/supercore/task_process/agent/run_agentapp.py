@@ -67,6 +67,7 @@ from .session import (
     AgentRuntime,
     RuntimeAgentConnectors,
     RuntimeAgentEvents,
+    RuntimeAgentGrid,
     RuntimeAgentSession,
 )
 
@@ -256,6 +257,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         agent = RuntimeAgentSession(
             connectors=RuntimeAgentConnectors(agent_runtime),
             events=agent_events,
+            grid=RuntimeAgentGrid(grid, agent_events),
         )
         agent_app(agent=agent, context=context)
         agent_events.close()
