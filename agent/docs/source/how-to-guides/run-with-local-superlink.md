@@ -50,15 +50,18 @@ $ export FLWR_MODEL_API_KEY="<your-provider-api-key>"
 ```
 
 You can omit `FLWR_MODEL_API_KEY` when the custom endpoint does not require
-authentication. The model and AgentApp subprocesses inherit these variables
-from SuperLink.
+authentication.
 
-Without either variable, model requests through a self-hosted SuperLink fail
-with:
-
-```text
-HTTP 502 {"message":"Model API key is not set (FLWR_MODEL_API_KEY)."}
+```{warning}
+The local subprocess executor passes the SuperLink environment, including
+`FLWR_MODEL_API_KEY`, to both model and AgentApp processes. Run only trusted
+AgentApps on a SuperLink configured with provider credentials.
 ```
+
+Without either variable, model requests through a self-hosted SuperLink fail. A
+streaming request receives a terminal SSE `error` event reporting that
+`FLWR_MODEL_API_KEY` is not set. A non-streaming request receives an HTTP 502
+response with the same message in its JSON `error` object.
 
 ### Use a fully on-premises model
 
@@ -142,7 +145,7 @@ it does not stop the SuperLink process. A SuperLink started automatically for a
 `:local:` connection is a different, background-managed process. There is
 currently no dedicated `flwr` command or PID file for stopping that process; see
 [Run Flower locally with a managed
-SuperLink](https://flower.ai/docs/framework/how-to-run-flower-locally.html#stop-the-background-local-superlink)
+SuperLink](https://flower.ai/docs/framework/how-to-run-flower-locally.html#stop-background-local-superlink)
 for the documented process-inspection procedure.
 
 ## Troubleshoot the local runtime

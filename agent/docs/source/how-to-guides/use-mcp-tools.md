@@ -17,12 +17,43 @@ the AgentApp converts the MCP definitions to function-tool schemas.
 
 ## Add an MCP client
 
-Declare an MCP client dependency and manage its connection in the AgentApp.
-Discover the server's tools, then expose only an explicit allowlist.
+Add the MCP Python SDK to the AgentApp dependencies:
+
+```console
+$ uv add mcp
+```
+
+Bridge Flower's synchronous entry point to the asynchronous MCP client and keep
+the client lifecycle inside context managers:
+
+```python
+import asyncio
+import os
+
+from flwr.agentapp import AgentApp, AgentSession
+from flwr.app import Context
+from mcp import Client
+
+app = AgentApp()
+
+
+async def run_mcp(agent: AgentSession, context: Context) -> None:
+    async with Client(os.environ["MCP_ENDPOINT"]) as mcp_client:
+        await use_mcp_tools(mcp_client, agent, context)
+
+
+@app.main()
+def main(agent: AgentSession, context: Context) -> None:
+    asyncio.run(run_mcp(agent, context))
+```
+
+Set `MCP_ENDPOINT` to the URL of a running Streamable HTTP MCP server. The
+following sections build `use_mcp_tools`.
 
 ## Discover and allowlist tools
 
-First list the server's tools, then select an explicit set of tool names:
+Inside the asynchronous helper, list the server's tools and select an explicit
+set of tool names:
 
 ```python
 ALLOWED_MCP_TOOLS = {
@@ -30,11 +61,17 @@ ALLOWED_MCP_TOOLS = {
     "read_document",
 }
 
-list_result = await mcp_client.list_tools()
-discovered_tools = list_result.tools
-selected_tools = [
-    tool for tool in discovered_tools if tool.name in ALLOWED_MCP_TOOLS
-]
+
+async def use_mcp_tools(
+    mcp_client: Client,
+    agent: AgentSession,
+    context: Context,
+) -> None:
+    list_result = await mcp_client.list_tools()
+    selected_tools = [
+        tool for tool in list_result.tools if tool.name in ALLOWED_MCP_TOOLS
+    ]
+    # Convert selected_tools, pass them to the model, and dispatch tool calls.
 ```
 
 The exact client setup and result container depend on the MCP library and
@@ -66,9 +103,10 @@ Schema. Pass `model_tools` through the `tools` field of
 
 ## Dispatch function calls back to MCP
 
-When the model returns a `function_call`, reject any name outside the allowlist,
-parse its arguments, call the matching MCP tool, and create a
-`function_call_output` item with the same `call_id`:
+When the OpenAI SDK returns a `function_call`, first convert it with
+`function_call.to_dict()`. Then reject any name outside the allowlist, parse its
+arguments, call the matching MCP tool, and create a `function_call_output` item
+with the same `call_id`:
 
 ```python
 import json
