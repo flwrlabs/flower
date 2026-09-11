@@ -843,6 +843,29 @@ def test_warm_dispatch_forwards_only_visible_output_after_acceptance(
     assert response._all.getvalue() == ""  # pylint: disable=protected-access
 
 
+def test_warm_dispatch_flushes_buffered_output_after_child_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Buffered visible output should survive a child exiting after acceptance."""
+    response = _WarmExecResponse()
+    log = Mock()
+    monkeypatch.setattr(warm_agentapp_executor, "log", log)
+    dispatch = warm_agentapp_executor.KubernetesWarmAgentAppDispatch(response)
+
+    dispatch.send_token("task-token")
+    response._stdout += (
+        "visible output with acknowledgement"  # pylint: disable=protected-access
+    )
+    assert dispatch.wait_for_acceptance(1.0)
+    response._open = False  # pylint: disable=protected-access
+
+    assert dispatch.wait_for_close(forward_output=True)
+
+    assert log.call_args_list == [
+        call(INFO, "%s", "visible output with acknowledgement")
+    ]
+
+
 @pytest.mark.parametrize(
     "acknowledgement",
     [

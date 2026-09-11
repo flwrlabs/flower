@@ -124,6 +124,7 @@ class KubernetesWarmAgentAppDispatch:
         Forward child output only after token acceptance when the task opted in.
         This keeps the token acknowledgement out of the SuperExec logs.
         """
+        self._drain_output(forward_output)
         while self._is_open():
             self._update(1.0)
             self._drain_output(forward_output)
