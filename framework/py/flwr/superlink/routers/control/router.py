@@ -96,6 +96,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
@@ -173,6 +175,18 @@ def get_run_series(
 ) -> GetRunSeriesResponse:
     """Get a run series."""
     return control_handlers.get_run_series(request, account, linkstate)
+
+
+@router.post("/update-run-series-description")
+def update_run_series_description(
+    request: Annotated[
+        UpdateRunSeriesDescriptionRequest, Depends(get_protobuf_request)
+    ],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> UpdateRunSeriesDescriptionResponse:
+    """Update a run series description."""
+    return control_handlers.update_run_series_description(request, account, linkstate)
 
 
 @router.post("/list-run-series-events")

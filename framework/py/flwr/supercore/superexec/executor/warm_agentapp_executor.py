@@ -20,16 +20,19 @@ import importlib
 import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
-from logging import WARNING
+from logging import INFO, WARNING
 from typing import TYPE_CHECKING
 
+from flwr.common.constant import (
+    FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
+    FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
+)
 from flwr.supercore import log
 from flwr.supercore.constant import (
     TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
     TASK_TYPE_TO_COMMAND,
     TaskType,
 )
-from flwr.supercore.typing import JSONObject
 
 from .types import ExecutionSpec, LaunchResult
 from .warm_executor_pool import (
@@ -42,8 +45,16 @@ from .warm_executor_pool import (
 if TYPE_CHECKING:
     from .kubernetes_executor import KubernetesClient, KubernetesExecutorConfig
 
-_TOKEN_STDIN_ACKNOWLEDGEMENT = "FLWR_AGENTAPP_TOKEN_ACCEPTED"
+_TOKEN_STDIN_ACKNOWLEDGEMENTS = (
+    FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
+    FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
+)
+_TOKEN_STDIN_ACKNOWLEDGEMENT_BUFFER_SIZE = max(map(len, _TOKEN_STDIN_ACKNOWLEDGEMENTS))
 WARM_EXECUTOR_CONSUMED_ANNOTATION = "flower.ai/warm-executor-consumed"
+WARM_AGENTAPP_ROOT_CERTIFICATES_MOUNT_PATH = "/run/flwr/runtime-ca"
+WARM_AGENTAPP_ROOT_CERTIFICATES_FILE_PATH = (
+    f"{WARM_AGENTAPP_ROOT_CERTIFICATES_MOUNT_PATH}/ca.crt"
+)
 _WARM_EXECUTOR_ACK_TIMEOUT_SECONDS = 5.0
 # A surviving consumed Pod is safe to retire only after all task processes exit.
 # Ignore PID 1 (the idle parent), this probe, and zombies. A concurrent readiness
@@ -92,9 +103,12 @@ class KubernetesWarmAgentAppDispatch:
             stdout += self._read_stdout()
             self._read_stderr()
             self._discard_combined_output()
-            if _TOKEN_STDIN_ACKNOWLEDGEMENT in stdout:
+            if any(
+                acknowledgement in stdout
+                for acknowledgement in _TOKEN_STDIN_ACKNOWLEDGEMENTS
+            ):
                 return True
-            stdout = stdout[-len(_TOKEN_STDIN_ACKNOWLEDGEMENT) :]
+            stdout = stdout[-_TOKEN_STDIN_ACKNOWLEDGEMENT_BUFFER_SIZE:]
             if not self._is_open():
                 return False
             self._update(min(0.5, deadline - time.monotonic()))
@@ -166,8 +180,11 @@ def warm_agentapp_command(
     if spec.insecure:
         command.append("--insecure")
     elif runtime_root_certificates is not None:
-        raise WarmAgentAppUnavailable(
-            "Warm executor dispatch cannot safely deliver Runtime API certificates."
+        command.extend(
+            [
+                "--root-certificates",
+                WARM_AGENTAPP_ROOT_CERTIFICATES_FILE_PATH,
+            ]
         )
     if spec.runtime_dependency_install:
         command.append("--allow-runtime-dependency-installation")
@@ -184,8 +201,9 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         active_pod_count: Callable[[], int],
         exec_client: KubernetesClient | None = None,
         *,
-        build_warm_executor_pod: Callable[
-            [WarmExecutorPoolKey, KubernetesExecutorConfig, str], JSONObject
+        create_warm_executor: Callable[
+            [KubernetesClient, WarmExecutorPoolKey, KubernetesExecutorConfig, str],
+            None,
         ],
         has_warm_executor_configuration: Callable[
             [object, KubernetesExecutorConfig], bool
@@ -199,7 +217,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         self._exec_client = exec_client or client
         self._config = config
         self._active_pod_count = active_pod_count
-        self._build_warm_executor_pod = build_warm_executor_pod
+        self._create_warm_executor = create_warm_executor
         self._has_warm_executor_configuration = has_warm_executor_configuration
         self._is_active_warm_executor = is_active_warm_executor
         self._warm_executor_owner_label_selector = warm_executor_owner_label_selector
@@ -220,13 +238,16 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
 
         with self._lock:
             if self._closed:
+                self._log_dispatch(pool, "setup_unavailable")
                 return None
             try:
                 pod_name = self._take_ready_pod(pool.key)
             except WarmAgentAppUnavailable:
+                self._log_dispatch(pool, "setup_unavailable")
                 return None
             if pod_name is None:
                 self._ensure_pool_capacity(pool, reserved_pod_capacity=1)
+                self._log_dispatch(pool, "capacity_unavailable")
                 return None
             self._ensure_pool_capacity(pool)
 
@@ -238,6 +259,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
             )
         except WarmAgentAppUnavailable:
             self._retire_unavailable_pod(pod_name)
+            self._log_dispatch(pool, "setup_unavailable")
             return None
 
         try:
@@ -247,6 +269,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
             # preserve the Pod if a task nevertheless started.
             dispatch.close()
             self._retire_after_dispatch(pod_name, pool.key, dispatch)
+            self._log_dispatch(pool, "unknown")
             return LaunchResult.unknown(
                 "Warm executor token delivery outcome was unknown."
             )
@@ -256,6 +279,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         except Exception:  # pylint: disable=broad-exception-caught
             dispatch.close()
             self._retire_after_dispatch(pod_name, pool.key, dispatch)
+            self._log_dispatch(pool, "unknown")
             return LaunchResult.unknown(
                 "Warm executor token acknowledgement outcome was unknown."
             )
@@ -263,9 +287,22 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
             dispatch.close()
         self._retire_after_dispatch(pod_name, pool.key, dispatch)
         if accepted:
+            self._log_dispatch(pool, "warm_claimed")
             return LaunchResult.accepted()
+        self._log_dispatch(pool, "unknown")
         return LaunchResult.unknown(
             "Warm executor did not acknowledge task token delivery."
+        )
+
+    @staticmethod
+    def _log_dispatch(pool: WarmExecutorPoolConfig, outcome: str) -> None:
+        """Log one configured warm-pool dispatch decision."""
+        log(
+            INFO,
+            "warm_executor_dispatch task_type=%s pool_size=%s outcome=%s",
+            pool.key.task_type.value,
+            pool.size,
+            outcome,
         )
 
     def ensure_capacity(self, reserved_pod_capacity: int = 0) -> None:
@@ -391,10 +428,12 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
             pods_to_create = min(pods_to_create, max(available_pod_capacity, 0))
         for _ in range(pods_to_create):
             try:
-                pod = self._build_warm_executor_pod(
-                    pool.key, self._config, new_warm_executor_id()
+                self._create_warm_executor(
+                    self._client,
+                    pool.key,
+                    self._config,
+                    new_warm_executor_id(),
                 )
-                self._client.create_namespaced_pod(self._config.namespace, pod)
             except Exception:  # pylint: disable=broad-exception-caught
                 log(WARNING, "Failed to create a warm TaskExecutor Pod.", exc_info=True)
                 return

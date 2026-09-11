@@ -102,7 +102,7 @@ def test_get_executor_configures_usable_agentapp_warm_executor_pool(
     insecure: bool,
     ca_source: str | None,
 ) -> None:
-    """Only provision warm pools usable with the configured Runtime transport."""
+    """Provision warm pools when their Runtime API trust is known at Pod creation."""
     client = Mock()
     exec_client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
@@ -133,7 +133,7 @@ def test_get_executor_configures_usable_agentapp_warm_executor_pool(
 
     assert isinstance(executor, KubernetesExecutor)
     config = executor._config  # pylint: disable=protected-access
-    enabled = insecure or ca_source is None
+    enabled = insecure or ca_source != "task"
     assert bool(config.warm_executor_pools) == enabled
     if enabled:
         pool = config.warm_executor_pools[0]
@@ -149,6 +149,9 @@ def test_get_executor_configures_usable_agentapp_warm_executor_pool(
     assert manager._exec_client is exec_client  # pylint: disable=protected-access
     executor.reconcile()
     assert client.create_namespaced_pod.call_count == (2 if enabled else 0)
+    assert client.create_namespaced_secret.call_count == (
+        2 if enabled and ca_source == "executor" else 0
+    )
 
 
 def test_get_executor_rejects_non_string_warm_executor_owner() -> None:

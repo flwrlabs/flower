@@ -72,14 +72,12 @@ def get_executor(
         if (
             config.warm_executor_pools
             and not insecure
-            and (
-                config.runtime_root_certificates is not None
-                or root_certificates_path is not None
-            )
+            and config.runtime_root_certificates is None
+            and root_certificates_path is not None
         ):
             log(
                 WARNING,
-                "Warm executor pools are disabled because custom Runtime CA "
+                "Warm executor pools are disabled because task-specific Runtime CA "
                 "certificates require cold dispatch.",
             )
             # Retain the owner so reconciliation can clean up surviving idle Pods.

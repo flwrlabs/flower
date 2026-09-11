@@ -94,6 +94,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
@@ -179,6 +181,16 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     ) -> GetRunSeriesResponse:
         """Get run series."""
         return control_handlers.get_run_series(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def UpdateRunSeriesDescription(
+        self,
+        request: UpdateRunSeriesDescriptionRequest,
+        context: grpc.ServicerContext,
+    ) -> UpdateRunSeriesDescriptionResponse:
+        """Update a run series description."""
+        return control_handlers.update_run_series_description(
             request, _get_account(), self.linkstate_factory.state()
         )
 

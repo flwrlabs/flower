@@ -14,11 +14,11 @@
 # ==============================================================================
 """`flwr-connector` command."""
 
-
 import argparse
 from logging import DEBUG, INFO
 
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
+from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
 from flwr.supercore import log
 from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore.logger import restore_output
@@ -30,6 +30,9 @@ def flwr_connector() -> None:
     """Run process-isolated Flower connector task."""
     args = _parse_args_run_flwr_connector().parse_args()
     token = try_obtain_flwr_app_token(args)
+
+    if bool(getattr(args, "token_stdin", False)):
+        print(FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT, flush=True)
 
     log(INFO, "Start `flwr-connector` process")
     log(
@@ -63,5 +66,5 @@ def _parse_args_run_flwr_connector() -> argparse.ArgumentParser:
         help="Address of SuperLink's Runtime API (IPv4, IPv6, or a domain name)."
         f"By default, it is set to {SUPERLINK_DEFAULT_CLIENT_ADDRESS}.",
     )
-    add_args_flwr_app_common(parser=parser)
+    add_args_flwr_app_common(parser=parser, include_token_stdin=True)
     return parser
