@@ -41,9 +41,9 @@ from flwr.supercore.utils import uint64_to_int64
 
 from .object_store import NoObjectInStoreError, ObjectStore
 
-_objectstore_mutation_lock_held: ContextVar[bool] = ContextVar(
-    "objectstore_mutation_lock_held",
-    default=False,
+_objectstore_mutation_lock_scopes: ContextVar[frozenset[object]] = ContextVar(
+    "objectstore_mutation_lock_scopes",
+    default=frozenset(),
 )
 
 
@@ -280,16 +280,19 @@ class SqlObjectStore(ObjectStore, SqlMixin):
     def _mutation_session(self) -> Iterator[Session]:
         """Start a mutation transaction and acquire its SQL lock once."""
         with self.session() as session:
-            if _objectstore_mutation_lock_held.get():
+            lock_scopes = _objectstore_mutation_lock_scopes.get()
+            if self._session_scope in lock_scopes:
                 yield session
                 return
 
-            token = _objectstore_mutation_lock_held.set(True)
+            token = _objectstore_mutation_lock_scopes.set(
+                lock_scopes | {self._session_scope}
+            )
             try:
                 self._lock_objectstore_mutation()
                 yield session
             finally:
-                _objectstore_mutation_lock_held.reset(token)
+                _objectstore_mutation_lock_scopes.reset(token)
 
     def _lock_objectstore_mutation(self) -> None:
         """Serialize structural ObjectStore writes within the active transaction."""
