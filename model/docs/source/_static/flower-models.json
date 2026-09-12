@@ -1,0 +1,65 @@
+{
+  "models": [
+    {
+      "slug": "flower-endeavor",
+      "display_name": "Endeavor",
+      "description": "Flower Endeavor through the Flower Labs Responses-compatible endpoint.",
+      "base_instructions": "You are Flower Endeavor, a coding agent. Work with the user to complete the requested task. Inspect the workspace before making changes, use available tools when they are useful, and report the verified result concisely. Preserve unrelated user changes.",
+      "context_window": 128000,
+      "max_context_window": 128000,
+      "auto_compact_token_limit": 96000,
+      "comp_hash": "flower-endeavor-1",
+      "default_reasoning_level": "low",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low",
+          "description": "Fast responses with lighter reasoning"
+        },
+        {
+          "effort": "medium",
+          "description": "Balances speed and reasoning depth"
+        },
+        {
+          "effort": "high",
+          "description": "Greater reasoning depth for complex tasks"
+        },
+        {
+          "effort": "xhigh",
+          "description": "Maximum supported reasoning depth"
+        }
+      ],
+      "supports_reasoning_summaries": true,
+      "reasoning_summary_format": "experimental",
+      "default_reasoning_summary": "none",
+      "input_modalities": ["text"],
+      "supports_image_detail_original": false,
+      "supports_parallel_tool_calls": true,
+      "tool_mode": null,
+      "experimental_supported_tools": [],
+      "multi_agent_version": "v2",
+      "use_responses_lite": false,
+      "include_skills_usage_instructions": true,
+      "support_verbosity": false,
+      "default_verbosity": null,
+      "apply_patch_tool_type": "freeform",
+      "web_search_tool_type": "text",
+      "shell_type": "shell_command",
+      "prefer_websockets": false,
+      "truncation_policy": {
+        "mode": "tokens",
+        "limit": 10000
+      },
+      "supported_in_api": true,
+      "minimal_client_version": "0.153.4",
+      "availability_nux": {
+        "message": ""
+      },
+      "auto_review_model_override": null,
+      "upgrade": null,
+      "service_tiers": [],
+      "additional_speed_tiers": [],
+      "visibility": "list",
+      "priority": 1
+    }
+  ]
+}
