@@ -17,6 +17,9 @@ allowing you to federate any workload, machine learning framework, or programmin
 This Helm chart installs the server-side components of the Flower Framework, specifically
 setting up the SuperLink.
 
+The SuperLink serves its Runtime and Control APIs over HTTP on the same server and port
+(`8000` by default). The Fleet API remains available on port `9092`.
+
 The default installation configuration aims to replicate the functionality and setup of the
 provided Flower Framework releases.
 
@@ -365,11 +368,16 @@ tls:
 
 ## Override Certificate Paths
 
-By default, the TLS-related flags use the following paths when TLS is enabled:
+By default, the TLS-related flags use the following paths when TLS is enabled. The
+`--ssl-*` flags configure the Fleet API, while the `--appio-ssl-*` flags configure the
+shared Runtime and Control HTTP APIs:
 
 `--ssl-ca-certfile`: `/app/cert/ca.crt`,
 `--ssl-certfile`: `/app/cert/tls.crt`,
-`--ssl-keyfile`: `/app/cert/tls.key`.
+`--ssl-keyfile`: `/app/cert/tls.key`,
+`--appio-ssl-ca-certfile`: `/app/cert/ca.crt`,
+`--appio-ssl-certfile`: `/app/cert/tls.crt`,
+`--appio-ssl-keyfile`: `/app/cert/tls.key`.
 
 These paths can be overridden by specifying the flags in the `extraArgs`, as shown below:
 
@@ -384,6 +392,12 @@ superlink:
     - --ssl-certfile
     - /mount/cert/tls.cert
     - --ssl-keyfile
+    - /mount/cert/tls.key
+    - --appio-ssl-ca-certfile
+    - /mount/cert/ca.cert
+    - --appio-ssl-certfile
+    - /mount/cert/tls.cert
+    - --appio-ssl-keyfile
     - /mount/cert/tls.key
 ```
 
@@ -422,7 +436,7 @@ superlink:
  ingress:
     enabled: true
     annotations:
-      nginx.ingress.kubernetes.io/backend-protocol: GRPCS
+      nginx.ingress.kubernetes.io/backend-protocol: HTTPS
       nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
       nginx.ingress.kubernetes.io/ssl-passthrough: "false"
       nginx.ingress.kubernetes.io/ssl-redirect: "false"
@@ -468,9 +482,9 @@ superlink:
 By default, when `cert-manager` issues a `Certificate` it only includes the DNS name specified in
 `commonName`, which is derived from `global.domain`.
 
-In some deployments, the server and client charts may run inside the same Kubernetes cluster,
-while the Control API is exposed publicly over the internet. In this scenario, the SuperNodes
-need to connect to the SuperLink using its internal service URL
+In some deployments, the SuperLink and SuperExec may run inside the same Kubernetes cluster,
+while the Control API is exposed publicly over the internet. In this scenario, SuperExec
+connects to the shared Runtime and Control HTTP server using its internal service URL
 (e.g., `<superlink>.<namespace>.svc.cluster.local`).
 
 To support this, you can extend the certificate with additional hosts by using
@@ -490,7 +504,7 @@ superlink:
  ingress:
     enabled: true
     annotations:
-      nginx.ingress.kubernetes.io/backend-protocol: GRPCS
+      nginx.ingress.kubernetes.io/backend-protocol: HTTPS
       nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
       nginx.ingress.kubernetes.io/ssl-passthrough: "false"
       nginx.ingress.kubernetes.io/ssl-redirect: "false"
@@ -503,7 +517,7 @@ superlink:
       - name: <superlink_name>.<namespace>.svc.cluster.local
         pathType: ImplementationSpecific
         path: /
-        port: 9092
+        port: 8000
     tls:
       enabled: true
 ```
@@ -511,9 +525,8 @@ superlink:
 ### SSL-Passthrough
 
 In some scenarios, you may want to let the SuperLink service terminate TLS directly rather than
-having the Ingress controller handle TLS termination. This is useful if you need to use protocols
-such as gRPC over TLS end-to-end, where the Ingress should simply forward the encrypted traffic
-without decrypting it.
+having the Ingress controller handle TLS termination. This is useful when the Ingress should
+forward encrypted HTTPS traffic without decrypting it.
 
 To enable this mode with the NGINX Ingress Controller, you can configure SSL passthrough by setting
 the `nginx.ingress.kubernetes.io/ssl-passthrough` annotation to `"true"`. In this configuration,
@@ -530,7 +543,7 @@ superlink:
   enabled: true
   ingress:
     annotations:
-      nginx.ingress.kubernetes.io/backend-protocol: GRPCS
+      nginx.ingress.kubernetes.io/backend-protocol: HTTPS
       nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
       nginx.ingress.kubernetes.io/ssl-passthrough: "true"
       nginx.ingress.kubernetes.io/ssl-redirect: "false"
@@ -539,11 +552,6 @@ superlink:
     control:
       enabled: true
       hostname: control.example.com
-      path: /
-      pathType: ImplementationSpecific
-    fleet:
-      enabled: true
-      hostname: fleet.example.com
       path: /
       pathType: ImplementationSpecific
     serverAppIo:
@@ -659,35 +667,35 @@ global:
 | `superlink.serviceAccount.labels`                             | Labels applied to enabled service account                                                                               | `{}`                      |
 | `superlink.serviceAccount.automountServiceAccountToken`       | Automount SA-Token                                                                                                      | `true`                    |
 | `superlink.service.type`                                      | Valid are ClusterIP, NodePort or Loadbalancer                                                                           | `ClusterIP`               |
-| `superlink.service.servicePortControlName`                    | Prefix of the SuperLink Control API port                                                                                | `control`                 |
-| `superlink.service.servicePortControl`                        | Port to expose for the SuperLink Control API                                                                            | `9093`                    |
+| `superlink.service.servicePortControlName`                    | Prefix of the SuperLink HTTP Control API port                                                                           | `control`                 |
+| `superlink.service.servicePortControl`                        | Port to expose for the SuperLink HTTP Control API                                                                       | `8000`                    |
 | `superlink.service.nodePortControl`                           | Node port for SuperLink Control API                                                                                     | `""`                      |
 | `superlink.service.servicePortServerAppIoName`                | Prefix of the SuperLink Runtime API port                                                                                | `serverappio`             |
-| `superlink.service.servicePortServerAppIo`                    | Port to expose for the SuperLink Runtime API                                                                            | `9091`                    |
+| `superlink.service.servicePortServerAppIo`                    | Port to expose for the SuperLink Runtime API on the shared HTTP server                                                  | `8000`                    |
 | `superlink.service.nodePortServerAppIo`                       | Node port for the SuperLink Runtime API                                                                                 | `""`                      |
 | `superlink.service.servicePortFleetName`                      | Prefix of the SuperLink Fleet API port                                                                                  | `fleet`                   |
 | `superlink.service.servicePortFleet`                          | Port to expose for the SuperLink Fleet API                                                                              | `9092`                    |
 | `superlink.service.nodePortFleet`                             | Node port for SuperLink Fleet API                                                                                       | `""`                      |
-| `superlink.containerPorts.control`                            | Container port for SuperLink Control API                                                                                | `9093`                    |
-| `superlink.containerPorts.serverAppIo`                        | Container port for the SuperLink Runtime API                                                                            | `9091`                    |
+| `superlink.containerPorts.control`                            | Container port for the SuperLink HTTP Control API                                                                       | `8000`                    |
+| `superlink.containerPorts.serverAppIo`                        | Container port for the SuperLink Runtime API on the shared HTTP server                                                  | `8000`                    |
 | `superlink.containerPorts.fleet`                              | Container port for SuperLink Fleet API                                                                                  | `9092`                    |
 | `superlink.containerPorts.health`                             | Container port for SuperLink Health API                                                                                 | `8081`                    |
 | `superlink.replicaCount`                                      | The number of SuperLink pods to run                                                                                     | `1`                       |
 | `superlink.labels`                                            | Extra labels for SuperLink pods                                                                                         | `{}`                      |
 | `superlink.extraArgs`                                         | Add extra arguments to the default arguments for the SuperLink                                                          | `[]`                      |
-| `superlink.appioTls.enabled`                                  | Enable TLS on the SuperLink Runtime API.                                                                                | `false`                   |
-| `superlink.appioTls.existingSecret`                           | Existing Kubernetes Secret for Runtime API TLS.                                                                         | `""`                      |
-| `superlink.appioTls.mountPath`                                | Mount path used when the Runtime API uses a separate TLS Secret.                                                        | `/app/appio-cert`         |
-| `superlink.appioTls.caCertfile`                               | Path to the CA certificate used by SuperExec to verify the Runtime API.                                                 | `/app/cert/ca.crt`        |
-| `superlink.appioTls.certfile`                                 | Path to the Runtime API server certificate.                                                                             | `/app/cert/tls.crt`       |
-| `superlink.appioTls.keyfile`                                  | Path to the Runtime API server private key.                                                                             | `/app/cert/tls.key`       |
-| `superlink.appioTls.certificate.enabled`                      | Enable automatic creation of a cert-manager Certificate for the Runtime API.                                            | `false`                   |
+| `superlink.appioTls.enabled`                                  | Enable TLS on the shared SuperLink Runtime and Control HTTP APIs.                                                       | `false`                   |
+| `superlink.appioTls.existingSecret`                           | Existing Kubernetes Secret for Runtime and Control API TLS.                                                             | `""`                      |
+| `superlink.appioTls.mountPath`                                | Mount path used when the Runtime and Control APIs use a separate TLS Secret.                                            | `/app/appio-cert`         |
+| `superlink.appioTls.caCertfile`                               | Path to the CA certificate used to verify the Runtime and Control APIs.                                                 | `/app/cert/ca.crt`        |
+| `superlink.appioTls.certfile`                                 | Path to the shared Runtime and Control HTTP API server certificate.                                                     | `/app/cert/tls.crt`       |
+| `superlink.appioTls.keyfile`                                  | Path to the shared Runtime and Control HTTP API server private key.                                                     | `/app/cert/tls.key`       |
+| `superlink.appioTls.certificate.enabled`                      | Enable automatic creation of a cert-manager Certificate for the Runtime and Control APIs.                               | `false`                   |
 | `superlink.appioTls.certificate.annotations`                  | Certificate CRD annotations.                                                                                            | `{}`                      |
-| `superlink.appioTls.certificate.secretName`                   | Name of the Kubernetes Secret storing the Runtime API TLS key and certificate.                                          | `""`                      |
+| `superlink.appioTls.certificate.secretName`                   | Name of the Kubernetes Secret storing the Runtime and Control API TLS key and certificate.                              | `""`                      |
 | `superlink.appioTls.certificate.issuerGroup`                  | API group for the issuer.                                                                                               | `""`                      |
 | `superlink.appioTls.certificate.existingIssuer`               | Name of an existing Issuer or ClusterIssuer to use.                                                                     | `""`                      |
 | `superlink.appioTls.certificate.existingIssuerKind`           | Kind of the existing issuer (`Issuer` or `ClusterIssuer`).                                                              | `""`                      |
-| `superlink.appioTls.certificate.dnsNames`                     | DNS names for the Runtime API certificate.                                                                              | `[]`                      |
+| `superlink.appioTls.certificate.dnsNames`                     | DNS names for the Runtime and Control API certificate.                                                                  | `[]`                      |
 | `superlink.appioTls.certificate.duration`                     | The requested certificate lifetime.                                                                                     | `43800h`                  |
 | `superlink.appioTls.certificate.renewBefore`                  | How long before expiry cert-manager should renew the certificate.                                                       | `360h`                    |
 | `superlink.appioTls.certificate.privateKey`                   | Private key options.                                                                                                    | `{}`                      |
@@ -718,17 +726,17 @@ global:
 | `superlink.ingress.ingressClassName`                          | Defines which ingress controller which implement the resource                                                           | `""`                      |
 | `superlink.ingress.tls.enabled`                               | Enable TLS termination at the Ingress level.                                                                            | `false`                   |
 | `superlink.ingress.tls.secretName`                            | Name of the Kubernetes Secret that will contain the                                                                     | `""`                      |
-| `superlink.ingress.control.enabled`                           | Enable an ingress resource for SuperLink API                                                                            | `false`                   |
-| `superlink.ingress.control.hostname`                          | Ingress hostname for the SuperLink API ingress                                                                          | `control.example.com`     |
-| `superlink.ingress.control.path`                              | SuperLink API ingress path                                                                                              | `/`                       |
-| `superlink.ingress.control.pathType`                          | Ingress path type. One of Exact, Prefix or ImplementationSpecific                                                       | `ImplementationSpecific`  |
+| `superlink.ingress.control.enabled`                           | Enable an ingress resource for the SuperLink HTTP Control API                                                           | `false`                   |
+| `superlink.ingress.control.hostname`                          | Ingress hostname for the SuperLink HTTP Control API                                                                     | `control.example.com`     |
+| `superlink.ingress.control.path`                              | SuperLink HTTP Control API ingress path                                                                                 | `/`                       |
+| `superlink.ingress.control.pathType`                          | HTTP Control API ingress path type. One of Exact, Prefix or ImplementationSpecific                                      | `ImplementationSpecific`  |
 | `superlink.ingress.fleet.enabled`                             | Enable an ingress resource for SuperLink Fleet API                                                                      | `false`                   |
 | `superlink.ingress.fleet.hostname`                            | Ingress hostname for the SuperLink Fleet API ingress                                                                    | `fleet.example.com`       |
 | `superlink.ingress.fleet.path`                                | SuperLink Fleet API ingress path                                                                                        | `/`                       |
 | `superlink.ingress.fleet.pathType`                            | Ingress path type. One of Exact, Prefix or ImplementationSpecific                                                       | `ImplementationSpecific`  |
-| `superlink.ingress.serverAppIo.enabled`                       | Enable an ingress resource for the SuperLink Runtime API                                                                | `false`                   |
-| `superlink.ingress.serverAppIo.hostname`                      | Ingress hostname for the SuperLink Runtime API                                                                          | `serverappio.example.com` |
-| `superlink.ingress.serverAppIo.path`                          | SuperLink Runtime API ingress path                                                                                      | `/`                       |
+| `superlink.ingress.serverAppIo.enabled`                       | Enable an ingress resource for the Runtime API on the shared HTTP server                                                | `false`                   |
+| `superlink.ingress.serverAppIo.hostname`                      | Ingress hostname for the Runtime API on the shared HTTP server                                                          | `serverappio.example.com` |
+| `superlink.ingress.serverAppIo.path`                          | Shared HTTP server Runtime API ingress path                                                                             | `/`                       |
 | `superlink.ingress.serverAppIo.pathType`                      | Ingress path type. One of Exact, Prefix or ImplementationSpecific                                                       | `ImplementationSpecific`  |
 | `superlink.ingress.extraHosts`                                | An array with additional hostname(s) to be covered with the ingress record                                              | `[]`                      |
 | `superlink.ingress.extraTls`                                  | TLS configuration for additional hostname(s) to be covered with this ingress record                                     | `[]`                      |
