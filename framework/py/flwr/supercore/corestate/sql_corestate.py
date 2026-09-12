@@ -49,7 +49,6 @@ from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
     SERIES_ID_NUM_BYTES,
-    SUPERLINK_NODE_ID,
     TASK_ID_NUM_BYTES,
     Status,
     SubStatus,
@@ -1488,7 +1487,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def store_task_message(self, message: Message) -> bool:
         """Store one task-addressed Message."""
-        if validate_task_message(message):
+        if validate_task_message(message, self.get_node_id()):
             return False
 
         with self.session() as session:
@@ -1585,7 +1584,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 dst_task_ids, src_task_ids, order_by, limit
             )
             snapshots = [_task_message_snapshot_from_model(row) for row in rows]
-        return [_task_message_from_snapshot(row) for row in snapshots]
+        node_id = self.get_node_id()
+        return [_task_message_from_snapshot(row, node_id) for row in snapshots]
 
     def store_task_events(
         self,
@@ -1987,7 +1987,7 @@ def _task_message_snapshot_from_model(model: TaskMessageModel) -> dict[str, Any]
     }
 
 
-def _task_message_from_snapshot(row: dict[str, Any]) -> Message:
+def _task_message_from_snapshot(row: dict[str, Any], node_id: int) -> Message:
     """Convert a claimed task_message snapshot to a Message."""
     content, error = None, None
     if row["content"] is not None:
@@ -1998,8 +1998,8 @@ def _task_message_from_snapshot(row: dict[str, Any]) -> Message:
     metadata = Metadata(
         run_id=int64_to_uint64(row["run_id"]),
         message_id=row["message_id"],
-        src_node_id=SUPERLINK_NODE_ID,
-        dst_node_id=SUPERLINK_NODE_ID,
+        src_node_id=node_id,
+        dst_node_id=node_id,
         reply_to_message_id=row["reply_to_message_id"] or "",
         group_id="",  # Task messages don't have this field for now
         created_at=row["created_at"],

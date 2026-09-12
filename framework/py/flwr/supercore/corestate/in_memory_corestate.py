@@ -1171,7 +1171,7 @@ class InMemoryCoreState(
     ) -> bool:
         """Store one task-addressed Message."""
         message_id = message.metadata.message_id
-        if validate_task_message(message):
+        if validate_task_message(message, self.get_node_id()):
             return False
         src_task_id = cast(int, message.metadata.src_task_id)
         dst_task_id = cast(int, message.metadata.dst_task_id)

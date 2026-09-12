@@ -50,6 +50,7 @@ def _client(state: Mock) -> TestClient:
 
 def _state() -> Mock:
     state = Mock(spec=LinkState)
+    state.get_node_id.return_value = 789
     state.get_task_by_token.return_value = Task(
         task_id=123, run_id=789, type=TaskType.AGENT_APP
     )
@@ -129,6 +130,8 @@ def test_responses_returns_correlated_model_response() -> None:
     request = state.store_task_message.call_args.args[0]
     assert request.metadata.src_task_id == 123
     assert request.metadata.dst_task_id == 456
+    assert request.metadata.src_node_id == 789
+    assert request.metadata.dst_node_id == 789
     assert state.get_task_message.call_count == 2
     state.get_task_message.assert_called_with(
         dst_task_ids=[123],
