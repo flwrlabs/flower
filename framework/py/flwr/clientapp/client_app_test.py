@@ -21,7 +21,30 @@ from unittest.mock import Mock
 
 import pytest
 
-from flwr.app.message import Context, Message
+from flwr.app import Context, Error, Message, RecordDict
+from flwr.common import (
+    Code,
+    EvaluateIns,
+    EvaluateRes,
+    FitIns,
+    FitRes,
+    Parameters,
+    Status,
+)
+from flwr.common.fl_event import (
+    FL_NODE_EVALUATE_COMPLETED,
+    FL_NODE_EVALUATE_FAILED,
+    FL_NODE_EVALUATE_STARTED,
+    FL_NODE_FIT_COMPLETED,
+    FL_NODE_FIT_FAILED,
+    FL_NODE_FIT_STARTED,
+)
+from flwr.compat.client.client import Client
+from flwr.compat.common.recorddict_compat import (
+    evaluateins_to_recorddict,
+    fitins_to_recorddict,
+)
+from flwr.supercore.utils import strict_json_loads
 
 from .client_app import ClientApp
 from .typing import ClientAppCallable
@@ -259,3 +282,266 @@ def test_register_repeated_func(category: str, action: str | None) -> None:
         @decorator(*args)  # type: ignore
         def func2(_msg: Message, _cxt: Context) -> Message:
             raise AssertionError("This function should not be called")
+
+
+class _MockClient(Client):
+    """A minimal ``Client`` implementation for event tests."""
+
+    def fit(self, ins: FitIns) -> FitRes:
+        """Return a successful fit result."""
+        return FitRes(
+            status=Status(code=Code.OK, message="Success"),
+            parameters=ins.parameters,
+            num_examples=1,
+            metrics={"accuracy": 0.9},
+        )
+
+    def evaluate(self, ins: EvaluateIns) -> EvaluateRes:
+        """Return a successful evaluate result."""
+        return EvaluateRes(
+            status=Status(code=Code.OK, message="Success"),
+            loss=0.5,
+            num_examples=1,
+            metrics={"accuracy": 0.8},
+        )
+
+
+class _FailingFitClient(Client):
+    """A ``Client`` whose ``fit`` raises for failure-event tests."""
+
+    def fit(self, ins: FitIns) -> FitRes:
+        """Raise an exception to simulate a fit failure."""
+        raise RuntimeError("fit failed")
+
+
+class _FailingEvaluateClient(Client):
+    """A ``Client`` whose ``evaluate`` raises for failure-event tests."""
+
+    def evaluate(self, ins: EvaluateIns) -> EvaluateRes:
+        """Raise an exception to simulate an evaluate failure."""
+        raise RuntimeError("evaluate failed")
+
+
+def _make_message(message_type: str) -> Message:
+    """Create a message with the given message type."""
+    parameters = Parameters(tensors=[], tensor_type="")
+    if message_type == "train":
+        content = fitins_to_recorddict(FitIns(parameters, {}), keep_input=True)
+    elif message_type == "evaluate":
+        content = evaluateins_to_recorddict(
+            EvaluateIns(parameters, {}), keep_input=True
+        )
+    else:
+        content = RecordDict()
+    return Message(
+        content,
+        dst_node_id=123,
+        message_type=message_type,
+        group_id="7",
+    )
+
+
+def test_client_app_emits_fit_events() -> None:
+    """Test that a legacy ``ClientApp`` emits fit lifecycle events."""
+    # Prepare
+    callback = Mock()
+    app = ClientApp(
+        client_fn=lambda _: _MockClient(),
+        event_callback=callback,
+    )
+    message = _make_message("train")
+    context = Mock(spec=Context)
+
+    # Execute
+    app(message, context)
+
+    # Assert
+    events = [call.args[0].event for call in callback.call_args_list]
+    assert events == [
+        FL_NODE_FIT_STARTED,
+        FL_NODE_FIT_COMPLETED,
+    ]
+    started_event = callback.call_args_list[0].args[0]
+    assert (
+        started_event.data
+        == '{"type":"fl.node.fit.started","node_id":123,"server_round":7}'
+    )
+    completed_event = strict_json_loads(callback.call_args_list[1].args[0].data)
+    assert completed_event.pop("elapsed_time") >= 0
+    assert completed_event == {
+        "type": FL_NODE_FIT_COMPLETED,
+        "node_id": 123,
+        "server_round": 7,
+        "num_examples": 1,
+        "accuracy": 0.9,
+    }
+
+
+def test_client_app_emits_evaluate_events() -> None:
+    """Test that a legacy ``ClientApp`` emits evaluate lifecycle events."""
+    # Prepare
+    callback = Mock()
+    app = ClientApp(
+        client_fn=lambda _: _MockClient(),
+        event_callback=callback,
+    )
+    message = _make_message("evaluate")
+    context = Mock(spec=Context)
+
+    # Execute
+    app(message, context)
+
+    # Assert
+    events = [call.args[0].event for call in callback.call_args_list]
+    assert events == [
+        FL_NODE_EVALUATE_STARTED,
+        FL_NODE_EVALUATE_COMPLETED,
+    ]
+    completed_event = strict_json_loads(callback.call_args_list[1].args[0].data)
+    assert completed_event.pop("elapsed_time") >= 0
+    assert completed_event == {
+        "type": FL_NODE_EVALUATE_COMPLETED,
+        "node_id": 123,
+        "server_round": 7,
+        "loss": 0.5,
+        "num_examples": 1,
+        "accuracy": 0.8,
+    }
+
+
+def test_client_app_emits_fit_failed_event() -> None:
+    """Test that a legacy ``ClientApp`` emits a fit-failed event on exceptions."""
+    # Prepare
+    callback = Mock()
+    app = ClientApp(
+        client_fn=lambda _: _FailingFitClient(),
+        event_callback=callback,
+    )
+    message = _make_message("train")
+    context = Mock(spec=Context)
+
+    # Execute and assert
+    with pytest.raises(RuntimeError, match="fit failed"):
+        app(message, context)
+
+    events = [call.args[0].event for call in callback.call_args_list]
+    assert events == [
+        FL_NODE_FIT_STARTED,
+        FL_NODE_FIT_FAILED,
+    ]
+    failed_event = strict_json_loads(callback.call_args_list[-1].args[0].data)
+    assert failed_event["elapsed_time"] >= 0
+
+
+def test_client_app_emits_evaluate_failed_event() -> None:
+    """Test that a legacy ``ClientApp`` emits an evaluate-failed event on exceptions."""
+    # Prepare
+    callback = Mock()
+    app = ClientApp(
+        client_fn=lambda _: _FailingEvaluateClient(),
+        event_callback=callback,
+    )
+    message = _make_message("evaluate")
+    context = Mock(spec=Context)
+
+    # Execute and assert
+    with pytest.raises(RuntimeError, match="evaluate failed"):
+        app(message, context)
+
+    events = [call.args[0].event for call in callback.call_args_list]
+    assert events == [
+        FL_NODE_EVALUATE_STARTED,
+        FL_NODE_EVALUATE_FAILED,
+    ]
+
+
+def test_client_app_emits_events_for_registered_train_handler() -> None:
+    """Test lifecycle events are emitted for registered train handlers."""
+    callback = Mock()
+    app = ClientApp(event_callback=callback)
+
+    @app.train()
+    def train(message: Message, _: Context) -> Message:
+        return Message(message.content, reply_to=message)
+
+    app(_make_message("train"), Mock(spec=Context))
+
+    assert [call.args[0].event for call in callback.call_args_list] == [
+        FL_NODE_FIT_STARTED,
+        FL_NODE_FIT_COMPLETED,
+    ]
+
+
+def test_client_app_emits_failed_event_for_error_reply() -> None:
+    """Error replies are terminal node failures, not completed executions."""
+    callback = Mock()
+    app = ClientApp(event_callback=callback)
+
+    @app.train()
+    def train(message: Message, _: Context) -> Message:
+        return Message(Error(code=1), reply_to=message)
+
+    app(_make_message("train"), Mock(spec=Context))
+
+    failed_event = strict_json_loads(callback.call_args_list[-1].args[0].data)
+    assert [call.args[0].event for call in callback.call_args_list] == [
+        FL_NODE_FIT_STARTED,
+        FL_NODE_FIT_FAILED,
+    ]
+    assert failed_event.pop("elapsed_time") >= 0
+    assert failed_event["error"] == "execution_failed"
+
+
+def test_client_app_failure_event_does_not_include_exception_details() -> None:
+    """Test failure events only contain a stable, safe error classification."""
+    callback = Mock()
+    app = ClientApp(event_callback=callback)
+
+    @app.train()
+    def train(_: Message, __: Context) -> Message:
+        raise RuntimeError("secret-token-should-not-be-persisted")
+
+    with pytest.raises(RuntimeError, match="secret-token-should-not-be-persisted"):
+        app(_make_message("train"), Mock(spec=Context))
+
+    failed_event = strict_json_loads(callback.call_args_list[-1].args[0].data)
+    assert failed_event.pop("elapsed_time") >= 0
+    assert failed_event == {
+        "type": FL_NODE_FIT_FAILED,
+        "node_id": 123,
+        "server_round": 7,
+        "error": "execution_failed",
+    }
+
+
+def test_client_app_continues_when_event_delivery_fails() -> None:
+    """Test lifecycle event delivery failures do not affect ClientApp execution."""
+    app = ClientApp(
+        client_fn=lambda _: _MockClient(),
+        event_callback=Mock(side_effect=RuntimeError("event delivery failed")),
+    )
+
+    app(_make_message("train"), Mock(spec=Context))
+
+
+def test_client_app_emits_failed_event_when_lifespan_teardown_fails() -> None:
+    """Test a lifespan teardown failure does not emit a completed event."""
+    callback = Mock()
+    app = ClientApp(event_callback=callback)
+
+    @app.lifespan()
+    def lifespan(_: Context) -> Iterator[None]:
+        yield
+        raise RuntimeError("lifespan teardown failed")
+
+    @app.train()
+    def train(message: Message, _: Context) -> Message:
+        return Message(message.content, reply_to=message)
+
+    with pytest.raises(RuntimeError, match="lifespan teardown failed"):
+        app(_make_message("train"), Mock(spec=Context))
+
+    assert [call.args[0].event for call in callback.call_args_list] == [
+        FL_NODE_FIT_STARTED,
+        FL_NODE_FIT_FAILED,
+    ]

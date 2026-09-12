@@ -30,6 +30,7 @@ from flwr.common import Config, GetPropertiesIns, MessageTypeLegacy, Scalar
 from flwr.common.constant import PARTITION_ID_KEY
 from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
 from flwr.compat.common.recorddict_compat import getpropertiesins_to_recorddict
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
 from flwr.server.superlink.fleet.vce.backend.raybackend import RayBackend
 from flwr.simulation.ray_transport.ray_actor import pool_size_from_resources
@@ -65,7 +66,7 @@ def backend_build_process_and_termination(
     backend: RayBackend,
     app_fn: Callable[[], ClientApp],
     process_args: tuple[Message, Context] | None = None,
-) -> tuple[Message, Context] | None:
+) -> tuple[Message, Context, list[TaskEvent]] | None:
     """Build, process job and terminate RayBackend."""
     backend.build(app_fn)
     to_return = None
@@ -141,7 +142,8 @@ class TestRayBackend(TestCase):
         if res is None:
             raise AssertionError("This shouldn't happen")
 
-        out_mssg, updated_context = res
+        out_mssg, updated_context, events = res
+        assert events == []
 
         # Verify message content is as expected
         content = out_mssg.content

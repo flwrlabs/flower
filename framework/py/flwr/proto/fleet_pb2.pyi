@@ -21,6 +21,7 @@ import builtins
 import collections.abc
 import flwr.proto.message_pb2
 import flwr.proto.node_pb2
+import flwr.proto.task_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
@@ -286,3 +287,37 @@ class Reconnect(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["reconnect", b"reconnect"]) -> None: ...
 
 global___Reconnect = Reconnect
+
+@typing.final
+class FleetPushTaskEventsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODE_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    EVENTS_FIELD_NUMBER: builtins.int
+    run_id: builtins.int
+    @property
+    def node(self) -> flwr.proto.node_pb2.Node: ...
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.TaskEvent]: ...
+    def __init__(
+        self,
+        *,
+        node: flwr.proto.node_pb2.Node | None = ...,
+        run_id: builtins.int = ...,
+        events: collections.abc.Iterable[flwr.proto.task_pb2.TaskEvent] | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["node", b"node"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events", "node", b"node", "run_id", b"run_id"]) -> None: ...
+
+global___FleetPushTaskEventsRequest = FleetPushTaskEventsRequest
+
+@typing.final
+class FleetPushTaskEventsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___FleetPushTaskEventsResponse = FleetPushTaskEventsResponse

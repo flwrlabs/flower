@@ -15,7 +15,7 @@
 """Contextmanager for a GrpcAdapter channel to the Flower server."""
 
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from logging import ERROR
 
@@ -25,6 +25,7 @@ from flwr.app.message import Message
 from flwr.client.grpc_rere_client.connection import grpc_request_response
 from flwr.client.grpc_rere_client.grpc_adapter import GrpcAdapter
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.fab import Fab
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
@@ -41,6 +42,9 @@ def grpc_adapter(  # pylint: disable=R0913,too-many-positional-arguments
     root_certificates: bytes | str | None = None,
     authentication_keys: (
         tuple[ec.EllipticCurvePrivateKey, ec.EllipticCurvePublicKey] | None
+    ) = None,
+    on_task_events_ready: (
+        Callable[[Callable[[int, Sequence[TaskEvent]], None]], None] | None
     ) = None,
 ) -> Iterator[
     tuple[
@@ -99,5 +103,6 @@ def grpc_adapter(  # pylint: disable=R0913,too-many-positional-arguments
         root_certificates=root_certificates,
         authentication_keys=None,  # Authentication is not supported
         adapter_cls=GrpcAdapter,
+        on_task_events_ready=on_task_events_ready,
     ) as conn:
         yield conn

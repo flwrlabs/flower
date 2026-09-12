@@ -36,6 +36,8 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeResponse,
     DeactivateNodeRequest,
     DeactivateNodeResponse,
+    FleetPushTaskEventsRequest,
+    FleetPushTaskEventsResponse,
     PullMessagesRequest,
     PullMessagesResponse,
     PushMessagesRequest,
@@ -64,6 +66,8 @@ from flwr.server.superlink.utils import check_abort
 from flwr.supercore import log
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStore
 from flwr.supercore.run import InvalidRunStatusException, Run
+from flwr.supercore.typing import JSONObject
+from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
 
 class InvalidHeartbeatIntervalError(Exception):
@@ -224,6 +228,43 @@ def push_messages(
         state.add_clientapp_runtime(run_id, request.clientapp_runtime_list[0])
 
     return response
+
+
+def push_task_events(
+    request: FleetPushTaskEventsRequest,
+    state: LinkState,
+) -> FleetPushTaskEventsResponse:
+    """Store ClientApp lifecycle events against the run's primary task."""
+    if not request.events:
+        return FleetPushTaskEventsResponse()
+
+    run = _validate_node_in_federation(state, request.node.node_id, request.run_id)
+    abort_msg = check_abort(
+        request.run_id,
+        [Status.PENDING, Status.STARTING, Status.FINISHED],
+        state,
+    )
+    if abort_msg:
+        raise InvalidRunStatusException(abort_msg)
+
+    primary_task_id = run.primary_task_id
+    if primary_task_id is None:
+        raise ValueError(f"Run ID {request.run_id} has no primary task.")
+
+    # The ClientApp payload is untrusted. Stamp the event with the authenticated
+    # SuperNode identity and the primary task consumed by StreamRunEvents.
+    for event in request.events:
+        data = strict_json_loads(event.data)
+        if not isinstance(data, dict):
+            raise ValueError("Task event data must be a JSON object.")
+        payload: JSONObject = data
+        payload["node_id"] = request.node.node_id
+        event.data = strict_json_dumps(payload, compact=True)
+        event.run_id = request.run_id
+        event.task_id = primary_task_id
+
+    state.store_task_events(request.events)
+    return FleetPushTaskEventsResponse()
 
 
 def get_run(request: GetRunRequest, state: LinkState) -> GetRunResponse:

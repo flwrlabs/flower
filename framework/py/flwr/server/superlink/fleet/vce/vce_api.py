@@ -110,6 +110,7 @@ def worker(
     backend: Backend,
     f_stop: threading.Event,
     metrics: VceMetrics,
+    state: LinkState,
 ) -> None:
     """Process messages from the queue, execute them, update context, and enqueue
     replies."""
@@ -129,7 +130,23 @@ def worker(
 
             # Let backend process message
             processing_started_at = time.perf_counter()
-            out_mssg, updated_context = backend.process_message(message, context)
+            out_mssg, updated_context, task_events = backend.process_message(
+                message, context
+            )
+
+            if task_events:
+                try:
+                    run = state.get_run_info(run_ids=[message.metadata.run_id])[0]
+                    if run.primary_task_id is None:
+                        raise ValueError(
+                            f"Run ID {message.metadata.run_id} has no primary task."
+                        )
+                    for event in task_events:
+                        event.run_id = message.metadata.run_id
+                        event.task_id = run.primary_task_id
+                    state.store_task_events(task_events)
+                except Exception as ex:  # pylint: disable=broad-exception-caught
+                    log(ERROR, "Failed to store ClientApp lifecycle events: %s", ex)
 
             # Update Context
             node_info_store[node_id].update_context(
@@ -250,6 +267,7 @@ def run_api(
                     backend,
                     f_stop,
                     metrics,
+                    state,
                 )
                 for _ in range(backend.num_workers)
             ]
