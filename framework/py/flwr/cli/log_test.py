@@ -17,11 +17,22 @@
 
 import unittest
 from typing import NoReturn
-from unittest.mock import Mock, call, patch
+from unittest.mock import MagicMock, Mock, call, patch
+
+import click
+import httpx
 
 from flwr.proto.control_pb2 import StreamLogsResponse  # pylint: disable=E0611
 
 from .log import _log_with_control_api, print_logs, stream_logs
+
+
+def _timeout_stream(path: str | None) -> MagicMock:
+    """Return a stream which times out while being read."""
+    stream = MagicMock()
+    request = httpx.Request("POST", f"http://superlink{path}") if path else None
+    stream.__iter__.side_effect = httpx.ReadTimeout("Timed out", request=request)
+    return stream
 
 
 class InterruptedStreamLogsResponse:
@@ -72,6 +83,37 @@ class TestFlwrLog(unittest.TestCase):
             print_logs(run_id=123, stub=self.mock_stub)
             # Assert that mock print was called with the expected arguments
             mock_print.assert_has_calls(self.expected_print_call)
+        self.mock_stub.StreamLogs.assert_called_once()
+        self.assertEqual(
+            self.mock_stub.StreamLogs.call_args.kwargs, {"read_timeout": 5.0}
+        )
+
+    def test_flwr_log_print_method_timeout(self) -> None:
+        """Exit gracefully when no logs arrive before the timeout."""
+        self.mock_stub.StreamLogs.side_effect = None
+        self.mock_stub.StreamLogs.return_value = _timeout_stream(
+            "/v1/control/stream-logs"
+        )
+
+        print_logs(run_id=123, stub=self.mock_stub)
+
+    def test_flwr_log_print_method_refresh_timeout(self) -> None:
+        """Report timeouts from token refresh requests."""
+        self.mock_stub.StreamLogs.side_effect = None
+        self.mock_stub.StreamLogs.return_value = _timeout_stream(
+            "/v1/control/refresh-auth-tokens"
+        )
+
+        with self.assertRaises(click.ClickException):
+            print_logs(run_id=123, stub=self.mock_stub)
+
+    def test_flwr_log_print_method_timeout_without_request(self) -> None:
+        """Report timeouts without request information."""
+        self.mock_stub.StreamLogs.side_effect = None
+        self.mock_stub.StreamLogs.return_value = _timeout_stream(None)
+
+        with self.assertRaises(click.ClickException):
+            print_logs(run_id=123, stub=self.mock_stub)
 
     def test_log_with_control_api_owns_client_lifecycle(self) -> None:
         """Close the HTTP client at the command boundary."""
