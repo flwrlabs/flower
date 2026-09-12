@@ -35,10 +35,6 @@ class NodeState(CoreState):
         """Set the node ID."""
 
     @abstractmethod
-    def get_node_id(self) -> int:
-        """Get the node ID."""
-
-    @abstractmethod
     def store_message(self, message: Message) -> str | None:
         """Store a message.
 
