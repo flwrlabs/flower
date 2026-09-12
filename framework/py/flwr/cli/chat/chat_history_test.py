@@ -15,22 +15,20 @@
 """Tests for conversation history in the CLI `chat` application."""
 
 import asyncio
-import json
 from unittest.mock import Mock, patch
 
-from flwr.app import ConfigRecord, Context, RecordDict
 from flwr.cli.chat.chat_app import ChatApplication
-from flwr.cli.chat.chat_history import HistoryBlock
+from flwr.cli.chat.chat_history import HistoryBlock, load_conversation
 from flwr.cli.constant import CHAT_DEFAULT_FEDERATION_NAME
-from flwr.common.serde import context_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    GetRunSeriesRequest,
-    GetRunSeriesResponse,
+    ListRunSeriesEventsRequest,
+    ListRunSeriesEventsResponse,
     ListRunSeriesRequest,
     ListRunSeriesResponse,
 )
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 
 FEDERATION = f"@flower/{CHAT_DEFAULT_FEDERATION_NAME}"
 
@@ -40,32 +38,43 @@ def _create_chat(stub: Mock) -> ChatApplication:
         return ChatApplication(stub, [Federation(name=FEDERATION)], Mock())
 
 
-def test_history_widget_restores_selected_context() -> None:
-    """History should navigate chronologically and restore the selected context."""
+def test_history_widget_restores_selected_events() -> None:
+    """History should navigate chronologically and restore the selected events."""
     stub = Mock()
     selected = RunSeries(series_id=6, federation=FEDERATION, description="Saved chat")
     latest = RunSeries(series_id=7, federation=FEDERATION, description="Latest chat")
     stub.ListRunSeries.return_value = ListRunSeriesResponse(entries=[latest, selected])
-    items = [
-        {"type": "message", "role": "user", "content": "Previous question"},
-        {
-            "type": "message",
-            "role": "assistant",
-            "content": [{"type": "output_text", "text": "**Previous answer**"}],
-        },
-    ]
-    context = Context(
-        run_id=10,
-        node_id=0,
-        node_config={},
-        state=RecordDict(
-            {"items": ConfigRecord({"json": [json.dumps(item) for item in items]})}
-        ),
-        run_config={},
-        series_id=6,
-    )
-    stub.GetRunSeries.return_value = GetRunSeriesResponse(
-        series=selected, context=context_to_proto(context)
+    stub.ListRunSeriesEvents.return_value = ListRunSeriesEventsResponse(
+        events=[
+            TaskEvent(
+                event="message",
+                data=(
+                    '{"type":"message","role":"user",'
+                    '"content":"Previous question"}'
+                ),
+            ),
+            TaskEvent(
+                event="response.output_text.delta",
+                data=(
+                    '{"type":"response.output_text.delta",'
+                    '"delta":"**Previous "}'
+                ),
+            ),
+            TaskEvent(
+                event="response.output_text.delta",
+                data=(
+                    '{"type":"response.output_text.delta",'
+                    '"delta":"answer**"}'
+                ),
+            ),
+            TaskEvent(
+                event="response.completed",
+                data=(
+                    '{"type":"response.completed","response":'
+                    '{"output_text":"**Previous answer**"}}'
+                ),
+            ),
+        ]
     )
     chat = _create_chat(stub)
     event = Mock()
@@ -87,7 +96,9 @@ def test_history_widget_restores_selected_context() -> None:
     stub.ListRunSeries.assert_called_once_with(
         ListRunSeriesRequest(federation_id=FEDERATION, is_agent=True)
     )
-    stub.GetRunSeries.assert_called_once_with(GetRunSeriesRequest(series_id=6))
+    stub.ListRunSeriesEvents.assert_called_once_with(
+        ListRunSeriesEventsRequest(series_id=6)
+    )
     assert chat.series_id == 6
     assert chat.transcript == [
         ("class:user.message", "❯ Previous question\n"),
@@ -106,6 +117,33 @@ def test_history_handles_empty_result() -> None:
     asyncio.run(event.app.create_background_task.call_args.args[0])
     assert chat.transcript == [
         ("class:notice", f"No conversation history found for {FEDERATION}.\n\n")
+    ]
+
+
+def test_load_conversation_restores_incomplete_response_from_deltas() -> None:
+    """Persisted deltas should restore an assistant response without a terminal."""
+    stub = Mock()
+    entry = RunSeries(series_id=6, federation=FEDERATION)
+    stub.ListRunSeriesEvents.return_value = ListRunSeriesEventsResponse(
+        events=[
+            TaskEvent(
+                event="message",
+                data='{"type":"message","role":"user","content":"Question"}',
+            ),
+            TaskEvent(
+                event="response.output_text.delta",
+                data='{"type":"response.output_text.delta","delta":"Partial "}',
+            ),
+            TaskEvent(
+                event="response.output_text.delta",
+                data='{"type":"response.output_text.delta","delta":"answer"}',
+            ),
+        ]
+    )
+
+    assert load_conversation(stub, entry, FEDERATION) == [
+        ("user", "Question"),
+        ("assistant", "Partial answer"),
     ]
 
 
