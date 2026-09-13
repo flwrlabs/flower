@@ -119,7 +119,7 @@ class KubernetesWarmExecutorDispatch:
                         "".join(
                             (*stdout_before_acceptance, stdout[:acknowledgement_start])
                         ),
-                        stdout[acknowledgement_end:].lstrip("\r\n"),
+                        stdout[acknowledgement_end:].removeprefix("\n"),
                     )
                     if output
                 )

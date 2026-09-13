@@ -795,7 +795,7 @@ def test_warm_dispatch_drains_stderr_until_the_child_exits() -> None:
     [
         (
             True,
-            "visible output before acknowledgement"
+            "visible output before acknowledgement\n"
             "visible output with acknowledgement"
             "visible output after acknowledgement",
             "visible error before acknowledgement"
@@ -817,7 +817,7 @@ def test_warm_dispatch_forwards_only_visible_output_after_acceptance(
     response.read_stdout.side_effect = [
         "visible output before acknowledgement",
         (
-            f"{FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT}\n"
+            f"{FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT}\n\n"
             "visible output with acknowledgement"
         ),
         "visible output after acknowledgement",
