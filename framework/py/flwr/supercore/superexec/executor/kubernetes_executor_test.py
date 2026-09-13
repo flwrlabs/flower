@@ -832,8 +832,8 @@ def test_warm_dispatch_forwards_only_visible_output_after_acceptance(
     response.is_open.side_effect = [True, True, False]
     stdout = StringIO()
     stderr = StringIO()
-    monkeypatch.setattr(warm_executor_dispatch.sys, "stdout", stdout)
-    monkeypatch.setattr(warm_executor_dispatch.sys, "stderr", stderr)
+    monkeypatch.setattr(sys, "stdout", stdout)
+    monkeypatch.setattr(sys, "stderr", stderr)
     dispatch = warm_executor_dispatch.KubernetesWarmExecutorDispatch(response)
 
     dispatch.send_token("task-token")
@@ -856,7 +856,7 @@ def test_warm_dispatch_flushes_buffered_output_after_child_exit(
     """Buffered visible output should survive a child exiting after acceptance."""
     response = _WarmExecResponse()
     stdout = StringIO()
-    monkeypatch.setattr(warm_executor_dispatch.sys, "stdout", stdout)
+    monkeypatch.setattr(sys, "stdout", stdout)
     dispatch = warm_executor_dispatch.KubernetesWarmExecutorDispatch(response)
 
     dispatch.send_token("task-token")
