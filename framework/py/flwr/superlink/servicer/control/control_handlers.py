@@ -182,6 +182,8 @@ from flwr.superlink.federation.noop_federation_manager import NoOpFederationMana
 from flwr.superlink.federation.typing import Federation as FederationInfo
 from flwr.superlink.run_source import RunSource
 
+from .conversation_title import start_title_generation
+
 
 class InvalidConnectorRequestError(FlowerError):
     """Exception raised when a connector request is invalid."""
@@ -661,8 +663,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             )
 
         initial_task_event = None
+        agent_input = fused_run_config.get("agent.input")
         if primary_task_type == TaskType.AGENT_APP:
-            agent_input = fused_run_config.get("agent.input")
             if isinstance(agent_input, str) and agent_input:
                 input_item: JSONObject = {
                     "type": "message",
@@ -700,6 +702,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
         run = state.get_run_info(run_ids=[run_id])[0]
         series_id = run.series_id
+        if series_description and isinstance(agent_input, str) and series_id:
+            start_title_generation(state, series_id, agent_input)
 
     except ValueError as e:
         log(ERROR, "Could not start run: %s", str(e))
