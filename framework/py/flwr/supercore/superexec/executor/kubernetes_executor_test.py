@@ -21,7 +21,6 @@ import subprocess
 import sys
 import threading
 from io import StringIO
-from logging import INFO
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -792,26 +791,25 @@ def test_warm_dispatch_drains_stderr_until_the_child_exits() -> None:
 
 
 @pytest.mark.parametrize(
-    ("forward_output", "expected_calls"),
+    ("forward_output", "expected_stdout", "expected_stderr"),
     [
         (
             True,
-            [
-                call(INFO, "%s", "visible output before acknowledgement"),
-                call(INFO, "%s", "visible output with acknowledgement"),
-                call(INFO, "%s", "visible error before acknowledgement"),
-                call(INFO, "%s", "visible error with acknowledgement"),
-                call(INFO, "%s", "visible output after acknowledgement"),
-                call(INFO, "%s", "visible error after acknowledgement"),
-            ],
+            "visible output before acknowledgement"
+            "visible output with acknowledgement"
+            "visible output after acknowledgement",
+            "visible error before acknowledgement"
+            "visible error with acknowledgement"
+            "visible error after acknowledgement",
         ),
-        (False, []),
+        (False, "", ""),
     ],
 )
 def test_warm_dispatch_forwards_only_visible_output_after_acceptance(
     monkeypatch: pytest.MonkeyPatch,
     forward_output: bool,
-    expected_calls: list[Any],
+    expected_stdout: str,
+    expected_stderr: str,
 ) -> None:
     """Warm dispatch should mirror visible output only after acknowledgement."""
     response = Mock(returncode=0)
@@ -832,8 +830,10 @@ def test_warm_dispatch_forwards_only_visible_output_after_acceptance(
         "",
     ]
     response.is_open.side_effect = [True, True, False]
-    log = Mock()
-    monkeypatch.setattr(warm_executor_dispatch, "log", log)
+    stdout = StringIO()
+    stderr = StringIO()
+    monkeypatch.setattr(warm_executor_dispatch.sys, "stdout", stdout)
+    monkeypatch.setattr(warm_executor_dispatch.sys, "stderr", stderr)
     dispatch = warm_executor_dispatch.KubernetesWarmExecutorDispatch(response)
 
     dispatch.send_token("task-token")
@@ -841,9 +841,12 @@ def test_warm_dispatch_forwards_only_visible_output_after_acceptance(
 
     assert dispatch.wait_for_close(forward_output=forward_output)
 
-    assert log.call_args_list == expected_calls
-    assert all("TOKEN_ACCEPTED" not in str(log_call) for log_call in log.call_args_list)
-    assert all("task-token" not in str(log_call) for log_call in log.call_args_list)
+    assert stdout.getvalue() == expected_stdout
+    assert stderr.getvalue() == expected_stderr
+    assert all(
+        value not in stdout.getvalue() + stderr.getvalue()
+        for value in ("TOKEN_ACCEPTED", "task-token")
+    )
     assert response._all.getvalue() == ""  # pylint: disable=protected-access
 
 
@@ -852,8 +855,8 @@ def test_warm_dispatch_flushes_buffered_output_after_child_exit(
 ) -> None:
     """Buffered visible output should survive a child exiting after acceptance."""
     response = _WarmExecResponse()
-    log = Mock()
-    monkeypatch.setattr(warm_executor_dispatch, "log", log)
+    stdout = StringIO()
+    monkeypatch.setattr(warm_executor_dispatch.sys, "stdout", stdout)
     dispatch = warm_executor_dispatch.KubernetesWarmExecutorDispatch(response)
 
     dispatch.send_token("task-token")
@@ -865,9 +868,7 @@ def test_warm_dispatch_flushes_buffered_output_after_child_exit(
 
     assert dispatch.wait_for_close(forward_output=True)
 
-    assert log.call_args_list == [
-        call(INFO, "%s", "visible output with acknowledgement")
-    ]
+    assert stdout.getvalue() == "visible output with acknowledgement"
 
 
 @pytest.mark.parametrize(

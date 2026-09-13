@@ -17,11 +17,12 @@
 from __future__ import annotations
 
 import importlib
+import sys
 import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
 from logging import INFO, WARNING
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TextIO
 
 from flwr.common.constant import (
     FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
@@ -86,7 +87,7 @@ class KubernetesWarmExecutorDispatch:
 
     def __init__(self, response: object) -> None:
         self._response = response
-        self._output_after_acceptance: list[str] = []
+        self._output_after_acceptance: list[tuple[TextIO, str]] = []
 
     def send_token(self, token: str) -> None:
         """Send one token over stdin without retaining it in Pod metadata."""
@@ -113,15 +114,17 @@ class KubernetesWarmExecutorDispatch:
             if acknowledgement_span is not None:
                 acknowledgement_start, acknowledgement_end = acknowledgement_span
                 self._output_after_acceptance.extend(
-                    output
+                    (sys.stdout, output)
                     for output in (
                         "".join(
                             (*stdout_before_acceptance, stdout[:acknowledgement_start])
                         ),
                         stdout[acknowledgement_end:].lstrip("\r\n"),
-                        *stderr_before_acceptance,
                     )
                     if output
+                )
+                self._output_after_acceptance.extend(
+                    (sys.stderr, output) for output in stderr_before_acceptance
                 )
                 return True
             stdout_before_acceptance.append(
@@ -199,16 +202,17 @@ class KubernetesWarmExecutorDispatch:
         return acknowledgement_start, acknowledgement_end
 
     def _drain_output(self, forward_output: bool) -> None:
-        """Consume exec output and optionally mirror it through SuperExec logs."""
+        """Consume exec output and optionally mirror it to SuperExec output."""
         output_after_acceptance = self._output_after_acceptance
         self._output_after_acceptance = []
-        for output in (
+        for stream, output in (
             *output_after_acceptance,
-            self._read_stdout(),
-            self._read_stderr(),
+            (sys.stdout, self._read_stdout()),
+            (sys.stderr, self._read_stderr()),
         ):
             if forward_output and output:
-                log(INFO, "%s", output.rstrip())
+                stream.write(output)
+                stream.flush()
 
     def _discard_combined_output(self) -> None:
         # WSClient.read_all() also clears unread channels, including the exit
