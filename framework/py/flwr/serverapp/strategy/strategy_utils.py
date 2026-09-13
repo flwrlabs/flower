@@ -24,7 +24,8 @@ from typing import cast
 import numpy as np
 
 from flwr.app import Array, ArrayRecord, ConfigRecord, MetricRecord, RecordDict
-from flwr.common import NDArray, log
+from flwr.common import NDArray
+from flwr.supercore import log
 
 from ..exception import InconsistentMessageReplies
 from ..grid import Grid

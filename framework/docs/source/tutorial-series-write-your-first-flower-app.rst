@@ -4,10 +4,9 @@
 
 Welcome to the second part of the Flower collaborative AI tutorial!
 
-In the previous tutorial, you created your first federation on SuperGrid using the
-simulation runtime. This allowed you to experiment with simulated SuperNodes, run an
-existing Flower App on SuperGrid, and explore the dashboard to follow its progress and
-view its logs.
+In the previous tutorial, you ran an existing Flower App on SuperGrid using your default
+workspace simulation federation. This allowed you to experiment with simulated
+SuperNodes and explore the dashboard to follow the app's progress and view its logs.
 
 In this tutorial, you'll pull the `@flwrlabs/demo
 <https://flower.ai/apps/flwrlabs/demo/>`__ app from Flower Hub and run it on SuperGrid
@@ -41,7 +40,7 @@ First, we install the Flower package ``flwr`` in a new Python environment.
 
 .. code-block:: shell
 
-    $ pip install -U "flwr[simulation]"
+    $ pip install -U flwr
 
 Then, use ``flwr new`` to fetch an existing Flower App from the Flower Hub. In this
 case, you'll fetch the `@flwrlabs/demo <https://flower.ai/apps/flwrlabs/demo/>`__ app.
@@ -91,21 +90,18 @@ first login to SuperGrid:
     # This will open a browser window where you can enter your SuperGrid credentials.
     $ flwr login supergrid
 
-Once you are logged in, run the following command to run the app on SuperGrid and across
-the federation you created in the previous tutorial:
+Once you are logged in, run the following command to run the app on SuperGrid:
 
 .. code-block:: shell
 
     # Navigate to the directory of the app you want to run
     $ cd /path/to/demo
-    # Run the app across the federation you created in the previous tutorial
-    $ flwr run . supergrid --federation @<username>/<federation-name>
-    # for example
-    # flwr run . supergrid --federation @peter123/my-first-federation
+    # Run the app on SuperGrid
+    $ flwr run . supergrid
 
 Then, if you navigate to the `SuperGrid dashboard <https://flower.ai/federations/>`__,
-you should see a new run in the list of runs of your federation. Click on it to see the
-run details and logs.
+you should see a new run in ``@<your-account>/workspace``. Click on it to see the run
+details and logs.
 
 .. image:: ./_static/second_run_started_dashboard.png
     :alt: SuperGrid dashboard showing the newly started run in the federation
@@ -159,7 +155,7 @@ SuperGrid:
 .. code-block:: shell
 
     # Run your app
-    $ flwr run . supergrid --federation @<username>/<federation-name>
+    $ flwr run . supergrid
 
 Then, if you navigate to the `SuperGrid dashboard <https://flower.ai/federations/>`__,
 and open the logs of the new run, you should see the new printed messages from the

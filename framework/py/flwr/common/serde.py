@@ -606,7 +606,7 @@ def message_from_proto(message_proto: ProtoMessage) -> Message:
 
 def context_to_proto(context: Context) -> ProtoContext:
     """Serialize `Context` to ProtoBuf."""
-    proto = ProtoContext(
+    return ProtoContext(
         run_id=context.run_id,
         node_id=context.node_id,
         node_config=user_config_to_proto(context.node_config),
@@ -614,7 +614,6 @@ def context_to_proto(context: Context) -> ProtoContext:
         run_config=user_config_to_proto(context.run_config),
         series_id=context.series_id,
     )
-    return proto
 
 
 def context_from_proto(context_proto: ProtoContext) -> Context:
@@ -647,12 +646,13 @@ def run_to_proto(run: Run) -> ProtoRun:
         finished_at=run.finished_at,
         status=run_status_to_proto(run.status),
         flwr_aid=run.flwr_aid,
-        federation=run.federation,
+        federation=run.federation_id,
         bytes_sent=run.bytes_sent,
         bytes_recv=run.bytes_recv,
         clientapp_runtime=run.clientapp_runtime,
         primary_task_type=run.primary_task_type,
         series_id=run.series_id,
+        account_name=run.account_name,
     )
     if run.primary_task_id is not None:
         proto.primary_task_id = run.primary_task_id
@@ -673,7 +673,7 @@ def run_from_proto(run_proto: ProtoRun) -> Run:
         finished_at=run_proto.finished_at,
         status=run_status_from_proto(run_proto.status),
         flwr_aid=run_proto.flwr_aid,
-        federation=run_proto.federation,
+        federation_id=run_proto.federation,
         primary_task_id=(
             run_proto.primary_task_id if run_proto.HasField("primary_task_id") else None
         ),
@@ -682,6 +682,7 @@ def run_from_proto(run_proto: ProtoRun) -> Run:
         clientapp_runtime=run_proto.clientapp_runtime,
         primary_task_type=run_proto.primary_task_type,
         series_id=run_proto.series_id,
+        account_name=run_proto.account_name,
     )
     return run
 

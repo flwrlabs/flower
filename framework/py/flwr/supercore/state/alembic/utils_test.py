@@ -40,8 +40,8 @@ from sqlalchemy import (
 from sqlalchemy.engine import URL, Connection, Engine
 
 from flwr.common.constant import SubStatus
-from flwr.common.exit import ExitCode
 from flwr.supercore.constant import TaskType
+from flwr.supercore.exit import ExitCode
 from flwr.supercore.state.alembic.utils import (
     ALEMBIC_DIR,
     ALEMBIC_VERSION_TABLE,
@@ -55,6 +55,22 @@ from flwr.supercore.state.alembic.utils import (
     register_version_location,
     run_migrations,
 )
+
+
+class TestMigrationGraph(unittest.TestCase):
+    """Test the structure of the Flower migration graph."""
+
+    def test_flwr_migrations_have_single_head(self) -> None:
+        """Ensure Flower migrations form a graph with exactly one head."""
+        script = ScriptDirectory(str(ALEMBIC_DIR))
+
+        heads = script.get_heads()
+
+        self.assertEqual(
+            len(heads),
+            1,
+            f"Expected exactly one Flower migration head, found: {heads}",
+        )
 
 
 class TestAlembicRun(unittest.TestCase):
@@ -131,7 +147,7 @@ class TestAlembicRun(unittest.TestCase):
             "usage_reported_at": "",
             "sub_status": None,
             "details": None,
-            "federation": "fed",
+            "federation": "@me/fed",
             "federation_config": None,
             "run_type": "serverapp",
             "flwr_aid": "aid",
@@ -285,6 +301,116 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
+    def test_hub_origin_migration_preserves_unknown_legacy_rows(self) -> None:
+        """Ensure legacy federation apps retain unknown Hub provenance."""
+        engine = self.create_engine("federation_app_hub_origin.db")
+        try:
+            self.upgrade_to_revision(engine, "03f4cfe3ff15")
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO federation_app (
+                            federation_id, app_id, fab_hash, app_type,
+                            added_by, added_at
+                        ) VALUES (
+                            :federation_id, :app_id, :fab_hash, :app_type,
+                            :added_by, :added_at
+                        )
+                        """
+                    ),
+                    {
+                        "federation_id": "@alice/research",
+                        "app_id": "@flwragent/flwr-agent",
+                        "fab_hash": "legacy-hash",
+                        "app_type": TaskType.AGENT_APP,
+                        "added_by": "alice",
+                        "added_at": "2026-08-23 10:00:00+00:00",
+                    },
+                )
+
+            self.upgrade_to_revision(engine, "heads")
+
+            with engine.connect() as connection:
+                is_hub_app = connection.execute(
+                    text(
+                        """
+                        SELECT is_hub_app
+                        FROM federation_app
+                        WHERE federation_id = :federation_id
+                          AND app_id = :app_id
+                        """
+                    ),
+                    {
+                        "federation_id": "@alice/research",
+                        "app_id": "@flwragent/flwr-agent",
+                    },
+                ).scalar_one()
+
+            self.assertIsNone(is_hub_app)
+        finally:
+            engine.dispose()
+
+    def test_automation_timestamp_migration_normalizes_sqlite_text(self) -> None:
+        """Ensure legacy SQLite automation timestamps use ORM-compatible text."""
+        engine = self.create_engine("automation_timestamp_normalization.db")
+        try:
+            self.upgrade_to_revision(engine, "28482626dbdc")
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO automation (
+                            federation_id, flwr_aid, series_id, status,
+                            created_at, updated_at, next_run_at, stopped_at,
+                            fixed_interval, remaining_runs, start_run_request
+                        ) VALUES (
+                            :federation_id, :flwr_aid, :series_id, :status,
+                            :created_at, :updated_at, :next_run_at, :stopped_at,
+                            :fixed_interval, :remaining_runs, :start_run_request
+                        )
+                        """
+                    ),
+                    {
+                        "federation_id": "fed",
+                        "flwr_aid": "aid",
+                        "series_id": 7,
+                        "status": "active",
+                        "created_at": "2026-08-10T10:00:00+00:00",
+                        "updated_at": "2026-08-10T10:01:00+00:00",
+                        "next_run_at": "2026-08-10T10:02:00+00:00",
+                        "stopped_at": "2026-08-10T10:03:00+00:00",
+                        "fixed_interval": 60,
+                        "remaining_runs": 1,
+                        "start_run_request": None,
+                    },
+                )
+
+            self.upgrade_to_revision(engine, "heads")
+
+            with engine.connect() as connection:
+                automation = (
+                    connection.execute(
+                        text(
+                            """
+                            SELECT created_at, updated_at, next_run_at, stopped_at
+                            FROM automation
+                            WHERE federation_id = :federation_id
+                            """
+                        ),
+                        {"federation_id": "fed"},
+                    )
+                    .mappings()
+                    .one()
+                )
+
+            self.assertEqual(automation["created_at"], "2026-08-10 10:00:00+00:00")
+            self.assertEqual(automation["updated_at"], "2026-08-10 10:01:00+00:00")
+            self.assertEqual(automation["next_run_at"], "2026-08-10 10:02:00+00:00")
+            self.assertEqual(automation["stopped_at"], "2026-08-10 10:03:00+00:00")
+        finally:
+            engine.dispose()
+
     def test_primary_task_backfill_populates_historical_runs(self) -> None:
         """Ensure historical runs get backfilled primary tasks during migration."""
         engine = self.create_engine("primary_task_backfill.db")
@@ -300,7 +426,7 @@ class TestAlembicRun(unittest.TestCase):
                             fab_version="1.0.0",
                             fab_hash="fab-pending",
                             pending_at="2026-04-27T10:00:00+00:00",
-                            federation="fed-a",
+                            federation="@me/fed-a",
                             flwr_aid="aid-a",
                         ),
                         self.build_run_row(
@@ -314,7 +440,7 @@ class TestAlembicRun(unittest.TestCase):
                             finished_at="2026-04-27T11:03:00+00:00",
                             sub_status="completed",
                             details="done",
-                            federation="fed-b",
+                            federation="@me/fed-b",
                             federation_config="{}",
                             run_type="simulation",
                             flwr_aid="aid-b",
@@ -331,7 +457,7 @@ class TestAlembicRun(unittest.TestCase):
                             finished_at="2026-04-27T12:05:00+00:00",
                             sub_status="failed",
                             details="boom",
-                            federation="fed-c",
+                            federation="@me/fed-c",
                             flwr_aid="aid-c",
                             bytes_sent=1,
                             bytes_recv=2,
@@ -422,7 +548,7 @@ class TestAlembicRun(unittest.TestCase):
                             pending_at="2026-04-27T13:00:00+00:00",
                             starting_at="2026-04-27T13:01:00+00:00",
                             running_at="2026-04-27T13:02:00+00:00",
-                            federation="fed-live",
+                            federation="@me/live",
                             flwr_aid="aid-live",
                         )
                     ],
@@ -490,7 +616,7 @@ class TestAlembicRun(unittest.TestCase):
                             finished_at="2026-04-27T10:03:00+00:00",
                             sub_status=SubStatus.COMPLETED,
                             details="done",
-                            federation="fed",
+                            federation="@me/fed",
                             flwr_aid="aid",
                         )
                     ],

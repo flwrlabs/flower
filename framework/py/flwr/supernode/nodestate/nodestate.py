@@ -26,6 +26,10 @@ from flwr.supercore.run import Run
 class NodeState(CoreState):
     """Abstract base class for node state."""
 
+    def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
+        """Delete Messages belonging to an expired push session."""
+        self.delete_messages(message_ids=list(message_object_ids))
+
     @abstractmethod
     def set_node_id(self, node_id: int) -> None:
         """Set the node ID."""

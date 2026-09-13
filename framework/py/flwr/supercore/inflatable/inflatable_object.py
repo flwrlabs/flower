@@ -153,7 +153,9 @@ def get_object_body(object_content: bytes, cls: type[T]) -> bytes:
     return _get_object_body(object_content)
 
 
-def add_header_to_object_body(object_body: bytes, obj: InflatableObject) -> bytes:
+def add_header_to_object_body(
+    object_body: bytes | memoryview, obj: InflatableObject
+) -> bytes:
     """Add header to object content."""
     # Construct header
     header = f"%s{HEAD_VALUE_DIVIDER}%s{HEAD_VALUE_DIVIDER}%d" % (

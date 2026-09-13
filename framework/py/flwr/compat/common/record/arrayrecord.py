@@ -18,7 +18,7 @@ from logging import WARN
 from typing import Any
 
 from flwr.app.message import ArrayRecord
-from flwr.common.logger import log
+from flwr.supercore import log
 
 
 class ParametersRecord(ArrayRecord):

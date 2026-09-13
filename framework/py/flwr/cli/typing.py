@@ -109,7 +109,7 @@ class SuperLinkConnection:
          Whether to use an insecure channel. If True, the
          connection will not use TLS encryption.
     federation : str
-         The name of the federation to interface with.
+         The federation ID to interface with.
     options : SuperLinkSimulationOptions
          Configuration options for the simulation runtime.
     """
@@ -185,7 +185,7 @@ class SuperLinkConnection:
                     + f"expected str, but got {type(self.federation).__name__}."
                 )
 
-            # Check if the federation string is valid
+            # Check if the federation ID is valid
             check_federation_format(self.federation)
 
         # The connection needs to have either an address or options (or both).

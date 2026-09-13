@@ -16,6 +16,7 @@
 
 
 from .grpc_retry import make_simple_grpc_retry_invoker, wrap_stub
+from .http_retry import make_simple_http_retry_invoker
 from .retry_invoker import RetryInvoker, RetryState, constant, exponential, full_jitter
 
 __all__ = [
@@ -25,5 +26,6 @@ __all__ = [
     "exponential",
     "full_jitter",
     "make_simple_grpc_retry_invoker",
+    "make_simple_http_retry_invoker",
     "wrap_stub",
 ]

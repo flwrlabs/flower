@@ -15,18 +15,16 @@
 """Tests for ObjectStore."""
 
 
-import sqlite3
 import tempfile
 import threading
 import unittest
 from abc import abstractmethod
-from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, cast
-from unittest.mock import patch
+from typing import cast
+from unittest.mock import Mock
 
 from parameterized import parameterized
-from sqlalchemy import Engine, inspect
+from sqlalchemy import Engine, inspect, select
 
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore.inflatable.inflatable_object import (
@@ -36,6 +34,7 @@ from flwr.supercore.inflatable.inflatable_object import (
 )
 from flwr.supercore.inflatable.inflatable_object_test import CustomDataClass
 
+from ..state.schema.objectstore_models import ObjectStoreLock
 from .in_memory_object_store import InMemoryObjectStore
 from .object_store import NoObjectInStoreError, ObjectStore
 from .sql_object_store import SqlObjectStore
@@ -258,7 +257,7 @@ class ObjectStoreTest(unittest.TestCase):
         self.assertEqual(retrieved_tree_traversed, obj_tree_traversed)
 
     @parameterized.expand([(""), ("invalid")])  # type: ignore
-    def test_preregister_with_invalid_object_id(self, invalid_object_id) -> None:
+    def test_preregister_with_invalid_object_id(self, invalid_object_id: str) -> None:
         """Test preregistering with object_id that is not a valid SHA256."""
         # Prepare
         object_store = self.object_store_factory()
@@ -383,24 +382,15 @@ class InMemoryObjectStoreTest(ObjectStoreTest):
         return InMemoryObjectStore()
 
 
-class SqlInMemoryObjectStoreTest(ObjectStoreTest):
-    """Test SqlObjectStore implementation with in-memory database."""
+class SqlObjectStoreTestMixin(unittest.TestCase):
+    """Test SQL-specific ObjectStore behavior."""
 
-    __test__ = True
+    __test__ = False
+    run_id: int
 
     def object_store_factory(self) -> SqlObjectStore:
-        """Return SqlObjectStore."""
-        store = SqlObjectStore(":memory:")
-        store.initialize()
-        return store
-
-    def test_in_memory_does_not_create_alembic_version(self) -> None:
-        """Ensure in-memory DB uses create_all without Alembic versioning."""
-        store = self.object_store_factory()
-        table_names = inspect(
-            cast(Engine, store._engine)  # pylint: disable=W0212
-        ).get_table_names()
-        self.assertNotIn("alembic_version", table_names)
+        """Provide SQL ObjectStore implementation to test."""
+        raise NotImplementedError()
 
     def test_preregister_rejects_new_children_for_existing_object_id(self) -> None:
         """Ensure existing SQL objects cannot get new children."""
@@ -419,41 +409,95 @@ class SqlInMemoryObjectStoreTest(ObjectStoreTest):
                 ),
             )
 
+    def test_get_object_tree_uses_current_database_state(self) -> None:
+        """Ensure tree reads do not return a cached object after deletion."""
+        store = self.object_store_factory()
+        object_id = get_object_id(b"object")
+        store.preregister(self.run_id, ObjectTree(object_id=object_id))
 
-class SqlFileBasedObjectStoreTest(ObjectStoreTest):
-    """Test SqlObjectStore implementation with file-based database."""
+        with store.session():
+            self.assertTrue(object_id in store)
+            store.query(
+                "DELETE FROM objects WHERE object_id = :object_id",
+                {"object_id": object_id},
+            )
+
+            with self.assertRaises(NoObjectInStoreError):
+                store.get_object_tree(object_id)
+
+
+class SqlInMemoryObjectStoreTest(SqlObjectStoreTestMixin, ObjectStoreTest):
+    """Test SqlObjectStore implementation with in-memory database."""
 
     __test__ = True
 
-    def setUp(self) -> None:
-        """Set up the test case."""
-        super().setUp()
-        self.temp_file = tempfile.NamedTemporaryFile()  # pylint: disable=R1732
-
-    def tearDown(self) -> None:
-        """Tear down the test case."""
-        super().tearDown()
-        self.temp_file.close()
-
     def object_store_factory(self) -> SqlObjectStore:
         """Return SqlObjectStore."""
-        store = SqlObjectStore(self.temp_file.name)
+        store = SqlObjectStore(":memory:")
         store.initialize()
         return store
 
-    def test_file_db_creates_alembic_version(self) -> None:
-        """Ensure file-based DBs run Alembic migrations."""
+    def test_in_memory_does_not_create_alembic_version(self) -> None:
+        """Ensure in-memory DB uses create_all without Alembic versioning."""
+        store = self.object_store_factory()
+        table_names = inspect(
+            cast(Engine, store._engine)  # pylint: disable=W0212
+        ).get_table_names()
+        self.assertNotIn("alembic_version", table_names)
+
+
+class SqlPersistentObjectStoreTestMixin(unittest.TestCase):
+    """Test SQL ObjectStore behavior requiring a persistent database."""
+
+    __test__ = False
+    run_id: int
+
+    def object_store_factory(self) -> SqlObjectStore:
+        """Return a new store connected to the same persistent database."""
+        raise NotImplementedError()
+
+    def test_persistent_db_creates_alembic_version(self) -> None:
+        """Ensure persistent SQL databases run Alembic migrations."""
         store = self.object_store_factory()
         table_names = inspect(
             cast(Engine, store._engine)  # pylint: disable=W0212
         ).get_table_names()
         self.assertIn("alembic_version", table_names)
+        self.assertIn("objectstore_locks", table_names)
+
+    # pylint: disable=protected-access
+    def test_mutation_lock_uses_sql_lock_row(self) -> None:
+        """Ensure ObjectStore mutations use a transaction-scoped SQL lock."""
+        store = self.object_store_factory()
+        store._lock_objectstore_mutation()  # pylint: disable=protected-access
+
+        with store.session() as session:
+            self.assertEqual(
+                session.scalar(
+                    select(ObjectStoreLock.lock_id).where(
+                        ObjectStoreLock.lock_id == store._MUTATION_LOCK_ID
+                    )
+                ),
+                store._MUTATION_LOCK_ID,
+            )
+
+    def test_mutation_session_locks_once(self) -> None:
+        """Ensure nested mutation sessions reuse the transaction-scoped lock."""
+        store = self.object_store_factory()
+        store._lock_objectstore_mutation = Mock()  # type: ignore[method-assign]
+
+        with store._mutation_session():  # pylint: disable=protected-access
+            with store._mutation_session():  # pylint: disable=protected-access
+                pass
+
+        store._lock_objectstore_mutation.assert_called_once_with()
+
+    # pylint: enable=protected-access
 
     def test_concurrent_preregister_and_run_cleanup(self) -> None:
         """Concurrent run cleanup preserves objects registered by another run."""
         store = self.object_store_factory()
-        second_store = SqlObjectStore(self.temp_file.name)
-        second_store.initialize()
+        second_store = self.object_store_factory()
         child = CustomDataClass(b"shared")
         old_parent = CustomDataClass(b"old", children=[child])
         new_parent = CustomDataClass(b"new", children=[child])
@@ -484,36 +528,41 @@ class SqlFileBasedObjectStoreTest(ObjectStoreTest):
         self.assertEqual(store.get(new_parent.object_id), new_parent.deflate())
 
     def test_put_raises_if_object_deleted_before_update(self) -> None:
-        """A concurrent delete before the write must not report put success."""
+        """A delete before the write must not report put success."""
         store = self.object_store_factory()
+        second_store = self.object_store_factory()
         obj = CustomDataClass(data=b"test_value")
         object_content = obj.deflate()
         object_id = get_object_id(object_content)
         store.preregister(self.run_id, get_object_tree(obj))
 
-        should_delete = True
-        original_query = store.query
+        second_store.delete(object_id)
 
-        def delete_before_update(
-            query: str,
-            data: Sequence[dict[str, Any]] | dict[str, Any] | None = None,
-        ) -> list[dict[str, Any]]:
-            nonlocal should_delete
-            normalized_query = " ".join(query.split())
-            if should_delete and normalized_query.startswith(
-                "UPDATE objects SET content = :content"
-            ):
-                should_delete = False
-                with sqlite3.connect(self.temp_file.name) as conn:
-                    conn.execute("PRAGMA foreign_keys = ON")
-                    conn.execute(
-                        "DELETE FROM objects WHERE object_id = ? AND ref_count = 0",
-                        (object_id,),
-                    )
-            return original_query(query, data)
-
-        with patch.object(store, "query", side_effect=delete_before_update):
-            with self.assertRaises(NoObjectInStoreError):
-                store.put(object_id, object_content)
+        with self.assertRaises(NoObjectInStoreError):
+            store.put(object_id, object_content)
 
         self.assertIsNone(store.get(object_id))
+
+
+class SqlFileBasedObjectStoreTest(
+    SqlPersistentObjectStoreTestMixin, SqlObjectStoreTestMixin, ObjectStoreTest
+):
+    """Test SqlObjectStore implementation with file-based database."""
+
+    __test__ = True
+
+    def setUp(self) -> None:
+        """Set up the test case."""
+        super().setUp()
+        self.temp_file = tempfile.NamedTemporaryFile()  # pylint: disable=R1732
+
+    def tearDown(self) -> None:
+        """Tear down the test case."""
+        super().tearDown()
+        self.temp_file.close()
+
+    def object_store_factory(self) -> SqlObjectStore:
+        """Return SqlObjectStore."""
+        store = SqlObjectStore(self.temp_file.name)
+        store.initialize()
+        return store

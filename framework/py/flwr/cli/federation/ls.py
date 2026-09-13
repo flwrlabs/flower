@@ -33,17 +33,17 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ShowFederationRequest,
     ShowFederationResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation, Member  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.utils import humanize_duration, simulation_config_to_json
 
 from ..run_utils import RunRow, format_runs
 from ..utils import (
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
-    init_channel_from_connection,
+    flwr_cli_exc_handler,
+    init_http_client_from_connection,
     print_json_to_stdout,
 )
 
@@ -67,7 +67,7 @@ def ls(  # pylint: disable=R0914, R0913, R0917, R0912
         typer.Option(
             "--federation",
             case_sensitive=False,
-            help="Name of the federation to display",
+            help="Federation ID to display",
         ),
     ] = None,
     verbose: Annotated[
@@ -85,16 +85,15 @@ def ls(  # pylint: disable=R0914, R0913, R0917, R0912
 
         # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
-        channel = None
+        control_client = None
 
         try:
-            channel = init_channel_from_connection(superlink_connection)
-            stub = ControlStub(channel)
+            control_client = init_http_client_from_connection(superlink_connection)
 
             if federation:
                 # Show specific federation details
                 members, nodes, runs, archived, simulation, config = _show_federation(
-                    stub, federation
+                    control_client, federation
                 )
                 archived_str = (
                     "[bold yellow]ARCHIVED[/bold yellow] " if archived else ""
@@ -126,7 +125,7 @@ def ls(  # pylint: disable=R0914, R0913, R0917, R0912
             else:
                 # List federations
                 typer.echo("📄 Listing federations...")
-                federations = _list_federations(stub)
+                federations = _list_federations(control_client)
 
                 active = [f for f in federations if not f.archived]
                 archived_feds = [f for f in federations if f.archived]
@@ -138,13 +137,13 @@ def ls(  # pylint: disable=R0914, R0913, R0917, R0912
                     shown = active + archived_feds if verbose else active
                     Console().print(_to_table(shown))
         finally:
-            if channel:
-                channel.close()
+            if control_client:
+                control_client.close()
 
 
-def _list_federations(stub: ControlStub) -> list[Federation]:
+def _list_federations(stub: ControlHttpClient) -> list[Federation]:
     """List all federations."""
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         res: ListFederationsResponse = stub.ListFederations(ListFederationsRequest())
 
     return list(res.federations)
@@ -201,7 +200,7 @@ def _to_json(  # pylint: disable=R0913,R0917
         return {
             "federations": [
                 {
-                    "name": federation.name,
+                    "id": federation.name,
                     "description": federation.description,
                     "archived": federation.archived,
                     "simulation": federation.simulation,
@@ -252,23 +251,23 @@ def _to_json(  # pylint: disable=R0913,R0917
 
 
 def _show_federation(
-    stub: ControlStub, federation: str
+    stub: ControlHttpClient, federation: str
 ) -> tuple[list[Member], list[NodeInfo], list[RunRow], bool, bool, SimulationConfig]:
     """Show federation details.
 
     Parameters
     ----------
-    stub : ControlStub
-        The gRPC stub for Control API communication.
+    stub : ControlHttpClient
+        The HTTP client for Control API communication.
     federation : str
-        Name of the federation to show.
+        Federation ID to show.
 
     Returns
     -------
     tuple[list[Member], list[NodeInfo], list[RunRow], bool, bool, SimulationConfig]
         A tuple containing (members, nodes, runs, archived, simulation, config).
     """
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         res: ShowFederationResponse = stub.ShowFederation(
             ShowFederationRequest(federation_name=federation)
         )

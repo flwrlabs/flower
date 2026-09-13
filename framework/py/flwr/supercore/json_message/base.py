@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Self, cast
+from typing import Self
 
 from flwr.app.constants import DEFAULT_TTL
 from flwr.app.message import ConfigRecord, Message, RecordDict
@@ -198,4 +198,4 @@ def _payload_from_content(content: RecordDict) -> JSONObject:
 
     if not isinstance(payload, dict):
         raise ValueError("Payload JSON must be a JSON object.")
-    return cast(JSONObject, payload)
+    return payload

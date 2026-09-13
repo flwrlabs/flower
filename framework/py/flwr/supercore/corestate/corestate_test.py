@@ -18,12 +18,13 @@
 # pylint: disable=too-many-lines
 import unittest
 from contextlib import ExitStack
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from parameterized import parameterized
 
+from flwr.app import Context, RecordDict
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
@@ -31,9 +32,21 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.proto.task_pb2 import TaskEvent, TaskStatus  # pylint: disable=E0611
-from flwr.supercore.constant import TaskType
+from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.proto.task_pb2 import (  # pylint: disable=E0611
+    TaskEvent,
+    TaskStatus,
+    TaskUsage,
+)
+from flwr.supercore.constant import (
+    OBJECT_PUSH_SESSION_TTL_SECONDS,
+    AutomationStatus,
+    TaskType,
+)
 from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
+from flwr.supercore.typing import ConnectorRecord
 
 from . import CoreState
 from .utils_test import create_task_message
@@ -74,17 +87,563 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         mock_datetime.now.side_effect = timestamps
         return stack
 
+    def test_store_list_and_delete_apps(self) -> None:
+        """Federation apps can be stored, listed, limited, and deleted."""
+        state = self.state_factory()
+
+        server_hash = state.store_app(
+            fab=Fab("", b"server", {}),
+            federation_id="@me/fed-a",
+            app_id="@me/server",
+            app_type=TaskType.SERVER_APP,
+            added_by="account-a",
+        )
+        agent_hash = state.store_app(
+            fab=Fab("", b"agent", {}),
+            federation_id="@me/fed-a",
+            app_id="@me/z-agent",
+            app_type=TaskType.AGENT_APP,
+            added_by="account-a",
+            is_hub_app=True,
+        )
+        state.store_app(
+            fab=Fab("", b"other", {}),
+            federation_id="@me/fed-b",
+            app_id="@me/server",
+            app_type=TaskType.SERVER_APP,
+            added_by="account-b",
+        )
+
+        apps = state.list_apps("@me/fed-a")
+        self.assertEqual(
+            [(app.app_id, app.fab_hash, app.app_type, app.is_hub_app) for app in apps],
+            [
+                ("@me/z-agent", "", TaskType.AGENT_APP, True),
+                ("@me/server", server_hash, TaskType.SERVER_APP, False),
+            ],
+        )
+        self.assertIsNotNone(state.get_fab(agent_hash))
+        self.assertEqual(
+            state.get_app("@me/fed-a", "@me/server", server_hash),
+            Fab(server_hash, b"server", {}),
+        )
+        self.assertIsNone(state.get_app("@me/fed-b", "@me/server", server_hash))
+        self.assertIsNone(state.get_app("@me/fed-a", "@me/z-agent", server_hash))
+        self.assertEqual(
+            [app.app_id for app in state.list_apps("@me/fed-a", limit=1)],
+            ["@me/z-agent"],
+        )
+        self.assertEqual(state.list_apps("@me/fed-a", limit=0), [])
+        with self.assertRaises(AssertionError):
+            state.list_apps("@me/fed-a", limit=-1)
+
+        updated_hash = state.store_app(
+            fab=Fab("", b"updated", {}),
+            federation_id="@me/fed-a",
+            app_id="@me/server",
+            app_type=TaskType.SERVER_APP,
+            added_by="account-c",
+            is_hub_app=True,
+        )
+        updated = state.list_apps("@me/fed-a")
+        self.assertEqual(len(updated), 2)
+        self.assertEqual(updated[1].fab_hash, "")
+        self.assertTrue(updated[1].is_hub_app)
+        self.assertIsNone(state.get_app("@me/fed-a", "@me/server", server_hash))
+        self.assertIsNone(state.get_app("@me/fed-a", "@me/server", updated_hash))
+
+        self.assertTrue(state.delete_app("@me/fed-a", "@me/server"))
+        self.assertFalse(state.delete_app("@me/fed-a", "@me/server"))
+        self.assertEqual(
+            [app.app_id for app in state.list_apps("@me/fed-a")],
+            ["@me/z-agent"],
+        )
+        self.assertEqual(
+            [app.app_id for app in state.list_apps("@me/fed-b")],
+            ["@me/server"],
+        )
+        self.assertIsNotNone(state.get_fab(updated_hash))
+
+    def test_connector_upsert_get_and_delete(self) -> None:
+        """A connector can be created, updated, retrieved, and deleted."""
+        state = self.state_factory()
+
+        self.assertTrue(
+            state.upsert_connector(
+                flwr_aid="account-a",
+                connector_ref="calendar",
+                credentials_json='{"token":"first"}',
+                config_json='{"calendar":"primary"}',
+            )
+        )
+        self.assertEqual(
+            state.get_connector(flwr_aid="account-a", connector_ref="calendar"),
+            ConnectorRecord(
+                flwr_aid="account-a",
+                connector_ref="calendar",
+                credentials_json='{"token":"first"}',
+                config_json='{"calendar":"primary"}',
+            ),
+        )
+        self.assertTrue(
+            state.upsert_connector(
+                flwr_aid="account-a",
+                connector_ref="calendar",
+                credentials_json='{"token":"updated"}',
+                config_json='{"calendar":"work"}',
+            )
+        )
+        updated = state.get_connector(flwr_aid="account-a", connector_ref="calendar")
+        assert updated is not None
+        self.assertEqual(updated.credentials_json, '{"token":"updated"}')
+        self.assertEqual(updated.config_json, '{"calendar":"work"}')
+
+        self.assertTrue(
+            state.delete_connector(flwr_aid="account-a", connector_ref="calendar")
+        )
+        self.assertIsNone(
+            state.get_connector(flwr_aid="account-a", connector_ref="calendar")
+        )
+        self.assertFalse(
+            state.delete_connector(flwr_aid="account-a", connector_ref="calendar")
+        )
+
+    def test_bind_and_get_run_connectors(self) -> None:
+        """Run connector bindings should be deterministic and idempotent."""
+        state = self.state_factory()
+
+        state.bind_connectors_to_run(
+            run_id=42,
+            connector_refs=["notion", "calendar", "notion"],
+        )
+        state.bind_connectors_to_run(run_id=42, connector_refs=["notion"])
+
+        self.assertEqual(
+            list(state.get_run_connector_refs(run_id=42)),
+            ["calendar", "notion"],
+        )
+
+        self.assertFalse(
+            state.bind_connectors_to_run(run_id=43, connector_refs="notion")
+        )
+        self.assertEqual(list(state.get_run_connector_refs(run_id=43)), [])
+
+    def test_run_series_context_roundtrip(self) -> None:
+        """A run series context can be stored and retrieved."""
+        state = self.state_factory()
+
+        self.assertIsNone(state.get_run_series_context(series_id=42))
+        context = Context(
+            run_id=123,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={"node": "value"},
+            state=RecordDict(),
+            run_config={"run": "value"},
+            series_id=42,
+        )
+        state.set_run_series_context(series_id=42, context=context)
+
+        retrieved = state.get_run_series_context(series_id=42)
+
+        assert retrieved is not None
+        self.assertEqual(retrieved.run_id, context.run_id)
+        self.assertEqual(retrieved.node_id, context.node_id)
+        self.assertEqual(retrieved.node_config, context.node_config)
+        self.assertEqual(retrieved.run_config, context.run_config)
+        self.assertEqual(retrieved.series_id, context.series_id)
+
+        updated_context = Context(
+            run_id=456,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={"node": "updated"},
+            state=RecordDict(),
+            run_config={"run": "updated"},
+            series_id=42,
+        )
+        state.set_run_series_context(series_id=42, context=updated_context)
+
+        updated = state.get_run_series_context(series_id=42)
+
+        assert updated is not None
+        self.assertEqual(updated.run_id, updated_context.run_id)
+        self.assertEqual(updated.node_config, updated_context.node_config)
+        self.assertEqual(updated.run_config, updated_context.run_config)
+
+    def test_connector_oauth_session_lifecycle(self) -> None:
+        """An OAuth session can be created, retrieved, and completed once."""
+        state = self.state_factory()
+        expires_at = now() + timedelta(minutes=10)
+
+        session = state.create_connector_oauth_session(
+            oauth_session_id="session-1",
+            flwr_aid="account-a",
+            connector_ref="calendar",
+            state="oauth-state",
+            redirect_uri="https://example.test/callback",
+            pkce_verifier=None,
+            expires_at=expires_at,
+        )
+        assert session is not None
+        self.assertEqual(session.expires_at, expires_at.isoformat())
+        self.assertIsNone(session.completed_at)
+        self.assertEqual(
+            state.get_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-a"
+            ),
+            session,
+        )
+        self.assertIsNone(
+            state.create_connector_oauth_session(
+                oauth_session_id="session-1",
+                flwr_aid="account-a",
+                connector_ref="calendar",
+                state="oauth-state",
+                redirect_uri="https://example.test/callback",
+                pkce_verifier=None,
+                expires_at=expires_at,
+            )
+        )
+        self.assertIsNone(
+            state.get_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-b"
+            )
+        )
+        self.assertFalse(
+            state.complete_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-b"
+            )
+        )
+        self.assertTrue(
+            state.complete_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-a"
+            )
+        )
+        completed = state.get_connector_oauth_session(
+            oauth_session_id="session-1", flwr_aid="account-a"
+        )
+        assert completed is not None
+        self.assertIsNotNone(completed.completed_at)
+        self.assertFalse(
+            state.complete_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-a"
+            )
+        )
+        expired = state.create_connector_oauth_session(
+            oauth_session_id="expired-session",
+            flwr_aid="account-a",
+            connector_ref="calendar",
+            state="oauth-state",
+            redirect_uri="https://example.test/callback",
+            pkce_verifier=None,
+            expires_at=now() - timedelta(minutes=10),
+        )
+        assert expired is not None
+        self.assertFalse(
+            state.complete_connector_oauth_session(
+                oauth_session_id="expired-session", flwr_aid="account-a"
+            )
+        )
+
+    def store_automation(  # pylint: disable=too-many-arguments
+        self,
+        state: CoreState,
+        *,
+        series_id: int,
+        federation_id: str = "@me/fed-a",
+        flwr_aid: str = "aid-a",
+        next_run_at: str | None = None,
+        fixed_interval: int | None = None,
+        max_runs: int | None = 1,
+    ) -> Automation:
+        """Store a minimal automation."""
+        return state.store_automation(
+            federation_id=federation_id,
+            flwr_aid=flwr_aid,
+            start_run_request=StartRunRequest(
+                federation=federation_id,
+                series_id=series_id,
+            ),
+            series_id=series_id,
+            next_run_at=next_run_at or now().isoformat(),
+            fixed_interval=fixed_interval,
+            max_runs=max_runs,
+        )
+
+    def test_preregister_object_tree(self) -> None:
+        """Preregistering an object tree returns its missing objects."""
+        state = self.state_factory()
+        object_id = "a" * 64
+        object_tree = ObjectTree(object_id=object_id)
+        run_id = self.task_run_id(state)
+
+        missing_objects = state.preregister_object_tree(
+            object_tree, state.start_session(run_id)
+        )
+        replacement_missing_objects = state.preregister_object_tree(
+            object_tree, state.start_session(run_id)
+        )
+
+        self.assertEqual(missing_objects, [object_id])
+        self.assertEqual(replacement_missing_objects, [object_id])
+
+    def test_delete_sessions_in_run(self) -> None:
+        """Deleting sessions for a run preserves sessions belonging to other runs."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        other_run_id = self.other_task_run_id(state)
+        session_ids = [state.start_session(run_id) for _ in range(2)]
+        other_session_id = state.start_session(other_run_id)
+        object_ids = ["a" * 64, "b" * 64, "c" * 64]
+        for session_id, object_id in zip(
+            [*session_ids, other_session_id], object_ids, strict=True
+        ):
+            state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        state.delete_sessions_in_run(run_id)
+
+        for session_id in session_ids:
+            with self.assertRaisesRegex(ValueError, "Unknown object push session"):
+                state.preregister_object_tree(
+                    ObjectTree(object_id="d" * 64), session_id
+                )
+        self.assertEqual(
+            state.preregister_object_tree(
+                ObjectTree(object_id="e" * 64), other_session_id
+            ),
+            ["e" * 64],
+        )
+
+    def test_store_object_rejects_invalid_session_membership(self) -> None:
+        """Objects must be pending in a session belonging to the run."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        session_id = state.start_session(run_id)
+        state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        with (
+            patch.object(state.object_store, "put") as put_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            self.assertFalse(
+                state.store_object(run_id + 1, session_id, object_id, b"content")
+            )
+            self.assertFalse(
+                state.store_object(run_id, "unknown-session", object_id, b"content")
+            )
+            self.assertFalse(
+                state.store_object(run_id, session_id, "unknown-object-id", b"content")
+            )
+
+        put_object.assert_not_called()
+        cleanup_session.assert_not_called()
+
+    def test_store_object_resolves_empty_session_id(self) -> None:
+        """An empty session ID resolves through pending object membership."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        session_id = state.start_session(run_id)
+        state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        with patch.object(state.object_store, "put") as put_object:
+            self.assertTrue(state.store_object(run_id, "", object_id, b"content"))
+
+        put_object.assert_called_once_with(object_id, b"content")
+
+    def test_store_object_cleans_up_expired_session(self) -> None:
+        """An object cannot be stored after its push session expires."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = created_at
+            session_id = state.start_session(run_id)
+            state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        expired_at = created_at + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1)
+        with (
+            patch("flwr.supercore.date.datetime.datetime") as mock_datetime,
+            patch.object(state.object_store, "put") as put_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            mock_datetime.now.return_value = expired_at
+            stored = state.store_object(run_id, session_id, object_id, b"content")
+
+        self.assertFalse(stored)
+        put_object.assert_not_called()
+        cleanup_session.assert_called_once_with(session_id, cleanup_messages=True)
+
+    def test_store_object_refreshes_session_and_cleans_up_on_completion(self) -> None:
+        """A successful store refreshes TTL and cleans up an empty session."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        parent_id = "a" * 64
+        child_id = "b" * 64
+        created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        object_tree = ObjectTree(
+            object_id=parent_id,
+            children=[ObjectTree(object_id=child_id)],
+        )
+        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = created_at
+            session_id = state.start_session(run_id)
+            state.preregister_object_tree(object_tree, session_id)
+
+        first_store_at = created_at + timedelta(
+            seconds=OBJECT_PUSH_SESSION_TTL_SECONDS - 1
+        )
+        second_store_at = created_at + timedelta(
+            seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1
+        )
+        with (
+            patch.object(state.object_store, "put") as put_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+                mock_datetime.now.return_value = first_store_at
+                self.assertTrue(
+                    state.store_object(run_id, session_id, child_id, b"child")
+                )
+            cleanup_session.assert_not_called()
+
+            with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+                mock_datetime.now.return_value = second_store_at
+                self.assertTrue(
+                    state.store_object(run_id, session_id, parent_id, b"parent")
+                )
+
+        self.assertEqual(put_object.call_count, 2)
+        cleanup_session.assert_called_once_with(session_id, cleanup_messages=False)
+
+    def test_store_object_preserves_pending_claim_when_object_store_fails(self) -> None:
+        """An ObjectStore error returns False without consuming the pending claim."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        session_id = state.start_session(run_id)
+        state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        with patch.object(
+            state.object_store,
+            "put",
+            side_effect=[RuntimeError("write failed"), None],
+        ) as put_object:
+            self.assertFalse(
+                state.store_object(run_id, session_id, object_id, b"content")
+            )
+            self.assertTrue(
+                state.store_object(run_id, session_id, object_id, b"content")
+            )
+
+        self.assertEqual(put_object.call_count, 2)
+
+    def test_get_object_returns_object_store_result_without_cleanup(self) -> None:
+        """Available, unknown, and unowned unavailable objects are returned directly."""
+        state = self.state_factory()
+        with (
+            patch.object(
+                state.object_store,
+                "get",
+                side_effect=[b"content", None, b""],
+            ) as load_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            self.assertEqual(state.get_object(1, "available"), b"content")
+            self.assertIsNone(state.get_object(1, "unknown"))
+            self.assertEqual(state.get_object(1, "unavailable"), b"")
+
+        self.assertEqual(load_object.call_count, 3)
+        cleanup_session.assert_not_called()
+
+    def test_get_object_cleans_up_expired_sessions_and_reloads(self) -> None:
+        """An unavailable object triggers cleanup for all expired sessions."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = created_at
+            session_ids = []
+            for root_object_id in ("b" * 64, "c" * 64):
+                session_id = state.start_session(run_id)
+                session_ids.append(session_id)
+                state.preregister_object_tree(
+                    ObjectTree(
+                        object_id=root_object_id,
+                        children=[ObjectTree(object_id=object_id)],
+                    ),
+                    session_id,
+                )
+
+        expired_at = created_at + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1)
+        with (
+            patch("flwr.supercore.date.datetime.datetime") as mock_datetime,
+            patch.object(
+                state,
+                "_cleanup_push_session",
+                wraps=state._cleanup_push_session,  # pylint: disable=W0212
+            ) as cleanup_session,
+        ):
+            mock_datetime.now.return_value = expired_at
+            self.assertIsNone(state.get_object(run_id, "unknown-object-id"))
+            cleanup_session.assert_not_called()
+            self.assertIsNone(state.get_object(run_id, object_id))
+
+        cleanup_session.assert_has_calls(
+            [call(session_id, cleanup_messages=True) for session_id in session_ids],
+            any_order=True,
+        )
+        self.assertEqual(cleanup_session.call_count, 2)
+
     def test_store_run_in_series_creates_id(self) -> None:
         """Storing a run in a run series should create a nonzero ID."""
         state = self.state_factory()
 
         series_id = state.store_run_in_series(
-            run_id=123, federation="federation-a", series_id=None
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=True,
+            series_id=None,
+            description="Initial description",
         )
 
         self.assertIsNotNone(series_id)
         assert series_id is not None
         self.assertGreater(series_id, 0)
+        self.assertEqual(
+            state.store_run_in_series(
+                run_id=456,
+                federation_id="@me/fed-a",
+                is_agent=False,
+                series_id=series_id,
+                description="Replacement description",
+            ),
+            series_id,
+        )
+        run_series = state.get_run_series(series_ids=[series_id])
+        self.assertEqual(run_series[0].description, "Initial description")
+        self.assertEqual(state.get_run_series(is_agent=True), run_series)
+        self.assertEqual(state.get_run_series(is_agent=False), [])
+
+    def test_set_run_series_description(self) -> None:
+        """A valid RunSeries description can be changed."""
+        state = self.state_factory()
+        series_id = state.store_run_in_series(
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=True,
+            series_id=None,
+            description="Initial description",
+        )
+        assert series_id is not None
+
+        self.assertIsNone(
+            state.set_run_series_description(series_id, "  Generated title  ")
+        )
+        updated = state.get_run_series(series_ids=[series_id])[0]
+        self.assertEqual(updated.description, "Generated title")
 
     def test_store_run_in_series_returns_none_for_unknown_id(self) -> None:
         """Unknown caller-provided run series IDs return None."""
@@ -93,7 +652,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         with self.assertLogs("flwr", level="ERROR") as logs:
             series_id = state.store_run_in_series(
                 run_id=123,
-                federation="federation-a",
+                federation_id="@me/fed-a",
+                is_agent=False,
                 series_id=123,
             )
 
@@ -104,35 +664,48 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Storing the same run ID twice should return None."""
         state = self.state_factory()
         series_id = state.store_run_in_series(
-            run_id=123, federation="federation-a", series_id=None
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=False,
+            series_id=None,
         )
         assert series_id is not None
 
         stored = state.store_run_in_series(
             run_id=123,
-            federation="federation-a",
+            federation_id="@me/fed-a",
+            is_agent=False,
             series_id=series_id,
         )
 
         self.assertIsNone(stored)
 
-    def test_get_run_series_filters_by_series_ids_and_federations(self) -> None:
-        """RunSeries lookup should filter by IDs and federations."""
+    def test_get_run_series_filters_by_series_ids_and_federation_ids(self) -> None:
+        """RunSeries lookup should filter by series IDs and federation IDs."""
         state = self.state_factory()
         series_id_a = state.store_run_in_series(
-            run_id=123, federation="federation-a", series_id=None
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=False,
+            series_id=None,
         )
         series_id_b = state.store_run_in_series(
-            run_id=456, federation="federation-b", series_id=None
+            run_id=456,
+            federation_id="@me/fed-b",
+            is_agent=False,
+            series_id=None,
         )
         series_id_c = state.store_run_in_series(
-            run_id=789, federation="federation-a", series_id=None
+            run_id=789,
+            federation_id="@me/fed-a",
+            is_agent=False,
+            series_id=None,
         )
         assert series_id_a is not None
         assert series_id_b is not None
         assert series_id_c is not None
 
-        fed_a_series = state.get_run_series(federations=["federation-a"])
+        fed_a_series = state.get_run_series(federation_ids=["@me/fed-a"])
         self.assertSetEqual(
             {entry.series_id for entry in fed_a_series},
             {series_id_a, series_id_c},
@@ -146,12 +719,255 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         combined_series = state.get_run_series(
             series_ids=[series_id_a, series_id_b],
-            federations=["federation-a"],
+            federation_ids=["@me/fed-a"],
         )
         self.assertEqual([entry.series_id for entry in combined_series], [series_id_a])
 
         self.assertEqual(state.get_run_series(series_ids=[]), [])
-        self.assertEqual(state.get_run_series(federations=[]), [])
+        self.assertEqual(state.get_run_series(federation_ids=[]), [])
+
+    def test_store_list_and_stop_automation(self) -> None:
+        """Automation storage should support list, due filtering, and stop."""
+        state = self.state_factory()
+        current = now()
+        due_at = (current - timedelta(seconds=60)).isoformat()
+
+        due = self.store_automation(
+            state,
+            series_id=1,
+            next_run_at=due_at,
+            fixed_interval=60,
+        )
+        future = self.store_automation(
+            state,
+            series_id=2,
+            next_run_at=(current + timedelta(seconds=60)).isoformat(),
+        )
+        other = self.store_automation(
+            state,
+            series_id=3,
+            federation_id="@me/fed-b",
+            next_run_at=(current - timedelta(seconds=30)).isoformat(),
+        )
+
+        self.assertEqual(due.next_run_at, due_at)
+
+        listed = state.list_automations(
+            federations=["@me/fed-a"], order_by="updated_at"
+        )
+        self.assertSetEqual(
+            {automation.automation_id for automation in listed},
+            {due.automation_id, future.automation_id},
+        )
+
+        listed_across_federations = state.list_automations(
+            federations=["@me/fed-a", "@me/fed-b"],
+            order_by="updated_at",
+        )
+        self.assertSetEqual(
+            {automation.automation_id for automation in listed_across_federations},
+            {due.automation_id, future.automation_id, other.automation_id},
+        )
+        self.assertEqual(
+            state.list_automations(federations=[], order_by="updated_at"), []
+        )
+
+        listed_by_id = state.list_automations(
+            automation_ids=[due.automation_id, future.automation_id],
+            order_by="updated_at",
+        )
+        self.assertSetEqual(
+            {automation.automation_id for automation in listed_by_id},
+            {due.automation_id, future.automation_id},
+        )
+        self.assertEqual(
+            state.list_automations(automation_ids=[], order_by="updated_at"), []
+        )
+
+        due_list = state.list_automations(
+            federations=["@me/fed-a"],
+            statuses=["active"],
+            due_before=current,
+            order_by="next_run_at",
+            limit=10,
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in due_list], [due.automation_id]
+        )
+        self.assertEqual(due_list[0].remaining_runs, 1)
+
+        self.assertTrue(state.stop_automation(due.automation_id))
+        self.assertFalse(state.stop_automation(due.automation_id))
+
+        stopped = state.list_automations(
+            federations=["@me/fed-a"],
+            statuses=[AutomationStatus.STOPPED],
+            order_by="updated_at",
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in stopped], [due.automation_id]
+        )
+        self.assertEqual(stopped[0].next_run_at, due_at)
+
+    def test_advance_and_finish_automation(self) -> None:
+        """Automation advance should update records and finish terminally."""
+        state = self.state_factory()
+        current = now()
+
+        # Create a recurring automation with two finite occurrences.
+        previous_next_run_at = (current - timedelta(seconds=30)).isoformat()
+        next_run_at = (current + timedelta(seconds=30)).isoformat()
+        recurring = self.store_automation(
+            state,
+            series_id=1,
+            next_run_at=previous_next_run_at,
+            fixed_interval=60,
+            max_runs=2,
+        )
+
+        # Advance the first occurrence and reject the stale due-time claim.
+        self.assertTrue(
+            state.advance_automation(
+                recurring.automation_id,
+                previous_next_run_at=previous_next_run_at,
+                next_run_at=next_run_at,
+            )
+        )
+        self.assertFalse(
+            state.advance_automation(
+                recurring.automation_id,
+                previous_next_run_at=previous_next_run_at,
+                next_run_at=next_run_at,
+            )
+        )
+        updated = state.list_automations(
+            federations=["@me/fed-a"],
+            statuses=[AutomationStatus.ACTIVE],
+            order_by="updated_at",
+        )
+        self.assertEqual(updated[0].remaining_runs, 1)
+        self.assertEqual(updated[0].next_run_at, next_run_at)
+
+        # Advance the final occurrence, then complete the automation.
+        self.assertTrue(
+            state.advance_automation(
+                recurring.automation_id,
+                previous_next_run_at=next_run_at,
+                next_run_at=None,
+            )
+        )
+        self.assertTrue(
+            state.finish_automation(
+                recurring.automation_id,
+                status=AutomationStatus.COMPLETED,
+            )
+        )
+        completed = state.list_automations(
+            federations=["@me/fed-a"],
+            statuses=[AutomationStatus.COMPLETED],
+            order_by="updated_at",
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in completed],
+            [recurring.automation_id],
+        )
+
+        # Mark an advanced automation as failed when execution cannot proceed.
+        failed_previous_next_run_at = (current - timedelta(seconds=15)).isoformat()
+        failing = self.store_automation(
+            state,
+            series_id=2,
+            next_run_at=failed_previous_next_run_at,
+        )
+        self.assertTrue(
+            state.advance_automation(
+                failing.automation_id,
+                previous_next_run_at=failed_previous_next_run_at,
+                next_run_at=None,
+            )
+        )
+        self.assertTrue(
+            state.finish_automation(
+                failing.automation_id,
+                status=AutomationStatus.FAILED,
+            )
+        )
+        failed = state.list_automations(
+            federations=["@me/fed-a"],
+            statuses=[AutomationStatus.FAILED],
+            order_by="updated_at",
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in failed],
+            [failing.automation_id],
+        )
+        self.assertEqual(failed[0].next_run_at, failed_previous_next_run_at)
+
+    def test_claim_automation(self) -> None:
+        """Claiming should return the request and advance one occurrence."""
+        state = self.state_factory()
+        current = now()
+        first_run_at = current.isoformat()
+        second_run_at = (current + timedelta(seconds=60)).isoformat()
+        automation = self.store_automation(
+            state,
+            series_id=123,
+            flwr_aid="aid-claim",
+            next_run_at=first_run_at,
+            fixed_interval=60,
+            max_runs=2,
+        )
+        self.assertIsNone(
+            state.claim_automation(
+                automation.automation_id,
+                previous_next_run_at=first_run_at,
+                next_run_at=None,
+            )
+        )
+
+        claimed = state.claim_automation(
+            automation.automation_id,
+            previous_next_run_at=first_run_at,
+            next_run_at=second_run_at,
+        )
+
+        self.assertIsNotNone(claimed)
+        assert claimed is not None
+        request, flwr_aid = claimed
+        self.assertEqual(request.series_id, 123)
+        self.assertEqual(flwr_aid, "aid-claim")
+        self.assertIsNone(
+            state.claim_automation(
+                automation.automation_id,
+                previous_next_run_at=first_run_at,
+                next_run_at=second_run_at,
+            )
+        )
+
+        final_claim = state.claim_automation(
+            automation.automation_id,
+            previous_next_run_at=second_run_at,
+            next_run_at=None,
+        )
+
+        self.assertIsNotNone(final_claim)
+        updated = state.list_automations(
+            automation_ids=[automation.automation_id],
+            order_by="updated_at",
+        )
+        self.assertEqual(updated[0].remaining_runs, 0)
+
+    def test_store_automation_preserves_series_id_without_validation(self) -> None:
+        """Automation storage should preserve caller-provided series IDs."""
+        state = self.state_factory()
+        series_id = 123
+
+        automation = self.store_automation(
+            state, federation_id="@me/fed-b", series_id=series_id
+        )
+
+        self.assertEqual(automation.series_id, series_id)
+        self.assertEqual(automation.federation, "@me/fed-b")
 
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
@@ -284,6 +1100,52 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(reloaded_tasks), 1)
         reloaded = reloaded_tasks[0]
         self.assertEqual(reloaded.fab_hash, "fab-hash")
+
+    def test_add_and_get_task_usage(self) -> None:
+        """Task usage should round-trip and filter by task ID."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=run_id,
+        )
+        assert task_id is not None
+
+        state.add_task_usage(
+            task_id,
+            TaskUsage(
+                input_tokens=10,
+                output_tokens=20,
+                total_tokens=30,
+                usage_type="model_inference",
+                provider="openai/gpt-test",
+            ),
+        )
+        state.add_task_usage(
+            task_id,
+            TaskUsage(
+                input_tokens=999,
+                usage_type="model_inference",
+                provider="openai/gpt-test",
+            ),
+        )
+
+        usages = state.get_task_usage(task_ids=[task_id])
+        usages_by_run = state.get_task_usage(run_ids=[run_id])
+        empty_by_task = state.get_task_usage(task_ids=[])
+        empty_by_run = state.get_task_usage(run_ids=[])
+
+        self.assertEqual(len(usages), 2)
+        self.assertEqual(usages_by_run, usages)
+        self.assertEqual(empty_by_task, [])
+        self.assertEqual(empty_by_run, [])
+        usage = usages[0]
+        self.assertEqual(usage.input_tokens, 10)
+        self.assertEqual(usage.output_tokens, 20)
+        self.assertEqual(usage.total_tokens, 30)
+        self.assertEqual(usage.usage_type, "model_inference")
+        self.assertEqual(usage.provider, "openai/gpt-test")
+        self.assertEqual(usages[1].input_tokens, 999)
 
     def test_add_and_get_task_log(self) -> None:
         """Adding and retrieving task logs should preserve concatenation order."""
@@ -657,6 +1519,25 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].starting_at, "")
         self.assertEqual(tasks[0].finished_at, "")
 
+    def test_get_tasks_refreshes_cached_task_in_shared_session(self) -> None:
+        """Task reads should reflect raw-SQL status changes in a shared session."""
+        state = self.state_factory()
+        if not hasattr(state, "session"):
+            self.skipTest("SQL session test")
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert task_id is not None
+
+        with state.session():
+            tasks = state.get_tasks(task_ids=[task_id])
+            self.assertEqual(tasks[0].status.status, Status.PENDING)
+
+            assert state.claim_task(task_id) is not None
+            refreshed_tasks = state.get_tasks(task_ids=[task_id])
+
+        self.assertEqual(refreshed_tasks[0].status.status, Status.STARTING)
+        self.assertTrue(refreshed_tasks[0].starting_at)
+
     def test_expired_starting_task_token_does_not_call_expiry_hook(self) -> None:
         """Revived STARTING tasks should not be passed to expiry hooks."""
         state = self.state_factory()
@@ -861,6 +1742,39 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(pulled[0].metadata.message_id, msg_1.metadata.message_id)
         self.assertEqual(pulled_next[0].metadata.message_id, msg_2.metadata.message_id)
 
+    def test_get_task_message_filters_by_source_task(self) -> None:
+        """A source-specific claim should not consume another task's message."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        src_task_id_1 = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        src_task_id_2 = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert (
+            src_task_id_1 is not None
+            and src_task_id_2 is not None
+            and dst_task_id is not None
+        )
+        reply_1 = create_task_message(src_task_id_1, dst_task_id, run_id)
+        reply_2 = create_task_message(src_task_id_2, dst_task_id, run_id)
+        self.assertTrue(state.store_task_message(reply_1))
+        self.assertTrue(state.store_task_message(reply_2))
+
+        pulled_2 = state.get_task_message(
+            dst_task_ids=[dst_task_id],
+            src_task_ids=[src_task_id_2],
+            limit=1,
+            order_by="created_at",
+        )
+        pulled_1 = state.get_task_message(
+            dst_task_ids=[dst_task_id],
+            src_task_ids=[src_task_id_1],
+            limit=1,
+            order_by="created_at",
+        )
+
+        self.assertEqual(pulled_2[0].metadata.message_id, reply_2.metadata.message_id)
+        self.assertEqual(pulled_1[0].metadata.message_id, reply_1.metadata.message_id)
+
     def test_store_and_get_task_events(self) -> None:
         """Task events should round-trip in assigned ID order."""
         # Prepare: Create one run with a task and two valid task events.
@@ -884,12 +1798,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         # Execute: Store the events and read them through full and cursored fetches.
         self.assertFalse(state.store_task_events([]))
         self.assertTrue(state.store_task_events([event_1, event_2]))
-        events = state.get_task_events(run_id=run_id, after_task_event_id=None)
+        events = state.get_task_events(run_ids=[run_id], after_task_event_id=None)
         latest_id = events[-1].id
         after_first = state.get_task_events(
-            run_id=run_id, after_task_event_id=events[0].id
+            run_ids=[run_id], after_task_event_id=events[0].id
         )
-        no_new = state.get_task_events(run_id=run_id, after_task_event_id=latest_id)
+        no_new = state.get_task_events(run_ids=[run_id], after_task_event_id=latest_id)
+        filtered = state.get_task_events(run_ids=[run_id], task_ids=[task_id])
+        excluded = state.get_task_events(run_ids=[run_id], task_ids=[task_id + 1])
+        no_runs = state.get_task_events(run_ids=[])
 
         # Assert: Events keep assigned ID order and cursor filtering works.
         self.assertEqual(len(events), 2)
@@ -910,6 +1827,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(latest_id, events[1].id)
         self.assertEqual(after_first, [events[1]])
         self.assertEqual(no_new, [])
+        self.assertEqual(filtered, events)
+        self.assertEqual(excluded, [])
+        self.assertEqual(no_runs, [])
 
     @parameterized.expand(  # type: ignore
         [
@@ -950,7 +1870,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
 
         # Assert: The invalid payload rejects the whole batch.
-        events = state.get_task_events(run_id=run_id, after_task_event_id=None)
+        events = state.get_task_events(run_ids=[run_id], after_task_event_id=None)
         self.assertEqual(events, [])
 
     def test_reserve_nonce_first_reservation_succeeds(self) -> None:

@@ -15,10 +15,10 @@
 """Flower SuperLink Grid implementations."""
 
 
-from .grpc_grid import GrpcGrid
+from .http_grid import HttpGrid
 from .inmemory_grid import InMemoryGrid
 
 __all__ = [
-    "GrpcGrid",
+    "HttpGrid",
     "InMemoryGrid",
 ]

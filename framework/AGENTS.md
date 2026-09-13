@@ -179,7 +179,6 @@ uv run --no-sync --python=3.11.14 ./dev/check-migrations.sh
 ```bash
 python simulation.py
 ./../test_superlink.sh e2e-bare
-./../test_superlink.sh e2e-bare rest
 ./../test_superlink.sh e2e-bare sqlite
 ```
 

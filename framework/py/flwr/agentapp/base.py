@@ -18,29 +18,34 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from flwr.app import Context
 from flwr.supercore.typing import JSONObject
 
 
-class AgentResponses(ABC):
-    """Abstract base class for AgentApp model response creation."""
+class AgentConnectors(ABC):
+    """Abstract base class for AgentApp connector execution."""
 
     @abstractmethod
-    def create(self, request: JSONObject) -> JSONObject:
-        """Create a model response.
+    def tools(self, names: Sequence[str]) -> list[JSONObject]:
+        """Return model-facing tool schemas for built-in connectors."""
 
-        Parameters
-        ----------
-        request : JSONObject
-            Open Responses-compatible create request.
+    @abstractmethod
+    def call(self, tool_call: JSONObject) -> JSONObject:
+        """Execute one model function_call and return a function_call_output item."""
 
-        Returns
-        -------
-        response : JSONObject
-            Open Responses-compatible response.
-        """
+
+class AgentEvents(ABC):
+    """Abstract base class for AgentApp run events."""
+
+    @abstractmethod
+    def get_trace(self) -> list[JSONObject]:
+        """Get events from all runs in the current run series."""
+
+    @abstractmethod
+    def emit(self, event: JSONObject) -> None:
+        """Emit one structured run event."""
 
 
 class AgentSession(ABC):
@@ -48,8 +53,13 @@ class AgentSession(ABC):
 
     @property
     @abstractmethod
-    def responses(self) -> AgentResponses:
-        """Model response creation API."""
+    def connectors(self) -> AgentConnectors:
+        """Connector tool schema and execution API."""
+
+    @property
+    @abstractmethod
+    def events(self) -> AgentEvents:
+        """Frontend-visible structured run event API."""
 
 
 AgentAppCallable = Callable[[AgentSession, Context], None]

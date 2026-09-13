@@ -22,7 +22,7 @@ from collections.abc import Callable, Iterable
 from logging import INFO, WARN
 
 from flwr.app import ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
-from flwr.common import log
+from flwr.supercore import log
 
 from ..grid import Grid
 from .fedavg import FedAvg

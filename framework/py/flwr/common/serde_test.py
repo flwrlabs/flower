@@ -242,7 +242,9 @@ class RecordMaker:
         types = (float, int)
         return MetricRecord(
             metric_dict={
-                self.get_str(): self.get_value(self.rng.choice(types))
+                self.get_str(): cast(
+                    int | float, self.get_value(self.rng.choice(types))
+                )
                 for _ in range(num_entries)
             },
             keep_input=False,
@@ -254,7 +256,10 @@ class RecordMaker:
         types = (str, int, float, bytes, bool)
         return ConfigRecord(
             config_dict={
-                self.get_str(): self.get_value(self.rng.choice(types))
+                self.get_str(): cast(
+                    bool | bytes | float | int | str,
+                    self.get_value(self.rng.choice(types)),
+                )
                 for _ in range(num_entries)
             },
             keep_input=False,
@@ -481,13 +486,14 @@ def test_run_serialization_deserialization() -> None:
         finished_at="",
         status=RunStatus(status="running", sub_status="", details="OK"),
         flwr_aid="user123",
-        federation="mock-fed",
+        federation_id="@me/fed",
         primary_task_id=42,
         bytes_sent=2048,
         bytes_recv=1024,
         clientapp_runtime=3.14,
         primary_task_type=TaskType.SIMULATION,
         series_id=123,
+        account_name="test-account",
     )
 
     # Execute

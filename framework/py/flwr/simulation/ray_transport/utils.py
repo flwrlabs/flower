@@ -19,7 +19,7 @@ import traceback
 import warnings
 from logging import ERROR
 
-from flwr.common.logger import log
+from flwr.supercore import log
 
 try:
     import tensorflow as TF

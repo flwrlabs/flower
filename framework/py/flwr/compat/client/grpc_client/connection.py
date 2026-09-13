@@ -30,7 +30,6 @@ from flwr.app.message import make_message
 from flwr.app.message_type import MessageType
 from flwr.common import serde
 from flwr.common.constant import MessageTypeLegacy
-from flwr.common.logger import log
 from flwr.compat.common import recorddict_compat as compat
 from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     ClientMessage,
@@ -38,6 +37,7 @@ from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     ServerMessage,
 )
 from flwr.proto.transport_pb2_grpc import FlowerServiceStub  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.grpc import (

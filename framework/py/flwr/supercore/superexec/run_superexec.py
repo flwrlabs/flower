@@ -15,38 +15,30 @@
 """Flower SuperExec."""
 
 
+import math
+import os
 import time
 from logging import ERROR, WARNING
 from typing import Any
 
-import grpc
-
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.common.logger import log
-from flwr.common.serde import run_from_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     PullPendingTasksRequest,
 )
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
-from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import ExecutorType
-from flwr.supercore.grpc import create_channel, on_channel_state_change
+from flwr.supercore.constant import ExecutorType, TaskType
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import (
-    RuntimeVersionClientInterceptor,
-    SuperExecAuthClientInterceptor,
+    RuntimeVersionHttpInterceptor,
+    SuperExecAuthHttpInterceptor,
 )
-from flwr.supercore.interceptors.superexec_auth_interceptor import (
-    CLIENTAPPIO_SUPEREXEC_METHODS,
-    SERVERAPPIO_SUPEREXEC_METHODS,
-)
-from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
-from flwr.supercore.run import Run
+from flwr.supercore.protobuf.client import ProtobufClientInterceptor
+from flwr.supercore.retry import make_simple_http_retry_invoker
+from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
@@ -54,6 +46,46 @@ from .executor import LaunchResult, LaunchResultStatus, get_executor
 from .executor.config import ExecutorConfig
 from .plugin import ExecPlugin
 from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
+
+_TASK_POLL_INTERVAL_ENV = "FLWR_SUPEREXEC_TASK_POLL_INTERVAL"
+_MIN_TASK_POLL_INTERVAL_SECONDS = 0.01
+_MAX_TASK_POLL_INTERVAL_SECONDS = 60.0
+_DEFAULT_TASK_POLL_INTERVAL_SECONDS = 1.0
+_SUPEREXEC_AUTH_METHODS = frozenset(
+    {
+        "/flwr.proto.Runtime/PullPendingTasks",
+        "/flwr.proto.Runtime/ClaimTask",
+    }
+)
+
+
+def _get_task_poll_interval() -> float:
+    """Read and validate the SuperExec task polling interval."""
+    raw_interval = os.getenv(_TASK_POLL_INTERVAL_ENV)
+    if raw_interval is None:
+        return _DEFAULT_TASK_POLL_INTERVAL_SECONDS
+
+    try:
+        interval = float(raw_interval)
+    except ValueError as err:
+        raise ValueError(
+            f"Environment variable {_TASK_POLL_INTERVAL_ENV} must be a finite "
+            f"number of seconds between {_MIN_TASK_POLL_INTERVAL_SECONDS} and "
+            f"{_MAX_TASK_POLL_INTERVAL_SECONDS}, got {raw_interval!r}."
+        ) from err
+
+    if (
+        not math.isfinite(interval)
+        or interval < _MIN_TASK_POLL_INTERVAL_SECONDS
+        or interval > _MAX_TASK_POLL_INTERVAL_SECONDS
+    ):
+        raise ValueError(
+            f"Environment variable {_TASK_POLL_INTERVAL_ENV} must be a finite "
+            f"number of seconds between {_MIN_TASK_POLL_INTERVAL_SECONDS} and "
+            f"{_MAX_TASK_POLL_INTERVAL_SECONDS}, got {raw_interval!r}."
+        )
+
+    return interval
 
 
 def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
@@ -105,8 +137,8 @@ def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
 
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     plugin_class: type[ExecPlugin],
-    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
-    appio_api_address: str,
+    client_class: type[RuntimeHttpClient],
+    runtime_api_address: str,
     insecure: bool,
     root_certificates_path: str | None = None,
     superexec_auth_secret: bytes | None = None,
@@ -123,12 +155,12 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     ----------
     plugin_class : type[ExecPlugin]
         The class of the SuperExec plugin to use.
-    stub_class : type[ClientAppIoStub] | type[ServerAppIoStub]
-        The gRPC stub class for the AppIO API.
-    appio_api_address : str
-        The address of the AppIO API.
+    client_class : type[RuntimeHttpClient]
+        The HTTP client class for the Runtime API.
+    runtime_api_address : str
+        The address of the Runtime API.
     insecure : bool
-        Whether to connect to the AppIO API without TLS.
+        Whether to connect to the Runtime API without TLS.
     root_certificates_path : Optional[str] (default: None)
         The path to the PEM-encoded root certificate file used for secure TLS
         connections.
@@ -150,23 +182,26 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     executor_config : Optional[ExecutorConfig] (default: None)
         Parsed executor configuration.
     """
+    task_poll_interval = _get_task_poll_interval()
+
     try:
-        executor = get_executor(executor_type, executor_config=executor_config)
+        executor = get_executor(
+            executor_type,
+            executor_config=executor_config,
+            insecure=insecure,
+            root_certificates_path=root_certificates_path,
+        )
     except ValueError as err:
         flwr_exit(ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG, str(err))
 
-    interceptors: list[grpc.UnaryUnaryClientInterceptor] = [
-        RuntimeVersionClientInterceptor(component_name="SuperExec")
+    interceptors: list[ProtobufClientInterceptor] = [
+        RuntimeVersionHttpInterceptor(component_name="SuperExec")
     ]
-    auth_interceptor: SuperExecAuthClientInterceptor | None = None
+    auth_interceptor: SuperExecAuthHttpInterceptor | None = None
     if superexec_auth_secret:
-        if stub_class is ServerAppIoStub:
-            protected_methods = SERVERAPPIO_SUPEREXEC_METHODS
-        else:
-            protected_methods = CLIENTAPPIO_SUPEREXEC_METHODS
-        auth_interceptor = SuperExecAuthClientInterceptor(
+        auth_interceptor = SuperExecAuthHttpInterceptor(
             master_secret=superexec_auth_secret,
-            protected_methods=protected_methods,
+            protected_methods=_SUPEREXEC_AUTH_METHODS,
         )
         interceptors.append(auth_interceptor)
 
@@ -176,47 +211,45 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
     # Launch gRPC health server
     grpc_servers = []
-    if health_server_address is not None:
-        health_server = run_health_server_grpc_no_tls(health_server_address)
-        grpc_servers.append(health_server)
+    try:
+        if health_server_address is not None:
+            health_server = run_health_server_grpc_no_tls(health_server_address)
+            grpc_servers.append(health_server)
 
-    # Create the channel to the AppIO API
-    channel = create_channel(
-        server_address=appio_api_address,
-        insecure=insecure,
-        root_certificates=validate_and_resolve_root_certificates(
-            root_certificates_path, insecure
-        ),
-        interceptors=interceptors,
-    )
-    channel.subscribe(on_channel_state_change)
+        client = client_class.from_server_address(
+            server_address=runtime_api_address,
+            insecure=insecure,
+            root_certificates=validate_and_resolve_root_certificates(
+                root_certificates_path, insecure
+            ),
+            interceptors=interceptors,
+            retry_invoker=make_simple_http_retry_invoker(),
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        executor.close()
+        raise
 
-    # Register exit handlers to close the channel on exit
+    # Register exit handlers to close the Runtime API client on exit
     register_signal_handlers(
         event_type=EventType.RUN_SUPEREXEC_LEAVE,
         exit_message="SuperExec terminated gracefully.",
         grpc_servers=grpc_servers,
-        exit_handlers=[lambda: channel.close()],  # pylint: disable=W0108
+        exit_handlers=[client.close, executor.close],
     )
-
-    # Create the gRPC stub for the AppIO API
-    stub = stub_class(channel)
-    wrap_stub(stub, make_simple_grpc_retry_invoker())
-
-    def get_run(run_id: int) -> Run:
-        _req = GetRunRequest(run_id=run_id)
-        _res = stub.GetRun(_req)
-        return run_from_proto(_res.run)
 
     # Create the SuperExec plugin instance
-    plugin = plugin_class(
-        appio_api_address=appio_api_address,
-        insecure=insecure,
-        root_certificates_path=root_certificates_path,
-        get_run=get_run,
-        runtime_dependency_install=runtime_dependency_install,
-        executor=executor,
-    )
+    try:
+        plugin = plugin_class(
+            runtime_api_address=runtime_api_address,
+            insecure=insecure,
+            root_certificates_path=root_certificates_path,
+            runtime_dependency_install=runtime_dependency_install,
+            executor=executor,
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        client.close()
+        executor.close()
+        raise
 
     # Load plugin configuration from file if provided
     try:
@@ -231,8 +264,9 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     # Start the main loop
     try:
         while True:
+            executor.reconcile()
             # Fetch pending tasks
-            tasks_res = stub.PullPendingTasks(request=PullPendingTasksRequest())
+            tasks_res = client.PullPendingTasks(request=PullPendingTasksRequest())
 
             # Select a task to execute using the plugin's selection logic
             task = None
@@ -241,10 +275,18 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
             # If a task was selected, claim it
             if task is not None:
-                executor.wait_for_capacity()
+                try:
+                    task_type = TaskType(task.type)
+                except ValueError:
+                    task_type = None
+                executor.wait_for_capacity(
+                    task_type=task_type,
+                    insecure=insecure,
+                    root_certificates_path=root_certificates_path,
+                )
 
                 claim_req = ClaimTaskRequest(task_id=task.task_id)
-                claim_res = stub.ClaimTask(claim_req)
+                claim_res = client.ClaimTask(claim_req)
 
                 # Launch the app if a token was granted; do nothing if not
                 if claim_res.token:
@@ -267,6 +309,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                     _handle_launch_result(launch_result, task)
 
             # Sleep for a while before checking again
-            time.sleep(1)
+            time.sleep(task_poll_interval)
     finally:
-        channel.close()
+        client.close()
+        executor.close()

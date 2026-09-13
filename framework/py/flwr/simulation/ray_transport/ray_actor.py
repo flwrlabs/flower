@@ -27,7 +27,7 @@ from ray.util.actor_pool import ActorPool
 
 from flwr.app import Context, Message
 from flwr.clientapp.client_app import ClientApp, ClientAppException, LoadClientAppError
-from flwr.common.logger import log
+from flwr.supercore import log
 
 ClientAppFn = Callable[[], ClientApp]
 
@@ -187,7 +187,9 @@ class VirtualClientEngineActorPool(ActorPool):
 
         # A dict that maps cid to another dict containing: a reference to the remote job
         # and its status (i.e. whether it is ready or not)
-        self._cid_to_future: dict[str, dict[str, bool | ObjectRef[Any] | None]] = {}
+        self._cid_to_future: dict[
+            str, dict[str, bool | ObjectRef[Any] | tuple[Any, ...] | None]
+        ] = {}
         self.actor_to_remove: set[str] = set()  # a set
         self.num_actors = len(actors)
 

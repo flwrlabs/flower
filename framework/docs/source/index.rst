@@ -99,6 +99,7 @@ ideas behind Flower and collaborative AI.
     explanation-differential-privacy
     explanation-ref-secure-aggregation-protocols
     explanation-flower-architecture
+    explanation-superlink-high-availability
     explanation-flower-strategy-abstraction
 
 References

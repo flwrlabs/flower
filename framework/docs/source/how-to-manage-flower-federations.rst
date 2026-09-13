@@ -22,10 +22,9 @@ own that are registered with the same SuperLink. Members of a Flower federation 
 execute runs (e.g. to federate the training of an AI model) across all SuperNodes that
 are part of it.
 
-Federations can be addressed by their unique identifier, which has the form
-``@<account-name>/<federation-name>`` being ``<account-name>`` the name of the account
-that created the federation and ``<federation-name>`` the name given to the federation
-at creation time.
+Federations can be addressed by their federation ID, which has the form
+``@<account-name>/<federation-name>``. The ``<account-name>`` is the name of the account
+that created the federation, and ``<federation-name>`` is the name of the federation.
 
 In this how-to guide, you will:
 
@@ -50,7 +49,8 @@ Flower account is part of:
     $ flwr federation list
 
 The above command will display a table with a row for each federation you are part of.
-In this case there is only one federation named ``default`` under the account ``none``:
+In this case there is one federation: ``@none/default``. Its federation name is
+``default``, and it belongs to the ``none`` account:
 
 .. code-block:: shell
 
@@ -65,16 +65,16 @@ In this case there is only one federation named ``default`` under the account ``
  Inspect a Federation
 **********************
 
-You can inspect a specific federation by providing the identifier of the federation to
-the ``flwr federation list`` command. With this command, you will be able to see the
-following information about a federation:
+You can inspect a specific federation by passing its federation ID to ``flwr federation
+list``. With this command, you will be able to see the following information about a
+federation:
 
 - The members of the federation.
 - The SuperNodes registered with the federation and their status.
 - The runs executed via the federation.
 
-The ``flwr federation list --federation <federation>`` command requires the identifier
-of the federation to inspect as an argument:
+The ``flwr federation list --federation <federation-id>`` command expects the federation
+ID as an argument:
 
 .. code-block:: shell
 

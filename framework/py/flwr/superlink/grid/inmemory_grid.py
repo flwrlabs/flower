@@ -22,15 +22,15 @@ from uuid import uuid4
 
 from flwr.app import Message, RecordDict
 from flwr.common.constant import SUPERLINK_NODE_ID
-from flwr.common.logger import warn_deprecated_feature
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.serverapp.grid import Grid
+from flwr.supercore.logger import warn_deprecated_feature
 from flwr.supercore.run import Run
 
 
 class InMemoryGrid(Grid):
-    """`InMemoryGrid` class provides an interface to the ServerAppIo API.
+    """`InMemoryGrid` class provides an interface to the Runtime API.
 
     Parameters
     ----------

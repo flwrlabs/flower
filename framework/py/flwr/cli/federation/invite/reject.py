@@ -20,8 +20,8 @@ from typing import Annotated, Literal
 import typer
 
 from flwr.cli.utils import (
-    cli_output_control_stub,
-    flwr_cli_grpc_exc_handler,
+    cli_output_control_client,
+    flwr_cli_exc_handler,
     print_json_to_stdout,
 )
 from flwr.common.constant import CliOutputFormat
@@ -29,13 +29,13 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RejectInvitationRequest,
     RejectInvitationResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.control import ControlHttpClient
 
 
 def reject(
     federation: Annotated[
         str,
-        typer.Argument(help="Name of the federation."),
+        typer.Argument(help="Federation ID."),
     ],
     superlink: Annotated[
         str | None,
@@ -51,18 +51,18 @@ def reject(
     ] = CliOutputFormat.DEFAULT,
 ) -> None:
     """Reject an invitation to join a federation."""
-    with cli_output_control_stub(superlink, output_format) as (stub, is_json):
+    with cli_output_control_client(superlink, output_format) as (stub, is_json):
         request = RejectInvitationRequest(federation_name=federation)
         _reject_invitation(stub=stub, request=request, is_json=is_json)
 
 
 def _reject_invitation(
-    stub: ControlStub,
+    stub: ControlHttpClient,
     request: RejectInvitationRequest,
     is_json: bool,
 ) -> None:
     """Send a reject invitation request."""
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         _: RejectInvitationResponse = stub.RejectInvitation(request)
 
     if is_json:

@@ -14,13 +14,14 @@
 # ==============================================================================
 """`flwr-connector` command."""
 
-
 import argparse
 from logging import DEBUG, INFO
 
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
-from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
-from flwr.common.logger import log, restore_output
+from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
+from flwr.supercore import log
+from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
+from flwr.supercore.logger import restore_output
 from flwr.supercore.task_process import run_connector
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
@@ -30,15 +31,17 @@ def flwr_connector() -> None:
     args = _parse_args_run_flwr_connector().parse_args()
     token = try_obtain_flwr_app_token(args)
 
+    if bool(getattr(args, "token_stdin", False)):
+        print(FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT, flush=True)
+
     log(INFO, "Start `flwr-connector` process")
     log(
         DEBUG,
-        "`flwr-connector` will attempt to connect to SuperLink's "
-        "ServerAppIo API at %s",
-        args.serverappio_api_address,
+        "`flwr-connector` will attempt to connect to SuperLink's Runtime API at %s",
+        args.runtime_api_address,
     )
     run_connector(
-        serverappio_api_address=args.serverappio_api_address,
+        runtime_api_address=args.runtime_api_address,
         token=token,
         insecure=args.insecure,
         certificates=validate_and_resolve_root_certificates(
@@ -56,11 +59,12 @@ def _parse_args_run_flwr_connector() -> argparse.ArgumentParser:
         description="Run a Flower connector task",
     )
     parser.add_argument(
-        "--serverappio-api-address",
-        default=SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+        "--runtime-api-address",
+        dest="runtime_api_address",
+        default=SUPERLINK_DEFAULT_CLIENT_ADDRESS,
         type=str,
-        help="Address of SuperLink's ServerAppIo API (IPv4, IPv6, or a domain name)."
-        f"By default, it is set to {SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS}.",
+        help="Address of SuperLink's Runtime API (IPv4, IPv6, or a domain name)."
+        f"By default, it is set to {SUPERLINK_DEFAULT_CLIENT_ADDRESS}.",
     )
-    add_args_flwr_app_common(parser=parser)
+    add_args_flwr_app_common(parser=parser, include_token_stdin=True)
     return parser

@@ -14,8 +14,13 @@
 # ==============================================================================
 """Kubernetes executor for SuperExec TaskExecutor processes."""
 
+# pylint: disable=too-many-lines
 
+import hashlib
 import importlib
+import json
+import re
+import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -24,14 +29,37 @@ from pathlib import Path
 from typing import Protocol, cast
 from uuid import uuid4
 
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.constant import (
     TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
     TASK_TYPE_TO_COMMAND,
+    TaskType,
 )
 from flwr.supercore.typing import JSONObject
 
 from .types import ExecutionSpec, LaunchResult
+from .warm_agentapp_executor import (
+    WARM_AGENTAPP_ROOT_CERTIFICATES_FILE_PATH,
+    WARM_AGENTAPP_ROOT_CERTIFICATES_MOUNT_PATH,
+    WARM_EXECUTOR_CONSUMED_ANNOTATION,
+    WarmAgentAppPoolManager,
+)
+from .warm_executor import (
+    WARM_EXECUTOR_MODULE,
+    WARM_EXECUTOR_READINESS_COMMAND,
+    WARM_EXECUTOR_READY_DIRECTORY,
+    WARM_EXECUTOR_READY_FILE,
+)
+from .warm_executor_pool import (
+    WARM_EXECUTOR_CONFIGURATION_ANNOTATION,
+    WARM_EXECUTOR_LABEL,
+    WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION,
+    WarmExecutorPoolConfig,
+    WarmExecutorPoolKey,
+    is_compatible_warm_executor,
+    is_warm_executor,
+    new_warm_executor_id,
+)
 
 APPIO_CREDENTIALS_MOUNT_PATH = "/run/flwr/appio"
 APPIO_TOKEN_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/token"
@@ -42,6 +70,8 @@ _NAME_LABEL = "app.kubernetes.io/name"
 _COMPONENT_LABEL = "app.kubernetes.io/component"
 _TASK_TYPE_LABEL = "flower.ai/task-type"
 _RESOURCE_POOL_LABEL = "flower.ai/resource-pool"
+_WARM_EXECUTOR_OWNER_LABEL = "flower.ai/warm-executor-owner"
+_WARM_EXECUTOR_CONSUMED_ANNOTATION = WARM_EXECUTOR_CONSUMED_ANNOTATION
 _EXECUTOR_OWNED_LABELS = frozenset(
     {
         _NAME_LABEL,
@@ -50,10 +80,41 @@ _EXECUTOR_OWNED_LABELS = frozenset(
         _TASK_TYPE_LABEL,
         LAUNCH_ATTEMPT_LABEL,
         _RESOURCE_POOL_LABEL,
+        WARM_EXECUTOR_LABEL,
+        _WARM_EXECUTOR_OWNER_LABEL,
     }
 )
 _APPIO_CREDENTIAL_SECRET_SUFFIX = "-appio"
+_WARM_EXECUTOR_READY_VOLUME_NAME = "warm-executor-ready"
+_WARM_EXECUTOR_ROOT_CERTIFICATES_VOLUME_NAME = "warm-executor-root-certificates"
+_WARM_EXECUTOR_ROOT_CERTIFICATES_SECRET_SUFFIX = "-runtime-ca"
+_RESERVED_TASKEXECUTOR_VOLUME_NAMES = frozenset(
+    {
+        "appio-credentials",
+        _WARM_EXECUTOR_READY_VOLUME_NAME,
+        _WARM_EXECUTOR_ROOT_CERTIFICATES_VOLUME_NAME,
+    }
+)
+_RESERVED_TASKEXECUTOR_VOLUME_MOUNT_PATHS = frozenset(
+    {
+        APPIO_CREDENTIALS_MOUNT_PATH,
+        WARM_EXECUTOR_READY_DIRECTORY,
+        WARM_EXECUTOR_READY_FILE,
+        WARM_AGENTAPP_ROOT_CERTIFICATES_MOUNT_PATH,
+        WARM_AGENTAPP_ROOT_CERTIFICATES_FILE_PATH,
+    }
+)
 _COMPLETED_POD_SWEEP_INTERVAL_SECONDS = 60.0
+_FORBIDDEN_TASKEXECUTOR_ENV_NAMES = frozenset(
+    {
+        "FLWR_MODEL_API_KEY",
+        "BRAVE_API_KEY",
+        "TAVILY_API_KEY",
+        "EXA_API_KEY",
+    }
+)
+_KUBERNETES_ENV_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_DNS_LABEL_PATTERN = re.compile(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
 
 
 class KubernetesList(Protocol):
@@ -89,9 +150,32 @@ class KubernetesClient(Protocol):
     ) -> KubernetesList:
         """List Kubernetes Pods in the selected namespace."""
 
+    def patch_namespaced_pod(
+        self, name: str, namespace: str, body: JSONObject
+    ) -> object:
+        """Update Pod metadata before dispatching a warm task."""
+
+    def connect_get_namespaced_pod_exec(
+        self, *args: object, **kwargs: object
+    ) -> object:
+        """Open a Pod exec connection used for one warm task handoff."""
+
 
 def create_incluster_kubernetes_client() -> KubernetesClient:
     """Create a KubernetesClient backed by in-cluster ServiceAccount auth."""
+    return _create_incluster_kubernetes_clients(1)[0]
+
+
+def create_incluster_kubernetes_clients() -> tuple[KubernetesClient, KubernetesClient]:
+    """Create separate Kubernetes clients for API and WebSocket exec calls."""
+    clients = _create_incluster_kubernetes_clients(2)
+    return clients[0], clients[1]
+
+
+def _create_incluster_kubernetes_clients(
+    count: int,
+) -> tuple[KubernetesClient, ...]:
+    """Create one or more independently transported in-cluster clients."""
     try:
         kubernetes_client = importlib.import_module("kubernetes.client")
         kubernetes_config = importlib.import_module("kubernetes.config")
@@ -114,8 +198,7 @@ def create_incluster_kubernetes_client() -> KubernetesClient:
             "credentials."
         ) from exc
 
-    client: KubernetesClient = kubernetes_client.CoreV1Api()
-    return client
+    return tuple(kubernetes_client.CoreV1Api() for _ in range(count))
 
 
 @dataclass
@@ -128,7 +211,7 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
         Kubernetes namespace for TaskExecutor Pods and credential Secrets.
     image : str
         Container image used for TaskExecutor Pods.
-    appio_root_certificates : str | None
+    runtime_root_certificates : str | None
         Optional PEM data mounted as ca.crt. If unset, launch uses
         ExecutionSpec.root_certificates_path when provided.
     image_pull_policy : str | None
@@ -141,6 +224,13 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
         Optional Flower resource-pool label value.
     resources : JSONObject | None
         Optional Kubernetes container resource requests and limits.
+    env : list[JSONObject] | None
+        Optional explicit TaskExecutor container environment. Only literal
+        name/value entries are supported.
+    volumes : list[JSONObject] | None
+        Optional Kubernetes Pod volumes.
+    volume_mounts : list[JSONObject] | None
+        Optional Kubernetes TaskExecutor container volume mounts.
     node_selector : dict[str, str] | None
         Optional Kubernetes nodeSelector.
     tolerations : list[JSONObject] | None
@@ -160,12 +250,15 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
 
     namespace: str
     image: str
-    appio_root_certificates: str | None = None
+    runtime_root_certificates: str | None = None
     image_pull_policy: str | None = None
     labels: dict[str, str] | None = None
     annotations: dict[str, str] | None = None
     resource_pool: str | None = None
     resources: JSONObject | None = None
+    env: list[JSONObject] | None = None
+    volumes: list[JSONObject] | None = None
+    volume_mounts: list[JSONObject] | None = None
     node_selector: dict[str, str] | None = None
     tolerations: list[JSONObject] | None = None
     affinity: JSONObject | None = None
@@ -177,8 +270,102 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     active_pod_budget: int | None = None
     capacity_poll_interval: float = 1.0
     capacity_log_interval: float | None = None
+    # Each static pool needs one active owner. Deployments with warm pools must
+    # use one SuperExec replica per owner value unless they add leader election.
+    warm_executor_owner: str | None = None
+    warm_executor_pools: tuple[WarmExecutorPoolConfig, ...] = ()
     sleep: Callable[[float], None] = time.sleep
     monotonic: Callable[[], float] = time.monotonic
+
+    def __post_init__(self) -> None:
+        """Validate config values used to build TaskExecutor Pods."""
+        if self.env is not None:
+            self.env = _taskexecutor_env(self.env)
+        if self.volumes is not None:
+            self.volumes = _taskexecutor_volumes(self.volumes)
+        if self.volume_mounts is not None:
+            self.volume_mounts = _taskexecutor_volume_mounts(self.volume_mounts)
+        if self.warm_executor_owner is not None and not isinstance(
+            self.warm_executor_owner, str
+        ):
+            raise ValueError("warm_executor_owner must be a string.")
+        if self.warm_executor_pools and not self.warm_executor_owner:
+            raise ValueError(
+                "warm_executor_owner is required when warm_executor_pools are set."
+            )
+        if any(
+            pool.key.task_type != TaskType.AGENT_APP
+            for pool in self.warm_executor_pools
+        ):
+            raise ValueError("warm executor pools support only AgentApp tasks.")
+        if self.warm_executor_owner and not _is_dns_label(self.warm_executor_owner):
+            raise ValueError("warm_executor_owner must be a DNS label.")
+        identities = [
+            (pool.key.task_type, pool.key.runtime_image)
+            for pool in self.warm_executor_pools
+        ]
+        if len(identities) != len(set(identities)):
+            raise ValueError(
+                "warm executor pools must not repeat a task type and image."
+            )
+        warm_pod_count = sum(pool.size for pool in self.warm_executor_pools)
+        if (
+            self.active_pod_budget is not None
+            and warm_pod_count >= self.active_pod_budget
+        ):
+            raise ValueError(
+                "active_pod_budget must exceed the configured warm executor capacity."
+            )
+
+
+class _WarmExecutorPoolManager(WarmAgentAppPoolManager):
+    """Wire the warm AgentApp pool lifecycle to Kubernetes executor helpers."""
+
+    def __init__(
+        self,
+        client: KubernetesClient,
+        config: KubernetesExecutorConfig,
+        active_pod_count: Callable[[], int],
+        exec_client: KubernetesClient | None = None,
+    ) -> None:
+        self._lifecycle_lock = threading.RLock()
+        super().__init__(
+            client,
+            config,
+            active_pod_count,
+            exec_client,
+            create_warm_executor=self._create_warm_executor_with_lifecycle_lock,
+            has_warm_executor_configuration=_has_warm_executor_configuration,
+            is_active_warm_executor=_is_active_warm_executor,
+            warm_executor_owner_label_selector=_warm_executor_owner_label_selector,
+        )
+
+    def _create_warm_executor_with_lifecycle_lock(
+        self,
+        client: KubernetesClient,
+        pool_key: WarmExecutorPoolKey,
+        config: KubernetesExecutorConfig,
+        executor_id: str,
+    ) -> None:
+        """Create a warm Pod without racing completed-Pod cleanup."""
+        with self._lifecycle_lock:
+            _create_warm_executor(client, pool_key, config, executor_id)
+
+    def sweep_completed_pods(self, sweep: Callable[[], None]) -> None:
+        """Run completed-Pod cleanup without racing warm Pod creation."""
+        with self._lifecycle_lock:
+            sweep()
+
+    def _delete_pod(self, pod_name: str) -> bool:
+        """Delete a warm Pod and its token-free Runtime API trust Secret."""
+        if not super()._delete_pod(pod_name):
+            return False
+        _delete_secret_best_effort(
+            self._client,
+            self._config.namespace,
+            _warm_executor_root_certificates_secret_name_from_pod_name(pod_name),
+        )
+        return True
 
 
 class KubernetesExecutor:
@@ -189,20 +376,76 @@ class KubernetesExecutor:
         *,
         client: KubernetesClient,
         config: KubernetesExecutorConfig,
+        exec_client: KubernetesClient | None = None,
     ) -> None:
         self._client = client
         self._config = config
         self._completed_pod_sweeper = CompletedPodSweeper(client=client, config=config)
         self._last_completed_pod_sweep_at: float | None = None
+        self._warm_executor_pool_manager = (
+            _WarmExecutorPoolManager(
+                client, config, self._active_pod_count, exec_client
+            )
+            if config.warm_executor_owner
+            else None
+        )
 
-    def wait_for_capacity(self) -> None:
+    def wait_for_capacity(
+        self,
+        task_type: TaskType | None = None,
+        *,
+        insecure: bool = False,
+        root_certificates_path: str | None = None,
+    ) -> None:
         """Wait until the configured resource pool is below its active Pod budget."""
-        self._sweep_completed_pods_if_due()
-        if self._config.active_pod_budget is None:
-            return
+        self._wait_for_capacity(
+            task_type,
+            allow_warm_dispatch=self._can_dispatch_warm(
+                insecure, root_certificates_path
+            ),
+            reconcile_warm_pools=True,
+        )
 
+    def reconcile(self) -> None:
+        """Maintain warm capacity even when there are no pending tasks."""
+        if self._warm_executor_pool_manager is not None:
+            self._sweep_completed_pods_if_due()
+            self._warm_executor_pool_manager.ensure_capacity()
+
+    def _wait_for_capacity(
+        self,
+        task_type: TaskType | None,
+        *,
+        allow_warm_dispatch: bool,
+        reconcile_warm_pools: bool,
+    ) -> bool:
+        """Wait for capacity and return True for warm dispatch or False for cold."""
+        self._sweep_completed_pods_if_due()
+        if reconcile_warm_pools and self._warm_executor_pool_manager is not None:
+            has_ready_warm_pod = (
+                allow_warm_dispatch
+                and task_type is not None
+                and self._warm_executor_pool_manager.has_ready_pod(task_type)
+            )
+            self._warm_executor_pool_manager.ensure_capacity(
+                reserved_pod_capacity=0 if has_ready_warm_pod else 1
+            )
+            if has_ready_warm_pod:
+                return True
         last_log_at: float | None = None
+        waited_for_capacity = False
         while True:
+            if self._warm_executor_pool_manager is not None:
+                self._warm_executor_pool_manager.retry_retiring_pods()
+            if self._config.active_pod_budget is None:
+                return False
+            if (
+                allow_warm_dispatch
+                and self._warm_executor_pool_manager is not None
+                and task_type is not None
+                and self._warm_executor_pool_manager.has_ready_pod(task_type)
+            ):
+                return True
             try:
                 active_pod_count = self._active_pod_count()
             except Exception:  # pylint: disable=broad-exception-caught
@@ -213,9 +456,12 @@ class KubernetesExecutor:
                     _capacity_label_selector(self._config),
                     exc_info=True,
                 )
-                return
+                return False
             if active_pod_count < self._config.active_pod_budget:
-                return
+                if waited_for_capacity:
+                    self._last_completed_pod_sweep_at = self._config.monotonic()
+                    self._sweep_completed_pods()
+                return False
 
             if self._config.capacity_log_interval is not None:
                 now = self._config.monotonic()
@@ -233,6 +479,7 @@ class KubernetesExecutor:
                     )
                     last_log_at = now
 
+            waited_for_capacity = True
             self._config.sleep(self._config.capacity_poll_interval)
 
     def _sweep_completed_pods_if_due(self) -> None:
@@ -246,8 +493,17 @@ class KubernetesExecutor:
             return
 
         self._last_completed_pod_sweep_at = now
+        self._sweep_completed_pods()
+
+    def _sweep_completed_pods(self) -> None:
+        """Run best-effort completed Pod cleanup."""
         try:
-            self._completed_pod_sweeper.sweep()
+            if self._warm_executor_pool_manager is None:
+                self._completed_pod_sweeper.sweep()
+            else:
+                self._warm_executor_pool_manager.sweep_completed_pods(
+                    self._completed_pod_sweeper.sweep
+                )
         except Exception:  # pylint: disable=broad-exception-caught
             log(
                 WARNING,
@@ -259,14 +515,35 @@ class KubernetesExecutor:
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Submit the TaskExecutor Pod and credential Secret."""
         try:
-            appio_root_certificates = _get_appio_root_certificates(spec, self._config)
+            runtime_root_certificates = _get_runtime_root_certificates(
+                spec, self._config
+            )
+            if self._warm_executor_pool_manager is not None:
+                allow_warm_dispatch = self._can_dispatch_warm(
+                    spec.insecure, spec.root_certificates_path
+                )
+                while True:
+                    if allow_warm_dispatch:
+                        warm_result = self._warm_executor_pool_manager.launch(
+                            spec, runtime_root_certificates
+                        )
+                        if warm_result is not None:
+                            return warm_result
+                    # Before token delivery, a warm Pod may recover while cold
+                    # capacity is full. Retry reservation when that happens.
+                    if not self._wait_for_capacity(
+                        spec.task_type,
+                        allow_warm_dispatch=allow_warm_dispatch,
+                        reconcile_warm_pools=False,
+                    ):
+                        break
             launch_attempt_id = _new_launch_attempt_id()
             secret_name = _credential_secret_name(spec, launch_attempt_id)
             secret = _build_appio_credentials_secret(
-                spec, self._config, appio_root_certificates, launch_attempt_id
+                spec, self._config, runtime_root_certificates, launch_attempt_id
             )
             pod = _build_taskexecutor_pod(
-                spec, self._config, appio_root_certificates, launch_attempt_id
+                spec, self._config, runtime_root_certificates, launch_attempt_id
             )
             self._client.create_namespaced_secret(self._config.namespace, secret)
         except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -284,17 +561,59 @@ class KubernetesExecutor:
 
         return LaunchResult.accepted()
 
+    def close(self) -> None:
+        """Delete idle warm Pods owned by this SuperExec instance."""
+        if self._warm_executor_pool_manager is not None:
+            self._warm_executor_pool_manager.close()
+
+    def _can_dispatch_warm(
+        self, insecure: bool, root_certificates_path: str | None
+    ) -> bool:
+        """Return whether warm dispatch can use the task's Runtime transport."""
+        return (
+            insecure
+            or self._config.runtime_root_certificates is not None
+            or root_certificates_path is None
+        )
+
+    def _launch_warm_executor(self, pool_key: WarmExecutorPoolKey) -> LaunchResult:
+        """Submit one warm TaskExecutor Pod for a fixed compatibility key."""
+        try:
+            _create_warm_executor(
+                self._client,
+                pool_key,
+                self._config,
+                new_warm_executor_id(),
+            )
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            return _launch_result_from_exception(exc)
+        return LaunchResult.accepted()
+
     def _active_pod_count(self) -> int:
         """Return the active TaskExecutor Pod count for the configured pool."""
         pod_list = self._client.list_namespaced_pod(
             self._config.namespace,
             label_selector=_capacity_label_selector(self._config),
         )
-        return sum(1 for pod in _pod_items(pod_list) if _is_active_pod(pod))
+        pods = _pod_items(pod_list)
+        if self._config.warm_executor_owner:
+            # Surviving busy Pods still consume this owner's capacity after
+            # caller labels or resource-pool settings change on restart.
+            pod_names = {_object_name(pod) for pod in pods}
+            owned_pods = self._client.list_namespaced_pod(
+                self._config.namespace,
+                label_selector=_warm_executor_owner_label_selector(self._config),
+            )
+            pods.extend(
+                pod
+                for pod in _pod_items(owned_pods)
+                if _object_name(pod) not in pod_names
+            )
+        return sum(1 for pod in pods if _is_active_pod(pod))
 
 
 class CompletedPodSweeper:
-    """Delete terminal TaskExecutor Pods and orphaned credential Secrets."""
+    """Delete terminal TaskExecutor Pods and their associated Secrets."""
 
     def __init__(
         self,
@@ -306,7 +625,7 @@ class CompletedPodSweeper:
         self._config = config
 
     def sweep(self) -> None:
-        """Delete terminal Pods and orphaned credential Secrets."""
+        """Delete terminal Pods and orphaned credential or warm trust Secrets."""
         selector = _taskexecutor_pool_label_selector(self._config)
         pods = _pod_items(
             self._client.list_namespaced_pod(
@@ -318,18 +637,48 @@ class CompletedPodSweeper:
                 self._config.namespace, label_selector=selector
             )
         )
+        pods = [pod for pod in pods if not is_warm_executor(pod)]
+        secrets = [secret for secret in secrets if not is_warm_executor(secret)]
+        if self._config.warm_executor_owner is not None:
+            # Caller labels and resource pools can change across restarts. Warm
+            # resources are instead owned by a stable SuperExec identity.
+            warm_selector = _warm_executor_owner_label_selector(self._config)
+            pods.extend(
+                _pod_items(
+                    self._client.list_namespaced_pod(
+                        self._config.namespace, label_selector=warm_selector
+                    )
+                )
+            )
+            secrets.extend(
+                _secret_items(
+                    self._client.list_namespaced_secret(
+                        self._config.namespace, label_selector=warm_selector
+                    )
+                )
+            )
         pod_names = {name for pod in pods if (name := _object_name(pod)) is not None}
         task_secret_names = {
             name
             for secret in secrets
             if (name := _object_name(secret)) is not None and _has_task_id_label(secret)
         }
+        warm_root_certificates_secret_names = {
+            name
+            for secret in secrets
+            if (
+                (name := _object_name(secret)) is not None
+                and is_warm_executor(secret)
+                and _pod_name_from_warm_executor_root_certificates_secret_name(name)
+                is not None
+            )
+        }
 
         for pod in pods:
             pod_name = _object_name(pod)
             if (
                 pod_name is None
-                or not _has_task_id_label(pod)
+                or not (_has_task_id_label(pod) or is_warm_executor(pod))
                 or not _is_terminal_pod(pod)
             ):
                 continue
@@ -337,13 +686,28 @@ class CompletedPodSweeper:
             credential_secret_name = _credential_secret_name_from_pod_name(pod_name)
             if credential_secret_name in task_secret_names:
                 self._delete_secret(credential_secret_name)
+            warm_root_certificates_secret_name = (
+                _warm_executor_root_certificates_secret_name_from_pod_name(pod_name)
+            )
+            if (
+                warm_root_certificates_secret_name
+                in warm_root_certificates_secret_names
+            ):
+                self._delete_secret(warm_root_certificates_secret_name)
 
-        # Delete credential Secrets whose owner Pod is no longer listed.
+        # Delete Secrets whose owner Pod is no longer listed.
         for secret in secrets:
             secret_name = _object_name(secret)
-            if secret_name is None or not _has_task_id_label(secret):
+            if secret_name is None:
                 continue
-            pod_name = _pod_name_from_credential_secret_name(secret_name)
+            if _has_task_id_label(secret):
+                pod_name = _pod_name_from_credential_secret_name(secret_name)
+            elif is_warm_executor(secret):
+                pod_name = _pod_name_from_warm_executor_root_certificates_secret_name(
+                    secret_name
+                )
+            else:
+                continue
             if pod_name is None or pod_name in pod_names:
                 continue
             self._delete_secret(secret_name)
@@ -372,13 +736,13 @@ class CompletedPodSweeper:
 def _build_appio_credentials_secret(
     spec: ExecutionSpec,
     config: KubernetesExecutorConfig,
-    appio_root_certificates: str | None,
+    runtime_root_certificates: str | None,
     launch_attempt_id: str,
 ) -> JSONObject:
     """Build the AppIo credential Secret for a TaskExecutor Pod."""
     data: JSONObject = {"token": spec.token}
-    if appio_root_certificates is not None:
-        data["ca.crt"] = appio_root_certificates
+    if runtime_root_certificates is not None:
+        data["ca.crt"] = runtime_root_certificates
 
     return {
         "apiVersion": "v1",
@@ -397,44 +761,186 @@ def _build_appio_credentials_secret(
 def _build_taskexecutor_pod(
     spec: ExecutionSpec,
     config: KubernetesExecutorConfig,
-    appio_root_certificates: str | None,
+    runtime_root_certificates: str | None,
     launch_attempt_id: str,
 ) -> JSONObject:
     """Build the TaskExecutor Pod for a claimed SuperExec task."""
+    volume_mounts: list[JSONObject] = [
+        {
+            "name": "appio-credentials",
+            "mountPath": APPIO_CREDENTIALS_MOUNT_PATH,
+            "readOnly": True,
+        }
+    ]
+    if config.volume_mounts is not None:
+        volume_mounts.extend(config.volume_mounts)
+
     container: JSONObject = {
         "name": "taskexecutor",
         "image": config.image,
         "command": [TASK_TYPE_TO_COMMAND[spec.task_type]],
-        "args": _taskexecutor_args(spec, appio_root_certificates),
-        "volumeMounts": [
+        "args": _taskexecutor_args(spec, runtime_root_certificates),
+        "volumeMounts": volume_mounts,
+    }
+    _apply_taskexecutor_container_config(container, config)
+
+    volumes: list[JSONObject] = [
+        {
+            "name": "appio-credentials",
+            "secret": {
+                "secretName": _credential_secret_name(spec, launch_attempt_id),
+                "defaultMode": 0o444,
+            },
+        }
+    ]
+    if config.volumes is not None:
+        volumes.extend(config.volumes)
+
+    return {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": _metadata(
+            _pod_name(spec, launch_attempt_id), spec, config, launch_attempt_id
+        ),
+        "spec": _taskexecutor_pod_spec(container, volumes, config),
+    }
+
+
+def _build_warm_executor_pod(
+    pool_key: WarmExecutorPoolKey,
+    config: KubernetesExecutorConfig,
+    executor_id: str,
+) -> JSONObject:
+    """Build a warm TaskExecutor Pod without task authority or credentials."""
+    volume_mounts: list[JSONObject] = [
+        {
+            "name": _WARM_EXECUTOR_READY_VOLUME_NAME,
+            "mountPath": WARM_EXECUTOR_READY_DIRECTORY,
+        }
+    ]
+    volumes: list[JSONObject] = [
+        {"name": _WARM_EXECUTOR_READY_VOLUME_NAME, "emptyDir": {}}
+    ]
+    if config.runtime_root_certificates is not None:
+        volume_mounts.append(
             {
-                "name": "appio-credentials",
-                "mountPath": APPIO_CREDENTIALS_MOUNT_PATH,
+                "name": _WARM_EXECUTOR_ROOT_CERTIFICATES_VOLUME_NAME,
+                "mountPath": WARM_AGENTAPP_ROOT_CERTIFICATES_MOUNT_PATH,
                 "readOnly": True,
             }
+        )
+        volumes.append(
+            {
+                "name": _WARM_EXECUTOR_ROOT_CERTIFICATES_VOLUME_NAME,
+                "secret": {
+                    "secretName": _warm_executor_root_certificates_secret_name(
+                        executor_id
+                    ),
+                    "defaultMode": 0o444,
+                },
+            }
+        )
+    container: JSONObject = {
+        "name": "taskexecutor",
+        "image": pool_key.runtime_image,
+        "command": ["python", "-m", WARM_EXECUTOR_MODULE],
+        "volumeMounts": [
+            *volume_mounts,
+            *(config.volume_mounts or []),
         ],
+        "readinessProbe": {
+            "exec": {"command": list(WARM_EXECUTOR_READINESS_COMMAND)},
+            "periodSeconds": 1,
+        },
     }
+    _apply_taskexecutor_container_config(container, config)
+
+    volumes.extend(config.volumes or [])
+    return {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": _warm_executor_metadata(
+            _warm_executor_pod_name(executor_id), pool_key, config
+        ),
+        "spec": _taskexecutor_pod_spec(container, volumes, config),
+    }
+
+
+def _build_warm_executor_root_certificates_secret(
+    pool_key: WarmExecutorPoolKey,
+    config: KubernetesExecutorConfig,
+    executor_id: str,
+) -> JSONObject:
+    """Build the token-free Runtime API trust Secret for a warm Pod."""
+    runtime_root_certificates = config.runtime_root_certificates
+    assert runtime_root_certificates is not None
+    return {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": _warm_executor_metadata(
+            _warm_executor_root_certificates_secret_name(executor_id),
+            pool_key,
+            config,
+        ),
+        "type": "Opaque",
+        "stringData": {"ca.crt": runtime_root_certificates},
+    }
+
+
+def _create_warm_executor(
+    client: KubernetesClient,
+    pool_key: WarmExecutorPoolKey,
+    config: KubernetesExecutorConfig,
+    executor_id: str,
+) -> None:
+    """Create one warm Pod and its token-free Runtime API trust Secret."""
+    if config.runtime_root_certificates is not None:
+        secret = _build_warm_executor_root_certificates_secret(
+            pool_key, config, executor_id
+        )
+        client.create_namespaced_secret(config.namespace, secret)
+    pod = _build_warm_executor_pod(pool_key, config, executor_id)
+    try:
+        client.create_namespaced_pod(config.namespace, pod)
+    except Exception as exc:
+        if config.runtime_root_certificates is not None and _is_definite_pod_rejection(
+            exc
+        ):
+            _delete_secret_best_effort(
+                client,
+                config.namespace,
+                _warm_executor_root_certificates_secret_name(executor_id),
+            )
+        raise
+
+
+def _apply_taskexecutor_container_config(
+    container: JSONObject, config: KubernetesExecutorConfig
+) -> None:
+    """Apply shared optional configuration to a TaskExecutor container."""
     if config.image_pull_policy is not None:
         container["imagePullPolicy"] = config.image_pull_policy
     if config.resources is not None:
         container["resources"] = config.resources
+    if config.env is not None:
+        container["env"] = config.env
     if config.container_security_context is not None:
         container["securityContext"] = config.container_security_context
 
+
+def _taskexecutor_pod_spec(
+    container: JSONObject,
+    volumes: list[JSONObject],
+    config: KubernetesExecutorConfig,
+) -> JSONObject:
+    """Build the shared TaskExecutor Pod lifecycle and placement fields."""
     pod_spec: JSONObject = {
         "automountServiceAccountToken": False,
         "restartPolicy": "Never",
         "containers": [container],
-        "volumes": [
-            {
-                "name": "appio-credentials",
-                "secret": {
-                    "secretName": _credential_secret_name(spec, launch_attempt_id),
-                    "defaultMode": 0o444,
-                },
-            }
-        ],
     }
+    if volumes:
+        pod_spec["volumes"] = volumes
     if config.service_account_name is not None:
         pod_spec["serviceAccountName"] = config.service_account_name
     if config.node_selector is not None:
@@ -448,30 +954,23 @@ def _build_taskexecutor_pod(
     if config.pod_security_context is not None:
         pod_spec["securityContext"] = config.pod_security_context
 
-    return {
-        "apiVersion": "v1",
-        "kind": "Pod",
-        "metadata": _metadata(
-            _pod_name(spec, launch_attempt_id), spec, config, launch_attempt_id
-        ),
-        "spec": pod_spec,
-    }
+    return pod_spec
 
 
 def _taskexecutor_args(
-    spec: ExecutionSpec, appio_root_certificates: str | None
+    spec: ExecutionSpec, runtime_root_certificates: str | None
 ) -> list[str]:
     """Build TaskExecutor arguments with file-based credential delivery."""
     args = [
         TASK_TYPE_TO_APPIO_API_ADDRESS_ARG[spec.task_type],
-        spec.appio_api_address,
+        spec.runtime_api_address,
         "--token-file",
         APPIO_TOKEN_FILE_PATH,
     ]
 
     if spec.insecure:
         args.append("--insecure")
-    elif appio_root_certificates is not None:
+    elif runtime_root_certificates is not None:
         args.extend(["--root-certificates", APPIO_ROOT_CERTIFICATES_FILE_PATH])
 
     if spec.runtime_dependency_install:
@@ -480,12 +979,113 @@ def _taskexecutor_args(
     return args
 
 
-def _get_appio_root_certificates(
+def _taskexecutor_env(env: list[JSONObject]) -> list[JSONObject]:
+    """Build validated TaskExecutor container environment entries."""
+    if not isinstance(env, list):
+        raise ValueError("TaskExecutor env must be a list of mappings.")
+    entries: list[JSONObject] = []
+    for entry in env:
+        if not isinstance(entry, dict):
+            raise ValueError("TaskExecutor env entries must be mappings.")
+        # Keep this path limited to non-secret literal config. Design secret
+        # references separately before allowing them into TaskExecutor Pods.
+        if "valueFrom" in entry:
+            raise ValueError(
+                "TaskExecutor env entries support literal 'value' only; "
+                "'valueFrom' is not supported."
+            )
+        if set(entry) != {"name", "value"}:
+            raise ValueError(
+                "TaskExecutor env entries must contain exactly 'name' and 'value'."
+            )
+        name = entry["name"]
+        value = entry["value"]
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("TaskExecutor env names must be non-empty strings.")
+        # Validate env name locally so invalid executor config fails before Pod creation
+        if not _KUBERNETES_ENV_NAME_PATTERN.fullmatch(name):
+            raise ValueError(
+                f"TaskExecutor env name {name!r} must be a valid Kubernetes "
+                "environment variable name."
+            )
+        if not isinstance(value, str):
+            raise ValueError(f"TaskExecutor env value for {name!r} must be a string.")
+        # Reject task-visible provider API key env names before Pod construction
+        if name in _FORBIDDEN_TASKEXECUTOR_ENV_NAMES:
+            raise ValueError(
+                f"TaskExecutor env name {name!r} is not allowed because it is a "
+                "provider API key."
+            )
+        # Copy only the validated Kubernetes env shape into the generated Pod spec.
+        entries.append({"name": name, "value": value})
+    return entries
+
+
+def _taskexecutor_volumes(volumes: list[JSONObject]) -> list[JSONObject]:
+    """Build validated TaskExecutor Pod volumes."""
+    if not isinstance(volumes, list):
+        raise ValueError("TaskExecutor volumes must be a list of mappings.")
+    entries: list[JSONObject] = []
+    for entry in volumes:
+        if not isinstance(entry, dict):
+            raise ValueError("TaskExecutor volume entries must be mappings.")
+        volume_name = entry.get("name")
+        if volume_name in _RESERVED_TASKEXECUTOR_VOLUME_NAMES:
+            raise ValueError(f"TaskExecutor volume name {volume_name!r} is reserved.")
+        if "secret" in entry:
+            raise ValueError("TaskExecutor secret volumes are not supported.")
+        if _has_rejected_projected_source(entry):
+            raise ValueError(
+                "TaskExecutor projected secret and serviceAccountToken volumes "
+                "are not supported."
+            )
+        entries.append(entry)
+    return entries
+
+
+def _taskexecutor_volume_mounts(volume_mounts: list[JSONObject]) -> list[JSONObject]:
+    """Build validated TaskExecutor container volume mounts."""
+    if not isinstance(volume_mounts, list):
+        raise ValueError("TaskExecutor volume mounts must be a list of mappings.")
+    entries: list[JSONObject] = []
+    for entry in volume_mounts:
+        if not isinstance(entry, dict):
+            raise ValueError("TaskExecutor volume mount entries must be mappings.")
+        volume_name = entry.get("name")
+        if volume_name in _RESERVED_TASKEXECUTOR_VOLUME_NAMES:
+            raise ValueError(
+                f"TaskExecutor volume mount name {volume_name!r} is reserved."
+            )
+        mount_path = entry.get("mountPath")
+        if mount_path in _RESERVED_TASKEXECUTOR_VOLUME_MOUNT_PATHS:
+            raise ValueError(
+                f"TaskExecutor volume mount path {mount_path!r} is reserved."
+            )
+        entries.append(entry)
+    return entries
+
+
+def _has_rejected_projected_source(volume: JSONObject) -> bool:
+    """Return true if a projected volume source exposes credentials."""
+    projected = volume.get("projected")
+    if not isinstance(projected, dict):
+        return False
+    sources = projected.get("sources")
+    if not isinstance(sources, list):
+        return False
+    return any(
+        isinstance(source, dict)
+        and ("secret" in source or "serviceAccountToken" in source)
+        for source in sources
+    )
+
+
+def _get_runtime_root_certificates(
     spec: ExecutionSpec, config: KubernetesExecutorConfig
 ) -> str | None:
-    """Return PEM data for AppIo root certificates, if configured."""
-    if config.appio_root_certificates is not None:
-        return config.appio_root_certificates
+    """Return PEM data for Runtime API root certificates, if configured."""
+    if config.runtime_root_certificates is not None:
+        return config.runtime_root_certificates
     if spec.root_certificates_path is not None:
         return (
             Path(spec.root_certificates_path).expanduser().read_text(encoding="utf-8")
@@ -503,6 +1103,18 @@ def _pod_name(spec: ExecutionSpec, launch_attempt_id: str) -> str:
     return f"flwr-taskexecutor-{spec.task_id}-{launch_attempt_id}"
 
 
+def _warm_executor_pod_name(executor_id: str) -> str:
+    """Return the name of a warm TaskExecutor Pod."""
+    return f"flwr-taskexecutor-warm-{executor_id}"
+
+
+def _warm_executor_root_certificates_secret_name(executor_id: str) -> str:
+    """Return the Runtime API trust Secret name for a warm TaskExecutor Pod."""
+    return _warm_executor_root_certificates_secret_name_from_pod_name(
+        _warm_executor_pod_name(executor_id)
+    )
+
+
 def _credential_secret_name(spec: ExecutionSpec, launch_attempt_id: str) -> str:
     """Return the AppIo credential Secret name."""
     return _credential_secret_name_from_pod_name(_pod_name(spec, launch_attempt_id))
@@ -513,11 +1125,28 @@ def _credential_secret_name_from_pod_name(pod_name: str) -> str:
     return f"{pod_name}{_APPIO_CREDENTIAL_SECRET_SUFFIX}"
 
 
+def _warm_executor_root_certificates_secret_name_from_pod_name(pod_name: str) -> str:
+    """Return the Runtime API trust Secret name for a warm TaskExecutor Pod."""
+    return f"{pod_name}{_WARM_EXECUTOR_ROOT_CERTIFICATES_SECRET_SUFFIX}"
+
+
 def _pod_name_from_credential_secret_name(secret_name: str) -> str | None:
     """Return the owner Pod name encoded in a credential Secret name."""
     if not secret_name.endswith(_APPIO_CREDENTIAL_SECRET_SUFFIX):
         return None
     pod_name = secret_name[: -len(_APPIO_CREDENTIAL_SECRET_SUFFIX)]
+    if not pod_name:
+        return None
+    return pod_name
+
+
+def _pod_name_from_warm_executor_root_certificates_secret_name(
+    secret_name: str,
+) -> str | None:
+    """Return the warm Pod name encoded in a Runtime API trust Secret name."""
+    if not secret_name.endswith(_WARM_EXECUTOR_ROOT_CERTIFICATES_SECRET_SUFFIX):
+        return None
+    pod_name = secret_name[: -len(_WARM_EXECUTOR_ROOT_CERTIFICATES_SECRET_SUFFIX)]
     if not pod_name:
         return None
     return pod_name
@@ -538,6 +1167,82 @@ def _metadata(
     if config.annotations is not None:
         metadata["annotations"] = cast(JSONObject, config.annotations)
     return metadata
+
+
+def _warm_executor_metadata(
+    name: str,
+    pool_key: WarmExecutorPoolKey,
+    config: KubernetesExecutorConfig,
+) -> JSONObject:
+    """Return metadata identifying one compatible warm TaskExecutor Pod."""
+    labels: JSONObject = {}
+    labels.update(_caller_labels(config))
+    labels.update(
+        {
+            _NAME_LABEL: "flower",
+            _COMPONENT_LABEL: "taskexecutor",
+            _TASK_TYPE_LABEL: pool_key.task_type.value,
+            WARM_EXECUTOR_LABEL: "true",
+        }
+    )
+    if config.resource_pool is not None:
+        labels[_RESOURCE_POOL_LABEL] = config.resource_pool
+    if config.warm_executor_owner is not None:
+        labels[_WARM_EXECUTOR_OWNER_LABEL] = config.warm_executor_owner
+
+    annotations: JSONObject = {}
+    annotations.update(config.annotations or {})
+    annotations.pop(_WARM_EXECUTOR_CONSUMED_ANNOTATION, None)
+    annotations.update(
+        {
+            WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION: pool_key.runtime_image,
+            WARM_EXECUTOR_CONFIGURATION_ANNOTATION: (
+                _warm_executor_configuration_hash(config)
+            ),
+        }
+    )
+    return {
+        "name": name,
+        "namespace": config.namespace,
+        "labels": labels,
+        "annotations": annotations,
+    }
+
+
+def _warm_executor_configuration_hash(config: KubernetesExecutorConfig) -> str:
+    """Return a stable fingerprint for the configured warm Pod environment."""
+    payload = {
+        "image": config.image,
+        "image_pull_policy": config.image_pull_policy,
+        "labels": _caller_labels(config),
+        "annotations": config.annotations,
+        "resource_pool": config.resource_pool,
+        "resources": config.resources,
+        "env": config.env,
+        "volumes": config.volumes,
+        "volume_mounts": config.volume_mounts,
+        "node_selector": config.node_selector,
+        "tolerations": config.tolerations,
+        "affinity": config.affinity,
+        "priority_class_name": config.priority_class_name,
+        "pod_security_context": config.pod_security_context,
+        "container_security_context": config.container_security_context,
+        "service_account_name": config.service_account_name,
+        "runtime_root_certificates": config.runtime_root_certificates,
+    }
+    serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode()).hexdigest()
+
+
+def _has_warm_executor_configuration(
+    pod: object, config: KubernetesExecutorConfig
+) -> bool:
+    """Return true when a warm Pod was created with the current configuration."""
+    metadata = _object_field(pod, "metadata")
+    annotations = _object_field(metadata, "annotations")
+    return _object_field(
+        annotations, WARM_EXECUTOR_CONFIGURATION_ANNOTATION
+    ) == _warm_executor_configuration_hash(config)
 
 
 def _labels(
@@ -585,6 +1290,18 @@ def _taskexecutor_pool_labels(config: KubernetesExecutorConfig) -> dict[str, str
     return labels
 
 
+def _warm_executor_owner_label_selector(config: KubernetesExecutorConfig) -> str:
+    """Return a selector limited to warm Pods owned by this SuperExec instance."""
+    assert config.warm_executor_owner is not None
+    labels = {
+        _NAME_LABEL: "flower",
+        _COMPONENT_LABEL: "taskexecutor",
+        WARM_EXECUTOR_LABEL: "true",
+        _WARM_EXECUTOR_OWNER_LABEL: config.warm_executor_owner,
+    }
+    return _label_selector(labels)
+
+
 def _caller_labels(config: KubernetesExecutorConfig) -> dict[str, str]:
     """Return caller-provided labels that are not owned by the executor."""
     return {
@@ -629,6 +1346,23 @@ def _is_active_pod(pod: object) -> bool:
         return True
 
     return _object_field(status, "phase") not in {"Succeeded", "Failed"}
+
+
+def _is_active_warm_executor(
+    pod: object, pool_key: WarmExecutorPoolKey, config: KubernetesExecutorConfig
+) -> bool:
+    """Return true when a compatible warm Pod still occupies its pool slot."""
+    if not is_compatible_warm_executor(
+        pod, pool_key
+    ) or not _has_warm_executor_configuration(pod, config):
+        return False
+    metadata = _object_field(pod, "metadata")
+    deletion_timestamp = _object_field(metadata, "deletion_timestamp")
+    if deletion_timestamp is None:
+        deletion_timestamp = _object_field(metadata, "deletionTimestamp")
+    if deletion_timestamp is not None:
+        return False
+    return not _is_terminal_pod(pod)
 
 
 def _is_terminal_pod(pod: object) -> bool:
@@ -694,13 +1428,15 @@ def _is_definite_pod_rejection(exc: Exception) -> bool:
 def _delete_secret_best_effort(
     client: KubernetesClient, namespace: str, secret_name: str
 ) -> None:
-    """Best-effort cleanup for a Secret whose Pod was definitely rejected."""
+    """Best-effort cleanup for a Secret that is no longer needed."""
     try:
         client.delete_namespaced_secret(secret_name, namespace)
-    except Exception:  # pylint: disable=broad-exception-caught
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        if _exception_status(exc) == 404:
+            return
         log(
             WARNING,
-            "Failed to delete Kubernetes credential Secret %r in namespace %r",
+            "Failed to delete Kubernetes Secret %r in namespace %r",
             secret_name,
             namespace,
             exc_info=True,
@@ -739,3 +1475,8 @@ def _is_capacity_message(message: str) -> bool:
         "insufficient pods",
     )
     return any(marker in message for marker in capacity_markers)
+
+
+def _is_dns_label(value: str) -> bool:
+    """Return whether value can be used as a Kubernetes label value here."""
+    return len(value) <= 63 and _DNS_LABEL_PATTERN.fullmatch(value) is not None

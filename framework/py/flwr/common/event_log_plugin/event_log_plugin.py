@@ -18,6 +18,7 @@
 from abc import ABC, abstractmethod
 
 import grpc
+from fastapi import Request
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.supercore.auth.typing import AccountInfo
@@ -35,7 +36,7 @@ class EventLogWriterPlugin(ABC):
     def compose_log_before_event(  # pylint: disable=too-many-arguments
         self,
         request: GrpcMessage,
-        context: grpc.ServicerContext,
+        context: grpc.ServicerContext | Request,
         account_info: AccountInfo | None,
         method_name: str,
     ) -> LogEntry:
@@ -45,7 +46,7 @@ class EventLogWriterPlugin(ABC):
     def compose_log_after_event(  # pylint: disable=too-many-arguments,R0917
         self,
         request: GrpcMessage,
-        context: grpc.ServicerContext,
+        context: grpc.ServicerContext | Request,
         account_info: AccountInfo | None,
         method_name: str,
         response: GrpcMessage | BaseException | None,

@@ -27,7 +27,7 @@ from flwr.supercore.run import Run
 class Federation:  # pylint: disable=R0902
     """Federation details."""
 
-    name: str
+    id: str
     description: str
     members: list[Member]
     nodes: list[NodeInfo]
@@ -35,3 +35,6 @@ class Federation:  # pylint: disable=R0902
     archived: bool
     simulation: bool
     config: SimulationConfig | None
+    can_invite_members: bool
+    can_add_supernodes: bool
+    member_count: int | None = None

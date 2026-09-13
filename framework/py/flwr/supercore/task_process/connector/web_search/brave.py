@@ -32,10 +32,13 @@ REQUEST_TIMEOUT = 60.0
 class BraveWebSearchProvider:
     """Brave Search API adapter."""
 
+    name = BRAVE_WEB_SEARCH_PROVIDER
+    env = BRAVE_API_KEY_ENV
+
     def __init__(self) -> None:
-        api_key = os.getenv(BRAVE_API_KEY_ENV, "").strip()
+        api_key = os.getenv(self.env, "").strip()
         if not api_key:
-            raise RuntimeError(f"Environment variable {BRAVE_API_KEY_ENV} is required.")
+            raise RuntimeError(f"Environment variable {self.env} is required.")
         self._api_key = api_key
 
     def search(self, query: str) -> JSONObject:
@@ -56,16 +59,14 @@ class BraveWebSearchProvider:
                 timeout=REQUEST_TIMEOUT,
             )
         except requests.RequestException as exc:
-            raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} web search request failed: {exc}"
-            ) from exc
+            raise RuntimeError(f"{self.name} web search request failed: {exc}") from exc
         if response.status_code >= 400:
             try:
                 detail = cast(JSONValue, response.json())
             except ValueError:
                 detail = response.text
             raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} web search request failed: "
+                f"{self.name} web search request failed: "
                 f"{response.status_code} {detail}"
             )
 
@@ -73,12 +74,10 @@ class BraveWebSearchProvider:
             payload = response.json()
         except ValueError as exc:
             raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} web search returned invalid JSON."
+                f"{self.name} web search returned invalid JSON."
             ) from exc
         if not isinstance(payload, dict):
-            raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} web search returned invalid JSON."
-            )
+            raise RuntimeError(f"{self.name} web search returned invalid JSON.")
 
         return {
             "results": cast(

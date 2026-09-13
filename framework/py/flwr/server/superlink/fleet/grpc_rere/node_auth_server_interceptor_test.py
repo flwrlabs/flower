@@ -56,6 +56,7 @@ from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
     SendNodeHeartbeatResponse,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    ObjectTree,
     PullObjectRequest,
     PullObjectResponse,
     PushObjectRequest,
@@ -63,10 +64,9 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
-from flwr.server.app import _run_fleet_api_grpc_rere
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_res_message
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, TaskType
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID, TaskType
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.object_store import ObjectStoreFactory
@@ -75,6 +75,7 @@ from flwr.supercore.primitives.asymmetric import (
     public_key_to_bytes,
     sign_message,
 )
+from flwr.superlink.cli.flower_superlink import _run_fleet_api_grpc_rere
 from flwr.superlink.federation import NoOpFederationManager
 
 from .node_auth_server_interceptor import NodeAuthServerInterceptor
@@ -253,7 +254,7 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
             "",
             fab_hash,
             {},
-            NOOP_FEDERATION,
+            NOOP_FEDERATION_ID,
             None,
             "",
             TaskType.SERVER_APP,
@@ -272,7 +273,11 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
         msg_proto = create_res_message(
             src_node_id=node_id, dst_node_id=SUPERLINK_NODE_ID, run_id=run_id
         )
-        req = PushMessagesRequest(node=Node(node_id=node_id), messages_list=[msg_proto])
+        req = PushMessagesRequest(
+            node=Node(node_id=node_id),
+            messages_list=[msg_proto],
+            message_object_trees=[ObjectTree(object_id="object-id")],
+        )
         return self._push_messages.with_call(request=req, metadata=metadata)
 
     def _test_pull_object(self, metadata: list[Any]) -> Any:

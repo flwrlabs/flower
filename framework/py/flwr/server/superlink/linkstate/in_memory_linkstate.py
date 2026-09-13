@@ -25,7 +25,6 @@ from typing import Literal, cast
 
 from flwr.app import Message
 from flwr.app.user_config import UserConfig
-from flwr.common import log
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
@@ -37,12 +36,15 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.utils import validate_message
-from flwr.supercore.constant import NodeStatus
+from flwr.supercore import log
+from flwr.supercore.constant import NodeStatus, TaskType
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
+from flwr.supercore.corestate.utils import validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
@@ -157,7 +159,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
                 return None
 
-            federation = self.run_ids[message.metadata.run_id].run.federation
+            federation_id = self.run_ids[message.metadata.run_id].run.federation_id
 
             # Validate destination node ID
             dst_node = self.nodes.get(message.metadata.dst_node_id)
@@ -167,7 +169,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 # Node must be online or offline
                 or dst_node.status not in (NodeStatus.ONLINE, NodeStatus.OFFLINE)
                 # Node must belong to the same federation
-                or not self.federation_manager.has_node(dst_node.node_id, federation)
+                or not self.federation_manager.has_node(dst_node.node_id, federation_id)
             ):
                 log(
                     ERROR,
@@ -179,6 +181,22 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             self.message_ins_store[message_id] = message
 
         return message_id
+
+    def store_message_and_object_tree(
+        self, message: Message, object_tree: ObjectTree, session_id: str
+    ) -> tuple[bool, list[str]]:
+        """Store a Message and preregister its ObjectTree."""
+        with self.lock:
+            if message.metadata.reply_to_message_id:
+                stored = self.store_message_res(message) is not None
+            else:
+                stored = self.store_message_ins(message) is not None
+
+            if not stored:
+                return False, []
+
+            missing_objects = self.preregister_object_tree(object_tree, session_id)
+            return True, missing_objects
 
     def _check_stored_messages(self, message_ids: set[str]) -> None:
         """Check and delete the message if it's invalid."""
@@ -199,9 +217,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 # same federation
                 src_node_id = message.metadata.src_node_id
                 dst_node_id = message.metadata.dst_node_id
+                federation_id = self.run_ids[message.metadata.run_id].run.federation_id
                 filtered = self.federation_manager.filter_nodes(
                     {src_node_id, dst_node_id},
-                    self.run_ids[message.metadata.run_id].run.federation,
+                    federation_id,
                 )
                 if len(filtered) != 2:  # Not both nodes are in the federation
                     invalid_msg_ids.add(msg_id)
@@ -248,6 +267,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         res_metadata = message.metadata
         with self.lock:
+            message_id = res_metadata.message_id
             # Check if the Message it is replying to exists and is valid
             msg_ins_id = res_metadata.reply_to_message_id
             self._check_stored_messages({msg_ins_id})
@@ -266,15 +286,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 log(
                     ERROR,
                     "Message with ID %s does not exist.",
-                    msg_ins_id,
-                )
-                return None
-
-            if msg_ins_id in self.message_ins_id_to_message_res_id:
-                log(
-                    ERROR,
-                    "Failed to store Message reply: duplicate reply for "
-                    "reply_to_message_id %s.",
                     msg_ins_id,
                 )
                 return None
@@ -309,7 +320,18 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
                 return None
 
-            message_id = message.metadata.message_id
+            if message_id in self.message_res_store:
+                return message_id
+
+            if msg_ins_id in self.message_ins_id_to_message_res_id:
+                log(
+                    ERROR,
+                    "Failed to store Message reply: duplicate reply for "
+                    "reply_to_message_id %s.",
+                    msg_ins_id,
+                )
+                return None
+
             self.message_res_store[message_id] = message
             self.message_ins_id_to_message_res_id[msg_ins_id] = message_id
 
@@ -391,6 +413,17 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     )
                     del self.message_res_store[message_res_id]
 
+    def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
+        """Delete Messages belonging to an expired push session."""
+        with self.lock:
+            self.delete_messages(message_object_ids)
+            for message_id in message_object_ids:
+                message_res = self.message_res_store.pop(message_id, None)
+                if message_res is not None:
+                    self.message_ins_id_to_message_res_id.pop(
+                        message_res.metadata.reply_to_message_id, None
+                    )
+
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
         message_id_list: set[str] = set()
@@ -413,9 +446,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         if not self.finish_task(primary_task_id, SubStatus.STOPPED, ""):
             return False
 
-        # Clean up messages and their objects related to the run
-        self.delete_messages(self.get_message_ids_from_run_id(run_id))
-        self.object_store.delete_objects_in_run(run_id)
+        self.cleanup_run(run_id)
         return True
 
     def num_message_ins(self) -> int:
@@ -541,12 +572,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         with self.lock:
             if run_id not in self.run_ids:
                 return set()
-            federation = self.run_ids[run_id].run.federation
+            federation_id = self.run_ids[run_id].run.federation_id
             node_ids = {
                 node.node_id
                 for node in self.get_node_info(statuses=[NodeStatus.ONLINE])
             }
-            return self.federation_manager.filter_nodes(node_ids, federation)
+            return self.federation_manager.filter_nodes(node_ids, federation_id)
 
     def get_node_info(
         self,
@@ -604,14 +635,26 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         fab_version: str | None,
         fab_hash: str | None,
         override_config: UserConfig,
-        federation: str,
+        federation_id: str,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         primary_task_type: str,
         series_id: int | None = None,
+        series_description: str | None = None,
+        connector_refs: Sequence[str] = (),
+        initial_task_event: TaskEvent | None = None,
     ) -> int:
         """Create a new run."""
-        with self.lock_task_store, self.lock:
+        if isinstance(connector_refs, str) or any(
+            not connector_ref for connector_ref in connector_refs
+        ):
+            return 0
+        if initial_task_event is not None:
+            try:
+                validate_task_event_data(initial_task_event.data)
+            except ValueError:
+                return 0
+        with self.lock_task_store, self.lock, self.lock_task_event_store:
             run_id = generate_rand_int_from_bytes(
                 RUN_ID_NUM_BYTES,
                 exclude=set(self.run_ids),
@@ -623,8 +666,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             current = now().isoformat()
             resolved_series_id = self.store_run_in_series(
                 run_id=run_id,
-                federation=federation,
+                federation_id=federation_id,
+                is_agent=primary_task_type == TaskType.AGENT_APP,
                 series_id=series_id,
+                description=series_description,
             )
             if resolved_series_id is None:
                 log(ERROR, "Unexpected run series membership failure.")
@@ -650,7 +695,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         details="",
                     ),
                     flwr_aid=flwr_aid if flwr_aid else "",
-                    federation=federation,
+                    federation_id=federation_id,
                     primary_task_id=task_id,
                     bytes_sent=0,
                     bytes_recv=0,
@@ -679,6 +724,17 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 model_ref=None,
                 connector_ref=None,
             )
+            if initial_task_event is not None:
+                initial_task_event.id = self._next_task_event_id
+                initial_task_event.timestamp = current
+                initial_task_event.run_id = run_id
+                initial_task_event.task_id = task_id
+                self.task_event_store.setdefault(run_id, []).append(initial_task_event)
+                self._next_task_event_id += 1
+            self.bind_connectors_to_run(
+                run_id=run_id,
+                connector_refs=connector_refs,
+            )
 
             return run_id
 
@@ -688,7 +744,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
-        federations: Sequence[str] | None = None,
+        federation_ids: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
@@ -727,15 +783,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     aid_matched |= self.flwr_aid_to_run_ids.get(flwr_aid, set())
                 matched_run_ids &= aid_matched
 
-            # Filter by federations
-            if federations is not None:
-                if not federations:
+            # Filter by federation IDs
+            if federation_ids is not None:
+                if not federation_ids:
                     return []
-                federation_set = set(federations)
+                federation_id_set = set(federation_ids)
                 matched_run_ids &= {
                     run_id
                     for run_id in matched_run_ids
-                    if self.run_ids[run_id].run.federation in federation_set
+                    if self.run_ids[run_id].run.federation_id in federation_id_set
                 }
 
             runs = [self._get_run(run_id) for run_id in matched_run_ids]

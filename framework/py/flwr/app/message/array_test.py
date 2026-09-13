@@ -181,7 +181,7 @@ class TestArray(unittest.TestCase):
             ),  # 14 ArrayChunks (if FLWR_PRIVATE_MAX_ARRAY_CHUNK_SIZE = 5 MB )
         ]
     )
-    def test_deflate_and_inflate(self, ndarray) -> None:
+    def test_deflate_and_inflate(self, ndarray: np.ndarray[Any, Any]) -> None:
         """Ensure an Array can be (de)inflated correctly."""
         arr = Array(ndarray)
 

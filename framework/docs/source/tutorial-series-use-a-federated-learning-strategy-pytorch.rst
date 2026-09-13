@@ -59,14 +59,12 @@ If you are starting here directly, install Flower and fetch the same app:
 
 .. code-block:: shell
 
-    # Install Flower with the simulation extra
-    $ pip install -U "flwr[simulation]"
+    # Install Flower
+    $ pip install -U flwr
     # Fetch the app from Flower Hub
     $ flwr new @flwrlabs/quickstart-pytorch
     # Navigate to the app directory
     $ cd quickstart-pytorch
-    # Install the app dependencies
-    $ pip install -e .
 
 With that, we're ready to introduce a number of new strategy features.
 
@@ -119,8 +117,8 @@ Next, run the app on SuperGrid to confirm that the new strategy is being used:
 
     # Log in if you are not already logged in
     $ flwr login supergrid
-    # Run the app across the federation you created earlier in this tutorial series
-    $ flwr run . supergrid --federation @<username>/<federation-name>
+    # Run the app in SuperGrid
+    $ flwr run . supergrid
 
 Open the `SuperGrid dashboard <https://flower.ai/federations/>`__, select your
 federation, and inspect the logs for the new run. You should see that Flower starts the

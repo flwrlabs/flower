@@ -278,10 +278,165 @@
     }
   }
 
+  function makeFetchedUrlsAbsolute(root, baseUrl) {
+    root.querySelectorAll("[href], [src]").forEach((element) => {
+      for (const attribute of ["href", "src"]) {
+        const value = element.getAttribute(attribute);
+        if (!value || value.startsWith("#")) {
+          continue;
+        }
+        try {
+          element.setAttribute(attribute, new URL(value, baseUrl).href);
+        } catch (error) {
+          console.warn(`Could not resolve changelog ${attribute}:`, value, error);
+        }
+      }
+    });
+  }
+
+  async function fetchSharedChangelog(docsBaseUrl, language) {
+    const url = `${docsBaseUrl}/main/${language}/changelog/index.html`;
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+
+    const html = await response.text();
+    const parsedDocument = new DOMParser().parseFromString(html, "text/html");
+    const article = parsedDocument.querySelector("article#furo-main-content");
+    if (!article) {
+      throw new Error("Shared changelog article was not found");
+    }
+    makeFetchedUrlsAbsolute(article, response.url);
+    const toc = parsedDocument.querySelector("aside.toc-drawer");
+    if (toc) {
+      makeFetchedUrlsAbsolute(toc, response.url);
+    }
+    return { article, toc };
+  }
+
+  async function loadSharedChangelog(versioningContainer) {
+    const placeholder = document.querySelector("[data-flwr-changelog]");
+    const isChangelogPage = window.location.pathname.endsWith(
+      "/ref-changelog.html",
+    );
+    const currentArticle =
+      placeholder?.closest("article") ||
+      (isChangelogPage && document.querySelector("article#furo-main-content"));
+    if (!currentArticle) {
+      return;
+    }
+
+    const docsBaseUrl = getDocsBaseUrl(versioningContainer);
+    const currentLanguage =
+      (versioningContainer && versioningContainer.dataset.currentLanguage) || "en";
+    const languages = currentLanguage === "en" ? ["en"] : [currentLanguage, "en"];
+
+    for (const language of languages) {
+      try {
+        const sharedChangelog = await fetchSharedChangelog(docsBaseUrl, language);
+        currentArticle.innerHTML = sharedChangelog.article.innerHTML;
+        const currentToc = document.querySelector("aside.toc-drawer");
+        if (sharedChangelog.toc && currentToc) {
+          currentToc.className = sharedChangelog.toc.className;
+          currentToc.innerHTML = sharedChangelog.toc.innerHTML;
+          initializeSharedChangelogToc(currentToc);
+          document
+            .querySelectorAll(".toc-overlay-icon.no-toc")
+            .forEach((element) => {
+              element.classList.remove("no-toc");
+            });
+        }
+        const anchor = window.location.hash.slice(1);
+        if (anchor) {
+          requestAnimationFrame(() => {
+            document.getElementById(anchor)?.scrollIntoView();
+          });
+        }
+        return;
+      } catch (error) {
+        console.warn(`Could not load the ${language} changelog:`, error);
+      }
+    }
+
+    if (!placeholder) {
+      return;
+    }
+    placeholder.setAttribute("role", "alert");
+    placeholder.textContent = "Could not load the shared changelog. ";
+    const fallbackLink = document.createElement("a");
+    fallbackLink.href = `${docsBaseUrl}/main/en/changelog/index.html`;
+    fallbackLink.textContent = "Open the changelog from main.";
+    placeholder.appendChild(fallbackLink);
+  }
+
+  function initializeSharedChangelogToc(toc) {
+    const tocScroll = toc.querySelector(".toc-scroll");
+    const entries = Array.from(toc.querySelectorAll('.toc-tree a[href^="#"]'))
+      .map((link) => ({
+        link,
+        target: document.getElementById(link.hash.slice(1)),
+      }))
+      .filter(({ target }) => target);
+    if (!tocScroll || entries.length === 0) {
+      return;
+    }
+
+    let activeItem;
+    let frame;
+    const update = () => {
+      frame = undefined;
+      const headerHeight =
+        document.querySelector("header")?.getBoundingClientRect().height || 0;
+      const scrollPosition = window.scrollY + headerHeight + 40;
+      let activeEntry = entries[0];
+      for (const entry of entries) {
+        const top = entry.target.getBoundingClientRect().top + window.scrollY;
+        if (top > scrollPosition) {
+          break;
+        }
+        activeEntry = entry;
+      }
+
+      const nextActiveItem = activeEntry.link.closest("li");
+      if (!nextActiveItem || nextActiveItem === activeItem) {
+        return;
+      }
+      toc.querySelectorAll(".scroll-current").forEach((element) => {
+        element.classList.remove("scroll-current");
+      });
+      activeItem = nextActiveItem;
+      for (
+        let item = activeItem;
+        item && toc.contains(item);
+        item = item.parentElement?.closest("li")
+      ) {
+        item.classList.add("scroll-current");
+      }
+
+      const itemRect = activeItem.getBoundingClientRect();
+      const scrollRect = tocScroll.getBoundingClientRect();
+      if (itemRect.top < scrollRect.top) {
+        tocScroll.scrollTop -= scrollRect.top - itemRect.top;
+      } else if (itemRect.bottom > scrollRect.bottom) {
+        tocScroll.scrollTop += itemRect.bottom - scrollRect.bottom;
+      }
+    };
+    const scheduleUpdate = () => {
+      if (frame === undefined) {
+        frame = requestAnimationFrame(update);
+      }
+    };
+
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    update();
+  }
+
   document.addEventListener("DOMContentLoaded", async () => {
     const versioningContainer = getVersioningContainer();
     bindVersionLinks(versioningContainer);
     hideEmptyAnnouncementFallback();
+    loadSharedChangelog(versioningContainer);
 
     const docsUiMetadataUrl = getDocsUiMetadataUrl(versioningContainer);
     const docsUiMetadata = await loadDocsUiMetadata(docsUiMetadataUrl);

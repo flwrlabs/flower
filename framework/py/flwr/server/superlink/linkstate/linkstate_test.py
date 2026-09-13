@@ -16,6 +16,7 @@
 # pylint: disable=invalid-name, too-many-lines, R0904, R0913
 
 import hashlib
+import json
 import multiprocessing
 import os
 import secrets
@@ -25,13 +26,16 @@ import threading
 import time
 import unittest
 from abc import abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import Mock, PropertyMock, patch
 from uuid import uuid4
 
+from google.protobuf.message import DecodeError
 from parameterized import parameterized
+from sqlalchemy import event, insert
+from sqlalchemy.sql.dml import Update
 
 from flwr.app import DEFAULT_TTL, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
@@ -44,22 +48,35 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
+from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
 from flwr.proto.message_pb2 import Message as ProtoMessage
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
-from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, TaskType
+from flwr.supercore.constant import (
+    NOOP_FEDERATION_ID,
+    AutomationStatus,
+    NodeStatus,
+    TaskType,
+)
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
+from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
+from flwr.supercore.inflatable.inflatable_object import get_object_tree
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
+from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.state.schema.linkstate_models import MessageIns as MessageInsModel
+from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
 
 
@@ -141,15 +158,17 @@ class StateTest(CoreStateTest):
         """Test if create_run and get_run_info work correctly."""
         # Prepare
         state: LinkState = self.state_factory()
+        initial_event = TaskEvent(event="message", data='{"type":"message"}')
         run_id = state.create_run(
             None,
             None,
             "9f86d08",
             {"test_key": "test_value"},
-            "health-federation",
+            "@me/health",
             None,
             "i1r9f",
             TaskType.SERVER_APP,
+            initial_task_event=initial_event,
         )
 
         # Execute
@@ -158,22 +177,26 @@ class StateTest(CoreStateTest):
         # Assert
         assert run.run_id == run_id
         assert run.fab_hash == "9f86d08"
-        assert run.federation == "health-federation"
+        assert run.federation_id == "@me/health"
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
         assert run.series_id > 0
+        stored_event = state.get_task_events(run_ids=[run_id])[0]
+        assert stored_event.event == initial_event.event
+        assert stored_event.data == initial_event.data
+        assert stored_event.task_id == run.primary_task_id
 
     def test_create_run_uses_existing_series_id(self) -> None:
         """Test create_run links the run to an existing run series."""
         # Prepare
         state = self.state_factory()
-        initial_run_id = create_dummy_run(state, federation="health-federation")
+        initial_run_id = create_dummy_run(state, federation_id="@me/health")
         series_id = state.get_run_info(run_ids=[initial_run_id])[0].series_id
 
         # Execute
         run_id = create_dummy_run(
             state,
-            federation="health-federation",
+            federation_id="@me/health",
             series_id=series_id,
         )
 
@@ -189,18 +212,94 @@ class StateTest(CoreStateTest):
         # Execute
         run_id_1 = create_dummy_run(
             state,
-            federation="health-federation",
+            federation_id="@me/health",
         )
         first_run = state.get_run_info(run_ids=[run_id_1])[0]
         run_id_2 = create_dummy_run(
             state,
-            federation="health-federation",
+            federation_id="@me/health",
             series_id=first_run.series_id,
         )
 
         # Assert
         runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
         self.assertEqual({run.series_id for run in runs}, {first_run.series_id})
+
+    @parameterized.expand(  # type: ignore[untyped-decorator]
+        [
+            (TaskType.AGENT_APP, True),
+            (TaskType.SERVER_APP, False),
+            (TaskType.SIMULATION, False),
+        ]
+    )
+    def test_create_run_stores_series_agent_status(
+        self, primary_task_type: str, expected_is_agent: bool
+    ) -> None:
+        """Test run series stores whether its first run is an AgentApp."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state, primary_task_type=primary_task_type)
+        run = state.get_run_info(run_ids=[run_id])[0]
+
+        matching_series = state.get_run_series(is_agent=expected_is_agent)
+        other_series = state.get_run_series(is_agent=not expected_is_agent)
+
+        self.assertEqual(
+            [entry.series_id for entry in matching_series], [run.series_id]
+        )
+        self.assertEqual(other_series, [])
+
+    def test_claim_automation_returns_stored_run_request(self) -> None:
+        """Claiming an automation should return its unresolved run request."""
+        state = self.state_factory()
+        initial_run_id = create_dummy_run(state, federation_id="@me/health")
+        series_id = state.get_run_info(run_ids=[initial_run_id])[0].series_id
+        previous_next_run_at = (now() - timedelta(seconds=30)).isoformat()
+        next_run_at = (now() + timedelta(seconds=30)).isoformat()
+        start_run_request = StartRunRequest(
+            app_spec="@flwr/demo",
+            federation="@me/health",
+            series_id=series_id,
+        )
+        automation = state.store_automation(
+            federation_id="@me/health",
+            flwr_aid="aid-a",
+            start_run_request=start_run_request,
+            series_id=series_id,
+            next_run_at=previous_next_run_at,
+            fixed_interval=60,
+            max_runs=2,
+        )
+
+        claimed = state.claim_automation(
+            automation.automation_id,
+            previous_next_run_at=previous_next_run_at,
+            next_run_at=next_run_at,
+        )
+
+        self.assertIsNotNone(claimed)
+        assert claimed is not None
+        claimed_request, flwr_aid = claimed
+        self.assertEqual(claimed_request, start_run_request)
+        self.assertEqual(flwr_aid, "aid-a")
+        self.assertIsNone(
+            state.claim_automation(
+                automation.automation_id,
+                previous_next_run_at=previous_next_run_at,
+                next_run_at=next_run_at,
+            )
+        )
+
+        updated = state.list_automations(
+            federations=["@me/health"],
+            statuses=[AutomationStatus.ACTIVE],
+            order_by="updated_at",
+        )
+        self.assertEqual(
+            [item.automation_id for item in updated],
+            [automation.automation_id],
+        )
+        self.assertEqual(updated[0].remaining_runs, 1)
+        self.assertEqual(updated[0].next_run_at, next_run_at)
 
     def test_create_run_creates_primary_task(self) -> None:
         """Creating a run should also create its primary task."""
@@ -216,6 +315,38 @@ class StateTest(CoreStateTest):
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
+
+    def test_create_run_binds_connectors(self) -> None:
+        """Creating a run should atomically persist its connector allowlist."""
+        state = self.state_factory()
+
+        run_id = create_dummy_run(
+            state,
+            connector_refs=["notion", "github", "notion"],
+        )
+
+        self.assertEqual(
+            list(state.get_run_connector_refs(run_id=run_id)),
+            ["github", "notion"],
+        )
+
+    def test_create_run_rejects_empty_connector_ref(self) -> None:
+        """An invalid connector allowlist should prevent run creation."""
+        state = self.state_factory()
+
+        run_id = create_dummy_run(state, connector_refs=[""])
+
+        self.assertEqual(run_id, 0)
+        self.assertEqual(list(state.get_run_info()), [])
+
+    def test_create_run_rejects_string_connector_refs(self) -> None:
+        """A string should not be interpreted as a sequence of connector refs."""
+        state = self.state_factory()
+
+        run_id = create_dummy_run(state, connector_refs="notion")
+
+        self.assertEqual(run_id, 0)
+        self.assertEqual(list(state.get_run_info()), [])
 
     def test_store_messages_rejects_stopped_run(self) -> None:
         """Messages cannot be stored after a run is stopped."""
@@ -238,12 +369,38 @@ class StateTest(CoreStateTest):
         self.assertEqual(state.num_message_ins(), 0)
         self.assertEqual(state.num_message_res(), 0)
 
+    def test_cleanup_run(self) -> None:
+        """Test cleanup of run-scoped messages and objects."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=node_id,
+                run_id=run_id,
+            )
+        )
+        session_id = state.start_session(run_id)
+        stored, _ = state.store_message_and_object_tree(
+            msg, get_object_tree(msg), session_id
+        )
+        assert stored
+
+        state.cleanup_run(run_id)
+
+        self.assertEqual(state.num_message_ins(), 0)
+        self.assertFalse(msg.metadata.message_id in state.object_store)
+        self.assertFalse(
+            state.store_object(run_id, session_id, msg.metadata.message_id, b"content")
+        )
+
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
         """Test get_run_info returns all runs when no filter is provided."""
         # Prepare
         state = self.state_factory()
-        run_id1 = create_dummy_run(state, flwr_aid="aid-1", federation="federation-1")
-        run_id2 = create_dummy_run(state, flwr_aid="aid-2", federation="federation-2")
+        run_id1 = create_dummy_run(state, flwr_aid="aid-1", federation_id="@me/other")
+        run_id2 = create_dummy_run(state, flwr_aid="aid-2", federation_id="@me/fed")
 
         # Execute
         runs = state.get_run_info()
@@ -270,10 +427,10 @@ class StateTest(CoreStateTest):
         # Prepare
         state = self.state_factory()
 
-        _ = create_dummy_run(state, flwr_aid="aid-1", federation="federation-a")
-        run_id2 = create_dummy_run(state, flwr_aid="aid-1", federation="federation-b")
-        run_id3 = create_dummy_run(state, flwr_aid="aid-2", federation="federation-a")
-        run_id4 = create_dummy_run(state, flwr_aid="aid-2", federation="federation-b")
+        _ = create_dummy_run(state, flwr_aid="aid-1", federation_id="@me/fed-a")
+        run_id2 = create_dummy_run(state, flwr_aid="aid-1", federation_id="@me/fed-b")
+        run_id3 = create_dummy_run(state, flwr_aid="aid-2", federation_id="@me/fed-a")
+        run_id4 = create_dummy_run(state, flwr_aid="aid-2", federation_id="@me/fed-b")
 
         transition_run_status(state, run_id2, 1)  # STARTING
         transition_run_status(state, run_id3, 1)  # STARTING
@@ -283,7 +440,7 @@ class StateTest(CoreStateTest):
         runs = state.get_run_info(
             statuses=[Status.STARTING, Status.RUNNING],
             flwr_aids=["aid-2"],
-            federations=["federation-a", "federation-b"],
+            federation_ids=["@me/fed-a", "@me/fed-b"],
         )
 
         # Assert
@@ -318,16 +475,16 @@ class StateTest(CoreStateTest):
                     expected_run_ids,
                 )
 
-    def test_get_run_info_filter_by_federations(self) -> None:
-        """Test get_run_info filters correctly by federations only."""
+    def test_get_run_info_filter_by_federation_ids(self) -> None:
+        """Test get_run_info filters correctly by federation IDs only."""
         # Prepare
         state = self.state_factory()
-        run_id1 = create_dummy_run(state, federation="federation-a")
-        _ = create_dummy_run(state, federation="federation-b")
-        run_id3 = create_dummy_run(state, federation="federation-a")
+        run_id1 = create_dummy_run(state, federation_id="@me/fed-a")
+        _ = create_dummy_run(state, federation_id="@me/fed-b")
+        run_id3 = create_dummy_run(state, federation_id="@me/fed-a")
 
         # Execute
-        runs = state.get_run_info(federations=["federation-a"])
+        runs = state.get_run_info(federation_ids=["@me/fed-a"])
 
         # Assert
         self.assertSetEqual({run.run_id for run in runs}, {run_id1, run_id3})
@@ -402,8 +559,8 @@ class StateTest(CoreStateTest):
         """Test get_run_info returns empty when any filter list is empty."""
         # Prepare
         state = self.state_factory()
-        _ = create_dummy_run(state, flwr_aid="aid-1", federation="federation-a")
-        _ = create_dummy_run(state, flwr_aid="aid-2", federation="federation-b")
+        _ = create_dummy_run(state, flwr_aid="aid-1", federation_id="@me/fed-a")
+        _ = create_dummy_run(state, flwr_aid="aid-2", federation_id="@me/fed-b")
 
         # Execute & Assert
         runs_statuses_empty = state.get_run_info(statuses=[])
@@ -412,8 +569,8 @@ class StateTest(CoreStateTest):
         runs_flwr_aids_empty = state.get_run_info(flwr_aids=[])
         self.assertEqual(list(runs_flwr_aids_empty), [])
 
-        runs_federations_empty = state.get_run_info(federations=[])
-        self.assertEqual(list(runs_federations_empty), [])
+        runs_federation_ids_empty = state.get_run_info(federation_ids=[])
+        self.assertEqual(list(runs_federation_ids_empty), [])
 
         runs_run_ids_empty = state.get_run_info(run_ids=[])
         self.assertEqual(list(runs_run_ids_empty), [])
@@ -651,6 +808,79 @@ class StateTest(CoreStateTest):
         assert datetime.fromisoformat(actual_message_ins.metadata.delivered_at) > dt
         assert actual_message_ins.metadata.ttl > 0
 
+    def test_store_message_and_object_tree_ins(self) -> None:
+        """Test store_message_and_object_tree with instruction Messages."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+        )
+        session_id = state.start_session(run_id)
+
+        # Execute
+        stored, missing_objects = state.store_message_and_object_tree(
+            msg, get_object_tree(msg), session_id
+        )
+
+        # Assert
+        assert stored
+        assert msg.metadata.message_id in missing_objects
+        assert msg.metadata.message_id in state.object_store
+        message_ins_list = state.get_message_ins(node_id=node_id, limit=1)
+        assert len(message_ins_list) == 1
+        assert message_ins_list[0].metadata.message_id == msg.metadata.message_id
+
+        # Invalid messages should not preregister objects.
+        invalid_msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=SUPERLINK_NODE_ID,
+                run_id=run_id,
+            )
+        )
+        stored, missing_objects = state.store_message_and_object_tree(
+            invalid_msg, get_object_tree(invalid_msg), session_id
+        )
+        assert not stored
+        assert missing_objects == []
+        assert invalid_msg.metadata.message_id not in state.object_store
+
+    def test_store_message_and_object_tree_res(self) -> None:
+        """Test store_message_and_object_tree with reply Messages."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+        )
+        ins_msg_id = state.store_message_ins(msg)
+        assert ins_msg_id
+        ins_msg = state.get_message_ins(node_id=node_id, limit=1)[0]
+        res_msg = Message(RecordDict(), reply_to=ins_msg)
+        # pylint: disable-next=W0212
+        res_msg.metadata._message_id = res_msg.object_id  # type: ignore
+        session_id = state.start_session(run_id)
+
+        # Execute
+        stored, missing_objects = state.store_message_and_object_tree(
+            res_msg, get_object_tree(res_msg), session_id
+        )
+
+        # Assert
+        assert stored
+        assert res_msg.metadata.message_id in missing_objects
+        assert res_msg.metadata.message_id in state.object_store
+        replies = state.get_message_res({ins_msg_id})
+        assert len(replies) == 1
+        assert replies[0].metadata.message_id == res_msg.metadata.message_id
+
     @parameterized.expand([(False,), (True,)])  # type: ignore
     def test_store_message_ins_duplicate_same_message_is_idempotent(
         self, deliver_before_retry: bool
@@ -797,11 +1027,17 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 3
         assert state.num_message_res() == 2
 
+        state._on_push_session_expired(  # pylint: disable=protected-access
+            {msg_res_0.metadata.message_id}
+        )
+        assert state.num_message_ins() == 3
+        assert state.num_message_res() == 1
+
         state.delete_messages({msg_id_0})
         assert state.num_message_ins() == 2
         assert state.num_message_res() == 1
 
-        state.delete_messages({msg_id_1})
+        state._on_push_session_expired({msg_id_1})  # pylint: disable=protected-access
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 0
 
@@ -977,7 +1213,7 @@ class StateTest(CoreStateTest):
         """Test that get_nodes respects federation manager filtering."""
         # Prepare
         state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state, federation="test-federation")
+        run_id = create_dummy_run(state, federation_id="@me/fed")
 
         # Create 5 nodes
         node_ids = [create_dummy_node(state) for _ in range(5)]
@@ -991,7 +1227,7 @@ class StateTest(CoreStateTest):
         retrieved_node_ids = state.get_nodes(run_id)
 
         # Assert
-        mock_filter.assert_called_once_with(set(node_ids), "test-federation")
+        mock_filter.assert_called_once_with(set(node_ids), "@me/fed")
         assert retrieved_node_ids == subset_node_ids
 
     def test_create_node_public_key(self) -> None:
@@ -1336,15 +1572,15 @@ class StateTest(CoreStateTest):
             }
 
         # Assert
-        # Allow up to 1 decimal place difference due to file-based SQLite DB speed.
-        # CI runs on cracky old machines, so minor delays are expected.
+        # Allow up to one second of difference due to file-based SQLite DB speed.
+        # CI runs on shared machines, so minor delays are expected.
         self.assertSetEqual(online_node_ids, set(node_ids[7:]))
         for node in nodes:
             actual = datetime.fromisoformat(node.last_activated_at).timestamp()
-            self.assertAlmostEqual(actual, expected_activated_at, 1)
+            self.assertAlmostEqual(actual, expected_activated_at, delta=1)
             if node.status == NodeStatus.OFFLINE:
                 actual = datetime.fromisoformat(node.last_deactivated_at).timestamp()
-                self.assertAlmostEqual(actual, expected_deactivated_at, 1)
+                self.assertAlmostEqual(actual, expected_deactivated_at, delta=1)
 
     def test_acknowledge_node_heartbeat_failed(self) -> None:
         """Test that acknowledge_node_heartbeat returns False when the heartbeat
@@ -1748,6 +1984,35 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 1
 
+    def test_store_message_res_duplicate_same_message_is_idempotent(self) -> None:
+        """Test duplicate store_message_res with the same Message is idempotent."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+        )
+        ins_msg_id = state.store_message_ins(msg)
+        assert ins_msg_id
+
+        ins_msg = state.get_message_ins(node_id=node_id, limit=1)[0]
+        res_msg = Message(RecordDict(), reply_to=ins_msg)
+        res_msg.metadata._message_id = str(uuid4())  # type: ignore
+        retry_res_msg = message_from_proto(message_to_proto(res_msg))
+
+        # Execute
+        first_res_msg_id = state.store_message_res(res_msg)
+        second_res_msg_id = state.store_message_res(retry_res_msg)
+
+        # Assert
+        assert first_res_msg_id == res_msg.metadata.message_id
+        assert second_res_msg_id == res_msg.metadata.message_id
+        assert state.num_message_res() == 1
+
     def test_store_message_res_rejects_duplicate_reply(self) -> None:
         """Test store_message_res rejects a second reply for one Message."""
         # Prepare
@@ -2037,11 +2302,12 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     fab_version: str | None = "mock_fab_version",
     fab_hash: str | None = "mock_fab_hash",
     override_config: UserConfig | None = None,
-    federation: str = NOOP_FEDERATION,
+    federation_id: str = NOOP_FEDERATION_ID,
     federation_config: SimulationConfig | None = None,
     flwr_aid: str | None = "mock_flwr_aid",
     primary_task_type: str = TaskType.SERVER_APP,
     series_id: int | None = None,
+    connector_refs: Sequence[str] = (),
 ) -> int:
     """Create a dummy run."""
     return state.create_run(
@@ -2049,28 +2315,53 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         fab_version=fab_version,
         fab_hash=fab_hash,
         override_config=override_config or {},
-        federation=federation,
+        federation_id=federation_id,
         federation_config=federation_config,
         flwr_aid=flwr_aid,
         primary_task_type=primary_task_type,
         series_id=series_id,
+        connector_refs=connector_refs,
     )
 
 
-def _claim_running_in_separate_process(
+def _claim_running_in_separate_process(  # pylint: disable=too-many-positional-arguments
     database_path: str,
     task_id: int,
+    ready_event: Any,
     start_event: Any,
     result_queue: Any,
+    initialization_lock: Any,
     timeout: float,
 ) -> None:
     """Try to claim STARTING -> RUNNING in a dedicated process."""
+    # Deployments can install additional Alembic revisions in EE. Spawned
+    # children do not inherit the parent process's registration, so load the
+    # optional module before SqlLinkState.initialize() builds its migration
+    # configuration.
+    try:
+        # pylint: disable=import-outside-toplevel
+        import flwr.ee.state.alembic  # noqa: F401  # pylint: disable=unused-import
+
+        # pylint: enable=import-outside-toplevel
+    except ImportError:
+        pass
+
     state = SqlLinkState(
         database_path=database_path,
         federation_manager=NoOpFederationManager(),
         object_store=ObjectStoreFactory().store(),
     )
-    state.initialize()
+    # SQLite cannot safely migrate the shared database from both spawned
+    # processes at once. Serialize only initialization; the claim itself still
+    # starts concurrently after both processes signal readiness.
+    with initialization_lock:
+        try:
+            state.initialize()
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            result_queue.put((False, f"initialization failed: {ex!r}"))
+            ready_event.set()
+            return
+    ready_event.set()
     if not start_event.wait(timeout=timeout):
         result_queue.put((False, "start-event-timeout"))
         return
@@ -2118,58 +2409,316 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state.initialize()
         return state
 
-    @parameterized.expand(
-        [  # type: ignore
-            ("claim", "_claim_message_ins_rows", (1, 3)),
-            ("load", "_load_message_ins_rows", ({"abc"},)),
-        ]
-    )
-    def test_message_ins_rows_uses_deterministic_ordering(
-        self, _name: str, method: str, args: tuple[Any, ...]
-    ) -> None:
-        """Message querying should use deterministic ordering."""
+    def test_get_fab_refreshes_cached_row_in_shared_session(self) -> None:
+        """Test get_fab observes raw SQL updates in a shared session."""
         state = self.state_factory()
-        captured: list[str] = []
+        content = b"fab-content"
+        fab_hash = hashlib.sha256(content).hexdigest()
 
-        # pylint: disable-next=unused-argument
-        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
-            captured.append(query)
-            return []
+        with state.session() as session:
+            state.store_fab(Fab(fab_hash, content, {"meta": "old"}))
+            cached_row = session.get(FabModel, fab_hash)
+            assert cached_row is not None
+            self.assertEqual(json.loads(cached_row.verifications), {"meta": "old"})
+            state.store_fab(Fab(fab_hash, content, {"meta": "new"}))
+            second = state.get_fab(fab_hash)
 
-        state.query = fake_query  # type: ignore[method-assign]
-        getattr(state, method)(*args)
+        assert second is not None
+        self.assertEqual(second.verifications, {"meta": "new"})
 
-        self.assertTrue(captured)
-        self.assertIn("ORDER BY created_at, message_id", captured[0])
-        self.assertNotIn("rowid", captured[0])
-
-    def test_message_ins_claim_can_append_select_lock_clause(self) -> None:
-        """Message claiming can append a subclass-provided row-locking clause."""
-        # Prepare
+    def test_get_connector_refreshes_cached_row_in_shared_session(self) -> None:
+        """Test get_connector observes raw SQL updates in a shared session."""
         state = self.state_factory()
-        last_query = ""
 
-        # pylint: disable-next=unused-argument
-        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
-            nonlocal last_query
-            last_query = query
-            return []
+        with state.session() as session:
+            state.upsert_connector(
+                flwr_aid="account-a",
+                connector_ref="calendar",
+                credentials_json='{"token":"old"}',
+                config_json='{"calendar":"primary"}',
+            )
+            cached_row = session.get(ConnectorModel, ("account-a", "calendar"))
+            assert cached_row is not None
+            self.assertEqual(cached_row.credentials_json, '{"token":"old"}')
+            state.upsert_connector(
+                flwr_aid="account-a",
+                connector_ref="calendar",
+                credentials_json='{"token":"new"}',
+                config_json='{"calendar":"work"}',
+            )
+            second = state.get_connector(flwr_aid="account-a", connector_ref="calendar")
 
-        state.query = fake_query  # type: ignore[method-assign]
+        assert second is not None
+        self.assertEqual(second.credentials_json, '{"token":"new"}')
+        self.assertEqual(second.config_json, '{"calendar":"work"}')
 
-        # Execute & assert - without lock clause
-        state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
-        self.assertNotIn("FOR TEST LOCK", last_query)
+    def test_get_node_info_refreshes_rows_after_offline_tagging(self) -> None:
+        """Test get_node_info observes offline tagging in a shared session."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
 
-        # Execute & assert - with lock clause
+        with state.session():
+            state.get_node_info(node_ids=[node_id])
+            state.query(
+                "UPDATE node SET online_until = :online_until WHERE node_id = :node_id",
+                {
+                    "online_until": now().timestamp() - 1.0,
+                    "node_id": uint64_to_int64(node_id),
+                },
+            )
+            refreshed = state.get_node_info(node_ids=[node_id])[0]
+
+        self.assertEqual(refreshed.status, NodeStatus.OFFLINE)
+
+    def test_get_run_info_refreshes_rows_after_raw_sql_update(self) -> None:
+        """Test get_run_info observes raw SQL updates in a shared session."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+
+        with state.session():
+            state.get_run_info(run_ids=[run_id])
+            state.store_traffic(run_id, bytes_sent=100, bytes_recv=200)
+            refreshed = state.get_run_info(run_ids=[run_id])[0]
+
+        self.assertEqual(refreshed.bytes_sent, 100)
+        self.assertEqual(refreshed.bytes_recv, 200)
+
+    def test_get_run_status_refreshes_task_after_raw_sql_update(self) -> None:
+        """Test get_run_status observes raw SQL updates in a shared session."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        task_id = get_primary_task_id(state, run_id)
+
+        with state.session():
+            state.get_run_status({run_id})
+            state.query(
+                "UPDATE task SET starting_at = :starting_at WHERE task_id = :task_id",
+                {
+                    "starting_at": now().isoformat(),
+                    "task_id": uint64_to_int64(task_id),
+                },
+            )
+            refreshed = state.get_run_status({run_id})[run_id]
+
+        self.assertEqual(refreshed.status, Status.STARTING)
+
+    def test_reserve_nonce_cleans_expired_rows_on_duplicate(self) -> None:
+        """Expired nonce cleanup commits even when reservation is duplicate."""
+        state = self.state_factory()
+        current = now().timestamp()
+
+        self.assertTrue(state.reserve_nonce("namespace", "duplicate", current + 100.0))
+        state.query(
+            """
+            INSERT INTO nonce_store (namespace, nonce, expires_at)
+            VALUES (:namespace, :nonce, :expires_at)
+            """,
+            {
+                "namespace": "namespace",
+                "nonce": "expired",
+                "expires_at": current - 100.0,
+            },
+        )
+
+        self.assertFalse(state.reserve_nonce("namespace", "duplicate", current + 100.0))
+        rows = state.query(
+            """
+            SELECT nonce
+            FROM nonce_store
+            ORDER BY nonce
+            """,
+            {},
+        )
+        self.assertEqual([row["nonce"] for row in rows], ["duplicate"])
+
+    def test_reserve_nonce_duplicate_returns_false_in_shared_session(self) -> None:
+        """Duplicate nonce reservation is handled before outer commit."""
+        state = self.state_factory()
+        current = now().timestamp()
+
+        self.assertTrue(state.reserve_nonce("namespace", "duplicate", current + 100.0))
+        state.query(
+            """
+            INSERT INTO nonce_store (namespace, nonce, expires_at)
+            VALUES (:namespace, :nonce, :expires_at)
+            """,
+            {
+                "namespace": "namespace",
+                "nonce": "expired",
+                "expires_at": current - 100.0,
+            },
+        )
+
+        with state.session():
+            self.assertFalse(
+                state.reserve_nonce("namespace", "duplicate", current + 100.0)
+            )
+
+        rows = state.query(
+            """
+            SELECT nonce
+            FROM nonce_store
+            ORDER BY nonce
+            """,
+            {},
+        )
+        self.assertEqual([row["nonce"] for row in rows], ["duplicate"])
+
+    def test_get_task_message_commits_claim_before_deserialization(self) -> None:
+        """Malformed claimed task Messages should not remain queued forever."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert src_task_id is not None and dst_task_id is not None
+
+        current = now().timestamp()
+        valid_message = create_task_message(
+            src_task_id,
+            dst_task_id,
+            run_id,
+            created_at=current + 1.0,
+        )
+        self.assertTrue(state.store_task_message(valid_message))
+        state.query(
+            """
+            INSERT INTO task_message (
+                message_id, run_id, src_task_id, dst_task_id,
+                reply_to_message_id, created_at, ttl, message_type, content, error
+            )
+            VALUES (
+                :message_id, :run_id, :src_task_id, :dst_task_id,
+                :reply_to_message_id, :created_at, :ttl, :message_type, :content,
+                :error
+            )
+            """,
+            {
+                "message_id": str(uuid4()),
+                "run_id": uint64_to_int64(run_id),
+                "src_task_id": uint64_to_int64(src_task_id),
+                "dst_task_id": uint64_to_int64(dst_task_id),
+                "reply_to_message_id": "",
+                "created_at": current,
+                "ttl": DEFAULT_TTL,
+                "message_type": valid_message.metadata.message_type,
+                "content": b"\xff",
+                "error": None,
+            },
+        )
+
+        with self.assertRaises(DecodeError):
+            state.get_task_message(
+                dst_task_ids=[dst_task_id], order_by="created_at", limit=2
+            )
+
+        rows = state.query(
+            """
+            SELECT COUNT(*) AS message_count
+            FROM task_message
+            WHERE dst_task_id = :dst_task_id
+            """,
+            {"dst_task_id": uint64_to_int64(dst_task_id)},
+        )
+        self.assertEqual(rows[0]["message_count"], 0)
+        self.assertEqual(state.get_task_message(dst_task_ids=[dst_task_id]), [])
+
+    def test_run_series_distinguishes_missing_and_empty_descriptions(self) -> None:
+        """Missing and explicitly empty descriptions remain distinct in SQL."""
+        state = self.state_factory()
+        self.assertIsNotNone(
+            state.store_run_in_series(
+                1,
+                "@me/fed-a",
+                is_agent=False,
+                series_id=None,
+            )
+        )
+        self.assertIsNotNone(
+            state.store_run_in_series(
+                2,
+                "@me/fed-a",
+                is_agent=False,
+                series_id=None,
+                description="",
+            )
+        )
+
+        rows = state.query("SELECT description FROM run_series")
+        self.assertCountEqual([row["description"] for row in rows], [None, ""])
+
+    def test_message_ins_claim_uses_deterministic_candidates(self) -> None:
+        """Message claiming should prefer the oldest message IDs."""
+        state = self.state_factory()
+        assert isinstance(state, SqlLinkState)
+        created_at = now().timestamp()
+        with state.session() as session:
+            session.execute(
+                insert(MessageInsModel),
+                [
+                    {
+                        "message_id": message_id,
+                        "dst_node_id": 1,
+                        "created_at": created_at,
+                        "delivered_at": "",
+                        "ttl": 60.0,
+                    }
+                    for message_id in ["c", "a", "b"]
+                ],
+            )
+
+        rows = state._claim_message_ins_rows(  # pylint: disable=protected-access
+            node_id=1, limit=2
+        )
+
+        self.assertEqual({row["message_id"] for row in rows}, {"a", "b"})
+
+    def test_load_message_ins_rows_uses_deterministic_ordering(self) -> None:
+        """Loading messages should order equal timestamps by message ID."""
+        state = self.state_factory()
+        assert isinstance(state, SqlLinkState)
+        created_at = now().timestamp()
+        with state.session() as session:
+            session.execute(
+                insert(MessageInsModel),
+                [
+                    {
+                        "message_id": message_id,
+                        "created_at": created_at,
+                    }
+                    for message_id in ["b", "a"]
+                ],
+            )
+
+        rows = state._load_message_ins_rows(  # pylint: disable=protected-access
+            {"a", "b"}
+        )
+
+        self.assertEqual([row["message_id"] for row in rows], ["a", "b"])
+
+    def test_message_ins_claim_supports_select_lock_clause(self) -> None:
+        """Message claiming should support the standard row-locking clause."""
+        state = self.state_factory()
+        assert isinstance(state, SqlLinkState)
+
+        with patch.object(
+            type(state),
+            "select_lock_sql",
+            new_callable=PropertyMock,
+            return_value="FOR UPDATE SKIP LOCKED",
+        ):
+            rows = state._claim_message_ins_rows(  # pylint: disable=protected-access
+                1, 3
+            )
+        self.assertEqual(rows, [])
+
         with patch.object(
             type(state),
             "select_lock_sql",
             new_callable=PropertyMock,
             return_value="FOR TEST LOCK",
         ):
-            state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
-        self.assertIn("FOR TEST LOCK", last_query)
+            with self.assertRaises(NotImplementedError):
+                state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
 
     def test_token_expiry_does_not_overwrite_finished_completed_run(self) -> None:
         """Ensure token cleanup doesn't mutate terminal COMPLETED status."""
@@ -2222,7 +2771,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
 
     def _claim_running_process_target(
         self,
-    ) -> Callable[[str, int, Any, Any, float], None]:
+    ) -> Callable[[str, int, Any, Any, Any, Any, float], None]:
         """Return process target for STARTING -> RUNNING claim tests."""
         return _claim_running_in_separate_process
 
@@ -2345,30 +2894,43 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             heartbeat_state = states[0]
             delete_state = states[1]
             node_id = create_dummy_node(heartbeat_state, activate=False)
-            original_query = heartbeat_state.query
             did_delete = False
 
             def delete_before_heartbeat_update(
-                query: str, data: Any = None
-            ) -> list[dict[str, Any]]:
+                _conn: Any,
+                statement: Any,
+                _multiparams: Any,
+                _params: Any,
+                _execution_options: Any,
+            ) -> None:
                 nonlocal did_delete
-                normalized_query = " ".join(query.split())
-                if not did_delete and normalized_query.startswith(
-                    "UPDATE node SET online_until"
+                if (
+                    not did_delete
+                    and isinstance(statement, Update)
+                    and getattr(statement.table, "name", None) == "node"
                 ):
                     did_delete = True
                     delete_state.delete_node("mock_flwr_aid", node_id)
-                return original_query(query, data)
-
-            heartbeat_state.query = (  # type: ignore[method-assign]
-                delete_before_heartbeat_update
-            )
 
             # Execute
-            acknowledged = heartbeat_state.acknowledge_node_heartbeat(
-                node_id, heartbeat_interval=30
+            engine = heartbeat_state._engine  # pylint: disable=protected-access
+            assert engine is not None
+            event.listen(
+                engine,
+                "before_execute",
+                delete_before_heartbeat_update,
             )
 
+            try:
+                acknowledged = heartbeat_state.acknowledge_node_heartbeat(
+                    node_id, heartbeat_interval=30
+                )
+            finally:
+                event.remove(
+                    engine,
+                    "before_execute",
+                    delete_before_heartbeat_update,
+                )
             # Assert
             assert did_delete
             assert not acknowledged
@@ -2408,7 +2970,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
                 != claimed_messages[1][0].metadata.message_id
             )
 
-    # pylint: disable-next=too-many-locals
+    # pylint: disable-next=too-many-branches,too-many-locals
     def test_activate_task_running_claim_is_atomic_across_replicas(self) -> None:
         """Ensure only one replica can claim STARTING -> RUNNING transition."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2422,23 +2984,58 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             ctx = multiprocessing.get_context("spawn")
             start_event = ctx.Event()
             result_queue = ctx.Queue()
+            initialization_lock = ctx.Lock()
             timeout = self._CONCURRENT_TEST_TIMEOUT
+            ready_events = [ctx.Event(), ctx.Event()]
 
             # Execute
             claim_target = self._claim_running_process_target()
             processes = [
                 ctx.Process(
                     target=claim_target,
-                    args=(db_path, task_id, start_event, result_queue, timeout),
+                    args=(
+                        db_path,
+                        task_id,
+                        ready_events[0],
+                        start_event,
+                        result_queue,
+                        initialization_lock,
+                        timeout,
+                    ),
                 ),
                 ctx.Process(
                     target=claim_target,
-                    args=(db_path, task_id, start_event, result_queue, timeout),
+                    args=(
+                        db_path,
+                        task_id,
+                        ready_events[1],
+                        start_event,
+                        result_queue,
+                        initialization_lock,
+                        timeout,
+                    ),
                 ),
             ]
             for proc in processes:
                 proc.start()
-            # Release both processes to claim at (roughly) the same time.
+
+            # Wait until both replicas have initialized before releasing them to
+            # claim at (roughly) the same time. This keeps SQLite migration startup
+            # contention out of the atomic claim assertion.
+            ready_deadline = time.monotonic() + timeout
+            for ready_event in ready_events:
+                remaining = ready_deadline - time.monotonic()
+                if remaining <= 0 or not ready_event.wait(timeout=remaining):
+                    for proc in processes:
+                        if proc.is_alive():
+                            proc.terminate()
+                    for proc in processes:
+                        proc.join(timeout=1.0)
+                    self.fail(
+                        "Concurrent run-claim test timed out waiting for replicas "
+                        f"to initialize after {timeout} seconds."
+                    )
+
             start_event.set()
             for proc in processes:
                 proc.join(timeout=timeout)

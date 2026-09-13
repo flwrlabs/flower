@@ -14,16 +14,26 @@
 # ==============================================================================
 """Abstract base class CoreState."""
 
+# pylint: disable=too-many-lines
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Literal
 
 from flwr.app import Context, Message
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AppInfo,
+    Automation,
+    StartRunRequest,
+)
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
+from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
+from ..constant import AutomationStatus
 from ..object_store import ObjectStore
 
 
@@ -36,19 +46,315 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Return the ObjectStore instance used by this CoreState."""
 
     @abstractmethod
+    def start_session(self, run_id: int) -> str:
+        """Start a run-scoped object push session."""
+
+    @abstractmethod
+    def delete_sessions_in_run(self, run_id: int) -> None:
+        """Delete bookkeeping for all object push sessions in a run.
+
+        This does not delete any messages or objects associated with the sessions.
+        """
+
+    @abstractmethod
+    def preregister_object_tree(
+        self, object_tree: ObjectTree, session_id: str
+    ) -> list[str]:
+        """Preregister the object tree for the object push session."""
+
+    @abstractmethod
+    def store_object(
+        self,
+        run_id: int,
+        session_id: str,
+        object_id: str,
+        object_content: bytes,
+    ) -> bool:
+        """Store an object if it is pending for an active push session.
+
+        Parameters
+        ----------
+        run_id : int
+            The ID of the run with which the push session is associated.
+        session_id : str
+            The ID of the object push session.
+        object_id : str
+            The ID of the object to store.
+        object_content : bytes
+            The object content to store.
+
+        Returns
+        -------
+        bool
+            True if the object was stored, otherwise False.
+        """
+
+    @abstractmethod
+    def get_object(self, run_id: int, object_id: str) -> bytes | None:
+        """Get an object and clean up expired push sessions when needed.
+
+        Parameters
+        ----------
+        run_id : int
+            The ID of the run requesting the object.
+        object_id : str
+            The ID of the object to retrieve.
+
+        Returns
+        -------
+        bytes | None
+            The object content, `b""` if it is known but unavailable, or None if it
+            is unknown.
+        """
+
+    @abstractmethod
+    def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
+        """Remove an object push session and optionally its messages."""
+
+    def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
+        """Handle messages when a push session expires."""
+
+    @abstractmethod
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB and return its canonical SHA-256 hash."""
+
+    @abstractmethod
+    def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        fab: Fab | None,
+        federation_id: str,
+        app_id: str,
+        app_type: str,
+        added_by: str,
+        is_hub_app: bool = False,
+    ) -> str:
+        """Store an optional FAB and associate its app with a federation.
+
+        A federation has at most one association for each app ID. Storing the app
+        again updates its FAB hash, when applicable, and type while preserving when
+        and by whom it was first added.
+
+        Parameters
+        ----------
+        fab : Fab | None
+            FAB content and verification metadata to store. Required for custom
+            apps and optional for Hub apps.
+        federation_id : str
+            ID of the federation to associate with the app.
+        app_id : str
+            App ID, unique within the federation.
+        app_type : str
+            Type of the app.
+        added_by : str
+            ID of the account adding the app to the federation.
+        is_hub_app : bool, default=False
+            Whether the app was fetched from Flower Hub. Hub app associations do
+            not retain a FAB hash so future runs resolve the latest version.
+
+        Returns
+        -------
+        str
+            Canonical SHA-256 hash of the stored FAB, or an empty string when no
+            FAB was provided.
+        """
 
     @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return the FAB for the given hash, if present."""
 
     @abstractmethod
-    def get_run_series(
+    def get_app(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
+        """Return a FAB only when it matches the federation-app association."""
+
+    @abstractmethod
+    def list_apps(
+        self, federation_id: str, limit: int | None = None
+    ) -> Sequence[AppInfo]:
+        """List apps associated with a federation, newest first."""
+
+    @abstractmethod
+    def delete_app(self, federation_id: str, app_id: str) -> bool:
+        """Delete one federation-app association; its FAB remains in state."""
+
+    @abstractmethod
+    def upsert_connector(
+        self,
+        flwr_aid: str,
+        connector_ref: str,
+        credentials_json: str,
+        config_json: str,
+    ) -> bool:
+        """Create or update a connector for an account.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the connector.
+        connector_ref : str
+            Connector reference unique within the account.
+        credentials_json : str
+            Serialized connector credentials.
+        config_json : str
+            Serialized connector configuration.
+
+        Returns
+        -------
+        bool
+            ``True`` if the connector was stored, otherwise ``False``.
+        """
+
+    @abstractmethod
+    def get_connector(
+        self, flwr_aid: str, connector_ref: str
+    ) -> ConnectorRecord | None:
+        """Return an account's connector, if present.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the connector.
+        connector_ref : str
+            Connector reference unique within the account.
+
+        Returns
+        -------
+        ConnectorRecord | None
+            The stored connector, or `None` if it does not exist.
+        """
+
+    @abstractmethod
+    def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
+        """Delete an account's connector if it exists.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the connector.
+        connector_ref : str
+            Connector reference unique within the account.
+
+        Returns
+        -------
+        bool
+            `True` if the connector was deleted, otherwise `False`.
+        """
+
+    @abstractmethod
+    def bind_connectors_to_run(
+        self, run_id: int, connector_refs: Sequence[str]
+    ) -> bool:
+        """Associate connector references with a run."""
+
+    @abstractmethod
+    def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
+        """Return connector references associated with a run."""
+
+    @abstractmethod
+    def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        oauth_session_id: str,
+        flwr_aid: str,
+        connector_ref: str,
+        state: str,
+        redirect_uri: str,
+        pkce_verifier: str | None,
+        expires_at: datetime,
+    ) -> ConnectorOAuthSessionRecord | None:
+        """Create and return a connector OAuth session.
+
+        Parameters
+        ----------
+        oauth_session_id : str
+            Unique ID of the OAuth session.
+        flwr_aid : str
+            Account ID owning the OAuth session.
+        connector_ref : str
+            Reference of the connector being authorized.
+        state : str
+            OAuth state used to protect against cross-site request forgery.
+        redirect_uri : str
+            URI to redirect to after authorization.
+        pkce_verifier : str | None
+            PKCE verifier used for the authorization code exchange, if present.
+        expires_at : datetime
+            Timezone-aware expiration timestamp, normalized to UTC before storage.
+
+        Returns
+        -------
+        ConnectorOAuthSessionRecord | None
+            The created session, or `None` if the session ID already exists, a
+            required identifier is empty, or `expires_at` is timezone-naive.
+        """
+
+    @abstractmethod
+    def get_connector_oauth_session(
+        self, oauth_session_id: str, flwr_aid: str
+    ) -> ConnectorOAuthSessionRecord | None:
+        """Return an account's connector OAuth session, if present.
+
+        Parameters
+        ----------
+        oauth_session_id : str
+            Unique ID of the OAuth session.
+        flwr_aid : str
+            Account ID owning the OAuth session.
+
+        Returns
+        -------
+        ConnectorOAuthSessionRecord | None
+            The stored session, or `None` if it does not exist for the account.
+        """
+
+    @abstractmethod
+    def complete_connector_oauth_session(
+        self, oauth_session_id: str, flwr_aid: str
+    ) -> bool:
+        """Mark a pending connector OAuth session as completed.
+
+        Parameters
+        ----------
+        oauth_session_id : str
+            Unique ID of the OAuth session.
+        flwr_aid : str
+            Account ID owning the OAuth session.
+
+        Returns
+        -------
+        bool
+            `True` if the session was completed. `False` if the session is missing,
+            belongs to another account, is expired, or was already completed.
+        """
+
+    @abstractmethod
+    def store_message_and_object_tree(
+        self, message: Message, object_tree: ObjectTree, session_id: str
+    ) -> tuple[bool, list[str]]:
+        """Store a Message and preregister its ObjectTree.
+
+        Parameters
+        ----------
+        message : Message
+            The Message to store.
+        object_tree : ObjectTree
+            The ObjectTree containing the IDs of objects to preregister.
+        session_id : str
+            The ID of the object push session.
+
+        Returns
+        -------
+        tuple[bool, list[str]]
+            A tuple containing a boolean indicating whether the Message was
+            stored and a list of object IDs that still need to be pushed. If
+            storing the Message fails, returns `(False, [])`.
+        """
+
+    @abstractmethod
+    def get_run_series(  # pylint: disable=too-many-arguments
         self,
         *,
         series_ids: Sequence[int] | None = None,
-        federations: Sequence[str] | None = None,
+        federation_ids: Sequence[str] | None = None,
+        is_agent: bool | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
@@ -62,8 +368,10 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         series_ids : Optional[Sequence[int]] (default: None)
             Sequence of RunSeries IDs to filter by.
-        federations : Optional[Sequence[str]] (default: None)
-            Sequence of federation names to filter by.
+        federation_ids : Optional[Sequence[str]] (default: None)
+            Sequence of federation IDs to filter by.
+        is_agent : bool | None (default: None)
+            If set, filter by whether the run series belongs to an AgentApp.
         updated_before : str | None (default: None)
             If set, return only RunSeries updated before this ISO timestamp.
         limit : int | None (default: None)
@@ -74,6 +382,20 @@ class CoreState(ABC):  # pylint: disable=R0904
         -------
         Sequence[RunSeries]
             RunSeries records ordered by `updated_at` descending.
+        """
+
+    @abstractmethod
+    def set_run_series_description(self, series_id: int, description: str) -> None:
+        """Set the description of an existing RunSeries.
+
+        Empty descriptions are ignored and do not update the RunSeries.
+
+        Parameters
+        ----------
+        series_id : int
+            The ID of the RunSeries to update.
+        description : str
+            The non-empty description to store.
         """
 
     @abstractmethod
@@ -104,11 +426,13 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def store_run_in_series(
+    def store_run_in_series(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         run_id: int,
-        federation: str,
+        federation_id: str,
+        is_agent: bool,
         series_id: int | None,
+        description: str | None = None,
     ) -> int | None:
         """Store a run in a run series and return the series ID.
 
@@ -116,12 +440,18 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         run_id : int
             Run ID to associate with the run series.
-        federation : str
-            Federation the run series belongs to.
+        federation_id : str
+            Federation ID the run series belongs to.
+        is_agent : bool
+            Whether a newly created run series belongs to an AgentApp.
         series_id : int | None
             Caller-provided series ID. If `None`, a new series ID is generated
             and creation is attempted. If set, the matching series must already
-            exist and belong to `federation`.
+            exist and belong to `federation_id`.
+        description : str | None (default: None)
+            Optional description for a newly created run series. Ignored when
+            `series_id` refers to an existing run series. `None` means no
+            description was provided; an empty string is an explicit description.
 
         Returns
         -------
@@ -130,6 +460,177 @@ class CoreState(ABC):  # pylint: disable=R0904
             new run series could not be created, the caller-provided run
             series is invalid, or the run could not be associated with the
             run series.
+        """
+
+    @abstractmethod
+    def store_automation(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        federation_id: str,
+        flwr_aid: str,
+        start_run_request: StartRunRequest,
+        series_id: int,
+        next_run_at: str,
+        fixed_interval: int | None = None,
+        max_runs: int | None = None,
+    ) -> Automation:
+        """Store an automation and return its metadata.
+
+        Parameters
+        ----------
+        federation_id : str
+            Federation ID the automation belongs to.
+        flwr_aid : str
+            FLWR account ID used to dispatch the automation.
+        start_run_request : StartRunRequest
+            Unresolved run request to execute for each scheduled occurrence.
+        series_id : int
+            Run series ID to use when dispatching automation runs.
+        next_run_at : str
+            Initial due time as a timestamp string. This is required when
+            storing an automation. For one-shot automations, this is the
+            requested `start_at`; for recurring automations, this is the first
+            scheduled run time.
+        fixed_interval : int | None (default: None)
+            Recurring interval in seconds.
+        max_runs : int | None (default: None)
+            Maximum number of runs, if finite. The value initializes the
+            persisted `remaining_runs` counter.
+
+        Returns
+        -------
+        Automation
+            Stored automation metadata.
+        """
+
+    @abstractmethod
+    def claim_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> tuple[StartRunRequest, str] | None:
+        """Claim an automation occurrence and return its unresolved run request.
+
+        Parameters
+        ----------
+        automation_id : int
+            Automation ID to claim.
+        previous_next_run_at : str
+            Previously observed due time timestamp string. The claim only succeeds
+            if the stored `next_run_at` still matches this value.
+        next_run_at : str | None
+            Next due time timestamp string. If `None`, the current occurrence is
+            treated as the last finite occurrence.
+
+        Returns
+        -------
+        tuple[StartRunRequest, str] | None
+            A copy of the stored run request and its FLWR account ID if the claim
+            succeeded, otherwise `None`.
+        """
+
+    @abstractmethod
+    def list_automations(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        automation_ids: Sequence[int] | None = None,
+        federations: Sequence[str] | None = None,
+        statuses: Sequence[str] | None = None,
+        due_before: datetime | None = None,
+        order_by: Literal["next_run_at", "updated_at"],
+        limit: int | None = None,
+    ) -> Sequence[Automation]:
+        """Return automations matching the given filters.
+
+        Parameters
+        ----------
+        automation_ids : Sequence[int] | None (default: None)
+            Automation IDs to filter by.
+        federations : Sequence[str] | None (default: None)
+            Federation IDs to filter by.
+        statuses : Sequence[str] | None (default: None)
+            Automation statuses to filter by.
+        due_before : datetime | None (default: None)
+            If set, return only automations with `next_run_at` at or before this
+            timestamp.
+        order_by : Literal["next_run_at", "updated_at"]
+            Field used to order the result. `next_run_at` orders ascending;
+            `updated_at` orders descending.
+        limit : int | None (default: None)
+            Maximum number of automation records to return.
+
+        Returns
+        -------
+        Sequence[Automation]
+            Automation metadata ordered by `order_by`.
+        """
+
+    @abstractmethod
+    def stop_automation(self, automation_id: int) -> bool:
+        """Stop an active automation.
+
+        Parameters
+        ----------
+        automation_id : int
+            Automation ID to stop.
+
+        Returns
+        -------
+        bool
+            True if an active automation was stopped, otherwise False.
+        """
+
+    @abstractmethod
+    def advance_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> bool:
+        """Advance an active automation occurrence.
+
+        Parameters
+        ----------
+        automation_id : int
+            Automation ID to advance.
+        previous_next_run_at : str
+            Previously observed due time timestamp string. The update only
+            succeeds if the stored `next_run_at` still matches this value, preventing
+            multiple workers from executing the same scheduled run concurrently.
+        next_run_at : str | None
+            Next due time timestamp string. If `None`, the current occurrence is
+            treated as the last finite occurrence and no next due time is stored.
+
+        Returns
+        -------
+        bool
+            True if the active automation occurrence was advanced, otherwise
+            False.
+        """
+
+    @abstractmethod
+    def finish_automation(
+        self,
+        automation_id: int,
+        *,
+        status: Literal[AutomationStatus.COMPLETED, AutomationStatus.FAILED],
+    ) -> bool:
+        """Finish an active automation with a terminal status.
+
+        Parameters
+        ----------
+        automation_id : int
+            Automation ID to finish.
+        status : AutomationStatus
+            Terminal target status. Must be `completed` or `failed`.
+
+        Returns
+        -------
+        bool
+            True if the active automation was finished, otherwise False.
         """
 
     @abstractmethod
@@ -249,6 +750,48 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
+    def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
+        """Record usage for the specified task.
+
+        Parameters
+        ----------
+        task_id : int
+            The identifier of the task that incurred the usage.
+        usage : TaskUsage
+            Usage payload to persist.
+
+        Notes
+        -----
+        Each successful call appends a new usage record for the task.
+        """
+
+    @abstractmethod
+    def get_task_usage(
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        task_ids: Sequence[int] | None = None,
+    ) -> Sequence[TaskUsage]:
+        """Retrieve task usage records based on the specified filters.
+
+        - If a filter is set to None, it is ignored.
+        - If multiple filters are provided, they are combined using AND logic.
+        - Within each filter, provided values are combined using OR logic.
+
+        Parameters
+        ----------
+        run_ids : Optional[Sequence[int]] (default: None)
+            Sequence of run IDs to filter by.
+        task_ids : Optional[Sequence[int]] (default: None)
+            Sequence of task IDs to filter by.
+
+        Returns
+        -------
+        Sequence[TaskUsage]
+            Usage records ordered by insertion order.
+        """
+
+    @abstractmethod
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task.
 
@@ -357,6 +900,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
+        src_task_ids: Sequence[int] | None = None,
         limit: int | None = None,
         order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
@@ -369,6 +913,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         dst_task_ids : Optional[Sequence[int]] (default: None)
             Sequence of destination task IDs to filter by.
+        src_task_ids : Optional[Sequence[int]] (default: None)
+            Sequence of source task IDs to filter by.
         limit : Optional[int] (default: None)
             Maximum number of messages to return. If `None`, no limit is applied.
         order_by : Optional[Literal["created_at"]] (default: None)
@@ -406,16 +952,19 @@ class CoreState(ABC):  # pylint: disable=R0904
     def get_task_events(
         self,
         *,
-        run_id: int | None = None,
+        run_ids: Sequence[int] | None = None,
+        task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events matching the filters.
 
         Parameters
         ----------
-        run_id : Optional[int] (default: None)
-            If set, return only events for this run. If set to `None`, return
+        run_ids : Optional[Sequence[int]] (default: None)
+            If set, return only events for these runs. If set to `None`, return
             events for all runs.
+        task_ids : Optional[Sequence[int]] (default: None)
+            If set, return only events produced by these tasks.
         after_task_event_id : Optional[int] (default: None)
             Return only events with an ID greater than this cursor. If set to
             `None`, retrieve all events.

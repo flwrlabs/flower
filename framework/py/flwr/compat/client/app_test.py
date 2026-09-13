@@ -15,8 +15,6 @@
 """Flower Client app tests."""
 
 
-from flwr.client.client import Client
-from flwr.client.numpy_client import NumPyClient
 from flwr.common import (
     Config,
     EvaluateIns,
@@ -30,6 +28,8 @@ from flwr.common import (
     NDArrays,
     Scalar,
 )
+from flwr.compat.client.client import Client
+from flwr.compat.client.numpy_client import NumPyClient
 
 from .app import start_client, start_numpy_client
 

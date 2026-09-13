@@ -45,13 +45,14 @@ class Run:  # pylint: disable=too-many-instance-attributes
     finished_at: str
     status: RunStatus
     flwr_aid: str
-    federation: str
+    federation_id: str
     primary_task_id: int | None
     bytes_sent: int
     bytes_recv: int
     clientapp_runtime: float
     primary_task_type: str = ""
     series_id: int = 0
+    account_name: str = ""
 
     @classmethod
     def create_empty(cls, run_id: int) -> "Run":
@@ -68,13 +69,14 @@ class Run:  # pylint: disable=too-many-instance-attributes
             finished_at="",
             status=RunStatus(status="", sub_status="", details=""),
             flwr_aid="",
-            federation="",
+            federation_id="",
             primary_task_id=None,
             bytes_sent=0,
             bytes_recv=0,
             clientapp_runtime=0.0,
             primary_task_type=TaskType.SERVER_APP,
             series_id=0,
+            account_name="",
         )
 
 

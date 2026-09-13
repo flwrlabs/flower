@@ -30,7 +30,7 @@ from .types import ExecutionSpec, LaunchResultStatus
 def _execution_spec(**overrides: Any) -> ExecutionSpec:
     base: dict[str, Any] = {
         "task_type": TaskType.CLIENT_APP,
-        "appio_api_address": "127.0.0.1:9094",
+        "runtime_api_address": "127.0.0.1:9094",
         "token": "token",
         "insecure": True,
         "root_certificates_path": None,
@@ -51,7 +51,7 @@ def test_launch_renders_insecure_clientapp_args() -> None:
     popen_mock.assert_called_once_with(
         [
             "flwr-clientapp",
-            "--clientappio-api-address",
+            "--runtime-api-address",
             "127.0.0.1:9094",
             "--token",
             "token",
@@ -75,7 +75,7 @@ def test_launch_renders_root_certificates_args() -> None:
     popen_mock.assert_called_once_with(
         [
             "flwr-clientapp",
-            "--clientappio-api-address",
+            "--runtime-api-address",
             "127.0.0.1:9094",
             "--token",
             "token",
@@ -125,17 +125,17 @@ def test_launch_suppresses_output_when_requested() -> None:
     ],
     ids=["serverapp", "simulation", "agentapp", "model", "connector"],
 )
-def test_launch_renders_serverappio_task_args(
+def test_launch_renders_runtime_api_task_args(
     task_type: TaskType, command: str
 ) -> None:
-    """Test subprocess executor renders ServerAppIo task args."""
+    """Test subprocess executor renders Runtime API task args."""
     with patch.object(subprocess, "Popen") as popen_mock:
         SubprocessExecutor().launch(_execution_spec(task_type=task_type))
 
     popen_mock.assert_called_once_with(
         [
             command,
-            "--serverappio-api-address",
+            "--runtime-api-address",
             "127.0.0.1:9094",
             "--token",
             "token",

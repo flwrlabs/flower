@@ -27,6 +27,7 @@ class ServerAppExecPlugin(BaseExecPlugin):
     """
 
     suppress_output = True
+    visible_output_task_types = frozenset({TaskType.CONNECTOR, TaskType.MODEL})
     supported_task_types = frozenset(
         {
             TaskType.AGENT_APP,

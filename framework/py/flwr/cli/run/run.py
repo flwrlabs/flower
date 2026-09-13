@@ -32,9 +32,8 @@ from flwr.common.config import get_metadata_from_config, parse_config_args
 from flwr.common.constant import FAB_CONFIG_FILE, CliOutputFormat
 from flwr.common.serde import fab_to_proto, user_config_to_proto
 from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
-from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
-from flwr.supercore.constant import NOOP_FEDERATION
+from flwr.supercore.constant import NOOP_FEDERATION_ID
 from flwr.supercore.fab import Fab
 from flwr.supercore.utils import (
     check_federation_format,
@@ -44,13 +43,12 @@ from flwr.supercore.utils import (
 
 from ..log import start_stream
 from ..utils import (
+    AppPathDepthError,
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
-    init_channel_from_connection,
+    flwr_cli_exc_handler,
+    init_http_client_from_connection,
     print_json_to_stdout,
 )
-
-CONN_REFRESH_PERIOD = 60  # Connection refresh period for log streaming (seconds)
 
 
 # pylint: disable-next=too-many-locals, too-many-branches, R0913, R0917
@@ -70,8 +68,8 @@ def run(
         str | None,
         typer.Option(
             "--federation",
-            help="The federation to submit the run to; must be in the "
-            "format `@<account>/<federation>`.",
+            help="The federation ID to submit the run to; must be in the "
+            "format `@<account>/<federation-name>`.",
         ),
     ] = None,
     run_config_overrides: Annotated[
@@ -158,7 +156,7 @@ def run(
 def _run_with_control_api(
     app: Path,
     config: dict[str, Any],
-    federation: str | None,
+    federation_id: str | None,
     superlink_connection: SuperLinkConnection,
     config_overrides: list[str] | None,
     federation_config_overrides: list[str] | None,
@@ -166,22 +164,24 @@ def _run_with_control_api(
     is_json: bool,
     app_spec: str | None,
 ) -> None:
-    channel = None
+    control_client = None
     is_remote_app = app_spec is not None
 
     # Determine federation to use
-    if federation:  # Override federation from CLI
-        check_federation_format(federation)
+    if federation_id:  # Override federation from CLI
+        check_federation_format(federation_id)
     else:  # Use federation from SuperLink connection if set
-        federation = superlink_connection.federation or ""
+        federation_id = superlink_connection.federation or ""
 
     try:
-        channel = init_channel_from_connection(superlink_connection)
-        stub = ControlStub(channel)
+        control_client = init_http_client_from_connection(superlink_connection)
 
         # Build FAB if local app
         if not is_remote_app:
-            fab_bytes = build_fab_from_disk(app)
+            try:
+                fab_bytes = build_fab_from_disk(app)
+            except AppPathDepthError as err:
+                raise err.to_click_exception() from None
             fab_hash = hashlib.sha256(fab_bytes).hexdigest()
             fab_id, fab_version = get_metadata_from_config(config)
             fab = Fab(fab_hash, fab_bytes, {})
@@ -194,21 +194,21 @@ def _run_with_control_api(
         req = StartRunRequest(
             fab=fab_to_proto(fab),
             override_config=user_config_to_proto(parse_config_args(config_overrides)),
-            federation=federation,
+            federation=federation_id,
             override_federation_config=_parse_federation_config_overrides(
                 federation_config_overrides, superlink_connection
             ),
             app_spec=app_spec or "",
         )
-        with flwr_cli_grpc_exc_handler():
-            res = stub.StartRun(req)
+        with flwr_cli_exc_handler():
+            res = control_client.StartRun(req)
 
         if res.HasField("note"):
             typer.secho(f"Note: {res.note}", fg=typer.colors.YELLOW, err=True)
 
         if res.HasField("run_id"):
-            message = f"🎊 Successfully started run {res.run_id}"
-            if res.federation and res.federation != NOOP_FEDERATION:
+            message = f"Successfully started run {res.run_id}"
+            if res.federation and res.federation != NOOP_FEDERATION_ID:
                 message += f" in federation {res.federation}"
             typer.secho(message, fg=typer.colors.GREEN)
         else:
@@ -219,7 +219,7 @@ def _run_with_control_api(
             payload: dict[str, Any] = {
                 "success": res.HasField("run_id"),
                 "run-id": f"{res.run_id}" if res.HasField("run_id") else None,
-                "federation": res.federation,
+                "federation-id": res.federation,
             }
             if res.HasField("note"):
                 payload["note"] = res.note
@@ -236,10 +236,10 @@ def _run_with_control_api(
             print_json_to_stdout(payload)
 
         if stream:
-            start_stream(res.run_id, channel, CONN_REFRESH_PERIOD)
+            start_stream(res.run_id, control_client)
     finally:
-        if channel:
-            channel.close()
+        if control_client:
+            control_client.close()
 
 
 def _parse_federation_config_overrides(

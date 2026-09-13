@@ -51,7 +51,7 @@ tutorial:
 .. code-block:: shell
 
     # Install Flower
-    $ pip install -U "flwr[simulation]"
+    $ pip install -U flwr
     # Create a new Flower App using the PyTorch quickstart template
     $ flwr new @flwrlabs/quickstart-pytorch
 
@@ -67,17 +67,16 @@ In this tutorial, you'll use Weights & Biases to log strategy metrics. From the
 
     "wandb>=0.17.8"
 
-Then install the updated project dependencies:
-
-.. code-block:: shell
-
-    $ pip install -e .
+When the app runs, Flower installs this dependency in an isolated runtime environment.
+See :doc:`Install Flower App dependencies at runtime
+<how-to-install-app-dependencies-at-runtime>` for more details.
 
 .. note::
 
     If this is your first time installing ``wandb``, you might be asked to create an
-    account and then log in to your system. You can start this process by typing this in
-    your terminal:
+    account and then log in to your system. You can start this process by typing the
+    command below in your terminal. If that's the case, you might want to do this in
+    your current environment before starting your run.
 
     .. code-block:: shell
 

@@ -24,50 +24,45 @@ from typing import cast
 from unittest.mock import Mock, patch
 
 import click
-import grpc
+import httpx
 import pytest
+import typer
 from parameterized import parameterized
 
 from flwr.cli.constant import (
-    LOCAL_CONTROL_API_ADDRESS,
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
+    LOCAL_SUPERLINK_HTTP_API_PORT,
 )
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
-from flwr.common.constant import FLWR_DIR
+from flwr.common.constant import FLWR_DIR, CliOutputFormat
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    RefreshAuthTokensRequest,
+    RefreshAuthTokensResponse,
+)
 from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
-from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
-from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
+from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.interceptors import RuntimeVersionHttpInterceptor
 
+from .cli_account_auth_interceptor import CliAccountAuthHttpInterceptor
+from .cli_client_interceptor import CliClientHttpInterceptor
 from .utils import (
-    _format_grpc_error,
+    AUTHENTICATION_FAILED_MESSAGE,
+    SUPERLINK_UNAVAILABLE_MESSAGE,
+    AppPathDepthError,
+    _format_flower_error,
     build_pathspec,
+    cli_output_control_client,
     cli_output_handler,
     collect_files,
     depth_of,
     filter_paths_for_publish,
-    flwr_cli_grpc_exc_handler,
+    flwr_cli_exc_handler,
     get_executed_command,
     get_sha256_hash,
-    init_channel_from_connection,
+    init_http_client_from_connection,
     load_gitignore_patterns,
     validate_federation_name,
 )
-
-
-class _GrpcErrorWithDetails:
-    """Test helper object carrying a gRPC-like details string."""
-
-    def __init__(self, details: str) -> None:
-        self._details = details
-
-    def details(self) -> str:
-        """Return the stored gRPC details string."""
-        return self._details
-
-
-def _grpc_error_with_details(details: str) -> grpc.RpcError:
-    """Return a grpc.RpcError-compatible test helper with a details method."""
-    return cast(grpc.RpcError, _GrpcErrorWithDetails(details))
 
 
 class TestGetSHA256Hash(unittest.TestCase):
@@ -206,8 +201,8 @@ def test_get_executed_command_nested() -> None:
                 assert get_executed_command() == "flwr federation list"
 
 
-def test_init_channel_from_connection_uses_resolved_connection() -> None:
-    """Ensure resolved connection values are used for channel creation."""
+def test_init_http_client_from_connection_uses_resolved_connection() -> None:
+    """Configure the HTTP client from the resolved local connection."""
     unresolved = SuperLinkConnection(
         name="local",
         address=LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
@@ -215,72 +210,166 @@ def test_init_channel_from_connection_uses_resolved_connection() -> None:
     )
     resolved = SuperLinkConnection(
         name="local",
-        address=LOCAL_CONTROL_API_ADDRESS,
+        address=f"127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}",
         insecure=True,
         options=SuperLinkSimulationOptions(num_supernodes=2),
     )
     auth_plugin = Mock()
-    auth_plugin.load_tokens = Mock()
+    http_client = Mock()
+    http_client.RefreshAuthTokens.return_value = RefreshAuthTokensResponse(
+        access_token="new-access-token",
+        refresh_token="new-refresh-token",
+    )
 
-    with patch(
-        "flwr.cli.utils.ensure_local_superlink", return_value=resolved
-    ) as mock_ensure:
-        with patch("flwr.cli.utils.load_certificate_in_connection", return_value=None):
-            with patch("flwr.cli.utils.create_channel") as mock_create:
-                channel = Mock()
-                mock_create.return_value = channel
+    with (
+        patch("flwr.cli.utils.ensure_local_superlink", return_value=resolved),
+        patch("flwr.cli.utils.load_certificate_in_connection", return_value=None),
+        patch(
+            "flwr.cli.utils.load_cli_auth_plugin_from_connection",
+            return_value=auth_plugin,
+        ) as load_auth_plugin,
+        patch(
+            "flwr.cli.utils.ControlHttpClient.from_server_address",
+            return_value=http_client,
+        ) as client_factory,
+    ):
+        result = init_http_client_from_connection(unresolved)
 
-                ret = init_channel_from_connection(unresolved, auth_plugin)
+    assert result is http_client
+    address = f"127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}"
+    load_auth_plugin.assert_called_once_with(address)
+    auth_plugin.load_tokens.assert_called_once_with()
 
-    assert ret is channel
-    mock_ensure.assert_called_once_with(unresolved)
-    auth_plugin.load_tokens.assert_called_once()
-
-    kwargs = mock_create.call_args.kwargs
-    assert kwargs["server_address"] == LOCAL_CONTROL_API_ADDRESS
+    kwargs = client_factory.call_args.kwargs
+    assert kwargs["server_address"] == address
     assert kwargs["insecure"] is True
     assert kwargs["root_certificates"] is None
-    assert kwargs["max_message_length"] == GRPC_MAX_MESSAGE_LENGTH
-    assert len(kwargs["interceptors"]) == 2
-    assert isinstance(kwargs["interceptors"][0], RuntimeVersionClientInterceptor)
-    # pylint: disable-next=protected-access
-    assert kwargs["interceptors"][0]._metadata.component_name == "flwr CLI"
-    channel.subscribe.assert_called_once()
+    assert len(kwargs["interceptors"]) == 3
+    assert isinstance(kwargs["interceptors"][0], CliClientHttpInterceptor)
+    assert isinstance(kwargs["interceptors"][1], RuntimeVersionHttpInterceptor)
+    auth_interceptor = kwargs["interceptors"][2]
+    assert isinstance(auth_interceptor, CliAccountAuthHttpInterceptor)
+
+    credentials = auth_interceptor.refresh_tokens("old-refresh-token")
+
+    http_client.RefreshAuthTokens.assert_called_once_with(
+        RefreshAuthTokensRequest(refresh_token="old-refresh-token")
+    )
+    assert credentials.access_token == "new-access-token"
+    assert credentials.refresh_token == "new-refresh-token"
 
 
-def test_custom_grpc_err_handler() -> None:
-    """Test flwr_cli_grpc_exc_handler with a custom error handler."""
+def test_cli_output_control_client_closes_client() -> None:
+    """Close the HTTP client after a CLI output command completes."""
+    connection = Mock()
+    control_client = Mock()
+
+    with (
+        patch("flwr.cli.utils.cli_output_handler") as output_handler,
+        patch(
+            "flwr.cli.utils.read_superlink_connection", return_value=connection
+        ) as read_connection,
+        patch(
+            "flwr.cli.utils.init_http_client_from_connection",
+            return_value=control_client,
+        ) as init_client,
+    ):
+        output_handler.return_value.__enter__.return_value = True
+        with cli_output_control_client("remote", "json") as result:
+            assert result == (control_client, True)
+
+    output_handler.assert_called_once_with(output_format="json")
+    read_connection.assert_called_once_with("remote")
+    init_client.assert_called_once_with(connection)
+    control_client.close.assert_called_once_with()
+
+
+def test_custom_err_handler() -> None:
+    """Call a custom handler for an HTTP transport error."""
+    transport_error = httpx.ConnectError(
+        "Connection refused",
+        request=httpx.Request("POST", "http://api.example"),
+    )
 
     # Prepare
     class CustomError(Exception):
         """Custom error for testing."""
 
     mock_handler = Mock(side_effect=CustomError)
-    grpc_error = grpc.RpcError()
 
     # Execute & assert
     with pytest.raises(CustomError):
-        with flwr_cli_grpc_exc_handler(mock_handler):
-            raise grpc_error
+        with flwr_cli_exc_handler(mock_handler):
+            raise transport_error
 
-    mock_handler.assert_called_once_with(grpc_error)
+    mock_handler.assert_called_once_with(transport_error)
 
 
-def test_format_grpc_error_uses_json_message_field() -> None:
-    """Structured Flower errors combine public message and details."""
-    err = _grpc_error_with_details(
-        '{"public_message": "request failed", '
-        '"public_details": "missing entitlement", "code": 400}'
+@pytest.mark.parametrize(
+    ("response", "expected"),
+    [
+        (
+            httpx.Response(
+                400,
+                json={
+                    "code": ApiErrorCode.INVALID_RUN_CONFIG,
+                    "detail": "Invalid run configuration.",
+                    "extra": "Unknown override key.",
+                },
+                request=httpx.Request("POST", "http://api.example"),
+            ),
+            "[code: 15] Invalid run configuration. Unknown override key.",
+        ),
+        (
+            httpx.Response(
+                401,
+                json={"detail": "Not authenticated"},
+                request=httpx.Request("POST", "http://api.example"),
+            ),
+            AUTHENTICATION_FAILED_MESSAGE,
+        ),
+        (
+            httpx.Response(
+                502,
+                json={"detail": "Upstream service unavailable."},
+                request=httpx.Request("POST", "http://api.example"),
+            ),
+            "Upstream service unavailable.",
+        ),
+    ],
+)
+def test_http_status_error(response: httpx.Response, expected: str) -> None:
+    """Translate HTTP error responses into concise CLI messages."""
+    with pytest.raises(click.ClickException) as exc_info:
+        with flwr_cli_exc_handler():
+            response.raise_for_status()
+
+    assert exc_info.value.message == expected
+
+
+def test_http_request_error() -> None:
+    """Translate HTTP connection failures into the unavailable message."""
+    request = httpx.Request("POST", "http://api.example")
+
+    with pytest.raises(click.ClickException) as exc_info:
+        with flwr_cli_exc_handler():
+            raise httpx.ConnectError("Connection refused", request=request)
+
+    assert exc_info.value.message == SUPERLINK_UNAVAILABLE_MESSAGE
+
+
+def test_format_flower_error() -> None:
+    """Format FlowerError code, message, and public details."""
+    err = FlowerError(
+        ApiErrorCode.INVALID_RUN_CONFIG,
+        "Invalid run configuration.",
+        "Unknown override key: tool.invalid-key",
     )
 
-    assert _format_grpc_error(err) == "request failed\nmissing entitlement"
-
-
-def test_format_grpc_error_falls_back_to_plain_string() -> None:
-    """Non-JSON errors fall back to their normal string form."""
-    err = _grpc_error_with_details("plain failure")
-
-    assert _format_grpc_error(err) == "plain failure"
+    assert _format_flower_error(err) == (
+        "[code: 15] Invalid run configuration. "
+        "Unknown override key: tool.invalid-key"
+    )
 
 
 def test_cli_output_handler_raises_click_exception_for_json_error() -> None:
@@ -290,6 +379,15 @@ def test_cli_output_handler_raises_click_exception_for_json_error() -> None:
             raise click.ClickException('{"message": "request failed", "code": 400}')
 
     assert exc_info.value.message == '{"message": "request failed", "code": 400}'
+
+
+def test_cli_output_handler_preserves_json_exit_code() -> None:
+    """cli_output_handler preserves a nonzero exit code for JSON output."""
+    with pytest.raises(typer.Exit) as exc_info:
+        with cli_output_handler(output_format=CliOutputFormat.JSON):
+            raise typer.Exit(code=1)
+
+    assert exc_info.value.exit_code == 1
 
 
 @pytest.mark.parametrize(
@@ -419,6 +517,7 @@ def test_filter_paths_for_publish_include(
     [
         "__pycache__/mod.py",
         ".flwr/creds.json",
+        ".venv/" + "/".join(["d"] * (MAX_DIR_DEPTH + 1)) + "/mod.py",
     ],
 )
 @pytest.mark.parametrize("use_paths", [False, True], ids=["bytes", "path"])
@@ -460,7 +559,7 @@ def test_filter_paths_for_publish_respects_gitignore(
 def test_filter_paths_for_publish_max_depth_exceeded(
     use_paths: bool, tmp_path: Path
 ) -> None:
-    """ValueError is raised when a file exceeds MAX_DIR_DEPTH."""
+    """A specific error is raised when a file exceeds MAX_DIR_DEPTH."""
     # Prepare
     deep = "/".join(["d"] * (MAX_DIR_DEPTH + 1)) + "/f.py"
     raw: dict[str, bytes] = {deep: b""}
@@ -468,8 +567,12 @@ def test_filter_paths_for_publish_max_depth_exceeded(
         dict[str, Path | bytes], _to_path_files(raw, tmp_path) if use_paths else raw
     )
     # Execute & assert
-    with pytest.raises(ValueError, match="exceeds the maximum directory depth"):
+    with pytest.raises(
+        AppPathDepthError, match="exceeds the maximum directory depth"
+    ) as exc_info:
         filter_paths_for_publish(files)
+    assert exc_info.value.path == deep
+    assert exc_info.value.max_depth == MAX_DIR_DEPTH
 
 
 def test_filter_paths_for_publish_empty() -> None:

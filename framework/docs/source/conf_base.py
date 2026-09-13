@@ -176,7 +176,27 @@ templates_path = ["_templates"]
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "ref-exit-codes/_template.rst"]
+exclude_patterns = [
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    "ref-exit-codes/_template.rst",
+    "changelog/v*.md" if current_version == "main" else "changelog/**",
+]
+
+
+def _use_shared_changelog(app, docname, source):
+    """Avoid rendering release branches' historical changelog sources."""
+    if current_version != "main" and docname == "ref-changelog":
+        source[0] = (
+            Path(app.confdir) / "_templates" / "shared-changelog.md"
+        ).read_text(encoding="utf-8")
+
+
+def setup(app):
+    """Configure build-time source replacements."""
+    app.connect("source-read", _use_shared_changelog)
+
 
 # Sphinx redirects, implemented after the doc filename changes.
 # To prevent 404 errors and redirect to the new pages.

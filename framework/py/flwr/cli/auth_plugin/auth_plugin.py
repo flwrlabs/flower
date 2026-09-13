@@ -14,12 +14,11 @@
 # ==============================================================================
 """Abstract classes for Flower account auth plugin."""
 
-
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
-from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore.auth.typing import AccountAuthCredentials, AccountAuthLoginDetails
+from flwr.supercore.control import ControlHttpClient
 
 
 class LoginError(Exception):
@@ -42,7 +41,7 @@ class CliAuthPlugin(ABC):
     @abstractmethod
     def login(
         login_details: AccountAuthLoginDetails,
-        control_stub: ControlStub,
+        control_client: ControlHttpClient,
     ) -> AccountAuthCredentials:
         """Authenticate the account and retrieve authentication credentials.
 
@@ -50,8 +49,8 @@ class CliAuthPlugin(ABC):
         ----------
         login_details : AccountAuthLoginDetails
             An object containing the account's login details.
-        control_stub : ControlStub
-            A stub for executing RPC calls to the server.
+        control_client : ControlHttpClient
+            A client for making authentication requests.
 
         Returns
         -------
@@ -81,9 +80,3 @@ class CliAuthPlugin(ABC):
         self, metadata: Sequence[tuple[str, str | bytes]]
     ) -> Sequence[tuple[str, str | bytes]]:
         """Write authentication tokens to the provided metadata."""
-
-    @abstractmethod
-    def read_tokens_from_metadata(
-        self, metadata: Sequence[tuple[str, str | bytes]]
-    ) -> AccountAuthCredentials | None:
-        """Read authentication tokens from the provided metadata."""

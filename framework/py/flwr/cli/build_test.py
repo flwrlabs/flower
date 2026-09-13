@@ -20,6 +20,8 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
+import tomli
+import tomli_w
 from parameterized import parameterized
 
 from .build import build_fab_from_files
@@ -33,8 +35,19 @@ def _make_files(
     **extra_files: bytes,
 ) -> dict[str, bytes | Path]:
     """Build a minimal files dict with the given [tool.flwr.app] fragment."""
-    pyproject = f'[project]\nname = "app"\nversion = "1.0.0"\n{app_toml}'
-    return {"pyproject.toml": pyproject.encode(), **extra_files}
+    config = tomli.loads(f'[project]\nname = "app"\nversion = "1.0.0"\n{app_toml}')
+    app_config = (
+        config.setdefault("tool", {}).setdefault("flwr", {}).setdefault("app", {})
+    )
+    app_config.setdefault("publisher", "alice")
+    app_config.setdefault(
+        "components",
+        {
+            "serverapp": "app.server:app",
+            "clientapp": "app.client:app",
+        },
+    )
+    return {"pyproject.toml": tomli_w.dumps(config).encode(), **extra_files}
 
 
 def _build_entries(files: dict[str, bytes | Path]) -> set[str]:
@@ -64,6 +77,33 @@ def test_build_fab_from_files_missing_pyproject_raises() -> None:
     """Test that missing pyproject.toml raises ValueError."""
     with pytest.raises(ValueError, match="pyproject.toml"):
         build_fab_from_files({"client.py": _DUMMY_PY})
+
+
+def test_build_fab_from_files_rejects_missing_components() -> None:
+    """Test direct FAB builds validate the full Flower App configuration."""
+    files = {
+        "pyproject.toml": (
+            b'[project]\nname = "app"\nversion = "1.0.0"\n'
+            b'[tool.flwr.app]\npublisher = "alice"\n'
+        ),
+        "client.py": _DUMMY_PY,
+    }
+
+    with pytest.raises(
+        ValueError, match=r"Missing \[tool\.flwr\.app\.components\] section"
+    ):
+        build_fab_from_files(files)
+
+
+def test_build_fab_from_files_rejects_invalid_component_reference() -> None:
+    """Test direct FAB builds validate component object references."""
+    files = _make_files(
+        '\n[tool.flwr.app.components]\nagentapp = "missing-attribute"\n',
+        **{"agent.py": _DUMMY_PY},
+    )
+
+    with pytest.raises(ValueError, match="Missing attribute"):
+        build_fab_from_files(files)
 
 
 @parameterized.expand(  # type: ignore

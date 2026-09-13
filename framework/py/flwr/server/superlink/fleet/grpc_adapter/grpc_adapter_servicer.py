@@ -29,7 +29,6 @@ from flwr.common.constant import (
     GRPC_ADAPTER_METADATA_MESSAGE_MODULE_KEY,
     GRPC_ADAPTER_METADATA_MESSAGE_QUALNAME_KEY,
 )
-from flwr.common.logger import log
 from flwr.proto import grpcadapter_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.fab_pb2 import GetFabRequest  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
@@ -48,6 +47,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectRequest,
 )
 from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.version import package_name, package_version
 
 from ..grpc_rere.fleet_servicer import FleetServicer
