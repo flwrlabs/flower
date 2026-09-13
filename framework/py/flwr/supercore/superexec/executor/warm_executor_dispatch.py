@@ -101,6 +101,7 @@ class KubernetesWarmExecutorDispatch:
         """Return whether the task child acknowledged consuming the token."""
         deadline = time.monotonic() + timeout
         stdout = ""
+        stdout_before_acceptance: list[str] = []
         stderr_before_acceptance: list[str] = []
         while time.monotonic() < deadline:
             stdout += self._read_stdout()
@@ -108,17 +109,24 @@ class KubernetesWarmExecutorDispatch:
             if stderr:
                 stderr_before_acceptance.append(stderr)
             self._discard_combined_output()
-            acknowledgement_end = self._acknowledgement_end(stdout)
-            if acknowledgement_end is not None:
+            acknowledgement_span = self._acknowledgement_span(stdout)
+            if acknowledgement_span is not None:
+                acknowledgement_start, acknowledgement_end = acknowledgement_span
                 self._output_after_acceptance.extend(
                     output
                     for output in (
+                        "".join(
+                            (*stdout_before_acceptance, stdout[:acknowledgement_start])
+                        ),
                         stdout[acknowledgement_end:].lstrip("\r\n"),
                         *stderr_before_acceptance,
                     )
                     if output
                 )
                 return True
+            stdout_before_acceptance.append(
+                stdout[:-_TOKEN_STDIN_ACKNOWLEDGEMENT_BUFFER_SIZE]
+            )
             stdout = stdout[-_TOKEN_STDIN_ACKNOWLEDGEMENT_BUFFER_SIZE:]
             if not self._is_open():
                 return False
@@ -175,8 +183,8 @@ class KubernetesWarmExecutorDispatch:
         return ""
 
     @staticmethod
-    def _acknowledgement_end(stdout: str) -> int | None:
-        """Return the end of the first complete token acknowledgement."""
+    def _acknowledgement_span(stdout: str) -> tuple[int, int] | None:
+        """Return the span of the first complete token acknowledgement."""
         acknowledgement_start: int | None = None
         acknowledgement_end: int | None = None
         for acknowledgement in _TOKEN_STDIN_ACKNOWLEDGEMENTS:
@@ -186,7 +194,9 @@ class KubernetesWarmExecutorDispatch:
             ):
                 acknowledgement_start = start
                 acknowledgement_end = start + len(acknowledgement)
-        return acknowledgement_end
+        if acknowledgement_start is None or acknowledgement_end is None:
+            return None
+        return acknowledgement_start, acknowledgement_end
 
     def _drain_output(self, forward_output: bool) -> None:
         """Consume exec output and optionally mirror it through SuperExec logs."""

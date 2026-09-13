@@ -797,6 +797,7 @@ def test_warm_dispatch_drains_stderr_until_the_child_exits() -> None:
         (
             True,
             [
+                call(INFO, "%s", "visible output before acknowledgement"),
                 call(INFO, "%s", "visible output with acknowledgement"),
                 call(INFO, "%s", "visible error before acknowledgement"),
                 call(INFO, "%s", "visible error with acknowledgement"),
@@ -812,11 +813,11 @@ def test_warm_dispatch_forwards_only_visible_output_after_acceptance(
     forward_output: bool,
     expected_calls: list[Any],
 ) -> None:
-    """Warm dispatch should mirror only post-acknowledgement visible output."""
+    """Warm dispatch should mirror visible output only after acknowledgement."""
     response = Mock(returncode=0)
     response._all = StringIO()  # pylint: disable=protected-access
     response.read_stdout.side_effect = [
-        "",
+        "visible output before acknowledgement",
         (
             f"{FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT}\n"
             "visible output with acknowledgement"
