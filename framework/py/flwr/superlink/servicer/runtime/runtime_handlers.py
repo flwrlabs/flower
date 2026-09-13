@@ -47,6 +47,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -79,6 +81,24 @@ from flwr.superlink.servicer.control.control_handlers import (
 RUNTIME_ENDPOINT_UNAVAILABLE_MESSAGE = (
     "Some Runtime API endpoints are only available for Deployment Runtime runs."
 )
+
+
+def get_run_series_events(
+    request: GetRunSeriesEventsRequest,
+    state: LinkState,
+    task: Task,
+) -> GetRunSeriesEventsResponse:
+    """Get events from all runs in the authenticated task's series."""
+    log(DEBUG, "Runtime.GetRunSeriesEvents")
+
+    run = state.get_run_info(run_ids=[task.run_id])[0]
+    series = state.get_run_series(series_ids=[run.series_id])[0]
+    series_runs = state.get_run_info(run_ids=series.run_ids)
+    primary_task_ids = [
+        run.primary_task_id for run in series_runs if run.primary_task_id is not None
+    ]
+    events = state.get_task_events(task_ids=primary_task_ids)
+    return GetRunSeriesEventsResponse(events=events)
 
 
 def pull_pending_tasks(

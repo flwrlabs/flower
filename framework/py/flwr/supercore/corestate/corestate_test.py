@@ -118,10 +118,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type, app.is_hub_app) for app in apps],
             [
-                ("@me/z-agent", agent_hash, TaskType.AGENT_APP, True),
+                ("@me/z-agent", "", TaskType.AGENT_APP, True),
                 ("@me/server", server_hash, TaskType.SERVER_APP, False),
             ],
         )
+        self.assertIsNotNone(state.get_fab(agent_hash))
         self.assertEqual(
             state.get_app("@me/fed-a", "@me/server", server_hash),
             Fab(server_hash, b"server", {}),
@@ -146,10 +147,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         updated = state.list_apps("@me/fed-a")
         self.assertEqual(len(updated), 2)
-        self.assertEqual(updated[1].fab_hash, updated_hash)
+        self.assertEqual(updated[1].fab_hash, "")
         self.assertTrue(updated[1].is_hub_app)
         self.assertIsNone(state.get_app("@me/fed-a", "@me/server", server_hash))
-        self.assertIsNotNone(state.get_app("@me/fed-a", "@me/server", updated_hash))
+        self.assertIsNone(state.get_app("@me/fed-a", "@me/server", updated_hash))
 
         self.assertTrue(state.delete_app("@me/fed-a", "@me/server"))
         self.assertFalse(state.delete_app("@me/fed-a", "@me/server"))
@@ -625,6 +626,24 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(run_series[0].description, "Initial description")
         self.assertEqual(state.get_run_series(is_agent=True), run_series)
         self.assertEqual(state.get_run_series(is_agent=False), [])
+
+    def test_set_run_series_description(self) -> None:
+        """A valid RunSeries description can be changed."""
+        state = self.state_factory()
+        series_id = state.store_run_in_series(
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=True,
+            series_id=None,
+            description="Initial description",
+        )
+        assert series_id is not None
+
+        self.assertIsNone(
+            state.set_run_series_description(series_id, "  Generated title  ")
+        )
+        updated = state.get_run_series(series_ids=[series_id])[0]
+        self.assertEqual(updated.description, "Generated title")
 
     def test_store_run_in_series_returns_none_for_unknown_id(self) -> None:
         """Unknown caller-provided run series IDs return None."""
@@ -1779,14 +1798,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         # Execute: Store the events and read them through full and cursored fetches.
         self.assertFalse(state.store_task_events([]))
         self.assertTrue(state.store_task_events([event_1, event_2]))
-        events = state.get_task_events(run_id=run_id, after_task_event_id=None)
+        events = state.get_task_events(run_ids=[run_id], after_task_event_id=None)
         latest_id = events[-1].id
         after_first = state.get_task_events(
-            run_id=run_id, after_task_event_id=events[0].id
+            run_ids=[run_id], after_task_event_id=events[0].id
         )
-        no_new = state.get_task_events(run_id=run_id, after_task_event_id=latest_id)
-        filtered = state.get_task_events(run_id=run_id, task_ids=[task_id])
-        excluded = state.get_task_events(run_id=run_id, task_ids=[task_id + 1])
+        no_new = state.get_task_events(run_ids=[run_id], after_task_event_id=latest_id)
+        filtered = state.get_task_events(run_ids=[run_id], task_ids=[task_id])
+        excluded = state.get_task_events(run_ids=[run_id], task_ids=[task_id + 1])
+        no_runs = state.get_task_events(run_ids=[])
 
         # Assert: Events keep assigned ID order and cursor filtering works.
         self.assertEqual(len(events), 2)
@@ -1809,6 +1829,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(no_new, [])
         self.assertEqual(filtered, events)
         self.assertEqual(excluded, [])
+        self.assertEqual(no_runs, [])
 
     @parameterized.expand(  # type: ignore
         [
@@ -1849,7 +1870,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
 
         # Assert: The invalid payload rejects the whole batch.
-        events = state.get_task_events(run_id=run_id, after_task_event_id=None)
+        events = state.get_task_events(run_ids=[run_id], after_task_event_id=None)
         self.assertEqual(events, [])
 
     def test_reserve_nonce_first_reservation_succeeds(self) -> None:

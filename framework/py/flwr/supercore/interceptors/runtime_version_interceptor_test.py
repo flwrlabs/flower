@@ -38,8 +38,6 @@ from flwr.supercore.interceptors import (
     RuntimeVersionServerInterceptor,
     create_control_runtime_version_server_interceptor,
     create_fleet_runtime_version_server_interceptor,
-    create_superlink_runtime_version_server_interceptor,
-    create_supernode_runtime_version_server_interceptor,
 )
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 
@@ -391,16 +389,6 @@ class TestRuntimeVersionServerInterceptor(TestCase):
             "expected a peer from the same major.minor release, but received "
             "simulation version 1.30.1.",
         )
-
-    def test_superlink_runtime_factory_rejects_incompatible_by_default(self) -> None:
-        """SuperLink Runtime factory should reject different major.minor."""
-        interceptor = create_superlink_runtime_version_server_interceptor()
-        self.assertTrue(interceptor._reject_incompatible)  # pylint: disable=W0212
-
-    def test_supernode_runtime_factory_rejects_incompatible_by_default(self) -> None:
-        """SuperNode Runtime factory should reject different major.minor."""
-        interceptor = create_supernode_runtime_version_server_interceptor()
-        self.assertTrue(interceptor._reject_incompatible)  # pylint: disable=W0212
 
     def test_fleet_factory_observes_by_default(self) -> None:
         """Fleet factory should not return warning metadata by default."""

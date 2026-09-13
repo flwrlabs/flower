@@ -20,6 +20,7 @@ import subprocess
 from flwr.supercore.constant import (
     TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
     TASK_TYPE_TO_COMMAND,
+    TaskType,
 )
 
 from .types import ExecutionSpec, LaunchResult
@@ -28,8 +29,15 @@ from .types import ExecutionSpec, LaunchResult
 class SubprocessExecutor:
     """Run TaskExecutor processes as local subprocesses."""
 
-    def wait_for_capacity(self) -> None:
+    def wait_for_capacity(
+        self,
+        task_type: TaskType | None = None,
+        *,
+        insecure: bool = False,
+        root_certificates_path: str | None = None,
+    ) -> None:
         """Return immediately because subprocess launches have no capacity gate."""
+        del task_type, insecure, root_certificates_path
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""
@@ -63,3 +71,9 @@ class SubprocessExecutor:
         subprocess.Popen(args)  # pylint: disable=consider-using-with
 
         return LaunchResult.accepted()
+
+    def close(self) -> None:
+        """Release executor-owned resources during SuperExec shutdown."""
+
+    def reconcile(self) -> None:
+        """Local subprocess execution has no pool to maintain."""

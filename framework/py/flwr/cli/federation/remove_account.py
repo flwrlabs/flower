@@ -24,9 +24,13 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveAccountFromFederationRequest,
     RemoveAccountFromFederationResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.control import ControlHttpClient
 
-from ..utils import cli_output_control_stub, flwr_cli_exc_handler, print_json_to_stdout
+from ..utils import (
+    cli_output_control_client,
+    flwr_cli_exc_handler,
+    print_json_to_stdout,
+)
 
 
 def remove_account(
@@ -52,7 +56,7 @@ def remove_account(
     ] = CliOutputFormat.DEFAULT,
 ) -> None:
     """Remove an account from an existing federation."""
-    with cli_output_control_stub(superlink, output_format) as (stub, is_json):
+    with cli_output_control_client(superlink, output_format) as (stub, is_json):
         request = RemoveAccountFromFederationRequest(
             federation_name=federation, account_name=account_name
         )
@@ -64,7 +68,7 @@ def remove_account(
 
 
 def _remove_account_from_federation(  # pylint: disable=W0613
-    stub: ControlStub,
+    stub: ControlHttpClient,
     request: RemoveAccountFromFederationRequest,
     is_json: bool,
 ) -> None:

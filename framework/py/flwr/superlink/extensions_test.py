@@ -73,14 +73,16 @@ def test_notify_result_delivered_passes_a_snapshot_to_the_extension(
     monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: module)
     run = Run.create_empty(123)
 
-    extensions.notify_result_delivered(run, "account-123", "logs")
+    extensions.notify_result_delivered(
+        run, "account-123", extensions.RESULT_DELIVERY_CHANNEL_LOGS
+    )
 
     callback.assert_called_once()
     notified_run, flwr_aid, channel = callback.call_args.args
     assert notified_run == run
     assert notified_run is not run
     assert flwr_aid == "account-123"
-    assert channel == "logs"
+    assert channel == extensions.RESULT_DELIVERY_CHANNEL_LOGS
 
 
 def test_notify_result_delivered_isolates_extension_failure(
@@ -92,4 +94,6 @@ def test_notify_result_delivered_isolates_extension_failure(
     module.on_result_delivered = callback  # type: ignore[attr-defined]
     monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: module)
 
-    extensions.notify_result_delivered(Run.create_empty(123), "account-123", "chat")
+    extensions.notify_result_delivered(
+        Run.create_empty(123), "account-123", extensions.RESULT_DELIVERY_CHANNEL_CHAT
+    )

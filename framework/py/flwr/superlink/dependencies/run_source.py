@@ -18,18 +18,15 @@ from typing import Annotated
 
 from fastapi import Depends, Header
 
-from flwr.superlink.run_source import (
-    RUN_SOURCE_METADATA_KEY,
-    RunStartSource,
-    resolve_run_start_source,
-)
+from flwr.supercore.constant import FLWR_CLIENT_METADATA_KEY
+from flwr.superlink.run_source import RunSource, resolve_source
 
 
 def get_run_source(
-    run_source: Annotated[str | None, Header(alias=RUN_SOURCE_METADATA_KEY)] = None,
-) -> RunStartSource:
-    """Return the normalized run source from the request header."""
-    return resolve_run_start_source(run_source)
+    run_source: Annotated[str | None, Header(alias=FLWR_CLIENT_METADATA_KEY)] = None,
+) -> RunSource:
+    """Return the normalized run source from the client metadata header."""
+    return resolve_source(run_source)
 
 
-RunSourceDependency = Annotated[RunStartSource, Depends(get_run_source)]
+RunSourceDependency = Annotated[RunSource, Depends(get_run_source)]

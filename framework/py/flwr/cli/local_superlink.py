@@ -23,23 +23,20 @@ import time
 from pathlib import Path
 
 import click
-import grpc
+import httpx
 import typer
 
 from flwr.common.constant import ISOLATION_MODE_SUBPROCESS
-from flwr.proto.control_pb2 import ListFederationsRequest  # pylint: disable=E0611
-from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore.constant import FLWR_DISABLE_UPDATE_CHECK
-from flwr.supercore.grpc import create_channel
 from flwr.supercore.utils import get_flwr_home, get_popen_detach_kwargs
 
 from .constant import (
     CONTROL_API_PROBE_INTERVAL,
     CONTROL_API_PROBE_TIMEOUT,
     LOCAL_CONTROL_API_ADDRESS,
-    LOCAL_RUNTIME_API_PORT,
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY,
+    LOCAL_SUPERLINK_HTTP_API_PORT,
     LOCAL_SUPERLINK_STARTUP_TIMEOUT,
 )
 from .typing import SuperLinkConnection
@@ -62,16 +59,17 @@ def ensure_local_superlink(connection: SuperLinkConnection) -> SuperLinkConnecti
     ):
         runtime_connection = SuperLinkConnection(
             name=connection.name,
-            address=LOCAL_CONTROL_API_ADDRESS,
+            address=f"127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}",
             root_certificates=None,
             insecure=True,
             federation=connection.federation,
             options=connection.options,
         )
         if not _is_local_superlink_started():
-            _start_local_superlink(
+            in_memory = (
                 connection.address == LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY
             )
+            _start_local_superlink(in_memory)
         return runtime_connection
 
     # Explicit addresses are user-managed.
@@ -88,25 +86,25 @@ def _get_local_superlink_paths() -> tuple[Path, Path]:
 
 
 def _is_local_superlink_started() -> bool:
-    """Return True if local SuperLink's Control API endpoint is reachable."""
-    channel = create_channel(server_address=LOCAL_CONTROL_API_ADDRESS, insecure=True)
+    """Return True if local SuperLink's HTTP endpoint is reachable."""
     try:
-        ControlStub(channel).ListFederations(
-            ListFederationsRequest(), timeout=CONTROL_API_PROBE_TIMEOUT
+        response = httpx.get(
+            f"http://127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}/health",
+            timeout=CONTROL_API_PROBE_TIMEOUT,
         )
-        return True
-    except (grpc.FutureTimeoutError, grpc.RpcError):
+        return response.is_success
+    except httpx.HTTPError:
         return False
-    finally:
-        channel.close()
 
 
-def _start_local_superlink(in_memory: bool = False) -> None:
+def _start_local_superlink(
+    in_memory: bool = False,
+) -> None:
     """Start a managed local SuperLink in simulation mode and wait for readiness."""
     database_path, log_file_path = _get_local_superlink_paths()
 
     typer.secho(
-        f"Starting local SuperLink on {LOCAL_CONTROL_API_ADDRESS}...",
+        f"Starting local SuperLink on 127.0.0.1:{LOCAL_SUPERLINK_HTTP_API_PORT}...",
         fg=typer.colors.BLUE,
     )
 
@@ -121,7 +119,7 @@ def _start_local_superlink(in_memory: bool = False) -> None:
         "--host",
         "127.0.0.1",
         "--port",
-        LOCAL_RUNTIME_API_PORT,
+        LOCAL_SUPERLINK_HTTP_API_PORT,
         "--log-file",
         str(log_file_path),
         "--log-rotation-interval-hours",

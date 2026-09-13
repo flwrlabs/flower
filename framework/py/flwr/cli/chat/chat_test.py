@@ -38,9 +38,8 @@ def test_chat_requires_login_before_interactive_application() -> None:
         name=CHAT_SUPERGRID_CONNECTION_NAME,
         address="supergrid.flower.ai",
     )
-    channel = Mock()
-    stub = Mock()
-    stub.ListFederations.side_effect = click.ClickException(
+    control_client = Mock()
+    control_client.ListFederations.side_effect = click.ClickException(
         "Missing authentication tokens. Please login first."
     )
 
@@ -52,18 +51,17 @@ def test_chat_requires_login_before_interactive_application() -> None:
         ),
         patch.object(
             chat_module,
-            "init_channel_from_connection",
-            return_value=channel,
+            "init_http_client_from_connection",
+            return_value=control_client,
         ),
         patch.object(chat_module, "load_cli_auth_plugin_from_connection"),
-        patch.object(chat_module, "ControlStub", return_value=stub),
         patch.object(chat_module, "ChatApplication") as mock_chat_application,
     ):
         with pytest.raises(click.ClickException, match="login first"):
             chat_module.chat()
 
     mock_chat_application.assert_not_called()
-    channel.close.assert_called_once()
+    control_client.close.assert_called_once()
 
 
 def test_chat_runs_interactive_application() -> None:
@@ -72,10 +70,11 @@ def test_chat_runs_interactive_application() -> None:
         name=CHAT_SUPERGRID_CONNECTION_NAME,
         address="supergrid.flower.ai",
     )
-    channel = Mock()
-    stub = Mock()
+    control_client = Mock()
     federations = [Federation(name=f"@flower/{CHAT_DEFAULT_FEDERATION_NAME}")]
-    stub.ListFederations.return_value = ListFederationsResponse(federations=federations)
+    control_client.ListFederations.return_value = ListFederationsResponse(
+        federations=federations
+    )
     auth_plugin = Mock()
 
     with (
@@ -86,21 +85,22 @@ def test_chat_runs_interactive_application() -> None:
         ),
         patch.object(
             chat_module,
-            "init_channel_from_connection",
-            return_value=channel,
-        ) as mock_init_channel,
+            "init_http_client_from_connection",
+            return_value=control_client,
+        ) as mock_init_client,
         patch.object(
             chat_module,
             "load_cli_auth_plugin_from_connection",
             return_value=auth_plugin,
         ),
-        patch.object(chat_module, "ControlStub", return_value=stub),
         patch.object(chat_module, "ChatApplication") as mock_chat_application,
     ):
         chat_module.chat()
 
-    stub.ListFederations.assert_called_once()
-    mock_init_channel.assert_called_once_with(superlink_connection, auth_plugin)
-    mock_chat_application.assert_called_once_with(stub, federations, auth_plugin)
+    control_client.ListFederations.assert_called_once()
+    mock_init_client.assert_called_once_with(superlink_connection, auth_plugin)
+    mock_chat_application.assert_called_once_with(
+        control_client, federations, auth_plugin
+    )
     mock_chat_application.return_value.run.assert_called_once_with()
-    channel.close.assert_called_once()
+    control_client.close.assert_called_once()

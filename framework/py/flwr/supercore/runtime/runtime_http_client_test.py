@@ -38,6 +38,7 @@ _UNARY_UNARY_PATHS = (
     "start-automation",
     "push-task-message",
     "push-task-events",
+    "get-run-series-events",
     "pull-task-message",
     "record-task-usage",
     "get-connector",

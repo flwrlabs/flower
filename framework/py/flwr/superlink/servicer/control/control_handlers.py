@@ -93,6 +93,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListInvitationsResponse,
     ListNodesRequest,
     ListNodesResponse,
+    ListRunSeriesEventsRequest,
+    ListRunSeriesEventsResponse,
     ListRunSeriesRequest,
     ListRunSeriesResponse,
     ListRunsRequest,
@@ -129,11 +131,14 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
@@ -159,6 +164,7 @@ from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
     CreateInvitationContext,
+    JSONObject,
     RegisterSupernodeContext,
     StartRunContext,
 )
@@ -173,7 +179,10 @@ from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
-from flwr.superlink.run_source import RunStartSource
+from flwr.superlink.federation.typing import Federation as FederationInfo
+from flwr.superlink.run_source import RunSource
+
+from .conversation_title import start_title_generation
 
 
 class InvalidConnectorRequestError(FlowerError):
@@ -468,13 +477,39 @@ def validate_run_connector_refs(
     return canonical_refs
 
 
+def _get_hub_app_id(
+    state: LinkState, federation_id: str, request: StartRunRequest
+) -> str | None:
+    """Return the Hub app ID declared by a StartRun request, if any."""
+    if request.app_spec:
+        try:
+            app_id, _ = parse_app_spec(request.app_spec)
+        except ValueError:
+            return None
+    elif request.fab.content:
+        try:
+            fab_id, _ = get_metadata_from_config(get_fab_config(request.fab.content))
+            app_id = f"@{fab_id}"
+        except ValueError:
+            return None
+    else:
+        return None
+
+    if any(
+        app.app_id == app_id and app.HasField("is_hub_app") and app.is_hub_app
+        for app in state.list_apps(federation_id)
+    ):
+        return app_id
+    return None
+
+
 def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
     state: LinkState,
     fleet_api_type: str | None,
     *,
-    source: RunStartSource = "unknown",
+    source: RunSource = "unknown",
 ) -> StartRunResponse:
     """Create run ID."""
     log(INFO, "ControlServicer.StartRun")
@@ -627,6 +662,20 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 _derive_run_series_description(fused_run_config) or None
             )
 
+        initial_task_event = None
+        agent_input = fused_run_config.get("agent.input")
+        if primary_task_type == TaskType.AGENT_APP:
+            if isinstance(agent_input, str) and agent_input:
+                input_item: JSONObject = {
+                    "type": "message",
+                    "role": "user",
+                    "content": agent_input,
+                }
+                initial_task_event = TaskEvent(
+                    event="message",
+                    data=strict_json_dumps(input_item, compact=True),
+                )
+
         run_id = state.create_run(
             fab_id,
             fab_version,
@@ -639,6 +688,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             series_id=series_id,
             series_description=series_description,
             connector_refs=connector_refs,
+            initial_task_event=initial_task_event,
         )
 
         if run_id == 0:
@@ -652,6 +702,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
         run = state.get_run_info(run_ids=[run_id])[0]
         series_id = run.series_id
+        if series_description and isinstance(agent_input, str) and series_id:
+            start_title_generation(state, series_id, agent_input)
 
     except ValueError as e:
         log(ERROR, "Could not start run: %s", str(e))
@@ -692,7 +744,9 @@ def stream_logs(
     _validate_federation_membership_in_request(
         state, account.flwr_aid, run.federation_id
     )
-    extensions.notify_result_delivered(run, account.flwr_aid, "logs")
+    extensions.notify_result_delivered(
+        run, account.flwr_aid, extensions.RESULT_DELIVERY_CHANNEL_LOGS
+    )
 
     after_timestamp = request.after_timestamp + 1e-6
     return _stream_logs(run_id, task_id, after_timestamp, state, is_active)
@@ -750,11 +804,10 @@ def stream_run_events(
     _validate_federation_membership_in_request(
         state, account.flwr_aid, run.federation_id
     )
-    # A chat/read receipt represents an AgentApp result. ServerApp and
-    # simulation runs can also expose task events, but those are not chat
-    # results and must not be classified as such.
-    if run.primary_task_type == TaskType.AGENT_APP:
-        extensions.notify_result_delivered(run, account.flwr_aid, "chat")
+    # Record every accepted result request, regardless of the primary task type.
+    extensions.notify_result_delivered(
+        run, account.flwr_aid, extensions.RESULT_DELIVERY_CHANNEL_CHAT
+    )
 
     after_task_event_id = None
     if request.HasField("after_task_event_id"):
@@ -784,7 +837,7 @@ def _stream_run_events(
         # Retrieve and yield all task events generated after the latest
         # streamed task event
         events = state.get_task_events(
-            run_id=run_id,
+            run_ids=[run_id],
             task_ids=[primary_task_id],
             after_task_event_id=after_task_event_id,
         )
@@ -807,7 +860,7 @@ def _stream_run_events(
         time.sleep(RUN_EVENTS_STREAM_INTERVAL)
 
 
-def start_automation(  # pylint: disable=too-many-locals
+def start_automation(  # pylint: disable=too-many-branches,too-many-locals
     request: StartAutomationRequest,
     account: AccountInfo,
     state: LinkState,
@@ -902,6 +955,12 @@ def start_automation(  # pylint: disable=too-many-locals
     stored_start_run_request = StartRunRequest()
     stored_start_run_request.CopyFrom(start_run_request)
     stored_start_run_request.federation = federation_id
+    app_id = _get_hub_app_id(state, federation_id, stored_start_run_request)
+    if app_id is not None:
+        # Store Hub automations by unversioned app ID. Each dispatch then resolves
+        # the latest compatible version instead of pinning the current run's FAB.
+        stored_start_run_request.app_spec = app_id
+        stored_start_run_request.ClearField("fab")
 
     # Persist the unresolved run request so dispatch uses the StartRun workflow.
     try:
@@ -1153,11 +1212,78 @@ def get_run_series(
     # Run series context is created atomically by LinkState.create_run(...)
     # and should never be None.
     series_context = state.get_run_series_context(request.series_id)
+    run_series = series_matches[0]
+    runs = [run_to_proto(run) for run in state.get_run_info(run_ids=run_series.run_ids)]
     response = GetRunSeriesResponse(
-        series=_with_last_run_statuses(state, series_matches)[0],
+        series=_with_last_run_statuses(state, [run_series])[0],
         context=context_to_proto(series_context) if series_context else None,
+        runs=runs,
     )
     return response
+
+
+def update_run_series_description(
+    request: UpdateRunSeriesDescriptionRequest,
+    account: AccountInfo,
+    state: LinkState,
+) -> UpdateRunSeriesDescriptionResponse:
+    """Update a run series description."""
+    log(INFO, "ControlServicer.UpdateRunSeriesDescription")
+
+    series_id = request.series_id
+    series_matches = state.get_run_series(series_ids=[series_id])
+
+    # The caller must be a member of the federation. Return the same error for
+    # missing and inaccessible series to avoid revealing their existence.
+    if not series_matches or not state.federation_manager.has_member(
+        account.flwr_aid, series_matches[0].federation
+    ):
+        raise FlowerError(
+            ApiErrorCode.RUN_SERIES_ID_NOT_FOUND,
+            f"Run series {series_id} not found for {account.flwr_aid}.",
+        )
+
+    description = request.description.strip()
+    if not description or len(description) > RUN_SERIES_DESCRIPTION_MAX_LENGTH:
+        raise FlowerError(
+            ApiErrorCode.INVALID_RUN_SERIES_DESCRIPTION,
+            "Run series description must contain between 1 and "
+            f"{RUN_SERIES_DESCRIPTION_MAX_LENGTH} characters.",
+        )
+
+    run_series = RunSeries()
+    run_series.CopyFrom(series_matches[0])
+
+    state.set_run_series_description(series_id, description)
+    run_series.description = description
+    return UpdateRunSeriesDescriptionResponse(series=run_series)
+
+
+def list_run_series_events(
+    request: ListRunSeriesEventsRequest, account: AccountInfo, state: LinkState
+) -> ListRunSeriesEventsResponse:
+    """List task events for all runs in a run series."""
+    log(INFO, "ControlServicer.ListRunSeriesEvents")
+
+    series_id = request.series_id
+    series_matches = state.get_run_series(series_ids=[series_id])
+    if not series_matches or not state.federation_manager.has_member(
+        account.flwr_aid, series_matches[0].federation
+    ):
+        raise FlowerError(
+            ApiErrorCode.RUN_SERIES_ID_NOT_FOUND,
+            f"Run series {series_id} not found for {account.flwr_aid}.",
+        )
+
+    run_ids = series_matches[0].run_ids
+    runs = state.get_run_info(run_ids=run_ids)
+    for run in runs:
+        extensions.notify_result_delivered(
+            run, account.flwr_aid, extensions.RESULT_DELIVERY_CHANNEL_CHAT
+        )
+    primary_task_ids = [cast(int, run.primary_task_id) for run in runs]
+    events = state.get_task_events(run_ids=run_ids, task_ids=primary_task_ids)
+    return ListRunSeriesEventsResponse(events=events)
 
 
 def stop_run(
@@ -1409,6 +1535,22 @@ def list_nodes(
     return ListNodesResponse(nodes_info=nodes_info, now=now().isoformat())
 
 
+def _get_federation_member_count(federation: FederationInfo) -> int:
+    """Return the explicit member count or fall back to the member list size."""
+    count = (
+        federation.member_count
+        if federation.member_count is not None
+        else len(federation.members)
+    )
+    if count < 0 or count > 0xFFFFFFFF:
+        raise FlowerError(
+            ApiErrorCode.INVALID_HANDLER_RESPONSE,
+            f"Invalid federation member_count={count} "
+            f"for federation_id={federation.id}.",
+        )
+    return count
+
+
 def list_federations(
     request: ListFederationsRequest, account: AccountInfo, state: LinkState
 ) -> ListFederationsResponse:
@@ -1427,6 +1569,8 @@ def list_federations(
             Federation(
                 name=fed.id,
                 description=fed.description,
+                members=fed.members,
+                member_count=_get_federation_member_count(fed),
                 archived=fed.archived,
                 simulation=fed.simulation,
                 can_invite_members=fed.can_invite_members,
@@ -1468,7 +1612,7 @@ def add_app(
     """Add a Hub app to a federation."""
     federation_id = request.federation_id
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
-    fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, request.app_id)
+    fab_file, _, _ = _get_remote_fab(fleet_api_type, request.app_id)
     try:
         app_type = _get_app_type(get_fab_config(fab_file))
     except ValueError as e:
@@ -1478,11 +1622,7 @@ def add_app(
         ) from e
 
     state.store_app(
-        fab=Fab(
-            hash_str=hashlib.sha256(fab_file).hexdigest(),
-            content=fab_file,
-            verifications=verification_dict,
-        ),
+        fab=None,
         federation_id=federation_id,
         app_id=request.app_id,
         app_type=app_type,
@@ -1529,6 +1669,7 @@ def show_federation(
         name=federation_id,
         description=details.description,
         members=details.members,
+        member_count=_get_federation_member_count(details),
         nodes=details.nodes,
         runs=[run_to_proto(run) for run in details.runs],
         archived=details.archived,
@@ -1589,6 +1730,7 @@ def create_federation(
             name=federation.id,
             description=federation.description,
             members=federation.members,
+            member_count=_get_federation_member_count(federation),
             simulation=federation.simulation,
             can_invite_members=federation.can_invite_members,
             can_add_supernodes=federation.can_add_supernodes,

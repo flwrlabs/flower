@@ -418,41 +418,46 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab,
+        fab: Fab | None,
         federation_id: str,
         app_id: str,
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
     ) -> str:
-        """Atomically store a FAB and associate its app with a federation."""
+        """Store an optional FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
             raise ValueError(
                 "Federation ID, app ID, app type, and added by are required"
             )
-        fab_hash = hashlib.sha256(fab.content).hexdigest()
-        if fab.hash_str and fab.hash_str != fab_hash:
-            raise ValueError(
-                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+        if fab is None and not is_hub_app:
+            raise ValueError("A FAB is required for custom apps")
+        fab_hash = None
+        fab_stmt = None
+        if fab is not None:
+            fab_hash = hashlib.sha256(fab.content).hexdigest()
+            if fab.hash_str and fab.hash_str != fab_hash:
+                raise ValueError(
+                    f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+                )
+            # Keep launch behavior: last write wins for metadata under the same
+            # content hash.
+            fab_stmt = self.dialect_insert(FabModel).values(
+                fab_hash=fab_hash,
+                content=fab.content,
+                verifications=json.dumps(fab.verifications),
             )
-        # Keep launch behavior: last write wins for metadata under the same
-        # content hash.
-        fab_stmt = self.dialect_insert(FabModel).values(
-            fab_hash=fab_hash,
-            content=fab.content,
-            verifications=json.dumps(fab.verifications),
-        )
-        fab_stmt = fab_stmt.on_conflict_do_update(
-            index_elements=[FabModel.fab_hash],
-            set_={
-                "content": fab_stmt.excluded.content,
-                "verifications": fab_stmt.excluded.verifications,
-            },
-        )
+            fab_stmt = fab_stmt.on_conflict_do_update(
+                index_elements=[FabModel.fab_hash],
+                set_={
+                    "content": fab_stmt.excluded.content,
+                    "verifications": fab_stmt.excluded.verifications,
+                },
+            )
         app_stmt = self.dialect_insert(FederationAppModel).values(
             federation_id=federation_id,
             app_id=app_id,
-            fab_hash=fab_hash,
+            fab_hash=None if is_hub_app else fab_hash,
             app_type=app_type,
             is_hub_app=is_hub_app,
             added_by=added_by,
@@ -470,9 +475,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             },
         )
         with self.session() as session:
-            session.execute(fab_stmt)
+            if fab_stmt is not None:
+                session.execute(fab_stmt)
             session.execute(app_stmt)
-        return fab_hash
+        return fab_hash or ""
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
@@ -542,7 +548,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return [
                 AppInfo(
                     app_id=app.app_id,
-                    fab_hash=app.fab_hash,
+                    fab_hash=app.fab_hash or "",
                     app_type=app.app_type,
                     is_hub_app=app.is_hub_app,
                 )
@@ -801,6 +807,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         int64_to_uint64(stored_run_id)
                     )
         return list(series_by_id.values())
+
+    def set_run_series_description(self, series_id: int, description: str) -> None:
+        """Set the description of an existing RunSeries."""
+        normalized = description.strip()
+        if not normalized:
+            return
+        stmt = (
+            update(RunSeriesModel)
+            .where(RunSeriesModel.series_id == uint64_to_int64(series_id))
+            .values(description=normalized)
+        )
+        with self.session() as session:
+            session.execute(stmt)
 
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
@@ -1258,7 +1277,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if run_ids is not None:
             if not run_ids:
                 return []
-            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
+            sint64_run_ids = [
+                uint64_to_int64(series_run_id) for series_run_id in run_ids
+            ]
             query = query.where(TaskModel.run_id.in_(sint64_run_ids))
 
         if statuses is not None:
@@ -1600,7 +1621,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def get_task_events(
         self,
         *,
-        run_id: int | None = None,
+        run_ids: Sequence[int] | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
@@ -1611,8 +1632,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .where(TaskEventModel.id > cursor)
             .order_by(TaskEventModel.id.asc())
         )
-        if run_id is not None:
-            query = query.where(TaskEventModel.run_id == uint64_to_int64(run_id))
+        if run_ids is not None:
+            if not run_ids:
+                return []
+            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
+            query = query.where(TaskEventModel.run_id.in_(sint64_run_ids))
         if task_ids is not None:
             if not task_ids:
                 return []

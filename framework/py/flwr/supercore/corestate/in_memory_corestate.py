@@ -98,7 +98,7 @@ class FederationAppRecord:
 
     federation_id: str
     app_id: str
-    fab_hash: str
+    fab_hash: str | None
     app_type: str
     is_hub_app: bool
     added_by: str
@@ -331,43 +331,48 @@ class InMemoryCoreState(
 
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab,
+        fab: Fab | None,
         federation_id: str,
         app_id: str,
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
     ) -> str:
-        """Atomically store a FAB and associate its app with a federation."""
+        """Store an optional FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
             raise ValueError(
                 "Federation ID, app ID, app type, and added by are required"
             )
-        fab_hash = hashlib.sha256(fab.content).hexdigest()
-        if fab.hash_str and fab.hash_str != fab_hash:
-            raise ValueError(
-                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
-            )
+        if fab is None and not is_hub_app:
+            raise ValueError("A FAB is required for custom apps")
+        fab_hash = None
+        if fab is not None:
+            fab_hash = hashlib.sha256(fab.content).hexdigest()
+            if fab.hash_str and fab.hash_str != fab_hash:
+                raise ValueError(
+                    f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+                )
         key = (federation_id, app_id)
         with self.lock_fab_store, self.lock_federation_app_store:
-            # Keep launch behavior: last write wins for metadata under the same
-            # content hash.
-            self.fab_store[fab_hash] = Fab(
-                hash_str=fab_hash,
-                content=fab.content,
-                verifications=dict(fab.verifications),
-            )
+            if fab is not None and fab_hash is not None:
+                # Keep launch behavior: last write wins for metadata under the same
+                # content hash.
+                self.fab_store[fab_hash] = Fab(
+                    hash_str=fab_hash,
+                    content=fab.content,
+                    verifications=dict(fab.verifications),
+                )
             existing = self.federation_app_store.get(key)
             self.federation_app_store[key] = FederationAppRecord(
                 federation_id=federation_id,
                 app_id=app_id,
-                fab_hash=fab_hash,
+                fab_hash=None if is_hub_app else fab_hash,
                 app_type=app_type,
                 is_hub_app=is_hub_app,
                 added_by=existing.added_by if existing else added_by,
                 added_at=existing.added_at if existing else now(),
             )
-        return fab_hash
+        return fab_hash or ""
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
@@ -419,7 +424,7 @@ class InMemoryCoreState(
             return [
                 AppInfo(
                     app_id=record.app_id,
-                    fab_hash=record.fab_hash,
+                    fab_hash=record.fab_hash or "",
                     app_type=record.app_type,
                     is_hub_app=record.is_hub_app,
                 )
@@ -599,6 +604,17 @@ class InMemoryCoreState(
             if limit is not None:
                 run_series = run_series[:limit]
             return list(run_series)
+
+    def set_run_series_description(self, series_id: int, description: str) -> None:
+        """Set the description of an existing RunSeries."""
+        normalized = description.strip()
+        if not normalized:
+            return
+        with self.lock_run_series_store:
+            run_series = self.run_series_store.get(series_id)
+            if run_series is None:
+                return
+            run_series.description = normalized
 
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
@@ -1277,28 +1293,38 @@ class InMemoryCoreState(
     def get_task_events(
         self,
         *,
-        run_id: int | None = None,
+        run_ids: Sequence[int] | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
         cursor = after_task_event_id if after_task_event_id is not None else 0
         with self.lock_task_event_store:
-            if run_id is None:
+            if run_ids is not None and not run_ids:
+                return []
+
+            run_id_set = set(run_ids) if run_ids is not None else None
+            if run_id_set is not None:
+                events = [
+                    event
+                    for requested_run_id in run_id_set
+                    for event in self.task_event_store.get(requested_run_id, [])
+                ]
+            else:
                 events = [
                     event
                     for task_events in self.task_event_store.values()
                     for event in task_events
                 ]
-            else:
-                events = list(self.task_event_store.get(run_id, []))
-            task_id_set = set(task_ids) if task_ids is not None else None
-            return [
-                event
-                for event in sorted(events, key=lambda event: event.id)
-                if event.id > cursor
-                and (task_id_set is None or event.task_id in task_id_set)
-            ]
+
+        task_id_set = set(task_ids) if task_ids is not None else None
+        return [
+            event
+            for event in sorted(events, key=lambda event: event.id)
+            if event.id > cursor
+            and (run_id_set is None or event.run_id in run_id_set)
+            and (task_id_set is None or event.task_id in task_id_set)
+        ]
 
     def _cleanup_expired_task_tokens_locked(self) -> None:
         """Remove expired task tokens.

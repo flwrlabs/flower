@@ -31,15 +31,15 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListNodesRequest,
     ListNodesResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.date import isoformat8601_utc
 from flwr.supercore.utils import humanize_duration
 
 from ..utils import (
     cli_output_handler,
     flwr_cli_exc_handler,
-    init_channel_from_connection,
+    init_http_client_from_connection,
     print_json_to_stdout,
 )
 
@@ -76,13 +76,12 @@ def ls(  # pylint: disable=R0914, R0913, R0917
 
         # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
-        channel = None
+        control_client = None
 
         try:
-            channel = init_channel_from_connection(superlink_connection)
-            stub = ControlStub(channel)
+            control_client = init_http_client_from_connection(superlink_connection)
             typer.echo("📄 Listing all nodes...")
-            formatted_nodes = _list_nodes(stub)
+            formatted_nodes = _list_nodes(control_client)
 
             if is_json:
                 print_json_to_stdout(_to_json(formatted_nodes, verbose=verbose))
@@ -90,11 +89,11 @@ def ls(  # pylint: disable=R0914, R0913, R0917
                 Console().print(_to_table(formatted_nodes, verbose=verbose))
 
         finally:
-            if channel:
-                channel.close()
+            if control_client:
+                control_client.close()
 
 
-def _list_nodes(stub: ControlStub) -> list[_NodeListType]:
+def _list_nodes(stub: ControlHttpClient) -> list[_NodeListType]:
     """List all nodes."""
     with flwr_cli_exc_handler():
         res: ListNodesResponse = stub.ListNodes(ListNodesRequest())

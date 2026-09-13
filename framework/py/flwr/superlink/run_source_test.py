@@ -16,7 +16,7 @@
 
 from pytest import mark
 
-from .run_source import RunStartSource, resolve_run_start_source
+from .run_source import RunSource, resolve_source
 
 
 @mark.parametrize(
@@ -28,6 +28,6 @@ from .run_source import RunStartSource, resolve_run_start_source
         ("not-a-source", "unknown"),
     ],
 )
-def test_resolve_run_start_source(value: str | None, expected: RunStartSource) -> None:
+def test_resolve_source(value: str | None, expected: RunSource) -> None:
     """Normalize best-effort caller attribution without treating it as auth."""
-    assert resolve_run_start_source(value) == expected
+    assert resolve_source(value) == expected

@@ -20,7 +20,7 @@ from typing import Annotated, Literal
 import typer
 
 from flwr.cli.utils import (
-    cli_output_control_stub,
+    cli_output_control_client,
     flwr_cli_exc_handler,
     print_json_to_stdout,
 )
@@ -29,7 +29,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RejectInvitationRequest,
     RejectInvitationResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.control import ControlHttpClient
 
 
 def reject(
@@ -51,13 +51,13 @@ def reject(
     ] = CliOutputFormat.DEFAULT,
 ) -> None:
     """Reject an invitation to join a federation."""
-    with cli_output_control_stub(superlink, output_format) as (stub, is_json):
+    with cli_output_control_client(superlink, output_format) as (stub, is_json):
         request = RejectInvitationRequest(federation_name=federation)
         _reject_invitation(stub=stub, request=request, is_json=is_json)
 
 
 def _reject_invitation(
-    stub: ControlStub,
+    stub: ControlHttpClient,
     request: RejectInvitationRequest,
     is_json: bool,
 ) -> None:

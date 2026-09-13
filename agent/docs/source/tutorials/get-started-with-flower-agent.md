@@ -42,7 +42,7 @@ default file includes this connection:
 
 ```toml
 [superlink.supergrid]
-address = "supergrid.flower.ai"
+address = "api.flower.ai"
 ```
 
 If you maintain a custom file, ensure that section exists. Then log in:

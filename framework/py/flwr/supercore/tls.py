@@ -15,12 +15,9 @@
 """TLS helpers for Runtime API connections."""
 
 
-import argparse
 from pathlib import Path
 
 from flwr.supercore.exit import ExitCode, flwr_exit
-
-ServerCertificates = tuple[bytes, bytes, bytes]
 
 
 def get_client_tls_args(
@@ -33,52 +30,6 @@ def get_client_tls_args(
     if root_certificates_path is None:
         return []
     return ["--root-certificates", root_certificates_path]
-
-
-def try_obtain_optional_runtime_server_certificates(
-    args: argparse.Namespace,
-) -> ServerCertificates | None:
-    """Load optional Runtime API server certificates from parsed arguments."""
-    if (
-        args.runtime_ssl_certfile
-        and args.runtime_ssl_keyfile
-        and args.runtime_ssl_ca_certfile
-    ):
-        runtime_ssl_ca_certfile = Path(args.runtime_ssl_ca_certfile).expanduser()
-        runtime_ssl_certfile = Path(args.runtime_ssl_certfile).expanduser()
-        runtime_ssl_keyfile = Path(args.runtime_ssl_keyfile).expanduser()
-        if not runtime_ssl_ca_certfile.is_file():
-            flwr_exit(
-                ExitCode.COMMON_PATH_INVALID,
-                "Path argument `--appio-ssl-ca-certfile` does not point to a file.",
-            )
-        if not runtime_ssl_certfile.is_file():
-            flwr_exit(
-                ExitCode.COMMON_PATH_INVALID,
-                "Path argument `--appio-ssl-certfile` does not point to a file.",
-            )
-        if not runtime_ssl_keyfile.is_file():
-            flwr_exit(
-                ExitCode.COMMON_PATH_INVALID,
-                "Path argument `--appio-ssl-keyfile` does not point to a file.",
-            )
-        return (
-            runtime_ssl_ca_certfile.read_bytes(),
-            runtime_ssl_certfile.read_bytes(),
-            runtime_ssl_keyfile.read_bytes(),
-        )
-    if (
-        args.runtime_ssl_certfile
-        or args.runtime_ssl_keyfile
-        or args.runtime_ssl_ca_certfile
-    ):
-        flwr_exit(
-            ExitCode.COMMON_TLS_SERVER_CERTIFICATES_INVALID,
-            "You need to provide valid file paths to `--appio-ssl-certfile`, "
-            "`--appio-ssl-keyfile`, and `--appio-ssl-ca-certfile` to create a "
-            "secure Runtime API connection.",
-        )
-    return None
 
 
 def validate_and_resolve_root_certificates(

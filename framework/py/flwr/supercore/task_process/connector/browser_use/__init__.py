@@ -23,26 +23,34 @@ from flwr.supercore.typing import JSONObject
 # Prevent browser-use from configuring logging and duplicating Flower logs
 os.environ["BROWSER_USE_SETUP_LOGGING"] = "false"
 
-try:
-    from .browser_use import invoke_browser_use_provider
-except ImportError:
 
-    def invoke_browser_use_provider(
-        task: str,
-        allowed_domains: list[str] | None = None,
-        model: str | None = None,
-        *,
-        usage_recorder: TaskUsageRecorder,
-    ) -> JSONObject:
-        """."""
-        del task, allowed_domains, model, usage_recorder
-        raise ImportError(
-            "Flower's built-in Browser Use connector requires the optional "
-            "'browser-use' dependency. To use this feature, add `flwr[agent]` "
-            "to `[project].dependencies` in your Flower App's `pyproject.toml`. "
-            "If runtime dependency installation is disabled or unavailable, "
-            "install `flwr[agent]` in the runtime environment instead."
-        )
+def invoke_browser_use_provider(
+    task: str,
+    allowed_domains: list[str] | None = None,
+    model: str | None = None,
+    *,
+    usage_recorder: TaskUsageRecorder,
+) -> JSONObject:
+    """Invoke Browser Use when the optional dependency is installed."""
+    try:
+        # pylint: disable-next=import-outside-toplevel
+        from .browser_use import invoke_browser_use_provider as invoke
+    except ModuleNotFoundError as error:
+        if error.name == "browser_use":
+            raise ImportError(
+                "Flower's built-in Browser Use connector requires the optional "
+                "'browser-use' dependency. To use this feature, add `flwr[agent]` "
+                "to `[project].dependencies` in your Flower App's `pyproject.toml`. "
+                "If runtime dependency installation is disabled or unavailable, "
+                "install `flwr[agent]` in the runtime environment instead."
+            ) from error
+        raise
+    return invoke(
+        task,
+        allowed_domains=allowed_domains,
+        model=model,
+        usage_recorder=usage_recorder,
+    )
 
 
 BROWSER_USE_CONNECTOR_NAME = "browser_use"

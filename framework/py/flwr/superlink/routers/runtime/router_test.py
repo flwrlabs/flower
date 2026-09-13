@@ -18,7 +18,7 @@ import inspect
 from typing import cast
 from unittest.mock import Mock
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 from google.protobuf.message import Message
@@ -30,6 +30,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskResponse,
     GetNodesRequest,
     GetNodesResponse,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
@@ -38,18 +40,17 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
+from flwr.supercore.dependencies.runtime import get_runtime_state, get_task
+from flwr.supercore.dependencies.runtime_version import RuntimeVersionDependency
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import (
     PROTOBUF_REQUEST_TYPES,
     ProtobufTranslationMiddleware,
 )
+from flwr.supercore.routers.runtime import router
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
-from flwr.superlink.dependencies.linkstate import get_linkstate
-from flwr.superlink.dependencies.task import get_task
 from flwr.superlink.servicer.runtime import runtime_handlers
-
-from .router import router
 
 _SUPEREXEC_PATHS = {
     "/v1/runtime/pull-pending-tasks",
@@ -66,10 +67,21 @@ def _create_app(
     """Create a minimal app containing the Runtime API stack."""
     app = FastAPI()
     app.state.superexec_auth_secret = superexec_auth_secret
-    app.include_router(router)
+    app.state.runtime_handlers = runtime_handlers
+    app.include_router(
+        router,
+        dependencies=[
+            Depends(
+                RuntimeVersionDependency(
+                    component_name="SuperLink",
+                    connection_name="Caller <-> SuperLink Runtime API",
+                )
+            )
+        ],
+    )
     app.add_middleware(ProtobufTranslationMiddleware)
     app.middleware("http")(http_error_translator)
-    app.dependency_overrides[get_linkstate] = lambda: state
+    app.dependency_overrides[get_runtime_state] = lambda: state
     if task is not None:
         app.dependency_overrides[get_task] = lambda: task
     return app
@@ -120,7 +132,7 @@ def test_all_runtime_routes_have_protobuf_request_types() -> None:
         if route_key[1].startswith("/v1/runtime/")
     }
 
-    assert len(route_keys) == 19
+    assert len(route_keys) == 20
     assert route_keys == runtime_request_types
 
 
@@ -191,6 +203,25 @@ def test_get_nodes_delegates_with_authenticated_task(
 
     assert response.status_code == 200
     assert GetNodesResponse.FromString(response.content) == expected
+    handler.assert_called_once_with(request, state, task)
+
+
+def test_get_run_series_events_delegates_with_authenticated_task(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Run-series event requests should pass the authenticated task."""
+    state = Mock(spec=LinkState)
+    task = Task(task_id=123)
+    expected = GetRunSeriesEventsResponse()
+    handler = Mock(return_value=expected)
+    monkeypatch.setattr(runtime_handlers, "get_run_series_events", handler)
+    client = TestClient(_create_app(state, task=task))
+    request = GetRunSeriesEventsRequest()
+
+    response = _post(client, "/v1/runtime/get-run-series-events", request)
+
+    assert response.status_code == 200
+    assert GetRunSeriesEventsResponse.FromString(response.content) == expected
     handler.assert_called_once_with(request, state, task)
 
 

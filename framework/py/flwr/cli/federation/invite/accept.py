@@ -20,7 +20,7 @@ from typing import Annotated, Literal
 import typer
 
 from flwr.cli.utils import (
-    cli_output_control_stub,
+    cli_output_control_client,
     flwr_cli_exc_handler,
     print_json_to_stdout,
 )
@@ -29,7 +29,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.control import ControlHttpClient
 
 
 def accept(
@@ -51,13 +51,13 @@ def accept(
     ] = CliOutputFormat.DEFAULT,
 ) -> None:
     """Accept an invitation to join a federation."""
-    with cli_output_control_stub(superlink, output_format) as (stub, is_json):
+    with cli_output_control_client(superlink, output_format) as (stub, is_json):
         request = AcceptInvitationRequest(federation_name=federation)
         _accept_invitation(stub=stub, request=request, is_json=is_json)
 
 
 def _accept_invitation(
-    stub: ControlStub,
+    stub: ControlHttpClient,
     request: AcceptInvitationRequest,
     is_json: bool,
 ) -> None:

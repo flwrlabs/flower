@@ -79,6 +79,16 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesResponse.FromString,
                 _registered_method=True)
+        self.UpdateRunSeriesDescription = channel.unary_unary(
+                '/flwr.proto.Control/UpdateRunSeriesDescription',
+                request_serializer=flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionResponse.FromString,
+                _registered_method=True)
+        self.ListRunSeriesEvents = channel.unary_unary(
+                '/flwr.proto.Control/ListRunSeriesEvents',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsResponse.FromString,
+                _registered_method=True)
         self.GetLoginDetails = channel.unary_unary(
                 '/flwr.proto.Control/GetLoginDetails',
                 request_serializer=flwr_dot_proto_dot_control__pb2.GetLoginDetailsRequest.SerializeToString,
@@ -277,6 +287,20 @@ class ControlServicer(object):
 
     def GetRunSeries(self, request, context):
         """Get run series
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateRunSeriesDescription(self, request, context):
+        """Update run series description
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListRunSeriesEvents(self, request, context):
+        """List events for all runs in a run series
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -522,6 +546,16 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.GetRunSeries,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesResponse.SerializeToString,
+            ),
+            'UpdateRunSeriesDescription': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateRunSeriesDescription,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionResponse.SerializeToString,
+            ),
+            'ListRunSeriesEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListRunSeriesEvents,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsResponse.SerializeToString,
             ),
             'GetLoginDetails': grpc.unary_unary_rpc_method_handler(
                     servicer.GetLoginDetails,
@@ -902,6 +936,60 @@ class Control(object):
             '/flwr.proto.Control/GetRunSeries',
             flwr_dot_proto_dot_control__pb2.GetRunSeriesRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.GetRunSeriesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateRunSeriesDescription(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/UpdateRunSeriesDescription',
+            flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListRunSeriesEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListRunSeriesEvents',
+            flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsResponse.FromString,
             options,
             channel_credentials,
             insecure,

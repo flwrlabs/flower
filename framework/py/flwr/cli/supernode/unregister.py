@@ -23,12 +23,12 @@ from flwr.cli.config_migration import migrate
 from flwr.cli.flower_config import read_superlink_connection
 from flwr.common.constant import CliOutputFormat
 from flwr.proto.control_pb2 import UnregisterNodeRequest  # pylint: disable=E0611
-from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.control import ControlHttpClient
 
 from ..utils import (
     cli_output_handler,
     flwr_cli_exc_handler,
-    init_channel_from_connection,
+    init_http_client_from_connection,
     print_json_to_stdout,
 )
 
@@ -61,21 +61,20 @@ def unregister(  # pylint: disable=R0914
 
         # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
-        channel = None
+        control_client = None
 
         try:
-            channel = init_channel_from_connection(superlink_connection)
-            stub = ControlStub(channel)
+            control_client = init_http_client_from_connection(superlink_connection)
 
-            _unregister_node(stub=stub, node_id=node_id, is_json=is_json)
+            _unregister_node(stub=control_client, node_id=node_id, is_json=is_json)
 
         finally:
-            if channel:
-                channel.close()
+            if control_client:
+                control_client.close()
 
 
 def _unregister_node(
-    stub: ControlStub,
+    stub: ControlHttpClient,
     node_id: int,
     is_json: bool,
 ) -> None:

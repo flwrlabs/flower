@@ -28,12 +28,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopRunRequest,
     StopRunResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.control import ControlHttpClient
 
 from .utils import (
     cli_output_handler,
     flwr_cli_exc_handler,
-    init_channel_from_connection,
+    init_http_client_from_connection,
     print_json_to_stdout,
 )
 
@@ -78,27 +78,26 @@ def stop(  # pylint: disable=R0914
 
         # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
-        channel = None
+        control_client = None
 
         try:
-            channel = init_channel_from_connection(superlink_connection)
-            stub = ControlStub(channel)  # pylint: disable=unused-variable # noqa: F841
+            control_client = init_http_client_from_connection(superlink_connection)
 
             typer.secho(f"✋ Stopping run ID {run_id}...", fg=typer.colors.GREEN)
-            _stop_run(stub=stub, run_id=run_id, is_json=is_json)
+            _stop_run(stub=control_client, run_id=run_id, is_json=is_json)
 
         finally:
-            if channel:
-                channel.close()
+            if control_client:
+                control_client.close()
 
 
-def _stop_run(stub: ControlStub, run_id: int, is_json: bool) -> None:
+def _stop_run(stub: ControlHttpClient, run_id: int, is_json: bool) -> None:
     """Stop a run and display the result.
 
     Parameters
     ----------
-    stub : ControlStub
-        The gRPC stub for Control API communication.
+    stub : ControlHttpClient
+        The HTTP client for Control API communication.
     run_id : int
         The unique identifier of the run to stop.
     is_json : bool

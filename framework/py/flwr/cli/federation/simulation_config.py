@@ -21,7 +21,7 @@ import click
 import typer
 
 from flwr.cli.utils import (
-    cli_output_control_stub,
+    cli_output_control_client,
     flwr_cli_exc_handler,
     print_json_to_stdout,
 )
@@ -29,9 +29,9 @@ from flwr.common.constant import CliOutputFormat
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ConfigureSimulationFederationRequest,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.supercore.constant import NOOP_FEDERATION_ID
+from flwr.supercore.control import ControlHttpClient
 
 
 def simulation_config(  # pylint: disable=R0913,R0917,W0613,R0914
@@ -141,7 +141,7 @@ def simulation_config(  # pylint: disable=R0913,R0917,W0613,R0914
         )
     )
 
-    with cli_output_control_stub(superlink, output_format) as (stub, is_json):
+    with cli_output_control_client(superlink, output_format) as (stub, is_json):
 
         if no_sim_options_passed:
             raise click.UsageError(
@@ -175,7 +175,7 @@ def simulation_config(  # pylint: disable=R0913,R0917,W0613,R0914
 
 
 def _configure_federation_for_simulation(
-    stub: ControlStub,
+    stub: ControlHttpClient,
     request: ConfigureSimulationFederationRequest,
     is_json: bool,
 ) -> None:

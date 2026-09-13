@@ -14,13 +14,13 @@
 # ==============================================================================
 """`flwr-agentapp` command."""
 
-
 import argparse
 from logging import DEBUG, INFO
 from pathlib import Path
 from queue import Queue
 
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
+from flwr.common.constant import FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT
 from flwr.supercore import log
 from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore.logger import mirror_output_to_queue, restore_output
@@ -31,6 +31,10 @@ def flwr_agentapp() -> None:
     """Run process-isolated Flower AgentApp."""
     args = _parse_args_run_flwr_agentapp().parse_args()
     token = try_obtain_flwr_app_token(args)
+
+    if bool(getattr(args, "token_stdin", False)):
+        # Older SuperExec instances recognize this AgentApp-specific value only.
+        print(FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT, flush=True)
 
     # Capture stdout/stderr
     log_queue: Queue[str | None] = Queue()
@@ -77,5 +81,5 @@ def _parse_args_run_flwr_agentapp() -> argparse.ArgumentParser:
         help="Address of SuperLink's Runtime API (IPv4, IPv6, or a domain name)."
         f"By default, it is set to {SUPERLINK_DEFAULT_CLIENT_ADDRESS}.",
     )
-    add_args_flwr_app_common(parser=parser)
+    add_args_flwr_app_common(parser=parser, include_token_stdin=True)
     return parser

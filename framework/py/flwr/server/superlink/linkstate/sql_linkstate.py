@@ -52,16 +52,17 @@ from flwr.common.constant import (
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.utils.validator import validate_message
 from flwr.supercore import log
 from flwr.supercore.constant import NodeStatus, TaskType
 from flwr.supercore.corestate.sql_corestate import SqlCoreState
-from flwr.supercore.corestate.utils import timestamp_to_iso
+from flwr.supercore.corestate.utils import timestamp_to_iso, validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
+from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_models import MessageIns as MessageInsModel
 from flwr.supercore.state.schema.linkstate_models import MessageRes as MessageResModel
@@ -907,12 +908,18 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         series_id: int | None = None,
         series_description: str | None = None,
         connector_refs: Sequence[str] = (),
+        initial_task_event: TaskEvent | None = None,
     ) -> int:
         """Create a new run."""
         if isinstance(connector_refs, str) or any(
             not connector_ref for connector_ref in connector_refs
         ):
             return 0
+        if initial_task_event is not None:
+            try:
+                validate_task_event_data(initial_task_event.data)
+            except ValueError:
+                return 0
         # Convert federation_config to JSON string for storage
         fed_config_json = None
         if federation_config:
@@ -980,6 +987,18 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         details="",
                     )
                 )
+                if initial_task_event is not None:
+                    initial_task_event.run_id = run_id
+                    initial_task_event.task_id = task_id
+                    session.execute(
+                        insert(TaskEventModel).values(
+                            timestamp=current,
+                            run_id=uint64_to_int64(run_id),
+                            task_id=uint64_to_int64(task_id),
+                            event=initial_task_event.event,
+                            data=initial_task_event.data,
+                        )
+                    )
                 self.bind_connectors_to_run(
                     run_id=run_id,
                     connector_refs=connector_refs,

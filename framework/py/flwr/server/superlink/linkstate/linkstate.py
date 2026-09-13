@@ -24,6 +24,7 @@ from flwr.app.user_config import UserConfig
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import FederationManager
@@ -276,6 +277,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         series_id: int | None = None,
         series_description: str | None = None,
         connector_refs: Sequence[str] = (),
+        initial_task_event: TaskEvent | None = None,
     ) -> int:
         """Create a new run.
 
@@ -307,6 +309,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             description was provided; an empty string is an explicit description.
         connector_refs : Sequence[str] (default: ())
             Connector references the run is allowed to invoke.
+        initial_task_event : TaskEvent | None (default: None)
+            Event to store atomically before the pending primary task is visible.
 
         Returns
         -------

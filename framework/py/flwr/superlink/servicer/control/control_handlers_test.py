@@ -17,7 +17,8 @@
 
 import hashlib
 import unittest
-from unittest.mock import Mock, patch
+from typing import Any, cast
+from unittest.mock import Mock, call, patch
 
 from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
@@ -32,13 +33,17 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAppsRequest,
     ListAppsResponse,
     ListAutomationsRequest,
+    ListRunSeriesEventsRequest,
     RefreshAuthTokensRequest,
     RemoveAppRequest,
     RemoveAppResponse,
     StartAutomationRequest,
     StartRunRequest,
     StopAutomationRequest,
+    UpdateRunSeriesDescriptionRequest,
 )
+from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
@@ -51,21 +56,24 @@ from flwr.supercore.constant import (
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
+from flwr.superlink.extensions import RESULT_DELIVERY_CHANNEL_CHAT
 from flwr.superlink.federation import NoOpFederationManager
 
 from .control_handlers import (
     add_app,
     list_apps,
     list_automations,
+    list_run_series_events,
     refresh_auth_tokens,
     remove_app,
     start_automation,
     start_run,
     stop_automation,
+    update_run_series_description,
 )
 
 
-class TestControlHandlers(unittest.TestCase):
+class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
     """Test Control API handlers."""
 
     def setUp(self) -> None:
@@ -79,6 +87,172 @@ class TestControlHandlers(unittest.TestCase):
             flwr_aid=NOOP_FLWR_AID,
             account_name=NOOP_ACCOUNT_NAME,
         )
+
+    def _create_dummy_run(self) -> int:
+        """Create a run owned by the test account."""
+        return self.state.create_run(
+            "flwr/demo",
+            "v0.0.1",
+            "hash123",
+            {},
+            NOOP_FEDERATION_ID,
+            None,
+            self.account.flwr_aid,
+            TaskType.SERVER_APP,
+        )
+
+    def _create_dummy_run_series(
+        self, series_id: int, run_ids: list[int] | None = None
+    ) -> None:
+        """Create a run series in the in-memory state."""
+        cast(Any, self.state).run_series_store[series_id] = RunSeries(
+            series_id=series_id,
+            federation=NOOP_FEDERATION_ID,
+            description=f"series {series_id}",
+            created_at="2026-05-29T00:00:00+00:00",
+            updated_at="2026-05-30T00:00:00+00:00",
+            run_ids=run_ids or [],
+        )
+
+    def test_list_run_series_events_returns_only_primary_task_events(self) -> None:
+        """Return primary-task events from every run in the series."""
+        run_ids = [self._create_dummy_run() for _ in range(2)]
+        primary_task_ids = [
+            cast(int, self.state.get_run_info(run_ids=[run_id])[0].primary_task_id)
+            for run_id in run_ids
+        ]
+        child_task_id = self.state.create_task(
+            task_type=TaskType.MODEL, run_id=run_ids[0]
+        )
+        assert child_task_id is not None
+        self._create_dummy_run_series(10, run_ids)
+        self.assertTrue(
+            self.state.store_task_events(
+                [
+                    TaskEvent(
+                        run_id=run_ids[0],
+                        task_id=primary_task_ids[0],
+                        event="response.created",
+                        data='{"type":"response.created"}',
+                    ),
+                    TaskEvent(
+                        run_id=run_ids[0],
+                        task_id=child_task_id,
+                        event="response.output_text.delta",
+                        data='{"type":"response.output_text.delta","delta":"child"}',
+                    ),
+                    TaskEvent(
+                        run_id=run_ids[1],
+                        task_id=primary_task_ids[1],
+                        event="response.completed",
+                        data='{"type":"response.completed"}',
+                    ),
+                ]
+            )
+        )
+
+        with patch(
+            "flwr.superlink.servicer.control.control_handlers"
+            ".extensions.notify_result_delivered"
+        ) as notify_result_delivered:
+            response = list_run_series_events(
+                ListRunSeriesEventsRequest(series_id=10), self.account, self.state
+            )
+
+        self.assertEqual([event.task_id for event in response.events], primary_task_ids)
+        runs = self.state.get_run_info(run_ids=run_ids)
+        notify_result_delivered.assert_has_calls(
+            [
+                call(run, self.account.flwr_aid, RESULT_DELIVERY_CHANNEL_CHAT)
+                for run in runs
+            ],
+            any_order=True,
+        )
+        self.assertEqual(notify_result_delivered.call_count, len(runs))
+
+    def test_list_run_series_events_hides_unauthorized_series(self) -> None:
+        """Reject event history access outside the caller's federations."""
+        self._create_dummy_run_series(10)
+
+        with (
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=False
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            list_run_series_events(
+                ListRunSeriesEventsRequest(series_id=10), self.account, self.state
+            )
+
+        self.assertEqual(error.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND)
+
+    def test_update_run_series_description_returns_updated_series(self) -> None:
+        """Normalize and persist a description at the maximum length."""
+        self._create_dummy_run_series(10)
+        description = "a" * 80
+
+        with patch.object(
+            self.state,
+            "set_run_series_description",
+            wraps=self.state.set_run_series_description,
+        ) as set_description:
+            response = update_run_series_description(
+                UpdateRunSeriesDescriptionRequest(
+                    series_id=10, description=f"  {description}  "
+                ),
+                self.account,
+                self.state,
+            )
+
+        set_description.assert_called_once_with(10, description)
+        self.assertEqual(response.series.series_id, 10)
+        self.assertEqual(response.series.description, description)
+
+    def test_update_run_series_description_rejects_invalid_description(self) -> None:
+        """Reject blank descriptions and descriptions longer than 80 characters."""
+        self._create_dummy_run_series(10)
+
+        for description in ("  ", "a" * 81):
+            with (
+                self.subTest(description=description),
+                self.assertRaises(FlowerError) as error,
+            ):
+                update_run_series_description(
+                    UpdateRunSeriesDescriptionRequest(
+                        series_id=10, description=description
+                    ),
+                    self.account,
+                    self.state,
+                )
+
+            self.assertEqual(
+                error.exception.code,
+                ApiErrorCode.INVALID_RUN_SERIES_DESCRIPTION,
+            )
+
+    def test_update_run_series_description_hides_missing_and_unauthorized(self) -> None:
+        """Return the same not-found error for missing and inaccessible series."""
+        self._create_dummy_run_series(10)
+
+        for series_id, is_member in ((11, True), (10, False)):
+            with (
+                self.subTest(series_id=series_id, is_member=is_member),
+                patch.object(
+                    self.state.federation_manager,
+                    "has_member",
+                    return_value=is_member,
+                ),
+                self.assertRaises(FlowerError) as error,
+            ):
+                update_run_series_description(
+                    UpdateRunSeriesDescriptionRequest(
+                        series_id=series_id, description="Title"
+                    ),
+                    self.account,
+                    self.state,
+                )
+
+            self.assertEqual(error.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND)
 
     def test_refresh_auth_tokens_returns_rotated_tokens(self) -> None:
         """Return both tokens produced by the authentication plugin."""
@@ -206,6 +380,51 @@ class TestControlHandlers(unittest.TestCase):
             [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
         )
 
+    def test_start_run_persists_agent_input_event(self) -> None:
+        """Persist agent input as a primary-task message item."""
+        request = StartRunRequest(federation=NOOP_FEDERATION_ID)
+        request.fab.content = b"AgentApp FAB"
+        request.override_config["agent.input"].string = "Hello"
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={
+                    "tool": {"flwr": {"app": {"config": {"agent": {"input": ""}}}}}
+                },
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/agent", "v0.0.1"),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers._get_app_type",
+                return_value=TaskType.AGENT_APP,
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".start_title_generation"
+            ) as start_title,
+        ):
+            response = start_run(request, self.account, self.state, None)
+
+        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        event = self.state.get_task_events(run_ids=[response.run_id])[0]
+        self.assertEqual(
+            (event.task_id, event.event, event.data),
+            (
+                run.primary_task_id,
+                "message",
+                '{"type":"message","role":"user","content":"Hello"}',
+            ),
+        )
+        start_title.assert_called_once_with(
+            self.state,
+            run.series_id,
+            "Hello",
+        )
+
     def test_start_run_notifies_extension_after_persisting_run(self) -> None:
         """Notify the optional extension with the persisted run snapshot."""
         fab_content = b"stored FAB"
@@ -324,7 +543,7 @@ class TestControlHandlers(unittest.TestCase):
 
     def test_list_apps_preserves_hub_flag_over_wire(self) -> None:
         """ListApps preserves Hub provenance through protobuf serialization."""
-        fab_hash = self.state.store_app(
+        self.state.store_app(
             fab=Fab("", b"hub fab", {}),
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
@@ -340,7 +559,7 @@ class TestControlHandlers(unittest.TestCase):
         )
         round_tripped = ListAppsResponse.FromString(response.SerializeToString())
 
-        self.assertEqual(round_tripped.apps[0].fab_hash, fab_hash)
+        self.assertEqual(round_tripped.apps[0].fab_hash, "")
         self.assertTrue(round_tripped.apps[0].is_hub_app)
 
     def test_list_apps_preserves_unknown_hub_origin_over_wire(self) -> None:
@@ -361,8 +580,8 @@ class TestControlHandlers(unittest.TestCase):
 
         self.assertFalse(round_tripped.apps[0].HasField("is_hub_app"))
 
-    def test_add_and_remove_app(self) -> None:
-        """AddApp stores the latest Hub FAB and RemoveApp removes the app."""
+    def test_add_and_remove_hub_app_metadata(self) -> None:
+        """AddApp stores Hub metadata without retaining the downloaded FAB."""
         fab_content = b"hub FAB"
         verification_dict = {"publisher-key": "verified"}
         with (
@@ -395,12 +614,12 @@ class TestControlHandlers(unittest.TestCase):
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
-            [("@flwr/demo", fab_hash, TaskType.AGENT_APP)],
+            [("@flwr/demo", "", TaskType.AGENT_APP)],
         )
         self.assertTrue(apps[0].is_hub_app)
-        self.assertEqual(
-            self.state.get_app(NOOP_FEDERATION_ID, "@flwr/demo", fab_hash),
-            Fab(fab_hash, fab_content, verification_dict),
+        self.assertIsNone(self.state.get_fab(fab_hash))
+        self.assertIsNone(
+            self.state.get_app(NOOP_FEDERATION_ID, "@flwr/demo", fab_hash)
         )
 
         remove_response = remove_app(
@@ -475,6 +694,49 @@ class TestControlHandlers(unittest.TestCase):
         # Assert
         self.assertFalse(stored_automation.HasField("fixed_interval"))
         self.assertFalse(listed_automation.HasField("fixed_interval"))
+
+    def test_start_automation_stores_hub_app_without_fab(self) -> None:
+        """Store Hub automations by app ID so dispatch fetches the latest FAB."""
+        self.state.store_app(
+            fab=None,
+            federation_id=NOOP_FEDERATION_ID,
+            app_id="@flwr/agent",
+            app_type=TaskType.AGENT_APP,
+            added_by=self.account.flwr_aid,
+            is_hub_app=True,
+        )
+        fab_content = b"current Hub FAB"
+        request = StartAutomationRequest(
+            start_run_request=StartRunRequest(
+                federation=NOOP_FEDERATION_ID,
+                series_id=1,
+            )
+        )
+        request.start_run_request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
+        request.start_run_request.fab.content = fab_content
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/agent", "1.0.0"),
+            ),
+        ):
+            response = start_automation(request, self.account, self.state)
+
+        claimed = self.state.claim_automation(
+            response.automation_id,
+            previous_next_run_at=response.next_run_at,
+            next_run_at=None,
+        )
+        self.assertIsNotNone(claimed)
+        stored_request, _ = cast(tuple[StartRunRequest, str], claimed)
+        self.assertEqual(stored_request.app_spec, "@flwr/agent")
+        self.assertFalse(stored_request.HasField("fab"))
 
     def test_start_automation_rejects_start_at_without_timezone(self) -> None:
         """Reject a start time without timezone information."""

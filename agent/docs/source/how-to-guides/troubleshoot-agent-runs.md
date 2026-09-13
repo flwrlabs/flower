@@ -25,7 +25,7 @@ Check `~/.flwr/config.toml`:
 
 ```toml
 [superlink.supergrid]
-address = "supergrid.flower.ai"
+address = "api.flower.ai"
 ```
 
 Preserve other connections and settings. Add only the missing section, then run

@@ -69,14 +69,21 @@ def test_parse_superexec_accepts_kubernetes_executor_config(
     assert args.executor_config == "executor.yaml"
 
 
+@pytest.mark.parametrize(
+    "address_args",
+    [
+        ["--appio-api-address", "127.0.0.1:9091"],
+        ["--appio-api-address=127.0.0.1:9091"],
+    ],
+)
 def test_flower_superexec_warns_for_renamed_appio_api_address(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, address_args: list[str]
 ) -> None:
     """SuperExec should warn when the renamed address flag is used."""
     monkeypatch.setattr(
         flower_superexec_module.sys,
         "argv",
-        ["flower-superexec", "--appio-api-address", "127.0.0.1:9091"],
+        ["flower-superexec", *address_args],
     )
     monkeypatch.setattr(flower_superexec_module, "_parse_args", Mock())
     monkeypatch.setattr(

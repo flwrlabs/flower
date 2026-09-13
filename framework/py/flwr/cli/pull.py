@@ -27,9 +27,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     PullArtifactsRequest,
     PullArtifactsResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
 
-from .utils import flwr_cli_exc_handler, init_channel_from_connection
+from .utils import flwr_cli_exc_handler, init_http_client_from_connection
 
 
 def pull(  # pylint: disable=R0914
@@ -64,12 +63,11 @@ def pull(  # pylint: disable=R0914
 
     # Read superlink connection configuration
     superlink_connection = read_superlink_connection(superlink)
-    channel = None
+    control_client = None
     try:
-        channel = init_channel_from_connection(superlink_connection)
-        stub = ControlStub(channel)
+        control_client = init_http_client_from_connection(superlink_connection)
         with flwr_cli_exc_handler():
-            res: PullArtifactsResponse = stub.PullArtifacts(
+            res: PullArtifactsResponse = control_client.PullArtifacts(
                 PullArtifactsRequest(run_id=run_id)
             )
 
@@ -83,5 +81,5 @@ def pull(  # pylint: disable=R0914
             fg=typer.colors.GREEN,
         )
     finally:
-        if channel:
-            channel.close()
+        if control_client:
+            control_client.close()

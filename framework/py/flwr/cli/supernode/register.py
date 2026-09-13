@@ -31,14 +31,14 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RegisterNodeRequest,
     RegisterNodeResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.primitives.asymmetric import public_key_to_bytes, uses_nist_ec_curve
 
 from ..utils import (
     cli_output_handler,
     flwr_cli_exc_handler,
-    init_channel_from_connection,
+    init_http_client_from_connection,
     print_json_to_stdout,
 )
 
@@ -74,24 +74,23 @@ def register(  # pylint: disable=R0914
 
         # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
-        channel = None
+        control_client = None
 
         try:
-            channel = init_channel_from_connection(superlink_connection)
-            stub = ControlStub(channel)
+            control_client = init_http_client_from_connection(superlink_connection)
 
             _register_node(
-                stub=stub,
+                stub=control_client,
                 public_key=public_key_bytes,
                 is_json=is_json,
             )
 
         finally:
-            if channel:
-                channel.close()
+            if control_client:
+                control_client.close()
 
 
-def _register_node(stub: ControlStub, public_key: bytes, is_json: bool) -> None:
+def _register_node(stub: ControlHttpClient, public_key: bytes, is_json: bool) -> None:
     """Register a node."""
     with flwr_cli_exc_handler():
         response: RegisterNodeResponse = stub.RegisterNode(

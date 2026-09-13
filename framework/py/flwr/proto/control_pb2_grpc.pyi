@@ -87,6 +87,18 @@ class ControlStub:
     ]
     """Get run series"""
 
+    UpdateRunSeriesDescription: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionRequest,
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse,
+    ]
+    """Update run series description"""
+
+    ListRunSeriesEvents: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListRunSeriesEventsRequest,
+        flwr.proto.control_pb2.ListRunSeriesEventsResponse,
+    ]
+    """List events for all runs in a run series"""
+
     GetLoginDetails: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
         flwr.proto.control_pb2.GetLoginDetailsResponse,
@@ -308,6 +320,18 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.GetRunSeriesResponse,
     ]
     """Get run series"""
+
+    UpdateRunSeriesDescription: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionRequest,
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse,
+    ]
+    """Update run series description"""
+
+    ListRunSeriesEvents: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListRunSeriesEventsRequest,
+        flwr.proto.control_pb2.ListRunSeriesEventsResponse,
+    ]
+    """List events for all runs in a run series"""
 
     GetLoginDetails: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
@@ -548,6 +572,22 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.GetRunSeriesResponse, collections.abc.Awaitable[flwr.proto.control_pb2.GetRunSeriesResponse]]:
         """Get run series"""
+
+    @abc.abstractmethod
+    def UpdateRunSeriesDescription(
+        self,
+        request: flwr.proto.control_pb2.UpdateRunSeriesDescriptionRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse, collections.abc.Awaitable[flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse]]:
+        """Update run series description"""
+
+    @abc.abstractmethod
+    def ListRunSeriesEvents(
+        self,
+        request: flwr.proto.control_pb2.ListRunSeriesEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListRunSeriesEventsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListRunSeriesEventsResponse]]:
+        """List events for all runs in a run series"""
 
     @abc.abstractmethod
     def GetLoginDetails(

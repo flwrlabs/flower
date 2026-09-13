@@ -30,6 +30,8 @@ _UNARY_UNARY_ENDPOINTS = (
     "list-runs",
     "list-run-series",
     "get-run-series",
+    "update-run-series-description",
+    "list-run-series-events",
     "get-login-details",
     "get-auth-tokens",
     "refresh-auth-tokens",
