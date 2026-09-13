@@ -14,55 +14,76 @@
 # ==============================================================================
 """SQLAlchemy-based implementation of the link state."""
 
-
 # pylint: disable=too-many-lines
 
 import json
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from logging import ERROR, WARNING
-from typing import Any
+from typing import Any, Literal, cast
 
-from sqlalchemy import MetaData
+from sqlalchemy import (
+    MetaData,
+    bindparam,
+    case,
+    delete,
+    exists,
+    func,
+    insert,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import aliased
 
+from flwr.app import Message
 from flwr.app.user_config import UserConfig
-from flwr.common import Context, Message, log, now
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
     NODE_ID_NUM_BYTES,
-    RUN_FAILURE_DETAILS_NO_HEARTBEAT,
     RUN_ID_NUM_BYTES,
     SUPERLINK_NODE_ID,
+    TASK_ID_NUM_BYTES,
     Status,
     SubStatus,
 )
-from flwr.common.record import ConfigRecord
-from flwr.common.typing import Run, RunStatus
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.utils.validator import validate_message
-from flwr.supercore.constant import NodeStatus
+from flwr.supercore import log
+from flwr.supercore.constant import NodeStatus, TaskType
 from flwr.supercore.corestate.sql_corestate import SqlCoreState
+from flwr.supercore.corestate.utils import timestamp_to_iso, validate_task_event_data
+from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
+from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.state.schema.corestate_models import Task as TaskModel
+from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
+from flwr.supercore.state.schema.linkstate_models import MessageIns as MessageInsModel
+from flwr.supercore.state.schema.linkstate_models import MessageRes as MessageResModel
+from flwr.supercore.state.schema.linkstate_models import Node as NodeModel
+from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
-from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
+from flwr.supercore.utils import (
+    int64_to_uint64,
+    simulation_config_from_json,
+    simulation_config_to_json,
+    uint64_to_int64,
+)
 from flwr.superlink.federation import FederationManager
 
 from .linkstate import LinkState
 from .utils import (
     check_node_availability_for_in_message,
-    configrecord_from_bytes,
-    configrecord_to_bytes,
-    context_from_bytes,
-    context_to_bytes,
     convert_sint64_values_in_dict_to_uint64,
     convert_uint64_values_in_dict_to_sint64,
     dict_to_message,
     generate_rand_int_from_bytes,
-    has_valid_sub_status,
-    is_valid_transition,
     message_to_dict,
     verify_found_message_replies,
     verify_message_ids,
@@ -87,7 +108,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Start with linkstate tables
         metadata = create_linkstate_metadata()
 
-        # Add corestate tables (token_store)
+        # Add corestate tables (for example fab)
         corestate_metadata = create_corestate_metadata()
         for table in corestate_metadata.tables.values():
             table.to_metadata(metadata)
@@ -98,6 +119,29 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def federation_manager(self) -> FederationManager:
         """Return the FederationManager instance."""
         return self._federation_manager
+
+    def _lock_run(
+        self, run_id: int, *, require_unfinished: bool = False
+    ) -> dict[str, Any] | None:
+        """Lock the run row if it is in the required state."""
+        stmt = update(RunModel).where(RunModel.run_id == uint64_to_int64(run_id))
+        if require_unfinished:
+            stmt = stmt.where(
+                exists(
+                    select(TaskModel.task_id).where(
+                        TaskModel.task_id == RunModel.primary_task_id,
+                        TaskModel.finished_at.is_(None),
+                    )
+                )
+            )
+        stmt = stmt.values(run_id=RunModel.run_id).returning(
+            RunModel.run_id,
+            RunModel.federation_id,
+            RunModel.primary_task_id,
+        )
+        with self.session() as session:
+            row = session.execute(stmt).mappings().one_or_none()
+            return dict(row) if row is not None else None
 
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
@@ -124,46 +168,67 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             )
             return None
 
-        with self.session():
-            # Validate run_id
-            query = "SELECT federation FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": data[0]["run_id"]})
-            if not rows:
-                log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
-                return None
-            federation: str = rows[0]["federation"]
-
-            # Validate destination node ID
-            query = """SELECT node_id FROM node WHERE node_id = :node_id
-                       AND status IN (:online, :offline)"""
-            rows = self.query(
-                query,
-                {
-                    "node_id": data[0]["dst_node_id"],
-                    "online": NodeStatus.ONLINE,
-                    "offline": NodeStatus.OFFLINE,
-                },
-            )
-            if not rows or not self.federation_manager.has_node(
-                message.metadata.dst_node_id, federation
-            ):
-                log(
-                    ERROR,
-                    "Invalid destination node ID for Message: %s",
-                    message.metadata.dst_node_id,
+        try:
+            with self.session() as session:
+                # Validate run_id
+                run_row = self._lock_run(
+                    message.metadata.run_id, require_unfinished=True
                 )
-                return None
+                if not run_row:
+                    log(
+                        ERROR,
+                        "Invalid run ID for Message: %s",
+                        message.metadata.run_id,
+                    )
+                    return None
+                federation_id: str = run_row["federation_id"]
 
-            # Insert message
-            columns = ", ".join([f":{key}" for key in data[0]])
-            query = f"INSERT INTO message_ins VALUES({columns})"
+                # Validate destination node ID
+                node_id = session.scalar(
+                    select(NodeModel.node_id).where(
+                        NodeModel.node_id == data[0]["dst_node_id"],
+                        NodeModel.status.in_([NodeStatus.ONLINE, NodeStatus.OFFLINE]),
+                    )
+                )
+                if node_id is None or not self.federation_manager.has_node(
+                    message.metadata.dst_node_id, federation_id
+                ):
+                    log(
+                        ERROR,
+                        "Invalid destination node ID for Message: %s",
+                        message.metadata.dst_node_id,
+                    )
+                    return None
 
-            # Only invalid run_id can trigger IntegrityError.
-            # This may need to be changed in the future version
-            # with more integrity checks.
-            self.query(query, data[0])
+                session.execute(insert(MessageInsModel).values(data[0]))
+        except IntegrityError as e:
+            orig = e.orig
+            constraint = getattr(getattr(orig, "diag", None), "constraint_name", None)
+            is_duplicate_message_id = (
+                constraint == "message_ins_message_id_key"
+                if constraint
+                else "message_ins.message_id" in str(orig)
+            )
+            if not is_duplicate_message_id:
+                raise
 
         return message.metadata.message_id
+
+    def store_message_and_object_tree(
+        self, message: Message, object_tree: ObjectTree, session_id: str
+    ) -> tuple[bool, list[str]]:
+        """Store a Message and preregister its ObjectTree."""
+        with self.session():
+            if message.metadata.reply_to_message_id:
+                stored = self.store_message_res(message) is not None
+            else:
+                stored = self.store_message_ins(message) is not None
+
+            if not stored:
+                return False, []
+
+            missing_objects = self.preregister_object_tree(object_tree, session_id)
+            return True, missing_objects
 
     # pylint: disable-next=too-many-locals
     def _check_stored_messages(self, message_ids: set[str]) -> None:
@@ -171,37 +236,33 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if not message_ids:
             return
 
-        with self.session():
-            # Batch fetch all messages in one query
-            placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
-            query = f"""
-                SELECT * FROM message_ins
-                WHERE message_id IN ({placeholders})
-            """
-            params = {f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)}
-            message_rows = self.query(query, params)
+        with self.session() as session:
+            message_rows = session.scalars(
+                select(MessageInsModel).where(
+                    MessageInsModel.message_id.in_(message_ids)
+                )
+            ).all()
 
             if not message_rows:
                 return
 
             # Build message lookup dict
-            message_dict: dict[str, dict[str, Any]] = {
-                row["message_id"]: row for row in message_rows
+            message_dict: dict[str, MessageInsModel] = {
+                cast(str, model.message_id): model for model in message_rows
             }
 
             # Collect unique run_ids for batch federation lookup
-            run_ids = {row["run_id"] for row in message_rows}
-            placeholders = ",".join([f":rid_{i}" for i in range(len(run_ids))])
-            query = f"""
-                SELECT run_id, federation FROM run
-                WHERE run_id IN ({placeholders})
-            """
-            params = {f"rid_{i}": rid for i, rid in enumerate(run_ids)}
-            run_rows = self.query(query, params)
+            run_ids = {model.run_id for model in message_rows}
+            run_rows = session.execute(
+                select(RunModel.run_id, RunModel.federation_id).where(
+                    RunModel.run_id.in_(run_ids)
+                )
+            ).all()
 
-            # Build run_id to federation mapping
-            run_id_to_federation: dict[int, str] = {
-                row["run_id"]: row["federation"] for row in run_rows
+            # Build run_id to federation ID mapping
+            run_id_to_federation_id: dict[int, str] = {
+                cast(int, run_id): cast(str, federation_id)
+                for run_id, federation_id in run_rows
             }
 
             invalid_msg_ids: set[str] = set()
@@ -209,30 +270,32 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
             # Check each message for validity
             for msg_id in message_ids:
-                message_row = message_dict.get(msg_id)
-                if not message_row:
+                message_model = message_dict.get(msg_id)
+                if not message_model:
                     continue
 
                 # Check if the message has expired
-                available_until = message_row["created_at"] + message_row["ttl"]
+                available_until = cast(float, message_model.created_at) + cast(
+                    float, message_model.ttl
+                )
                 if available_until <= current_time:
                     invalid_msg_ids.add(msg_id)
                     continue
 
-                # Check if run exists and get federation
-                run_id = message_row["run_id"]
-                federation = run_id_to_federation.get(run_id)
-                if not federation:
+                # Check if run exists and get federation ID
+                run_id = cast(int, message_model.run_id)
+                federation_id = run_id_to_federation_id.get(run_id)
+                if not federation_id:
                     invalid_msg_ids.add(msg_id)
                     continue
 
                 # Convert sint64 to uint64 for node IDs
-                src_node_id = int64_to_uint64(message_row["src_node_id"])
-                dst_node_id = int64_to_uint64(message_row["dst_node_id"])
+                src_node_id = int64_to_uint64(cast(int, message_model.src_node_id))
+                dst_node_id = int64_to_uint64(cast(int, message_model.dst_node_id))
 
                 # Filter nodes to check if they're in the federation
                 filtered = self.federation_manager.filter_nodes(
-                    {src_node_id, dst_node_id}, federation
+                    {src_node_id, dst_node_id}, federation_id
                 )
                 if len(filtered) != 2:  # Not both nodes are in the federation
                     invalid_msg_ids.add(msg_id)
@@ -249,48 +312,15 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             msg = f"`node_id` must be != {SUPERLINK_NODE_ID}"
             raise AssertionError(msg)
 
-        params: dict[str, str | int] = {}
-
-        # Convert the uint64 value to sint64 for SQLite
-        params["node_id"] = uint64_to_int64(node_id)
-
         with self.session():
-            # Retrieve all Messages for node_id
-            query = """
-                SELECT message_id
-                FROM message_ins
-                WHERE dst_node_id = :node_id
-                AND delivered_at = ''
-                AND (created_at + ttl) > CAST(strftime('%s', 'now') AS REAL)
-            """
-
-            if limit is not None:
-                query += " LIMIT :limit"
-                params["limit"] = limit
-
-            rows = self.query(query, params)
+            rows = self._claim_message_ins_rows(node_id, limit)
             message_ids: set[str] = {row["message_id"] for row in rows}
             self._check_stored_messages(message_ids)
 
-            # Mark retrieved Messages as delivered
-            if rows:
-                # Prepare query
-                placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
-                query = f"""
-                    UPDATE message_ins
-                    SET delivered_at = :delivered_at
-                    WHERE message_id IN ({placeholders})
-                    RETURNING *
-                """
-
-                # Prepare data for query
-                delivered_at = now().isoformat()
-                params = {"delivered_at": delivered_at}
-                for index, msg_id in enumerate(message_ids):
-                    params[f"mid_{index}"] = str(msg_id)
-
-                # Run query
-                rows = self.query(query, params)
+            # _check_stored_messages can delete claimed Messages if they became invalid
+            # (for example, node removed from federation), so re-read current rows.
+            if message_ids:
+                rows = self._load_message_ins_rows(message_ids)
 
             for row in rows:
                 # Convert values from sint64 to uint64
@@ -302,7 +332,66 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         return result
 
-    def store_message_res(self, message: Message) -> str | None:
+    def _claim_message_ins_rows(
+        self, node_id: int, limit: int | None
+    ) -> list[dict[str, Any]]:
+        """Atomically claim eligible instruction Messages for a node."""
+        current_time = now()
+        common_conditions = (
+            MessageInsModel.dst_node_id == uint64_to_int64(node_id),
+            MessageInsModel.delivered_at == "",
+            MessageInsModel.created_at + MessageInsModel.ttl > current_time.timestamp(),
+        )
+        stmt = update(MessageInsModel).where(*common_conditions)
+        if limit is not None:
+            # Materialize limited candidates before updating. Some backends can
+            # otherwise re-evaluate same-table subqueries while UPDATE scans rows.
+            candidates = (
+                select(MessageInsModel.message_id)
+                .where(*common_conditions)
+                .order_by(
+                    MessageInsModel.created_at.asc(),
+                    MessageInsModel.message_id.asc(),
+                )
+                .limit(limit)
+            )
+            if self.select_lock_sql:
+                if self.select_lock_sql.strip().upper() != "FOR UPDATE SKIP LOCKED":
+                    raise NotImplementedError(
+                        "Custom select_lock_sql values are not supported for ORM "
+                        "message_ins claims."
+                    )
+                candidates = candidates.with_for_update(skip_locked=True)
+            selected = candidates.cte("candidate_message_ins")
+            stmt = update(MessageInsModel).where(
+                MessageInsModel.message_id.in_(select(selected.c.message_id)),
+                MessageInsModel.delivered_at == "",
+            )
+
+        stmt = stmt.values(delivered_at=current_time.isoformat()).returning(
+            MessageInsModel
+        )
+        with self.session() as session:
+            models = list(session.scalars(stmt))
+            return [_message_model_to_dict(model) for model in models]
+
+    def _load_message_ins_rows(self, message_ids: set[str]) -> list[dict[str, Any]]:
+        """Load instruction Messages by IDs."""
+        stmt = (
+            select(MessageInsModel)
+            .where(MessageInsModel.message_id.in_(message_ids))
+            .order_by(
+                MessageInsModel.created_at.asc(), MessageInsModel.message_id.asc()
+            )
+        )
+        with self.session() as session:
+            return [
+                _message_model_to_dict(model) for model in session.scalars(stmt).all()
+            ]
+
+    def store_message_res(  # pylint: disable=too-many-return-statements
+        self, message: Message
+    ) -> str | None:
         """Store one Message."""
         # Validate message
         errors = validate_message(message=message, is_reply_message=True)
@@ -311,85 +400,103 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             return None
 
         res_metadata = message.metadata
-        msg_ins_id = res_metadata.reply_to_message_id
-        msg_ins = self.get_valid_message_ins(msg_ins_id)
-        if msg_ins is None:
-            log(
-                ERROR,
-                "Failed to store Message reply: "
-                "The message it replies to with message_id %s does not exist or "
-                "has expired, or was deleted because the target SuperNode was "
-                "removed from the federation.",
-                msg_ins_id,
-            )
-            return None
-
-        # Ensure that the dst_node_id of the original message matches the src_node_id
-        # of reply being processed.
-        if (
-            msg_ins
-            and message
-            and int64_to_uint64(msg_ins["dst_node_id"]) != res_metadata.src_node_id
-        ):
-            return None
-
-        # Fail if the Message TTL exceeds the
-        # expiration time of the Message it replies to.
-        # Condition: ins_metadata.created_at + ins_metadata.ttl ≥
-        #            res_metadata.created_at + res_metadata.ttl
-        # A small tolerance is introduced to account
-        # for floating-point precision issues.
-        max_allowed_ttl = (
-            msg_ins["created_at"] + msg_ins["ttl"] - res_metadata.created_at
-        )
-        if res_metadata.ttl and (
-            res_metadata.ttl - max_allowed_ttl > MESSAGE_TTL_TOLERANCE
-        ):
-            log(
-                WARNING,
-                "Received Message with TTL %.2f exceeding the allowed maximum "
-                "TTL %.2f.",
-                res_metadata.ttl,
-                max_allowed_ttl,
-            )
-            return None
-
-        # Store Message
-        msg_dict = message_to_dict(message)
-
-        # Convert values from uint64 to sint64 for SQLite
-        convert_uint64_values_in_dict_to_sint64(
-            msg_dict, ["run_id", "src_node_id", "dst_node_id"]
-        )
-
-        columns = ", ".join([f":{key}" for key in msg_dict])
-        query = f"INSERT INTO message_res VALUES({columns})"
+        message_id = res_metadata.message_id
 
         try:
-            self.query(query, msg_dict)
+            with self.session() as session:
+                if not self._lock_run(res_metadata.run_id, require_unfinished=True):
+                    log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
+                    return None
+
+                msg_ins_id = res_metadata.reply_to_message_id
+                msg_ins = self.get_valid_message_ins(msg_ins_id)
+                if msg_ins is None:
+                    log(
+                        ERROR,
+                        "Failed to store Message reply: "
+                        "The message it replies to with message_id %s does not exist "
+                        "or has expired, or was deleted because the target SuperNode "
+                        "was removed from the federation.",
+                        msg_ins_id,
+                    )
+                    return None
+
+                # Ensure that the dst_node_id of the original message matches the
+                # src_node_id of reply being processed.
+                if int64_to_uint64(msg_ins["dst_node_id"]) != res_metadata.src_node_id:
+                    return None
+
+                # Fail if the Message TTL exceeds the expiration time of the Message it
+                # replies to, with a small tolerance for floating-point precision.
+                max_allowed_ttl = (
+                    msg_ins["created_at"] + msg_ins["ttl"] - res_metadata.created_at
+                )
+                if res_metadata.ttl and (
+                    res_metadata.ttl - max_allowed_ttl > MESSAGE_TTL_TOLERANCE
+                ):
+                    log(
+                        WARNING,
+                        "Received Message with TTL %.2f exceeding the allowed maximum "
+                        "TTL %.2f.",
+                        res_metadata.ttl,
+                        max_allowed_ttl,
+                    )
+                    return None
+
+                # Check idempotent retries before attempting INSERT. We cannot rely on
+                # IntegrityError details alone because `message_res` also has a unique
+                # constraint on `reply_to_message_id`, so the same retry can violate
+                # either constraint depending on backend/index behavior.
+                if (
+                    session.scalar(
+                        select(MessageResModel.message_id).where(
+                            MessageResModel.message_id == message_id
+                        )
+                    )
+                    is not None
+                ):
+                    return message_id
+
+                # Store Message
+                msg_dict = message_to_dict(message)
+
+                # Convert values from uint64 to sint64 for SQLite
+                convert_uint64_values_in_dict_to_sint64(
+                    msg_dict, ["run_id", "src_node_id", "dst_node_id"]
+                )
+
+                session.execute(insert(MessageResModel).values(msg_dict))
         except IntegrityError:
-            log(ERROR, "`run` is invalid")
+            log(
+                ERROR,
+                "Failed to store Message reply: duplicate reply for "
+                "reply_to_message_id %s or invalid run.",
+                res_metadata.reply_to_message_id,
+            )
             return None
 
-        return message.metadata.message_id
+        return message_id
 
     def get_message_res(self, message_ids: set[str]) -> list[Message]:
         """Get reply Messages for the given Message IDs."""
         # pylint: disable=too-many-locals
+        if not message_ids:
+            return []
+
         ret: dict[str, Message] = {}
 
-        with self.session():
+        with self.session() as session:
             # Verify Message IDs
             self._check_stored_messages(message_ids)
             current = now().timestamp()
-            placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
-            query = f"""
-                SELECT *
-                FROM message_ins
-                WHERE message_id IN ({placeholders})
-            """
-            params = {f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)}
-            rows = self.query(query, params)
+            rows = [
+                _message_model_to_dict(model)
+                for model in session.scalars(
+                    select(MessageInsModel).where(
+                        MessageInsModel.message_id.in_(message_ids)
+                    )
+                ).all()
+            ]
             found_message_ins_dict: dict[str, Message] = {}
             for row in rows:
                 convert_sint64_values_in_dict_to_uint64(
@@ -406,41 +513,49 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             # Check node availability
             dst_node_ids: set[int] = set()
             for message_id in message_ids:
-                in_message = found_message_ins_dict[message_id]
+                in_message = found_message_ins_dict.get(message_id)
+                if in_message is None:
+                    continue
                 sint_node_id = uint64_to_int64(in_message.metadata.dst_node_id)
                 dst_node_ids.add(sint_node_id)
-            placeholders = ",".join([f":nid_{i}" for i in range(len(dst_node_ids))])
-            query = f"""
-                SELECT node_id, online_until
-                FROM node
-                WHERE node_id IN ({placeholders})
-                AND status != :unregistered
-            """
-            node_params: dict[str, int | str] = {
-                f"nid_{i}": nid for i, nid in enumerate(dst_node_ids)
-            }
-            node_params["unregistered"] = NodeStatus.UNREGISTERED
-            rows = self.query(query, node_params)
+            if dst_node_ids:
+                node_rows = session.execute(
+                    select(NodeModel.node_id, NodeModel.online_until).where(
+                        NodeModel.node_id.in_(dst_node_ids),
+                        NodeModel.status != NodeStatus.UNREGISTERED,
+                    )
+                ).all()
+            else:
+                node_rows = []
             tmp_ret_dict = check_node_availability_for_in_message(
                 inquired_in_message_ids=message_ids,
                 found_in_message_dict=found_message_ins_dict,
                 node_id_to_online_until={
-                    int64_to_uint64(row["node_id"]): row["online_until"] for row in rows
+                    int64_to_uint64(cast(int, node_id)): cast(float, online_until)
+                    for node_id, online_until in node_rows
                 },
                 current_time=current,
             )
             ret.update(tmp_ret_dict)
 
-            # Find all reply Messages
-            placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
-            query = f"""
-                SELECT *
-                FROM message_res
-                WHERE reply_to_message_id IN ({placeholders})
-                AND delivered_at = ''
-            """
-            params = {f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)}
-            rows = self.query(query, params)
+            # Return accumulated replies if no IDs remain to avoid generating `IN ()`
+            if not message_ids:
+                return list(ret.values())
+
+            # Atomically claim all eligible reply Messages
+            delivered_at = now().isoformat()
+            rows = [
+                _message_model_to_dict(model)
+                for model in session.scalars(
+                    update(MessageResModel)
+                    .where(
+                        MessageResModel.reply_to_message_id.in_(message_ids),
+                        MessageResModel.delivered_at == "",
+                    )
+                    .values(delivered_at=delivered_at)
+                    .returning(MessageResModel)
+                )
+            ]
             for row in rows:
                 convert_sint64_values_in_dict_to_uint64(
                     row, ["run_id", "src_node_id", "dst_node_id"]
@@ -453,23 +568,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             )
             ret.update(tmp_ret_dict)
 
-            # Mark existing reply Messages to be returned as delivered
-            delivered_at = now().isoformat()
-            for message_res in ret.values():
-                message_res.metadata.delivered_at = delivered_at
-            message_res_ids = [
-                message_res.metadata.message_id for message_res in ret.values()
-            ]
-            placeholders = ",".join([f":mid_{i}" for i in range(len(message_res_ids))])
-            query = f"""
-                UPDATE message_res
-                SET delivered_at = :delivered_at
-                WHERE message_id IN ({placeholders})
-            """
-            params = {"delivered_at": delivered_at}
-            params.update({f"mid_{i}": mid for i, mid in enumerate(message_res_ids)})
-            self.query(query, params)
-
         return list(ret.values())
 
     def num_message_ins(self) -> int:
@@ -477,57 +575,77 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         This includes delivered but not yet deleted.
         """
-        query = "SELECT count(*) AS num FROM message_ins"
-        rows = self.query(query, {})
-        return int(rows[0]["num"])
+        with self.session() as session:
+            # pylint: disable-next=not-callable
+            cnt = session.scalar(select(func.count()).select_from(MessageInsModel))
+            return cast(int, cnt)
 
     def num_message_res(self) -> int:
         """Calculate the number of reply Messages in store.
 
         This includes delivered but not yet deleted.
         """
-        query = "SELECT count(*) AS num FROM message_res"
-        rows = self.query(query)
-        return int(rows[0]["num"])
+        with self.session() as session:
+            # pylint: disable-next=not-callable
+            cnt = session.scalar(select(func.count()).select_from(MessageResModel))
+            return cast(int, cnt)
 
     def delete_messages(self, message_ins_ids: set[str]) -> None:
         """Delete a Message and its reply based on provided Message IDs."""
         if not message_ins_ids:
             return
 
-        placeholders = ",".join([f":mid_{i}" for i in range(len(message_ins_ids))])
-        params = {f"mid_{i}": str(mid) for i, mid in enumerate(message_ins_ids)}
+        with self.session() as session:
+            session.execute(
+                delete(MessageInsModel).where(
+                    MessageInsModel.message_id.in_(message_ins_ids)
+                )
+            )
+            session.execute(
+                delete(MessageResModel).where(
+                    MessageResModel.reply_to_message_id.in_(message_ins_ids)
+                )
+            )
 
-        # Delete Message
-        query_1 = f"""
-            DELETE FROM message_ins
-            WHERE message_id IN ({placeholders})
-        """
+    def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
+        """Delete Messages belonging to an expired push session."""
+        if not message_object_ids:
+            return
 
-        # Delete reply Message
-        query_2 = f"""
-            DELETE FROM message_res
-            WHERE reply_to_message_id IN ({placeholders})
-        """
-
-        with self.session():
-            self.query(query_1, params)
-            self.query(query_2, params)
+        with self.session() as session:
+            self.delete_messages(message_object_ids)
+            session.execute(
+                delete(MessageResModel).where(
+                    MessageResModel.message_id.in_(message_object_ids)
+                )
+            )
 
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
-        query = """
-            SELECT message_id
-            FROM message_ins
-            WHERE run_id = :run_id
-        """
         sint64_run_id = uint64_to_int64(run_id)
-        params = {"run_id": sint64_run_id}
+        with self.session() as session:
+            message_ids = session.scalars(
+                select(MessageInsModel.message_id).where(
+                    MessageInsModel.run_id == sint64_run_id
+                )
+            ).all()
 
-        with self.session():
-            rows = self.query(query, params)
+        return {message_id for message_id in message_ids if message_id is not None}
 
-        return {row["message_id"] for row in rows}
+    def stop_run(self, run_id: int) -> bool:
+        """Stop a run and clean up run-scoped messages and objects."""
+        # Check if the run exists
+        runs = self.get_run_info(run_ids=[run_id])
+        if not runs:
+            return False
+
+        # Stop the run's primary task, which will cascade to stop all its tasks
+        primary_task_id = cast(int, runs[0].primary_task_id)
+        if not self.finish_task(primary_task_id, SubStatus.STOPPED, ""):
+            return False
+
+        self.cleanup_run(run_id)
+        return True
 
     def create_node(
         self,
@@ -539,42 +657,40 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """Create, store in the link state, and return `node_id`."""
         # Sample a random uint64 as node_id
         uint64_node_id = generate_rand_int_from_bytes(
-            NODE_ID_NUM_BYTES, exclude=[SUPERLINK_NODE_ID, 0]
+            NODE_ID_NUM_BYTES, exclude={SUPERLINK_NODE_ID, 0}
         )
 
         # Convert the uint64 value to sint64 for SQLite
         sint64_node_id = uint64_to_int64(uint64_node_id)
 
-        query = """
-            INSERT INTO node
-            (node_id, owner_aid, owner_name, status, registered_at, last_activated_at,
-            last_deactivated_at, unregistered_at, online_until, heartbeat_interval,
-            public_key)
-            VALUES (:node_id, :owner_aid, :owner_name, :status, :registered_at,
-            :last_activated_at, :last_deactivated_at, :unregistered_at, :online_until,
-            :heartbeat_interval, :public_key)
-        """
-
         # Mark the node online until now().timestamp() + heartbeat_interval
         try:
-            self.query(
-                query,
-                {
-                    "node_id": sint64_node_id,
-                    "owner_aid": owner_aid,
-                    "owner_name": owner_name,
-                    "status": NodeStatus.REGISTERED,
-                    "registered_at": now().isoformat(),
-                    "last_activated_at": None,
-                    "last_deactivated_at": None,
-                    "unregistered_at": None,
-                    "online_until": None,  # initialized with offline status
-                    "heartbeat_interval": heartbeat_interval,
-                    "public_key": public_key,
-                },
-            )
+            with self.session() as session:
+                session.execute(
+                    insert(NodeModel).values(
+                        node_id=sint64_node_id,
+                        owner_aid=owner_aid,
+                        owner_name=owner_name,
+                        status=NodeStatus.REGISTERED,
+                        registered_at=now().isoformat(),
+                        last_activated_at=None,
+                        last_deactivated_at=None,
+                        unregistered_at=None,
+                        online_until=None,  # initialized with offline status
+                        heartbeat_interval=heartbeat_interval,
+                        public_key=public_key,
+                    )
+                )
         except IntegrityError as e:
-            if "node.public_key" in str(e):
+            # Check the underlying DB exception to distinguish constraint types.
+            # - SQLite: str(e.orig) is e.g. "UNIQUE constraint failed: node.public_key"
+            # - psycopg3: e.orig.diag.constraint_name contains the constraint name
+            orig = e.orig
+            constraint = getattr(getattr(orig, "diag", None), "constraint_name", None)
+            is_pk_conflict = (
+                "public_key" in constraint if constraint else "public_key" in str(orig)
+            )
+            if is_pk_conflict:
                 raise ValueError("Public key already in use.") from None
             # Must be node ID conflict, almost impossible unless system is compromised
             log(ERROR, "Unexpected node registration failure.")
@@ -586,26 +702,27 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def delete_node(self, owner_aid: str, node_id: int) -> None:
         """Delete a node."""
         sint64_node_id = uint64_to_int64(node_id)
-
-        query = """
-            UPDATE node
-            SET status = :unregistered, unregistered_at = :unregistered_at,
-            online_until = IIF(online_until > :current, :current, online_until)
-            WHERE node_id = :node_id AND status != :unregistered
-            AND owner_aid = :owner_aid
-            RETURNING node_id
-        """
         current = now()
-        params = {
-            "unregistered": NodeStatus.UNREGISTERED,
-            "unregistered_at": current.isoformat(),
-            "current": current.timestamp(),
-            "node_id": sint64_node_id,
-            "owner_aid": owner_aid,
-        }
-
-        rows = self.query(query, params)
-        if not rows:
+        stmt = (
+            update(NodeModel)
+            .where(
+                NodeModel.node_id == sint64_node_id,
+                NodeModel.status != NodeStatus.UNREGISTERED,
+                NodeModel.owner_aid == owner_aid,
+            )
+            .values(
+                status=NodeStatus.UNREGISTERED,
+                unregistered_at=current.isoformat(),
+                online_until=case(
+                    (NodeModel.online_until > current.timestamp(), current.timestamp()),
+                    else_=NodeModel.online_until,
+                ),
+            )
+            .returning(NodeModel.node_id)
+        )
+        with self.session() as session:
+            updated_node_id = session.scalar(stmt)
+        if updated_node_id is None:
             raise ValueError(
                 f"Node {node_id} already deleted, not found or unauthorized "
                 "deletion attempt."
@@ -618,28 +735,23 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Only activate if the node is currently registered or offline
         current_dt = now()
         sint64_node_id = uint64_to_int64(node_id)
-        query = """
-            UPDATE node
-            SET status = :online,
-                last_activated_at = :current,
-                online_until = :online_until,
-                heartbeat_interval = :heartbeat_interval
-            WHERE node_id = :node_id AND status IN (:registered, :offline)
-            RETURNING node_id
-        """
-        params = {
-            "online": NodeStatus.ONLINE,
-            "current": current_dt.isoformat(),
-            "online_until": current_dt.timestamp()
-            + HEARTBEAT_PATIENCE * heartbeat_interval,
-            "heartbeat_interval": heartbeat_interval,
-            "node_id": sint64_node_id,
-            "registered": NodeStatus.REGISTERED,
-            "offline": NodeStatus.OFFLINE,
-        }
-
-        rows = self.query(query, params)
-        return len(rows) > 0
+        stmt = (
+            update(NodeModel)
+            .where(
+                NodeModel.node_id == sint64_node_id,
+                NodeModel.status.in_([NodeStatus.REGISTERED, NodeStatus.OFFLINE]),
+            )
+            .values(
+                status=NodeStatus.ONLINE,
+                last_activated_at=current_dt.isoformat(),
+                online_until=current_dt.timestamp()
+                + HEARTBEAT_PATIENCE * heartbeat_interval,
+                heartbeat_interval=heartbeat_interval,
+            )
+            .returning(NodeModel.node_id)
+        )
+        with self.session() as session:
+            return session.scalar(stmt) is not None
 
     def deactivate_node(self, node_id: int) -> bool:
         """Deactivate the node with the specified `node_id`."""
@@ -647,24 +759,21 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         # Only deactivate if the node is currently online
         current_dt = now()
-        query = """
-            UPDATE node
-            SET status = :offline,
-                last_deactivated_at = :current_iso,
-                online_until = :current_ts
-            WHERE node_id = :node_id AND status = :online
-            RETURNING node_id
-        """
-        params = {
-            "offline": NodeStatus.OFFLINE,
-            "current_iso": current_dt.isoformat(),
-            "current_ts": current_dt.timestamp(),
-            "node_id": uint64_to_int64(node_id),
-            "online": NodeStatus.ONLINE,
-        }
-
-        rows = self.query(query, params)
-        return len(rows) > 0
+        stmt = (
+            update(NodeModel)
+            .where(
+                NodeModel.node_id == uint64_to_int64(node_id),
+                NodeModel.status == NodeStatus.ONLINE,
+            )
+            .values(
+                status=NodeStatus.OFFLINE,
+                last_deactivated_at=current_dt.isoformat(),
+                online_until=current_dt.timestamp(),
+            )
+            .returning(NodeModel.node_id)
+        )
+        with self.session() as session:
+            return session.scalar(stmt) is not None
 
     def get_nodes(self, run_id: int) -> set[int]:
         """Retrieve all currently stored node IDs as a set.
@@ -674,16 +783,16 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         If the provided `run_id` does not exist or has no matching nodes,
         an empty `Set` MUST be returned.
         """
-        with self.session():
+        with self.session() as session:
             # Convert the uint64 value to sint64 for SQLite
             sint64_run_id = uint64_to_int64(run_id)
 
             # Validate run ID
-            query = "SELECT federation FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": sint64_run_id})
-            if not rows:
+            federation_id = session.scalar(
+                select(RunModel.federation_id).where(RunModel.run_id == sint64_run_id)
+            )
+            if federation_id is None:
                 return set()
-            federation: str = rows[0]["federation"]
 
             # Retrieve all online nodes
             node_ids = {
@@ -691,29 +800,54 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 for node in self.get_node_info(statuses=[NodeStatus.ONLINE])
             }
         # Filter node IDs by federation
-        return self.federation_manager.filter_nodes(node_ids, federation)
+        return self.federation_manager.filter_nodes(node_ids, federation_id)
 
     def _check_and_tag_offline_nodes(self, node_ids: list[int] | None = None) -> None:
         """Check and tag offline nodes."""
-        # strftime will convert POSIX timestamp to ISO format
-        query = """
-            UPDATE node SET status = :offline,
-            last_deactivated_at =
-            strftime('%Y-%m-%dT%H:%M:%f+00:00', online_until, 'unixepoch')
-            WHERE online_until <= :current_time AND status = :online
-        """
-        params: dict[str, Any] = {
-            "offline": NodeStatus.OFFLINE,
-            "current_time": now().timestamp(),
-            "online": NodeStatus.ONLINE,
-        }
+        current_time = now().timestamp()
+        stmt = select(NodeModel.node_id, NodeModel.online_until).where(
+            NodeModel.online_until <= current_time,
+            NodeModel.status == NodeStatus.ONLINE,
+        )
         if node_ids is not None:
-            placeholders = ",".join([f":nid_{i}" for i in range(len(node_ids))])
-            query += f" AND node_id IN ({placeholders})"
-            params.update(
-                {f"nid_{i}": uint64_to_int64(nid) for i, nid in enumerate(node_ids)}
+            if not node_ids:
+                return
+            sint64_node_ids = [uint64_to_int64(nid) for nid in node_ids]
+            stmt = stmt.where(NodeModel.node_id.in_(sint64_node_ids))
+
+        # Select candidate node_ids first so `last_deactivated_at` can preserve the
+        # expiry time without relying on database-specific epoch formatting functions
+        with self.session() as session:
+            rows = session.execute(stmt).all()
+            if not rows:
+                return
+
+            # Use one executemany UPDATE while keeping the state and expiry checks
+            # in the statement to avoid overwriting a concurrent heartbeat.
+            update_stmt = (
+                update(NodeModel)
+                .execution_options(dml_strategy="core_only")
+                .where(
+                    NodeModel.node_id == bindparam("offline_node_id"),
+                    NodeModel.status == NodeStatus.ONLINE,
+                    NodeModel.online_until <= bindparam("offline_current_time"),
+                )
+                .values(
+                    status=NodeStatus.OFFLINE,
+                    last_deactivated_at=bindparam("offline_deactivated_at"),
+                )
             )
-        self.query(query, params)
+            update_params = [
+                {
+                    "offline_node_id": node_id,
+                    "offline_current_time": current_time,
+                    "offline_deactivated_at": datetime.fromtimestamp(
+                        cast(float, online_until), tz=UTC
+                    ).isoformat(),
+                }
+                for node_id, online_until in rows
+            ]
+            session.execute(update_stmt, update_params)
 
     def get_node_info(  # pylint: disable=too-many-locals
         self,
@@ -723,284 +857,365 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         statuses: Sequence[str] | None = None,
     ) -> Sequence[NodeInfo]:
         """Retrieve information about nodes based on the specified filters."""
-        with self.session():
+        if node_ids is not None and len(node_ids) == 0:
+            return []
+        if owner_aids is not None and len(owner_aids) == 0:
+            return []
+        if statuses is not None and len(statuses) == 0:
+            return []
+
+        with self.session() as session:
             self._check_and_tag_offline_nodes()
 
-            # Build the WHERE clause based on provided filters
-            conditions = []
-            params: dict[str, Any] = {}
+            stmt = select(NodeModel).execution_options(populate_existing=True)
             if node_ids is not None:
                 sint64_node_ids = [uint64_to_int64(node_id) for node_id in node_ids]
-                placeholders = ",".join(
-                    [f":nid_{i}" for i in range(len(sint64_node_ids))]
-                )
-                conditions.append(f"node_id IN ({placeholders})")
-                for i, nid in enumerate(sint64_node_ids):
-                    params[f"nid_{i}"] = nid
+                stmt = stmt.where(NodeModel.node_id.in_(sint64_node_ids))
             if owner_aids is not None:
-                placeholders = ",".join([f":aid_{i}" for i in range(len(owner_aids))])
-                conditions.append(f"owner_aid IN ({placeholders})")
-                for i, aid in enumerate(owner_aids):
-                    params[f"aid_{i}"] = aid
+                stmt = stmt.where(NodeModel.owner_aid.in_(owner_aids))
             if statuses is not None:
-                placeholders = ",".join([f":st_{i}" for i in range(len(statuses))])
-                conditions.append(f"status IN ({placeholders})")
-                for i, status in enumerate(statuses):
-                    params[f"st_{i}"] = status
+                stmt = stmt.where(NodeModel.status.in_(statuses))
 
-            # Construct the final query
-            query = "SELECT * FROM node"
-            if conditions:
-                query += " WHERE " + " AND ".join(conditions)
-
-            rows = self.query(query, params)
-
-            result: list[NodeInfo] = []
-            for row in rows:
-                # Convert sint64 node_id to uint64
-                row["node_id"] = int64_to_uint64(row["node_id"])
-                result.append(NodeInfo(**row))
-
-            return result
+            return [
+                _node_info_from_model(model) for model in session.scalars(stmt).all()
+            ]
 
     def get_node_id_by_public_key(self, public_key: bytes) -> int | None:
         """Get `node_id` for the specified `public_key` if it exists and is not
         deleted."""
-        query = """SELECT node_id FROM node
-                   WHERE public_key = :public_key AND status != :unregistered;"""
-        rows = self.query(
-            query, {"public_key": public_key, "unregistered": NodeStatus.UNREGISTERED}
+        stmt = select(NodeModel.node_id).where(
+            NodeModel.public_key == public_key,
+            NodeModel.status != NodeStatus.UNREGISTERED,
         )
-
-        # If no result is found, return None
-        if not rows:
+        with self.session() as session:
+            node_id = session.scalar(stmt)
+        if node_id is None:
             return None
 
         # Convert sint64 node_id to uint64
-        node_id = int64_to_uint64(rows[0]["node_id"])
-        return node_id
+        return int64_to_uint64(node_id)
 
-    def create_run(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def create_run(  # pylint: disable=R0913, R0914, R0917
         self,
         fab_id: str | None,
         fab_version: str | None,
         fab_hash: str | None,
         override_config: UserConfig,
-        federation: str,
-        federation_options: ConfigRecord,
+        federation_id: str,
+        federation_config: SimulationConfig | None,
         flwr_aid: str | None,
+        primary_task_type: str,
+        series_id: int | None = None,
+        series_description: str | None = None,
+        connector_refs: Sequence[str] = (),
+        initial_task_event: TaskEvent | None = None,
     ) -> int:
         """Create a new run."""
-        # Sample a random int64 as run_id
-        uint64_run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
+        if isinstance(connector_refs, str) or any(
+            not connector_ref for connector_ref in connector_refs
+        ):
+            return 0
+        if initial_task_event is not None:
+            try:
+                validate_task_event_data(initial_task_event.data)
+            except ValueError:
+                return 0
+        # Convert federation_config to JSON string for storage
+        fed_config_json = None
+        if federation_config:
+            fed_config_json = json.dumps(simulation_config_to_json(federation_config))
 
-        # Convert the uint64 value to sint64 for SQLite
-        sint64_run_id = uint64_to_int64(uint64_run_id)
+        override_config_json = json.dumps(override_config)
+        run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
+        task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
 
-        with self.session():
-            # Check conflicts
-            query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": sint64_run_id})
-            if rows[0]["cnt"] == 0:
-                query = """
-                    INSERT INTO run
-                    (run_id, fab_id, fab_version,
-                    fab_hash, override_config, federation, federation_options,
-                    pending_at, starting_at, running_at, finished_at, sub_status,
-                    details, flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
-                    VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
-                    :federation, :federation_options, :pending_at, :starting_at,
-                    :running_at, :finished_at, :sub_status, :details, :flwr_aid,
-                    :bytes_sent, :bytes_recv, :clientapp_runtime)
-                """
-                override_config_json = json.dumps(override_config)
-                params = {
-                    "run_id": sint64_run_id,
-                    "fab_id": fab_id or "",
-                    "fab_version": fab_version or "",
-                    "fab_hash": fab_hash or "",
-                    "override_config": override_config_json,
-                    "federation": federation,
-                    "federation_options": configrecord_to_bytes(federation_options),
-                    "pending_at": now().isoformat(),
-                    "starting_at": "",
-                    "running_at": "",
-                    "finished_at": "",
-                    "sub_status": "",
-                    "details": "",
-                    "flwr_aid": flwr_aid or "",
-                    "bytes_sent": 0,
-                    "bytes_recv": 0,
-                    "clientapp_runtime": 0.0,
-                }
-                self.query(query, params)
-                return uint64_run_id
+        with self.session() as session:
+            existing_run_id = session.scalar(
+                select(RunModel.run_id).where(
+                    RunModel.run_id == uint64_to_int64(run_id)
+                )
+            )
+            if existing_run_id is None:
+                current = now()
+                resolved_series_id = self.store_run_in_series(
+                    run_id=run_id,
+                    federation_id=federation_id,
+                    is_agent=primary_task_type == TaskType.AGENT_APP,
+                    series_id=series_id,
+                    description=series_description,
+                )
+                if resolved_series_id is None:
+                    log(ERROR, "Unexpected run series membership failure.")
+                    return 0
+                self._refresh_run_series_context(
+                    run_id=run_id,
+                    series_id=resolved_series_id,
+                )
+                session.execute(
+                    insert(RunModel).values(
+                        run_id=uint64_to_int64(run_id),
+                        fab_id=fab_id or "",
+                        fab_version=fab_version or "",
+                        fab_hash=fab_hash or "",
+                        override_config=override_config_json,
+                        federation_id=federation_id,
+                        primary_task_id=uint64_to_int64(task_id),
+                        federation_config=fed_config_json,
+                        usage_reported_at="",
+                        series_id=uint64_to_int64(resolved_series_id),
+                        flwr_aid=flwr_aid or "",
+                        bytes_sent=0,
+                        bytes_recv=0,
+                        clientapp_runtime=0.0,
+                    )
+                )
+                session.execute(
+                    insert(TaskModel).values(
+                        task_id=uint64_to_int64(task_id),
+                        type=primary_task_type,
+                        run_id=uint64_to_int64(run_id),
+                        fab_hash=fab_hash,
+                        model_ref=None,
+                        connector_ref=None,
+                        token=None,
+                        active_until=None,
+                        pending_at=current,
+                        starting_at=None,
+                        running_at=None,
+                        finished_at=None,
+                        sub_status="",
+                        details="",
+                    )
+                )
+                if initial_task_event is not None:
+                    initial_task_event.run_id = run_id
+                    initial_task_event.task_id = task_id
+                    session.execute(
+                        insert(TaskEventModel).values(
+                            timestamp=current,
+                            run_id=uint64_to_int64(run_id),
+                            task_id=uint64_to_int64(task_id),
+                            event=initial_task_event.event,
+                            data=initial_task_event.data,
+                        )
+                    )
+                self.bind_connectors_to_run(
+                    run_id=run_id,
+                    connector_refs=connector_refs,
+                )
+                return run_id
+
         log(ERROR, "Unexpected run creation failure.")
         return 0
 
-    def get_run_ids(self, flwr_aid: str | None) -> set[int]:
-        """Retrieve all run IDs if `flwr_aid` is not specified.
+    def get_run_info(  # pylint: disable=too-many-arguments, too-many-branches
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        statuses: Sequence[str] | None = None,
+        flwr_aids: Sequence[str] | None = None,
+        federation_ids: Sequence[str] | None = None,
+        order_by: Literal["pending_at"] | None = None,
+        ascending: bool = True,
+        limit: int | None = None,
+    ) -> Sequence[Run]:
+        """Retrieve information about runs based on the specified filters."""
+        self._cleanup_expired_task_tokens()
+        stmt = (
+            select(RunModel, TaskModel)
+            .join(TaskModel, TaskModel.task_id == RunModel.primary_task_id)
+            .execution_options(populate_existing=True)
+        )
 
-        Otherwise, retrieve all run IDs for the specified `flwr_aid`.
-        """
-        if flwr_aid:
-            rows = self.query(
-                "SELECT run_id FROM run WHERE flwr_aid = :flwr_aid",
-                {"flwr_aid": flwr_aid},
+        # Filter by run_ids
+        if run_ids is not None:
+            if not run_ids:
+                return []
+            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
+            stmt = stmt.where(RunModel.run_id.in_(sint64_run_ids))
+
+        # Filter by statuses
+        if statuses is not None:
+            if not statuses:
+                return []
+            status_conditions = [
+                _primary_task_status_filter(status)
+                for status in (
+                    Status.PENDING,
+                    Status.STARTING,
+                    Status.RUNNING,
+                    Status.FINISHED,
+                )
+                if status in statuses
+            ]
+            if not status_conditions:
+                return []
+            stmt = stmt.where(or_(*status_conditions))
+
+        # Filter by Flower Account IDs
+        if flwr_aids is not None:
+            if not flwr_aids:
+                return []
+            stmt = stmt.where(RunModel.flwr_aid.in_(flwr_aids))
+
+        # Filter by federation IDs
+        if federation_ids is not None:
+            if not federation_ids:
+                return []
+            stmt = stmt.where(RunModel.federation_id.in_(federation_ids))
+
+        if order_by is not None:
+            order_column = TaskModel.pending_at
+            stmt = stmt.order_by(
+                order_column.asc() if ascending else order_column.desc()
             )
-        else:
-            rows = self.query("SELECT run_id FROM run", {})
-        return {int64_to_uint64(row["run_id"]) for row in rows}
+        if limit is not None:
+            stmt = stmt.limit(limit)
 
-    def get_run(self, run_id: int) -> Run | None:
-        """Retrieve information about the run with the specified `run_id`."""
-        # Clean up expired tokens; this will flag inactive runs as needed
-        self._cleanup_expired_tokens()
-
-        # Convert the uint64 value to sint64 for SQLite
-        sint64_run_id = uint64_to_int64(run_id)
-        query = "SELECT * FROM run WHERE run_id = :run_id"
-        rows = self.query(query, {"run_id": sint64_run_id})
-        if rows:
-            row = rows[0]
-            return Run(
-                run_id=int64_to_uint64(row["run_id"]),
-                fab_id=row["fab_id"],
-                fab_version=row["fab_version"],
-                fab_hash=row["fab_hash"],
-                override_config=json.loads(row["override_config"]),
-                pending_at=row["pending_at"],
-                starting_at=row["starting_at"],
-                running_at=row["running_at"],
-                finished_at=row["finished_at"],
-                status=RunStatus(
-                    status=determine_run_status(row),
-                    sub_status=row["sub_status"],
-                    details=row["details"],
-                ),
-                flwr_aid=row["flwr_aid"],
-                federation=row["federation"],
-                bytes_sent=row["bytes_sent"],
-                bytes_recv=row["bytes_recv"],
-                clientapp_runtime=row["clientapp_runtime"],
-            )
-        log(ERROR, "`run_id` does not exist.")
-        return None
+        with self.session() as session:
+            rows = session.execute(stmt).all()
+            return [
+                _run_from_models(run_model, task_model)
+                for run_model, task_model in rows
+            ]
 
     def get_run_status(self, run_ids: set[int]) -> dict[int, RunStatus]:
         """Retrieve the statuses for the specified runs."""
-        # Clean up expired tokens; this will flag inactive runs as needed
-        self._cleanup_expired_tokens()
+        self._cleanup_expired_task_tokens()
+        if not run_ids:
+            return {}
 
-        # Convert the uint64 value to sint64 for SQLite
-        placeholders = ",".join([f":rid_{i}" for i in range(len(run_ids))])
-        query = f"SELECT * FROM run WHERE run_id IN ({placeholders})"
-        params = {f"rid_{i}": uint64_to_int64(rid) for i, rid in enumerate(run_ids)}
-        rows = self.query(query, params)
-
-        return {
-            # Restore uint64 run IDs
-            int64_to_uint64(row["run_id"]): RunStatus(
-                status=determine_run_status(row),
-                sub_status=row["sub_status"],
-                details=row["details"],
-            )
-            for row in rows
-        }
-
-    def update_run_status(self, run_id: int, new_status: RunStatus) -> bool:
-        """Update the status of the run with the specified `run_id`."""
-        # Clean up expired tokens; this will flag inactive runs as needed
-        self._cleanup_expired_tokens()
-
-        with self.session():
-            # Convert the uint64 value to sint64 for SQLite
-            sint64_run_id = uint64_to_int64(run_id)
-            query = "SELECT * FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": sint64_run_id})
-
-            # Check if the run_id exists
-            if not rows:
-                log(ERROR, "`run_id` is invalid")
-                return False
-
-            # Check if the status transition is valid
-            row = rows[0]
-            current_status = RunStatus(
-                status=determine_run_status(row),
-                sub_status=row["sub_status"],
-                details=row["details"],
-            )
-            if not is_valid_transition(current_status, new_status):
-                log(
-                    ERROR,
-                    'Invalid status transition: from "%s" to "%s"',
-                    current_status.status,
-                    new_status.status,
-                )
-                return False
-
-            # Check if the sub-status is valid
-            if not has_valid_sub_status(current_status):
-                log(
-                    ERROR,
-                    'Invalid sub-status "%s" for status "%s"',
-                    current_status.sub_status,
-                    current_status.status,
-                )
-                return False
-
-            # Update the status
-            query = """
-                UPDATE run SET %s = :timestamp,
-                sub_status = :sub_status, details = :details
-                WHERE run_id = :run_id
-            """
-
-            # Prepare data for query
-            current = now()
-
-            # Determine the timestamp field based on the new status
-            timestamp_fld = ""
-            if new_status.status == Status.STARTING:
-                timestamp_fld = "starting_at"
-            elif new_status.status == Status.RUNNING:
-                timestamp_fld = "running_at"
-            elif new_status.status == Status.FINISHED:
-                timestamp_fld = "finished_at"
-
-            params = {
-                "timestamp": current.isoformat(),
-                "sub_status": new_status.sub_status,
-                "details": new_status.details,
-                "run_id": sint64_run_id,
+        sint64_run_ids = [uint64_to_int64(rid) for rid in run_ids]
+        stmt = (
+            select(RunModel.run_id, TaskModel)
+            .join(TaskModel, TaskModel.task_id == RunModel.primary_task_id)
+            .where(RunModel.run_id.in_(sint64_run_ids))
+            .execution_options(populate_existing=True)
+        )
+        with self.session() as session:
+            rows = session.execute(stmt).all()
+            return {
+                int64_to_uint64(cast(int, run_id)): _run_status_from_task_model(task)
+                for run_id, task in rows
             }
-            self.query(query % timestamp_fld, params)
-        return True
 
-    def get_pending_run_id(self) -> int | None:
-        """Get the `run_id` of a run with `Status.PENDING` status."""
-        # Fetch all runs with unset `starting_at` (i.e. they are in PENDING status)
-        query = "SELECT * FROM run WHERE starting_at = '' LIMIT 1"
-        rows = self.query(query, {})
-        if rows:
-            return int64_to_uint64(rows[0]["run_id"])
-        return None
-
-    def get_federation_options(self, run_id: int) -> ConfigRecord | None:
-        """Retrieve the federation options for the specified `run_id`."""
-        # Convert the uint64 value to sint64 for SQLite
+    def get_federation_config(self, run_id: int) -> SimulationConfig | None:
+        """Get the resolved federation configuration for the specified `run_id`."""
         sint64_run_id = uint64_to_int64(run_id)
-        query = "SELECT federation_options FROM run WHERE run_id = :run_id"
-        rows = self.query(query, {"run_id": sint64_run_id})
-
-        # Check if the run_id exists
-        if not rows:
-            log(ERROR, "`run_id` is invalid")
+        with self.session() as session:
+            row = session.execute(
+                select(RunModel.federation_config).where(
+                    RunModel.run_id == sint64_run_id
+                )
+            ).one_or_none()
+        if row is None:
+            log(ERROR, "`run_id` invalid for fetching resolved federation config")
+            return None
+        fed_config_json = row[0]
+        if fed_config_json is None:
             return None
 
-        row = rows[0]
-        return configrecord_from_bytes(row["federation_options"])
+        return simulation_config_from_json(json.loads(fed_config_json))
+
+    def _finish_run_tasks(
+        self, run_primary_pairs: list[tuple[int, int]], sub_status: str, details: str
+    ) -> None:
+        """Finish all unfinished tasks of the run for the given run/primary-task pairs.
+
+        The IDs must be sint64 DB values. Each task's ``finished_at`` is copied from
+        its run's primary task.
+        """
+        if not run_primary_pairs:
+            return
+
+        sint_run_ids = [pair[0] for pair in run_primary_pairs]
+        sint_task_ids = [pair[1] for pair in run_primary_pairs]
+        primary_task = aliased(TaskModel)
+        primary_finished_at = (
+            select(primary_task.finished_at)
+            .where(
+                primary_task.task_id.in_(sint_task_ids),
+                primary_task.run_id == TaskModel.run_id,
+            )
+            .correlate(TaskModel)
+            .scalar_subquery()
+        )
+        stmt = (
+            update(TaskModel)
+            .where(
+                TaskModel.run_id.in_(sint_run_ids),
+                TaskModel.finished_at.is_(None),
+            )
+            .values(
+                finished_at=primary_finished_at,
+                sub_status=sub_status,
+                details=details,
+                active_until=None,
+                token=None,
+            )
+        )
+        with self.session() as session:
+            session.execute(stmt)
+
+    def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
+        """Move an unfinished task to finished."""
+        result = super().finish_task(task_id, sub_status, details)
+        if result:
+            sint64_task_id = uint64_to_int64(task_id)
+            # Check whether this task is referenced as a run's primary task
+            with self.session() as session:
+                run_id = session.scalar(
+                    select(RunModel.run_id).where(
+                        RunModel.primary_task_id == sint64_task_id
+                    )
+                )
+            if run_id is not None:
+                # Stop all tasks of the run when the run is stopped
+                if sub_status == SubStatus.STOPPED:
+                    finish_sub_status = SubStatus.STOPPED
+                    finish_details = "Task stopped because the run was stopped"
+                # Otherwise, fail all tasks of the run
+                else:
+                    finish_sub_status = SubStatus.FAILED
+                    finish_details = "Task failed because the run finished"
+                self._finish_run_tasks(
+                    [(run_id, sint64_task_id)],
+                    sub_status=finish_sub_status,
+                    details=finish_details,
+                )
+                self.federation_manager.report_run_usage()
+        return result
+
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+        """Fail unfinished tasks for runs whose primary task expired and report usage.
+
+        When an expired task is the primary task of a run, this hook marks all
+        unfinished tasks in that run as finished with FAILED status, removes any
+        associated task tokens, and reports run usage.
+        """
+        if not tasks:
+            return
+
+        # Check if any of the expired tasks is referenced as a run's primary task.
+        task_ids = [uint64_to_int64(task.task_id) for task in tasks]
+        with self.session() as session:
+            rows = session.execute(
+                select(RunModel.run_id, RunModel.primary_task_id).where(
+                    RunModel.primary_task_id.in_(task_ids)
+                )
+            ).all()
+        if not rows:
+            return
+
+        # Fail any remaining tasks for expired runs
+        self._finish_run_tasks(
+            [(cast(int, run_id), primary_task_id) for run_id, primary_task_id in rows],
+            sub_status=SubStatus.FAILED,
+            details="Task failed because the run expired",
+        )
+
+        # Report usage for the run
+        self.federation_manager.report_run_usage()
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
@@ -1014,188 +1229,45 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """
         sint64_node_id = uint64_to_int64(node_id)
 
-        # Check if the node exists and is not unregistered
-        query = """
-            SELECT status FROM node WHERE node_id = :node_id AND status != :unregistered
-        """
-        rows = self.query(
-            query, {"node_id": sint64_node_id, "unregistered": NodeStatus.UNREGISTERED}
-        )
-        if not rows:
-            return False
-
-        # Construct query and params
         current_dt = now()
-        query = (
-            "UPDATE node SET online_until = :online_until, "
-            "heartbeat_interval = :heartbeat_interval"
+        stmt = (
+            update(NodeModel)
+            .where(
+                NodeModel.node_id == sint64_node_id,
+                NodeModel.status != NodeStatus.UNREGISTERED,
+            )
+            .values(
+                online_until=current_dt.timestamp()
+                + HEARTBEAT_PATIENCE * heartbeat_interval,
+                heartbeat_interval=heartbeat_interval,
+                last_activated_at=case(
+                    (
+                        NodeModel.status != NodeStatus.ONLINE,
+                        current_dt.isoformat(),
+                    ),
+                    else_=NodeModel.last_activated_at,
+                ),
+                status=NodeStatus.ONLINE,
+            )
+            .returning(NodeModel.node_id)
         )
-        params: dict[str, Any] = {
-            "online_until": current_dt.timestamp()
-            + HEARTBEAT_PATIENCE * heartbeat_interval,
-            "heartbeat_interval": heartbeat_interval,
-        }
-
-        # Set timestamp if the status changes
-        if rows[0]["status"] != NodeStatus.ONLINE:
-            query += ", status = :online, last_activated_at = :last_activated_at"
-            params["online"] = NodeStatus.ONLINE
-            params["last_activated_at"] = current_dt.isoformat()
-
-        # Execute the query, refreshing `online_until` and `heartbeat_interval`
-        query += " WHERE node_id = :node_id"
-        params["node_id"] = sint64_node_id
-        self.query(query, params)
-        return True
-
-    def _on_tokens_expired(self, expired_records: list[tuple[int, float]]) -> None:
-        """Handle cleanup of expired tokens.
-
-        Override in subclasses to add custom cleanup logic.
-
-        Parameters
-        ----------
-        expired_records : list[tuple[int, float]]
-            List of tuples containing (run_id, active_until timestamp)
-            for expired tokens.
-        """
-        if not expired_records:
-            return
-
-        with self.session():
-            query = """
-                UPDATE run
-                SET sub_status = :failed, details = :details, finished_at = :finished_at
-                WHERE run_id = :run_id
-            """
-            data = [
-                {
-                    "failed": SubStatus.FAILED,
-                    "details": RUN_FAILURE_DETAILS_NO_HEARTBEAT,
-                    "finished_at": datetime.fromtimestamp(
-                        active_until, tz=timezone.utc
-                    ).isoformat(),
-                    "run_id": uint64_to_int64(run_id),
-                }
-                for run_id, active_until in expired_records
-            ]
-            self.query(query, data)
-
-    def get_serverapp_context(self, run_id: int) -> Context | None:
-        """Get the context for the specified `run_id`."""
-        # Retrieve context if any
-        query = "SELECT context FROM context WHERE run_id = :run_id"
-        rows = self.query(query, {"run_id": uint64_to_int64(run_id)})
-        context = context_from_bytes(rows[0]["context"]) if rows else None
-        return context
-
-    def set_serverapp_context(self, run_id: int, context: Context) -> None:
-        """Set the context for the specified `run_id`."""
-        # Convert context to bytes
-        context_bytes = context_to_bytes(context)
-        sint_run_id = uint64_to_int64(run_id)
-
-        with self.session():
-            # Check if any existing Context assigned to the run_id
-            query = "SELECT COUNT(*) as count FROM context WHERE run_id = :run_id"
-            row = self.query(query, {"run_id": sint_run_id})[0]
-            if row["count"] > 0:
-                # Update context
-                query = """
-                    UPDATE context
-                    SET context = :context_bytes WHERE run_id = :run_id
-                """
-                self.query(
-                    query, {"context_bytes": context_bytes, "run_id": sint_run_id}
-                )
-            else:
-                try:
-                    # Store context
-                    query = (
-                        "INSERT INTO context (run_id, context) "
-                        "VALUES (:run_id, :context_bytes)"
-                    )
-                    self.query(
-                        query, {"run_id": sint_run_id, "context_bytes": context_bytes}
-                    )
-                except IntegrityError:
-                    raise ValueError(f"Run {run_id} not found") from None
-
-    def add_serverapp_log(self, run_id: int, log_message: str) -> None:
-        """Add a log entry to the ServerApp logs for the specified `run_id`."""
-        # Convert the uint64 value to sint64 for SQLite
-        sint64_run_id = uint64_to_int64(run_id)
-
-        # Store log
-        try:
-            query = """
-                INSERT INTO logs (timestamp, run_id, node_id, log)
-                VALUES (:current_ts, :run_id, :node_id, :log)
-            """
-            self.query(
-                query,
-                {
-                    "current_ts": now().timestamp(),
-                    "run_id": sint64_run_id,
-                    "node_id": 0,
-                    "log": log_message,
-                },
-            )
-        except IntegrityError:
-            raise ValueError(f"Run {run_id} not found") from None
-
-    def get_serverapp_log(
-        self, run_id: int, after_timestamp: float | None
-    ) -> tuple[str, float]:
-        """Get the ServerApp logs for the specified `run_id`."""
-        # Convert the uint64 value to sint64 for SQLite
-        sint64_run_id = uint64_to_int64(run_id)
-
-        with self.session():
-            # Check if the run_id exists
-            query = "SELECT run_id FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": sint64_run_id})
-            if not rows:
-                raise ValueError(f"Run {run_id} not found")
-
-            # Retrieve logs
-            if after_timestamp is None:
-                after_timestamp = 0.0
-            query = """
-                SELECT log, timestamp FROM logs
-                WHERE run_id = :run_id AND node_id = :node_id
-                AND timestamp > :after_timestamp
-                ORDER BY timestamp
-            """
-            rows = self.query(
-                query,
-                {
-                    "run_id": sint64_run_id,
-                    "node_id": 0,
-                    "after_timestamp": after_timestamp,
-                },
-            )
-            latest_timestamp = rows[-1]["timestamp"] if rows else 0.0
-        return "".join(row["log"] for row in rows), latest_timestamp
+        with self.session() as session:
+            return session.scalar(stmt) is not None
 
     def get_valid_message_ins(self, message_id: str) -> dict[str, Any] | None:
         """Check if the Message exists and is valid (not expired).
 
         Return Message if valid.
         """
-        with self.session():
+        with self.session() as session:
             self._check_stored_messages({message_id})
-            query = """
-                SELECT *
-                FROM message_ins
-                WHERE message_id = :message_id
-            """
-            rows = self.query(query, {"message_id": message_id})
-            if not rows:
+            model = session.scalar(
+                select(MessageInsModel).where(MessageInsModel.message_id == message_id)
+            )
+            if model is None:
                 # Message does not exist
                 return None
-
-        return dict(rows[0])
+            return _message_model_to_dict(model)
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""
@@ -1213,55 +1285,131 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         sint64_run_id = uint64_to_int64(run_id)
 
-        with self.session():
-            # Check if run exists, performing the update only if it does
-            update_query = """
-                UPDATE run
-                SET bytes_sent = bytes_sent + :bytes_sent,
-                    bytes_recv = bytes_recv + :bytes_recv
-                WHERE run_id = :run_id
-                RETURNING run_id
-            """
-            rows = self.query(
-                update_query,
-                {
-                    "bytes_sent": bytes_sent,
-                    "bytes_recv": bytes_recv,
-                    "run_id": sint64_run_id,
-                },
+        stmt = (
+            update(RunModel)
+            .where(RunModel.run_id == sint64_run_id)
+            .values(
+                bytes_sent=RunModel.bytes_sent + bytes_sent,
+                bytes_recv=RunModel.bytes_recv + bytes_recv,
             )
-
-            if not rows:
+            .returning(RunModel.run_id)
+        )
+        with self.session() as session:
+            if session.scalar(stmt) is None:
                 raise ValueError(f"Run {run_id} not found")
 
     def add_clientapp_runtime(self, run_id: int, runtime: float) -> None:
         """Add ClientApp runtime to the cumulative total for the specified `run_id`."""
         sint64_run_id = uint64_to_int64(run_id)
-        with self.session():
-            # Check if run exists, performing the update only if it does
-            update_query = """
-                UPDATE run
-                SET clientapp_runtime = clientapp_runtime + :runtime
-                WHERE run_id = :run_id
-                RETURNING run_id
-            """
-            rows = self.query(
-                update_query, {"runtime": runtime, "run_id": sint64_run_id}
+        stmt = (
+            update(RunModel)
+            .where(RunModel.run_id == sint64_run_id)
+            .values(
+                clientapp_runtime=RunModel.clientapp_runtime + runtime,
             )
-
-            if not rows:
+            .returning(RunModel.run_id)
+        )
+        with self.session() as session:
+            if session.scalar(stmt) is None:
                 raise ValueError(f"Run {run_id} not found")
 
 
-def determine_run_status(row: dict[str, Any]) -> str:
-    """Determine the status of the run based on timestamp fields."""
-    if row["pending_at"]:
-        if row["finished_at"]:
-            return Status.FINISHED
-        if row["starting_at"]:
-            if row["running_at"]:
-                return Status.RUNNING
-            return Status.STARTING
-        return Status.PENDING
-    run_id = int64_to_uint64(row["run_id"])
-    raise ValueError(f"The run {run_id} does not have a valid status.")
+def _primary_task_status_filter(status: str) -> Any:
+    """Return the ORM filter expression for a primary task status."""
+    if status == Status.PENDING:
+        return TaskModel.starting_at.is_(None) & TaskModel.finished_at.is_(None)
+    if status == Status.STARTING:
+        return (
+            TaskModel.starting_at.is_not(None)
+            & TaskModel.running_at.is_(None)
+            & TaskModel.finished_at.is_(None)
+        )
+    if status == Status.RUNNING:
+        return TaskModel.running_at.is_not(None) & TaskModel.finished_at.is_(None)
+    if status == Status.FINISHED:
+        return TaskModel.finished_at.is_not(None)
+    raise ValueError(f"Unsupported task status {status!r}.")
+
+
+def _run_status_from_task_model(task: TaskModel) -> RunStatus:
+    """Determine a run status from its primary task model."""
+    if task.pending_at:
+        if task.finished_at:
+            return RunStatus(
+                status=Status.FINISHED,
+                sub_status=task.sub_status,
+                details=task.details,
+            )
+        if task.starting_at:
+            if task.running_at:
+                return RunStatus(status=Status.RUNNING, sub_status="", details="")
+            return RunStatus(status=Status.STARTING, sub_status="", details="")
+        return RunStatus(status=Status.PENDING, sub_status="", details="")
+    task_id = int64_to_uint64(task.task_id)
+    raise ValueError(f"The task {task_id} does not have a valid status.")
+
+
+def _node_info_from_model(model: NodeModel) -> NodeInfo:
+    """Convert a node model to a NodeInfo message."""
+    return NodeInfo(
+        node_id=int64_to_uint64(cast(int, model.node_id)),
+        owner_aid=cast(str, model.owner_aid),
+        owner_name=cast(str, model.owner_name),
+        status=cast(str, model.status),
+        registered_at=cast(str, model.registered_at),
+        last_activated_at=model.last_activated_at,
+        last_deactivated_at=model.last_deactivated_at,
+        unregistered_at=model.unregistered_at,
+        online_until=model.online_until,
+        heartbeat_interval=cast(float, model.heartbeat_interval),
+        public_key=cast(bytes, model.public_key),
+    )
+
+
+def _message_model_to_dict(
+    model: MessageInsModel | MessageResModel,
+) -> dict[str, Any]:
+    """Convert a message model to the dictionary representation used by serde.
+
+    This is a temporary compatibility adapter while the message utilities still
+    consume dictionaries. It should be replaced and removed once those utilities
+    accept ORM models or typed domain objects directly.
+    """
+    return {
+        "message_id": model.message_id,
+        "group_id": model.group_id,
+        "run_id": model.run_id,
+        "src_node_id": model.src_node_id,
+        "dst_node_id": model.dst_node_id,
+        "reply_to_message_id": model.reply_to_message_id,
+        "created_at": model.created_at,
+        "delivered_at": model.delivered_at,
+        "ttl": model.ttl,
+        "message_type": model.message_type,
+        "content": model.content,
+        "error": model.error,
+    }
+
+
+def _run_from_models(run: RunModel, task: TaskModel) -> Run:
+    """Convert a run and its primary task models to a Run object."""
+    return Run(
+        run_id=int64_to_uint64(cast(int, run.run_id)),
+        fab_id=cast(str, run.fab_id),
+        fab_version=cast(str, run.fab_version),
+        fab_hash=cast(str, run.fab_hash),
+        override_config=json.loads(cast(str, run.override_config)),
+        pending_at=timestamp_to_iso(task.pending_at),
+        starting_at=timestamp_to_iso(task.starting_at),
+        running_at=timestamp_to_iso(task.running_at),
+        finished_at=timestamp_to_iso(task.finished_at),
+        status=_run_status_from_task_model(task),
+        flwr_aid=cast(str, run.flwr_aid),
+        federation_id=cast(str, run.federation_id),
+        primary_task_id=int64_to_uint64(run.primary_task_id),
+        bytes_sent=cast(int, run.bytes_sent),
+        bytes_recv=cast(int, run.bytes_recv),
+        clientapp_runtime=cast(float, run.clientapp_runtime),
+        primary_task_type=task.type,
+        series_id=int64_to_uint64(run.series_id) if run.series_id else 0,
+    )

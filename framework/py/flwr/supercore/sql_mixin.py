@@ -24,16 +24,23 @@ from logging import DEBUG, ERROR, WARNING
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Engine, MetaData, create_engine, event, inspect, text
+from sqlalchemy import Engine, MetaData, create_engine, event, inspect, make_url, text
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
+from sqlalchemy.sql.dml import Insert
 
-from flwr.common.logger import log
-from flwr.supercore.constant import FLWR_IN_MEMORY_SQLITE_DB_URL, SQLITE_PRAGMAS
+from flwr.supercore import log
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_SQLITE_DB_URL,
+    SQL_ALLOWED_DIALECTS,
+    SQLITE_PRAGMAS,
+)
 from flwr.supercore.state.alembic.utils import run_migrations
 
-_current_session: ContextVar[Session | None] = ContextVar(
-    "current_sqlalchemy_session",
+_current_sessions: ContextVar[dict[object, Session] | None] = ContextVar(
+    "current_sqlalchemy_sessions",
     default=None,
 )
 
@@ -59,12 +66,11 @@ def _log_query(  # pylint: disable=W0613,R0913,R0917
 
 
 class SqlMixin(ABC):
-    """Mixin providing common SQLite connection and initialization logic.
+    """Mixin providing common SQL connection and initialization logic."""
 
-    This mixin uses SQLAlchemy Core API for SQLite database access. It accepts either a
-    database file path or a SQLite URL, automatically converting file paths to SQLite
-    URLs.
-    """
+    # Subclasses can restrict supported SQLAlchemy dialects.
+    # Flower Framework SQL backend currently allows only the SQLite dialect.
+    allowed_dialects: frozenset[str] | None = SQL_ALLOWED_DIALECTS
 
     def __init__(self, database_path: str) -> None:
         """Initialize the SqlMixin.
@@ -94,27 +100,62 @@ class SqlMixin(ABC):
             )
             database_path = ":memory:"
 
-        # Auto-convert file path to SQLAlchemy SQLite URL if needed
-        if database_path == ":memory:":
-            self.database_url = FLWR_IN_MEMORY_SQLITE_DB_URL
-        elif not database_path.startswith("sqlite://"):
-            # Treat as file path, convert to absolute and create SQLite URL
-            abs_path = Path(database_path).resolve()
-            self.database_url = f"sqlite:///{abs_path}"
-        else:
-            # Already a SQLite URL
-            self.database_url = database_path
+        self.database_url = self._normalize_database_url(database_path)
+        parsed_database_url = make_url(self.database_url)
+        self.database_backend = parsed_database_url.get_backend_name()
+        self._validate_allowed_dialects(self.database_backend)
+        self._is_in_memory_sqlite = (
+            self.database_backend == "sqlite"
+            and parsed_database_url.database in (None, "", ":memory:")
+        )
+
+        # Persistent SQL states using the same database URL may share one
+        # transaction. In-memory SQLite engines are independent per instance, so
+        # they must not share sessions.
+        self._session_scope = self if self._is_in_memory_sqlite else self.database_url
 
         self._engine: Engine | None = None
         self._session_factory: sessionmaker[Session] | None = None
+
+    def _normalize_database_url(self, database_path: str) -> str:
+        """Normalize user input to a SQLAlchemy database URL."""
+        if database_path == ":memory:":
+            return FLWR_IN_MEMORY_SQLITE_DB_URL
+
+        # Explicit SQLAlchemy URL, keep as-is for dialect validation.
+        if "://" in database_path:
+            return database_path.strip()
+
+        # Treat as file path and convert to a SQLite URL.
+        abs_path = Path(database_path).resolve()
+        return f"sqlite:///{abs_path}"
+
+    def _validate_allowed_dialects(self, dialect: str) -> None:
+        """Validate configured dialect against class-level restrictions."""
+        allowed = self.allowed_dialects
+        if allowed is None or dialect in allowed:
+            return
+
+        allowed_str = ", ".join(sorted(allowed))
+        hint = (
+            " Supported backends are in-memory and SQLite paths/URLs."
+            if "sqlite" in allowed
+            else ""
+        )
+
+        raise ValueError(
+            f"Unsupported SQL dialect {dialect!r} for {type(self).__name__}."
+            f" Supported dialects: {allowed_str}.{hint}"
+        )
 
     @contextmanager
     def session(self) -> Iterator[Session]:
         """Provide a transactional database session context.
 
         Yields a SQLAlchemy Session that automatically commits on success or rolls
-        back on exceptions. Re-entrant: nested calls reuse the same session. Use for
-        multi-statement transactions; prefer `query()` for single statements.
+        back on exceptions. Re-entrant for the same database scope: nested calls
+        reuse that scope's session. Use for multi-statement transactions; prefer
+        `query()` for single statements.
 
         Yields
         ------
@@ -127,9 +168,15 @@ class SqlMixin(ABC):
                 session.execute(text("DELETE FROM t WHERE id = :id"), {"id": 1})
                 session.execute(text("INSERT INTO t2 SELECT * FROM t"))
         """
-        existing = _current_session.get()
+        current_sessions = _current_sessions.get()
+        existing = (
+            current_sessions.get(self._session_scope)
+            if current_sessions is not None
+            else None
+        )
 
-        # Re-entrant: reuse the session if in a session context, no begin()
+        # Re-entrant: reuse the active session for this database scope, even when
+        # another database scope was entered more recently.
         if existing is not None:
             yield existing
             return
@@ -139,14 +186,25 @@ class SqlMixin(ABC):
 
         # Create new session; outermost scope owns the transaction
         session = self._session_factory()
-        token = _current_session.set(session)
+        token = _current_sessions.set(
+            {**(current_sessions or {}), self._session_scope: session}
+        )
 
         try:
             with session.begin():
                 yield session
         finally:
-            _current_session.reset(token)
+            _current_sessions.reset(token)
             session.close()
+
+    def dialect_insert(self, table: Any) -> Insert:
+        """Return a dialect-specific insert statement for the active backend."""
+        if self.database_backend == "sqlite":
+            return sqlite_insert(table)
+
+        raise NotImplementedError(
+            f"No dialect-specific insert configured for {self.database_backend!r}."
+        )
 
     def get_metadata(self) -> MetaData | None:
         """Return the MetaData object for this class.
@@ -177,15 +235,20 @@ class SqlMixin(ABC):
         list[str]
             The list of all tables in the DB.
         """
-        # Create engine with SQLite-specific settings
-        engine_kwargs: dict[str, Any] = {
+        # Create engine with dialect-specific settings
+        engine_kwargs: dict[str, Any] = {}
+        if self.database_backend == "sqlite":
             # SQLite needs check_same_thread=False for multi-threaded access
-            "connect_args": {"check_same_thread": False}
-        }
+            engine_kwargs["connect_args"] = {"check_same_thread": False}
+        # In-memory SQLite databases are per-connection; use StaticPool to ensure
+        # all threads share the same database instance.
+        if self._is_in_memory_sqlite:
+            engine_kwargs["poolclass"] = StaticPool
         self._engine = create_engine(self.database_url, **engine_kwargs)
 
         # Set SQLite pragmas via event listener for optimal performance and correctness
-        event.listen(self._engine, "connect", _set_sqlite_pragmas)
+        if self.database_backend == "sqlite":
+            event.listen(self._engine, "connect", _set_sqlite_pragmas)
 
         if log_queries:
             # Set up query logging via event listener
@@ -196,7 +259,7 @@ class SqlMixin(ABC):
 
         # Create database
         metadata: MetaData | None = self.get_metadata()
-        if metadata and self.database_url == FLWR_IN_MEMORY_SQLITE_DB_URL:
+        if metadata and self._is_in_memory_sqlite:
             # In-memory databases: create tables directly from SQLAlchemy metadata
             metadata.create_all(self._engine)
         else:
@@ -220,8 +283,9 @@ class SqlMixin(ABC):
         isolated transaction that is automatically committed. This is suitable for
         single SQL statements.
 
-        If called within a session() context, query() reuses the existing session
-        and transaction. This enables atomic multi-query operations:
+        If called within a session() context for the same database scope, query()
+        reuses the existing session and transaction. This enables atomic multi-query
+        operations:
 
             with self.session() as session:
                 self.query("UPDATE ...", {...})    # Shares same transaction
@@ -266,14 +330,28 @@ class SqlMixin(ABC):
         # Multi-statement transaction - query() calls share the same session
         with self.session():
             # Both statements succeed or fail together
-            self.query("DELETE FROM token_store WHERE active_until < :time", {...})
-            self.query("UPDATE run SET status = :status WHERE id = :id", {...})
+            self.query(
+                "UPDATE example_records SET status = :status WHERE record_id = :id",
+                {"status": "running", "id": 1},
+            )
+            self.query(
+                "INSERT INTO example_audit_log (record_id, event) "
+                "VALUES (:id, :event)",
+                {"id": 1, "event": "record updated"},
+            )
 
         # Nested session() - query() calls share the same session
         with self.session():
-            self.query("DELETE FROM token_store WHERE active_until < :time", {...})
+            self.query(
+                "UPDATE example_records SET status = :status WHERE record_id = :id",
+                {"status": "running", "id": 1},
+            )
             with self.session():
-                self.query("UPDATE run SET status = :status WHERE id = :id", {...})
+                self.query(
+                    "INSERT INTO example_audit_log (record_id, event) "
+                    "VALUES (:id, :event)",
+                    {"id": 1, "event": "record updated"},
+                )
         """
         if self._engine is None:
             raise AttributeError(

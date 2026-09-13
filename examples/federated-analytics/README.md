@@ -150,7 +150,8 @@ The `db-url` parameter accepts a standard PostgreSQL connection string in the fo
 flower-supernode \
      --insecure \
      --superlink 127.0.0.1:9092 \
-     --clientappio-api-address 127.0.0.1:9094 \
+     --host 127.0.0.1 \
+     --port 9094 \
      --node-config="db-url='postgresql+psycopg://flwrlabs:flwrlabs@localhost:5433/flwrlabs'"
 ```
 
@@ -158,7 +159,8 @@ flower-supernode \
 flower-supernode \
      --insecure \
      --superlink 127.0.0.1:9092 \
-     --clientappio-api-address 127.0.0.1:9095 \
+     --host 127.0.0.1 \
+     --port 9095 \
      --node-config="db-url='postgresql+psycopg://flwrlabs:flwrlabs@localhost:5434/flwrlabs'"
 ```
 

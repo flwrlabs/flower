@@ -17,7 +17,8 @@
 
 import numpy as np
 
-from flwr.common import ArrayRecord, Message, NDArrays
+from flwr.app import ArrayRecord, Message
+from flwr.common import NDArrays
 
 from .fedavgm import FedAvgM
 from .strategy_utils_test import create_mock_reply
@@ -89,3 +90,20 @@ def test_aggregate_fit_server_learning_rate_and_momentum() -> None:
     assert actual is not None
     for w_act, w_exp in zip(actual.to_numpy_ndarrays(), expected, strict=True):
         np.testing.assert_almost_equal(w_act, w_exp, decimal=5)
+
+
+def test_aggregate_fit_with_scalar_weights() -> None:
+    """Test aggregate with scalar-shaped weights."""
+    strategy = FedAvgM(server_learning_rate=1.0 + 1e-9)
+    strategy.current_arrays = ArrayRecord([np.array(0.0)])
+    replies = [
+        create_mock_reply(ArrayRecord([np.array(1.0)]), num_examples=1),
+        create_mock_reply(ArrayRecord([np.array(3.0)]), num_examples=2),
+    ]
+
+    actual, _ = strategy.aggregate_train(1, replies)
+
+    assert actual is not None
+    scalar_weight = actual.to_numpy_ndarrays()[0]
+    assert scalar_weight.shape == ()
+    np.testing.assert_allclose(scalar_weight, np.array(7.0 / 3.0), rtol=1e-6)

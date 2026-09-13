@@ -1,0 +1,31 @@
+[project]
+name = "flower-agent-docs"
+version = "0.1.0"
+description = "Documentation for Flower Agent"
+license = "Apache-2.0"
+authors = [{ name = "The Flower Authors", email = "hello@flower.ai" }]
+readme = "docs/README.md"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "furo==2024.8.6",
+    "myst-parser==3.0.1",
+    "sphinx==7.4.7",
+]
+
+[project.urls]
+homepage = "https://flower.ai"
+repository = "https://github.com/flwrlabs/flower"
+documentation = "https://flower.ai/docs/agent"
+
+[dependency-groups]
+dev = [
+    "beautysh==6.4.2",
+    "mdformat==1.0.0",
+    "mdformat-beautysh==1.0.0",
+    "mdformat-frontmatter==2.0.10",
+    "mdformat-gfm==1.0.0",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+package = false

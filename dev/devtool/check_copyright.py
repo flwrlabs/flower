@@ -44,9 +44,7 @@ COPYRIGHT_FORMAT = """# Copyright {} Flower Labs GmbH. All Rights Reserved.
 # =============================================================================="""
 
 # Regex pattern to extract copyright year from file
-COPYRIGHT_PATTERN = re.compile(
-    r"# Copyright (\d{4}) Flower Labs GmbH"
-)
+COPYRIGHT_PATTERN = re.compile(r"# Copyright (\d{4}) Flower Labs GmbH")
 
 
 def _get_file_creation_year(filepath: str) -> int:
@@ -97,12 +95,12 @@ def _check_copyright(dir_list: list[str]) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 0:
-        raise Exception(  # pylint: disable=W0719
+    if len(sys.argv) < 2:
+        raise ValueError(
             "Please provide at least one directory path relative "
             "to your current working directory."
         )
-    for i, _ in enumerate(sys.argv):
-        abs_path: str = os.path.abspath(os.path.join(os.getcwd(), sys.argv[i]))
-        __, init_dirs = get_init_dir_list_and_warnings(abs_path)
+    for relative_path in sys.argv[1:]:
+        abs_path = os.path.abspath(os.path.join(os.getcwd(), relative_path))
+        _, init_dirs = get_init_dir_list_and_warnings(abs_path)
         _check_copyright(init_dirs)

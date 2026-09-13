@@ -24,8 +24,9 @@ from typing import cast
 
 import numpy as np
 
-from flwr.common import Array, ArrayRecord, Message, MetricRecord, NDArray, RecordDict
-from flwr.common.logger import log
+from flwr.app import Array, ArrayRecord, Message, MetricRecord, RecordDict
+from flwr.common import NDArray
+from flwr.supercore import log
 
 from ..exception import AggregationError
 from .fedavg import FedAvg
@@ -70,7 +71,8 @@ class FedTrimmedAvg(FedAvg):
         If `None`, defaults to `aggregate_metricrecords`, which performs a weighted
         average using the provided weight factor key.
     beta : float (default: 0.2)
-        Fraction to cut off of both tails of the distribution.
+        Fraction to cut off of both tails of the distribution. Must be in the range
+        ``[0, 0.5)``.
     """
 
     def __init__(  # pylint: disable=R0913, R0917
@@ -91,6 +93,9 @@ class FedTrimmedAvg(FedAvg):
         ) = None,
         beta: float = 0.2,
     ) -> None:
+        if not 0.0 <= beta < 0.5:
+            raise ValueError("`beta` must be in the range [0, 0.5).")
+
         super().__init__(
             fraction_train=fraction_train,
             fraction_evaluate=fraction_evaluate,
@@ -139,7 +144,9 @@ class FedTrimmedAvg(FedAvg):
             ]
             # Compute trimmed mean and save as Array in ArrayRecord
             try:
-                arrays[array_key] = Array(trim_mean(np.stack(layers), self.beta))
+                arrays[array_key] = Array(
+                    np.asarray(trim_mean(np.stack(layers), self.beta))
+                )
             except ValueError as e:
                 raise AggregationError(
                     f"Trimmed mean could not be computed. "
@@ -161,12 +168,13 @@ def trim_mean(array: NDArray, cut_fraction: float) -> NDArray:
 
     https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.trim_mean.html
     """
+    if not 0.0 <= cut_fraction < 0.5:
+        raise ValueError("Cut fraction must be in the range [0, 0.5).")
+
     axis = 0
     nobs = array.shape[0]
     lowercut = int(cut_fraction * nobs)
     uppercut = nobs - lowercut
-    if lowercut > uppercut:
-        raise ValueError("Fraction too big.")
 
     atmp = np.partition(array, (lowercut, uppercut - 1), axis)
 

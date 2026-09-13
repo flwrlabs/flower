@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from flwr.common.typing import UserConfig
+from flwr.app import UserConfig
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import DirichletPartitioner
 from torch.utils.data import DataLoader

@@ -3,7 +3,6 @@
 # This file is distributed under the same license as the Flower package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2023.
 #
-#, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: Flower \n"
@@ -21,22 +20,20 @@ msgstr ""
 
 #: ../../source/_templates/base.html:18
 msgid "About these documents"
-msgstr ""
+msgstr "À propos de ces documents"
 
 #: ../../source/_templates/base.html:21
 msgid "Index"
-msgstr ""
+msgstr "Index"
 
-#: ../../source/_templates/base.html:24
-#: ../../source/_templates/sidebar/search.html:2
+#: ../../source/_templates/base.html:24 ../../source/_templates/sidebar/search.html:2
 msgid "Search"
-msgstr ""
+msgstr "Recherche"
 
 #: ../../source/_templates/base.html:27
 msgid "Copyright"
-msgstr ""
+msgstr "Copyright"
 
 #: ../../source/_templates/sidebar/search.html:2
 msgid "Type / to search"
-msgstr ""
-
+msgstr "Saisissez / pour rechercher"

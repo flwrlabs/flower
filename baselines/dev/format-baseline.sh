@@ -10,6 +10,5 @@ cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../$1
 echo "Formatting started"
 python -m isort .
 python -m black -q .
-python -m docformatter -i -r .
 python -m ruff check --fix .
 echo "Formatting done"

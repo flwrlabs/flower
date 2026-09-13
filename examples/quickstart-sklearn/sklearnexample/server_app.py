@@ -38,8 +38,9 @@ def main(grid: Grid, context: Context) -> None:
         num_rounds=num_rounds,
     )
 
-    # Save final model parameters
-    print("\nSaving final model to disk...")
-    ndarrays = result.arrays.to_numpy_ndarrays()
-    set_model_params(model, ndarrays)
-    joblib.dump(model, "logreg_model.pkl")
+    if context.run_config["save-model"]:
+        # Save final model parameters
+        print("\nSaving final model to disk...")
+        ndarrays = result.arrays.to_numpy_ndarrays()
+        set_model_params(model, ndarrays)
+        joblib.dump(model, "logreg_model.pkl")

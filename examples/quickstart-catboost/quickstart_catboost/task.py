@@ -18,15 +18,17 @@ def convert_to_model_dict(model_input: CatBoostClassifier) -> dict:
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
         model_input.save_model(tmp.name, format="json")
         tmp_path = tmp.name
-    model_dict = json.load(open(tmp_path, "r"))
+    with open(tmp_path, "r", encoding="utf-8") as tmp:
+        model_dict = json.load(tmp)
     return model_dict
 
 
 def convert_to_catboost(model_input: bytes) -> CatBoostClassifier:
     """Convert serialized model dict to CatBoost object."""
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
-        json.dump(json.loads(model_input), open(tmp.name, "w"))
         tmp_path = tmp.name
+    with open(tmp_path, "w", encoding="utf-8") as tmp:
+        json.dump(json.loads(model_input), tmp)
     cbc_init = CatBoostClassifier()
     cbc_init.load_model(tmp_path, "json")
     return cbc_init

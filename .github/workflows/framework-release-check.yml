@@ -1,0 +1,107 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+name: Check Framework Release PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: framework-release-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check-framework-release:
+    if: startsWith(github.event.pull_request.head.ref, 'automation/release/framework-')
+    name: Validate Framework release PR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout release PR head
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Read release metadata
+        shell: bash
+        run: |
+          # Read the release version from the machine-managed metadata file.
+          metadata_file=".github/framework-release.json"
+          version="$(jq --raw-output '.version // empty' "${metadata_file}")"
+          if [[ -z "${version}" ]]; then
+            echo "::error file=${metadata_file}::Unable to read the release version."
+            exit 1
+          fi
+
+          # Read the pinned source commit from the metadata file.
+          release_source_sha="$(jq --raw-output '.release_source_sha // empty' "${metadata_file}")"
+          if [[ -z "${release_source_sha}" ]]; then
+            echo "::error file=${metadata_file}::Unable to read the release source SHA."
+            exit 1
+          fi
+
+          # Expose the release metadata to later workflow steps.
+          echo "VERSION=${version}" >> "${GITHUB_ENV}"
+          echo "RELEASE_SOURCE_SHA=${release_source_sha}" >> "${GITHUB_ENV}"
+
+      - name: Check deterministic version state
+        shell: bash
+        run: |
+          # Confirm that release preparation produced the expected version state.
+          python framework/dev/update_version.py \
+            --released-version "${VERSION}" \
+            --check
+
+      - name: Check release changelog
+        shell: bash
+        run: |
+          # Require the changelog file for this release.
+          changelog="framework/docs/source/changelog/v${VERSION}.md"
+          if [[ ! -f "${changelog}" ]]; then
+            echo "::error file=${changelog}::Release changelog does not exist."
+            exit 1
+          fi
+
+          # Require the changelog index to include this release.
+          include="\`\`\`{include} v${VERSION}.md"
+          if ! grep --fixed-strings --line-regexp --quiet \
+            "${include}" framework/docs/source/changelog/index.md; then
+            echo "::error file=framework/docs/source/changelog/index.md::Missing ${include}"
+            exit 1
+          fi
+
+          # Require the release header to use today's UTC date.
+          expected_header="## v${VERSION} ($(date -u +%Y-%m-%d))"
+          actual_header="$(head -n 1 "${changelog}")"
+          if [[ "${actual_header}" != "${expected_header}" ]]; then
+            echo "::error file=${changelog},line=1::Expected '${expected_header}', found '${actual_header}'."
+            exit 1
+          fi
+
+      - name: Check release artifact readiness
+        shell: bash
+        run: |
+          # Download the artifact index for the exact pinned source commit.
+          artifact_index="${RUNNER_TEMP}/digests.json"
+          curl --fail --location --silent --show-error \
+            --output "${artifact_index}" \
+            "https://artifact.flower.ai/framework/commits/${RELEASE_SOURCE_SHA}/digests.json"
+
+          # Validate the artifact index identity and image entries.
+          jq --exit-status \
+            --arg release_source_sha "${RELEASE_SOURCE_SHA}" \
+            '.schema_version == 1
+              and .commit_sha == $release_source_sha
+              and (.images | type == "array" and length > 0)
+              and all(.images[];
+                (.repository | type == "string" and length > 0)
+                and (.tags | type == "array" and length > 0)
+                and (.index_digest
+                  | type == "string"
+                  and test("^sha256:[0-9a-f]{64}$")))' \
+            "${artifact_index}" > /dev/null

@@ -48,11 +48,18 @@ enabled:
     :doc:`how-to-enable-tls-connections` guide and extends it to introduce node
     authentication to the SuperLink ↔ SuperNode connection.
 
+.. note::
+
+    This guide covers CLI-managed SuperNode authentication for a self-hosted SuperLink.
+    To register SuperNodes in the SuperGrid dashboard and add them to a deployment
+    federation, see :doc:`how-to-connect-supernodes-to-supergrid`.
+
 .. tip::
 
     Checkout the `Flower Authentication
-    <https://github.com/adap/flower/tree/main/examples/flower-authentication>`_ example
-    for a complete self-contained example on how to setup TLS and node authentication.
+    <https://github.com/flwrlabs/flower/tree/main/examples/supernode-authentication>`_
+    example for a complete self-contained example on how to setup TLS and node
+    authentication.
 
 ******************************
  Generate authentication keys
@@ -108,7 +115,39 @@ allowed to connect to it. This process is handled through the
 |flower_cli_supernode_link|_ using the public keys previously generated for each
 SuperNode you plan to connect to the SuperLink.
 
-Here's how this looks in code:
+First, ensure your Flower configuration file has a SuperLink connection profile that
+points to your running SuperLink and that includes a ``root-certificates`` field with
+the path to the CA certificate used to launch the SuperLink. For example:
+
+.. code-block:: toml
+    :caption: config.toml
+    :emphasize-lines: 3
+
+    [superlink.local-deployment]
+    address = "127.0.0.1:8000"
+    root-certificates = "/absolute/path/to/certificates/ca.crt"
+
+You can verify that your connection is correctly configured by running a ``flwr ls``
+command:
+
+.. code-block:: bash
+
+    $ flwr ls local-deployment
+
+    📄 Listing all runs...
+    ┏━━━━━━━━┳━━━━━━━━━━━━┳━━━━━┳━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┓
+    ┃ Run ID ┃ Federation ┃ App ┃ Status ┃ Elapsed ┃ Status Changed @ ┃
+    ┡━━━━━━━━╇━━━━━━━━━━━━╇━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩
+    └────────┴────────────┴─────┴────────┴─────────┴──────────────────┘
+
+.. tip::
+
+    You can setup your ``local-deployment`` profile as the default so you don't have to
+    specify it in every Flower CLI command that needs to connect to the SuperLink. For
+    that and more details about the Flower configuration, refer to the :doc:`the Flower
+    Configuration <ref-flower-configuration>` guide.
+
+With a correctly configured Flower CLI, let's proceed to register two SuperNodes:
 
 .. code-block:: bash
 
@@ -152,13 +191,19 @@ Connecting a SuperNode to a SuperLink that has node authentication enabled requi
 passing one additional argument (i.e. the private key of the SuperNode) in addition to
 the TLS certificate.
 
+.. note::
+
+    To enable TLS also for the Runtime API on SuperNodes, please refer to
+    :ref:`Launching the SuperNodes with TLS <connecting-the-supernodes-with-tls>`.
+
 .. code-block:: bash
     :emphasize-lines: 6
 
     $ flower-supernode \
         --root-certificates certificates/ca.crt \
         --superlink 127.0.0.1:9092 \
-        --clientappio-api-address 127.0.0.1:9094 \
+        --host 127.0.0.1 \
+        --port 9094 \
         --node-config="partition-id=0 num-partitions=2" \
         --auth-supernode-private-key keys/supernode_credentials_1
 
@@ -175,7 +220,8 @@ private key:
     $ flower-supernode \
         --root-certificates certificates/ca.crt \
         --superlink 127.0.0.1:9092 \
-        --clientappio-api-address 127.0.0.1:9095 \
+        --host 127.0.0.1 \
+        --port 9095 \
         --node-config="partition-id=1 num-partitions=2" \
         --auth-supernode-private-key keys/supernode_credentials_2
 

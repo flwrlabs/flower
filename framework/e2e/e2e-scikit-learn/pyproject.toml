@@ -12,7 +12,7 @@ authors = [
     { name = "Kaushik Amar Das", email = "kaushik.das@iiitg.ac.in" },
 ]
 dependencies = [
-    "flwr[simulation,rest] @ {root:parent:parent:uri}",
+    "flwr[simulation] @ {root:parent:parent:uri}",
     "flwr-datasets[vision]>=0.5.0,<1.0.0",
     "scikit-learn>=1.1.1,<2.0.0",
 ]

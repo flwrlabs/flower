@@ -13,3 +13,20 @@
 # limitations under the License.
 # ==============================================================================
 """Infrastructure components shared between SuperLink and SuperNode."""
+
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .logger import log as log
+
+__all__ = ["log"]
+
+
+def __getattr__(name: str) -> Any:
+    """Lazily resolve exports that depend on ``flwr.common`` initialization."""
+    if name == "log":
+        value = import_module("flwr.supercore.logger").log
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

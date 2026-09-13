@@ -12,25 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SQLAlchemy Core Table definitions for CoreState."""
+"""Compatibility wrapper for CoreState SQLAlchemy metadata."""
 
+from sqlalchemy import MetaData
 
-from sqlalchemy import Column, Float, Integer, MetaData, String, Table
+from flwr.supercore.state.schema.corestate_models import FlwrBase
 
 
 def create_corestate_metadata() -> MetaData:
     """Create and return MetaData with CoreState table definitions."""
     metadata = MetaData()
-
-    # --------------------------------------------------------------------------
-    #  Table: token_store
-    # --------------------------------------------------------------------------
-    Table(
-        "token_store",
-        metadata,
-        Column("run_id", Integer, primary_key=True, nullable=True),
-        Column("token", String, unique=True, nullable=False),
-        Column("active_until", Float),
-    )
-
+    for table in FlwrBase.metadata.tables.values():
+        table.to_metadata(metadata)
     return metadata

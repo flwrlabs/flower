@@ -1,0 +1,150 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Handle connector tasks."""
+
+from __future__ import annotations
+
+import time
+from typing import cast
+
+from flwr.common.serde import message_from_proto, message_to_proto
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    GetConnectorRequest,
+    PullTaskMessageRequest,
+    PushTaskMessageRequest,
+)
+from flwr.supercore.json_message.connector_message import (
+    ConnectorRequest,
+    ConnectorResponse,
+)
+from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.task_process.usage import TaskUsageRecorder
+from flwr.supercore.typing import JSONObject
+from flwr.supercore.utils import strict_json_loads
+
+from .http import ConnectorApiError
+from .registry import (
+    get_connector_ref,
+    invoke_connector,
+    requires_connector_credentials,
+)
+
+
+def handle_task(
+    client: RuntimeHttpClient,
+    task_id: int,
+    run_id: int,
+) -> None:
+    """Run one connector task request."""
+    request_message = _pull_connector_request(client)
+    if request_message.metadata.src_task_id is None:
+        raise RuntimeError("Connector request source task is not set.")
+
+    def _push_connector_response(response: JSONObject) -> None:
+        """Push a ConnectorResponse back to the requesting task."""
+        message = ConnectorResponse(
+            dst_task_id=cast(int, request_message.metadata.src_task_id),
+            name=cast(str, request_message.payload["name"]),
+            call_id=cast(str, request_message.payload["call_id"]),
+            output=response["output"],
+            error=cast(JSONObject | None, response["error"]),
+            reply_to_message_id=request_message.metadata.message_id,
+        )
+        message.metadata.__dict__["_run_id"] = run_id
+        message.metadata.src_task_id = task_id
+        message.metadata.__dict__["_message_id"] = message.object_id
+        client.PushTaskMessage(
+            PushTaskMessageRequest(message=message_to_proto(message))
+        )
+
+    response = None
+    name = cast(str, request_message.payload["name"])
+    connector_ref = get_connector_ref(name)
+    uses_credentials = requires_connector_credentials(name)
+    credential_failure_message = None
+    try:
+        credentials: JSONObject | None = None
+        config: JSONObject | None = None
+        if uses_credentials:
+            connector = client.GetConnector(GetConnectorRequest())
+            if connector.connector_ref != connector_ref:
+                raise RuntimeError("Connector credentials could not be loaded.")
+            credentials = _parse_connector_json(connector.credentials_json)
+            config = _parse_connector_json(connector.config_json)
+        response = {
+            "output": invoke_connector(
+                name=name,
+                arguments=cast(JSONObject, request_message.payload["arguments"]),
+                usage_recorder=TaskUsageRecorder(client),
+                credentials=credentials,
+                config=config,
+            ),
+            "error": None,
+        }
+    except Exception as ex:  # pylint: disable=broad-exception-caught
+        if uses_credentials:
+            safe_error = ex if isinstance(ex, ConnectorApiError) else None
+            response = _make_error_response(safe_error)
+            credential_failure_message = (
+                str(safe_error)
+                if safe_error is not None
+                else "Credential-backed connector execution failed."
+            )
+        else:
+            response = _make_error_response(ex)
+            raise
+    finally:
+        # Push the response
+        if response is not None:
+            _push_connector_response(response)
+
+    # Raise outside the except block so the secret-bearing exception is not retained
+    # as context on the sanitized error.
+    if credential_failure_message is not None:
+        raise RuntimeError(credential_failure_message)
+
+
+def _pull_connector_request(client: RuntimeHttpClient) -> ConnectorRequest:
+    """Pull one connector request, waiting until it becomes available."""
+    # Keep polling until flwr-agentapp produces a request. If it exits, cleanup
+    # forces flwr-connector to stop, with auth handling revoked tokens.
+    while True:
+        pull_response = client.PullTaskMessage(PullTaskMessageRequest(limit=1))
+        messages = [message_from_proto(message) for message in pull_response.messages]
+        if messages:
+            return ConnectorRequest.from_message(messages[0])
+        time.sleep(1)  # Wait for 1 second before trying again.
+
+
+def _parse_connector_json(value: str) -> JSONObject:
+    """Parse one connector JSON object without exposing its content in errors."""
+    try:
+        parsed = strict_json_loads(value)
+    except (TypeError, ValueError):
+        raise RuntimeError("Connector credentials could not be loaded.") from None
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Connector credentials could not be loaded.")
+    return parsed
+
+
+def _make_error_response(ex: Exception | None) -> JSONObject:
+    """Create a JSON error response from an exception."""
+    return {
+        "output": None,
+        "error": {
+            "code": "connector_error",
+            "message": str(ex) if ex is not None else "Connector execution failed.",
+        },
+    }

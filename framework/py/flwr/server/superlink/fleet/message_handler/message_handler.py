@@ -16,7 +16,7 @@
 
 from logging import ERROR
 
-from flwr.common import Message, log
+from flwr.app import Message
 from flwr.common.constant import (
     HEARTBEAT_MAX_INTERVAL,
     HEARTBEAT_MIN_INTERVAL,
@@ -24,14 +24,12 @@ from flwr.common.constant import (
     NOOP_FLWR_AID,
     Status,
 )
-from flwr.common.inflatable import UnexpectedObjectContentError
 from flwr.common.serde import (
     fab_to_proto,
     message_from_proto,
     message_to_proto,
     run_to_proto,
 )
-from flwr.common.typing import Fab, InvalidRunStatusException, Run
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -63,8 +61,9 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.utils import check_abort
-from flwr.supercore.ffs import Ffs
+from flwr.supercore import log
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStore
+from flwr.supercore.run import InvalidRunStatusException, Run
 
 
 class InvalidHeartbeatIntervalError(Exception):
@@ -183,7 +182,6 @@ def pull_messages(  # pylint: disable=too-many-locals
 def push_messages(
     request: PushMessagesRequest,
     state: LinkState,
-    store: ObjectStore,
 ) -> PushMessagesResponse:
     """Push Messages handler."""
     # Convert Message from proto
@@ -198,23 +196,22 @@ def push_messages(
         run_id,
         [Status.PENDING, Status.STARTING, Status.FINISHED],
         state,
-        store,
     )
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
 
-    # Store Message object to descendants mapping and preregister objects
-    objects_to_push: set[str] = set()
-    for object_tree in request.message_object_trees:
-        objects_to_push |= set(store.preregister(run_id, object_tree))
-    # Store Message in State
-    message_id: str | None = state.store_message_res(message=msg)
+    # Store Message in State and preregister its objects.
+    session_id = state.start_session(run_id)
+    _, objects_to_push = state.store_message_and_object_tree(
+        msg, request.message_object_trees[0], session_id
+    )
 
     # Build response
     response = PushMessagesResponse(
         reconnect=Reconnect(reconnect=5),
-        results={str(message_id): 0},
+        results={msg.metadata.message_id: 0},
         objects_to_push=objects_to_push,
+        session_id=session_id,
     )
 
     # Record outgoing traffic size
@@ -229,9 +226,7 @@ def push_messages(
     return response
 
 
-def get_run(
-    request: GetRunRequest, state: LinkState, store: ObjectStore
-) -> GetRunResponse:
+def get_run(request: GetRunRequest, state: LinkState) -> GetRunResponse:
     """Get run information."""
     # Validate that the requesting SuperNode is part of the federation
     run = _validate_node_in_federation(state, request.node.node_id, request.run_id)
@@ -241,7 +236,6 @@ def get_run(
         request.run_id,
         [Status.PENDING, Status.STARTING, Status.FINISHED],
         state,
-        store,
     )
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
@@ -249,75 +243,68 @@ def get_run(
     return GetRunResponse(run=run_to_proto(run))
 
 
-def get_fab(
-    request: GetFabRequest, ffs: Ffs, state: LinkState, store: ObjectStore
-) -> GetFabResponse:
+def get_fab(request: GetFabRequest, state: LinkState) -> GetFabResponse:
     """Get FAB."""
     # Validate that the requesting SuperNode is part of the federation
-    _validate_node_in_federation(state, request.node.node_id, request.run_id)
+    run = _validate_node_in_federation(state, request.node.node_id, request.run_id)
 
     # Abort if the run is not running
     abort_msg = check_abort(
         request.run_id,
         [Status.PENDING, Status.STARTING, Status.FINISHED],
         state,
-        store,
     )
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
 
-    if result := ffs.get(request.hash_str):
-        fab = Fab(request.hash_str, result[0], result[1])
+    if request.hash_str != run.fab_hash:
+        raise ValueError(
+            f"Requested FAB hash {request.hash_str} does not match run FAB "
+            f"hash {run.fab_hash}."
+        )
+
+    if fab := state.get_fab(request.hash_str):
         return GetFabResponse(fab=fab_to_proto(fab))
 
     raise ValueError(f"Found no FAB with hash: {request.hash_str}")
 
 
-def push_object(
-    request: PushObjectRequest, state: LinkState, store: ObjectStore
-) -> PushObjectResponse:
+def push_object(request: PushObjectRequest, state: LinkState) -> PushObjectResponse:
     """Push Object."""
     abort_msg = check_abort(
         request.run_id,
         [Status.PENDING, Status.STARTING, Status.FINISHED],
         state,
-        store,
     )
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
 
-    stored = False
-    try:
-        store.put(request.object_id, request.object_content)
-        stored = True
-        # Record bytes traffic pushed from SuperNode
+    stored = state.store_object(
+        request.run_id,
+        request.session_id,
+        request.object_id,
+        request.object_content,
+    )
+    # Record bytes traffic pushed from SuperNode
+    if stored:
         state.store_traffic(
             request.run_id, bytes_sent=0, bytes_recv=len(request.object_content)
         )
-    except (NoObjectInStoreError, ValueError) as e:
-        log(ERROR, str(e))
-    except UnexpectedObjectContentError as e:
-        # Object content is not valid
-        log(ERROR, str(e))
-        raise
     return PushObjectResponse(stored=stored)
 
 
-def pull_object(
-    request: PullObjectRequest, state: LinkState, store: ObjectStore
-) -> PullObjectResponse:
+def pull_object(request: PullObjectRequest, state: LinkState) -> PullObjectResponse:
     """Pull Object."""
     abort_msg = check_abort(
         request.run_id,
         [Status.PENDING, Status.STARTING, Status.FINISHED],
         state,
-        store,
     )
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
 
-    # Fetch from store
-    content = store.get(request.object_id)
+    # Fetch from state
+    content = state.get_object(request.run_id, request.object_id)
     if content is not None:
         object_available = content != b""
         # Record bytes traffic pulled by SuperNode
@@ -341,7 +328,6 @@ def confirm_message_received(
         request.run_id,
         [Status.PENDING, Status.STARTING, Status.FINISHED],
         state,
-        store,
     )
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
@@ -368,10 +354,12 @@ def _validate_node_in_federation(
 ) -> Run:
     """Raise if the requesting SuperNode is not part of the federation the run belongs
     to."""
-    run = state.get_run(run_id)
-    if not run:
+    if not (runs := state.get_run_info(run_ids=[run_id])):
         raise ValueError(f"Run ID not found: {run_id}")
 
-    if not state.federation_manager.has_node(node_id, run.federation):
-        raise ValueError(f"SuperNode is not part of the federation '{run.federation}'.")
+    run = runs[0]
+    if not state.federation_manager.has_node(node_id, run.federation_id):
+        raise ValueError(
+            f"SuperNode is not part of the federation '{run.federation_id}'."
+        )
     return run

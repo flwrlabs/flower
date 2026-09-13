@@ -218,34 +218,3 @@ def load_certificate_in_connection(
         root_certificates_bytes = None
 
     return root_certificates_bytes
-
-
-def get_insecure_flag(federation_config: dict[str, Any]) -> bool:
-    """Extract and validate the `insecure` flag from the federation configuration.
-
-    Parameters
-    ----------
-    federation_config : dict[str, Any]
-        The federation configuration dictionary.
-
-    Returns
-    -------
-    bool
-        The insecure flag value. Returns False if not specified.
-
-    Raises
-    ------
-    click.ClickException
-        If insecure value is not a boolean type.
-    """
-    insecure_value = federation_config.get("insecure")
-
-    if insecure_value is None:
-        # Not provided, default to False (TLS enabled)
-        return False
-    if isinstance(insecure_value, bool):
-        return insecure_value
-    raise click.ClickException(
-        "Invalid type for `insecure`: expected a boolean if provided. "
-        "(`insecure = true` or `insecure = false`)"
-    )

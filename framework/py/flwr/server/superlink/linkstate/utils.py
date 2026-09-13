@@ -15,44 +15,25 @@
 """Utility functions for State."""
 
 
-from os import urandom
 from typing import Any
 
-from flwr.common import ConfigRecord, Context, Error, Message, Metadata, now, serde
-from flwr.common.constant import (
-    HEARTBEAT_PATIENCE,
-    SUPERLINK_NODE_ID,
-    ErrorCode,
-    Status,
-    SubStatus,
-)
-from flwr.common.message import make_message
+from flwr.app import Error, Message, Metadata
+from flwr.app.message import make_message
+from flwr.common.constant import HEARTBEAT_PATIENCE, SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
-from flwr.common.typing import RunStatus
 
 # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError
-from flwr.proto.message_pb2 import Context as ProtoContext
-from flwr.proto.recorddict_pb2 import ConfigRecord as ProtoConfigRecord
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
+from flwr.supercore.corestate.utils import (
+    generate_rand_int_from_bytes as corestate_generate_rand_int_from_bytes,
+)
+from flwr.supercore.date import now
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 # pylint: enable=E0611
-VALID_RUN_STATUS_TRANSITIONS = {
-    (Status.PENDING, Status.STARTING),
-    (Status.STARTING, Status.RUNNING),
-    (Status.RUNNING, Status.FINISHED),
-    # Any non-FINISHED status can transition to FINISHED
-    (Status.PENDING, Status.FINISHED),
-    (Status.STARTING, Status.FINISHED),
-}
-VALID_RUN_SUB_STATUSES = {
-    SubStatus.COMPLETED,
-    SubStatus.FAILED,
-    SubStatus.STOPPED,
-}
 MESSAGE_UNAVAILABLE_ERROR_REASON = (
     "Error: Message Unavailable - The requested message could not be found in the "
     "database. It may have expired due to its TTL, been deleted because the "
@@ -68,18 +49,10 @@ NODE_UNAVAILABLE_ERROR_REASON = (
 
 
 def generate_rand_int_from_bytes(
-    num_bytes: int, exclude: list[int] | None = None
+    num_bytes: int, exclude: set[int] | None = None
 ) -> int:
-    """Generate a random unsigned integer from `num_bytes` bytes.
-
-    If `exclude` is set, this function guarantees such number is not returned.
-    """
-    num = int.from_bytes(urandom(num_bytes), "little", signed=False)
-
-    if exclude:
-        while num in exclude:
-            num = int.from_bytes(urandom(num_bytes), "little", signed=False)
-    return num
+    """Generate a random unsigned integer from `num_bytes` bytes."""
+    return corestate_generate_rand_int_from_bytes(num_bytes, exclude)
 
 
 def convert_uint64_values_in_dict_to_sint64(
@@ -116,80 +89,6 @@ def convert_sint64_values_in_dict_to_uint64(
             data_dict[key] = int64_to_uint64(data_dict[key])
 
 
-def context_to_bytes(context: Context) -> bytes:
-    """Serialize `Context` to bytes."""
-    return serde.context_to_proto(context).SerializeToString()
-
-
-def context_from_bytes(context_bytes: bytes) -> Context:
-    """Deserialize `Context` from bytes."""
-    return serde.context_from_proto(ProtoContext.FromString(context_bytes))
-
-
-def configrecord_to_bytes(config_record: ConfigRecord) -> bytes:
-    """Serialize a `ConfigRecord` to bytes."""
-    return serde.config_record_to_proto(config_record).SerializeToString()
-
-
-def configrecord_from_bytes(configrecord_bytes: bytes) -> ConfigRecord:
-    """Deserialize `ConfigRecord` from bytes."""
-    return serde.config_record_from_proto(
-        ProtoConfigRecord.FromString(configrecord_bytes)
-    )
-
-
-def is_valid_transition(current_status: RunStatus, new_status: RunStatus) -> bool:
-    """Check if a transition between two run statuses is valid.
-
-    Parameters
-    ----------
-    current_status : RunStatus
-        The current status of the run.
-    new_status : RunStatus
-        The new status to transition to.
-
-    Returns
-    -------
-    bool
-        True if the transition is valid, False otherwise.
-    """
-    # Transition to FINISHED from a non-RUNNING status is only allowed
-    # if the sub-status is not COMPLETED
-    if (
-        current_status.status in [Status.PENDING, Status.STARTING]
-        and new_status.status == Status.FINISHED
-    ):
-        return new_status.sub_status != SubStatus.COMPLETED
-
-    return (
-        current_status.status,
-        new_status.status,
-    ) in VALID_RUN_STATUS_TRANSITIONS
-
-
-def has_valid_sub_status(status: RunStatus) -> bool:
-    """Check if the 'sub_status' field of the given status is valid.
-
-    Parameters
-    ----------
-    status : RunStatus
-        The status object to be checked.
-
-    Returns
-    -------
-    bool
-        True if the status object has a valid sub-status, False otherwise.
-
-    Notes
-    -----
-    Only an empty string (i.e., "") is considered a valid sub-status for
-    non-finished statuses. The sub-status of a finished status cannot be empty.
-    """
-    if status.status == Status.FINISHED:
-        return status.sub_status in VALID_RUN_SUB_STATUSES
-    return status.sub_status == ""
-
-
 def create_message_error_unavailable_res_message(
     ins_metadata: Metadata, error_type: str
 ) -> Message:
@@ -207,6 +106,8 @@ def create_message_error_unavailable_res_message(
         message_type=ins_metadata.message_type,
         created_at=current_time,
         ttl=ttl,
+        src_task_id=ins_metadata.dst_task_id,
+        dst_task_id=ins_metadata.src_task_id,
     )
 
     msg = make_message(

@@ -19,6 +19,7 @@ limitations under the License.
 
 import builtins
 import collections.abc
+import flwr.proto.federation_config_pb2
 import flwr.proto.node_pb2
 import flwr.proto.run_pb2
 import google.protobuf.descriptor
@@ -47,40 +48,115 @@ class Account(google.protobuf.message.Message):
 global___Account = Account
 
 @typing.final
+class Member(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ACCOUNT_FIELD_NUMBER: builtins.int
+    ROLE_FIELD_NUMBER: builtins.int
+    role: builtins.str
+    @property
+    def account(self) -> global___Account: ...
+    def __init__(
+        self,
+        *,
+        account: global___Account | None = ...,
+        role: builtins.str = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["account", b"account"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["account", b"account", "role", b"role"]) -> None: ...
+
+global___Member = Member
+
+@typing.final
 class Federation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     NAME_FIELD_NUMBER: builtins.int
-    MEMBER_AIDS_FIELD_NUMBER: builtins.int
     NODES_FIELD_NUMBER: builtins.int
     RUNS_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
-    ACCOUNTS_FIELD_NUMBER: builtins.int
+    MEMBERS_FIELD_NUMBER: builtins.int
+    ARCHIVED_FIELD_NUMBER: builtins.int
+    SIMULATION_FIELD_NUMBER: builtins.int
+    CONFIG_FIELD_NUMBER: builtins.int
+    CAN_INVITE_MEMBERS_FIELD_NUMBER: builtins.int
+    CAN_ADD_SUPERNODES_FIELD_NUMBER: builtins.int
+    MEMBER_COUNT_FIELD_NUMBER: builtins.int
     name: builtins.str
     description: builtins.str
     """Added in v1.26.0"""
-    @property
-    def member_aids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """Deprecated in v1.26.0"""
-
+    archived: builtins.bool
+    """Added in v1.27.0"""
+    simulation: builtins.bool
+    """Added in v1.28.0"""
+    can_invite_members: builtins.bool
+    """Added in v1.34.0"""
+    can_add_supernodes: builtins.bool
+    """Added in v1.34.0"""
+    member_count: builtins.int
+    """Added in v1.37.0"""
     @property
     def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.node_pb2.NodeInfo]: ...
     @property
     def runs(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.run_pb2.Run]: ...
     @property
-    def accounts(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Account]:
-        """Added in v1.26.0"""
+    def members(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Member]:
+        """Added in v1.27.0"""
+
+    @property
+    def config(self) -> flwr.proto.federation_config_pb2.SimulationConfig:
+        """Added in v1.28.0"""
 
     def __init__(
         self,
         *,
         name: builtins.str = ...,
-        member_aids: collections.abc.Iterable[builtins.str] | None = ...,
         nodes: collections.abc.Iterable[flwr.proto.node_pb2.NodeInfo] | None = ...,
         runs: collections.abc.Iterable[flwr.proto.run_pb2.Run] | None = ...,
         description: builtins.str = ...,
-        accounts: collections.abc.Iterable[global___Account] | None = ...,
+        members: collections.abc.Iterable[global___Member] | None = ...,
+        archived: builtins.bool = ...,
+        simulation: builtins.bool = ...,
+        config: flwr.proto.federation_config_pb2.SimulationConfig | None = ...,
+        can_invite_members: builtins.bool = ...,
+        can_add_supernodes: builtins.bool = ...,
+        member_count: builtins.int | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["accounts", b"accounts", "description", b"description", "member_aids", b"member_aids", "name", b"name", "nodes", b"nodes", "runs", b"runs"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_member_count", b"_member_count", "config", b"config", "member_count", b"member_count"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_member_count", b"_member_count", "archived", b"archived", "can_add_supernodes", b"can_add_supernodes", "can_invite_members", b"can_invite_members", "config", b"config", "description", b"description", "member_count", b"member_count", "members", b"members", "name", b"name", "nodes", b"nodes", "runs", b"runs", "simulation", b"simulation"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_member_count", b"_member_count"]) -> typing.Literal["member_count"] | None: ...
 
 global___Federation = Federation
+
+@typing.final
+class Invitation(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_NAME_FIELD_NUMBER: builtins.int
+    INVITER_FIELD_NUMBER: builtins.int
+    INVITEE_FIELD_NUMBER: builtins.int
+    STATUS_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    STATUS_CHANGED_AT_FIELD_NUMBER: builtins.int
+    federation_name: builtins.str
+    status: builtins.str
+    created_at: builtins.str
+    status_changed_at: builtins.str
+    @property
+    def inviter(self) -> global___Account: ...
+    @property
+    def invitee(self) -> global___Account: ...
+    def __init__(
+        self,
+        *,
+        federation_name: builtins.str = ...,
+        inviter: global___Account | None = ...,
+        invitee: global___Account | None = ...,
+        status: builtins.str = ...,
+        created_at: builtins.str = ...,
+        status_changed_at: builtins.str = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["invitee", b"invitee", "inviter", b"inviter"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "federation_name", b"federation_name", "invitee", b"invitee", "inviter", b"inviter", "status", b"status", "status_changed_at", b"status_changed_at"]) -> None: ...
+
+global___Invitation = Invitation

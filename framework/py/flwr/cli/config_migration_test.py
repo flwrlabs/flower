@@ -32,6 +32,7 @@ from .config_migration import (
     _migrate_pyproject_toml_to_flower_config,
     migrate,
 )
+from .constant import LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE
 from .flower_config import init_flwr_config, read_superlink_connection
 
 TEST_PYPROJECT_TOML = """[build-system]
@@ -99,7 +100,7 @@ class TestConfigMigration(unittest.TestCase):
         self.get_home_patcher.stop()
         self.temp_dir.cleanup()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(  # type: ignore[untyped-decorator]
         [
             ("local", ["my-federation"], True),  # single extra arg
             ("/abs/path", [], True),  # absolute path
@@ -133,6 +134,7 @@ class TestConfigMigration(unittest.TestCase):
 
         my_sim = read_superlink_connection("my-sim")
         assert my_sim is not None
+        assert my_sim.address == LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE
         assert my_sim.options is not None
         assert my_sim.options.num_supernodes == 2
 
@@ -200,7 +202,7 @@ class TestConfigMigration(unittest.TestCase):
         with self.assertRaises(click.ClickException):
             _ = read_superlink_connection("named-conn")
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(  # type: ignore[untyped-decorator]
         [
             (None, False),
             ("named-conn", False),

@@ -15,17 +15,78 @@
 """Utility functions for the infrastructure."""
 
 
+import ctypes
 import json
 import os
 import re
+import subprocess
+import sys
+from collections.abc import Callable, Iterable, Sequence
+from logging import WARN
 from pathlib import Path
+from typing import Any, Literal, TypeVar, cast
 
 import requests
 
-from flwr.common.constant import FLWR_DIR, FLWR_HOME
+from flwr.common.constant import FLWR_DIR, FLWR_HOME, NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.version import package_version as flwr_version
 
-from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN
+from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN, MAX_NAME_LENGTH
+from .typing import JSONValue
+
+T = TypeVar("T", str, bytes)
+PR_SET_DUMPABLE = 4  # from /usr/include/linux/prctl.h
+
+
+MetadataLookupErrorType = Literal["missing", "duplicate", "wrong_type", "empty"]
+
+
+class MetadataLookupError(Exception):
+    """Error type for metadata lookup failures."""
+
+    def __init__(self, key: str, error_type: MetadataLookupErrorType) -> None:
+        self.key = key
+        self.error_type = error_type
+        if error_type == "missing":
+            message = f"Metadata key '{key}' is missing."
+        elif error_type == "duplicate":
+            message = f"Metadata key '{key}' has duplicate values."
+        elif error_type == "wrong_type":
+            message = f"Metadata key '{key}' has a value of the wrong type."
+        elif error_type == "empty":
+            message = f"Metadata key '{key}' has an empty value."
+        else:
+            message = f"Metadata key '{key}' has an unknown error: {error_type}."
+        super().__init__(message)
+
+
+def _reject_non_finite_strict_json(value: str) -> None:
+    """Reject JSON constants that are not valid JSON values."""
+    raise ValueError(f"Strict JSON value contains non-finite number {value}.")
+
+
+def strict_json_loads(raw: str | bytes | bytearray) -> JSONValue:
+    """Parse a strict JSON value.
+
+    Strict JSON values reject Python's non-standard ``NaN`` and ``Infinity``
+    number constants.
+    """
+    return cast(
+        JSONValue,
+        json.loads(raw, parse_constant=_reject_non_finite_strict_json),
+    )
+
+
+def strict_json_dumps(value: JSONValue, *, compact: bool = False) -> str:
+    """Serialize a strict JSON value.
+
+    Strict JSON values reject non-finite floating-point values.
+    """
+    if compact:
+        return json.dumps(value, separators=(",", ":"), allow_nan=False)
+    return json.dumps(value, allow_nan=False)
 
 
 def mask_string(value: str, head: int = 4, tail: int = 4) -> str:
@@ -63,6 +124,15 @@ def int64_to_uint64(signed: int) -> int:
     if signed < 0:
         return signed + (1 << 64)
     return signed
+
+
+def build_sql_in_params(
+    values: Iterable[Any], prefix: str
+) -> tuple[str, dict[str, Any]]:
+    """Build SQL IN-clause placeholders and a matching parameter dictionary."""
+    params = {f"{prefix}_{i}": value for i, value in enumerate(values)}
+    placeholders = ",".join(f":{key}" for key in params)
+    return placeholders, params
 
 
 def get_flwr_home() -> Path:
@@ -116,8 +186,8 @@ def parse_app_spec(app_spec: str) -> tuple[str, str | None]:
 
 def request_download_link(
     app_id: str, app_version: str | None, in_url: str, out_url: str
-) -> tuple[str, list[dict[str, str]] | None]:
-    """Request a download link for the given app from the Flower Platform API.
+) -> tuple[str, list[dict[str, str]] | None, str | None]:
+    """Request a download link for the given app from Flower Hub.
 
     Parameters
     ----------
@@ -132,10 +202,11 @@ def request_download_link(
 
     Returns
     -------
-    tuple[str, list[dict[str, str]] | None]
+    tuple[str, list[dict[str, str]] | None, str | None]
         A tuple containing:
         - The download URL for the application.
         - A list of verification dictionaries if provided by the API, otherwise None.
+        - A compatibility note if provided by the API, otherwise None.
 
     Raises
     ------
@@ -191,8 +262,38 @@ def request_download_link(
         raise ValueError("Invalid response from Platform API")
 
     verifications = data["verifications"] if "verifications" in data else None
+    note = data["note"] if "note" in data else None
 
-    return str(data[out_url]), verifications
+    return str(data[out_url]), verifications, note
+
+
+def simulation_config_to_json(config: SimulationConfig) -> dict[str, Any]:
+    """Convert a simulation config protobuf to a JSON-serializable dictionary."""
+    payload: dict[str, Any] = {}
+    for field in config.DESCRIPTOR.fields:
+        if field.has_presence and not config.HasField(field.name):
+            payload[field.name] = None
+            continue
+        payload[field.name] = getattr(config, field.name)
+
+    return payload
+
+
+def simulation_config_from_json(payload: dict[str, Any]) -> SimulationConfig:
+    """Convert a JSON payload into a simulation config protobuf."""
+    config = SimulationConfig()
+    valid_fields = {field.name for field in config.DESCRIPTOR.fields}
+    unknown_fields = set(payload) - valid_fields
+    if unknown_fields:
+        field_names = ", ".join(sorted(unknown_fields))
+        raise ValueError(f"Unknown simulation config field(s): {field_names}")
+
+    for field_name, value in payload.items():
+        if value is None:
+            continue
+        setattr(config, field_name, value)
+
+    return config
 
 
 def humanize_duration(seconds: float) -> str:
@@ -256,22 +357,188 @@ def humanize_bytes(num_bytes: int) -> str:
     raise RuntimeError("Unreachable code")  # Make mypy happy
 
 
-def check_federation_format(federation: str) -> None:
-    """Check if the federation string is valid.
+def check_federation_format(federation_id: str) -> None:
+    """Check if the federation ID string is valid.
 
     Parameters
     ----------
-    federation : str
-        The federation string to check.
+    federation_id : str
+        The federation ID string to check.
 
     Raises
     ------
     ValueError
-        If the federation string is not valid. The expected
+        If the federation ID string is not valid. The expected
         format is '@<account-name>/<federation-name>'.
     """
-    if not re.match(r"^@[a-zA-Z0-9\-_]+/[a-zA-Z0-9\-_]+$", federation):
+    if not re.match(r"^@[a-zA-Z0-9\-_]+/[a-zA-Z0-9\-_]+$", federation_id):
         raise ValueError(
-            f"Invalid federation format: {federation}. "
+            f"Invalid federation ID format: {federation_id}. "
             f"Expected format: '@<account-name>/<federation-name>'."
         )
+
+
+def is_valid_name(name: str) -> tuple[bool, str]:
+    """Check if the given string is a valid name for an app or federation.
+
+    A valid name must start with a letter and can only contain letters, digits, and
+    hyphens. It must be less than or equal to MAX_NAME_LENGTH characters.
+    """
+    if not name:
+        return False, "Cannot be empty."
+
+    # Check if the name exceeds the maximum length
+    if len(name) > MAX_NAME_LENGTH:
+        return False, f"Must be no longer than {MAX_NAME_LENGTH} characters."
+
+    # Check if the first character is a letter
+    if not name[0].isalpha():
+        return False, "Must start with a letter."
+
+    # Check if the rest of the characters are valid (letter, digit, or dash)
+    for char in name[1:]:
+        if not (char.isalnum() or char in "-"):
+            return False, "Can only contain letters, digits, and hyphens."
+
+    return True, ""
+
+
+def find_metadata_keys(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+    keys: Iterable[str],
+) -> set[str]:
+    """Return the subset of `keys` present in the gRPC metadata sequence."""
+    if metadata is None:
+        return set()
+
+    key_set = set(keys)
+    return {metadata_key for metadata_key, _ in metadata if metadata_key in key_set}
+
+
+def _get_metadata_typed_checked(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+    key: str,
+    value_type: type[T],
+) -> T:
+    """Return exactly one non-empty string or bytes metadata value for `key`.
+
+    Raises
+    ------
+    MetadataLookupError
+        If the metadata value for `key` is missing, duplicated, of the wrong type,
+        or empty.
+    """
+    values: list[Any] = [
+        value for metadata_key, value in metadata or [] if metadata_key == key
+    ]
+    if not values:
+        raise MetadataLookupError(key, "missing")
+    if len(values) > 1:
+        raise MetadataLookupError(key, "duplicate")
+    value = values[0]
+    if not isinstance(value, value_type):
+        raise MetadataLookupError(key, "wrong_type")
+    if value in ("", b""):
+        raise MetadataLookupError(key, "empty")
+    return value
+
+
+def get_metadata_str_checked(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+    key: str,
+) -> str:
+    """Return exactly one non-empty string metadata value for `key`.
+
+    Raises
+    ------
+    MetadataLookupError
+        If the metadata value for `key` is missing, duplicated, of the wrong type,
+        or empty.
+    """
+    return _get_metadata_typed_checked(metadata, key, str)
+
+
+def get_metadata_bytes_checked(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+    key: str,
+) -> bytes:
+    """Return exactly one non-empty bytes metadata value for `key`.
+
+    Raises
+    ------
+    MetadataLookupError
+        If the metadata value for `key` is missing, duplicated, of the wrong type,
+        or empty.
+    """
+    return _get_metadata_typed_checked(metadata, key, bytes)
+
+
+def get_metadata_str(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+    key: str,
+) -> str | None:
+    """Return exactly one non-empty string metadata value for `key`, or None if not
+    found or invalid."""
+    try:
+        return get_metadata_str_checked(metadata, key)
+    except MetadataLookupError:
+        return None
+
+
+def get_metadata_bytes(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+    key: str,
+) -> bytes | None:
+    """Return exactly one non-empty bytes metadata value for `key`, or None if not found
+    or invalid."""
+    try:
+        return get_metadata_bytes_checked(metadata, key)
+    except MetadataLookupError:
+        return None
+
+
+def disable_process_dumping(strict: bool) -> None:
+    """Disable process dumping (core dumps + ptrace) on Linux."""
+    if not sys.platform.startswith("linux"):
+        return  # No-op on non-Linux systems
+
+    try:
+        libc = ctypes.CDLL(None)
+
+        # Define argument and return types for prctl
+        libc.prctl.argtypes = [ctypes.c_int, ctypes.c_ulong]
+        libc.prctl.restype = ctypes.c_int
+
+        result = libc.prctl(PR_SET_DUMPABLE, 0)
+        if result != 0:
+            raise OSError("prctl(PR_SET_DUMPABLE, 0) failed")
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        if strict:
+            raise RuntimeError(f"Failed to disable process dumping: {e!r}") from e
+        log(WARN, "Failed to disable process dumping: %s", e)
+
+
+def resolve_account_ids(ids: Iterable[str]) -> dict[str, str]:
+    """Resolve account IDs to account names."""
+    # Lazy import to avoid circular dependency with flwr.ee.utils
+    try:
+        # pylint: disable-next=import-outside-toplevel
+        from flwr.ee.utils import resolve_account_ids as _resolve_account_ids_ee
+
+        resolve_account_ids_ee: Callable[[Iterable[str]], dict[str, str]]
+        resolve_account_ids_ee = _resolve_account_ids_ee
+        return resolve_account_ids_ee(ids)
+    except ModuleNotFoundError:
+        return {id_: NOOP_ACCOUNT_NAME for id_ in ids if id_ == NOOP_FLWR_AID}
+
+
+def get_popen_detach_kwargs() -> dict[str, Any]:
+    """Return platform-specific Popen kwargs to detach the process."""
+    if os.name == "nt":
+        return {
+            # The Windows-only constant is absent from non-Windows type stubs.
+            "creationflags": subprocess.CREATE_NEW_PROCESS_GROUP,  # type: ignore[attr-defined]
+        }
+
+    return {"start_new_session": True}

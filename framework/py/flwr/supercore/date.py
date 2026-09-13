@@ -20,11 +20,11 @@ import datetime
 
 def now() -> datetime.datetime:
     """Construct a datetime from time.time() with time zone set to UTC."""
-    return datetime.datetime.now(tz=datetime.timezone.utc)
+    return datetime.datetime.now(tz=datetime.UTC)
 
 
 def isoformat8601_utc(dt: datetime.datetime) -> str:
     """Return the datetime formatted as an ISO 8601 string with a trailing 'Z'."""
-    if dt.tzinfo != datetime.timezone.utc:
+    if dt.tzinfo != datetime.UTC:
         raise ValueError("Expected datetime with timezone set to UTC")
     return dt.isoformat(timespec="seconds").replace("+00:00", "Z")

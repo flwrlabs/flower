@@ -1,0 +1,26 @@
+####################################################
+ [608] COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR
+####################################################
+
+*************
+ Description
+*************
+
+Runtime installation of Flower App dependencies failed.
+
+****************
+ How to Resolve
+****************
+
+Check the logs for the ``uv sync`` error. The failure can happen for several reasons:
+the package index might be unreachable, a package or version might not exist on the
+configured index, credentials or proxy settings might be invalid, or the declared
+dependencies might be incompatible with the current Python environment.
+
+Verify the dependencies declared in the Flower App's ``pyproject.toml``, including
+package names, version constraints, and Python compatibility. If the runtime host should
+use a custom package index, configure uv's native ``UV_DEFAULT_INDEX`` and make sure the
+required packages are available there.
+
+If your environment does not allow dependencies to be installed at runtime, preinstall
+the Flower App dependencies and disable runtime dependency installation.

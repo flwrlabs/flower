@@ -1,11 +1,13 @@
 services:
   supernode-1:
-    image: flwr/supernode:${FLWR_VERSION:-1.27.0}
+    image: flwr/supernode:${FLWR_VERSION:-1.37.0}
     command:
       - --superlink
       - ${SUPERLINK_IP:-127.0.0.1}:9092
-      - --clientappio-api-address
-      - 0.0.0.0:9094
+      - --host
+      - 0.0.0.0
+      - --port
+      - "9094"
       - --isolation
       - process
       - --node-config
@@ -17,12 +19,14 @@ services:
         target: /app/certificates/superlink-ca.crt
 
   supernode-2:
-    image: flwr/supernode:${FLWR_VERSION:-1.27.0}
+    image: flwr/supernode:${FLWR_VERSION:-1.37.0}
     command:
       - --superlink
       - ${SUPERLINK_IP:-127.0.0.1}:9092
-      - --clientappio-api-address
-      - 0.0.0.0:9095
+      - --host
+      - 0.0.0.0
+      - --port
+      - "9095"
       - --isolation
       - process
       - --node-config
@@ -36,12 +40,14 @@ services:
   # uncomment to add another SuperNode
   #
   # supernode-3:
-  #   image: flwr/supernode:${FLWR_VERSION:-1.27.0}
+  #   image: flwr/supernode:${FLWR_VERSION:-1.37.0}
   #   command:
   #     - --superlink
   #     - ${SUPERLINK_IP:-127.0.0.1}:9092
-  #     - --clientappio-api-address
-  #     - 0.0.0.0:9096
+  #     - --host
+  #     - 0.0.0.0
+  #     - --port
+  #     - "9096"
   #     - --isolation
   #     - process
   #     - --node-config
@@ -56,10 +62,10 @@ services:
     build:
       context: ${PROJECT_DIR:-.}
       dockerfile_inline: |
-        FROM flwr/superexec:${FLWR_VERSION:-1.27.0}
+        FROM flwr/superexec:${FLWR_VERSION:-1.37.0}
 
         WORKDIR /app
-        COPY --chown=app:app pyproject.toml .
+        COPY --chown=app:app pyproject.toml LICENSE* ./
         RUN sed -i 's/.*flwr\[simulation\].*//' pyproject.toml \
           && python -m pip install -U --no-cache-dir .
 
@@ -68,7 +74,7 @@ services:
       - --insecure
       - --plugin-type
       - clientapp
-      - --appio-api-address
+      - --runtime-api-address
       - supernode-1:9094
     deploy:
       resources:
@@ -82,10 +88,10 @@ services:
     build:
       context: ${PROJECT_DIR:-.}
       dockerfile_inline: |
-        FROM flwr/superexec:${FLWR_VERSION:-1.27.0}
+        FROM flwr/superexec:${FLWR_VERSION:-1.37.0}
 
         WORKDIR /app
-        COPY --chown=app:app pyproject.toml .
+        COPY --chown=app:app pyproject.toml LICENSE* ./
         RUN sed -i 's/.*flwr\[simulation\].*//' pyproject.toml \
           && python -m pip install -U --no-cache-dir .
 
@@ -94,7 +100,7 @@ services:
       - --insecure
       - --plugin-type
       - clientapp
-      - --appio-api-address
+      - --runtime-api-address
       - supernode-2:9095
     deploy:
       resources:
@@ -109,10 +115,10 @@ services:
   #   build:
   #     context: ${PROJECT_DIR:-.}
   #     dockerfile_inline: |
-  #       FROM flwr/superexec:${FLWR_VERSION:-1.27.0}
+  #       FROM flwr/superexec:${FLWR_VERSION:-1.37.0}
 
   #       WORKDIR /app
-  #       COPY --chown=app:app pyproject.toml .
+  #       COPY --chown=app:app pyproject.toml LICENSE* ./
   #       RUN sed -i 's/.*flwr\[simulation\].*//' pyproject.toml \
   #         && python -m pip install -U --no-cache-dir .
 
@@ -121,7 +127,7 @@ services:
   #     - --insecure
   #     - --plugin-type
   #     - clientapp
-  #     - --appio-api-address
+  #     - --runtime-api-address
   #     - supernode-3:9096
   #   deploy:
   #     resources:

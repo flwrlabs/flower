@@ -21,7 +21,7 @@ from unittest.mock import MagicMock
 import numpy as np
 
 import flwr
-from flwr.common.typing import Config, GetParametersIns
+from flwr.common import Config, GetParametersIns
 from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     ClientMessage,
     Parameters,

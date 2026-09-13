@@ -44,7 +44,7 @@ def parse_address(address: str) -> tuple[str, int, bool | None] | None:
 
         port = int(raw_port)
 
-        if port > 65535 or port < 1:
+        if port > 65535 or port < 0:
             raise ValueError("Port number is invalid.")
 
         try:
@@ -81,6 +81,9 @@ def is_port_in_use(address: str) -> bool:
     if not parsed_address:
         return True
     host, port, is_v6 = parsed_address
+
+    if port == 0:  # OS will assign an unused port, no need to check for availability
+        return False
 
     if is_v6:
         protocol = socket.AF_INET6

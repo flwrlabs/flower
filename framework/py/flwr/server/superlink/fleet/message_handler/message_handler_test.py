@@ -17,14 +17,16 @@
 
 from unittest.mock import MagicMock
 
-from flwr.common import Metadata, RecordDict, now
-from flwr.common.message import make_message
+from flwr.app import Metadata, RecordDict
+from flwr.app.message import make_message
 from flwr.common.serde import message_to_proto
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     PullMessagesRequest,
     PushMessagesRequest,
 )
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.supercore.date import now
 
 from .message_handler import pull_messages, push_messages
 
@@ -104,18 +106,28 @@ def test_push_messages() -> None:
         ),
     )
 
-    request = PushMessagesRequest(messages_list=[message_to_proto(msg)])
+    object_tree = ObjectTree(object_id="object-id")
+    request = PushMessagesRequest(
+        messages_list=[message_to_proto(msg)],
+        message_object_trees=[object_tree],
+    )
     state = MagicMock()
-    store = MagicMock()
+    state.start_session.return_value = "session-id"
+    state.store_message_and_object_tree.return_value = (True, ["object-id"])
 
     # Execute
-    push_messages(request=request, state=state, store=store)
+    response = push_messages(request=request, state=state)
 
     # Assert
     state.create_node.assert_not_called()
     state.delete_node.assert_not_called()
     state.store_message_ins.assert_not_called()
     state.get_message_ins.assert_not_called()
-    state.store_message_res.assert_called_once()
+    state.store_message_res.assert_not_called()
+    state.start_session.assert_called_once_with(123)
+    state.store_message_and_object_tree.assert_called_once()
+    assert state.store_message_and_object_tree.call_args.args[1] == object_tree
+    assert state.store_message_and_object_tree.call_args.args[2] == "session-id"
+    assert response.session_id == "session-id"
     state.get_message_res.assert_not_called()
     state.store_traffic.assert_called_once()

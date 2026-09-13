@@ -6,10 +6,10 @@ on:
       - 'main'
 jobs:
   autoupdate:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Automatically update mergeable PRs
-        uses: adRise/update-pr-branch@cd305ecbd76bf63056c9400ce2c725293fc3e0c0 # v0.7.0
+        uses: adRise/update-pr-branch@v0.10.2
         with:
           token: ${{ secrets.FLWRMACHINE_TOKEN }}
           base: 'main'

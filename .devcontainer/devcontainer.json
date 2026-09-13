@@ -15,9 +15,6 @@
     }
   },
   "remoteUser": "flwr-vscode",
-  "containerEnv": {
-    "POETRY_VIRTUALENVS_CREATE": "false"
-  },
   "mounts": [
     "source=flwr-bashhistory,target=/commandhistory,type=volume"
   ]

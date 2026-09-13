@@ -12,79 +12,92 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower SimulationIo connection."""
+"""Flower simulation connection compatibility helper."""
 
 
 from logging import DEBUG, WARNING
 from typing import cast
 
-import grpc
-
-from flwr.common.constant import SIMULATIONIO_API_DEFAULT_CLIENT_ADDRESS
-from flwr.common.grpc import create_channel, on_channel_state_change
-from flwr.common.logger import log
-from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
-from flwr.proto.simulationio_pb2_grpc import SimulationIoStub  # pylint: disable=E0611
+from flwr.supercore import log
+from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
+from flwr.supercore.interceptors import (
+    RuntimeTokenHttpInterceptor,
+    RuntimeVersionHttpInterceptor,
+)
+from flwr.supercore.retry import make_simple_http_retry_invoker
+from flwr.supercore.runtime import RuntimeHttpClient
 
 
 class SimulationIoConnection:
-    """`SimulationIoConnection` provides an interface to the SimulationIo API.
+    """`SimulationIoConnection` provides an interface to the Runtime API.
 
     Parameters
     ----------
-    simulationio_service_address : str (default: "[::]:9094")
-        The address (URL, IPv6, IPv4) of the SuperLink SimulationIo API service.
+    runtime_api_address : str (default: "127.0.0.1:8000")
+        The address (URL, IPv6, IPv4) of the SuperLink Runtime API service.
+    insecure : bool (default: False)
+        If True, use plaintext (TLS disabled). If False, use TLS.
     root_certificates : Optional[bytes] (default: None)
         The PEM-encoded root certificates as a byte string.
-        If provided, a secure connection using the certificates will be
-        established to an SSL-enabled Flower server.
+        Used only when `insecure` is False. If provided, these certificates are
+        used to verify the server certificate. If None, HTTPX's default trusted CA
+        bundle is used.
+    token : str
+        Executor token attached to all outgoing RPCs via metadata.
     """
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
-        simulationio_service_address: str = SIMULATIONIO_API_DEFAULT_CLIENT_ADDRESS,
+        runtime_api_address: str = SUPERLINK_DEFAULT_CLIENT_ADDRESS,
+        insecure: bool = False,
         root_certificates: bytes | None = None,
+        *,
+        token: str,
     ) -> None:
-        self._addr = simulationio_service_address
+        if token == "":
+            raise ValueError("`token` must be a non-empty string")
+        self._addr = runtime_api_address
+        self._insecure = insecure
         self._cert = root_certificates
-        self._grpc_stub: SimulationIoStub | None = None
-        self._channel: grpc.Channel | None = None
-        self._retry_invoker = make_simple_grpc_retry_invoker()
+        self._token = token
+        self._client: RuntimeHttpClient | None = None
+        self._retry_invoker = make_simple_http_retry_invoker()
 
     @property
     def _is_connected(self) -> bool:
-        """Check if connected to the SimulationIo API server."""
-        return self._channel is not None
+        """Check if connected to the Runtime API server."""
+        return self._client is not None
 
     @property
-    def _stub(self) -> SimulationIoStub:
-        """SimulationIo stub."""
+    def _stub(self) -> RuntimeHttpClient:
+        """Runtime API client."""
         if not self._is_connected:
             self._connect()
-        return cast(SimulationIoStub, self._grpc_stub)
+        return cast(RuntimeHttpClient, self._client)
 
     def _connect(self) -> None:
-        """Connect to the SimulationIo API."""
+        """Connect to the Runtime API."""
         if self._is_connected:
             log(WARNING, "Already connected")
             return
-        self._channel = create_channel(
+        self._client = RuntimeHttpClient.from_server_address(
             server_address=self._addr,
-            insecure=(self._cert is None),
+            insecure=self._insecure,
             root_certificates=self._cert,
+            interceptors=[
+                RuntimeVersionHttpInterceptor(component_name="flwr-simulation"),
+                RuntimeTokenHttpInterceptor(token=self._token),
+            ],
+            retry_invoker=self._retry_invoker,
         )
-        self._channel.subscribe(on_channel_state_change)
-        self._grpc_stub = SimulationIoStub(self._channel)
-        wrap_stub(self._grpc_stub, self._retry_invoker)
-        log(DEBUG, "[SimulationIO] Connected to %s", self._addr)
+        log(DEBUG, "[Runtime] Connected to %s", self._addr)
 
     def _disconnect(self) -> None:
-        """Disconnect from the SimulationIo API."""
+        """Disconnect from the Runtime API."""
         if not self._is_connected:
             log(DEBUG, "Already disconnected")
             return
-        channel: grpc.Channel = self._channel
-        self._channel = None
-        self._grpc_stub = None
-        channel.close()
-        log(DEBUG, "[SimulationIO] Disconnected")
+        client = cast(RuntimeHttpClient, self._client)
+        self._client = None
+        client.close()
+        log(DEBUG, "[Runtime] Disconnected")

@@ -20,7 +20,7 @@ import signal
 import threading
 from collections.abc import Callable
 
-import grpc
+import httpx
 
 from flwr.common.constant import (
     HEARTBEAT_BASE_MULTIPLIER,
@@ -28,13 +28,11 @@ from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_RANDOM_RANGE,
 )
-from flwr.common.retry_invoker import RetryInvoker, exponential
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 
 # pylint: disable=E0611
-from flwr.proto.heartbeat_pb2 import SendAppHeartbeatRequest
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
-from flwr.proto.simulationio_pb2_grpc import SimulationIoStub
+from flwr.proto.runtime_pb2 import SendTaskHeartbeatRequest
+from flwr.supercore.retry import RetryInvoker, exponential
+from flwr.supercore.runtime import RuntimeHttpClient
 
 # pylint: enable=E0611
 
@@ -119,40 +117,25 @@ class HeartbeatSender:
                 raise HeartbeatFailure
 
 
-def make_app_heartbeat_fn_grpc(
-    stub: ServerAppIoStub | SimulationIoStub | ClientAppIoStub,
-    token: str,
+def make_task_heartbeat_fn_http(
+    client: RuntimeHttpClient,
 ) -> Callable[[], bool]:
-    """Get the function to send a heartbeat to gRPC endpoint from an app process.
-
-    Parameters
-    ----------
-    stub : Union[ServerAppIoStub, SimulationIoStub]
-        gRPC stub to send the heartbeat.
-    token : str
-        The token to use in the heartbeat request.
-
-    Returns
-    -------
-    Callable[[], bool]
-        Function that sends a heartbeat to the gRPC endpoint.
-    """
-    # Construct the heartbeat request
-    req = SendAppHeartbeatRequest(token=token)
+    """Get the function to send a heartbeat to an HTTP Runtime endpoint."""
+    req = SendTaskHeartbeatRequest()
 
     def fn() -> bool:
-        # Call ServerAppIo API
         try:
-            res = stub.SendAppHeartbeat(req)
-        except grpc.RpcError as e:
-            status_code = e.code()
-            if status_code == grpc.StatusCode.UNAVAILABLE:
-                return False
-            if status_code == grpc.StatusCode.DEADLINE_EXCEEDED:
+            res = client.SendTaskHeartbeat(req)
+        except httpx.TransportError:
+            return False
+        except httpx.HTTPStatusError as err:
+            if err.response.status_code in (
+                httpx.codes.SERVICE_UNAVAILABLE,  # 503
+                httpx.codes.GATEWAY_TIMEOUT,  # 504
+            ):
                 return False
             raise
 
-        # Raise SIGINT to trigger graceful shutdown if heartbeat failed
         if not res.success:
             signal.raise_signal(signal.SIGINT)
         return True

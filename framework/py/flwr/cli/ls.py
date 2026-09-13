@@ -16,7 +16,7 @@
 
 
 import json
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 from rich.console import Console
@@ -32,14 +32,14 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsRequest,
     ListRunsResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.utils import humanize_bytes, humanize_duration
 
 from .run_utils import RunRow, format_runs
 from .utils import (
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
-    init_channel_from_connection,
+    flwr_cli_exc_handler,
+    init_http_client_from_connection,
     print_json_to_stdout,
 )
 
@@ -58,13 +58,6 @@ def ls(  # pylint: disable=too-many-locals, too-many-branches, R0913, R0917
             hidden=True,
         ),
     ] = None,
-    runs: Annotated[
-        bool,
-        typer.Option(
-            "--runs",
-            help="List all runs",
-        ),
-    ] = False,
     run_id: Annotated[
         int | None,
         typer.Option(
@@ -72,8 +65,16 @@ def ls(  # pylint: disable=too-many-locals, too-many-branches, R0913, R0917
             help="Specific run ID to display",
         ),
     ] = None,
+    limit: Annotated[
+        int | None,
+        typer.Option(
+            "--limit",
+            help="Maximum number of runs to display",
+            min=1,
+        ),
+    ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,
@@ -103,24 +104,25 @@ def ls(  # pylint: disable=too-many-locals, too-many-branches, R0913, R0917
 
         # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
-        channel = None
+        control_client = None
+
+        # Check `--limit` is not used together with `--run-id`
+        if limit is not None and run_id is not None:
+            raise ValueError(
+                "The options '--run-id' and '--limit' cannot be used together."
+            )
 
         try:
-            if runs and run_id is not None:
-                raise ValueError(
-                    "The options '--runs' and '--run-id' are mutually exclusive."
-                )
-            channel = init_channel_from_connection(superlink_connection)
-            stub = ControlStub(channel)
+            control_client = init_http_client_from_connection(superlink_connection)
 
             # Display information about a specific run ID
             if run_id is not None:
                 typer.echo(f"🔍 Displaying information for run ID {run_id}...")
-                formatted_runs = _display_one_run(stub, run_id)
+                formatted_runs = _display_one_run(control_client, run_id)
             # By default, list all runs
             else:
                 typer.echo("📄 Listing all runs...")
-                formatted_runs = _list_runs(stub)
+                formatted_runs = _list_runs(control_client, limit)
 
             if is_json:
                 print_json_to_stdout(_to_json(formatted_runs))
@@ -130,8 +132,8 @@ def ls(  # pylint: disable=too-many-locals, too-many-branches, R0913, R0917
                 else:
                     Console().print(_to_table(formatted_runs))
         finally:
-            if channel:
-                channel.close()
+            if control_client:
+                control_client.close()
 
 
 def _get_status_style(status_text: str) -> str:
@@ -199,7 +201,7 @@ def _to_table(run_list: list[RunRow]) -> Table:
 
         formatted_row = (
             f"[bold]{row.run_id}[/bold]",
-            row.federation,
+            row.federation_id,
             f"@{row.fab_id}=={row.fab_version}",
             f"[{status_style}]{row.status_text}[/{status_style}]",
             humanize_duration(row.elapsed),
@@ -232,10 +234,11 @@ def _to_detail_table(run: RunRow) -> Table:
 
     # Add rows with all details
     table.add_row("Run ID", f"[bold]{run.run_id}[/bold]")
-    table.add_row("Federation", run.federation)
+    table.add_row("Federation", run.federation_id)
     table.add_row("App", f"@{run.fab_id}=={run.fab_version}")
     table.add_row("FAB Hash", f"{run.fab_hash[:8]}...{run.fab_hash[-8:]}")
     table.add_row("Status", f"[{status_style}]{run.status_text}[/{status_style}]")
+    table.add_row("Status Details", Text(run.details))
     table.add_row("Elapsed", f"[blue]{humanize_duration(run.elapsed)}[/blue]")
     table.add_row("Pending At", run.pending_at)
     table.add_row("Starting At", run.starting_at)
@@ -291,12 +294,13 @@ def _to_json(run_list: list[RunRow]) -> str:
         runs_list.append(
             {
                 "run-id": f"{row.run_id}",
-                "federation": row.federation,
+                "federation-id": row.federation_id,
                 "fab-id": row.fab_id,
                 "fab-name": row.fab_id.split("/")[-1],
                 "fab-version": row.fab_version,
-                "fab-hash": row.fab_hash[:8],
+                "fab-hash": row.fab_hash,
                 "status": row.status_text,
+                "status-details": row.details,
                 "elapsed": row.elapsed,
                 "pending-at": row.pending_at,
                 "starting-at": row.starting_at,
@@ -320,33 +324,33 @@ def _to_json(run_list: list[RunRow]) -> str:
     return json.dumps({"success": True, "runs": runs_list})
 
 
-def _list_runs(stub: ControlStub) -> list[RunRow]:
+def _list_runs(stub: ControlHttpClient, limit: int | None = None) -> list[RunRow]:
     """List all runs.
 
     Parameters
     ----------
-    stub : ControlStub
-        The gRPC stub for Control API communication.
+    stub : ControlHttpClient
+        The HTTP client for Control API communication.
 
     Returns
     -------
     list[RunRow]
         List of formatted run information for all runs.
     """
-    with flwr_cli_grpc_exc_handler():
-        res: ListRunsResponse = stub.ListRuns(ListRunsRequest())
+    with flwr_cli_exc_handler():
+        res: ListRunsResponse = stub.ListRuns(ListRunsRequest(limit=limit))
     runs = [run_from_proto(proto) for proto in res.run_dict.values()]
 
     return format_runs(runs, res.now)
 
 
-def _display_one_run(stub: ControlStub, run_id: int) -> list[RunRow]:
+def _display_one_run(stub: ControlHttpClient, run_id: int) -> list[RunRow]:
     """Display information about a specific run.
 
     Parameters
     ----------
-    stub : ControlStub
-        The gRPC stub for Control API communication.
+    stub : ControlHttpClient
+        The HTTP client for Control API communication.
     run_id : int
         The unique identifier of the run to display.
 
@@ -360,7 +364,7 @@ def _display_one_run(stub: ControlStub, run_id: int) -> list[RunRow]:
     ValueError
         If the run_id is not found.
     """
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         res: ListRunsResponse = stub.ListRuns(ListRunsRequest(run_id=run_id))
     if not res.run_dict:
         # This won't be reached as an gRPC error is raised if run_id is invalid

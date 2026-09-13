@@ -25,8 +25,9 @@ from logging import WARNING
 from typing import Any
 
 from flwr.common import FitRes, Scalar, ndarrays_to_parameters, parameters_to_ndarrays
-from flwr.common.logger import log, warn_deprecated_feature
 from flwr.server.client_proxy import ClientProxy
+from flwr.supercore import log
+from flwr.supercore.logger import warn_deprecated_feature
 
 from .aggregate import aggregate
 from .fedavg import FedAvg
@@ -38,7 +39,7 @@ class FedXgbNnAvg(FedAvg):
     Warning
     -------
     This strategy is deprecated, but a copy of it is available in Flower Baselines:
-    https://github.com/adap/flower/tree/main/baselines/hfedxgboost.
+    https://github.com/flwrlabs/flower/tree/main/baselines/hfedxgboost.
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

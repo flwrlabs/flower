@@ -19,7 +19,7 @@ In this example, we will federate the training of a [Diffusion](https://arxiv.or
 Start by cloning the example project. We prepared a single-line command that you can copy into your shell which will checkout the example for you:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
 		&& mv _tmp/examples/quickstart-lerobot . \
 		&& rm -rf _tmp && cd quickstart-lerobot
 ```

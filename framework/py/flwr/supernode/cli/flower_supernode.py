@@ -16,54 +16,124 @@
 
 
 import argparse
+import threading
+from collections.abc import Sequence
+from dataclasses import dataclass
 from logging import DEBUG, INFO, WARN
+from os.path import expanduser
 from pathlib import Path
+from time import sleep
+from typing import Any
 
+import uvicorn
 import yaml
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from cryptography.hazmat.primitives.serialization import load_ssh_private_key
 from cryptography.hazmat.primitives.serialization.ssh import load_ssh_public_key
 
-from flwr.common import EventType, event
-from flwr.common.args import try_obtain_root_certificates
+from flwr.app.user_config import UserConfig
+from flwr.common.args import (
+    add_args_runtime_dependency_install,
+    try_obtain_root_certificates,
+    try_obtain_server_certificates,
+)
 from flwr.common.config import parse_config_args
 from flwr.common.constant import (
-    CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
-    TRANSPORT_TYPE_REST,
 )
-from flwr.common.exit import ExitCode, flwr_exit
-from flwr.common.logger import log
+from flwr.supercore import log
+from flwr.supercore.auth import (
+    add_superexec_auth_secret_args,
+    load_superexec_auth_secret,
+)
+from flwr.supercore.constant import (
+    HTTP_SERVER_SHUTDOWN_TIMEOUT,
+    SUPERNODE_UVICORN_DEFAULT_PORT,
+    UVICORN_DEFAULT_HOST,
+)
+from flwr.supercore.exit import ExitCode, add_exit_handler, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.logger import console_handler
+from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.telemetry import EventType, event
+from flwr.supercore.update_check import warn_if_flwr_update_available
+from flwr.supercore.version import package_version
+from flwr.supernode.nodestate import NodeStateFactory
 from flwr.supernode.start_client_internal import start_client_internal
 
 
-def flower_supernode() -> None:
-    """Run Flower SuperNode."""
+@dataclass
+class SuperNodeLifespanConfig:  # pylint: disable=too-many-instance-attributes
+    """Configuration needed to start the SuperNode lifespan."""
+
+    server_address: str
+    transport: str
+    root_certificates: bytes | str | None
+    insecure: bool
+    authentication_keys: (
+        tuple[ec.EllipticCurvePrivateKey, ec.EllipticCurvePublicKey] | None
+    )
+    max_retries: int | None
+    max_wait_time: float | None
+    node_config: UserConfig
+    isolation: str
+    runtime_certificates: tuple[bytes, bytes, bytes] | None
+    runtime_root_certificates_path: str | None
+    health_server_address: str | None
+    trusted_entities: dict[str, str] | None
+    superexec_auth_secret: bytes | None
+    runtime_dependency_install: bool
+    host: str
+    port: int
+    runtime_ssl_certfile: str | None
+    runtime_ssl_keyfile: str | None
+
+
+def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
+    """Parse SuperNode CLI args and return the startup configuration."""
     args = _parse_args_run_supernode().parse_args()
-
-    log(INFO, "Starting Flower SuperNode")
-
-    event(EventType.RUN_SUPERNODE_ENTER)
-
-    # Check if both `--flwr-dir` and `--isolation` were set
-    if args.flwr_dir is not None and args.isolation is not None:
-        log(
-            WARN,
-            "Both `--flwr-dir` and `--isolation` were specified. "
-            "Ignoring `--flwr-dir`.",
-        )
 
     trusted_entities = _try_obtain_trusted_entities(args.trusted_entities)
     if trusted_entities:
         _validate_public_keys_ed25519(trusted_entities)
     root_certificates = try_obtain_root_certificates(args, args.superlink)
+    runtime_certificates = None
+    if args.ssl_certfile or args.ssl_keyfile or args.ssl_ca_certfile:
+        try:
+            runtime_certificates = try_obtain_server_certificates(args)
+        except SystemExit as err:
+            code = (
+                ExitCode.COMMON_PATH_INVALID
+                if args.ssl_certfile and args.ssl_keyfile and args.ssl_ca_certfile
+                else ExitCode.COMMON_TLS_SERVER_CERTIFICATES_INVALID
+            )
+            flwr_exit(code, str(err))
     authentication_keys = _try_setup_client_authentication(args)
+    superexec_auth_secret = None
+    if args.superexec_auth_secret_file is not None:
+        log(
+            WARN,
+            "EXPERIMENTAL: SuperExec authentication is experimental and "
+            "may change in future releases.",
+        )
+    if (
+        args.isolation == ISOLATION_MODE_PROCESS
+        and args.superexec_auth_secret_file is not None
+    ):
+        try:
+            superexec_auth_secret = load_superexec_auth_secret(
+                secret_file=args.superexec_auth_secret_file,
+            )
+        except ValueError as err:
+            flwr_exit(
+                ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED,
+                f"Failed to load SuperExec auth secret: {err}",
+            )
 
     # Warn if authentication keys are provided but transport is not grpc-rere
     if authentication_keys is not None and args.transport != TRANSPORT_TYPE_GRPC_RERE:
@@ -72,9 +142,7 @@ def flower_supernode() -> None:
             "SuperNode Authentication is only supported with the grpc-rere transport.",
         )
 
-    log(DEBUG, "Isolation mode: %s", args.isolation)
-
-    start_client_internal(
+    return SuperNodeLifespanConfig(
         server_address=args.superlink,
         transport=args.transport,
         root_certificates=root_certificates,
@@ -85,12 +153,115 @@ def flower_supernode() -> None:
         node_config=parse_config_args(
             [args.node_config] if args.node_config else args.node_config
         ),
-        flwr_path=args.flwr_dir,
         isolation=args.isolation,
-        clientappio_api_address=args.clientappio_api_address,
+        runtime_certificates=runtime_certificates,
+        runtime_root_certificates_path=(
+            str(Path(args.ssl_ca_certfile).expanduser())
+            if runtime_certificates is not None
+            else None
+        ),
         health_server_address=args.health_server_address,
         trusted_entities=trusted_entities,
+        superexec_auth_secret=superexec_auth_secret,
+        runtime_dependency_install=args.runtime_dependency_install,
+        host=args.host,
+        port=args.port,
+        runtime_ssl_certfile=(
+            str(Path(args.ssl_certfile).expanduser())
+            if runtime_certificates is not None
+            else None
+        ),
+        runtime_ssl_keyfile=(
+            str(Path(args.ssl_keyfile).expanduser())
+            if runtime_certificates is not None
+            else None
+        ),
     )
+
+
+def flower_supernode() -> None:
+    """Run Flower SuperNode."""
+    warn_if_flwr_update_available(process_name="flower-supernode")
+
+    log(INFO, "Starting Flower SuperNode")
+
+    event(EventType.RUN_SUPERNODE_ENTER)
+
+    config = _parse_supernode_lifespan_config()
+
+    log(DEBUG, "Isolation mode: %s", config.isolation)
+
+    objectstore_factory = ObjectStoreFactory()
+    state_factory = NodeStateFactory(objectstore_factory=objectstore_factory)
+    http_server, http_thread = _start_supernode_http_api(config, state_factory)
+    runtime_host = f"[{config.host}]" if ":" in config.host else config.host
+
+    def stop_http_server() -> None:
+        """Stop the Runtime HTTP API server."""
+        http_server.should_exit = True
+        http_thread.join(timeout=HTTP_SERVER_SHUTDOWN_TIMEOUT)
+        if http_thread.is_alive():
+            log(
+                WARN,
+                "Runtime HTTP API server did not stop within %.1f seconds.",
+                HTTP_SERVER_SHUTDOWN_TIMEOUT,
+            )
+            http_server.force_exit = True
+
+    add_exit_handler(stop_http_server)
+
+    start_client_internal(
+        state_factory=state_factory,
+        server_address=config.server_address,
+        transport=config.transport,
+        root_certificates=config.root_certificates,
+        insecure=config.insecure,
+        authentication_keys=config.authentication_keys,
+        max_retries=config.max_retries,
+        max_wait_time=config.max_wait_time,
+        node_config=config.node_config,
+        isolation=config.isolation,
+        runtime_api_address=f"{runtime_host}:{config.port}",
+        runtime_certificates=config.runtime_certificates,
+        runtime_root_certificates_path=config.runtime_root_certificates_path,
+        health_server_address=config.health_server_address,
+        trusted_entities=config.trusted_entities,
+        superexec_auth_secret=config.superexec_auth_secret,
+        runtime_dependency_install=config.runtime_dependency_install,
+    )
+
+
+def _start_supernode_http_api(
+    config: SuperNodeLifespanConfig,
+    state_factory: NodeStateFactory,
+) -> tuple[uvicorn.Server, threading.Thread]:
+    """Start the Runtime HTTP API in a background thread."""
+    from flwr.supernode.main import (  # pylint: disable=import-outside-toplevel
+        create_app,
+    )
+
+    server = uvicorn.Server(
+        uvicorn.Config(
+            app=create_app(
+                state_factory=state_factory,
+                superexec_auth_secret=config.superexec_auth_secret,
+            ),
+            host=config.host,
+            port=config.port,
+            reload=False,
+            access_log=console_handler.level <= DEBUG,
+            ssl_certfile=config.runtime_ssl_certfile,
+            ssl_keyfile=config.runtime_ssl_keyfile,
+            workers=1,
+        )
+    )
+    thread = threading.Thread(target=server.run, name="supernode-runtime-http-api")
+    thread.start()
+    while thread.is_alive() and not server.started:
+        sleep(0.1)
+    if not server.started:
+        raise RuntimeError("SuperNode Runtime HTTP API failed to start.")
+    return server, thread
 
 
 def _parse_args_run_supernode() -> argparse.ArgumentParser:
@@ -98,18 +269,13 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Start a Flower SuperNode",
     )
-    _parse_args_common(parser)
     parser.add_argument(
-        "--flwr-dir",
-        default=None,
-        help="""The path containing installed Flower Apps.
-        The default directory is:
-
-        - `$FLWR_HOME/` if `$FLWR_HOME` is defined
-        - `$XDG_DATA_HOME/.flwr/` if `$XDG_DATA_HOME` is defined
-        - `$HOME/.flwr/` in all other cases
-        """,
+        "-V",
+        "--version",
+        action="version",
+        version=f"Flower version: {package_version}",
     )
+    _parse_args_common(parser)
     parser.add_argument(
         "--isolation",
         default=ISOLATION_MODE_SUBPROCESS,
@@ -125,9 +291,64 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--clientappio-api-address",
-        default=CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
-        help="ClientAppIo API (gRPC) server address (IPv4, IPv6, or a domain name). "
-        f"By default, it is set to {CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS}.",
+        type=_unsupported_runtime_api_address,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--host",
+        default=UVICORN_DEFAULT_HOST,
+        help=f"Host for the Runtime HTTP API (default: {UVICORN_DEFAULT_HOST}).",
+    )
+    parser.add_argument(
+        "--port",
+        type=_port_int,
+        default=SUPERNODE_UVICORN_DEFAULT_PORT,
+        help=(
+            "Port for the Runtime HTTP API "
+            f"(default: {SUPERNODE_UVICORN_DEFAULT_PORT})."
+        ),
+    )
+    parser.add_argument(
+        "--ssl-certfile",
+        help="Runtime API server TLS certificate file (as a path str) "
+        "to create a secure connection. The certificate must include SANs for "
+        "the Runtime API address used by SuperExec.",
+        type=expanduser,
+        default=None,
+    )
+    parser.add_argument(
+        "--ssl-keyfile",
+        help="Runtime API server TLS private key file (as a path str) "
+        "to create a secure connection.",
+        type=expanduser,
+    )
+    parser.add_argument(
+        "--ssl-ca-certfile",
+        help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
+        "the Runtime API server certificate. This is not a client certificate "
+        "for mTLS.",
+        type=expanduser,
+    )
+    parser.add_argument(
+        "--appio-ssl-certfile",
+        dest="ssl_certfile",
+        action=_DeprecatedAppioSslOption,
+        type=expanduser,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--appio-ssl-keyfile",
+        dest="ssl_keyfile",
+        action=_DeprecatedAppioSslOption,
+        type=expanduser,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--appio-ssl-ca-certfile",
+        dest="ssl_ca_certfile",
+        action=_DeprecatedAppioSslOption,
+        type=expanduser,
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--trusted-entities",
@@ -141,9 +362,46 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
             "fpk_UUID2: 'ssh-ed25519 <key2> [comment2]' }"
         ),
     )
+    add_superexec_auth_secret_args(parser)
+    add_args_runtime_dependency_install(parser)
     add_args_health(parser)
 
     return parser
+
+
+class _DeprecatedAppioSslOption(argparse.Action):
+    """Route a deprecated AppIO TLS option to its replacement."""
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str | Sequence[Any] | None,
+        option_string: str | None = None,
+    ) -> None:
+        replacement = option_string.replace("--appio-", "--") if option_string else ""
+        log(
+            WARN,
+            "The `%s` flag is deprecated; use `%s` instead.",
+            option_string,
+            replacement,
+        )
+        setattr(namespace, self.dest, values)
+
+
+def _port_int(value: str) -> int:
+    """Parse a valid TCP port."""
+    parsed = int(value)
+    if parsed < 1 or parsed > 65535:
+        raise argparse.ArgumentTypeError("value must be between 1 and 65535")
+    return parsed
+
+
+def _unsupported_runtime_api_address(_value: str) -> str:
+    """Reject the removed combined Runtime API address option."""
+    raise argparse.ArgumentTypeError(
+        "this option is no longer supported; use `--host` and `--port` instead"
+    )
 
 
 def _parse_args_common(parser: argparse.ArgumentParser) -> None:
@@ -169,26 +427,17 @@ def _parse_args_common(parser: argparse.ArgumentParser) -> None:
         const=TRANSPORT_TYPE_GRPC_ADAPTER,
         help="Use grpc-adapter as a transport layer for the client.",
     )
-    ex_group.add_argument(
-        "--rest",
-        action="store_const",
-        dest="transport",
-        const=TRANSPORT_TYPE_REST,
-        help="Use REST as a transport layer for the client.",
-    )
     parser.add_argument(
         "--root-certificates",
         metavar="ROOT_CERT",
         type=str,
-        help="Specifies the path to the PEM-encoded root certificate file for "
-        "establishing secure HTTPS connections.",
+        help="Path to a PEM-encoded root CA certificate (or CA bundle) used to verify "
+        "the server's TLS certificate. This is not a client certificate for mTLS.",
     )
     parser.add_argument(
         "--superlink",
         default=FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
-        help="SuperLink Fleet API address (IPv4, IPv6, or a domain name). If using the "
-        "REST (experimental) transport, ensure your address is in the form "
-        "`http://...` or `https://...` when TLS is enabled.",
+        help="SuperLink Fleet API address (IPv4, IPv6, or a domain name).",
     )
     parser.add_argument(
         "--max-retries",

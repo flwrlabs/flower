@@ -24,15 +24,14 @@ from unittest.mock import Mock, patch
 
 import click
 import tomli
+import typer
 from parameterized import parameterized
 
 from flwr.cli.constant import (
     DEFAULT_FLOWER_CONFIG_TOML,
     FLOWER_CONFIG_FILE,
-    SimulationBackendConfigTomlKey,
-    SimulationClientResourcesTomlKey,
+    LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
     SuperLinkConnectionTomlKey,
-    SuperLinkSimulationOptionsTomlKey,
 )
 from flwr.cli.typing import (
     SimulationBackendConfig,
@@ -86,30 +85,15 @@ class TestInitFlwrConfig(unittest.TestCase):
         # 3. Check [superlink.supergrid]
         self.assertIn("supergrid", superlink)
         supergrid = superlink["supergrid"]
-        self.assertEqual(
-            supergrid[SuperLinkConnectionTomlKey.ADDRESS], "supergrid.flower.ai"
-        )
+        self.assertEqual(supergrid[SuperLinkConnectionTomlKey.ADDRESS], "api.flower.ai")
 
         # 4. Check [superlink.local]
         self.assertIn("local", superlink)
         local = superlink["local"]
-
-        # In TOML `options.num-supernodes = 10` creates a nested dict
-        self.assertIn(SuperLinkConnectionTomlKey.OPTIONS, local)
-        options = local[SuperLinkConnectionTomlKey.OPTIONS]
-        self.assertEqual(options[SuperLinkSimulationOptionsTomlKey.NUM_SUPERNODES], 10)
-
-        # options.backend...
-        self.assertIn(SuperLinkSimulationOptionsTomlKey.BACKEND, options)
-        backend = options[SuperLinkSimulationOptionsTomlKey.BACKEND]
-
-        # ...client-resources...
-        self.assertIn(SimulationBackendConfigTomlKey.CLIENT_RESOURCES, backend)
-        resources = backend[SimulationBackendConfigTomlKey.CLIENT_RESOURCES]
-
-        # ...num-cpus / num-gpus
-        self.assertEqual(resources[SimulationClientResourcesTomlKey.NUM_CPUS], 1)
-        self.assertEqual(resources[SimulationClientResourcesTomlKey.NUM_GPUS], 0)
+        self.assertEqual(
+            local[SuperLinkConnectionTomlKey.ADDRESS],
+            LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
+        )
 
     def test_init_flwr_config_does_not_overwrite(self) -> None:
         """Test that init_flwr_config does not overwrite existing config file."""
@@ -127,6 +111,92 @@ class TestInitFlwrConfig(unittest.TestCase):
                 self.assertEqual(
                     config_path.read_text(encoding="utf-8"), "existing_content"
                 )
+
+    def test_read_superlink_connection_warns_about_old_supergrid_address(
+        self,
+    ) -> None:
+        """Offer to update the old SuperGrid address and stop execution."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_path = Path(tmp_dir) / "config.toml"
+            config_path.write_text(
+                '[superlink.supergrid]\naddress = "supergrid.flower.ai"\n',
+                encoding="utf-8",
+            )
+
+            with (
+                patch.dict(os.environ, {FLWR_HOME: tmp_dir}),
+                patch("flwr.cli.flower_config.typer.secho") as secho,
+                patch("flwr.cli.flower_config.sys.stdin.isatty", return_value=True),
+                patch("flwr.cli.flower_config.sys.stdout.isatty", return_value=True),
+                patch(
+                    "flwr.cli.flower_config.typer.confirm", return_value=True
+                ) as confirm,
+            ):
+                with self.assertRaises(typer.Exit) as exc_info:
+                    read_superlink_connection("supergrid")
+
+            self.assertEqual(exc_info.exception.exit_code, 1)
+            message = secho.call_args_list[0].args[0]
+            self.assertIn("SuperLink connection `supergrid`", message)
+            self.assertIn("supergrid.flower.ai", message)
+            self.assertIn("api.flower.ai", message)
+            self.assertIn(str(config_path.resolve()), message)
+            self.assertIn("[superlink.supergrid]", message)
+            confirm.assert_called_once_with(
+                f"Do you want me to update `{config_path.resolve()}` now?"
+            )
+            self.assertEqual(
+                tomli.loads(config_path.read_text(encoding="utf-8"))["superlink"][
+                    "supergrid"
+                ]["address"],
+                "api.flower.ai",
+            )
+
+    def test_read_superlink_connection_does_not_prompt_when_noninteractive(
+        self,
+    ) -> None:
+        """Do not prompt to update the old address when output is redirected."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_path = Path(tmp_dir) / "config.toml"
+            config_path.write_text(
+                '[superlink.supergrid]\naddress = "supergrid.flower.ai"\n',
+                encoding="utf-8",
+            )
+
+            with (
+                patch.dict(os.environ, {FLWR_HOME: tmp_dir}),
+                patch("flwr.cli.flower_config.sys.stdout.isatty", return_value=False),
+                patch("flwr.cli.flower_config.typer.confirm") as confirm,
+                self.assertRaises(typer.Exit),
+            ):
+                read_superlink_connection("supergrid")
+
+            confirm.assert_not_called()
+            self.assertEqual(
+                tomli.loads(config_path.read_text(encoding="utf-8"))["superlink"][
+                    "supergrid"
+                ]["address"],
+                "supergrid.flower.ai",
+            )
+
+    def test_read_superlink_connection_only_checks_selected_connection(self) -> None:
+        """Do not warn about the old address on an unused connection."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_path = Path(tmp_dir) / "config.toml"
+            config_path.write_text(
+                '[superlink.supergrid]\naddress = "supergrid.flower.ai"\n'
+                '[superlink.local]\naddress = ":local:"\n',
+                encoding="utf-8",
+            )
+
+            with (
+                patch.dict(os.environ, {FLWR_HOME: tmp_dir}),
+                patch("flwr.cli.flower_config.typer.secho") as secho,
+            ):
+                connection = read_superlink_connection("local")
+
+            secho.assert_not_called()
+            self.assertEqual(connection.name, "local")
 
 
 class TestSuperLinkConnection(unittest.TestCase):
@@ -189,12 +259,28 @@ class TestSuperLinkConnection(unittest.TestCase):
             (
                 "local",
                 {
-                    SuperLinkConnectionTomlKey.OPTIONS: {
-                        "num-supernodes": 10,
-                    }
+                    SuperLinkConnectionTomlKey.ADDRESS: (
+                        LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE
+                    ),
                 },
                 SuperLinkConnection(
                     name="local",
+                    address=LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
+                ),
+            ),
+            (
+                "local-with-options",
+                {
+                    SuperLinkConnectionTomlKey.ADDRESS: (
+                        LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE
+                    ),
+                    SuperLinkConnectionTomlKey.OPTIONS: {
+                        "num-supernodes": 10,
+                    },
+                },
+                SuperLinkConnection(
+                    name="local-with-options",
+                    address=LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
                     options=SuperLinkSimulationOptions(
                         num_supernodes=10,
                     ),
@@ -278,7 +364,7 @@ class TestSuperLinkConnection(unittest.TestCase):
                 "num-supernodes": 10,
                 "backend": {
                     "client-resources": {"num-cpus": 1.0, "num-gpus": 0.5},
-                    "init-args": {"logging-level": "info", "log-to-drive": True},
+                    "init-args": {"logging-level": "info", "log-to-driver": True},
                     "name": "custom-backend",
                 },
             }
@@ -307,7 +393,7 @@ class TestSuperLinkConnection(unittest.TestCase):
         self.assertIsNotNone(backend.init_args)
         assert backend.init_args is not None
         self.assertEqual(backend.init_args.logging_level, "info")
-        self.assertTrue(backend.init_args.log_to_drive)
+        self.assertTrue(backend.init_args.log_to_driver)
         self.assertEqual(backend.name, "custom-backend")
 
     def test_parse_superlink_connection_simulation_invalid_name(self) -> None:
@@ -519,6 +605,7 @@ class TestSuperLinkConnection(unittest.TestCase):
             default = "local-sim"
 
             [superlink.local-sim]
+            address = ":local:"
             options.num-supernodes = 2
             options.verbose = true
             options.backend.client-resources.num-cpus = 2.0
@@ -534,7 +621,7 @@ class TestSuperLinkConnection(unittest.TestCase):
             # Assert
             assert config is not None
             self.assertEqual(config.name, "local-sim")
-            self.assertIsNone(config.address)
+            self.assertEqual(config.address, LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE)
             assert config.options is not None
             self.assertEqual(config.options.num_supernodes, 2)
             assert config.options.backend is not None
@@ -559,6 +646,7 @@ class TestSuperLinkConnection(unittest.TestCase):
             default = 'local-sim'
 
             [superlink.local-sim]
+            address = ':local:'
             options.num-supernodes = 2
             options.backend.client-resources.num-cpus = 2.0
             options.backend.unknown-key = "unexpected"
@@ -572,6 +660,7 @@ class TestSuperLinkConnection(unittest.TestCase):
             # that don't align with the scheema
             expected_config = SuperLinkConnection(
                 name="local-sim",
+                address=LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
                 options=SuperLinkSimulationOptions(
                     num_supernodes=2,
                     backend=SimulationBackendConfig(

@@ -44,13 +44,14 @@ def main(grid: Grid, context: Context) -> None:
         num_rounds=num_rounds,
     )
 
-    # Save final model to disk
-    bst = xgb.Booster(params=params)
-    global_model = bytearray(result.arrays["0"].numpy().tobytes())
+    if context.run_config["save-model"]:
+        # Save final model to disk
+        bst = xgb.Booster(params=params)
+        global_model = bytearray(result.arrays["0"].numpy().tobytes())
 
-    # Load global model into booster
-    bst.load_model(global_model)
+        # Load global model into booster
+        bst.load_model(global_model)
 
-    # Save model
-    print("\nSaving final model to disk...")
-    bst.save_model("final_model.json")
+        # Save model
+        print("\nSaving final model to disk...")
+        bst.save_model("final_model.json")

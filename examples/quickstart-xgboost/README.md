@@ -10,7 +10,7 @@ This example demonstrates how to perform EXtreme Gradient Boosting (XGBoost) wit
 We use [HIGGS](https://archive.ics.uci.edu/dataset/280/higgs) dataset for this example to perform a binary classification task.
 Tree-based with bagging method is used for aggregation on the server.
 
-This project provides a minimal code example to enable you to get started quickly. For a more comprehensive code example, take a look at [xgboost-comprehensive](https://github.com/adap/flower/tree/main/examples/xgboost-comprehensive).
+This project provides a minimal code example to enable you to get started quickly. For a more comprehensive code example, take a look at [xgboost-comprehensive](https://github.com/flwrlabs/flower/tree/main/examples/xgboost-comprehensive).
 
 ## Set up the project
 
@@ -62,13 +62,13 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 > Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ```bash
-flwr run .
+flwr run . --stream
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
 ```bash
-flwr run . --run-config "num-server-rounds=5 params.eta=0.05"
+flwr run . --run-config "num-server-rounds=5 params.eta=0.05" --stream
 ```
 
 > [!TIP]

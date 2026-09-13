@@ -12,45 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower Logger tests."""
+"""Tests for backwards-compatible Flower logger exports."""
+
+import flwr.common.logger as common_logger
+import flwr.supercore.logger as supercore_logger
+from flwr.common import configure as common_configure
+from flwr.common import log as common_log
+from flwr.supercore import log as supercore_log
 
 
-import sys
-from queue import Queue
-
-from .logger import mirror_output_to_queue, restore_output
-
-
-def test_mirror_output_to_queue() -> None:
-    """Test that stdout and stderr are mirrored to the provided queue."""
-    # Prepare
-    log_queue: Queue[str | None] = Queue()
-
-    # Execute
-    mirror_output_to_queue(log_queue)
-    print("Test message")
-    sys.stderr.write("Error message\n")
-
-    # Assert
-    assert not log_queue.empty()
-    assert log_queue.get() == "Test message"
-    assert log_queue.get() == "\n"
-    assert log_queue.get() == "Error message\n"
+def test_common_logger_reexports_supercore_implementation() -> None:
+    """Verify legacy logger exports refer to the SuperCore implementation."""
+    assert common_logger.__all__ == supercore_logger.__all__
+    for name in supercore_logger.__all__:
+        assert getattr(common_logger, name) is getattr(supercore_logger, name)
 
 
-def test_restore_output() -> None:
-    """Test that stdout and stderr are restored after calling restore_output."""
-    # Prepare
-    log_queue: Queue[str | None] = Queue()
-
-    # Execute
-    mirror_output_to_queue(log_queue)
-    print("Test message before restore")
-    restore_output()
-    print("Test message after restore")
-    sys.stderr.write("Error message after restore\n")
-
-    # Assert
-    assert log_queue.get() == "Test message before restore"
-    assert log_queue.get() == "\n"
-    assert log_queue.empty()
+def test_common_log_reexports_supercore_log() -> None:
+    """Verify the legacy package-level log export remains compatible."""
+    assert common_log is supercore_log
+    assert common_configure is supercore_logger.configure

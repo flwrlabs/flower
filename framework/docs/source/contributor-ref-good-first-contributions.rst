@@ -15,7 +15,7 @@ codebase. Good candidates to get started are:
 
 - Documentation: What's missing? What could be expressed more clearly?
 - Open issues: Issues with the tag `good first issue
-  <https://github.com/adap/flower/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22>`_.
+  <https://github.com/flwrlabs/flower/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22>`_.
 - Baselines: See below.
 - Examples: See below.
 
@@ -27,7 +27,7 @@ If you are not familiar with Flower Baselines, please check our `contributing gu
 baselines <https://flower.ai/docs/baselines/how-to-contribute-baselines.html>`_.
 
 Then take a look at the open `issues
-<https://github.com/adap/flower/issues?q=is%3Aopen+is%3Aissue+label%3A%22new+baseline%22>`_
+<https://github.com/flwrlabs/flower/issues?q=is%3Aopen+is%3Aissue+label%3A%22new+baseline%22>`_
 for baseline requests. If you find a baseline that you'd like to work on, and it has no
 assignees, feel free to assign it to yourself and get started!
 

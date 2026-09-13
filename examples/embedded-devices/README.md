@@ -6,7 +6,7 @@ framework: [torch]
 
 # Federated AI with Embedded Devices using Flower
 
-This example will show you how Flower makes it very easy to run Federated Learning workloads on edge devices. Here we'll be showing how to use Raspberry Pi as Flower clients, or better said, `SuperNodes`. The FL workload (i.e. model, dataset and training loop) is mostly borrowed from the [quickstart-pytorch](https://github.com/adap/flower/tree/main/examples/quickstart-pytorch) example, but you could adjust it to follow [quickstart-tensorflow](https://github.com/adap/flower/tree/main/examples/quickstart-tensorflow) if you prefere using TensorFlow. The main difference compare to those examples is that here you'll learn how to use Flower's Deployment Engine to run FL across multiple embedded devices.
+This example will show you how Flower makes it very easy to run Federated Learning workloads on edge devices. Here we'll be showing how to use Raspberry Pi as Flower clients, or better said, `SuperNodes`. The FL workload (i.e. model, dataset and training loop) is mostly borrowed from the [quickstart-pytorch](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-pytorch) example, but you could adjust it to follow [quickstart-tensorflow](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-tensorflow) if you prefere using TensorFlow. The main difference compare to those examples is that here you'll learn how to use Flower's Deployment Engine to run FL across multiple embedded devices.
 
 ![Different was of running Flower FL on embedded devices](_static/diagram.png)
 
@@ -34,7 +34,7 @@ What follows is a step-by-step guide on how to setup your client/s and the serve
 Start with cloning this example on your laptop or desktop machine. We have prepared a single line which you can copy and execute:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git \
+git clone --depth=1 https://github.com/flwrlabs/flower.git \
           && mv flower/examples/embedded-devices . \
           && rm -rf flower && cd embedded-devices
 ```
@@ -77,7 +77,7 @@ pip install -e .
    - SSH into your Rapsberry Pi.
    - Follow the steps outlined in [Embedded Devices Setup](device_setup.md) to set it up for develpment. The objetive of this step is to have your Pi ready to join later as a Flower `SuperNode` to an existing federation.
 
-3. Run your Flower experiments following the steps in the [Running FL with Flower](https://github.com/adap/flower/tree/main/examples/embedded-devices#running-fl-training-with-flower) section.
+3. Run your Flower experiments following the steps in the [Running FL with Flower](https://github.com/flwrlabs/flower/tree/main/examples/embedded-devices#running-fl-training-with-flower) section.
 
 ## Embedded Federated AI
 

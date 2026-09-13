@@ -20,8 +20,13 @@ from unittest.mock import MagicMock
 import numpy as np
 from numpy.testing import assert_allclose
 
-from flwr.common import Code, FitRes, Status, parameters_to_ndarrays
-from flwr.common.parameter import ndarrays_to_parameters
+from flwr.common import (
+    Code,
+    FitRes,
+    Status,
+    ndarrays_to_parameters,
+    parameters_to_ndarrays,
+)
 from flwr.server.client_proxy import ClientProxy
 
 from .fedavg import FedAvg

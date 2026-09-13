@@ -15,9 +15,8 @@
 """Flower Built-in Mods."""
 
 
-from flwr.client.mod.comms_mods import arrays_size_mod, message_size_mod
-
 from .centraldp_mods import adaptiveclipping_mod, fixedclipping_mod
+from .comms_mods import arrays_size_mod, message_size_mod
 from .localdp_mod import LocalDpMod
 
 __all__ = [

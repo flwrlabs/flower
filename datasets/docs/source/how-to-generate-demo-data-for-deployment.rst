@@ -87,7 +87,7 @@ key may be used.
    flower-supernode \
        --insecure \
        --superlink <SUPERLINK-FLEET-API> \
-       --node-config="data-path=/path/to/demo_data/partition_0"
+       --node-config="data-path='/path/to/demo_data/partition_0'"
 
 
 Loading the Dataset in Your ClientApp

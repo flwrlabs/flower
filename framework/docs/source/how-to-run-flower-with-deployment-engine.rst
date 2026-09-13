@@ -1,12 +1,12 @@
-:og:description: Guide to use Flower's Deployment Engine and run a Flower App trough a federation consisting of a SuperLink and two SuperNodes.
+:og:description: Guide to use Flower's Deployment Runtime and run a Flower App through a federation consisting of a SuperLink and two SuperNodes.
 .. meta::
-    :description: Guide to use Flower's Deployment Engine and run a Flower App trough a federation consisting of a SuperLink and two SuperNodes.
+    :description: Guide to use Flower's Deployment Runtime and run a Flower App through a federation consisting of a SuperLink and two SuperNodes.
 
-#######################################
- Run Flower with the Deployment Engine
-#######################################
+########################################
+ Run Flower with the Deployment Runtime
+########################################
 
-This how-to guide demonstrates how to set up and run Flower with the Deployment Engine
+This how-to guide demonstrates how to set up and run Flower with the Deployment Runtime
 using minimal configurations to illustrate the workflow. This is a complementary guide
 to the :doc:`docker/index` guides.
 
@@ -76,8 +76,11 @@ executing ``flwr new``:
 
 .. note::
 
-    If you decide to run the project with ``flwr run .``, the Simulation Engine will be
-    used. Continue to Step 2 to know how to instead use the Deployment Engine.
+    If you decide to run the project with ``flwr run .`` against the default local
+    profile (the one marked with ``address = ":local:"`` in the Flower configuration),
+    Flower submits the run to a managed local SuperLink, which then executes it with the
+    Simulation Runtime. Continue to Step 2 to instead point ``flwr run`` at a named
+    SuperLink connection for the Deployment Runtime.
 
 .. tip::
 
@@ -109,6 +112,11 @@ mode:
     * ``--insecure``: This flag tells the SuperLink to operate in an insecure mode, allowing
       unencrypted communication. Refer to the :doc:`how-to-enable-tls-connections` guide to learn how to run your SuperLink with TLS.
 
+.. note::
+
+    To enable TLS also for the SuperLink Runtime API, please refer to :ref:`Launching
+    the SuperLink with TLS <launching-the-superlink-with-tls>`.
+
 Start two Flower SuperNodes
 ===========================
 
@@ -132,7 +140,8 @@ need two terminals for this step.
        $ flower-supernode \
             --insecure \
             --superlink 127.0.0.1:9092 \
-            --clientappio-api-address 127.0.0.1:9094 \
+            --host 127.0.0.1 \
+            --port 9094 \
             --node-config "partition-id=0 num-partitions=2"
 
    .. dropdown:: Understand the command
@@ -142,8 +151,8 @@ need two terminals for this step.
          unencrypted communication. Refer to the :doc:`how-to-enable-tls-connections` guide to learn how to run your SuperNode with TLS.
        * ``--superlink 127.0.0.1:9092``: Connect to the SuperLink's Fleet API at the address
          ``127.0.0.1:9092``. If you had launched the SuperLink in a different machine, you'd replace ``127.0.0.1`` with the public IP of that machine.
-       * ``--clientappio-api-address 127.0.0.1:9094``: Set the address and port number where the
-         SuperNode is listening to communicate with the ``ClientApp``.
+       * ``--host 127.0.0.1``: Set the host where the SuperNode listens for Runtime API requests.
+       * ``--port 9094``: Set the Runtime API port used to communicate with the ``ClientApp``.
        * ``--node-config "partition-id=0 num-partitions=2"``: The ``ClientApp`` code generated via ``flwr new`` expects those two key-value pairs to be defined at run time. Set the partition ID to ``0`` and the number of partitions to ``2`` for the SuperNode configuration.
 
 2. **Terminal 2** Start the second SuperNode after activating your environment:
@@ -153,13 +162,19 @@ need two terminals for this step.
        $ flower-supernode \
             --insecure \
             --superlink 127.0.0.1:9092 \
-            --clientappio-api-address 127.0.0.1:9095 \
+            --host 127.0.0.1 \
+            --port 9095 \
             --node-config "partition-id=1 num-partitions=2"
 
    .. dropdown:: Understand the command
 
-       * ``--clientappio-api-address 127.0.0.1:9095``: Note that a different port is being used. This is only needed because you are running two SuperNodes on the same machine. Typically you would run one node per machine and therefore, the ``--clientappio-api-address`` could be omitted all together and left with its default value.
+       * ``--port 9095``: Note that a different port is being used. This is only needed because you are running two SuperNodes on the same machine. Typically you would run one node per machine and could omit ``--port`` to use its default value.
        * ``--node-config "partition-id=1 num-partitions=2"``: Note here we indicate a different `partition-id`. In this way, a ``ClientApp`` will use a different data partition depending on which SuperNode runs in.
+
+.. note::
+
+    To enable TLS also for the SuperNode Runtime API, please refer to :ref:`Connecting
+    the SuperNodes with TLS <connecting-the-supernodes-with-tls>`.
 
 ********************************************
  Step 3: Run a Flower App on the Federation
@@ -175,11 +190,10 @@ need two terminals for this step.
 At this point, you have launched two SuperNodes that are connected to the same
 SuperLink. The system is idling waiting for a ``Run`` to be submitted. Before you can
 run your Flower App through the federation we need a way to tell ``flwr run`` that the
-App is to be executed via the SuperLink we just started, instead of using the local
-Simulation Engine (the default). Doing this is easy: define a new SuperLink connection
-in the **Flower Configuration** file, indicate the address of the SuperLink and pass a
-certificate (if any) or set the insecure flag (only when testing locally, real
-deployments require TLS).
+App is to be executed via the SuperLink we just started. Doing this is easy: define a
+new SuperLink connection in the **Flower Configuration** file, indicate the address of
+the SuperLink and pass a certificate (if any) or set the insecure flag (only when
+testing locally, real deployments require TLS).
 
 1. Find the Flower Configuration TOML file in your machine. This file is automatically
    create for your when you first use a Flower CLI command. Use ``flwr config list`` to
@@ -201,7 +215,7 @@ deployments require TLS).
        :caption: config.toml
 
        [superlink.local-deployment]
-       address = "127.0.0.1:9093"
+       address = "127.0.0.1:8000"
        insecure = true
 
    .. note::
@@ -222,6 +236,13 @@ deployments require TLS).
 
    If you want to rerun the project or test an updated version by making changes to the
    code, simply re-run the command above.
+
+.. tip::
+
+    You can setup your ``local-deployment`` profile as the default so you don't have to
+    specify it in every Flower CLI command that needs to connect to the SuperLink. For
+    that and more details about the Flower configuration, refer to the :doc:`the Flower
+    Configuration <ref-flower-configuration>` guide.
 
 ******************
  Step 4: Clean Up

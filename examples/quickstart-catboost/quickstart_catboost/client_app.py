@@ -1,6 +1,7 @@
 """quickstart-catboost: A Flower / CatBoost app."""
 
 import json
+import tempfile
 
 from catboost import CatBoostClassifier, Pool
 from flwr.clientapp import ClientApp
@@ -30,27 +31,30 @@ def train(msg: Message, context: Context) -> Message:
     iterations = context.run_config["local-epochs"]
     learning_rate = context.run_config["learning-rate"]
     depth = context.run_config["depth"]
-    cbc = CatBoostClassifier(
-        iterations=iterations,
-        learning_rate=learning_rate,
-        depth=depth,
-        random_seed=42,
-        verbose=0,
-        cat_features=cat_features,
-    )
+    # CatBoost writes training artifacts; keep them isolated in a writable tmpdir.
+    with tempfile.TemporaryDirectory() as train_dir:
+        cbc = CatBoostClassifier(
+            iterations=iterations,
+            learning_rate=learning_rate,
+            depth=depth,
+            random_seed=42,
+            verbose=0,
+            cat_features=cat_features,
+            train_dir=train_dir,
+        )
 
-    # Load global model
-    # Note: In the first round, the global model is empty since no trees boosted yet.
-    global_model_dict = msg.content["gmodel"]["model"]
-    cbc_init = convert_to_catboost(global_model_dict) if global_model_dict else None
+        # Load global model
+        # Note: In the first round, the global model is empty since no trees boosted yet.
+        global_model_dict = msg.content["gmodel"]["model"]
+        cbc_init = convert_to_catboost(global_model_dict) if global_model_dict else None
 
-    # Local training
-    cbc.fit(X_train, y_train, init_model=cbc_init)
+        # Local training
+        cbc.fit(X_train, y_train, init_model=cbc_init)
 
-    # Evaluation
-    eval_pool = Pool(data=X_test, label=y_test, cat_features=cat_features)
-    metrics = cbc.eval_metrics(eval_pool, metrics=["AUC"])
-    auc = metrics["AUC"][-1]
+        # Evaluation
+        eval_pool = Pool(data=X_test, label=y_test, cat_features=cat_features)
+        metrics = cbc.eval_metrics(eval_pool, metrics=["AUC"])
+        auc = metrics["AUC"][-1]
 
     # Extract boosted trees
     model_dict = convert_to_model_dict(cbc)

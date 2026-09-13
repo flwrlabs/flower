@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower CLI account auth plugin for OIDC."""
 
-
 import time
 import webbrowser
 from collections.abc import Sequence
@@ -28,12 +27,12 @@ from flwr.cli.constant import (
     REFRESH_TOKEN_STORE_KEY,
 )
 from flwr.common.constant import ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, AuthnType
-from flwr.common.typing import AccountAuthCredentials, AccountAuthLoginDetails
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetAuthTokensRequest,
     GetAuthTokensResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.auth.typing import AccountAuthCredentials, AccountAuthLoginDetails
+from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.credential_store import get_credential_store
 
 from .auth_plugin import CliAuthPlugin, LoginError
@@ -55,7 +54,7 @@ class OidcCliPlugin(CliAuthPlugin):
     @staticmethod
     def login(
         login_details: AccountAuthLoginDetails,
-        control_stub: ControlStub,
+        control_client: ControlHttpClient,
     ) -> AccountAuthCredentials:
         """Authenticate the account and retrieve authentication credentials.
 
@@ -63,8 +62,8 @@ class OidcCliPlugin(CliAuthPlugin):
         ----------
         login_details : AccountAuthLoginDetails
             Login details containing device code and verification URI.
-        control_stub : ControlStub
-            Control stub for making authentication requests.
+        control_client : ControlHttpClient
+            Control client for making authentication requests.
 
         Returns
         -------
@@ -91,7 +90,7 @@ class OidcCliPlugin(CliAuthPlugin):
         time.sleep(login_details.interval)
 
         while (time.time() - start_time) < login_details.expires_in:
-            res: GetAuthTokensResponse = control_stub.GetAuthTokens(
+            res: GetAuthTokensResponse = control_client.GetAuthTokens(
                 GetAuthTokensRequest(device_code=login_details.device_code)
             )
 
@@ -146,19 +145,3 @@ class OidcCliPlugin(CliAuthPlugin):
             (ACCESS_TOKEN_KEY, self.access_token),
             (REFRESH_TOKEN_KEY, self.refresh_token),
         ]
-
-    def read_tokens_from_metadata(
-        self, metadata: Sequence[tuple[str, str | bytes]]
-    ) -> AccountAuthCredentials | None:
-        """Read authentication tokens from the provided metadata."""
-        metadata_dict = dict(metadata)
-        access_token = metadata_dict.get(ACCESS_TOKEN_KEY)
-        refresh_token = metadata_dict.get(REFRESH_TOKEN_KEY)
-
-        if isinstance(access_token, str) and isinstance(refresh_token, str):
-            return AccountAuthCredentials(
-                access_token=access_token,
-                refresh_token=refresh_token,
-            )
-
-        return None

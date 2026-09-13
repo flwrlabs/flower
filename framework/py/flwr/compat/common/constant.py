@@ -14,16 +14,11 @@
 # ==============================================================================
 """Flower constants."""
 
-from flwr.common.constant import (
-    TRANSPORT_TYPE_GRPC_RERE,
-    TRANSPORT_TYPE_REST,
-    TRANSPORT_TYPE_VCE,
-)
+from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE, TRANSPORT_TYPE_VCE
 
 TRANSPORT_TYPE_GRPC_BIDI = "grpc-bidi"
 TRANSPORT_TYPES_COMPAT = [
     TRANSPORT_TYPE_GRPC_BIDI,
     TRANSPORT_TYPE_GRPC_RERE,
-    TRANSPORT_TYPE_REST,
     TRANSPORT_TYPE_VCE,
 ]

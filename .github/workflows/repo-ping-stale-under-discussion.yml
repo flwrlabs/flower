@@ -2,12 +2,12 @@ name: Ping Stale Under Discussion GitHub Issues
 
 on:
   schedule:
-    - cron: '0 8 * * *'
+    - cron: '0 8 * * *'  # Daily at 08:00 UTC
   workflow_dispatch:
 
 jobs:
   ping-stale-issues:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       issues: read
     env:
@@ -15,7 +15,7 @@ jobs:
       SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID_SUPPORT_GITHUB_PRS }}
     steps:
       - name: Ping stale Under Discussion issues via Slack
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

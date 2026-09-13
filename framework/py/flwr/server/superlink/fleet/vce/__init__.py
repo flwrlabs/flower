@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Fleet Simulation Engine side."""
+"""Fleet Simulation Runtime side."""
 
 
 from .vce_api import start_vce

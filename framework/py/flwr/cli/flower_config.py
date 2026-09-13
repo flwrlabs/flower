@@ -16,6 +16,7 @@
 
 
 import re
+import sys
 from pathlib import Path
 from typing import Any, cast
 
@@ -26,8 +27,9 @@ import typer
 
 from flwr.cli.constant import (
     DEFAULT_FLOWER_CONFIG_TOML,
-    DEFAULT_SIMULATION_BACKEND_NAME,
     FLOWER_CONFIG_FILE,
+    LEGACY_SUPERGRID_ADDRESS,
+    SUPERGRID_HTTP_ADDRESS,
     SimulationBackendConfigTomlKey,
     SimulationClientResourcesTomlKey,
     SimulationInitArgsTomlKey,
@@ -42,6 +44,7 @@ from flwr.cli.typing import (
     SuperLinkSimulationOptions,
 )
 from flwr.common.config import flatten_dict
+from flwr.supercore.constant import DEFAULT_SIMULATION_CONFIG
 from flwr.supercore.utils import get_flwr_home
 
 
@@ -80,12 +83,15 @@ def _parse_simulation_options(options: dict[str, Any]) -> SuperLinkSimulationOpt
                 logging_level=init_args_dict.get(
                     SimulationInitArgsTomlKey.LOGGING_LEVEL
                 ),
-                log_to_drive=init_args_dict.get(SimulationInitArgsTomlKey.LOG_TO_DRIVE),
+                log_to_driver=init_args_dict.get(
+                    SimulationInitArgsTomlKey.LOG_TO_DRIVER
+                ),
             )
 
         simulation_backend = SimulationBackendConfig(
             name=backend_dict.get(
-                SimulationBackendConfigTomlKey.NAME, DEFAULT_SIMULATION_BACKEND_NAME
+                SimulationBackendConfigTomlKey.NAME,
+                DEFAULT_SIMULATION_CONFIG.backend,
             ),
             client_resources=client_resources,
             init_args=init_args,
@@ -132,7 +138,7 @@ def _serialize_simulation_options(
                 SimulationInitArgsTomlKey.NUM_CPUS: init_args.num_cpus,
                 SimulationInitArgsTomlKey.NUM_GPUS: init_args.num_gpus,
                 SimulationInitArgsTomlKey.LOGGING_LEVEL: init_args.logging_level,
-                SimulationInitArgsTomlKey.LOG_TO_DRIVE: init_args.log_to_drive,
+                SimulationInitArgsTomlKey.LOG_TO_DRIVER: init_args.log_to_driver,
             }
             # Remove None values
             init_args_dict = {k: v for k, v in init_args_dict.items() if v is not None}
@@ -293,8 +299,37 @@ def read_superlink_connection(
             raise click.ClickException(msg)
 
         conn_dict = superlink_config[connection_name]
+        if (
+            isinstance(conn_dict, dict)
+            and conn_dict.get(SuperLinkConnectionTomlKey.ADDRESS)
+            == LEGACY_SUPERGRID_ADDRESS
+        ):
+            config_path = config_path.resolve()
+            typer.secho(
+                f"\n⚠️ You are using SuperLink connection `{connection_name}`, which "
+                "uses the old SuperGrid address "
+                f"`{LEGACY_SUPERGRID_ADDRESS}`.\n\n"
+                f"To update it manually, open `{config_path}`, find `address` under "
+                f"the `[superlink.{connection_name}]` section, and replace "
+                f"`{LEGACY_SUPERGRID_ADDRESS}` with `{SUPERGRID_HTTP_ADDRESS}`.\n",
+                fg=typer.colors.YELLOW,
+            )
+            if (
+                sys.stdin.isatty()
+                and sys.stdout.isatty()
+                and typer.confirm(f"Do you want me to update `{config_path}` now?")
+            ):
+                conn_dict[SuperLinkConnectionTomlKey.ADDRESS] = SUPERGRID_HTTP_ADDRESS
+                write_flower_config(toml_dict)
+                typer.secho(
+                    f"Updated `{config_path}`. Please run the command again.",
+                    fg=typer.colors.GREEN,
+                )
+            raise typer.Exit(code=1)
         return parse_superlink_connection(conn_dict, connection_name)
 
+    except typer.Exit:
+        raise
     except ValueError as err:
         raise click.ClickException(
             f"Failed to parse the Flower configuration file ({config_path}). {err}"

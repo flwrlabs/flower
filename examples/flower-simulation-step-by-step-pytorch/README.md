@@ -9,7 +9,7 @@ framework: [torch]
 > [!NOTE]
 > While this tutorial shows how to extend the functionality of a Flower App that uses PyTorch, there is little specific about PyTorch in the changes described in this tutorial series. This means that you can make use of all the concepts presented even if you decide to use a different ML framework.
 >
-> The previous version of this tutorial from the 2023 video tutorial series can be found here: [c8120f2](https://github.com/adap/flower/tree/c8120f2669fef0f2e6815ab1e957e5366d06d19d/examples/flower-simulation-step-by-step-pytorch). Please note that method of running simulations is no longer recommended and some parts of it, e.g. using `start_simulation`, are deprecated in recent versions of `flwr`.
+> The previous version of this tutorial from the 2023 video tutorial series can be found here: [c8120f2](https://github.com/flwrlabs/flower/tree/c8120f2669fef0f2e6815ab1e957e5366d06d19d/examples/flower-simulation-step-by-step-pytorch). Please note that method of running simulations is no longer recommended and some parts of it, e.g. using `start_simulation`, are deprecated in recent versions of `flwr`.
 
 This directory contains the code to follow along the `Flower AI Simulation 2025` tutorial series on Youtube. You can find all the videos [here](https://www.youtube.com/playlist?list=PLNG4feLHqCWkdlSrEL2xbCtGa6QBxlUZb) or clicking on the video previews below.
 
@@ -29,7 +29,7 @@ In this tutorial series, we make reference to several pages in the [Flower Docum
 - [How-to Run Simulations page](https://flower.ai/docs/framework/how-to-run-simulations.html)
 - [How-to Design Stateful ClientApps](https://flower.ai/docs/framework/how-to-design-stateful-clients.html)
 - [Quickstart Pytorch Tutorial](https://flower.ai/docs/framework/tutorial-quickstart-pytorch.html)
-- [Advanced PyTorch Example](https://github.com/adap/flower/tree/main/examples/advanced-pytorch)
+- [Advanced PyTorch Example](https://github.com/flwrlabs/flower/tree/main/examples/advanced-pytorch)
 
 ## Getting Started
 

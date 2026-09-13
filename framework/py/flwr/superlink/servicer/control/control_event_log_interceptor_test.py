@@ -16,9 +16,11 @@
 
 
 import unittest
+from collections.abc import Iterator
 from unittest.mock import MagicMock
 
 import grpc
+from fastapi import Request
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.common.dummy_grpc_handlers_test import (
@@ -29,7 +31,8 @@ from flwr.common.dummy_grpc_handlers_test import (
     get_noop_unary_unary_handler,
 )
 from flwr.common.event_log_plugin import EventLogWriterPlugin
-from flwr.common.typing import AccountInfo, Actor, Event, LogEntry
+from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.event_log.typing import Actor, Event, LogEntry
 
 from .control_account_auth_interceptor import shared_account_info
 from .control_event_log_interceptor import ControlEventLogInterceptor
@@ -44,7 +47,7 @@ class DummyLogPlugin(EventLogWriterPlugin):
     def compose_log_before_event(
         self,
         request: GrpcMessage,
-        context: grpc.ServicerContext,
+        context: grpc.ServicerContext | Request,
         account_info: AccountInfo | None,
         method_name: str,
     ) -> LogEntry:
@@ -63,7 +66,7 @@ class DummyLogPlugin(EventLogWriterPlugin):
     def compose_log_after_event(  # pylint: disable=too-many-arguments,R0917
         self,
         request: GrpcMessage,
-        context: grpc.ServicerContext,
+        context: grpc.ServicerContext | Request,
         account_info: AccountInfo | None,
         method_name: str,
         response: GrpcMessage | BaseException | None,
@@ -228,6 +231,32 @@ class TestControlEventLogInterceptor(unittest.TestCase):
 
         # Assert that the expected logs should include the before log and the after
         # log (even though an exception occurred)
+        expected_logs = self.get_expected_logs(expected_method_name)
+        self.assertEqual(self.log_plugin.logs, expected_logs)
+
+    def test_unary_stream_interceptor_eager_exception(self) -> None:
+        """Test unary-stream RPC call when the handler raises before returning."""
+        handler_call_details = MagicMock()
+        handler_call_details.method = "/flwr.proto.Control/eager_stream_exception"
+        expected_method_name = handler_call_details.method
+
+        def eager_stream_error(
+            _request: GrpcMessage, _context: grpc.ServicerContext
+        ) -> Iterator[GrpcMessage]:
+            raise RuntimeError("Test eager stream error")
+
+        def continuation(
+            _handler_call_details: grpc.HandlerCallDetails,
+        ) -> grpc.RpcMethodHandler:
+            return grpc.unary_stream_rpc_method_handler(eager_stream_error)
+
+        intercepted_handler = self.interceptor.intercept_service(
+            continuation, handler_call_details
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "Test eager stream error"):
+            intercepted_handler.unary_stream(MagicMock(), MagicMock())
+
         expected_logs = self.get_expected_logs(expected_method_name)
         self.assertEqual(self.log_plugin.logs, expected_logs)
 

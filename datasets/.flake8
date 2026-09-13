@@ -1,3 +1,0 @@
-[flake8]
-max-line-length = 88
-ignore = SIG203, SIG503, W503

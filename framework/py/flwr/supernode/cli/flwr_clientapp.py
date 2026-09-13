@@ -18,13 +18,10 @@
 import argparse
 from logging import DEBUG, INFO
 
-from flwr.common.args import add_args_flwr_app_common
-from flwr.common.constant import CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS, ExecPluginType
-from flwr.common.exit import ExitCode, flwr_exit
-from flwr.common.logger import log
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
-from flwr.supercore.superexec.plugin import ClientAppExecPlugin
-from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
+from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
+from flwr.supercore import log
+from flwr.supercore.constant import SUPERNODE_DEFAULT_CLIENT_ADDRESS
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.supercore.utils import mask_string
 from flwr.supernode.runtime.run_clientapp import run_clientapp
 
@@ -32,40 +29,25 @@ from flwr.supernode.runtime.run_clientapp import run_clientapp
 def flwr_clientapp() -> None:
     """Run process-isolated Flower ClientApp."""
     args = _parse_args_run_flwr_clientapp().parse_args()
-    if not args.insecure:
-        flwr_exit(
-            ExitCode.COMMON_TLS_NOT_SUPPORTED,
-            "flwr-clientapp does not support TLS yet.",
-        )
-
-    # Disallow long-running `flwr-clientapp` processes
-    if args.token is None:
-        run_with_deprecation_warning(
-            cmd="flwr-clientapp",
-            plugin_type=ExecPluginType.CLIENT_APP,
-            plugin_class=ClientAppExecPlugin,
-            stub_class=ClientAppIoStub,
-            appio_api_address=args.clientappio_api_address,
-            flwr_dir=args.flwr_dir,
-            parent_pid=args.parent_pid,
-            warn_run_once=args.run_once,
-        )
-        return
+    token = try_obtain_flwr_app_token(args)
 
     log(INFO, "Start `flwr-clientapp` process")
     log(
         DEBUG,
         "`flwr-clientapp` will attempt to connect to SuperNode's "
-        "ClientAppIo API at %s with token %s",
-        args.clientappio_api_address,
-        mask_string(args.token) if args.token else "None",
+        "Runtime API at %s with token %s",
+        args.runtime_api_address,
+        mask_string(token),
     )
     run_clientapp(
-        clientappio_api_address=args.clientappio_api_address,
-        token=args.token,
-        flwr_dir=args.flwr_dir,
-        certificates=None,
+        runtime_api_address=args.runtime_api_address,
+        token=token,
+        insecure=args.insecure,
+        certificates=validate_and_resolve_root_certificates(
+            args.root_certificates, args.insecure
+        ),
         parent_pid=args.parent_pid,
+        runtime_dependency_install=args.runtime_dependency_install,
     )
 
 
@@ -75,11 +57,12 @@ def _parse_args_run_flwr_clientapp() -> argparse.ArgumentParser:
         description="Run a Flower ClientApp",
     )
     parser.add_argument(
-        "--clientappio-api-address",
-        default=CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+        "--runtime-api-address",
+        dest="runtime_api_address",
+        default=SUPERNODE_DEFAULT_CLIENT_ADDRESS,
         type=str,
-        help="Address of SuperNode's ClientAppIo API (IPv4, IPv6, or a domain name)."
-        f"By default, it is set to {CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS}.",
+        help="Address of SuperNode's Runtime API (IPv4, IPv6, or a domain name)."
+        f"By default, it is set to {SUPERNODE_DEFAULT_CLIENT_ADDRESS}.",
     )
     add_args_flwr_app_common(parser=parser)
     return parser

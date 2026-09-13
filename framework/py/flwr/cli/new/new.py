@@ -24,9 +24,10 @@ import click
 import requests
 import typer
 
-from flwr.supercore.constant import PLATFORM_API_URL
+from flwr.supercore.constant import FLWR_SUPERGRID_API_URL
 from flwr.supercore.utils import parse_app_spec, request_download_link
 
+from ..archive_utils import safe_extract_zip
 from ..utils import prompt_options, prompt_text
 
 
@@ -93,26 +94,13 @@ def new(
 def print_success_prompt(package_name: str) -> None:
     """Print styled setup instructions for running a new Flower App after creation."""
     prompt = typer.style(
-        "🎊 Flower App creation successful.\n\n"
-        "To run your Flower App, first install its dependencies:\n\n",
+        "🎊 Flower App creation successful.\n\nRun the app as follows:\n\n",
         fg=typer.colors.GREEN,
         bold=True,
     )
 
     prompt += typer.style(
-        f"	cd {package_name} && pip install -e .\n\n",
-        fg=typer.colors.BRIGHT_CYAN,
-        bold=True,
-    )
-
-    prompt += typer.style(
-        "then, run the app:\n\n ",
-        fg=typer.colors.GREEN,
-        bold=True,
-    )
-
-    prompt += typer.style(
-        "\tflwr run .\n\n",
+        f"\tflwr run {package_name} --stream\n\n",
         fg=typer.colors.BRIGHT_CYAN,
         bold=True,
     )
@@ -129,7 +117,7 @@ def print_success_prompt(package_name: str) -> None:
 
 def fetch_recommended_apps() -> list[dict[str, str]]:
     """Fetch recommended apps from Platform API."""
-    url = f"{PLATFORM_API_URL}/hub/apps?tag=recommended"
+    url = f"{FLWR_SUPERGRID_API_URL}/hub/apps?tag=recommended"
     try:
         response = requests.get(url, headers={"accept": "application/json"}, timeout=10)
         response.raise_for_status()
@@ -139,41 +127,6 @@ def fetch_recommended_apps() -> list[dict[str, str]]:
 
     except requests.RequestException as e:
         raise click.ClickException(f"Failed to fetch recommended apps: {e}") from e
-
-
-# Security: prevent zip-slip
-def _safe_extract_zip(zf: zipfile.ZipFile, dest_dir: Path) -> None:
-    """Extract ZIP file into destination directory."""
-    dest_dir = dest_dir.resolve()
-
-    def _is_within_directory(base: Path, target: Path) -> bool:
-        try:
-            target.relative_to(base)
-            return True
-        except ValueError:
-            return False
-
-    for member in zf.infolist():
-        # Skip directory placeholders;
-        # ZipInfo can represent them as names ending with '/'.
-        if member.is_dir():
-            target_path = (dest_dir / member.filename).resolve()
-            if not _is_within_directory(dest_dir, target_path):
-                raise ValueError(f"Unsafe path in zip: {member.filename}")
-            target_path.mkdir(parents=True, exist_ok=True)
-            continue
-
-        # Files
-        target_path = (dest_dir / member.filename).resolve()
-        if not _is_within_directory(dest_dir, target_path):
-            raise ValueError(f"Unsafe path in zip: {member.filename}")
-
-        # Ensure parent exists
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Extract
-        with zf.open(member, "r") as src, open(target_path, "wb") as dst:
-            dst.write(src.read())
 
 
 def _download_zip_to_memory(presigned_url: str) -> io.BytesIO:
@@ -219,25 +172,30 @@ def download_remote_app_via_api(app_spec: str) -> None:
         bold=True,
     )
     # Fetch ZIP downloading URL
-    url = f"{PLATFORM_API_URL}/hub/fetch-zip"
+    url = f"{FLWR_SUPERGRID_API_URL}/hub/fetch-zip"
     try:
-        presigned_url, _ = request_download_link(app_id, app_version, url, "zip_url")
+        presigned_url, _, note = request_download_link(
+            app_id, app_version, url, "zip_url"
+        )
     except ValueError as e:
         raise click.ClickException(str(e)) from e
 
+    if note:
+        typer.secho(f"Note: {note}", fg=typer.colors.YELLOW, err=True)
+
     typer.secho(
-        "🔽 Downloading ZIP into memory...",
+        "🔽 Downloading app...",
         fg=typer.colors.GREEN,
         bold=True,
     )
     zip_buf = _download_zip_to_memory(presigned_url)
 
     typer.secho(
-        f"📦 Unpacking into {project_dir}...",
+        f"📦 Unpacking app into {project_dir}...",
         fg=typer.colors.GREEN,
         bold=True,
     )
     with zipfile.ZipFile(zip_buf) as zf:
-        _safe_extract_zip(zf, Path.cwd())
+        safe_extract_zip(zf, Path.cwd())
 
     print_success_prompt(app_name)

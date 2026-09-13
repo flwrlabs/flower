@@ -16,60 +16,57 @@
 
 
 import argparse
-from logging import INFO
+import sys
+from logging import INFO, WARN
+from pathlib import Path
 from typing import Any
 
 import yaml
 
-from flwr.common import EventType, event
+from flwr.common.args import add_args_runtime_dependency_install
 from flwr.common.constant import ExecPluginType
-from flwr.common.exit import ExitCode, flwr_exit
-from flwr.common.logger import log
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
-from flwr.proto.simulationio_pb2_grpc import SimulationIoStub
-from flwr.supercore.constant import EXEC_PLUGIN_SECTION
+from flwr.supercore import log
+from flwr.supercore.auth import (
+    add_superexec_auth_secret_args,
+    load_superexec_auth_secret,
+)
+from flwr.supercore.constant import EXEC_PLUGIN_SECTION, ExecutorType
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.superexec.executor.config import (
+    ExecutorConfig,
+    ExecutorConfigError,
+    load_executor_config,
+)
 from flwr.supercore.superexec.plugin import (
     ClientAppExecPlugin,
     ExecPlugin,
+    ServerAppEphemeralExecPlugin,
     ServerAppExecPlugin,
-    SimulationExecPlugin,
 )
 from flwr.supercore.superexec.run_superexec import run_superexec
-
-try:
-    from flwr.ee import add_ee_args_superexec
-    from flwr.ee.constant import ExecEePluginType
-    from flwr.ee.exec_plugin import get_ee_plugin_and_stub_class
-except ImportError:
-
-    class ExecEePluginType:  # type: ignore[no-redef]
-        """SuperExec EE plugin types."""
-
-        @staticmethod
-        def all() -> list[str]:
-            """Return all SuperExec EE plugin types."""
-            return []
-
-    def get_ee_plugin_and_stub_class(  # pylint: disable=unused-argument
-        plugin_type: str,
-    ) -> tuple[type[ExecPlugin], type[object]] | None:
-        """Get the EE plugin class and stub class based on the plugin type."""
-        return None
-
-    # pylint: disable-next=unused-argument
-    def add_ee_args_superexec(parser: argparse.ArgumentParser) -> None:
-        """Add EE-specific arguments to the parser."""
+from flwr.supercore.telemetry import EventType, event
+from flwr.supercore.update_check import warn_if_flwr_update_available
+from flwr.supercore.utils import disable_process_dumping
+from flwr.supercore.version import package_version
 
 
 def flower_superexec() -> None:
     """Run `flower-superexec` command."""
+    disable_process_dumping(strict=False)
+    warn_if_flwr_update_available(process_name="flower-superexec")
     args = _parse_args().parse_args()
-    if not args.insecure:
-        flwr_exit(
-            ExitCode.COMMON_TLS_NOT_SUPPORTED,
-            "SuperExec does not support TLS yet.",
+
+    if any(
+        arg == "--appio-api-address" or arg.startswith("--appio-api-address=")
+        for arg in sys.argv[1:]
+    ):
+        log(
+            WARN,
+            "The `--appio-api-address` argument has been renamed to "
+            "`--runtime-api-address`. Please update your command; the old name will "
+            "be removed in a future release.",
         )
 
     # Log the first message after parsing arguments in case of `--help`
@@ -92,16 +89,66 @@ def flower_superexec() -> None:
                 f"Failed to load plugin config from '{plugin_config_path}': {e!r}",
             )
 
-    # Get the plugin class and stub class based on the plugin type
-    plugin_class, stub_class = _get_plugin_and_stub_class(args.plugin_type)
+    executor_config = _load_executor_config(
+        getattr(args, "executor_config", None), args.executor
+    )
+
+    # Get the plugin and Runtime HTTP client classes based on the plugin type
+    if args.plugin_type == ExecPluginType.SIMULATION:
+        log(
+            WARN,
+            "The '%s' plugin type is deprecated and will be removed in a future "
+            "release. Please use '%s' instead, which supports both simulation "
+            "and deployment.",
+            ExecPluginType.SIMULATION,
+            ExecPluginType.SERVER_APP,
+        )
+        args.plugin_type = ExecPluginType.SERVER_APP
+
+    if args.plugin_type == ExecPluginType.SERVER_APP_EPHEMERAL:
+        log(
+            WARN,
+            "The '%s' plugin type is experimental and may be removed in a future "
+            "release. Please use '%s' for production deployments.",
+            ExecPluginType.SERVER_APP_EPHEMERAL,
+            ExecPluginType.SERVER_APP,
+        )
+
+    plugin_class, client_class = _get_plugin_and_client_class(args.plugin_type)
+    superexec_auth_secret = None
+    if args.superexec_auth_secret_file is not None:
+        try:
+            superexec_auth_secret = load_superexec_auth_secret(
+                secret_file=args.superexec_auth_secret_file,
+            )
+        except ValueError as err:
+            flwr_exit(
+                ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED,
+                f"Failed to load SuperExec authentication secret: {err}",
+            )
+
+        # Destroy the auth secret file immediately after loading
+        if args.plugin_type == ExecPluginType.SERVER_APP_EPHEMERAL:
+            try:
+                secret_path = Path(args.superexec_auth_secret_file).expanduser()
+                secret_path.write_bytes(b"\x00" * secret_path.stat().st_size)
+                secret_path.unlink()
+            except OSError as e:
+                log(WARN, "Failed to destroy authentication secret file: %s", e)
+
     run_superexec(
         plugin_class=plugin_class,
-        stub_class=stub_class,  # type: ignore
-        appio_api_address=args.appio_api_address,
+        client_class=client_class,
+        runtime_api_address=args.runtime_api_address,
+        insecure=args.insecure,
+        root_certificates_path=args.root_certificates,
+        superexec_auth_secret=superexec_auth_secret,
         plugin_config=plugin_config,
-        flwr_dir=args.flwr_dir,
         parent_pid=args.parent_pid,
         health_server_address=args.health_server_address,
+        runtime_dependency_install=args.runtime_dependency_install,
+        executor_type=args.executor,
+        executor_config=executor_config,
     )
 
 
@@ -111,32 +158,44 @@ def _parse_args() -> argparse.ArgumentParser:
         description="Run Flower SuperExec.",
     )
     parser.add_argument(
-        "--appio-api-address", type=str, required=True, help="Address of the AppIO API"
+        "-V",
+        "--version",
+        action="version",
+        version=f"Flower version: {package_version}",
+    )
+    runtime_api_address_group = parser.add_mutually_exclusive_group(required=True)
+    runtime_api_address_group.add_argument(
+        "--runtime-api-address",
+        dest="runtime_api_address",
+        type=str,
+        help="Address of the Runtime API",
+    )
+    runtime_api_address_group.add_argument(
+        "--appio-api-address",
+        dest="runtime_api_address",
+        type=str,
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--plugin-type",
         type=str,
-        choices=ExecPluginType.all() + ExecEePluginType.all(),
+        choices=ExecPluginType.all(),
         required=True,
         help="The type of plugin to use.",
     )
     parser.add_argument(
         "--insecure",
         action="store_true",
-        help="Connect to the AppIO API without TLS. "
+        help="Connect to the Runtime API without TLS. "
         "Data transmitted between the client and server is not encrypted. "
         "Use this flag only if you understand the risks.",
     )
     parser.add_argument(
-        "--flwr-dir",
-        default=None,
-        help="""The path containing installed Flower Apps.
-        By default, this value is equal to:
-
-            - `$FLWR_HOME/` if `$FLWR_HOME` is defined
-            - `$XDG_DATA_HOME/.flwr/` if `$XDG_DATA_HOME` is defined
-            - `$HOME/.flwr/` in all other cases
-        """,
+        "--root-certificates",
+        metavar="ROOT_CERT",
+        type=str,
+        help="Path to a PEM-encoded root CA certificate (or CA bundle) used to verify "
+        "the server's TLS certificate. This is not a client certificate for mTLS.",
     )
     parser.add_argument(
         "--parent-pid",
@@ -145,22 +204,51 @@ def _parse_args() -> argparse.ArgumentParser:
         help="The PID of the parent process. When set, the process will terminate "
         "when the parent process exits.",
     )
-    add_ee_args_superexec(parser)
+    parser.add_argument(
+        "--executor",
+        type=ExecutorType,
+        choices=tuple(ExecutorType),
+        default=ExecutorType.SUBPROCESS,
+        help="The executor used to run task processes, for example as local "
+        "subprocesses.",
+    )
+    parser.add_argument(
+        "--executor-config",
+        metavar="PATH",
+        type=str,
+        help="Path to a YAML config file for the selected executor.",
+    )
+    add_superexec_auth_secret_args(parser)
     add_args_health(parser)
+    add_args_runtime_dependency_install(parser)
     return parser
 
 
-def _get_plugin_and_stub_class(
+def _load_executor_config(
+    executor_config_path: str | None, executor_type: ExecutorType
+) -> ExecutorConfig | None:
+    """Load executor config from a YAML file if needed."""
+    if executor_config_path is None:
+        return None
+
+    try:
+        return load_executor_config(executor_config_path, executor_type)
+    except ExecutorConfigError as err:
+        flwr_exit(ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG, str(err))
+
+
+def _get_plugin_and_client_class(
     plugin_type: str,
-) -> tuple[type[ExecPlugin], type[object]]:
-    """Get the plugin class and stub class based on the plugin type."""
-    mapping: dict[str, tuple[type[ExecPlugin], type[object]]] = {
-        ExecPluginType.CLIENT_APP: (ClientAppExecPlugin, ClientAppIoStub),
-        ExecPluginType.SERVER_APP: (ServerAppExecPlugin, ServerAppIoStub),
-        ExecPluginType.SIMULATION: (SimulationExecPlugin, SimulationIoStub),
+) -> tuple[type[ExecPlugin], type[RuntimeHttpClient]]:
+    """Get the plugin and Runtime HTTP client classes for a plugin type."""
+    mapping: dict[str, tuple[type[ExecPlugin], type[RuntimeHttpClient]]] = {
+        ExecPluginType.CLIENT_APP: (ClientAppExecPlugin, RuntimeHttpClient),
+        ExecPluginType.SERVER_APP: (ServerAppExecPlugin, RuntimeHttpClient),
+        ExecPluginType.SERVER_APP_EPHEMERAL: (
+            ServerAppEphemeralExecPlugin,
+            RuntimeHttpClient,
+        ),
     }
     if plugin_type in mapping:
         return mapping[plugin_type]
-    if ret := get_ee_plugin_and_stub_class(plugin_type):
-        return ret  # type: ignore[no-any-return]
     raise ValueError(f"Unknown plugin type: {plugin_type}")

@@ -18,7 +18,7 @@
 import pprint
 from functools import reduce
 
-from flwr.common.typing import Scalar
+from flwr.common import Scalar
 
 
 class History:

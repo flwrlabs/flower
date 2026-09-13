@@ -44,6 +44,21 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.StopRunRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.StopRunResponse.FromString,
                 _registered_method=True)
+        self.StartAutomation = channel.unary_unary(
+                '/flwr.proto.Control/StartAutomation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.StartAutomationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.StartAutomationResponse.FromString,
+                _registered_method=True)
+        self.ListAutomations = channel.unary_unary(
+                '/flwr.proto.Control/ListAutomations',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListAutomationsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListAutomationsResponse.FromString,
+                _registered_method=True)
+        self.StopAutomation = channel.unary_unary(
+                '/flwr.proto.Control/StopAutomation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.StopAutomationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.StopAutomationResponse.FromString,
+                _registered_method=True)
         self.StreamLogs = channel.unary_stream(
                 '/flwr.proto.Control/StreamLogs',
                 request_serializer=flwr_dot_proto_dot_control__pb2.StreamLogsRequest.SerializeToString,
@@ -54,6 +69,26 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.ListRunsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.ListRunsResponse.FromString,
                 _registered_method=True)
+        self.ListRunSeries = channel.unary_unary(
+                '/flwr.proto.Control/ListRunSeries',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesResponse.FromString,
+                _registered_method=True)
+        self.GetRunSeries = channel.unary_unary(
+                '/flwr.proto.Control/GetRunSeries',
+                request_serializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesResponse.FromString,
+                _registered_method=True)
+        self.UpdateRunSeriesDescription = channel.unary_unary(
+                '/flwr.proto.Control/UpdateRunSeriesDescription',
+                request_serializer=flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionResponse.FromString,
+                _registered_method=True)
+        self.ListRunSeriesEvents = channel.unary_unary(
+                '/flwr.proto.Control/ListRunSeriesEvents',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsResponse.FromString,
+                _registered_method=True)
         self.GetLoginDetails = channel.unary_unary(
                 '/flwr.proto.Control/GetLoginDetails',
                 request_serializer=flwr_dot_proto_dot_control__pb2.GetLoginDetailsRequest.SerializeToString,
@@ -63,6 +98,26 @@ class ControlStub(object):
                 '/flwr.proto.Control/GetAuthTokens',
                 request_serializer=flwr_dot_proto_dot_control__pb2.GetAuthTokensRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.GetAuthTokensResponse.FromString,
+                _registered_method=True)
+        self.ListConnectors = channel.unary_unary(
+                '/flwr.proto.Control/ListConnectors',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListConnectorsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListConnectorsResponse.FromString,
+                _registered_method=True)
+        self.DisconnectConnector = channel.unary_unary(
+                '/flwr.proto.Control/DisconnectConnector',
+                request_serializer=flwr_dot_proto_dot_control__pb2.DisconnectConnectorRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.DisconnectConnectorResponse.FromString,
+                _registered_method=True)
+        self.BeginConnectorOAuth = channel.unary_unary(
+                '/flwr.proto.Control/BeginConnectorOAuth',
+                request_serializer=flwr_dot_proto_dot_control__pb2.BeginConnectorOAuthRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.BeginConnectorOAuthResponse.FromString,
+                _registered_method=True)
+        self.CompleteConnectorOAuth = channel.unary_unary(
+                '/flwr.proto.Control/CompleteConnectorOAuth',
+                request_serializer=flwr_dot_proto_dot_control__pb2.CompleteConnectorOAuthRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.CompleteConnectorOAuthResponse.FromString,
                 _registered_method=True)
         self.PullArtifacts = channel.unary_unary(
                 '/flwr.proto.Control/PullArtifacts',
@@ -89,6 +144,21 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.ListFederationsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.ListFederationsResponse.FromString,
                 _registered_method=True)
+        self.ListApps = channel.unary_unary(
+                '/flwr.proto.Control/ListApps',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListAppsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListAppsResponse.FromString,
+                _registered_method=True)
+        self.AddApp = channel.unary_unary(
+                '/flwr.proto.Control/AddApp',
+                request_serializer=flwr_dot_proto_dot_control__pb2.AddAppRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.AddAppResponse.FromString,
+                _registered_method=True)
+        self.RemoveApp = channel.unary_unary(
+                '/flwr.proto.Control/RemoveApp',
+                request_serializer=flwr_dot_proto_dot_control__pb2.RemoveAppRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.RemoveAppResponse.FromString,
+                _registered_method=True)
         self.ShowFederation = channel.unary_unary(
                 '/flwr.proto.Control/ShowFederation',
                 request_serializer=flwr_dot_proto_dot_control__pb2.ShowFederationRequest.SerializeToString,
@@ -114,6 +184,46 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.RemoveNodeFromFederationRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.RemoveNodeFromFederationResponse.FromString,
                 _registered_method=True)
+        self.RemoveAccountFromFederation = channel.unary_unary(
+                '/flwr.proto.Control/RemoveAccountFromFederation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.RemoveAccountFromFederationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.RemoveAccountFromFederationResponse.FromString,
+                _registered_method=True)
+        self.CreateInvitation = channel.unary_unary(
+                '/flwr.proto.Control/CreateInvitation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.CreateInvitationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.CreateInvitationResponse.FromString,
+                _registered_method=True)
+        self.ListInvitations = channel.unary_unary(
+                '/flwr.proto.Control/ListInvitations',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListInvitationsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListInvitationsResponse.FromString,
+                _registered_method=True)
+        self.AcceptInvitation = channel.unary_unary(
+                '/flwr.proto.Control/AcceptInvitation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.AcceptInvitationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.AcceptInvitationResponse.FromString,
+                _registered_method=True)
+        self.RejectInvitation = channel.unary_unary(
+                '/flwr.proto.Control/RejectInvitation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.RejectInvitationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.RejectInvitationResponse.FromString,
+                _registered_method=True)
+        self.RevokeInvitation = channel.unary_unary(
+                '/flwr.proto.Control/RevokeInvitation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.RevokeInvitationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.RevokeInvitationResponse.FromString,
+                _registered_method=True)
+        self.ConfigureSimulationFederation = channel.unary_unary(
+                '/flwr.proto.Control/ConfigureSimulationFederation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ConfigureSimulationFederationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ConfigureSimulationFederationResponse.FromString,
+                _registered_method=True)
+        self.StreamRunEvents = channel.unary_stream(
+                '/flwr.proto.Control/StreamRunEvents',
+                request_serializer=flwr_dot_proto_dot_control__pb2.StreamRunEventsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.StreamRunEventsResponse.FromString,
+                _registered_method=True)
 
 
 class ControlServicer(object):
@@ -133,6 +243,27 @@ class ControlServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def StartAutomation(self, request, context):
+        """Start automation upon request
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListAutomations(self, request, context):
+        """List automations
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StopAutomation(self, request, context):
+        """Stop automation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def StreamLogs(self, request, context):
         """Start log stream upon request
         """
@@ -147,6 +278,34 @@ class ControlServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListRunSeries(self, request, context):
+        """List run series
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetRunSeries(self, request, context):
+        """Get run series
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateRunSeriesDescription(self, request, context):
+        """Update run series description
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListRunSeriesEvents(self, request, context):
+        """List events for all runs in a run series
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetLoginDetails(self, request, context):
         """Get login details upon request
         """
@@ -156,6 +315,34 @@ class ControlServicer(object):
 
     def GetAuthTokens(self, request, context):
         """Get auth tokens upon request
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListConnectors(self, request, context):
+        """List OAuth connectors available to the authenticated account
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DisconnectConnector(self, request, context):
+        """Disconnect connector credentials for the authenticated account
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def BeginConnectorOAuth(self, request, context):
+        """Begin OAuth connector authorization flow
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CompleteConnectorOAuth(self, request, context):
+        """Complete OAuth connector authorization flow
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -196,6 +383,27 @@ class ControlServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListApps(self, request, context):
+        """List Apps in a Federation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def AddApp(self, request, context):
+        """Add App to a Federation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RemoveApp(self, request, context):
+        """Remove App from a Federation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def ShowFederation(self, request, context):
         """Show Federation
         """
@@ -231,6 +439,66 @@ class ControlServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RemoveAccountFromFederation(self, request, context):
+        """Remove Account from Federation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateInvitation(self, request, context):
+        """Create Invitation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListInvitations(self, request, context):
+        """List Invitations
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def AcceptInvitation(self, request, context):
+        """Accept Invitation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RejectInvitation(self, request, context):
+        """Reject Invitation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RevokeInvitation(self, request, context):
+        """Revoke Invitation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ConfigureSimulationFederation(self, request, context):
+        """Set Simulation Configuration
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StreamRunEvents(self, request, context):
+        """##############
+        Unused for now
+        ##############
+
+        Start run event stream
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ControlServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -244,6 +512,21 @@ def add_ControlServicer_to_server(servicer, server):
                     request_deserializer=flwr_dot_proto_dot_control__pb2.StopRunRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.StopRunResponse.SerializeToString,
             ),
+            'StartAutomation': grpc.unary_unary_rpc_method_handler(
+                    servicer.StartAutomation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.StartAutomationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.StartAutomationResponse.SerializeToString,
+            ),
+            'ListAutomations': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListAutomations,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListAutomationsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListAutomationsResponse.SerializeToString,
+            ),
+            'StopAutomation': grpc.unary_unary_rpc_method_handler(
+                    servicer.StopAutomation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.StopAutomationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.StopAutomationResponse.SerializeToString,
+            ),
             'StreamLogs': grpc.unary_stream_rpc_method_handler(
                     servicer.StreamLogs,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.StreamLogsRequest.FromString,
@@ -254,6 +537,26 @@ def add_ControlServicer_to_server(servicer, server):
                     request_deserializer=flwr_dot_proto_dot_control__pb2.ListRunsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.ListRunsResponse.SerializeToString,
             ),
+            'ListRunSeries': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListRunSeries,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesResponse.SerializeToString,
+            ),
+            'GetRunSeries': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetRunSeries,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesResponse.SerializeToString,
+            ),
+            'UpdateRunSeriesDescription': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateRunSeriesDescription,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionResponse.SerializeToString,
+            ),
+            'ListRunSeriesEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListRunSeriesEvents,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsResponse.SerializeToString,
+            ),
             'GetLoginDetails': grpc.unary_unary_rpc_method_handler(
                     servicer.GetLoginDetails,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.GetLoginDetailsRequest.FromString,
@@ -263,6 +566,26 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.GetAuthTokens,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.GetAuthTokensRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.GetAuthTokensResponse.SerializeToString,
+            ),
+            'ListConnectors': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListConnectors,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListConnectorsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListConnectorsResponse.SerializeToString,
+            ),
+            'DisconnectConnector': grpc.unary_unary_rpc_method_handler(
+                    servicer.DisconnectConnector,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.DisconnectConnectorRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.DisconnectConnectorResponse.SerializeToString,
+            ),
+            'BeginConnectorOAuth': grpc.unary_unary_rpc_method_handler(
+                    servicer.BeginConnectorOAuth,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.BeginConnectorOAuthRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.BeginConnectorOAuthResponse.SerializeToString,
+            ),
+            'CompleteConnectorOAuth': grpc.unary_unary_rpc_method_handler(
+                    servicer.CompleteConnectorOAuth,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.CompleteConnectorOAuthRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.CompleteConnectorOAuthResponse.SerializeToString,
             ),
             'PullArtifacts': grpc.unary_unary_rpc_method_handler(
                     servicer.PullArtifacts,
@@ -289,6 +612,21 @@ def add_ControlServicer_to_server(servicer, server):
                     request_deserializer=flwr_dot_proto_dot_control__pb2.ListFederationsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.ListFederationsResponse.SerializeToString,
             ),
+            'ListApps': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListApps,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListAppsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListAppsResponse.SerializeToString,
+            ),
+            'AddApp': grpc.unary_unary_rpc_method_handler(
+                    servicer.AddApp,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.AddAppRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.AddAppResponse.SerializeToString,
+            ),
+            'RemoveApp': grpc.unary_unary_rpc_method_handler(
+                    servicer.RemoveApp,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.RemoveAppRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.RemoveAppResponse.SerializeToString,
+            ),
             'ShowFederation': grpc.unary_unary_rpc_method_handler(
                     servicer.ShowFederation,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.ShowFederationRequest.FromString,
@@ -313,6 +651,46 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.RemoveNodeFromFederation,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.RemoveNodeFromFederationRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.RemoveNodeFromFederationResponse.SerializeToString,
+            ),
+            'RemoveAccountFromFederation': grpc.unary_unary_rpc_method_handler(
+                    servicer.RemoveAccountFromFederation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.RemoveAccountFromFederationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.RemoveAccountFromFederationResponse.SerializeToString,
+            ),
+            'CreateInvitation': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateInvitation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.CreateInvitationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.CreateInvitationResponse.SerializeToString,
+            ),
+            'ListInvitations': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListInvitations,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListInvitationsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListInvitationsResponse.SerializeToString,
+            ),
+            'AcceptInvitation': grpc.unary_unary_rpc_method_handler(
+                    servicer.AcceptInvitation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.AcceptInvitationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.AcceptInvitationResponse.SerializeToString,
+            ),
+            'RejectInvitation': grpc.unary_unary_rpc_method_handler(
+                    servicer.RejectInvitation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.RejectInvitationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.RejectInvitationResponse.SerializeToString,
+            ),
+            'RevokeInvitation': grpc.unary_unary_rpc_method_handler(
+                    servicer.RevokeInvitation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.RevokeInvitationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.RevokeInvitationResponse.SerializeToString,
+            ),
+            'ConfigureSimulationFederation': grpc.unary_unary_rpc_method_handler(
+                    servicer.ConfigureSimulationFederation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ConfigureSimulationFederationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ConfigureSimulationFederationResponse.SerializeToString,
+            ),
+            'StreamRunEvents': grpc.unary_stream_rpc_method_handler(
+                    servicer.StreamRunEvents,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.StreamRunEventsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.StreamRunEventsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -380,6 +758,87 @@ class Control(object):
             _registered_method=True)
 
     @staticmethod
+    def StartAutomation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/StartAutomation',
+            flwr_dot_proto_dot_control__pb2.StartAutomationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.StartAutomationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListAutomations(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListAutomations',
+            flwr_dot_proto_dot_control__pb2.ListAutomationsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListAutomationsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StopAutomation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/StopAutomation',
+            flwr_dot_proto_dot_control__pb2.StopAutomationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.StopAutomationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def StreamLogs(request,
             target,
             options=(),
@@ -434,6 +893,114 @@ class Control(object):
             _registered_method=True)
 
     @staticmethod
+    def ListRunSeries(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListRunSeries',
+            flwr_dot_proto_dot_control__pb2.ListRunSeriesRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListRunSeriesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetRunSeries(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/GetRunSeries',
+            flwr_dot_proto_dot_control__pb2.GetRunSeriesRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.GetRunSeriesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateRunSeriesDescription(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/UpdateRunSeriesDescription',
+            flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListRunSeriesEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListRunSeriesEvents',
+            flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def GetLoginDetails(request,
             target,
             options=(),
@@ -477,6 +1044,114 @@ class Control(object):
             '/flwr.proto.Control/GetAuthTokens',
             flwr_dot_proto_dot_control__pb2.GetAuthTokensRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.GetAuthTokensResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListConnectors(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListConnectors',
+            flwr_dot_proto_dot_control__pb2.ListConnectorsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListConnectorsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DisconnectConnector(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/DisconnectConnector',
+            flwr_dot_proto_dot_control__pb2.DisconnectConnectorRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.DisconnectConnectorResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def BeginConnectorOAuth(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/BeginConnectorOAuth',
+            flwr_dot_proto_dot_control__pb2.BeginConnectorOAuthRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.BeginConnectorOAuthResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CompleteConnectorOAuth(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/CompleteConnectorOAuth',
+            flwr_dot_proto_dot_control__pb2.CompleteConnectorOAuthRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.CompleteConnectorOAuthResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -623,6 +1298,87 @@ class Control(object):
             _registered_method=True)
 
     @staticmethod
+    def ListApps(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListApps',
+            flwr_dot_proto_dot_control__pb2.ListAppsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListAppsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def AddApp(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/AddApp',
+            flwr_dot_proto_dot_control__pb2.AddAppRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.AddAppResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RemoveApp(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/RemoveApp',
+            flwr_dot_proto_dot_control__pb2.RemoveAppRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.RemoveAppResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def ShowFederation(request,
             target,
             options=(),
@@ -747,6 +1503,222 @@ class Control(object):
             '/flwr.proto.Control/RemoveNodeFromFederation',
             flwr_dot_proto_dot_control__pb2.RemoveNodeFromFederationRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.RemoveNodeFromFederationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RemoveAccountFromFederation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/RemoveAccountFromFederation',
+            flwr_dot_proto_dot_control__pb2.RemoveAccountFromFederationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.RemoveAccountFromFederationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateInvitation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/CreateInvitation',
+            flwr_dot_proto_dot_control__pb2.CreateInvitationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.CreateInvitationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListInvitations(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListInvitations',
+            flwr_dot_proto_dot_control__pb2.ListInvitationsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListInvitationsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def AcceptInvitation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/AcceptInvitation',
+            flwr_dot_proto_dot_control__pb2.AcceptInvitationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.AcceptInvitationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RejectInvitation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/RejectInvitation',
+            flwr_dot_proto_dot_control__pb2.RejectInvitationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.RejectInvitationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RevokeInvitation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/RevokeInvitation',
+            flwr_dot_proto_dot_control__pb2.RevokeInvitationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.RevokeInvitationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ConfigureSimulationFederation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ConfigureSimulationFederation',
+            flwr_dot_proto_dot_control__pb2.ConfigureSimulationFederationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ConfigureSimulationFederationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StreamRunEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/flwr.proto.Control/StreamRunEvents',
+            flwr_dot_proto_dot_control__pb2.StreamRunEventsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.StreamRunEventsResponse.FromString,
             options,
             channel_credentials,
             insecure,

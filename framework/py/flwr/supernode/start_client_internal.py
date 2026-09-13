@@ -24,61 +24,57 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from functools import partial
 from logging import ERROR, INFO, WARN
-from pathlib import Path
 from typing import cast
 
-import grpc
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from cryptography.hazmat.primitives.serialization.ssh import load_ssh_public_key
 from grpc import RpcError
 
+from flwr.app import Context, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.client.grpc_adapter_client.connection import grpc_adapter
 from flwr.client.grpc_rere_client.connection import grpc_request_response
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH, Context, Error, Message, RecordDict
-from flwr.common.config import get_flwr_dir, get_fused_config_from_fab
+from flwr.common.config import get_fused_config_from_fab
 from flwr.common.constant import (
-    CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
     ISOLATION_MODE_SUBPROCESS,
+    RUNTIME_DEPENDENCY_INSTALL,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
-    TRANSPORT_TYPE_REST,
     TRANSPORT_TYPES,
     ErrorCode,
     ExecPluginType,
+    SubStatus,
 )
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.common.grpc import generic_create_grpc_server
-from flwr.common.inflatable import (
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.supercore import log
+from flwr.supercore.address import parse_address, resolve_bind_address
+from flwr.supercore.constant import SUPERNODE_DEFAULT_SERVER_ADDRESS, TaskType
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.supercore.fab import Fab
+from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
+from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
+from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
     iterate_object_tree,
     no_object_id_recompute,
 )
-from flwr.common.inflatable_utils import (
+from flwr.supercore.inflatable.inflatable_utils import (
     pull_objects,
     push_object_contents_from_iterable,
 )
-from flwr.common.logger import log
-from flwr.common.retry_invoker import RetryInvoker, make_simple_grpc_retry_invoker
-from flwr.common.telemetry import EventType
-from flwr.common.typing import Fab, Run, RunNotRunningException
-from flwr.proto.clientappio_pb2_grpc import add_ClientAppIoServicer_to_server
-from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
-from flwr.supercore.address import parse_address, resolve_bind_address
-from flwr.supercore.ffs import Ffs, FfsFactory
-from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
-from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
+from flwr.supercore.object_store import ObjectStore
 from flwr.supercore.primitives.asymmetric_ed25519 import (
     create_message_to_sign,
     decode_base64url,
     verify_signature,
 )
+from flwr.supercore.retry import RetryInvoker, make_simple_grpc_retry_invoker
+from flwr.supercore.run import Run, RunNotRunningException
+from flwr.supercore.telemetry import EventType
+from flwr.supercore.tls import get_client_tls_args
 from flwr.supercore.version import package_version
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
-from flwr.supernode.servicer.clientappio import ClientAppIoServicer
-
-DEFAULT_FFS_DIR = get_flwr_dir() / "supernode" / "ffs"
 
 FAB_VERIFICATION_ERROR = Error(ErrorCode.INVALID_FAB, "The FAB could not be verified.")
 
@@ -90,6 +86,7 @@ FAB_VERIFICATION_ERROR = Error(ErrorCode.INVALID_FAB, "The FAB could not be veri
 # pylint: disable=too-many-arguments
 def start_client_internal(
     *,
+    state_factory: NodeStateFactory,
     server_address: str,
     node_config: UserConfig,
     root_certificates: bytes | str | None = None,
@@ -100,16 +97,21 @@ def start_client_internal(
     ) = None,
     max_retries: int | None = None,
     max_wait_time: float | None = None,
-    flwr_path: Path | None = None,
     isolation: str = ISOLATION_MODE_SUBPROCESS,
-    clientappio_api_address: str = CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
+    runtime_api_address: str = SUPERNODE_DEFAULT_SERVER_ADDRESS,
+    runtime_certificates: tuple[bytes, bytes, bytes] | None = None,
+    runtime_root_certificates_path: str | None = None,
     health_server_address: str | None = None,
     trusted_entities: dict[str, str] | None = None,
+    superexec_auth_secret: bytes | None = None,
+    runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Start a Flower client node which connects to a Flower server.
 
     Parameters
     ----------
+    state_factory : NodeStateFactory
+        Factory providing the state shared by the Fleet worker and Runtime API.
     server_address : str
         The IPv4 or IPv6 address of the server. If the Flower
         server runs on the same machine on port 8080, then `server_address`
@@ -127,7 +129,6 @@ def start_client_internal(
         Configure the transport layer. Allowed values:
         - 'grpc-rere': gRPC, request-response
         - 'grpc-adapter': gRPC via 3rd party adapter (experimental)
-        - 'rest': HTTP (experimental)
     authentication_keys : Optional[Tuple[PrivateKey, PublicKey]] (default: None)
         Tuple containing the elliptic curve private key and public key for
         authentication from the cryptography library.
@@ -141,18 +142,22 @@ def start_client_internal(
         The maximum duration before the client stops trying to
         connect to the server in case of connection error.
         If set to None, there is no limit to the total time.
-    flwr_path: Optional[Path] (default: None)
-        The fully resolved path containing installed Flower Apps.
     isolation : str (default: ISOLATION_MODE_SUBPROCESS)
         Isolation mode for `ClientApp`. Possible values are `subprocess` and
         `process`. If `subprocess`, the `ClientApp` runs in a subprocess started
-        by the SueprNode and communicates using gRPC at the address
-        `clientappio_api_address`. If `process`, the `ClientApp` runs in a separate
-        isolated process and communicates using gRPC at the address
-        `clientappio_api_address`.
-    clientappio_api_address : str
-        (default: `CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS`)
-        The SuperNode gRPC server address.
+        by the SuperNode and communicates using HTTP at the address
+        `runtime_api_address`. If `process`, the `ClientApp` runs in a separate
+        isolated process and communicates using HTTP at the address
+        `runtime_api_address`.
+    runtime_api_address : str
+        (default: `SUPERNODE_DEFAULT_SERVER_ADDRESS`)
+        The SuperNode Runtime HTTP API address.
+    runtime_certificates : Optional[Tuple[bytes, bytes, bytes]] (default: None)
+        Tuple containing CA certificate, server certificate, and private key used to
+        start a secure Runtime HTTP API server.
+    runtime_root_certificates_path : Optional[str] (default: None)
+        Path to the CA certificate file passed to subprocess SuperExec instances so
+        they can verify the Runtime API server certificate.
     health_server_address : Optional[str] (default: None)
         The address of the health server. If `None` is provided, the health server will
         NOT be started.
@@ -160,6 +165,10 @@ def start_client_internal(
         A dictionary mapping public key IDs to public keys.
         Only apps verified by at least one of these
         entities can run on a supernode.
+    superexec_auth_secret : Optional[bytes] (default: None)
+        Secret used by Runtime API SuperExec metadata auth.
+    runtime_dependency_install : bool (default: False)
+        Whether runtime dependency installation is allowed.
     """
     if insecure is None:
         insecure = root_certificates is None
@@ -177,21 +186,19 @@ def start_client_internal(
             f"to the Flower documentation for more information: {url_v}{page}",
         )
 
-    # Initialize factories
-    object_store_factory = ObjectStoreFactory()
-    state_factory = NodeStateFactory(objectstore_factory=object_store_factory)
-    ffs_factory = FfsFactory(get_flwr_dir(flwr_path) / "supernode" / "ffs")  # type: ignore
+    object_store_factory = state_factory.objectstore_factory
 
-    # Launch ClientAppIo API server
+    if isolation == ISOLATION_MODE_SUBPROCESS:
+        if superexec_auth_secret is not None:
+            log(
+                WARN,
+                "SuperExec auth is disabled for the Runtime API in subprocess "
+                "isolation mode. Provided SuperExec auth secret is ignored.",
+            )
+        superexec_auth_secret = None
+
+    # Runtime API is served over HTTP by the SuperNode process.
     grpc_servers = []
-    clientappio_server = run_clientappio_api_grpc(
-        address=clientappio_api_address,
-        state_factory=state_factory,
-        ffs_factory=ffs_factory,
-        objectstore_factory=object_store_factory,
-        certificates=None,
-    )
-    grpc_servers.append(clientappio_server)
 
     # Launch gRPC health server
     if health_server_address is not None:
@@ -205,20 +212,26 @@ def start_client_internal(
         grpc_servers=grpc_servers,
     )
 
-    # Initialize NodeState, Ffs, and ObjectStore
+    # Initialize NodeState and ObjectStore
     state = state_factory.state()
-    ffs = ffs_factory.ffs()
     store = object_store_factory.store()
 
     # Launch the SuperExec if the isolation mode is `subprocess`
     if isolation == ISOLATION_MODE_SUBPROCESS:
-        command = ["flower-superexec", "--insecure"]
+        runtime_address = resolve_bind_address(runtime_api_address)
+        command = ["flower-superexec"]
+        command += get_client_tls_args(
+            insecure=runtime_certificates is None,
+            root_certificates_path=runtime_root_certificates_path,
+        )
         command += [
-            "--appio-api-address",
-            resolve_bind_address(clientappio_api_address),
+            "--runtime-api-address",
+            runtime_address,
         ]
         command += ["--plugin-type", ExecPluginType.CLIENT_APP]
         command += ["--parent-pid", str(os.getpid())]
+        if runtime_dependency_install:
+            command += ["--allow-runtime-dependency-installation"]
         # pylint: disable-next=consider-using-with
         subprocess.Popen(command)
 
@@ -247,11 +260,8 @@ def start_client_internal(
 
         # pylint: disable=too-many-nested-blocks
         while True:
-            # The signature of the function will change after
-            # completing the transition to the `NodeState`-based SuperNode
             run_id = _pull_and_store_message(
                 state=state,
-                ffs=ffs,
                 object_store=store,
                 node_config=node_config,
                 receive=receive,
@@ -292,9 +302,8 @@ def _insert_message(msg: Message, state: NodeState, store: ObjectStore) -> None:
             store.put(obj_id, obj.deflate())
 
 
-def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
+def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0911
     state: NodeState,
-    ffs: Ffs,
     object_store: ObjectStore,
     node_config: UserConfig,
     receive: Callable[[], tuple[Message, ObjectTree] | None],
@@ -306,10 +315,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
 ) -> int | None:
     """Pull a message from the SuperLink and store it in the state.
 
-    This function current returns None if no message is received,
-    or run_id if a message is received and processed successfully.
-    This behavior will change in the future to return None after
-    completing transition to the `NodeState`-based SuperNode.
+    Return None if no message is received, otherwise return the processed run_id.
     """
     # pylint: disable=too-many-nested-blocks
     message = None
@@ -353,38 +359,59 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
             if trusted_entities:
                 if not fab.verifications.get("valid_license", ""):
                     log(
-                        WARN,
-                        "App verification is not supported by the connected SuperLink.",
+                        ERROR,
+                        "The FAB could not be verified. App verification is "
+                        "not supported by the connected SuperLink.",
                     )
-                else:
-                    fab_verified = _verify_fab(fab, trusted_entities)
-                    if not fab_verified:
-                        # Insert an error message in the state
-                        # when FAB verification fails
-                        log(
-                            ERROR,
-                            "FAB verification failed: the provided trusted entities "
-                            "could not verify the FAB. An error reply "
-                            "has been generated.",
-                        )
-                        reply = Message(FAB_VERIFICATION_ERROR, reply_to=message)
-                        _insert_message(reply, state, object_store)
-                        return run_id
+                    reply = Message(FAB_VERIFICATION_ERROR, reply_to=message)
+                    _insert_message(reply, state, object_store)
+                    return run_id
 
-            # Initialize the context
+                fab_verified = _verify_fab(fab, trusted_entities)
+                if not fab_verified:
+                    # Insert an error message in the state
+                    # when FAB verification fails
+                    log(
+                        ERROR,
+                        "FAB verification failed: the provided trusted entities "
+                        "could not verify the FAB. An error reply "
+                        "has been generated.",
+                    )
+                    reply = Message(FAB_VERIFICATION_ERROR, reply_to=message)
+                    _insert_message(reply, state, object_store)
+                    return run_id
+
+            # Initialize or refresh the context
             run_cfg = get_fused_config_from_fab(fab.content, run_info)
-            run_ctx = Context(
+            context = Context(
                 run_id=run_id,
                 node_id=state.get_node_id(),
                 node_config=node_config,
                 state=RecordDict(),
                 run_config=run_cfg,
+                series_id=run_info.series_id,
             )
+            if existing_context := state.get_run_series_context(run_info.series_id):
+                context.state = existing_context.state
 
             # Store in the state
-            state.store_context(run_ctx)
+            state.set_run_series_context(run_info.series_id, context)
             state.store_run(run_info)
-            ffs.put(fab.content, fab.verifications)
+            state.store_fab(fab)
+
+        # Create task
+        task_id = state.create_task(
+            task_type=TaskType.CLIENT_APP, run_id=run_id, fab_hash=run_info.fab_hash
+        )
+        if task_id is None:
+            # Task creation can fail if the generated uint64 task ID collides
+            log(
+                ERROR,
+                "Failed to create task for run ID %s. The message will not be "
+                "processed.",
+                run_id,
+            )
+            return None
 
         # Preregister the object tree of the message
         obj_ids_to_pull = object_store.preregister(run_id, object_tree)
@@ -413,6 +440,12 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
             )
             state.delete_messages(message_ids=[message.metadata.message_id])
             object_store.delete(message.metadata.message_id)
+            state.finish_task(
+                task_id,
+                sub_status=SubStatus.FAILED,
+                details=f"Pulling message objects failed: {err}",
+            )
+            return None
 
     except RunNotRunningException:
         if message is None:
@@ -436,8 +469,8 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
 def _push_messages(
     state: NodeState,
     object_store: ObjectStore,
-    send: Callable[[Message, ObjectTree, float], set[str]],
-    push_object: Callable[[int, str, bytes], None],
+    send: Callable[[Message, ObjectTree, float], tuple[set[str], str]],
+    push_object: Callable[[int, str, str, bytes], None],
 ) -> None:
     """Push reply messages to the SuperLink."""
     # This is to ensure that only one message is processed at a time
@@ -472,9 +505,11 @@ def _push_messages(
         def yield_object_contents(
             _obj_tree: ObjectTree, obj_id_set: set[str]
         ) -> Iterator[tuple[str, bytes]]:
+            remaining_obj_ids = set(obj_id_set)
             for tree in iterate_object_tree(_obj_tree):
-                if tree.object_id not in obj_id_set:
+                if tree.object_id not in remaining_obj_ids:
                     continue
+                remaining_obj_ids.remove(tree.object_id)
                 while (content := object_store.get(tree.object_id)) == b"":
                     # Wait for the content to be available
                     time.sleep(0.5)
@@ -489,7 +524,7 @@ def _push_messages(
             )
             # Send the reply message with its ObjectTree and ClientApp runtime
             # Get the IDs of objects to send
-            ids_obj_to_send = send(message, object_tree, clientapp_runtime)
+            ids_obj_to_send, session_id = send(message, object_tree, clientapp_runtime)
 
             # Push object contents from the ObjectStore
             run_id = message.metadata.run_id
@@ -498,8 +533,10 @@ def _push_messages(
                 # Use functools.partial to bind run_id explicitly,
                 # avoiding late binding issues and satisfying flake8 (B023)
                 # Equivalent to:
-                # lambda object_id, content: push_object(run_id, object_id, content)
-                push_object_fn=partial(push_object, run_id),
+                # lambda object_id, content: push_object(
+                #     run_id, session_id, object_id, content
+                # )
+                push_object_fn=partial(push_object, run_id, session_id),
             )
             log(INFO, "Sent successfully")
         except RunNotRunningException:
@@ -546,11 +583,11 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
     tuple[
         int,
         Callable[[], tuple[Message, ObjectTree] | None],
-        Callable[[Message, ObjectTree, float], set[str]],
+        Callable[[Message, ObjectTree, float], tuple[set[str], str]],
         Callable[[int], Run],
         Callable[[str, int], Fab],
         Callable[[int, str], bytes],
-        Callable[[int, str, bytes], None],
+        Callable[[int, str, str, bytes], None],
         Callable[[int, str], None],
     ]
 ]:
@@ -565,21 +602,11 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
     host, port, is_v6 = parsed_address
     address = f"[{host}]:{port}" if is_v6 else f"{host}:{port}"
 
-    # Use either gRPC bidirectional streaming or REST request/response
-    if transport == TRANSPORT_TYPE_REST:
-        try:
-            from requests.exceptions import ConnectionError as RequestsConnectionError
-
-            from flwr.client.rest_client.connection import http_request_response
-        except ModuleNotFoundError:
-            flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
-        if server_address[:4] != "http":
-            flwr_exit(ExitCode.SUPERNODE_REST_ADDRESS_INVALID)
-        connection, error_type = http_request_response, RequestsConnectionError
-    elif transport == TRANSPORT_TYPE_GRPC_RERE:
+    # Use one of the supported gRPC transports
+    if transport == TRANSPORT_TYPE_GRPC_RERE:
         connection, error_type = grpc_request_response, RpcError
     elif transport == TRANSPORT_TYPE_GRPC_ADAPTER:
-        connection, error_type = grpc_adapter, RpcError
+        connection, error_type = grpc_adapter, RpcError  # type: ignore[assignment]
     else:
         raise ValueError(
             f"Unknown transport type: {transport} (possible: {TRANSPORT_TYPES})"
@@ -618,34 +645,6 @@ def _make_fleet_connection_retry_invoker(
         retry_invoker.max_time = max_wait_time
 
     return retry_invoker
-
-
-def run_clientappio_api_grpc(
-    address: str,
-    state_factory: NodeStateFactory,
-    ffs_factory: FfsFactory,
-    objectstore_factory: ObjectStoreFactory,
-    certificates: tuple[bytes, bytes, bytes] | None,
-) -> grpc.Server:
-    """Run ClientAppIo API gRPC server."""
-    clientappio_servicer: grpc.Server = ClientAppIoServicer(
-        state_factory=state_factory,
-        ffs_factory=ffs_factory,
-        objectstore_factory=objectstore_factory,
-    )
-    clientappio_add_servicer_to_server_fn = add_ClientAppIoServicer_to_server
-    clientappio_grpc_server = generic_create_grpc_server(
-        servicer_and_add_fn=(
-            clientappio_servicer,
-            clientappio_add_servicer_to_server_fn,
-        ),
-        server_address=address,
-        max_message_length=GRPC_MAX_MESSAGE_LENGTH,
-        certificates=certificates,
-    )
-    log(INFO, "Flower Deployment Runtime: Starting ClientAppIo API on %s", address)
-    clientappio_grpc_server.start()
-    return clientappio_grpc_server
 
 
 def _verify_fab(fab: Fab, trusted_entities: dict[str, str]) -> bool:

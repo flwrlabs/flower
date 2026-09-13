@@ -5,9 +5,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as transforms
+from datasets import load_dataset
 from opacus import PrivacyEngine
 from torch.utils.data import DataLoader
-from torchvision.datasets import CIFAR10
 
 from flwr.app import Context
 from flwr.client import NumPyClient, start_client
@@ -16,9 +16,10 @@ from flwr.clientapp import ClientApp
 # Define parameters.
 PARAMS = {
     "batch_size": 32,
-    "train_split": 0.7,
+    "fixture_size": 200,
     "local_epochs": 1,
 }
+TRAIN_SPLIT = 0.7
 PRIVACY_PARAMS = {
     # 'target_epsilon': 5.0,
     "target_delta": 1e-5,
@@ -28,21 +29,36 @@ PRIVACY_PARAMS = {
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
+class Cifar10Dataset(torch.utils.data.Dataset):
+    """CIFAR-10 dataset loaded from Hugging Face."""
+
+    def __init__(self, split, transform):
+        self.dataset = load_dataset("uoft-cs/cifar10", split=split)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        item = self.dataset[idx]
+        return self.transform(item["img"]), item["label"]
+
+
 # Define model used for training.
 class Net(nn.Module):
     def __init__(self) -> None:
         super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
+        self.conv1 = nn.Conv2d(3, 4, 5)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16 * 5 * 5, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 10)
+        self.conv2 = nn.Conv2d(4, 8, 5)
+        self.fc1 = nn.Linear(8 * 5 * 5, 32)
+        self.fc2 = nn.Linear(32, 16)
+        self.fc3 = nn.Linear(16, 10)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 16 * 5 * 5)
+        x = x.view(-1, 8 * 5 * 5)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
@@ -80,12 +96,10 @@ def load_data():
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
     )
-    data = CIFAR10("./../data", train=True, download=True, transform=transform)
-    split = math.floor(len(data) * 0.01 * PARAMS["train_split"])
+    data = Cifar10Dataset("train", transform=transform)
+    split = math.floor(PARAMS["fixture_size"] * TRAIN_SPLIT)
     trainset = torch.utils.data.Subset(data, list(range(0, split)))
-    testset = torch.utils.data.Subset(
-        data, list(range(split, math.floor(len(data) * 0.01)))
-    )
+    testset = torch.utils.data.Subset(data, list(range(split, PARAMS["fixture_size"])))
     trainloader = DataLoader(trainset, PARAMS["batch_size"])
     testloader = DataLoader(testset, PARAMS["batch_size"])
     sample_rate = PARAMS["batch_size"] / len(trainset)

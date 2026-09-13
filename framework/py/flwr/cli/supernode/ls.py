@@ -17,7 +17,7 @@
 
 import json
 from datetime import datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 from rich.console import Console
@@ -31,19 +31,19 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListNodesRequest,
     ListNodesResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.date import isoformat8601_utc
 from flwr.supercore.utils import humanize_duration
 
 from ..utils import (
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
-    init_channel_from_connection,
+    flwr_cli_exc_handler,
+    init_http_client_from_connection,
     print_json_to_stdout,
 )
 
-_NodeListType = tuple[int, str, str, str, str, str, str, str, float]
+_NodeListType = tuple[int, str, str, str, str, str, str, float]
 
 
 def ls(  # pylint: disable=R0914, R0913, R0917
@@ -53,7 +53,7 @@ def ls(  # pylint: disable=R0914, R0913, R0917
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,
@@ -76,13 +76,12 @@ def ls(  # pylint: disable=R0914, R0913, R0917
 
         # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
-        channel = None
+        control_client = None
 
         try:
-            channel = init_channel_from_connection(superlink_connection)
-            stub = ControlStub(channel)
+            control_client = init_http_client_from_connection(superlink_connection)
             typer.echo("📄 Listing all nodes...")
-            formatted_nodes = _list_nodes(stub)
+            formatted_nodes = _list_nodes(control_client)
 
             if is_json:
                 print_json_to_stdout(_to_json(formatted_nodes, verbose=verbose))
@@ -90,13 +89,13 @@ def ls(  # pylint: disable=R0914, R0913, R0917
                 Console().print(_to_table(formatted_nodes, verbose=verbose))
 
         finally:
-            if channel:
-                channel.close()
+            if control_client:
+                control_client.close()
 
 
-def _list_nodes(stub: ControlStub) -> list[_NodeListType]:
+def _list_nodes(stub: ControlHttpClient) -> list[_NodeListType]:
     """List all nodes."""
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         res: ListNodesResponse = stub.ListNodes(ListNodesRequest())
 
     return _format_nodes(list(res.nodes_info), res.now)
@@ -128,7 +127,6 @@ def _format_nodes(
         formatted_nodes.append(
             (
                 node.node_id,
-                node.owner_aid,
                 node.owner_name,
                 node.status,
                 _format_datetime(node.registered_at),
@@ -158,7 +156,6 @@ def _to_table(nodes_info: list[_NodeListType], verbose: bool) -> Table:
     for row in nodes_info:
         (
             node_id,
-            _,
             owner_name,
             status,
             _,
@@ -211,7 +208,6 @@ def _to_json(nodes_info: list[_NodeListType], verbose: bool) -> str:
     for row in nodes_info:
         (
             node_id,
-            owner_aid,
             owner_name,
             status,
             created_at,
@@ -227,7 +223,6 @@ def _to_json(nodes_info: list[_NodeListType], verbose: bool) -> str:
         nodes_list.append(
             {
                 "node-id": f"{node_id}",
-                "owner-aid": owner_aid,
                 "owner-name": owner_name,
                 "status": status,
                 "created-at": created_at,

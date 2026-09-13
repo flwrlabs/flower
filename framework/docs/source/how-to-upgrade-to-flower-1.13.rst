@@ -160,7 +160,8 @@ project both in the traditional (now deprecated) way and in the new (recommended
     :emphasize-lines: 8,14
 
     from flwr.app import Context
-    from flwr.server import ServerAppComponents, ServerConfig, start_server
+    from flwr.compat.server import ServerAppComponents
+    from flwr.server import ServerConfig, start_server
     from flwr.server.strategy import FedAvg
     from flwr.serverapp import ServerApp
 
@@ -267,7 +268,8 @@ respectively. There is no need to use ``start_simulation()`` anymore. Here's an 
 
     from flwr.app import Context
     from flwr.clientapp import ClientApp
-    from flwr.server import ServerAppComponents, ServerConfig
+    from flwr.compat.server import ServerAppComponents
+    from flwr.server import ServerConfig
     from flwr.server.strategy import FedAvg
     from flwr.serverapp import ServerApp
     from flwr.simulation import start_simulation
