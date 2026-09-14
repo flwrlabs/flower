@@ -196,6 +196,11 @@ class _ChatCompleter(Completer):
         with self._completion_lock:
             self.agents = None
 
+    def invalidate_connectors(self) -> None:
+        """Clear cached connector completions."""
+        with self._completion_lock:
+            self.connectors = None
+
     def get_completions(  # pylint: disable=too-many-return-statements,too-many-branches
         self, document: Document, _complete_event: CompleteEvent
     ) -> Iterable[Completion]:
@@ -553,6 +558,9 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 "Connectors are only available in the personal federation.\n\n",
             )
             return True
+
+        if prompt.lower() == CHAT_CONNECTOR_COMMAND:
+            self.completer.invalidate_connectors()
 
         try:
             connectors = self.completer.load_connectors()

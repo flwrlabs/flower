@@ -238,20 +238,36 @@ def test_chat_selects_connector_from_dropdown() -> None:
 
 
 def test_chat_connector_command_directs_to_webui_when_empty() -> None:
-    """The connector command should direct setup to WebUI when none are connected."""
+    """The connector command should refresh after directing setup to WebUI."""
     application = Mock()
     stub = Mock()
-    stub.ListConnectors.return_value = ListConnectorsResponse()
+    stub.ListConnectors.side_effect = [
+        ListConnectorsResponse(),
+        ListConnectorsResponse(
+            connectors=[
+                Connector(
+                    connector_ref="github",
+                    display_name="GitHub",
+                    connected=True,
+                )
+            ]
+        ),
+    ]
     with patch.object(ChatApplication, "_create_application", return_value=application):
         chat = ChatApplication(stub, [Federation(name=_CHAT_FED_ID)], Mock())
+    chat.input_buffer = Mock()
 
-    assert chat._handle_command(  # pylint: disable=protected-access
-        Mock(app=application), "/connector"
-    )
+    event = Mock(app=application)
+    assert chat._handle_command(event, "/connector")  # pylint: disable=W0212
     assert chat.transcript[-1] == (
         "class:notice",
         "No connected connectors found. Please configure connectors using WebUI.\n\n",
     )
+
+    assert chat._handle_command(event, "/connector")  # pylint: disable=W0212
+    assert stub.ListConnectors.call_count == 2
+    assert chat.input_buffer.text == "/connector "
+    chat.input_buffer.start_completion.assert_called_once_with(select_first=False)
 
 
 def test_chat_rejects_connector_selection_outside_personal_federation() -> None:
