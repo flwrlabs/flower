@@ -239,7 +239,7 @@ def test_runtime_agent_grid_tools() -> None:
     """Grid tools should sample nodes, send content, and return serialized replies."""
     grid = Mock()
     grid.get_node_ids.return_value = [11, 22]
-    grid.push_messages.return_value = ["message-1", "message-2"]
+    grid.push_messages.return_value = ["message-1", ""]
     reply = Message(
         RecordDict({"result": ConfigRecord({"answer": "done"})}),
         dst_node_id=0,
@@ -287,7 +287,10 @@ def test_runtime_agent_grid_tools() -> None:
             },
         }
     )
-    assert pushed["output"] == '{"message_ids":["message-1","message-2"]}'
+    assert pushed["output"] == (
+        '{"results":[{"message_id":"message-1","error":null},'
+        '{"message_id":null,"error":"Message was not accepted."}]}'
+    )
     grid.create_message.assert_not_called()
     sent, second = list(grid.push_messages.call_args.args[0])
     assert sent.metadata.dst_node_id == 11

@@ -92,8 +92,9 @@ def _grid_tools() -> list[JSONObject]:
         function_tool(
             "push_messages",
             (
-                "Send messages to SuperNodes and return their message IDs in the "
-                "same order. Pass those IDs to pull_messages if replies are required."
+                "Send messages to SuperNodes and return one result per message in "
+                "the same order. Pass accepted message IDs to pull_messages if "
+                "replies are required."
             ),
             properties={
                 "messages": {
@@ -357,9 +358,17 @@ class RuntimeAgentGrid(AgentGrid):
             )
 
         message_ids = list(self._grid.push_messages(outgoing))
-        if len(message_ids) != len(outgoing) or any(not item for item in message_ids):
-            raise RuntimeError("Grid did not accept all messages.")
-        return {"message_ids": message_ids}
+        if len(message_ids) != len(outgoing):
+            raise RuntimeError("Grid returned an unexpected number of message IDs.")
+        return {
+            "results": [
+                {
+                    "message_id": message_id or None,
+                    "error": None if message_id else "Message was not accepted.",
+                }
+                for message_id in message_ids
+            ]
+        }
 
     def _pull_messages(self, message_ids: list[str], timeout: float) -> JSONObject:
         if not 0 <= timeout <= 300:
