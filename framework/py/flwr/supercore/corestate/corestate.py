@@ -40,6 +40,10 @@ from ..object_store import ObjectStore
 class CoreState(ABC):  # pylint: disable=R0904
     """Abstract base class for core state."""
 
+    @abstractmethod
+    def get_node_id(self) -> int:
+        """Return the ID of the node owning this CoreState."""
+
     @property
     @abstractmethod
     def object_store(self) -> ObjectStore:
