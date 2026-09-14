@@ -1939,6 +1939,32 @@ class StateTest(CoreStateTest):
 
         assert len(state.get_message_res({message_id}, run_id)) == 1
 
+    def test_get_message_res_does_not_delete_expired_message_from_another_run(
+        self,
+    ) -> None:
+        """Reject a foreign expired Message without deleting it."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        other_run_id = create_dummy_run(state)
+        message = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=node_id,
+                run_id=run_id,
+            )
+        )
+        message_id = state.store_message_ins(message)
+        assert message_id
+
+        future_dt = now() + timedelta(seconds=message.metadata.ttl + 0.1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = future_dt
+            with self.assertRaisesRegex(ValueError, "contains invalid IDs"):
+                state.get_message_res({message_id}, other_run_id)
+
+        assert state.num_message_ins() == 1
+
     def test_get_message_res_node_removed_from_federation(self) -> None:
         """Test that when node is removed from federation after storing message_ins and
         message_res, both are deleted and get_message_res returns error."""
@@ -2102,6 +2128,29 @@ class StateTest(CoreStateTest):
 
         # Assert
         assert msg_res_id is None
+        assert state.num_message_ins() == 1
+        assert state.num_message_res() == 0
+
+    def test_store_message_res_fail_if_run_id_mismatch(self) -> None:
+        """Reject a reply belonging to a different run than its instruction."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        other_run_id = create_dummy_run(state)
+        message = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=node_id,
+                run_id=run_id,
+            )
+        )
+        assert state.store_message_ins(message)
+        instruction = state.get_message_ins(node_id=node_id, limit=1)[0]
+        reply = Message(RecordDict(), reply_to=instruction)
+        reply.metadata.__dict__["_run_id"] = other_run_id
+        reply.metadata.__dict__["_message_id"] = str(uuid4())
+
+        assert state.store_message_res(reply) is None
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 0
 
