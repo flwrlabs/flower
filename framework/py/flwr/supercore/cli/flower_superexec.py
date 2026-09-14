@@ -72,6 +72,12 @@ def flower_superexec() -> None:
 
     # Log the first message after parsing arguments in case of `--help`
     log(INFO, "Starting Flower SuperExec")
+    if args.plugin_type is not None:
+        log(
+            WARN,
+            "`--plugin-type` is usually unnecessary. Omit it unless "
+            "you need to pin SuperExec to a specific plugin.",
+        )
 
     event(
         EventType.RUN_SUPEREXEC_ENTER,
