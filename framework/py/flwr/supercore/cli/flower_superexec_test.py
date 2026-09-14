@@ -25,9 +25,10 @@ import pytest
 from flwr.common.constant import ExecPluginType
 from flwr.supercore.constant import ExecutorType
 from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.superexec.plugin import ClientAppExecPlugin
 from flwr.supercore.version import package_version
 
-from .flower_superexec import _parse_args
+from .flower_superexec import _get_plugin_and_client_class, _parse_args
 
 flower_superexec_module = importlib.import_module("flwr.supercore.cli.flower_superexec")
 
@@ -66,6 +67,21 @@ def test_parse_superexec_accepts_kubernetes_executor_config(
     assert args.executor == ExecutorType.KUBERNETES
     assert args.executor_config == "executor.yaml"
     assert args.plugin_type is None
+
+
+def test_parse_superexec_preserves_explicit_plugin_type() -> None:
+    """An explicit plugin type should override automatic selection."""
+    args = _parse_args().parse_args(
+        [
+            "--runtime-api-address",
+            "127.0.0.1:9091",
+            "--plugin-type",
+            ExecPluginType.CLIENT_APP,
+        ]
+    )
+
+    plugin_class, _ = _get_plugin_and_client_class(args.plugin_type)
+    assert plugin_class is ClientAppExecPlugin
 
 
 @pytest.mark.parametrize(
