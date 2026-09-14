@@ -184,8 +184,9 @@ def pull_messages(  # pylint: disable=R0914
     """Pull a set of Messages."""
     log(DEBUG, "Runtime.PullMessages")
     run_id = _get_authenticated_serverapp_run_id(task)
+    message_ids = set(request.message_ids)
     messages_res: list[Message] = state.get_message_res(
-        message_ids=set(request.message_ids)
+        message_ids=message_ids, run_id=run_id
     )
 
     store = state.object_store

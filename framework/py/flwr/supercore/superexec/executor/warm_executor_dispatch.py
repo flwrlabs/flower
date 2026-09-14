@@ -12,16 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Kubernetes dispatch and pool lifecycle for one-task warm AgentApp executors."""
+"""Kubernetes dispatch and pool lifecycle for one-task warm executors."""
 
 from __future__ import annotations
 
 import importlib
+import sys
 import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
 from logging import INFO, WARNING
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TextIO
 
 from flwr.common.constant import (
     FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
@@ -38,6 +39,7 @@ from .types import ExecutionSpec, LaunchResult
 from .warm_executor_pool import (
     WarmExecutorPoolConfig,
     WarmExecutorPoolKey,
+    is_compatible_warm_executor,
     is_warm_executor_ready,
     new_warm_executor_id,
 )
@@ -51,9 +53,9 @@ _TOKEN_STDIN_ACKNOWLEDGEMENTS = (
 )
 _TOKEN_STDIN_ACKNOWLEDGEMENT_BUFFER_SIZE = max(map(len, _TOKEN_STDIN_ACKNOWLEDGEMENTS))
 WARM_EXECUTOR_CONSUMED_ANNOTATION = "flower.ai/warm-executor-consumed"
-WARM_AGENTAPP_ROOT_CERTIFICATES_MOUNT_PATH = "/run/flwr/runtime-ca"
-WARM_AGENTAPP_ROOT_CERTIFICATES_FILE_PATH = (
-    f"{WARM_AGENTAPP_ROOT_CERTIFICATES_MOUNT_PATH}/ca.crt"
+WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH = "/run/flwr/runtime-ca"
+WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH = (
+    f"{WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH}/ca.crt"
 )
 _WARM_EXECUTOR_ACK_TIMEOUT_SECONDS = 5.0
 # A surviving consumed Pod is safe to retire only after all task processes exit.
@@ -76,21 +78,22 @@ else:
 """
 
 
-class WarmAgentAppUnavailable(RuntimeError):
-    """Raised before a task token is sent to a warm AgentApp executor Pod."""
+class WarmExecutorUnavailable(RuntimeError):
+    """Raised before a task token is sent to a warm executor Pod."""
 
 
-class KubernetesWarmAgentAppDispatch:
+class KubernetesWarmExecutorDispatch:
     """Interact with one Kubernetes exec stream without logging task authority."""
 
     def __init__(self, response: object) -> None:
         self._response = response
+        self._output_after_acceptance: list[tuple[TextIO, str]] = []
 
     def send_token(self, token: str) -> None:
         """Send one token over stdin without retaining it in Pod metadata."""
         write_stdin = getattr(self._response, "write_stdin", None)
         if not callable(write_stdin):
-            raise WarmAgentAppUnavailable(
+            raise WarmExecutorUnavailable(
                 "Kubernetes exec stream does not support standard input."
             )
         write_stdin(f"{token}\n")
@@ -99,27 +102,50 @@ class KubernetesWarmAgentAppDispatch:
         """Return whether the task child acknowledged consuming the token."""
         deadline = time.monotonic() + timeout
         stdout = ""
+        stdout_before_acceptance: list[str] = []
+        stderr_before_acceptance: list[str] = []
         while time.monotonic() < deadline:
             stdout += self._read_stdout()
-            self._read_stderr()
+            stderr = self._read_stderr()
+            if stderr:
+                stderr_before_acceptance.append(stderr)
             self._discard_combined_output()
-            if any(
-                acknowledgement in stdout
-                for acknowledgement in _TOKEN_STDIN_ACKNOWLEDGEMENTS
-            ):
+            acknowledgement_span = self._acknowledgement_span(stdout)
+            if acknowledgement_span is not None:
+                acknowledgement_start, acknowledgement_end = acknowledgement_span
+                self._output_after_acceptance.extend(
+                    (sys.stdout, output)
+                    for output in (
+                        "".join(
+                            (*stdout_before_acceptance, stdout[:acknowledgement_start])
+                        ),
+                        stdout[acknowledgement_end:].removeprefix("\n"),
+                    )
+                    if output
+                )
+                self._output_after_acceptance.extend(
+                    (sys.stderr, output) for output in stderr_before_acceptance
+                )
                 return True
+            stdout_before_acceptance.append(
+                stdout[:-_TOKEN_STDIN_ACKNOWLEDGEMENT_BUFFER_SIZE]
+            )
             stdout = stdout[-_TOKEN_STDIN_ACKNOWLEDGEMENT_BUFFER_SIZE:]
             if not self._is_open():
                 return False
             self._update(min(0.5, deadline - time.monotonic()))
         return False
 
-    def wait_for_close(self) -> bool:
-        """Return whether stream closure confirms that the child exited."""
+    def wait_for_close(self, *, forward_output: bool = False) -> bool:
+        """Return whether stream closure confirms that the child exited.
+
+        Forward child output only after token acceptance when the task opted in.
+        This keeps the token acknowledgement out of the SuperExec logs.
+        """
+        self._drain_output(forward_output)
         while self._is_open():
             self._update(1.0)
-            self._read_stdout()
-            self._read_stderr()
+            self._drain_output(forward_output)
             self._discard_combined_output()
         # A disconnected socket is not proof of process exit. Kubernetes sends
         # the exit status on a separate channel, which must not be discarded.
@@ -151,11 +177,42 @@ class KubernetesWarmAgentAppDispatch:
         stdout = read_stdout()
         return stdout if isinstance(stdout, str) else ""
 
-    def _read_stderr(self) -> None:
+    def _read_stderr(self) -> str:
         peek_stderr = getattr(self._response, "peek_stderr", None)
         read_stderr = getattr(self._response, "read_stderr", None)
         if callable(read_stderr) and (not callable(peek_stderr) or peek_stderr()):
-            read_stderr()
+            stderr = read_stderr()
+            return stderr if isinstance(stderr, str) else ""
+        return ""
+
+    @staticmethod
+    def _acknowledgement_span(stdout: str) -> tuple[int, int] | None:
+        """Return the span of the first complete token acknowledgement."""
+        acknowledgement_start: int | None = None
+        acknowledgement_end: int | None = None
+        for acknowledgement in _TOKEN_STDIN_ACKNOWLEDGEMENTS:
+            start = stdout.find(acknowledgement)
+            if start >= 0 and (
+                acknowledgement_start is None or start < acknowledgement_start
+            ):
+                acknowledgement_start = start
+                acknowledgement_end = start + len(acknowledgement)
+        if acknowledgement_start is None or acknowledgement_end is None:
+            return None
+        return acknowledgement_start, acknowledgement_end
+
+    def _drain_output(self, forward_output: bool) -> None:
+        """Consume exec output and optionally mirror it to SuperExec output."""
+        output_after_acceptance = self._output_after_acceptance
+        self._output_after_acceptance = []
+        for stream, output in (
+            *output_after_acceptance,
+            (sys.stdout, self._read_stdout()),
+            (sys.stderr, self._read_stderr()),
+        ):
+            if forward_output and output:
+                stream.write(output)
+                stream.flush()
 
     def _discard_combined_output(self) -> None:
         # WSClient.read_all() also clears unread channels, including the exit
@@ -167,7 +224,7 @@ class KubernetesWarmAgentAppDispatch:
             combined_output.truncate()
 
 
-def warm_agentapp_command(
+def warm_executor_command(
     spec: ExecutionSpec, runtime_root_certificates: str | None
 ) -> list[str]:
     """Build a one-task child command that receives authority on standard input."""
@@ -183,7 +240,7 @@ def warm_agentapp_command(
         command.extend(
             [
                 "--root-certificates",
-                WARM_AGENTAPP_ROOT_CERTIFICATES_FILE_PATH,
+                WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH,
             ]
         )
     if spec.runtime_dependency_install:
@@ -191,8 +248,8 @@ def warm_agentapp_command(
     return command
 
 
-class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,too-many-arguments
-    """Own and dispatch a fixed set of compatible, one-task warm AgentApp Pods."""
+class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,too-many-arguments
+    """Own and dispatch a fixed set of compatible, one-task warm Pods."""
 
     def __init__(
         self,
@@ -223,7 +280,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         self._warm_executor_owner_label_selector = warm_executor_owner_label_selector
         self._pools = {pool.key: pool for pool in config.warm_executor_pools}
         self._busy_pods: set[str] = set()
-        self._retiring_pods: set[str] = set()
+        self._retiring_pods: dict[str, WarmExecutorPoolKey | None] = {}
         self._closed = False
         self._lock = threading.RLock()
 
@@ -242,7 +299,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 return None
             try:
                 pod_name = self._take_ready_pod(pool.key)
-            except WarmAgentAppUnavailable:
+            except WarmExecutorUnavailable:
                 self._log_dispatch(pool, "setup_unavailable")
                 return None
             if pod_name is None:
@@ -257,8 +314,8 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 spec=spec,
                 runtime_root_certificates=runtime_root_certificates,
             )
-        except WarmAgentAppUnavailable:
-            self._retire_unavailable_pod(pod_name)
+        except WarmExecutorUnavailable:
+            self._retire_unavailable_pod(pod_name, pool.key)
             self._log_dispatch(pool, "setup_unavailable")
             return None
 
@@ -285,7 +342,12 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
             )
         if not accepted:
             dispatch.close()
-        self._retire_after_dispatch(pod_name, pool.key, dispatch)
+        self._retire_after_dispatch(
+            pod_name,
+            pool.key,
+            dispatch,
+            forward_output=accepted and not spec.suppress_output,
+        )
         if accepted:
             self._log_dispatch(pool, "warm_claimed")
             return LaunchResult.accepted()
@@ -381,14 +443,14 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
     def _take_ready_pod(self, key: WarmExecutorPoolKey) -> str | None:
         pods = self._owned_warm_pods()
         if pods is None:
-            raise WarmAgentAppUnavailable("Warm executor Pods could not be listed.")
+            raise WarmExecutorUnavailable("Warm executor Pods could not be listed.")
         for pod in pods:
             pod_name = _object_name(pod)
             if pod_name is not None and self._is_dispatchable(pod, key):
                 try:
                     self._mark_pod_consumed(pod_name)
-                except WarmAgentAppUnavailable:
-                    self._retire_unavailable_pod(pod_name)
+                except WarmExecutorUnavailable:
+                    self._retire_unavailable_pod(pod_name, key)
                     raise
                 self._busy_pods.add(pod_name)
                 return pod_name
@@ -397,7 +459,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
     def _ensure_pool_capacity(
         self, pool: WarmExecutorPoolConfig, reserved_pod_capacity: int = 0
     ) -> None:
-        if self._closed or self._retiring_pods:
+        if self._closed or pool.key in self._retiring_pods.values():
             return
         pods = self._owned_warm_pods()
         if pods is None:
@@ -450,16 +512,14 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         }
         for pod in pods:
             pod_name = _object_name(pod)
-            if (
-                pod_name is not None
-                and pod_name not in self._busy_pods
-                and _is_consumed_warm_executor(pod)
-            ):
-                if self._consumed_pod_has_finished(pod):
-                    self._retire_pod(pod_name)
-                continue
-            if pod_name in self._retiring_pods:
-                continue
+            retiring_pool = next(
+                (
+                    candidate
+                    for candidate in self._pools.values()
+                    if is_compatible_warm_executor(pod, candidate.key)
+                ),
+                None,
+            )
             pool = next(
                 (
                     candidate
@@ -468,9 +528,25 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 ),
                 None,
             )
+            if (
+                pod_name is not None
+                and pod_name not in self._busy_pods
+                and _is_consumed_warm_executor(pod)
+            ):
+                if self._consumed_pod_has_finished(pod):
+                    self._retire_pod(
+                        pod_name,
+                        retiring_pool.key if retiring_pool is not None else None,
+                    )
+                continue
+            if pod_name in self._retiring_pods:
+                continue
             if pool is None:
                 if pod_name is not None and pod_name not in self._busy_pods:
-                    self._retire_pod(pod_name)
+                    self._retire_pod(
+                        pod_name,
+                        retiring_pool.key if retiring_pool is not None else None,
+                    )
                 continue
             compatible_pods[pool.key].append(pod)
 
@@ -487,7 +563,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
             for pod in idle_pods[pool.size :]:
                 pod_name = _object_name(pod)
                 if pod_name is not None:
-                    self._retire_pod(pod_name)
+                    self._retire_pod(pod_name, pool.key)
         return True
 
     def _retry_retiring_pods(self, pods: list[object]) -> None:
@@ -495,7 +571,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         pod_names = {
             pod_name for pod in pods if (pod_name := _object_name(pod)) is not None
         }
-        for pod_name in self._retiring_pods - pod_names:
+        for pod_name in self._retiring_pods.keys() - pod_names:
             self._release_pod(pod_name)
         for pod in pods:
             pod_name = _object_name(pod)
@@ -520,7 +596,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         pod_name: str,
         spec: ExecutionSpec,
         runtime_root_certificates: str | None,
-    ) -> KubernetesWarmAgentAppDispatch:
+    ) -> KubernetesWarmExecutorDispatch:
         try:
             stream = importlib.import_module("kubernetes.stream").stream
             # Kubernetes temporarily changes the exec client's transport during
@@ -531,7 +607,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
                     pod_name,
                     self._config.namespace,
                     container="taskexecutor",
-                    command=warm_agentapp_command(spec, runtime_root_certificates),
+                    command=warm_executor_command(spec, runtime_root_certificates),
                     stderr=True,
                     stdin=True,
                     stdout=True,
@@ -540,10 +616,10 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
                     _request_timeout=_WARM_EXECUTOR_ACK_TIMEOUT_SECONDS,
                 )
         except Exception as err:  # pylint: disable=broad-exception-caught
-            raise WarmAgentAppUnavailable(
+            raise WarmExecutorUnavailable(
                 "Warm TaskExecutor Pod is unavailable for dispatch."
             ) from err
-        return KubernetesWarmAgentAppDispatch(response)
+        return KubernetesWarmExecutorDispatch(response)
 
     def _consumed_pod_has_finished(self, pod: object) -> bool:
         """Preserve surviving tasks unless their exit can be established."""
@@ -579,7 +655,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
             return False
         finally:
             if response is not None:
-                KubernetesWarmAgentAppDispatch(response).close()
+                KubernetesWarmExecutorDispatch(response).close()
 
     def _mark_pod_consumed(self, pod_name: str) -> None:
         try:
@@ -593,7 +669,7 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 },
             )
         except Exception as err:  # pylint: disable=broad-exception-caught
-            raise WarmAgentAppUnavailable(
+            raise WarmExecutorUnavailable(
                 "Failed to persist warm TaskExecutor Pod consumption."
             ) from err
 
@@ -601,12 +677,14 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         self,
         pod_name: str,
         key: WarmExecutorPoolKey,
-        dispatch: KubernetesWarmAgentAppDispatch,
+        dispatch: KubernetesWarmExecutorDispatch,
+        *,
+        forward_output: bool = False,
     ) -> None:
         try:
             cleanup_thread = threading.Thread(
                 target=self._wait_for_task_and_replace,
-                args=(pod_name, key, dispatch),
+                args=(pod_name, key, dispatch, forward_output),
                 daemon=True,
             )
             cleanup_thread.start()
@@ -625,18 +703,19 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
         self,
         pod_name: str,
         key: WarmExecutorPoolKey,
-        dispatch: KubernetesWarmAgentAppDispatch,
+        dispatch: KubernetesWarmExecutorDispatch,
+        forward_output: bool = False,
     ) -> None:
         completed = False
         try:
-            completed = dispatch.wait_for_close()
+            completed = dispatch.wait_for_close(forward_output=forward_output)
         except Exception:  # pylint: disable=broad-exception-caught
             log(WARNING, "Warm TaskExecutor exec stream ended without an exit status.")
         finally:
             dispatch.close()
             with self._lock:
                 if completed:
-                    self._retire_pod(pod_name)
+                    self._retire_pod(pod_name, key)
                 else:
                     self._busy_pods.discard(pod_name)
                 if not self._closed:
@@ -645,15 +724,17 @@ class WarmAgentAppPoolManager:  # pylint: disable=too-many-instance-attributes,t
     def _release_pod(self, pod_name: str) -> None:
         with self._lock:
             self._busy_pods.discard(pod_name)
-            self._retiring_pods.discard(pod_name)
+            self._retiring_pods.pop(pod_name, None)
 
-    def _retire_unavailable_pod(self, pod_name: str) -> None:
+    def _retire_unavailable_pod(self, pod_name: str, key: WarmExecutorPoolKey) -> None:
         """Delete a Pod that failed before task authority was delivered."""
-        self._retire_pod(pod_name)
+        self._retire_pod(pod_name, key)
 
-    def _retire_pod(self, pod_name: str) -> bool:
+    def _retire_pod(
+        self, pod_name: str, key: WarmExecutorPoolKey | None = None
+    ) -> bool:
         with self._lock:
-            self._retiring_pods.add(pod_name)
+            self._retiring_pods[pod_name] = key
         if self._delete_pod(pod_name):
             self._release_pod(pod_name)
             return True
