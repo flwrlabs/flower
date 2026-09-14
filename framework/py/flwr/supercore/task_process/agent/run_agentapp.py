@@ -61,14 +61,12 @@ from flwr.supercore.superexec.dependency_installer import (
 )
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
-from flwr.supercore.typing import JSONObject
 from flwr.superlink.grid import HttpGrid
 
-from .context_items import append_items
 from .session import (
+    AgentRuntime,
     RuntimeAgentConnectors,
     RuntimeAgentEvents,
-    RuntimeAgentResponses,
     RuntimeAgentSession,
 )
 
@@ -216,16 +214,8 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         )
 
         agent_input = context.run_config.get(_AGENT_INPUT_KEY)
-        if agent_input is not None:
-            if not isinstance(agent_input, str):
-                raise ValueError("context.run_config['agent.input'] must be a string.")
-            if agent_input:
-                item: JSONObject = {
-                    "type": "message",
-                    "role": "user",
-                    "content": agent_input,
-                }
-                append_items(context, [item])
+        if agent_input is not None and not isinstance(agent_input, str):
+            raise ValueError("context.run_config['agent.input'] must be a string.")
 
         log(
             DEBUG,
@@ -250,11 +240,10 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
                 f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
             ) from None
         agent_events = RuntimeAgentEvents(grid._runtime_client)
-        responses = RuntimeAgentResponses(
+        agent_runtime = AgentRuntime(
             stub=grid._runtime_client,
             run_id=context.run_id,
             task_id=task_id,
-            context=context,
             start_run_request=StartRunRequest(
                 fab=fab_to_proto(fab),
                 override_config=user_config_to_proto(run.override_config),
@@ -265,8 +254,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             events=agent_events,
         )
         agent = RuntimeAgentSession(
-            responses=responses,
-            connectors=RuntimeAgentConnectors(responses),
+            connectors=RuntimeAgentConnectors(agent_runtime),
             events=agent_events,
         )
         agent_app(agent=agent, context=context)

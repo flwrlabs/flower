@@ -91,7 +91,7 @@ With default arguments you will see streamed output like this:
 
 .. code-block:: shell
 
-    Starting local SuperLink on 127.0.0.1:39093...
+    Starting local SuperLink on 127.0.0.1:39091...
     Successfully started run 1859953118041441032
     INFO :      Starting FedAvg strategy:
     INFO :          ├── Number of rounds: 3

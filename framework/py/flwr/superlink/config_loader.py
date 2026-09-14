@@ -68,7 +68,6 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     port: int
     insecure: bool
     certificates: tuple[bytes, bytes, bytes] | None
-    runtime_certificates: tuple[bytes, bytes, bytes] | None
     superexec_auth_secret: bytes | None
     authn_plugin: ControlAuthnPlugin
     event_log_plugin: EventLogWriterPlugin | None
@@ -78,13 +77,11 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     fleet_api_type: str
     fleet_api_address: str | None
     simulation: bool
-    ssl_keyfile: str | None
+    ssl_ca_certfile: str | None
     ssl_certfile: str | None
+    ssl_keyfile: str | None
     database: str
     isolation: str
-    runtime_ssl_ca_certfile: str | None
-    runtime_ssl_certfile: str | None
-    runtime_ssl_keyfile: str | None
     runtime_dependency_install: bool
 
 

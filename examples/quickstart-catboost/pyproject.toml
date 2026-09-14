@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-catboost"
-version = "1.1.10"
+version = "1.1.11"
 description = "Federated Learning with CatBoost and Flower (Quickstart Example)"
 license = {file = "LICENSE"}
 dependencies = [
-    "flwr[simulation]>=1.28.0",
-    "flwr-datasets>=0.6.0",
+    "flwr[simulation]>=1.36.0",
+    "flwr-datasets>=0.6.1",
     "catboost==1.2.8",
 ]
 
