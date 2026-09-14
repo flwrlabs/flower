@@ -163,10 +163,11 @@ Alongside the `AgentSession`, your main function receives a Flower `Context`:
 - `context.state` stores records persisted for the run series
 - `context.run_id` identifies the current run
 
-The runtime does not automatically append user input, model responses, or
-connector activity to `Context`. Those records are available through
-`agent.events.get_trace()`. Use `context.state` only for additional app-defined
-state that should persist across runs in the series.
+The runtime does not automatically append user input or model responses to
+`Context`. User input, connector activity, and events explicitly published with
+`agent.events.emit(...)` are available through `agent.events.get_trace()`. Use
+`context.state` only for additional app-defined state that should persist across
+runs in the series.
 
 Conversation continuity is an AgentApp behavior, not automatic runtime
 behavior. An AgentApp can convert stored user and assistant events from the
