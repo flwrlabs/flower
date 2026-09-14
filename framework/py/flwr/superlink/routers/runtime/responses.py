@@ -194,6 +194,9 @@ def _start_exchange(
     model_task_id = response.task_id
     request.metadata.dst_task_id = model_task_id
     request.metadata.__dict__["_run_id"] = task.run_id
+    node_id = state.get_node_id()
+    request.metadata.__dict__["_src_node_id"] = node_id
+    request.metadata.dst_node_id = node_id
     request.metadata.src_task_id = task.task_id
     request.metadata.__dict__["_message_id"] = request.object_id
     if not state.store_task_message(request):
