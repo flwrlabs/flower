@@ -29,7 +29,11 @@ from flwr.app.user_config import UserConfig
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.client.message_handler.message_handler import handle_control_message
-from flwr.clientapp.client_app import ClientApp, LoadClientAppError
+from flwr.clientapp.client_app import (
+    ClientApp,
+    LoadClientAppError,
+    format_load_client_app_error_reason,
+)
 from flwr.common.constant import MAX_RETRY_DELAY, ErrorCode
 from flwr.compat.client.client import Client
 from flwr.compat.client.grpc_client.connection import grpc_connection
@@ -475,10 +479,7 @@ def start_client_internal(
                         reason = str(type(ex)) + ":<'" + str(ex) + "'>"
                         exc_entity = "ClientApp"
                         if isinstance(ex, LoadClientAppError):
-                            reason = (
-                                "An exception was raised when attempting to load "
-                                "`ClientApp`"
-                            )
+                            reason = format_load_client_app_error_reason(ex)
                             e_code = ErrorCode.LOAD_CLIENT_APP_EXCEPTION
                             exc_entity = "SuperNode"
 
