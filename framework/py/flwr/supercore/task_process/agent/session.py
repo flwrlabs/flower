@@ -336,7 +336,7 @@ class RuntimeAgentGrid(AgentGrid):
                 }
             ),
             dst_node_id=int(dst_node_id),
-            message_type="query",  # TODO: Replace with an AgentGrid message type.
+            message_type="query",  # Replace with an AgentGrid message type.
             group_id=group_id,
             ttl=ttl,
         )
