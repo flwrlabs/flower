@@ -420,9 +420,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         MessageInsModel.message_id == msg_ins_id
                     )
                 )
-                if msg_ins_run_id is not None and int64_to_uint64(
-                    msg_ins_run_id
-                ) != res_metadata.run_id:
+                if (
+                    msg_ins_run_id is not None
+                    and int64_to_uint64(msg_ins_run_id) != res_metadata.run_id
+                ):
                     log(ERROR, "`metadata.run_id` is invalid")
                     return None
                 msg_ins = self.get_valid_message_ins(msg_ins_id)
