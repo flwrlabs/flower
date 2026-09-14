@@ -539,6 +539,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             return self._handle_connector_command(event, prompt)
         return False
 
+    # pylint: disable-next=too-many-return-statements
     def _handle_connector_command(self, event: KeyPressEvent, prompt: str) -> bool:
         """Show the connector selector or apply its selection."""
         if prompt.lower() == f"{CHAT_CONNECTOR_COMMAND} {CHAT_CONNECTOR_CLEAR}":

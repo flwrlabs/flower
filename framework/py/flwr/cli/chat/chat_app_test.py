@@ -230,11 +230,11 @@ def test_chat_selects_connector_from_dropdown() -> None:
     assert chat._handle_command(  # pylint: disable=protected-access
         event, "/connector clear"
     )
-    assert chat.connector_refs == []
+    assert not chat.connector_refs
     assert chat._render_agent_name() == [  # pylint: disable=protected-access
         ("class:agent.name", f" ✿ {CHAT_AGENT_NAME} · {_CHAT_FED_ID} ")
     ]
-    assert chat.transcript == []
+    assert not chat.transcript
 
 
 def test_chat_connector_command_directs_to_webui_when_empty() -> None:
@@ -268,7 +268,7 @@ def test_chat_rejects_connector_selection_outside_personal_federation() -> None:
     assert chat._handle_command(  # pylint: disable=protected-access
         Mock(app=application), "/federation @flower/other"
     )
-    assert chat.connector_refs == []
+    assert not chat.connector_refs
 
     assert chat._handle_command(  # pylint: disable=protected-access
         Mock(app=application), "/connector"
