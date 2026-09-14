@@ -533,6 +533,33 @@ def _refresh_hub_app(
         log(WARNING, "Failed to refresh Hub app %s: %s", app_id, exc)
 
 
+def _refresh_hub_app_in_thread(
+    state: LinkState,
+    federation_id: str,
+    app_id: str,
+    expected_fab_hash: str,
+    fleet_api_type: str | None,
+) -> None:
+    """Refresh a Hub app in a daemon thread unless one is already running."""
+    refresh_key = (federation_id, app_id)
+    with _hub_app_refresh_threads_lock:
+        refresh_thread = _hub_app_refresh_threads.get(refresh_key)
+        if refresh_thread is None or not refresh_thread.is_alive():
+            refresh_thread = Thread(
+                target=_refresh_hub_app,
+                args=(
+                    state,
+                    federation_id,
+                    app_id,
+                    expected_fab_hash,
+                    fleet_api_type,
+                ),
+                daemon=True,
+            )
+            _hub_app_refresh_threads[refresh_key] = refresh_thread
+            refresh_thread.start()
+
+
 def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
@@ -764,23 +791,13 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     if cached_hub_app is not None:
         cached_fab, updated_at = cached_hub_app
         if updated_at < now() - HUB_APP_REFRESH_INTERVAL:
-            refresh_key = (federation_id, app_id)
-            with _hub_app_refresh_threads_lock:
-                refresh_thread = _hub_app_refresh_threads.get(refresh_key)
-                if refresh_thread is None or not refresh_thread.is_alive():
-                    refresh_thread = Thread(
-                        target=_refresh_hub_app,
-                        args=(
-                            state,
-                            federation_id,
-                            app_id,
-                            cached_fab.hash_str,
-                            fleet_api_type,
-                        ),
-                        daemon=True,
-                    )
-                    _hub_app_refresh_threads[refresh_key] = refresh_thread
-                    refresh_thread.start()
+            _refresh_hub_app_in_thread(
+                state,
+                federation_id,
+                app_id,
+                cached_fab.hash_str,
+                fleet_api_type,
+            )
     return response
 
 
