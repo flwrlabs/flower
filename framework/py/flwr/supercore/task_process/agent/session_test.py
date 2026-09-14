@@ -49,12 +49,8 @@ from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TO
 from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject
 
-from .session import (
-    AgentRuntime,
-    RuntimeAgentConnectors,
-    RuntimeAgentEvents,
-    RuntimeAgentGrid,
-)
+from .grid import RuntimeAgentGrid
+from .session import AgentRuntime, RuntimeAgentConnectors, RuntimeAgentEvents
 
 
 def test_emit_event_pushes_task_event() -> None:

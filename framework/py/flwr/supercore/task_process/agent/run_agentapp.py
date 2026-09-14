@@ -63,11 +63,11 @@ from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.superlink.grid import HttpGrid
 
+from .grid import RuntimeAgentGrid
 from .session import (
     AgentRuntime,
     RuntimeAgentConnectors,
     RuntimeAgentEvents,
-    RuntimeAgentGrid,
     RuntimeAgentSession,
 )
 
