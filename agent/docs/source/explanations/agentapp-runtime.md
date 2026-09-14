@@ -170,9 +170,7 @@ state that should persist across runs in the series.
 
 Conversation continuity is an AgentApp behavior, not automatic runtime
 behavior. An AgentApp can convert stored user and assistant events from the
-trace back into model input. The default `@flwrlabs/agent` template forwards
-only `context.run_config["agent.input"]`, so it treats every run independently
-even when the runs share a series.
+trace back into model input.
 
 ## Run series and federations
 

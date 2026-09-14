@@ -136,7 +136,8 @@ def message_text(content: Any) -> str:
 
 def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
     """Rebuild completed user and assistant messages from the event trace."""
-    messages: list[dict[str, Any]] = []
+    run_order: list[int] = []
+    turns_by_run: dict[int, list[dict[str, Any]]] = {}
     assistant_parts_by_run: dict[int, list[str]] = {}
 
     for entry in agent.events.get_trace():
@@ -148,13 +149,15 @@ def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
 
         if event_type == "message" and data.get("role") == "user":
             assistant_parts_by_run.pop(run_id, None)
-            messages.append(
+            if run_id not in turns_by_run:
+                run_order.append(run_id)
+            turns_by_run[run_id] = [
                 {
                     "type": "message",
                     "role": "user",
                     "content": message_text(data.get("content")),
                 }
-            )
+            ]
         elif event_type in {
             "response.output_text.delta",
             "response.refusal.delta",
@@ -164,8 +167,9 @@ def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
                 assistant_parts_by_run.setdefault(run_id, []).append(delta)
         elif event_type == "response.completed":
             assistant_parts = assistant_parts_by_run.pop(run_id, [])
-            if assistant_parts:
-                messages.append(
+            turn = turns_by_run.get(run_id)
+            if assistant_parts and turn is not None:
+                turn.append(
                     {
                         "type": "message",
                         "role": "assistant",
@@ -175,13 +179,13 @@ def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
         elif event_type in {"error", "response.failed", "response.incomplete"}:
             assistant_parts_by_run.pop(run_id, None)
 
-    return messages
+    return [message for run_id in run_order for message in turns_by_run[run_id]]
 ```
 
 `message_text` raises an error for an unexpected shape instead of silently
-sending incomplete history to the model. The loader keeps partial assistant
-text separate for each run and adds it only after that run emits a
-`response.completed` event, so overlapping runs cannot mix their output and a
+sending incomplete history to the model. The loader groups each user message
+and completed assistant response by run, then flattens those turns in user-event
+order. Overlapping runs therefore cannot mix or reorder their output, and a
 failed or incomplete response is not replayed as a finished answer.
 
 ### Let the model recover from connector failures
@@ -368,7 +372,8 @@ def message_text(content: Any) -> str:
 
 def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
     """Rebuild completed user and assistant messages from the event trace."""
-    messages: list[dict[str, Any]] = []
+    run_order: list[int] = []
+    turns_by_run: dict[int, list[dict[str, Any]]] = {}
     assistant_parts_by_run: dict[int, list[str]] = {}
 
     for entry in agent.events.get_trace():
@@ -380,13 +385,15 @@ def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
 
         if event_type == "message" and data.get("role") == "user":
             assistant_parts_by_run.pop(run_id, None)
-            messages.append(
+            if run_id not in turns_by_run:
+                run_order.append(run_id)
+            turns_by_run[run_id] = [
                 {
                     "type": "message",
                     "role": "user",
                     "content": message_text(data.get("content")),
                 }
-            )
+            ]
         elif event_type in {
             "response.output_text.delta",
             "response.refusal.delta",
@@ -396,8 +403,9 @@ def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
                 assistant_parts_by_run.setdefault(run_id, []).append(delta)
         elif event_type == "response.completed":
             assistant_parts = assistant_parts_by_run.pop(run_id, [])
-            if assistant_parts:
-                messages.append(
+            turn = turns_by_run.get(run_id)
+            if assistant_parts and turn is not None:
+                turn.append(
                     {
                         "type": "message",
                         "role": "assistant",
@@ -407,7 +415,7 @@ def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
         elif event_type in {"error", "response.failed", "response.incomplete"}:
             assistant_parts_by_run.pop(run_id, None)
 
-    return messages
+    return [message for run_id in run_order for message in turns_by_run[run_id]]
 
 
 def connector_error_output(
