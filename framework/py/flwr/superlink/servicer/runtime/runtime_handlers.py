@@ -184,9 +184,15 @@ def pull_messages(  # pylint: disable=R0914
     """Pull a set of Messages."""
     log(DEBUG, "Runtime.PullMessages")
     run_id = _get_authenticated_serverapp_run_id(task)
-    messages_res: list[Message] = state.get_message_res(
-        message_ids=set(request.message_ids)
+    message_ids = set(request.message_ids)
+    _raise_if(
+        validation_error=not message_ids.issubset(
+            state.get_message_ids_from_run_id(run_id)
+        ),
+        request_name="PullMessages",
+        detail="`message_ids` contains invalid IDs",
     )
+    messages_res: list[Message] = state.get_message_res(message_ids=message_ids)
 
     store = state.object_store
     for msg_res in messages_res:
