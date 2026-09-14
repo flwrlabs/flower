@@ -653,6 +653,9 @@ def run_to_proto(run: Run) -> ProtoRun:
         primary_task_type=run.primary_task_type,
         series_id=run.series_id,
         account_name=run.account_name,
+        capability_package=run.capability_package,
+        capability_required=run.capability_required,
+        capability_binding=run.capability_binding,
     )
     if run.primary_task_id is not None:
         proto.primary_task_id = run.primary_task_id
@@ -683,6 +686,9 @@ def run_from_proto(run_proto: ProtoRun) -> Run:
         primary_task_type=run_proto.primary_task_type,
         series_id=run_proto.series_id,
         account_name=run_proto.account_name,
+        capability_package=run_proto.capability_package,
+        capability_required=run_proto.capability_required,
+        capability_binding=run_proto.capability_binding,
     )
     return run
 

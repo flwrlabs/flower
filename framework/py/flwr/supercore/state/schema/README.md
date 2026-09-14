@@ -153,6 +153,7 @@ erDiagram
   run {
     BIGINT bytes_recv "nullable"
     BIGINT bytes_sent "nullable"
+    VARCHAR capability_packages
     FLOAT clientapp_runtime "nullable"
     VARCHAR fab_hash "nullable"
     VARCHAR fab_id "nullable"

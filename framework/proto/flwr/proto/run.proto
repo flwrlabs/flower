@@ -40,6 +40,9 @@ message Run {
   optional uint64 primary_task_id = 17;
   uint64 series_id = 18;
   string account_name = 19;
+  bytes capability_package = 20;
+  bool capability_required = 21;
+  string capability_binding = 22;
 }
 
 message RunStatus {

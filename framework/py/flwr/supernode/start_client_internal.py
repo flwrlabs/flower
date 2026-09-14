@@ -73,9 +73,14 @@ from flwr.supercore.run import Run, RunNotRunningException
 from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import get_client_tls_args
 from flwr.supercore.version import package_version
+from flwr.supernode.guardian import GuardianVerificationError, verify_capability
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 
 FAB_VERIFICATION_ERROR = Error(ErrorCode.INVALID_FAB, "The FAB could not be verified.")
+CAPABILITY_VERIFICATION_ERROR = Error(
+    ErrorCode.CAPABILITY_VERIFICATION_FAILED,
+    "The run capability could not be verified.",
+)
 
 
 # pylint: disable=import-outside-toplevel
@@ -348,6 +353,14 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
         if (run_info := state.get_run(run_id)) is None:
             # Pull run info from SuperLink
             run_info = get_run(run_id)
+
+            try:
+                verify_capability(run_info)
+            except GuardianVerificationError as err:
+                log(ERROR, "Capability verification failed: %s", err)
+                reply = Message(CAPABILITY_VERIFICATION_ERROR, reply_to=message)
+                _insert_message(reply, state, object_store)
+                return run_id
 
             # Pull and store the FAB
             fab = get_fab(run_info.fab_hash, run_id)

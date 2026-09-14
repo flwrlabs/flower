@@ -15,7 +15,7 @@
 """Flower run definitions."""
 
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from flwr.app.user_config import UserConfig
 from flwr.supercore.constant import TaskType
@@ -53,6 +53,10 @@ class Run:  # pylint: disable=too-many-instance-attributes
     primary_task_type: str = ""
     series_id: int = 0
     account_name: str = ""
+    capability_packages: dict[str, bytes] = field(default_factory=dict)
+    capability_package: bytes = b""
+    capability_required: bool = False
+    capability_binding: str = ""
 
     @classmethod
     def create_empty(cls, run_id: int) -> "Run":

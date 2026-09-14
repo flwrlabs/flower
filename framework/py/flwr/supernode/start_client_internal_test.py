@@ -16,7 +16,7 @@
 
 
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
@@ -32,8 +32,10 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     iterate_object_tree,
 )
+from flwr.supercore.run import Run
 
 from .start_client_internal import (
+    CAPABILITY_VERIFICATION_ERROR,
     FAB_VERIFICATION_ERROR,
     _pull_and_store_message,
     _push_messages,
@@ -374,6 +376,73 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             stored_message.metadata.reply_to_message_id
             == self.mock_receive.return_value[0].metadata.message_id
         )
+
+    def test_pull_and_store_message_rejects_missing_capability_before_fab(self) -> None:
+        """Fail closed before fetching a FAB when no capability is routed."""
+        self._prepare_for_pull_and_store_message()
+        self.mock_state.get_run.return_value = None
+        self.mock_get_run.return_value = Mock(
+            capability_required=True,
+            capability_package=b"",
+        )
+
+        res = _pull_and_store_message(
+            state=self.mock_state,
+            object_store=self.mock_object_store,
+            node_config={},
+            receive=self.mock_receive,
+            get_run=self.mock_get_run,
+            get_fab=self.mock_get_fab,
+            pull_object=self.mock_pull_object,
+            confirm_message_received=self.mock_confirm_message_received,
+            trusted_entities={},
+        )
+
+        assert res == self.run_id
+        self.mock_get_fab.assert_not_called()
+        self.mock_state.store_run.assert_not_called()
+        self.mock_confirm_message_received.assert_not_called()
+        stored_message = self.mock_state.store_message.call_args.args[0]
+        assert stored_message.error == CAPABILITY_VERIFICATION_ERROR
+
+    def test_guardian_rejection_prevents_fab_retrieval_and_task_creation(self) -> None:
+        """Stop the SuperNode lifecycle at the Guardian rejection boundary."""
+        self._prepare_for_pull_and_store_message()
+        self.mock_state.get_run.return_value = None
+        run = Run.create_empty(self.run_id)
+        run.capability_required = True
+        run.capability_package = b"opaque"
+        run.capability_binding = "flwr-capability-binding-v1-sha256:" + "a" * 64
+        self.mock_get_run.return_value = run
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = (
+            b'{"version":"v1","allowed":false,"binding":""}'
+        )
+
+        with (
+            patch.dict(
+                "os.environ", {"FLWR_GUARDIAN_URL": "http://guardian"}, clear=True
+            ),
+            patch("urllib.request.urlopen", return_value=response),
+        ):
+            res = _pull_and_store_message(
+                state=self.mock_state,
+                object_store=self.mock_object_store,
+                node_config={},
+                receive=self.mock_receive,
+                get_run=self.mock_get_run,
+                get_fab=self.mock_get_fab,
+                pull_object=self.mock_pull_object,
+                confirm_message_received=self.mock_confirm_message_received,
+                trusted_entities={},
+            )
+
+        assert res == self.run_id
+        self.mock_get_fab.assert_not_called()
+        self.mock_state.create_task.assert_not_called()
+        self.mock_state.store_run.assert_not_called()
+        stored_message = self.mock_state.store_message.call_args.args[0]
+        assert stored_message.error == CAPABILITY_VERIFICATION_ERROR
 
     def test_pull_and_store_message_rejects_unverified_fab(self) -> None:
         """Test that trusted-entity verification rejects invalid FAB signatures."""

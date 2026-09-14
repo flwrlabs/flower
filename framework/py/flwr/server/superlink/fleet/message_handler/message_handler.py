@@ -14,9 +14,11 @@
 # ==============================================================================
 """Fleet API message handlers."""
 
+from dataclasses import replace
 from logging import ERROR
 
 from flwr.app import Message
+from flwr.common.capability import capability_binding, participant_id_from_public_key
 from flwr.common.constant import (
     HEARTBEAT_MAX_INTERVAL,
     HEARTBEAT_MIN_INTERVAL,
@@ -239,6 +241,17 @@ def get_run(request: GetRunRequest, state: LinkState) -> GetRunResponse:
     )
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
+
+    if run.capability_packages:
+        nodes = state.get_node_info(node_ids=[request.node.node_id])
+        public_key = nodes[0].public_key if nodes else b""
+        participant_id = participant_id_from_public_key(public_key)
+        run = replace(
+            run,
+            capability_package=run.capability_packages.get(participant_id, b""),
+            capability_required=True,
+            capability_binding=capability_binding(run.federation_id, run.fab_hash),
+        )
 
     return GetRunResponse(run=run_to_proto(run))
 

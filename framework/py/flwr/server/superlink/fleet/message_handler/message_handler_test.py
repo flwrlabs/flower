@@ -19,16 +19,62 @@ from unittest.mock import MagicMock
 
 from flwr.app import Metadata, RecordDict
 from flwr.app.message import make_message
+from flwr.common.capability import capability_binding, participant_id_from_public_key
+from flwr.common.constant import Status
 from flwr.common.serde import message_to_proto
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     PullMessagesRequest,
     PushMessagesRequest,
 )
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.node_pb2 import Node, NodeInfo  # pylint: disable=E0611
+from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.supercore.date import now
+from flwr.supercore.run import Run
 
-from .message_handler import pull_messages, push_messages
+from .message_handler import get_run, pull_messages, push_messages
+
+
+def test_get_run_routes_capability_by_registered_public_key() -> None:
+    """Return only the capability for the requesting SuperNode."""
+    public_key = b"canonical-public-key"
+    participant_id = participant_id_from_public_key(public_key)
+    run = Run.create_empty(123)
+    run.federation_id = "@account/federation"
+    run.fab_hash = "a" * 64
+    run.status.status = Status.RUNNING
+    run.capability_packages = {
+        participant_id: b"selected",
+        "flwr-p384-spki-pem-sha256:" + "b" * 64: b"other",
+    }
+    state = MagicMock()
+    state.get_run_info.return_value = [run]
+    state.federation_manager.has_node.return_value = True
+    state.get_node_info.return_value = [NodeInfo(public_key=public_key)]
+
+    response = get_run(GetRunRequest(node=Node(node_id=7), run_id=123), state)
+
+    assert response.run.capability_required
+    assert response.run.capability_package == b"selected"
+    assert response.run.capability_binding == capability_binding(
+        run.federation_id, run.fab_hash
+    )
+
+
+def test_get_run_marks_missing_participant_capability_as_required() -> None:
+    """Let SuperNode fail closed when no package matches its registered key."""
+    run = Run.create_empty(123)
+    run.status.status = Status.RUNNING
+    run.capability_packages = {"flwr-p384-spki-pem-sha256:" + "b" * 64: b"other"}
+    state = MagicMock()
+    state.get_run_info.return_value = [run]
+    state.federation_manager.has_node.return_value = True
+    state.get_node_info.return_value = [NodeInfo(public_key=b"unmatched-key")]
+
+    response = get_run(GetRunRequest(node=Node(node_id=7), run_id=123), state)
+
+    assert response.run.capability_required
+    assert response.run.capability_package == b""
 
 
 def test_pull_messages() -> None:

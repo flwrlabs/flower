@@ -16,6 +16,7 @@
 
 
 import hashlib
+import json
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -28,6 +29,7 @@ from flwr.cli.config_utils import load_and_validate
 from flwr.cli.constant import FEDERATION_CONFIG_HELP_MESSAGE, RUN_CONFIG_HELP_MESSAGE
 from flwr.cli.flower_config import read_superlink_connection
 from flwr.cli.typing import SuperLinkConnection
+from flwr.common.capability import CAPABILITY_FILE_VERSION, PARTICIPANT_ID_PATTERN
 from flwr.common.config import get_metadata_from_config, parse_config_args
 from flwr.common.constant import FAB_CONFIG_FILE, CliOutputFormat
 from flwr.common.serde import fab_to_proto, user_config_to_proto
@@ -85,6 +87,17 @@ def run(
         typer.Option(
             "--federation-config",
             help=FEDERATION_CONFIG_HELP_MESSAGE,
+        ),
+    ] = None,
+    capabilities_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--capabilities-file",
+            help="Versioned JSON file mapping SuperNode participant IDs to opaque "
+            "capability packages.",
+            exists=True,
+            dir_okay=False,
+            readable=True,
         ),
     ] = None,
     stream: Annotated[
@@ -146,6 +159,7 @@ def run(
             superlink_connection,
             run_config_overrides,
             federation_config_overrides,
+            capabilities_file,
             stream,
             is_json,
             app_spec,
@@ -160,6 +174,7 @@ def _run_with_control_api(
     superlink_connection: SuperLinkConnection,
     config_overrides: list[str] | None,
     federation_config_overrides: list[str] | None,
+    capabilities_file: Path | None,
     stream: bool,
     is_json: bool,
     app_spec: str | None,
@@ -199,6 +214,7 @@ def _run_with_control_api(
                 federation_config_overrides, superlink_connection
             ),
             app_spec=app_spec or "",
+            capability_packages=_load_capability_packages(capabilities_file),
         )
         with flwr_cli_exc_handler():
             res = control_client.StartRun(req)
@@ -240,6 +256,45 @@ def _run_with_control_api(
     finally:
         if control_client:
             control_client.close()
+
+
+def _load_capability_packages(path: Path | None) -> dict[str, bytes]:
+    """Read and validate the POC capability-file contract."""
+    if path is None:
+        return {}
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as err:
+        raise click.ClickException(f"Could not read capabilities file: {err}") from err
+    if (
+        not isinstance(document, dict)
+        or document.get("version") != CAPABILITY_FILE_VERSION
+    ):
+        raise click.ClickException(
+            f"Capabilities file must be an object with version "
+            f"'{CAPABILITY_FILE_VERSION}'"
+        )
+    packages = document.get("capabilities")
+    if not isinstance(packages, dict) or not packages:
+        raise click.ClickException(
+            "Capabilities file must contain a non-empty 'capabilities' object"
+        )
+
+    result: dict[str, bytes] = {}
+    for participant_id, package in packages.items():
+        if not isinstance(participant_id, str) or not PARTICIPANT_ID_PATTERN.fullmatch(
+            participant_id
+        ):
+            raise click.ClickException(
+                f"Invalid capability participant ID: {participant_id!r}"
+            )
+        if not isinstance(package, str) or not package:
+            raise click.ClickException(
+                f"Capability for participant '{participant_id}' must be a "
+                "non-empty string"
+            )
+        result[participant_id] = package.encode("utf-8")
+    return result
 
 
 def _parse_federation_config_overrides(

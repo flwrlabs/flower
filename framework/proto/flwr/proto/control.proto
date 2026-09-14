@@ -181,6 +181,7 @@ message StartRunRequest {
   optional uint64 series_id = 6;
   repeated string connector_refs = 7;
   string user_prompt = 8;
+  map<string, bytes> capability_packages = 9;
 }
 message StartRunResponse {
   optional uint64 run_id = 1;

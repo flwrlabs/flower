@@ -308,6 +308,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         connector_refs: Sequence[str] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
+        capability_packages: dict[str, bytes] | None = None,
     ) -> int:
         """Create a new run.
 
@@ -344,6 +345,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
         user_prompt : str | None (default: None)
             User prompt to store as an instruction Message for an AgentApp run.
             Ignored for other primary task types and when `None`.
+        capability_packages : dict[str, bytes] | None (default: None)
+            Opaque capability packages keyed by participant fingerprint.
 
         Returns
         -------

@@ -240,6 +240,21 @@ class StateTest(CoreStateTest):
                 == message.content.deflate()
             )
 
+    def test_create_and_get_run_capability_packages(self) -> None:
+        """Persist opaque capability packages with a run."""
+        state = self.state_factory()
+        participant_id = "flwr-p384-spki-pem-sha256:" + "a" * 64
+
+        run_id = create_dummy_run(
+            state,
+            capability_packages={participant_id: b"opaque\x00package"},
+        )
+
+        run = state.get_run_info(run_ids=[run_id])[0]
+        self.assertEqual(
+            run.capability_packages, {participant_id: b"opaque\x00package"}
+        )
+
     def test_create_run_uses_existing_series_id(self) -> None:
         """Test create_run links the run to an existing run series."""
         # Prepare
@@ -2491,6 +2506,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     primary_task_type: str = TaskType.SERVER_APP,
     series_id: int | None = None,
     connector_refs: Sequence[str] = (),
+    capability_packages: dict[str, bytes] | None = None,
 ) -> int:
     """Create a dummy run."""
     return state.create_run(
@@ -2504,6 +2520,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         primary_task_type=primary_task_type,
         series_id=series_id,
         connector_refs=connector_refs,
+        capability_packages=capability_packages,
     )
 
 

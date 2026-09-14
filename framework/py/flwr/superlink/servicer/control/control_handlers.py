@@ -30,6 +30,7 @@ from typing import Any, cast
 import requests
 
 from flwr.cli.utils import validate_federation_name
+from flwr.common.capability import PARTICIPANT_ID_PATTERN
 from flwr.common.config import (
     flatten_dict,
     fuse_dicts,
@@ -642,6 +643,14 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         return StartRunResponse()
 
     override_config = user_config_from_proto(request.override_config)
+    capability_packages = dict(request.capability_packages)
+    for participant_id, package in capability_packages.items():
+        if not PARTICIPANT_ID_PATTERN.fullmatch(participant_id) or not package:
+            raise FlowerError(
+                ApiErrorCode.INVALID_RUN_CONFIG,
+                "Capability packages must use valid participant IDs and "
+                "non-empty opaque values.",
+            )
     connector_refs = validate_run_connector_refs(request.connector_refs, account, state)
 
     if connector_refs:
@@ -682,6 +691,12 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             raise FlowerError(
                 ApiErrorCode.AGENTAPP_USER_PROMPT_REQUIRED,
                 "AgentApp run requested without a user prompt.",
+            )
+
+        if capability_packages and primary_task_type != TaskType.SERVER_APP:
+            raise FlowerError(
+                ApiErrorCode.INVALID_RUN_CONFIG,
+                "Capability packages are supported only for deployment runs.",
             )
 
         state.federation_manager.can_execute(
@@ -751,6 +766,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             series_description=series_description,
             connector_refs=connector_refs,
             initial_task_event=initial_task_event,
+            capability_packages=capability_packages,
         )
 
         if run_id == 0:

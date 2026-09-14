@@ -16,6 +16,7 @@
 
 # pylint: disable=too-many-lines
 
+import base64
 import json
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -952,6 +953,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         connector_refs: Sequence[str] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
+        capability_packages: dict[str, bytes] | None = None,
     ) -> int:
         """Create a new run."""
         if isinstance(connector_refs, str) or any(
@@ -1010,6 +1012,16 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         bytes_sent=0,
                         bytes_recv=0,
                         clientapp_runtime=0.0,
+                        capability_packages=json.dumps(
+                            {
+                                participant_id: base64.b64encode(package).decode(
+                                    "ascii"
+                                )
+                                for participant_id, package in (
+                                    capability_packages or {}
+                                ).items()
+                            }
+                        ),
                     )
                 )
                 session.execute(
@@ -1461,4 +1473,8 @@ def _run_from_models(run: RunModel, task: TaskModel) -> Run:
         clientapp_runtime=cast(float, run.clientapp_runtime),
         primary_task_type=task.type,
         series_id=int64_to_uint64(run.series_id) if run.series_id else 0,
+        capability_packages={
+            participant_id: base64.b64decode(package)
+            for participant_id, package in json.loads(run.capability_packages).items()
+        },
     )

@@ -207,6 +207,7 @@ class ErrorCode:
     MOD_FAILED_PRECONDITION = 6
     INVALID_FAB = 7
     CLIENT_APP_CRASHED = 8
+    CAPABILITY_VERIFICATION_FAILED = 9
 
     def __new__(cls) -> ErrorCode:
         """Prevent instantiation."""

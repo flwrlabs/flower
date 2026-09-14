@@ -84,6 +84,9 @@ class Run(LinkStateBase):
     bytes_sent: Mapped[int | None] = mapped_column(BigInteger, server_default="0")
     bytes_recv: Mapped[int | None] = mapped_column(BigInteger, server_default="0")
     clientapp_runtime: Mapped[float | None] = mapped_column(Float, server_default="0.0")
+    capability_packages: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text("'{}'")
+    )
 
     __mapper_args__ = {"primary_key": [run_id]}
 

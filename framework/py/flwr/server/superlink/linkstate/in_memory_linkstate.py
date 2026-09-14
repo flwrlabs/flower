@@ -679,6 +679,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         connector_refs: Sequence[str] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
+        capability_packages: dict[str, bytes] | None = None,
     ) -> int:
         """Create a new run."""
         if isinstance(connector_refs, str) or any(
@@ -738,6 +739,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     clientapp_runtime=0.0,
                     primary_task_type=primary_task_type,
                     series_id=resolved_series_id,
+                    capability_packages=dict(capability_packages or {}),
                 ),
                 federation_config=federation_config,
             )
