@@ -171,6 +171,9 @@ class RuntimeAgentGrid(AgentGrid):
         outgoing = []
         for item in messages:
             payload = cast(JSONObject, item["payload"])
+            ttl = cast(float | None, item.get("ttl"))
+            if ttl is not None and ttl <= 0:
+                raise ValueError("Grid message TTL must be positive.")
             outgoing.append(
                 Message(
                     RecordDict(
@@ -187,7 +190,7 @@ class RuntimeAgentGrid(AgentGrid):
                     dst_node_id=int(cast(str, item["dst_node_id"])),
                     message_type="query",  # Replace with an AgentGrid message type.
                     group_id="",
-                    ttl=cast(float | None, item.get("ttl")),
+                    ttl=ttl,
                 )
             )
 
