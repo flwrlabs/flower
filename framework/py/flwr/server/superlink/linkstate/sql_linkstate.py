@@ -477,7 +477,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         return message_id
 
-    def get_message_res(self, message_ids: set[str]) -> list[Message]:
+    def get_message_res(self, message_ids: set[str], run_id: int) -> list[Message]:
         """Get reply Messages for the given Message IDs."""
         # pylint: disable=too-many-locals
         if not message_ids:
@@ -503,6 +503,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     row, ["run_id", "src_node_id", "dst_node_id"]
                 )
                 found_message_ins_dict[row["message_id"]] = dict_to_message(row)
+            if any(
+                message.metadata.run_id != run_id
+                for message in found_message_ins_dict.values()
+            ):
+                raise ValueError("`message_ids` contains invalid IDs")
 
             ret = verify_message_ids(
                 inquired_message_ids=message_ids,

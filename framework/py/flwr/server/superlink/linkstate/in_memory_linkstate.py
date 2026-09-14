@@ -338,18 +338,28 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         # Return the new message_id
         return message_id
 
-    def get_message_res(self, message_ids: set[str]) -> list[Message]:
+    def get_message_res(self, message_ids: set[str], run_id: int) -> list[Message]:
         """Get reply Messages for the given Message IDs."""
         ret: dict[str, Message] = {}
 
         with self.lock:
             self._check_stored_messages(message_ids)
             current = now().timestamp()
+            found_message_ins_dict = {
+                message_id: self.message_ins_store[message_id]
+                for message_id in message_ids
+                if message_id in self.message_ins_store
+            }
+            if any(
+                message.metadata.run_id != run_id
+                for message in found_message_ins_dict.values()
+            ):
+                raise ValueError("`message_ids` contains invalid IDs")
 
             # Verify Message IDs
             ret = verify_message_ids(
                 inquired_message_ids=message_ids,
-                found_message_ins_dict=self.message_ins_store,
+                found_message_ins_dict=found_message_ins_dict,
                 current_time=current,
             )
 
@@ -360,7 +370,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             }
             tmp_ret_dict = check_node_availability_for_in_message(
                 inquired_in_message_ids=message_ids,
-                found_in_message_dict=self.message_ins_store,
+                found_in_message_dict=found_message_ins_dict,
                 node_id_to_online_until={
                     node_id: self.nodes[node_id].online_until
                     for node_id in dst_node_ids
@@ -383,7 +393,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         message_res_found.append(message_res)
             tmp_ret_dict = verify_found_message_replies(
                 inquired_message_ids=message_ids,
-                found_message_ins_dict=self.message_ins_store,
+                found_message_ins_dict=found_message_ins_dict,
                 found_message_res_list=message_res_found,
                 current_time=current,
             )
