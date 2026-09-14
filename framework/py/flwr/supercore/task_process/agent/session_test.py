@@ -239,7 +239,7 @@ def test_runtime_agent_grid_tools() -> None:
     """Grid tools should sample nodes, send content, and return serialized replies."""
     grid = Mock()
     grid.get_node_ids.return_value = [11, 22]
-    grid.push_messages.return_value = ["message-1"]
+    grid.push_messages.return_value = ["message-1", "message-2"]
     reply = Message(
         RecordDict({"result": ConfigRecord({"answer": "done"})}),
         dst_node_id=0,
@@ -252,9 +252,14 @@ def test_runtime_agent_grid_tools() -> None:
 
     assert [tool["name"] for tool in agent_grid.tools()] == [
         "get_nodes",
-        "push_message",
+        "push_messages",
         "pull_messages",
     ]
+    all_nodes = agent_grid.call(
+        {"name": "get_nodes", "call_id": "call-0", "arguments": {}}
+    )
+    assert all_nodes["output"] == '{"node_ids":["11","22"],"num_available":2}'
+
     get_nodes = agent_grid.call(
         {
             "name": "get_nodes",
@@ -269,18 +274,24 @@ def test_runtime_agent_grid_tools() -> None:
 
     pushed = agent_grid.call(
         {
-            "name": "push_message",
+            "name": "push_messages",
             "call_id": "call-2",
             "arguments": {
-                "dst_node_id": "11",
-                "payload": {"prompt": "hi", "values": [[1, 2], [3, 4]]},
+                "messages": [
+                    {
+                        "dst_node_id": "11",
+                        "payload": {"prompt": "hi", "values": [[1, 2], [3, 4]]},
+                    },
+                    {"dst_node_id": "22", "payload": {"prompt": "hello"}},
+                ]
             },
         }
     )
-    assert pushed["output"] == '{"message_id":"message-1"}'
+    assert pushed["output"] == '{"message_ids":["message-1","message-2"]}'
     grid.create_message.assert_not_called()
-    sent = list(grid.push_messages.call_args.args[0])[0]
+    sent, second = list(grid.push_messages.call_args.args[0])
     assert sent.metadata.dst_node_id == 11
+    assert second.metadata.dst_node_id == 22
     assert sent.metadata.message_type == "query"
     assert sent.metadata.group_id == ""
     assert (
@@ -301,7 +312,7 @@ def test_runtime_agent_grid_tools() -> None:
     assert isinstance(pulled_output, str)
     assert '"replyToMessageId":"message-1"' in pulled_output
     assert '"pending_message_ids":[]' in pulled_output
-    assert events.emit.call_count == 6
+    assert events.emit.call_count == 8
 
 
 def test_call_automation_embeds_input_in_control_request() -> None:

@@ -72,7 +72,7 @@ _EVENT_PUBLISH_BATCH_SIZE = 16
 _EVENT_PUBLISH_QUEUE_SIZE = 256
 _EVENT_PUBLISH_BATCH_WAIT = 0.05
 _EVENT_PUBLISH_STOP = object()
-_GRID_TOOL_NAMES = {"get_nodes", "push_message", "pull_messages"}
+_GRID_TOOL_NAMES = {"get_nodes", "push_messages", "pull_messages"}
 
 
 def _grid_tools() -> list[JSONObject]:
@@ -80,46 +80,55 @@ def _grid_tools() -> list[JSONObject]:
     return [
         function_tool(
             "get_nodes",
-            "Sample currently available SuperNodes from the federation.",
+            "Return all available SuperNodes, or a random sample if requested.",
             properties={
                 "sample_size": {
                     "type": "integer",
                     "minimum": 1,
-                    "description": "Maximum number of SuperNodes to return.",
+                    "description": "Optional maximum number of SuperNodes to return.",
                 }
             },
-            required=["sample_size"],
         ),
         function_tool(
-            "push_message",
+            "push_messages",
             (
-                "Send one message to a SuperNode and return its message ID. "
-                "If a reply is required, pass that ID to pull_messages."
+                "Send messages to SuperNodes and return their message IDs in the "
+                "same order. Pass those IDs to pull_messages if replies are required."
             ),
             properties={
-                "dst_node_id": string_property(
-                    "Destination SuperNode ID as a decimal string."
-                ),
-                "payload": {
-                    "type": "object",
-                    "description": "JSON object to send to the SuperNode.",
-                },
-                "group_id": {"type": "string", "description": "Optional group ID."},
-                "ttl": {
-                    "type": "number",
-                    "exclusiveMinimum": 0,
-                    "description": "Optional round-trip time-to-live in seconds.",
+                "messages": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "dst_node_id": string_property(
+                                "Destination SuperNode ID as a decimal string."
+                            ),
+                            "payload": {
+                                "type": "object",
+                                "description": "JSON object to send.",
+                            },
+                            "ttl": {
+                                "type": "number",
+                                "exclusiveMinimum": 0,
+                                "description": "Optional round-trip TTL in seconds.",
+                            },
+                        },
+                        "required": ["dst_node_id", "payload"],
+                        "additionalProperties": False,
+                    },
                 },
             },
-            required=["dst_node_id", "payload"],
+            required=["messages"],
         ),
         function_tool(
             "pull_messages",
-            "Wait for replies to message IDs returned by push_message.",
+            "Wait for replies to message IDs returned by push_messages.",
             properties={
                 "message_ids": {
                     "type": "array",
-                    "items": string_property("Message ID returned by push_message."),
+                    "items": string_property("Message ID returned by push_messages."),
                     "minItems": 1,
                     "description": "Message IDs whose replies are awaited.",
                 },
@@ -306,44 +315,51 @@ class RuntimeAgentGrid(AgentGrid):
         self._events.emit(output_item)
         return output_item
 
-    def _get_nodes(self, sample_size: int) -> JSONObject:
+    def _get_nodes(self, sample_size: int | None = None) -> JSONObject:
         node_ids = list(self._grid.get_node_ids())
+        if sample_size is not None and sample_size < 1:
+            raise ValueError("Grid sample size must be positive.")
+        selected = (
+            node_ids
+            if sample_size is None
+            else random.sample(node_ids, min(sample_size, len(node_ids)))
+        )
         return {
-            "node_ids": [
-                str(node_id)
-                for node_id in random.sample(node_ids, min(sample_size, len(node_ids)))
-            ],
+            "node_ids": [str(node_id) for node_id in selected],
             "num_available": len(node_ids),
         }
 
-    def _push_message(
-        self,
-        dst_node_id: str,
-        payload: JSONObject,
-        group_id: str = "",
-        ttl: float | None = None,
-    ) -> JSONObject:
-        message = Message(
-            RecordDict(
-                {
-                    AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: ConfigRecord(
+    def _push_messages(self, messages: list[JSONObject]) -> JSONObject:
+        if not messages:
+            raise ValueError("At least one message is required.")
+
+        outgoing = []
+        for item in messages:
+            payload = cast(JSONObject, item["payload"])
+            outgoing.append(
+                Message(
+                    RecordDict(
                         {
-                            AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: strict_json_dumps(
-                                payload, compact=True
+                            AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: ConfigRecord(
+                                {
+                                    AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: (
+                                        strict_json_dumps(payload, compact=True)
+                                    )
+                                }
                             )
                         }
-                    )
-                }
-            ),
-            dst_node_id=int(dst_node_id),
-            message_type="query",  # Replace with an AgentGrid message type.
-            group_id=group_id,
-            ttl=ttl,
-        )
-        message_ids = list(self._grid.push_messages([message]))
-        if len(message_ids) != 1:
-            raise RuntimeError("Grid did not accept the message.")
-        return {"message_id": message_ids[0]}
+                    ),
+                    dst_node_id=int(cast(str, item["dst_node_id"])),
+                    message_type="query",  # Replace with an AgentGrid message type.
+                    group_id="",
+                    ttl=cast(float | None, item.get("ttl")),
+                )
+            )
+
+        message_ids = list(self._grid.push_messages(outgoing))
+        if len(message_ids) != len(outgoing) or any(not item for item in message_ids):
+            raise RuntimeError("Grid did not accept all messages.")
+        return {"message_ids": message_ids}
 
     def _pull_messages(self, message_ids: list[str], timeout: float) -> JSONObject:
         if not 0 <= timeout <= 300:
