@@ -17,11 +17,10 @@
 from __future__ import annotations
 
 import os
+import sys
 import time
-from logging import INFO
 from uuid import uuid4
 
-from flwr.supercore import log
 from flwr.supercore.constant import TaskType
 
 _RUNTIME_TIMING_LOGGING_ENV = "FLWR_RUNTIME_TIMING_LOGGING"
@@ -58,11 +57,15 @@ def log_runtime_timing(marker: str, *, timing_id: str | None, **fields: str) -> 
         return
 
     details = " ".join(f"{key}={value}" for key, value in sorted(fields.items()))
-    log(
-        INFO,
-        "runtime_timing marker=%s timing_id=%s unix_time_ns=%d%s",
-        marker,
-        timing_id,
-        time.time_ns(),
-        f" {details}" if details else "",
+    # AgentApp mirrors ``sys.stdout`` and ``sys.stderr`` to PushLogs. The
+    # original stdout still reaches the trusted TaskExecutor Pod log without
+    # entering the user-visible run-log queue.
+    output = sys.__stdout__
+    if output is None:
+        return
+    output.write(
+        "INFO     : runtime_timing "
+        f"marker={marker} timing_id={timing_id} unix_time_ns={time.time_ns()}"
+        f"{f' {details}' if details else ''}\n"
     )
+    output.flush()
