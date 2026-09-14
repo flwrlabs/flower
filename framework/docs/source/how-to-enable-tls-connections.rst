@@ -186,17 +186,15 @@ API hosted by the SuperLink:
 
     $ flower-superexec \
         --root-certificates certificates/ca.crt \
-        --runtime-api-address 127.0.0.1:8000 \
-        --plugin-type serverapp
+        --runtime-api-address 127.0.0.1:8000
 
 .. dropdown:: Understand the command
 
     * ``--root-certificates``: Specify the location of the CA certificate file. The ``ca.crt`` file is used by SuperExec to verify the Runtime API server certificate.
     * | ``--runtime-api-address``: Specify the address of the Runtime API that SuperExec should connect to. In this example, ``127.0.0.1:8000`` is the SuperLink's Runtime API.
-    * | ``--plugin-type``: Specify the type of app process SuperExec should launch. Use ``serverapp`` for a ``ServerApp`` SuperExec.
 
 Next, use the same procedure for a ``ClientApp`` SuperExec, but pass the SuperNode's
-Runtime API address, e.g. ``127.0.0.1:9094``, and set ``--plugin-type clientapp``.
+Runtime API address, e.g. ``127.0.0.1:9094``.
 
 Now your SuperLink-side SuperExec and SuperNode-side SuperExec can establish TLS
 connections to their respective Runtime APIs. When using "process" isolation mode, it is

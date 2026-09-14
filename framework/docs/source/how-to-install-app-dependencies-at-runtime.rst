@@ -91,11 +91,10 @@ the app process. In this mode, SuperExec is started separately. Enable dependenc
 installation on ``flower-superexec`` instead:
 
 .. code-block:: shell
-    :emphasize-lines: 4
+    :emphasize-lines: 3
 
     $ flower-superexec \
         --runtime-api-address <runtime-api-address> \
-        --plugin-type <choice-of-plugin> \
         --allow-runtime-dependency-installation
 
 ************************

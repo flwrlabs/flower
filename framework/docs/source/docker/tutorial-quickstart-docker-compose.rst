@@ -317,8 +317,6 @@ You can add more SuperNodes and ClientApps by uncommenting their definitions in 
             ENTRYPOINT ["flower-superexec"]
         command:
           - --insecure
-          - --plugin-type
-          - clientapp
           - --runtime-api-address
           - supernode-3:9096
         deploy:
