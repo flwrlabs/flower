@@ -24,7 +24,7 @@ import time
 from collections.abc import Callable, Generator, Sequence
 from datetime import UTC, datetime, timedelta
 from logging import ERROR, INFO, WARNING
-from threading import Lock, Thread
+from threading import Thread
 from typing import Any, cast
 
 import requests
@@ -147,6 +147,7 @@ from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
     FLOWER_AGENT_APP_ID,
     FLWR_SUPERGRID_API_URL,
+    HUB_APP_REFRESH_INTERVAL,
     NOOP_FEDERATION_ID,
     OAUTH_SESSION_TTL,
     RUN_SERIES_DESCRIPTION_MAX_LENGTH,
@@ -184,10 +185,6 @@ from flwr.superlink.federation.typing import Federation as FederationInfo
 from flwr.superlink.run_source import RunSource
 
 from .conversation_title import start_title_generation
-
-HUB_APP_REFRESH_INTERVAL = timedelta(minutes=5)
-_hub_app_refresh_threads: dict[tuple[str, str], Thread] = {}
-_hub_app_refresh_threads_lock = Lock()
 
 
 class InvalidConnectorRequestError(FlowerError):
@@ -512,10 +509,10 @@ def _refresh_hub_app_in_thread(
     state: LinkState,
     federation_id: str,
     app_id: str,
-    expected_fab_hash: str,
+    previous_fab_hash: str,
     fleet_api_type: str | None,
 ) -> None:
-    """Refresh a Hub app in a daemon thread unless one is already running."""
+    """Refresh a Hub app in a daemon thread."""
 
     def refresh() -> None:
         try:
@@ -532,23 +529,14 @@ def _refresh_hub_app_in_thread(
             state.update_hub_app(
                 federation_id,
                 app_id,
-                expected_fab_hash,
+                previous_fab_hash,
                 fab_hash,
                 _get_app_type(fab_config),
             )
         except Exception as exc:  # pylint: disable=broad-exception-caught
             log(WARNING, "Failed to refresh Hub app %s: %s", app_id, exc)
 
-    refresh_key = (federation_id, app_id)
-    with _hub_app_refresh_threads_lock:
-        refresh_thread = _hub_app_refresh_threads.get(refresh_key)
-        if refresh_thread is None or not refresh_thread.is_alive():
-            refresh_thread = Thread(
-                target=refresh,
-                daemon=True,
-            )
-            _hub_app_refresh_threads[refresh_key] = refresh_thread
-            refresh_thread.start()
+    Thread(target=refresh, daemon=True).start()
 
 
 def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements

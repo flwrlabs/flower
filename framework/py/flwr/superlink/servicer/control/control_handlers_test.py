@@ -382,7 +382,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
 
     def test_start_run_uses_and_refreshes_stale_hub_fab(self) -> None:
-        """Start from the cached FAB before refreshing it in the background."""
+        """Start from the cached FAB and refresh it in the background."""
         fab_hash = self.state.store_app(
             Fab("", b"cached FAB", {}),
             NOOP_FEDERATION_ID,
@@ -407,26 +407,17 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 ".HUB_APP_REFRESH_INTERVAL",
                 timedelta(seconds=-1),
             ),
-            patch(
-                "flwr.superlink.servicer.control.control_handlers"
-                "._hub_app_refresh_threads",
-                {},
-            ),
             patch("flwr.superlink.servicer.control.control_handlers.Thread") as thread,
             patch(
                 "flwr.superlink.servicer.control.control_handlers._get_remote_fab"
             ) as get_remote_fab,
         ):
-            thread.return_value.is_alive.return_value = True
             response = start_run(request, self.account, self.state, None)
-            second_response = start_run(request, self.account, self.state, None)
 
         get_remote_fab.assert_not_called()
         thread.return_value.start.assert_called_once()
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         self.assertEqual(run.fab_hash, fab_hash)
-        second_run = self.state.get_run_info(run_ids=[second_response.run_id])[0]
-        self.assertEqual(second_run.fab_hash, fab_hash)
 
     def test_start_run_persists_agent_input_event(self) -> None:
         """Persist agent input as a primary-task message item."""

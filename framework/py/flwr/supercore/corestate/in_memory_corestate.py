@@ -418,18 +418,18 @@ class InMemoryCoreState(
         self,
         federation_id: str,
         app_id: str,
-        expected_fab_hash: str,
+        previous_fab_hash: str,
         fab_hash: str,
         app_type: str,
     ) -> bool:
-        """Update a Hub app if it still points to the expected FAB."""
+        """Update a Hub app if it still points to the previous FAB."""
         key = (federation_id, app_id)
         with self.lock_fab_store, self.lock_federation_app_store:
             app = self.federation_app_store.get(key)
             if (
                 app is None
                 or not app.is_hub_app
-                or app.fab_hash != expected_fab_hash
+                or app.fab_hash != previous_fab_hash
                 or fab_hash not in self.fab_store
             ):
                 return False

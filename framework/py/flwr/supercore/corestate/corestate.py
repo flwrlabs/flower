@@ -175,11 +175,11 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         federation_id: str,
         app_id: str,
-        expected_fab_hash: str,
+        previous_fab_hash: str,
         fab_hash: str,
         app_type: str,
     ) -> bool:
-        """Update a Hub app if it still points to the expected FAB."""
+        """Update a Hub app if it still points to the previous FAB."""
 
     @abstractmethod
     def list_apps(
