@@ -40,6 +40,7 @@ from flwr.supercore.superexec.executor.config import (
     load_executor_config,
 )
 from flwr.supercore.superexec.plugin import (
+    AutoExecPlugin,
     ClientAppExecPlugin,
     ExecPlugin,
     ServerAppEphemeralExecPlugin,
@@ -72,7 +73,10 @@ def flower_superexec() -> None:
     # Log the first message after parsing arguments in case of `--help`
     log(INFO, "Starting Flower SuperExec")
 
-    event(EventType.RUN_SUPEREXEC_ENTER, {"plugin_type": args.plugin_type})
+    event(
+        EventType.RUN_SUPEREXEC_ENTER,
+        {"plugin_type": args.plugin_type or "auto"},
+    )
 
     # Load plugin config from YAML file if provided
     plugin_config = None
@@ -180,8 +184,7 @@ def _parse_args() -> argparse.ArgumentParser:
         "--plugin-type",
         type=str,
         choices=ExecPluginType.all(),
-        required=True,
-        help="The type of plugin to use.",
+        help="The plugin to use. Omit to select execution from the task type.",
     )
     parser.add_argument(
         "--insecure",
@@ -238,10 +241,11 @@ def _load_executor_config(
 
 
 def _get_plugin_and_client_class(
-    plugin_type: str,
+    plugin_type: str | None,
 ) -> tuple[type[ExecPlugin], type[RuntimeHttpClient]]:
     """Get the plugin and Runtime HTTP client classes for a plugin type."""
-    mapping: dict[str, tuple[type[ExecPlugin], type[RuntimeHttpClient]]] = {
+    mapping: dict[str | None, tuple[type[ExecPlugin], type[RuntimeHttpClient]]] = {
+        None: (AutoExecPlugin, RuntimeHttpClient),
         ExecPluginType.CLIENT_APP: (ClientAppExecPlugin, RuntimeHttpClient),
         ExecPluginType.SERVER_APP: (ServerAppExecPlugin, RuntimeHttpClient),
         ExecPluginType.SERVER_APP_EPHEMERAL: (

@@ -44,7 +44,6 @@ from flwr.common.constant import (
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
     EventLogWriterType,
-    ExecPluginType,
 )
 from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
@@ -546,7 +545,6 @@ def _get_superexec_command(
         root_certificates_path=runtime_root_certificates_path,
     )
     command += ["--runtime-api-address", runtime_address]
-    command += ["--plugin-type", ExecPluginType.SERVER_APP]
     command += ["--parent-pid", str(parent_pid)]
     if runtime_dependency_install:
         # SuperLink subprocess isolation owns this SuperExec, so install dependencies.

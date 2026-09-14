@@ -56,8 +56,6 @@ def test_parse_superexec_accepts_kubernetes_executor_config(
         [
             address_flag,
             "127.0.0.1:9091",
-            "--plugin-type",
-            ExecPluginType.CLIENT_APP,
             "--executor",
             "kubernetes",
             "--executor-config",
@@ -67,6 +65,7 @@ def test_parse_superexec_accepts_kubernetes_executor_config(
 
     assert args.executor == ExecutorType.KUBERNETES
     assert args.executor_config == "executor.yaml"
+    assert args.plugin_type is None
 
 
 @pytest.mark.parametrize(

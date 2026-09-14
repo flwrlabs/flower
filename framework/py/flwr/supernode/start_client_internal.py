@@ -42,7 +42,6 @@ from flwr.common.constant import (
     TRANSPORT_TYPE_GRPC_RERE,
     TRANSPORT_TYPES,
     ErrorCode,
-    ExecPluginType,
     SubStatus,
 )
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -228,7 +227,6 @@ def start_client_internal(
             "--runtime-api-address",
             runtime_address,
         ]
-        command += ["--plugin-type", ExecPluginType.CLIENT_APP]
         command += ["--parent-pid", str(os.getpid())]
         if runtime_dependency_install:
             command += ["--allow-runtime-dependency-installation"]
