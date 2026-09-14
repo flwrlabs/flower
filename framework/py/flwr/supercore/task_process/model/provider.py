@@ -24,11 +24,11 @@ from typing import cast
 
 import requests
 
+from flwr.supercore.runtime_timing import log_runtime_timing
 from flwr.supercore.task_process.usage import (
     TaskUsageRecorder,
     task_usage_from_open_response,
 )
-from flwr.supercore.runtime_timing import log_runtime_timing
 from flwr.supercore.typing import JSONObject, JSONValue
 
 DEFAULT_MODEL_API_ENDPOINT = "https://api.flower.ai/v1/responses"

@@ -43,7 +43,7 @@ from flwr.supercore.telemetry import EventType, event
 from .task import handle_task
 
 
-def run_model(  # pylint: disable=too-many-locals
+def run_model(  # pylint: disable=too-many-locals,too-many-arguments,too-many-positional-arguments
     runtime_api_address: str,
     token: str,
     insecure: bool,

@@ -67,7 +67,7 @@ _TEXT_DELTA_EVENTS = frozenset(
 )
 
 
-class RuntimeAgentEvents(AgentEvents):
+class RuntimeAgentEvents(AgentEvents):  # pylint: disable=too-many-instance-attributes
     """Publish AgentApp-selected events through a background worker."""
 
     def __init__(
