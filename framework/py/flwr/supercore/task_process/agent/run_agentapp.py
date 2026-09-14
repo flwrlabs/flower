@@ -207,6 +207,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
                     "fab_version": run.fab_version,
                     "fab_hash": fab.hash_str,
                 },
+                runtime_timing_id=runtime_timing_id,
             )
             log_runtime_timing(
                 "agent_dependency_install_finished", timing_id=runtime_timing_id
