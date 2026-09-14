@@ -33,6 +33,10 @@ from flwr.superlink.federation import FederationManager
 class LinkState(CoreState):  # pylint: disable=R0904
     """Abstract LinkState."""
 
+    def get_node_id(self) -> int:
+        """Return the SuperLink node ID."""
+        return SUPERLINK_NODE_ID
+
     @property
     @abc.abstractmethod
     def federation_manager(self) -> FederationManager:
