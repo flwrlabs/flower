@@ -132,6 +132,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
@@ -178,7 +180,10 @@ from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
+from flwr.superlink.federation.typing import Federation as FederationInfo
 from flwr.superlink.run_source import RunSource
+
+from .conversation_title import start_title_generation
 
 HUB_APP_REFRESH_INTERVAL = timedelta(minutes=5)
 _hub_app_refresh_threads: dict[tuple[str, str], Thread] = {}
@@ -707,8 +712,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             )
 
         initial_task_event = None
+        agent_input = fused_run_config.get("agent.input")
         if primary_task_type == TaskType.AGENT_APP:
-            agent_input = fused_run_config.get("agent.input")
             if isinstance(agent_input, str) and agent_input:
                 input_item: JSONObject = {
                     "type": "message",
@@ -746,6 +751,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
         run = state.get_run_info(run_ids=[run_id])[0]
         series_id = run.series_id
+        if series_description and isinstance(agent_input, str) and series_id:
+            start_title_generation(state, series_id, agent_input)
 
     except ValueError as e:
         log(ERROR, "Could not start run: %s", str(e))
@@ -1274,11 +1281,51 @@ def get_run_series(
     # Run series context is created atomically by LinkState.create_run(...)
     # and should never be None.
     series_context = state.get_run_series_context(request.series_id)
+    run_series = series_matches[0]
+    runs = [run_to_proto(run) for run in state.get_run_info(run_ids=run_series.run_ids)]
     response = GetRunSeriesResponse(
-        series=_with_last_run_statuses(state, series_matches)[0],
+        series=_with_last_run_statuses(state, [run_series])[0],
         context=context_to_proto(series_context) if series_context else None,
+        runs=runs,
     )
     return response
+
+
+def update_run_series_description(
+    request: UpdateRunSeriesDescriptionRequest,
+    account: AccountInfo,
+    state: LinkState,
+) -> UpdateRunSeriesDescriptionResponse:
+    """Update a run series description."""
+    log(INFO, "ControlServicer.UpdateRunSeriesDescription")
+
+    series_id = request.series_id
+    series_matches = state.get_run_series(series_ids=[series_id])
+
+    # The caller must be a member of the federation. Return the same error for
+    # missing and inaccessible series to avoid revealing their existence.
+    if not series_matches or not state.federation_manager.has_member(
+        account.flwr_aid, series_matches[0].federation
+    ):
+        raise FlowerError(
+            ApiErrorCode.RUN_SERIES_ID_NOT_FOUND,
+            f"Run series {series_id} not found for {account.flwr_aid}.",
+        )
+
+    description = request.description.strip()
+    if not description or len(description) > RUN_SERIES_DESCRIPTION_MAX_LENGTH:
+        raise FlowerError(
+            ApiErrorCode.INVALID_RUN_SERIES_DESCRIPTION,
+            "Run series description must contain between 1 and "
+            f"{RUN_SERIES_DESCRIPTION_MAX_LENGTH} characters.",
+        )
+
+    run_series = RunSeries()
+    run_series.CopyFrom(series_matches[0])
+
+    state.set_run_series_description(series_id, description)
+    run_series.description = description
+    return UpdateRunSeriesDescriptionResponse(series=run_series)
 
 
 def list_run_series_events(
@@ -1557,6 +1604,22 @@ def list_nodes(
     return ListNodesResponse(nodes_info=nodes_info, now=now().isoformat())
 
 
+def _get_federation_member_count(federation: FederationInfo) -> int:
+    """Return the explicit member count or fall back to the member list size."""
+    count = (
+        federation.member_count
+        if federation.member_count is not None
+        else len(federation.members)
+    )
+    if count < 0 or count > 0xFFFFFFFF:
+        raise FlowerError(
+            ApiErrorCode.INVALID_HANDLER_RESPONSE,
+            f"Invalid federation member_count={count} "
+            f"for federation_id={federation.id}.",
+        )
+    return count
+
+
 def list_federations(
     request: ListFederationsRequest, account: AccountInfo, state: LinkState
 ) -> ListFederationsResponse:
@@ -1575,6 +1638,8 @@ def list_federations(
             Federation(
                 name=fed.id,
                 description=fed.description,
+                members=fed.members,
+                member_count=_get_federation_member_count(fed),
                 archived=fed.archived,
                 simulation=fed.simulation,
                 can_invite_members=fed.can_invite_members,
@@ -1673,6 +1738,7 @@ def show_federation(
         name=federation_id,
         description=details.description,
         members=details.members,
+        member_count=_get_federation_member_count(details),
         nodes=details.nodes,
         runs=[run_to_proto(run) for run in details.runs],
         archived=details.archived,
@@ -1733,6 +1799,7 @@ def create_federation(
             name=federation.id,
             description=federation.description,
             members=federation.members,
+            member_count=_get_federation_member_count(federation),
             simulation=federation.simulation,
             can_invite_members=federation.can_invite_members,
             can_add_supernodes=federation.can_add_supernodes,

@@ -92,7 +92,12 @@ class NoOpFederationManager(FederationManager):
             Federation(
                 id=NOOP_FEDERATION_ID,
                 description=NOOP_FEDERATION_DESCRIPTION,
-                members=[],
+                members=[
+                    Member(
+                        account=Account(id=NOOP_FLWR_AID, name=NOOP_ACCOUNT_NAME),
+                        role="owner",
+                    )
+                ],
                 nodes=[],
                 runs=[],
                 archived=False,
@@ -100,6 +105,7 @@ class NoOpFederationManager(FederationManager):
                 config=self._simulation_config,
                 can_invite_members=False,
                 can_add_supernodes=False,
+                member_count=1,
             )
         ]
 
@@ -124,6 +130,7 @@ class NoOpFederationManager(FederationManager):
             config=self._simulation_config,
             can_invite_members=False,
             can_add_supernodes=False,
+            member_count=1,
         )
 
     def get_simulation_config(self, federation_id: str) -> SimulationConfig | None:

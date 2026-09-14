@@ -239,34 +239,6 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
         return method_handler
 
 
-def create_superlink_runtime_version_server_interceptor(
-    connection_name: str = "Caller <-> SuperLink Runtime API",
-    send_warning_metadata: bool = False,
-    reject_incompatible: bool = True,
-) -> RuntimeVersionServerInterceptor:
-    """Create the SuperLink Runtime API version interceptor."""
-    return RuntimeVersionServerInterceptor(
-        connection_name=connection_name,
-        local_metadata=RuntimeVersionMetadata.from_local_component("SuperLink"),
-        send_warning_metadata=send_warning_metadata,
-        reject_incompatible=reject_incompatible,
-    )
-
-
-def create_supernode_runtime_version_server_interceptor(
-    connection_name: str = "Caller <-> SuperNode Runtime API",
-    send_warning_metadata: bool = False,
-    reject_incompatible: bool = True,
-) -> RuntimeVersionServerInterceptor:
-    """Create the SuperNode Runtime API version interceptor."""
-    return RuntimeVersionServerInterceptor(
-        connection_name=connection_name,
-        local_metadata=RuntimeVersionMetadata.from_local_component("SuperNode"),
-        send_warning_metadata=send_warning_metadata,
-        reject_incompatible=reject_incompatible,
-    )
-
-
 def create_fleet_runtime_version_server_interceptor(
     connection_name: str = "SuperNode <-> SuperLink Fleet API",
     send_warning_metadata: bool = False,

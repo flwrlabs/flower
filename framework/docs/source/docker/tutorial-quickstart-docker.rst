@@ -69,12 +69,13 @@ Open your terminal and run:
     :substitutions:
 
     $ docker run --rm \
-          -p 9091:9091 -p 9092:9092 -p 9093:9093 \
+          -p 8000:8000 -p 9092:9092 \
           --network flwr-network \
           --name superlink \
           --detach \
           flwr/superlink:|stable_flwr_version| \
           --insecure \
+          --host 0.0.0.0 \
           --isolation \
           process
 
@@ -82,10 +83,10 @@ Open your terminal and run:
 
     * ``docker run``: This tells Docker to run a container from an image.
     * ``--rm``: Remove the container once it is stopped or the command exits.
-    * ``-p 9091:9091 -p 9092:9092 -p 9093:9093``: Map port ``9091``, ``9092`` and ``9093`` of the
+    * ``-p 8000:8000 -p 9092:9092``: Map ports ``8000`` and ``9092`` of the
       container to the same port of the host machine, allowing other services to access the
-      Runtime API on ``http://localhost:9091``, the Fleet API on ``http://localhost:9092`` and
-      the Control API on ``http://localhost:9093``.
+      Runtime and Control APIs on ``http://localhost:8000`` and the Fleet API on
+      ``localhost:9092``.
     * ``--network flwr-network``: Make the container join the network named ``flwr-network``.
     * ``--name superlink``: Assign the name ``superlink`` to the container.
     * ``--detach``: Run the container in the background, freeing up the terminal.
@@ -93,6 +94,8 @@ Open your terminal and run:
       tag of the image. The tag :substitution-code:`|stable_flwr_version|` represents a :doc:`specific version <pin-version>` of the image.
     * ``--insecure``: This flag tells the container to operate in an insecure mode, allowing
       unencrypted communication.
+    * ``--host 0.0.0.0``: Make the Runtime and Control HTTP APIs reachable outside the
+      container.
     * ``--isolation process``: Tells the SuperLink that the ServerApp is executed by separate
       independent process. The SuperLink does not attempt to execute it. You can learn more about
       the different process modes here: :doc:`run-as-subprocess`.
@@ -236,7 +239,7 @@ pointing to the SuperLink's **Runtime API** endpoint.
            flwr_superexec:0.0.1 \
            --insecure \
            --plugin-type serverapp \
-           --runtime-api-address superlink:9091
+           --runtime-api-address superlink:8000
 
    .. dropdown:: Understand the command
 
@@ -251,8 +254,8 @@ pointing to the SuperLink's **Runtime API** endpoint.
          unencrypted communication. Secure connections will be added in future releases.
        * ``--plugin-type serverapp``: Load the *serverapp* plugin. SuperExec will spawn
          ServerApp processes as needed.
-       * ``--runtime-api-address superlink:9091``: Connect to the SuperLink's Runtime API
-         at the address ``superlink:9091``.
+       * ``--runtime-api-address superlink:8000``: Connect to the SuperLink's Runtime API
+         at the address ``superlink:8000``.
 
 ***************************************************
  Step 5: Start the SuperExec to execute ClientApps
@@ -329,7 +332,7 @@ using the *clientapp* plugin, pass ``--runtime-api-address`` pointing to the Sup
        :caption: config.toml
 
        [superlink.local-deployment]
-       address = "127.0.0.1:9093"
+       address = "127.0.0.1:8000"
        insecure = true
 
 2. Run the ``quickstart-pytorch`` project and follow the ServerApp logs to track the
@@ -384,7 +387,7 @@ using the *clientapp* plugin, pass ``--runtime-api-address`` pointing to the Sup
            flwr_superexec:0.0.1 \
            --insecure \
            --plugin-type serverapp \
-           --runtime-api-address superlink:9091
+           --runtime-api-address superlink:8000
        $ docker run --rm \
            --network flwr-network \
             --name superexec-clientapp-1 \

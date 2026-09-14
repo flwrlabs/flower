@@ -52,11 +52,13 @@ CHAT_AGENTS_API_PATH = "/user/agents"
 CHAT_HELP_COMMAND = "/help"
 CHAT_EXIT_COMMAND = "/quit"
 CHAT_NEW_COMMAND = "/new"
+CHAT_LOAD_COMMAND = "/load"
 CHAT_FEDERATION_COMMAND = "/federation"
 CHAT_HISTORY_COMMAND = "/history"
 CHAT_COMMANDS = {
     CHAT_HELP_COMMAND: "Show available commands.",
     CHAT_NEW_COMMAND: "Start a new conversation.",
+    CHAT_LOAD_COMMAND: "Build and select a local AgentApp.",
     CHAT_FEDERATION_COMMAND: "Select a federation.",
     CHAT_HISTORY_COMMAND: "Show or continue conversation history.",
     CHAT_EXIT_COMMAND: "Exit Flower Chat.",
@@ -153,7 +155,9 @@ class SimulationBackendConfigTomlKey:
 # Local SuperLink configuration
 LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE = ":local:"
 LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY = ":local-in-memory:"
-LOCAL_RUNTIME_API_PORT = os.environ.get("FLWR_LOCAL_RUNTIME_API_PORT", "39091")
+LOCAL_SUPERLINK_HTTP_API_PORT = os.environ.get(
+    "FLWR_LOCAL_SUPERLINK_HTTP_API_PORT", "39091"
+)
 LOCAL_CONTROL_API_PORT = os.environ.get("FLWR_LOCAL_CONTROL_API_PORT", "39093")
 LOCAL_CONTROL_API_ADDRESS = f"127.0.0.1:{LOCAL_CONTROL_API_PORT}"
 LOCAL_SUPERLINK_STARTUP_TIMEOUT = 15.0

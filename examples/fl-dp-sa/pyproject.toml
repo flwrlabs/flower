@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fl-dp-sa"
-version = "1.1.10"
+version = "1.1.11"
 description = "Central Differential Privacy and Secure Aggregation in Flower"
 license = { file = "LICENSE" }
 dependencies = [
-    "flwr[simulation]>=1.28.0",
-    "flwr-datasets[vision]>=0.6.0",
+    "flwr[simulation]>=1.36.0",
+    "flwr-datasets[vision]>=0.6.1",
     "torch==2.10.0",
     "torchvision==0.25.0",
 ]

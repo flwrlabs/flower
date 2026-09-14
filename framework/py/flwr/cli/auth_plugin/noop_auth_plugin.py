@@ -16,7 +16,6 @@
 
 from collections.abc import Sequence
 
-from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore.auth.typing import AccountAuthCredentials, AccountAuthLoginDetails
 from flwr.supercore.control import ControlHttpClient
 
@@ -33,7 +32,7 @@ class NoOpCliAuthPlugin(CliAuthPlugin):
     @staticmethod
     def login(
         login_details: AccountAuthLoginDetails,
-        control_client: ControlStub | ControlHttpClient,
+        control_client: ControlHttpClient,
     ) -> AccountAuthCredentials:
         """Raise LoginError as no-op plugin does not support login.
 
@@ -41,7 +40,7 @@ class NoOpCliAuthPlugin(CliAuthPlugin):
         ----------
         login_details : AccountAuthLoginDetails
             Login details (unused).
-        control_client : ControlStub | ControlHttpClient
+        control_client : ControlHttpClient
             Control client (unused).
 
         Returns
@@ -81,20 +80,3 @@ class NoOpCliAuthPlugin(CliAuthPlugin):
             The same metadata, unmodified.
         """
         return metadata
-
-    def read_tokens_from_metadata(
-        self, metadata: Sequence[tuple[str, str | bytes]]
-    ) -> AccountAuthCredentials | None:
-        """Return None (no tokens to read).
-
-        Parameters
-        ----------
-        metadata : Sequence[tuple[str, str | bytes]]
-            The metadata to read from (unused).
-
-        Returns
-        -------
-        None
-            Always returns None as no authentication is performed.
-        """
-        return None
