@@ -19,6 +19,10 @@ from unittest.mock import Mock, call, patch
 
 import pytest
 
+from flwr.agentapp.constants import (
+    AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY,
+    AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY,
+)
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -269,7 +273,6 @@ def test_runtime_agent_grid_tools() -> None:
             "call_id": "call-2",
             "arguments": {
                 "dst_node_id": "11",
-                "message_type": "query",
                 "payload": {"prompt": "hi", "values": [[1, 2], [3, 4]]},
             },
         }
@@ -280,8 +283,11 @@ def test_runtime_agent_grid_tools() -> None:
     assert sent.metadata.dst_node_id == 11
     assert sent.metadata.message_type == "query"
     assert sent.metadata.group_id == ""
-    assert sent.content["payload"]["payload"] == (
-        b'{"prompt":"hi","values":[[1,2],[3,4]]}'
+    assert (
+        sent.content[AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY][
+            AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY
+        ]
+        == '{"prompt":"hi","values":[[1,2],[3,4]]}'
     )
 
     pulled = agent_grid.call(

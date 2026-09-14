@@ -28,6 +28,10 @@ from typing import cast
 from google.protobuf.json_format import MessageToDict, ParseDict
 
 from flwr.agentapp import AgentConnectors, AgentEvents, AgentGrid, AgentSession
+from flwr.agentapp.constants import (
+    AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY,
+    AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY,
+)
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common.serde import message_from_proto, message_to_proto
 
@@ -96,9 +100,6 @@ def _grid_tools() -> list[JSONObject]:
                 "dst_node_id": string_property(
                     "Destination SuperNode ID as a decimal string."
                 ),
-                "message_type": string_property(
-                    "Message type handled by the ClientApp."
-                ),
                 "payload": {
                     "type": "object",
                     "description": "JSON object to send to the SuperNode.",
@@ -110,7 +111,7 @@ def _grid_tools() -> list[JSONObject]:
                     "description": "Optional round-trip time-to-live in seconds.",
                 },
             },
-            required=["dst_node_id", "message_type", "payload"],
+            required=["dst_node_id", "payload"],
         ),
         function_tool(
             "pull_messages",
@@ -315,10 +316,9 @@ class RuntimeAgentGrid(AgentGrid):
             "num_available": len(node_ids),
         }
 
-    def _push_message(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def _push_message(
         self,
         dst_node_id: str,
-        message_type: str,
         payload: JSONObject,
         group_id: str = "",
         ttl: float | None = None,
@@ -326,13 +326,17 @@ class RuntimeAgentGrid(AgentGrid):
         message = Message(
             RecordDict(
                 {
-                    "payload": ConfigRecord(
-                        {"payload": strict_json_dumps(payload, compact=True).encode()}
+                    AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: ConfigRecord(
+                        {
+                            AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: strict_json_dumps(
+                                payload, compact=True
+                            )
+                        }
                     )
                 }
             ),
-            int(dst_node_id),
-            message_type,
+            dst_node_id=int(dst_node_id),
+            message_type="query",  # TODO: Replace with an AgentGrid message type.
             group_id=group_id,
             ttl=ttl,
         )
