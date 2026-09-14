@@ -15,7 +15,7 @@
 """Middleware for the Control API."""
 
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 from typing import cast
 
 from fastapi import Request
@@ -137,10 +137,10 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
 
         result = getattr(request.state, "protobuf_response", None)
         # A protobuf Message is a unary response and must be checked before the
-        # iterable protocols, following ProtobufTranslationMiddleware's dispatch.
+        # iterator protocol, following ProtobufTranslationMiddleware's dispatch.
         if isinstance(result, Message):
             await run_in_threadpool(write_after_event, result)
-        elif isinstance(result, Iterable):
+        elif isinstance(result, Iterator):
 
             def logged_stream() -> Iterator[Message]:
                 """Write the after-event once stream iteration terminates."""
@@ -148,7 +148,7 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
                 error: BaseException | None = None
                 try:
                     # pylint: disable=use-yield-from
-                    for stream_response in cast(Iterable[Message], result):
+                    for stream_response in cast(Iterator[Message], result):
                         yield stream_response
                 except BaseException as exc:
                     error = exc
@@ -186,7 +186,35 @@ class ControlLicenseMiddleware(BaseHTTPMiddleware):
                 "License check failed.",
             )
 
-        return await call_next(request)
+        return response
+
+
+def _is_control_path(path: str) -> bool:
+    """Return whether the path belongs to a Control API endpoint."""
+    return path.startswith("/v1/control/")
+
+
+class ControlLicenseMiddleware(BaseHTTPMiddleware):
+    """Check Control API licenses when a license plugin is available."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        super().__init__(app)
+        self._license_plugin = get_license_plugin()
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        """Skip checks without a plugin and reject requests with an invalid license."""
+        if self._license_plugin is None or not _is_control_path(request.url.path):
+            return await call_next(request)
+
+        if not await run_in_threadpool(self._license_plugin.check_license):
+            raise FlowerError(
+                ApiErrorCode.LICENSE_CHECK_FAILED,
+                "License check failed.",
+            )
+
+        return response
 
 
 class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
@@ -208,4 +236,4 @@ class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
             )
 
         request.state.account = await run_in_threadpool(account_access, request)
-        return await call_next(request)
+        return response
