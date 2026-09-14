@@ -14,15 +14,61 @@
 # ===============================================================================
 """Attio action definitions."""
 
-from ..definition import ActionAccess, ActionDefinition
-from ..tool_schema import integer_property, string_property
+from flwr.supercore.typing import JSONObject
 
-_CURSOR = string_property("Cursor returned by the previous Attio response.")
-_PAGE_LIMIT = integer_property(
-    "Maximum number of results to return.", minimum=1, maximum=50
-)
+from ..definition import ActionAccess, ActionDefinition
+from ..tool_schema import string_property
+
+_CURSOR: JSONObject = {
+    "type": "string",
+    "description": (
+        "Opaque cursor returned in pagination.next_cursor by the previous Attio "
+        "response for the same action and filters."
+    ),
+}
+_PAGE_LIMIT: JSONObject = {
+    "type": "integer",
+    "minimum": 1,
+    "description": "The maximum number of items to return.",
+}
+
+
+def _uuid_property(description: str) -> JSONObject:
+    """Build an Attio UUID property schema."""
+    return {"type": "string", "format": "uuid", "description": description}
+
 
 ACTIONS = (
+    ActionDefinition(
+        name="identify",
+        description=(
+            "Identify the current Attio access token, its workspace, permissions, "
+            "and authorizing workspace member."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_workspace_member",
+        description=(
+            "Get an Attio workspace member, including their email address, by UUID."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "workspace_member_id": _uuid_property(
+                    "Attio workspace member UUID returned by identify."
+                ),
+            },
+            "required": ["workspace_member_id"],
+            "additionalProperties": False,
+        },
+    ),
     ActionDefinition(
         name="search_records",
         description="Search records in Attio.",
@@ -30,33 +76,114 @@ ACTIONS = (
         input_schema={
             "type": "object",
             "properties": {
-                "query": string_property("Attio record search query."),
+                "query": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "description": "Attio record search query.",
+                },
                 "objects": {
                     "type": "array",
-                    "items": string_property("Attio object type."),
+                    "items": {
+                        "type": "string",
+                        "description": "Attio object slug or UUID.",
+                    },
                     "minItems": 1,
                     "description": "Attio object types to search.",
                 },
-                "limit": integer_property(
-                    "Maximum number of matches to return.", minimum=1, maximum=25
-                ),
+                "limit": {
+                    **_PAGE_LIMIT,
+                    "description": "The maximum number of matches to return.",
+                },
+                "request_as": {
+                    "description": "Context in which to perform the search.",
+                    "anyOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "type": {"type": "string", "enum": ["workspace"]}
+                            },
+                            "required": ["type"],
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["workspace-member"],
+                                },
+                                "workspace_member_id": _uuid_property(
+                                    "Attio workspace member UUID."
+                                ),
+                            },
+                            "required": ["type", "workspace_member_id"],
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["workspace-member"],
+                                },
+                                "email_address": {
+                                    "type": "string",
+                                    "format": "email",
+                                    "description": "Attio workspace member email.",
+                                },
+                            },
+                            "required": ["type", "email_address"],
+                        },
+                    ],
+                },
             },
-            "required": ["query", "objects"],
+            "required": ["query", "objects", "request_as"],
             "additionalProperties": False,
         },
     ),
     ActionDefinition(
         name="list_meetings",
-        description="List meetings in Attio.",
+        description=(
+            "List meetings in the authenticated Attio workspace, optionally filtering "
+            "by linked record or participant email address and sorting by start time."
+        ),
         access=ActionAccess.READ,
         input_schema={
             "type": "object",
             "properties": {
                 "limit": _PAGE_LIMIT,
                 "cursor": _CURSOR,
-                "linked_object": string_property("Attio linked object type."),
-                "linked_record_id": string_property("Attio linked record ID."),
-                "participants": string_property("Meeting participant filter."),
+                "linked_object": string_property(
+                    "Attio object slug or ID. Must be provided together with "
+                    "linked_record_id."
+                ),
+                "linked_record_id": _uuid_property(
+                    "Attio record UUID. Must be provided together with linked_object."
+                ),
+                "participants": {
+                    "type": "string",
+                    "description": "Comma-separated participant email addresses.",
+                },
+                "sort": {
+                    "type": "string",
+                    "enum": ["start_asc", "start_desc"],
+                    "description": (
+                        "Meeting start-time order. Use start_desc for the latest "
+                        "meeting."
+                    ),
+                },
+                "ends_from": {
+                    "type": ["string", "null"],
+                    "description": "Inclusive lower bound for meeting end time.",
+                },
+                "starts_before": {
+                    "type": ["string", "null"],
+                    "description": "Exclusive upper bound for meeting start time.",
+                },
+                "timezone": {
+                    "type": "string",
+                    "description": (
+                        "Timezone for evaluating all-day meeting time filters."
+                    ),
+                },
             },
             "additionalProperties": False,
         },
@@ -68,10 +195,11 @@ ACTIONS = (
         input_schema={
             "type": "object",
             "properties": {
-                "meeting_id": string_property("Attio meeting ID."),
-                "limit": integer_property(
-                    "Maximum number of recordings to return.", minimum=1, maximum=200
-                ),
+                "meeting_id": _uuid_property("Attio meeting UUID."),
+                "limit": {
+                    **_PAGE_LIMIT,
+                    "description": "The maximum number of recordings to return.",
+                },
                 "cursor": _CURSOR,
             },
             "required": ["meeting_id"],
@@ -85,8 +213,8 @@ ACTIONS = (
         input_schema={
             "type": "object",
             "properties": {
-                "meeting_id": string_property("Attio meeting ID."),
-                "call_recording_id": string_property("Attio call recording ID."),
+                "meeting_id": _uuid_property("Attio meeting UUID."),
+                "call_recording_id": _uuid_property("Attio call recording UUID."),
                 "cursor": _CURSOR,
             },
             "required": ["meeting_id", "call_recording_id"],

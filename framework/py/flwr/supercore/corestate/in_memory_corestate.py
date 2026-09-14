@@ -605,6 +605,17 @@ class InMemoryCoreState(
                 run_series = run_series[:limit]
             return list(run_series)
 
+    def set_run_series_description(self, series_id: int, description: str) -> None:
+        """Set the description of an existing RunSeries."""
+        normalized = description.strip()
+        if not normalized:
+            return
+        with self.lock_run_series_store:
+            run_series = self.run_series_store.get(series_id)
+            if run_series is None:
+                return
+            run_series.description = normalized
+
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
         with self.lock_run_series_context_store:
@@ -1160,7 +1171,7 @@ class InMemoryCoreState(
     ) -> bool:
         """Store one task-addressed Message."""
         message_id = message.metadata.message_id
-        if validate_task_message(message):
+        if validate_task_message(message, self.get_node_id()):
             return False
         src_task_id = cast(int, message.metadata.src_task_id)
         dst_task_id = cast(int, message.metadata.dst_task_id)

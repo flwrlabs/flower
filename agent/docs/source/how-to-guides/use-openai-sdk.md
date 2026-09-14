@@ -145,6 +145,9 @@ event tells Flower Chat and other run-event clients that the response has
 finished. For model-generated output, prefer republishing the original SDK
 events so clients receive the complete response event sequence.
 
+`agent.events.emit(...)` publishes structured events; only event types that
+run-event clients recognize as response output are rendered as assistant text.
+
 Publishing these events does not add an assistant message to the conversation
 state. When later runs need to replay it, see
 {ref}`persist-final-assistant-message` for the complete `Context` update.

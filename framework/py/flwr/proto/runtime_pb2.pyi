@@ -295,6 +295,34 @@ class PushTaskEventsResponse(google.protobuf.message.Message):
 global___PushTaskEventsResponse = PushTaskEventsResponse
 
 @typing.final
+class GetRunSeriesEventsRequest(google.protobuf.message.Message):
+    """GetRunSeriesEvents messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetRunSeriesEventsRequest = GetRunSeriesEventsRequest
+
+@typing.final
+class GetRunSeriesEventsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.TaskEvent]: ...
+    def __init__(
+        self,
+        *,
+        events: collections.abc.Iterable[flwr.proto.task_pb2.TaskEvent] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+
+global___GetRunSeriesEventsResponse = GetRunSeriesEventsResponse
+
+@typing.final
 class PullTaskMessageRequest(google.protobuf.message.Message):
     """PullTaskMessage messages"""
 
