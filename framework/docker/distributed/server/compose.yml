@@ -40,8 +40,6 @@ services:
     command:
       - --root-certificates
       - certificates/superlink-ca.crt
-      - --plugin-type
-      - serverapp
       - --runtime-api-address
       - superlink:8000
     secrets:

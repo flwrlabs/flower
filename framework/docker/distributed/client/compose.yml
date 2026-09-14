@@ -72,8 +72,6 @@ services:
         ENTRYPOINT ["flower-superexec"]
     command:
       - --insecure
-      - --plugin-type
-      - clientapp
       - --runtime-api-address
       - supernode-1:9094
     deploy:
@@ -98,8 +96,6 @@ services:
         ENTRYPOINT ["flower-superexec"]
     command:
       - --insecure
-      - --plugin-type
-      - clientapp
       - --runtime-api-address
       - supernode-2:9095
     deploy:
@@ -125,8 +121,6 @@ services:
   #       ENTRYPOINT ["flower-superexec"]
   #   command:
   #     - --insecure
-  #     - --plugin-type
-  #     - clientapp
   #     - --runtime-api-address
   #     - supernode-3:9096
   #   deploy:
