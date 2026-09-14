@@ -46,7 +46,11 @@ def _grid_tools() -> list[JSONObject]:
     return [
         function_tool(
             "get_nodes",
-            "Return all available SuperNodes, or a random sample if requested.",
+            (
+                "Return all available SuperNodes, or a random sample if requested. "
+                "A SuperNode is a node in a federation that sits next to data, "
+                "performs operations on it, and returns results."
+            ),
             properties={
                 "sample_size": {
                     "type": "integer",
@@ -70,7 +74,8 @@ def _grid_tools() -> list[JSONObject]:
                         "type": "object",
                         "properties": {
                             "dst_node_id": string_property(
-                                "Destination SuperNode ID as a decimal string."
+                                "Destination SuperNode uint64 ID as a decimal string "
+                                "to preserve precision."
                             ),
                             "payload": {
                                 "type": "object",
