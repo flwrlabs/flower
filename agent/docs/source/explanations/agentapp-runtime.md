@@ -168,9 +168,10 @@ connector activity to `Context`. Those records are available through
 `agent.events.get_trace()`. Use `context.state` only for additional app-defined
 state that should persist across runs in the series.
 
-The current default Flower Agent converts stored user and assistant messages
-from the event trace back into model input. A simple custom AgentApp that
-forwards only `context.run_config["agent.input"]` treats every run independently
+Conversation continuity is an AgentApp behavior, not automatic runtime
+behavior. An AgentApp can convert stored user and assistant events from the
+trace back into model input. The default `@flwrlabs/agent` template forwards
+only `context.run_config["agent.input"]`, so it treats every run independently
 even when the runs share a series.
 
 ## Run series and federations

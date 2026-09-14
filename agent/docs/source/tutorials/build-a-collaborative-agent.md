@@ -137,16 +137,17 @@ def message_text(content: Any) -> str:
 def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
     """Rebuild completed user and assistant messages from the event trace."""
     messages: list[dict[str, Any]] = []
-    assistant_parts: list[str] = []
+    assistant_parts_by_run: dict[int, list[str]] = {}
 
     for entry in agent.events.get_trace():
+        run_id = entry.get("run_id")
         event_type = entry.get("event")
         data = entry.get("data")
-        if not isinstance(data, dict):
+        if not isinstance(run_id, int) or not isinstance(data, dict):
             continue
 
         if event_type == "message" and data.get("role") == "user":
-            assistant_parts.clear()
+            assistant_parts_by_run.pop(run_id, None)
             messages.append(
                 {
                     "type": "message",
@@ -160,8 +161,9 @@ def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
         }:
             delta = data.get("delta")
             if isinstance(delta, str):
-                assistant_parts.append(delta)
+                assistant_parts_by_run.setdefault(run_id, []).append(delta)
         elif event_type == "response.completed":
+            assistant_parts = assistant_parts_by_run.pop(run_id, [])
             if assistant_parts:
                 messages.append(
                     {
@@ -170,17 +172,17 @@ def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
                         "content": "".join(assistant_parts),
                     }
                 )
-            assistant_parts.clear()
         elif event_type in {"error", "response.failed", "response.incomplete"}:
-            assistant_parts.clear()
+            assistant_parts_by_run.pop(run_id, None)
 
     return messages
 ```
 
 `message_text` raises an error for an unexpected shape instead of silently
-sending incomplete history to the model. The loader keeps assistant text only
-after a `response.completed` event, so a failed or incomplete response is not
-replayed as a finished answer.
+sending incomplete history to the model. The loader keeps partial assistant
+text separate for each run and adds it only after that run emits a
+`response.completed` event, so overlapping runs cannot mix their output and a
+failed or incomplete response is not replayed as a finished answer.
 
 ### Let the model recover from connector failures
 
@@ -367,16 +369,17 @@ def message_text(content: Any) -> str:
 def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
     """Rebuild completed user and assistant messages from the event trace."""
     messages: list[dict[str, Any]] = []
-    assistant_parts: list[str] = []
+    assistant_parts_by_run: dict[int, list[str]] = {}
 
     for entry in agent.events.get_trace():
+        run_id = entry.get("run_id")
         event_type = entry.get("event")
         data = entry.get("data")
-        if not isinstance(data, dict):
+        if not isinstance(run_id, int) or not isinstance(data, dict):
             continue
 
         if event_type == "message" and data.get("role") == "user":
-            assistant_parts.clear()
+            assistant_parts_by_run.pop(run_id, None)
             messages.append(
                 {
                     "type": "message",
@@ -390,8 +393,9 @@ def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
         }:
             delta = data.get("delta")
             if isinstance(delta, str):
-                assistant_parts.append(delta)
+                assistant_parts_by_run.setdefault(run_id, []).append(delta)
         elif event_type == "response.completed":
+            assistant_parts = assistant_parts_by_run.pop(run_id, [])
             if assistant_parts:
                 messages.append(
                     {
@@ -400,9 +404,8 @@ def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
                         "content": "".join(assistant_parts),
                     }
                 )
-            assistant_parts.clear()
         elif event_type in {"error", "response.failed", "response.incomplete"}:
-            assistant_parts.clear()
+            assistant_parts_by_run.pop(run_id, None)
 
     return messages
 
