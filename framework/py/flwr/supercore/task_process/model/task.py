@@ -29,6 +29,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.runtime_timing import log_runtime_timing
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
@@ -41,9 +42,19 @@ _TEXT_DELTA_EVENTS = frozenset(
 )
 
 
-def handle_task(client: RuntimeHttpClient, task_id: int, run_id: int) -> None:
+def handle_task(
+    client: RuntimeHttpClient,
+    task_id: int,
+    run_id: int,
+    runtime_timing_id: str | None = None,
+) -> None:
     """Run one model task request."""
     request_message = _pull_model_request(client)
+    log_runtime_timing(
+        "model_request_received",
+        timing_id=runtime_timing_id,
+        model_request_id=request_message.metadata.message_id,
+    )
     is_stream = request_message.payload.get("stream") is True
     if request_message.metadata.src_task_id is None:
         raise RuntimeError("Model request source task is not set.")
@@ -70,7 +81,16 @@ def handle_task(client: RuntimeHttpClient, task_id: int, run_id: int) -> None:
         """Push buffered stream events."""
         if not is_stream or not events:
             return
+        pushed_first_text_event = not first_text_event_flushed and any(
+            event.event in _TEXT_DELTA_EVENTS for event in events
+        )
         client.PushTaskEvents(PushTaskEventsRequest(events=events))
+        if pushed_first_text_event:
+            log_runtime_timing(
+                "model_first_text_event_persisted",
+                timing_id=runtime_timing_id,
+                model_request_id=request_message.metadata.message_id,
+            )
         events.clear()
 
     def _buffer_event(event: JSONObject) -> None:
@@ -92,6 +112,7 @@ def handle_task(client: RuntimeHttpClient, task_id: int, run_id: int) -> None:
             request_message.payload,
             on_stream_event=_buffer_event,
             usage_recorder=TaskUsageRecorder(client),
+            runtime_timing_id=runtime_timing_id,
         )
     except Exception as ex:
         response = _make_error_response(ex)

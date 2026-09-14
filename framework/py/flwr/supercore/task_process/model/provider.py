@@ -28,6 +28,7 @@ from flwr.supercore.task_process.usage import (
     TaskUsageRecorder,
     task_usage_from_open_response,
 )
+from flwr.supercore.runtime_timing import log_runtime_timing
 from flwr.supercore.typing import JSONObject, JSONValue
 
 DEFAULT_MODEL_API_ENDPOINT = "https://api.flower.ai/v1/responses"
@@ -66,6 +67,7 @@ def invoke_model_provider(
     *,
     usage_recorder: TaskUsageRecorder,
     on_stream_event: Callable[[JSONObject], None] | None = None,
+    runtime_timing_id: str | None = None,
 ) -> JSONObject:
     """Invoke the configured Open Responses-compatible model provider.
 
@@ -114,6 +116,7 @@ def invoke_model_provider(
         on_stream_event=on_stream_event,
         usage_recorder=usage_recorder,
         provider=_provider_from_request(payload),
+        runtime_timing_id=runtime_timing_id,
     )
 
 
@@ -126,6 +129,7 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
     on_stream_event: Callable[[JSONObject], None] | None,
     usage_recorder: TaskUsageRecorder,
     provider: str,
+    runtime_timing_id: str | None,
 ) -> JSONObject:
     """Run a normal or streaming provider request.
 
@@ -139,6 +143,10 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
     stream = request.get("stream") is True
 
     # Send one HTTP request and let HTTP status represent transport failure.
+    log_runtime_timing(
+        "model_provider_request_started",
+        timing_id=runtime_timing_id,
+    )
     try:
         response = requests.post(
             responses_url,
@@ -183,6 +191,7 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
         )
 
     last_event: JSONObject | None = None
+    first_text_event_received = False
     for event_name, data in _iter_sse_events(response):
         if data.strip() == "[DONE]":
             continue
@@ -202,12 +211,24 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
             event = dict(event)
             event["type"] = event_name
 
+        event_type = event.get("type")
+        if (
+            not first_text_event_received
+            and isinstance(event_type, str)
+            and event_type
+            in {"response.output_text.delta", "response.reasoning_summary_text.delta"}
+        ):
+            log_runtime_timing(
+                "model_provider_first_text_event_received",
+                timing_id=runtime_timing_id,
+            )
+            first_text_event_received = True
+
         last_event = event
         if on_stream_event is not None:
             on_stream_event(event)
 
         # Terminal failure events stop the stream and surface the provider event.
-        event_type = event.get("type")
         is_failure_event = (
             isinstance(event_type, str) and event_type in _TERMINAL_FAILURE_EVENTS
         )

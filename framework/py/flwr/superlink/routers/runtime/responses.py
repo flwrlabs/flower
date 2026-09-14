@@ -38,6 +38,7 @@ from flwr.supercore import log
 from flwr.supercore.constant import TaskType
 from flwr.supercore.error import FlowerError
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
+from flwr.supercore.runtime_timing import log_runtime_timing
 from flwr.supercore.servicer.runtime import runtime_handlers
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
@@ -65,6 +66,9 @@ _SUPPORTED_FIELDS = frozenset(
 _TERMINAL_EVENTS = frozenset(
     {"error", "response.completed", "response.failed", "response.incomplete"}
 )
+_TEXT_DELTA_EVENTS = frozenset(
+    {"response.output_text.delta", "response.reasoning_summary_text.delta"}
+)
 _POLL_INTERVAL = 0.25
 _DEFAULT_MODEL_RESPONSE_TIMEOUT = 300.0
 _DEFAULT_MODEL_TASK_LAUNCH_TIMEOUT = 300.0
@@ -77,6 +81,7 @@ class _Exchange:
 
     agent_task_id: int
     model_task_id: int
+    model_request_id: str | None = None
 
 
 class _ResponsesError(Exception):
@@ -206,10 +211,16 @@ def _start_exchange(
         raise _ResponsesError(
             500, "Model request could not be stored.", "model_request_failed"
         )
+    log_runtime_timing(
+        "model_request_stored",
+        timing_id=request.metadata.message_id,
+        direction="agent_to_model",
+    )
 
     return _Exchange(
         agent_task_id=task.task_id,
         model_task_id=model_task_id,
+        model_request_id=request.metadata.message_id,
     )
 
 
@@ -255,6 +266,7 @@ async def _stream_response(
     cursor: int | None = None
     complete = False
     sequence_number = 0
+    first_text_event_relayed = False
     exchange: _Exchange | None = None
     try:
         exchange = await run_in_threadpool(_start_exchange, state, task, model_request)
@@ -288,6 +300,13 @@ async def _stream_response(
                     complete = True
                     yield _sse_frame(event)
                     return
+                if not first_text_event_relayed and event.event in _TEXT_DELTA_EVENTS:
+                    log_runtime_timing(
+                        "model_first_text_event_relayed",
+                        timing_id=exchange.model_request_id,
+                        direction="model_to_agent",
+                    )
+                    first_text_event_relayed = True
                 yield _sse_frame(event)
                 sequence_number += 1
 

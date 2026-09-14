@@ -36,6 +36,7 @@ class ExecutionSpec:  # pylint: disable=too-many-instance-attributes
     parent_pid: int | None
     suppress_output: bool
     task_id: int
+    runtime_timing_id: str | None = None
 
     def __post_init__(self) -> None:
         """Validate fields required by all executors."""

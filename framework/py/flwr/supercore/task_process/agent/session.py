@@ -47,6 +47,7 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorResponse,
 )
 from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.runtime_timing import log_runtime_timing
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
@@ -61,13 +62,20 @@ _EVENT_PUBLISH_BATCH_SIZE = 16
 _EVENT_PUBLISH_QUEUE_SIZE = 256
 _EVENT_PUBLISH_BATCH_WAIT = 0.05
 _EVENT_PUBLISH_STOP = object()
+_TEXT_DELTA_EVENTS = frozenset(
+    {"response.output_text.delta", "response.reasoning_summary_text.delta"}
+)
 
 
 class RuntimeAgentEvents(AgentEvents):
     """Publish AgentApp-selected events through a background worker."""
 
-    def __init__(self, stub: RuntimeHttpClient) -> None:
+    def __init__(
+        self, stub: RuntimeHttpClient, *, runtime_timing_id: str | None = None
+    ) -> None:
         self._stub = stub
+        self._runtime_timing_id = runtime_timing_id
+        self._first_text_event_persisted = False
         self._queue: Queue[TaskEvent | object] = Queue(
             maxsize=_EVENT_PUBLISH_QUEUE_SIZE
         )
@@ -128,6 +136,14 @@ class RuntimeAgentEvents(AgentEvents):
         """Publish one batch of task events."""
         try:
             self._stub.PushTaskEvents(PushTaskEventsRequest(events=batch))
+            if not self._first_text_event_persisted and any(
+                event.event in _TEXT_DELTA_EVENTS for event in batch
+            ):
+                log_runtime_timing(
+                    "agent_first_text_event_persisted",
+                    timing_id=self._runtime_timing_id,
+                )
+                self._first_text_event_persisted = True
         except Exception as err:  # pylint: disable=broad-exception-caught
             with self._error_lock:
                 if self._error is None:

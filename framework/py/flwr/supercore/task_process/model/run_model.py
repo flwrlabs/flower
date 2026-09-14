@@ -37,6 +37,7 @@ from flwr.supercore.interceptors import (
 )
 from flwr.supercore.retry import RetryInvoker, make_simple_http_retry_invoker
 from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.runtime_timing import log_runtime_timing
 from flwr.supercore.telemetry import EventType, event
 
 from .task import handle_task
@@ -48,6 +49,7 @@ def run_model(  # pylint: disable=too-many-locals
     insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
+    runtime_timing_id: str | None = None,
 ) -> None:
     """Run Flower model task process."""
     # Monitor the main process in case of SIGKILL
@@ -104,6 +106,10 @@ def run_model(  # pylint: disable=too-many-locals
         # Pull task input from SuperLink
         log(DEBUG, "[flwr-model] Pull task input")
         task_input: PullTaskInputResponse = client.PullTaskInput(PullTaskInputRequest())
+        log_runtime_timing(
+            "model_task_input_received",
+            timing_id=runtime_timing_id,
+        )
 
         event(EventType.FLWR_MODEL_RUN_ENTER)
 
@@ -111,6 +117,7 @@ def run_model(  # pylint: disable=too-many-locals
             client=client,
             task_id=task_input.task_id,
             run_id=task_input.run.run_id,
+            runtime_timing_id=runtime_timing_id,
         )
 
         # Update sub_status and details for successful completion

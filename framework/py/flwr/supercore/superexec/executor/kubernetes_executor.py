@@ -35,6 +35,7 @@ from flwr.supercore.constant import (
     TASK_TYPE_TO_COMMAND,
     TaskType,
 )
+from flwr.supercore.runtime_timing import log_runtime_timing, runtime_timing_marker
 from flwr.supercore.typing import JSONObject
 
 from .types import ExecutionSpec, LaunchResult
@@ -562,6 +563,13 @@ class KubernetesExecutor:
                 )
             return result
 
+        marker = runtime_timing_marker(spec.task_type, "executor_pod_created")
+        if marker is not None:
+            log_runtime_timing(
+                marker,
+                timing_id=spec.runtime_timing_id,
+                executor="cold",
+            )
         return LaunchResult.accepted()
 
     def close(self) -> None:
@@ -978,6 +986,11 @@ def _taskexecutor_args(
 
     if spec.runtime_dependency_install:
         args.append("--allow-runtime-dependency-installation")
+
+    if runtime_timing_marker(spec.task_type, "process_entered") is not None and (
+        spec.runtime_timing_id is not None
+    ):
+        args.extend(["--runtime-timing-id", spec.runtime_timing_id])
 
     return args
 
