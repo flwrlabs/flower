@@ -302,8 +302,9 @@ def main(agent: AgentSession, context: Context) -> None:
 
 The trace already contains the current `agent.input` event when the AgentApp
 starts. The planning calls remain local to this run because the app publishes
-only the final streamed response. The app keeps each complete planning output
-next to its connector outputs so later turns retain function-call context.
+only the final streamed response. The complete planning output and connector
+outputs stay in `input_items` for subsequent tool turns within this run; the
+trace loader does not replay them on later runs.
 
 The allowed names come from the returned schemas because one connector
 reference can expose several tools. The final request omits `tools`, which
