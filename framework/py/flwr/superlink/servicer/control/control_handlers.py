@@ -508,36 +508,6 @@ def _get_hub_app_id(
     return None
 
 
-def _refresh_hub_app(
-    state: LinkState,
-    federation_id: str,
-    app_id: str,
-    expected_fab_hash: str,
-    fleet_api_type: str | None,
-) -> None:
-    """Refresh a cached Hub app."""
-    try:
-        fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, app_id)
-        if len(fab_file) > FAB_MAX_SIZE:
-            raise ValueError("Downloaded FAB exceeds the maximum size")
-        fab_config = get_fab_config(fab_file)
-        fab_id, _ = get_metadata_from_config(fab_config)
-        if f"@{fab_id}" != app_id:
-            raise ValueError("Downloaded FAB ID does not match the Hub app ID")
-        fab_hash = state.store_fab(
-            Fab(hashlib.sha256(fab_file).hexdigest(), fab_file, verification_dict)
-        )
-        state.update_hub_app(
-            federation_id,
-            app_id,
-            expected_fab_hash,
-            fab_hash,
-            _get_app_type(fab_config),
-        )
-    except Exception as exc:  # pylint: disable=broad-exception-caught
-        log(WARNING, "Failed to refresh Hub app %s: %s", app_id, exc)
-
-
 def _refresh_hub_app_in_thread(
     state: LinkState,
     federation_id: str,
@@ -546,19 +516,35 @@ def _refresh_hub_app_in_thread(
     fleet_api_type: str | None,
 ) -> None:
     """Refresh a Hub app in a daemon thread unless one is already running."""
+
+    def refresh() -> None:
+        try:
+            fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, app_id)
+            if len(fab_file) > FAB_MAX_SIZE:
+                raise ValueError("Downloaded FAB exceeds the maximum size")
+            fab_config = get_fab_config(fab_file)
+            fab_id, _ = get_metadata_from_config(fab_config)
+            if f"@{fab_id}" != app_id:
+                raise ValueError("Downloaded FAB ID does not match the Hub app ID")
+            fab_hash = state.store_fab(
+                Fab(hashlib.sha256(fab_file).hexdigest(), fab_file, verification_dict)
+            )
+            state.update_hub_app(
+                federation_id,
+                app_id,
+                expected_fab_hash,
+                fab_hash,
+                _get_app_type(fab_config),
+            )
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            log(WARNING, "Failed to refresh Hub app %s: %s", app_id, exc)
+
     refresh_key = (federation_id, app_id)
     with _hub_app_refresh_threads_lock:
         refresh_thread = _hub_app_refresh_threads.get(refresh_key)
         if refresh_thread is None or not refresh_thread.is_alive():
             refresh_thread = Thread(
-                target=_refresh_hub_app,
-                args=(
-                    state,
-                    federation_id,
-                    app_id,
-                    expected_fab_hash,
-                    fleet_api_type,
-                ),
+                target=refresh,
                 daemon=True,
             )
             _hub_app_refresh_threads[refresh_key] = refresh_thread
