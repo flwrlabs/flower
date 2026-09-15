@@ -2853,14 +2853,88 @@ def test_launch_cleans_secret_if_claim_expires_during_secret_create() -> None:
 def test_prepare_launch_skips_claim_admission_when_snapshot_fails() -> None:
     """Snapshot failures must not permit another untracked launch attempt."""
     client = Mock()
-    client.list_namespaced_pod.side_effect = _KubernetesApiError(
+    client.list_namespaced_secret.side_effect = _KubernetesApiError(
         503, "service unavailable"
     )
     executor = KubernetesExecutor(client=client, config=_executor_config())
 
     assert not executor.prepare_launch(123)
 
-    client.list_namespaced_secret.assert_not_called()
+    client.list_namespaced_pod.assert_not_called()
+
+
+def test_snapshot_race_defers_replacement_until_late_pod_is_visible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A launch crossing the snapshot boundary must not leave a duplicate Pod."""
+    now = 0.0
+    client = Mock()
+    labels = {
+        **_task_labels(123),
+        LAUNCH_ATTEMPT_LABEL: _LAUNCH_ATTEMPT_ID,
+    }
+    late_pod = _pod("Pending", labels=labels, uid="late-pod-uid")
+    observed_secret = _secret(_SECRET_NAME, labels, uid="old-secret-uid")
+    task_pod_snapshots = iter([[], [late_pod]])
+    task_secret_snapshots = iter([[observed_secret], []])
+    snapshot_calls: list[str] = []
+
+    def _list_pods(*_args: object, **kwargs: object) -> dict[str, object]:
+        selector = kwargs.get("label_selector")
+        if isinstance(selector, str) and LAUNCH_ATTEMPT_LABEL in selector:
+            snapshot_calls.append("pods")
+            return {"items": next(task_pod_snapshots)}
+        return {"items": []}
+
+    def _list_secrets(*_args: object, **kwargs: object) -> dict[str, object]:
+        selector = kwargs.get("label_selector")
+        if isinstance(selector, str) and LAUNCH_ATTEMPT_LABEL in selector:
+            snapshot_calls.append("secrets")
+            return {"items": next(task_secret_snapshots)}
+        return {"items": []}
+
+    client.list_namespaced_pod.side_effect = _list_pods
+    client.list_namespaced_secret.side_effect = _list_secrets
+    monkeypatch.setattr(
+        kube, "_new_launch_attempt_id", Mock(return_value=_NEXT_LAUNCH_ATTEMPT_ID)
+    )
+    executor = KubernetesExecutor(
+        client=client, config=_executor_config(monotonic=lambda: now)
+    )
+
+    assert executor.prepare_launch(123)
+    assert snapshot_calls == ["secrets", "pods"]
+    first_result = executor.launch(_execution_spec(token="first-token"))
+
+    assert first_result.status == LaunchResultStatus.CAPACITY_REJECTED
+    client.delete_namespaced_secret.assert_called_once_with(
+        name=_SECRET_NAME,
+        namespace="flower-system",
+        body={"preconditions": {"uid": "old-secret-uid"}},
+    )
+    client.delete_namespaced_pod.assert_not_called()
+    client.create_namespaced_pod.assert_not_called()
+
+    # The normal retry snapshots and retires the Pod that appeared after the
+    # first Pod list, then creates exactly one replacement attempt.
+    now = 31.0
+    assert executor.prepare_launch(123)
+    second_result = executor.launch(_execution_spec(token="second-token"))
+
+    assert second_result.status == LaunchResultStatus.ACCEPTED
+    client.delete_namespaced_pod.assert_called_once_with(
+        name=_POD_NAME,
+        namespace="flower-system",
+        body={
+            "gracePeriodSeconds": 0,
+            "preconditions": {"uid": "late-pod-uid"},
+        },
+    )
+    client.create_namespaced_pod.assert_called_once()
+    assert (
+        client.create_namespaced_pod.call_args.args[1]["metadata"]["name"]
+        == _NEXT_POD_NAME
+    )
 
 
 def test_reclaimed_task_retires_all_prior_attempts_before_replacement(

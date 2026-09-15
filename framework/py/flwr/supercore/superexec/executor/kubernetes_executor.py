@@ -446,13 +446,16 @@ class KubernetesExecutor:
         self._prepared_launch = None
         try:
             selector = _task_attempt_label_selector(self._config, task_id)
-            pods = _object_refs(
-                self._client.list_namespaced_pod(
+            # Cold launch creates the credential Secret before its Pod. Listing
+            # in the same order lets cleanup detect a launch that crosses the
+            # snapshot boundary without assuming the two lists are atomic.
+            secrets = _object_refs(
+                self._client.list_namespaced_secret(
                     self._config.namespace, label_selector=selector
                 )
             )
-            secrets = _object_refs(
-                self._client.list_namespaced_secret(
+            pods = _object_refs(
+                self._client.list_namespaced_pod(
                     self._config.namespace, label_selector=selector
                 )
             )
@@ -707,17 +710,21 @@ class KubernetesExecutor:
                 )
                 retired_secret_names.add(secret_name)
 
-        # Remove credential Secrets whose Pod was absent from the snapshot.
+        # A missing Pod can be a true orphan or a launch still between Secret
+        # and Pod creation. Remove the Secret, but reject this launch cycle so a
+        # late Pod is visible to the next snapshot before creating a replacement.
         pod_names = {pod.name for pod in prepared.pods}
+        may_have_unobserved_pod = False
         for secret in prepared.secrets:
             if secret.name in retired_secret_names:
                 continue
             pod_name = _pod_name_from_credential_secret_name(secret.name)
             if pod_name is not None and pod_name not in pod_names:
+                may_have_unobserved_pod = True
                 cleanup_succeeded = (
                     self._delete_prepared_secret(secret) and cleanup_succeeded
                 )
-        return cleanup_succeeded, launch_deadline
+        return cleanup_succeeded and not may_have_unobserved_pod, launch_deadline
 
     def _launch_deadline_expired(self, launch_deadline: float | None) -> bool:
         """Return whether the conservative task claim deadline has passed."""
