@@ -17,7 +17,6 @@ from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 
 use_sim = sys.argv[1] == "simulation" if len(sys.argv) > 1 else False
 superlink_connection = "e2e-sim" if use_sim else "e2e"
-plugin_type_arg = "simulation" if use_sim else "serverapp"
 app_cmd = "flwr-simulation" if use_sim else "flwr-serverapp"
 SUPEREXEC_AUTH_SECRET_FILE = "_e2e_superexec_secret.bin"
 COMMAND_TIMEOUT = 30
@@ -41,7 +40,6 @@ def run_superexec(secret_path: str) -> subprocess.Popen:
     """Run the SuperExec."""
     cmd = ["flower-superexec", "--insecure"]
     cmd += ["--runtime-api-address", SUPERLINK_DEFAULT_CLIENT_ADDRESS]
-    cmd += ["--plugin-type", plugin_type_arg]
     cmd += ["--superexec-auth-secret-file", secret_path]
     return subprocess.Popen(cmd)
 
