@@ -179,25 +179,22 @@ class RuntimeAgentGrid(AgentGrid):
             ttl = cast(float | None, item.get("ttl"))
             if ttl is not None and ttl <= 0:
                 raise ValueError("Grid message TTL must be positive.")
-            outgoing.append(
-                Message(
-                    RecordDict(
-                        {
-                            AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: ConfigRecord(
-                                {
-                                    AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: (
-                                        strict_json_dumps(payload, compact=True)
-                                    )
-                                }
-                            )
-                        }
-                    ),
-                    dst_node_id=int(cast(str, item["dst_node_id"])),
-                    message_type="query",  # Replace with an AgentGrid message type.
-                    group_id="",
-                    ttl=ttl,
-                )
+            payload_json = strict_json_dumps(payload, compact=True)
+            config_record = ConfigRecord(
+                {AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: payload_json}
             )
+            content = RecordDict(
+                {AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: config_record}
+            )
+
+            message = Message(
+                content,
+                dst_node_id=int(cast(str, item["dst_node_id"])),
+                message_type="query",  # Replace with an AgentGrid message type.
+                group_id="",
+                ttl=ttl,
+            )
+            outgoing.append(message)
 
         message_ids = list(self._grid.push_messages(outgoing))
         if len(message_ids) != len(outgoing):
