@@ -247,6 +247,8 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     service_account_name : str | None
         Optional Kubernetes serviceAccountName. Service account policy/RBAC is
         decided outside this executor.
+    log_warm_executor_output : bool
+        Whether to log stdout and stderr from warm TaskExecutor exec streams.
     """
 
     namespace: str
@@ -275,6 +277,7 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     # use one SuperExec replica per owner value unless they add leader election.
     warm_executor_owner: str | None = None
     warm_executor_pools: tuple[WarmExecutorPoolConfig, ...] = ()
+    log_warm_executor_output: bool = False
     sleep: Callable[[float], None] = time.sleep
     monotonic: Callable[[], float] = time.monotonic
 
@@ -282,6 +285,8 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
         """Validate config values used to build TaskExecutor Pods."""
         if self.env is not None:
             self.env = _taskexecutor_env(self.env)
+        if not isinstance(self.log_warm_executor_output, bool):
+            raise ValueError("log_warm_executor_output must be a boolean.")
         if self.volumes is not None:
             self.volumes = _taskexecutor_volumes(self.volumes)
         if self.volume_mounts is not None:
