@@ -21,15 +21,12 @@ import random
 import time
 from typing import cast
 
-from google.protobuf.json_format import MessageToDict
-
 from flwr.agentapp import AgentEvents, AgentGrid
 from flwr.agentapp.constants import (
     AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY,
     AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY,
 )
 from flwr.app import ConfigRecord, Message, RecordDict
-from flwr.common.serde import message_to_proto
 from flwr.serverapp import Grid
 from flwr.supercore.task_process.connector.tool_schema import (
     function_tool,
@@ -58,6 +55,25 @@ def _grid_tools() -> list[JSONObject]:
                     "description": "Optional maximum number of SuperNodes to return.",
                 }
             },
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "node_ids": {
+                        "type": "array",
+                        "items": string_property(
+                            "Selected SuperNode uint64 ID as a decimal string."
+                        ),
+                        "description": "All or a random sample of available nodes.",
+                    },
+                    "num_available": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Total number of available SuperNodes.",
+                    },
+                },
+                "required": ["node_ids", "num_available"],
+                "additionalProperties": False,
+            },
         ),
         function_tool(
             "push_messages",
@@ -77,10 +93,7 @@ def _grid_tools() -> list[JSONObject]:
                                 "Destination SuperNode uint64 ID as a decimal string "
                                 "to preserve precision."
                             ),
-                            "payload": {
-                                "type": "object",
-                                "description": "JSON object to send.",
-                            },
+                            "payload": string_property("String payload to send."),
                             "ttl": {
                                 "type": "number",
                                 "exclusiveMinimum": 0,
@@ -93,6 +106,36 @@ def _grid_tools() -> list[JSONObject]:
                 },
             },
             required=["messages"],
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "results": {
+                        "type": "array",
+                        "description": "One result per input message, in order.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "message_id": {
+                                    "type": ["string", "null"],
+                                    "description": (
+                                        "Accepted message ID, or null if rejected."
+                                    ),
+                                },
+                                "error": {
+                                    "type": ["string", "null"],
+                                    "description": (
+                                        "Failure reason, or null if accepted."
+                                    ),
+                                },
+                            },
+                            "required": ["message_id", "error"],
+                            "additionalProperties": False,
+                        },
+                    }
+                },
+                "required": ["results"],
+                "additionalProperties": False,
+            },
         ),
         function_tool(
             "pull_messages",
@@ -112,6 +155,55 @@ def _grid_tools() -> list[JSONObject]:
                 },
             },
             required=["message_ids", "timeout"],
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "message_id": string_property("Reply message ID."),
+                                "reply_to_message_id": string_property(
+                                    "ID of the message this replies to."
+                                ),
+                                "src_node_id": string_property(
+                                    "Source SuperNode uint64 ID as a decimal string."
+                                ),
+                                "payload": {
+                                    "type": ["string", "null"],
+                                    "description": (
+                                        "Reply payload, or null for an error reply."
+                                    ),
+                                },
+                                "error": {
+                                    "type": ["string", "null"],
+                                    "description": (
+                                        "Error reason, or null for a content reply."
+                                    ),
+                                },
+                            },
+                            "required": [
+                                "message_id",
+                                "reply_to_message_id",
+                                "src_node_id",
+                                "payload",
+                                "error",
+                            ],
+                            "additionalProperties": False,
+                        },
+                        "description": "Replies received before the timeout.",
+                    },
+                    "pending_message_ids": {
+                        "type": "array",
+                        "items": string_property(
+                            "Requested message ID with no reply before the timeout."
+                        ),
+                    },
+                },
+                "required": ["messages", "pending_message_ids"],
+                "additionalProperties": False,
+            },
         ),
     ]
 
@@ -175,13 +267,11 @@ class RuntimeAgentGrid(AgentGrid):
 
         outgoing = []
         for item in messages:
-            payload = cast(JSONObject, item["payload"])
             ttl = cast(float | None, item.get("ttl"))
             if ttl is not None and ttl <= 0:
                 raise ValueError("Grid message TTL must be positive.")
-            payload_json = strict_json_dumps(payload, compact=True)
             config_record = ConfigRecord(
-                {AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: payload_json}
+                {AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: cast(str, item["payload"])}
             )
             content = RecordDict({AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: config_record})
 
@@ -223,10 +313,31 @@ class RuntimeAgentGrid(AgentGrid):
             if not pending or remaining <= 0:
                 break
             time.sleep(min(0.25, remaining))
+
+        messages: list[JSONObject] = []
+        for message in replies:
+            payload = None
+            error = None
+            if message.has_error():
+                error = message.error.reason
+            else:
+                payload = cast(
+                    str,
+                    message.content[AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY][
+                        AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY
+                    ],
+                )
+            messages.append(
+                {
+                    "message_id": message.metadata.message_id,
+                    "reply_to_message_id": message.metadata.reply_to_message_id,
+                    "src_node_id": str(message.metadata.src_node_id),
+                    "payload": payload,
+                    "error": error,
+                }
+            )
+
         return {
-            "messages": [
-                cast(JSONObject, MessageToDict(message_to_proto(message)))
-                for message in replies
-            ],
+            "messages": messages,
             "pending_message_ids": sorted(pending),
         }

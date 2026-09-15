@@ -32,10 +32,18 @@ def test_runtime_agent_grid_tools() -> None:
     grid.get_node_ids.return_value = [11, 22]
     grid.push_messages.return_value = ["message-1", ""]
     reply = Message(
-        RecordDict({"result": ConfigRecord({"answer": "done"})}),
+        RecordDict(
+            {
+                AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: ConfigRecord(
+                    {AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: "done"}
+                )
+            }
+        ),
         dst_node_id=0,
         message_type="query",
     )
+    reply.metadata.__dict__["_message_id"] = "reply-1"
+    reply.metadata.__dict__["_src_node_id"] = 11
     reply.metadata.__dict__["_reply_to_message_id"] = "message-1"
     grid.pull_messages.return_value = [reply]
     events = Mock()
@@ -71,9 +79,9 @@ def test_runtime_agent_grid_tools() -> None:
                 "messages": [
                     {
                         "dst_node_id": "11",
-                        "payload": {"prompt": "hi", "values": [[1, 2], [3, 4]]},
+                        "payload": "hi",
                     },
-                    {"dst_node_id": "22", "payload": {"prompt": "hello"}},
+                    {"dst_node_id": "22", "payload": "hello"},
                 ]
             },
         }
@@ -92,7 +100,7 @@ def test_runtime_agent_grid_tools() -> None:
         sent.content[AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY][
             AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY
         ]
-        == '{"prompt":"hi","values":[[1,2],[3,4]]}'
+        == "hi"
     )
 
     pulled = agent_grid.call(
@@ -102,8 +110,9 @@ def test_runtime_agent_grid_tools() -> None:
             "arguments": {"message_ids": ["message-1"], "timeout": 0},
         }
     )
-    pulled_output = pulled["output"]
-    assert isinstance(pulled_output, str)
-    assert '"replyToMessageId":"message-1"' in pulled_output
-    assert '"pending_message_ids":[]' in pulled_output
+    assert pulled["output"] == (
+        '{"messages":[{"message_id":"reply-1",'
+        '"reply_to_message_id":"message-1","src_node_id":"11",'
+        '"payload":"done","error":null}],"pending_message_ids":[]}'
+    )
     assert events.emit.call_count == 8
