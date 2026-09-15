@@ -31,7 +31,7 @@ version, pass it as the first argument:
 
 .. code-block:: shell
 
-    ./dev/bootstrap.sh 3.12.13
+    ./dev/bootstrap.sh 3.12.14
 
 Activate the created virtual environment with:
 
@@ -44,7 +44,7 @@ You can also run uv directly from the ``framework`` directory:
 .. code-block:: shell
 
     cd framework
-    uv sync --python=3.12.13 --locked --all-extras --all-groups
+    uv sync --python=3.12.14 --locked --all-extras --all-groups
 
 ****************************
  Python Versions with Pyenv
@@ -55,13 +55,13 @@ want uv to use:
 
 .. code-block:: shell
 
-    pyenv install 3.12.13
+    pyenv install 3.12.14
 
 Then pass that version to the bootstrap script:
 
 .. code-block:: shell
 
-    ./dev/bootstrap.sh 3.12.13
+    ./dev/bootstrap.sh 3.12.14
 
 *******************************
  Python Versions with Anaconda
@@ -74,6 +74,6 @@ installation instructions.
 
 .. code-block:: shell
 
-    conda create -n flower-3.12.13 python=3.12.13
-    conda activate flower-3.12.13
-    ./dev/bootstrap.sh 3.12.13
+    conda create -n flower-3.12.14 python=3.12.14
+    conda activate flower-3.12.14
+    ./dev/bootstrap.sh 3.12.14

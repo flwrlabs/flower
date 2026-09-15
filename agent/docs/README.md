@@ -13,13 +13,13 @@ framework documentation because `flwr.agentapp` is part of the `flwr` package.
 From the repository root, install the dedicated documentation environment:
 
 ```bash
-uv sync --project agent --locked --python=3.12.13
+uv sync --project agent --locked --python=3.12.14
 ```
 
 Then format-check and build the documentation:
 
 ```bash
-uv run --project agent --locked --python=3.12.13 \
+uv run --project agent --locked --python=3.12.14 \
     agent/dev/build-agent-docs.sh
 ```
 

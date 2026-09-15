@@ -5,7 +5,7 @@ pushd %~dp0
 REM Command file for Sphinx documentation
 
 if "%SPHINXBUILD%" == "" (
-	set SPHINXBUILD=uv run --project .. --locked --python=3.12.13 sphinx-build
+	set SPHINXBUILD=uv run --project .. --locked --python=3.12.14 sphinx-build
 )
 set SOURCEDIR=source
 set BUILDDIR=build
