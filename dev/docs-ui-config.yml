@@ -2,5 +2,29 @@
 
 # Announcement banner shown at the top of the docs.
 announcement:
-  enabled: false  # Set to false to hide the announcement banner.
-  html: "<a href='https://flower.ai/events/flower-ai-summit-2026/?utm_source=docs'><strong style='color: #f2b705;'>👉 Register now</strong></a> for Flower AI Summit 2026!<br />April 15-16, 🇬🇧 London"
+  enabled: true  # Set to false to hide the announcement banner.
+  html: >-
+    <style>
+      .announcement { background: #f2b705; color: #000000; }
+      .announcement-content { overflow: hidden; padding: 0; }
+      #flwr-runtime-announcement { display: block; height: 100%; min-width: 0; }
+      .flwr-event-banner { align-items: center; box-sizing: border-box; color: #000000 !important; display: flex; font-size: 0.875rem; font-weight: 500; gap: 0.75rem; height: 100%; justify-content: center; letter-spacing: 0.005em; padding: 0.5rem; text-decoration: none; width: 100%; }
+      .flwr-event-banner__headline { align-items: center; display: inline-flex; gap: 0.4rem; }
+      .flwr-event-banner__title { font-weight: 600; }
+      .flwr-event-banner__details { color: #000000; }
+      .flwr-event-banner__details::before { color: #000000; content: "·"; margin-right: 0.75rem; }
+      .flwr-event-banner:hover { background: rgb(255 255 255 / 14%); color: #000000 !important; text-decoration: none; }
+      .flwr-event-banner:hover .flwr-event-banner__title { text-decoration: underline; text-underline-offset: 0.18em; }
+      .flwr-event-banner:focus-visible { outline: 2px solid #000000; outline-offset: -3px; }
+      @media (max-width: 46em) {
+        .announcement { height: auto; min-height: var(--header-height); }
+        .announcement-content { white-space: normal; }
+        .flwr-event-banner { flex-direction: column; font-size: clamp(0.72rem, 3.2vw, 0.875rem); gap: 0.1rem; line-height: 1.35; padding: 0.55rem 0.75rem; }
+        .flwr-event-banner__headline { white-space: nowrap; }
+        .flwr-event-banner__details::before { display: none; }
+      }
+    </style>
+    <a class='flwr-event-banner' href='https://luma.com/flwrlabs-uygg'>
+      <span class='flwr-event-banner__headline'><span class='flwr-event-banner__title'>Flower AI Day 2026</span><span>—</span><span>Collaborative Superintelligence</span></span>
+      <span class='flwr-event-banner__details'>San Francisco · September 30</span>
+    </a>
