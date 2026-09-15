@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterator
 from typing import cast
 
 from fastapi import Depends, Request
@@ -264,11 +264,11 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
                 content=result.SerializeToString(), media_type=PROTOBUF_MEDIA_TYPE
             )
 
-        # Synchronous generators and other iterables are streamed lazily too.
+        # Synchronous iterators are streamed lazily.
         # Starlette advances a synchronous iterator outside the event loop.
-        if isinstance(result, Iterable):
+        if isinstance(result, Iterator):
             content = (
-                frame_message(message) for message in cast(Iterable[Message], result)
+                frame_message(message) for message in cast(Iterator[Message], result)
             )
             return CancellableProtobufStreamingResponse(
                 content,
@@ -279,7 +279,7 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         raise FlowerError(
             ApiErrorCode.INVALID_HANDLER_RESPONSE,
             "Invalid response returned from Control handler: expected a protobuf "
-            "Message or Iterable[Message], got "
+            "Message or Iterator[Message], got "
             f"{result!r} ({type(result).__name__})",
         )
 

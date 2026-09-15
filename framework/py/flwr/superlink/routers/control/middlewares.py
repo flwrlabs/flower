@@ -15,7 +15,7 @@
 """Middleware for the Control API."""
 
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 from typing import cast
 
 from fastapi import Request
@@ -137,10 +137,10 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
 
         result = getattr(request.state, "protobuf_response", None)
         # A protobuf Message is a unary response and must be checked before the
-        # iterable protocols, following ProtobufTranslationMiddleware's dispatch.
+        # iterator protocol, following ProtobufTranslationMiddleware's dispatch.
         if isinstance(result, Message):
             await run_in_threadpool(write_after_event, result)
-        elif isinstance(result, Iterable):
+        elif isinstance(result, Iterator):
 
             def logged_stream() -> Iterator[Message]:
                 """Write the after-event once stream iteration terminates."""
@@ -148,7 +148,7 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
                 error: BaseException | None = None
                 try:
                     # pylint: disable=use-yield-from
-                    for stream_response in cast(Iterable[Message], result):
+                    for stream_response in cast(Iterator[Message], result):
                         yield stream_response
                 except BaseException as exc:
                     error = exc
@@ -195,7 +195,7 @@ class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        """Authenticate the request and store its account on the request state."""
+        """Authenticate the request and store the account on the request state."""
         if not _is_control_path(request.url.path) or _is_control_auth_route(request):
             return await call_next(request)
 
