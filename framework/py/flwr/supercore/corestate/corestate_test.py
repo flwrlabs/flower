@@ -118,7 +118,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type, app.is_hub_app) for app in apps],
             [
-                ("@me/z-agent", "", TaskType.AGENT_APP, True),
+                ("@me/z-agent", agent_hash, TaskType.AGENT_APP, True),
                 ("@me/server", server_hash, TaskType.SERVER_APP, False),
             ],
         )
@@ -147,10 +147,35 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         updated = state.list_apps("@me/fed-a")
         self.assertEqual(len(updated), 2)
-        self.assertEqual(updated[1].fab_hash, "")
+        self.assertEqual(updated[1].fab_hash, updated_hash)
         self.assertTrue(updated[1].is_hub_app)
         self.assertIsNone(state.get_app("@me/fed-a", "@me/server", server_hash))
-        self.assertIsNone(state.get_app("@me/fed-a", "@me/server", updated_hash))
+        self.assertEqual(
+            state.get_app("@me/fed-a", "@me/server", updated_hash),
+            Fab(updated_hash, b"updated", {}),
+        )
+        refreshed_hash = state.store_fab(Fab("", b"refreshed", {}))
+        self.assertTrue(
+            state.update_hub_app(
+                "@me/fed-a",
+                "@me/server",
+                updated_hash,
+                refreshed_hash,
+                TaskType.AGENT_APP,
+            )
+        )
+        cached = state.get_hub_app("@me/fed-a", "@me/server")
+        self.assertEqual(cached[0].hash_str if cached else None, refreshed_hash)
+        self.assertEqual(state.list_apps("@me/fed-a")[1].app_type, TaskType.AGENT_APP)
+        self.assertFalse(
+            state.update_hub_app(
+                "@me/fed-a",
+                "@me/server",
+                updated_hash,
+                refreshed_hash,
+                TaskType.AGENT_APP,
+            )
+        )
 
         self.assertTrue(state.delete_app("@me/fed-a", "@me/server"))
         self.assertFalse(state.delete_app("@me/fed-a", "@me/server"))
@@ -626,6 +651,24 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(run_series[0].description, "Initial description")
         self.assertEqual(state.get_run_series(is_agent=True), run_series)
         self.assertEqual(state.get_run_series(is_agent=False), [])
+
+    def test_set_run_series_description(self) -> None:
+        """A valid RunSeries description can be changed."""
+        state = self.state_factory()
+        series_id = state.store_run_in_series(
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=True,
+            series_id=None,
+            description="Initial description",
+        )
+        assert series_id is not None
+
+        self.assertIsNone(
+            state.set_run_series_description(series_id, "  Generated title  ")
+        )
+        updated = state.get_run_series(series_ids=[series_id])[0]
+        self.assertEqual(updated.description, "Generated title")
 
     def test_store_run_in_series_returns_none_for_unknown_id(self) -> None:
         """Unknown caller-provided run series IDs return None."""

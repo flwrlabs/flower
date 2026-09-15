@@ -30,7 +30,13 @@ import grpc
 from parameterized import parameterized
 
 from flwr.app import ConfigRecord, Context, RecordDict
-from flwr.common.constant import NOOP_ACCOUNT_NAME, SUPERLINK_NODE_ID, Status, SubStatus
+from flwr.common.constant import (
+    NOOP_ACCOUNT_NAME,
+    NOOP_FLWR_AID,
+    SUPERLINK_NODE_ID,
+    Status,
+    SubStatus,
+)
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -807,9 +813,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         assert response.HasField("note")
         assert response.note
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
+        fab_hash = hashlib.sha256(b"test FAB content 123456").hexdigest()
         self.assertEqual(
             [(app.app_id, app.fab_hash) for app in apps],
-            [("@anne-dev/simple-legacy-127", "")],
+            [("@anne-dev/simple-legacy-127", fab_hash)],
         )
         self.assertTrue(apps[0].is_hub_app)
 
@@ -1035,8 +1042,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual([entry.series_id for entry in agent_response.entries], [1])
         self.assertEqual([entry.series_id for entry in non_agent_response.entries], [2])
 
-    def test_get_run_series_returns_context(self) -> None:
-        """Test GetRunSeries returns series metadata and shared Context."""
+    def test_get_run_series_returns_context_and_runs(self) -> None:
+        """Test GetRunSeries returns its context and runs."""
         # Prepare
         series_id = 10
         run_id = self._create_dummy_run(self.aid)
@@ -1061,6 +1068,12 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(response.series.last_run_status.status, Status.PENDING)
         self.assertTrue(response.HasField("context"))
         self.assertEqual(response.context.series_id, series_id)
+        self.assertEqual(len(response.runs), 1)
+        self.assertEqual(response.runs[0].run_id, run_id)
+        self.assertTrue(response.runs[0].pending_at)
+        self.assertFalse(response.runs[0].starting_at)
+        self.assertFalse(response.runs[0].running_at)
+        self.assertFalse(response.runs[0].finished_at)
 
     def test_get_run_series_raises_for_unknown_series(self) -> None:
         """Test GetRunSeries raises for unknown RunSeries IDs."""
@@ -1264,9 +1277,16 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         """Test ShowFederation method of ControlServicer."""
         # Prepare
         request = ShowFederationRequest(federation_name=NOOP_FEDERATION_ID)
+        details = self.state.federation_manager.get_details(NOOP_FEDERATION_ID)
+        details.member_count = 7
 
         # Execute
-        response: ShowFederationResponse = self.servicer.ShowFederation(request, Mock())
+        with patch.object(
+            self.state.federation_manager, "get_details", return_value=details
+        ):
+            response: ShowFederationResponse = self.servicer.ShowFederation(
+                request, Mock()
+            )
         retrieved_timestamp = datetime.fromisoformat(response.now).timestamp()
 
         # Assert
@@ -1275,9 +1295,24 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(response.federation.simulation)
         self.assertFalse(response.federation.can_invite_members)
         self.assertFalse(response.federation.can_add_supernodes)
+        self.assertEqual(response.federation.member_count, 7)
 
-    def test_list_federations_includes_simulation_flag(self) -> None:
-        """Test ListFederations surfaces the federation simulation flag."""
+    def test_show_federation_falls_back_to_preview_size(self) -> None:
+        """Test ShowFederation derives a count when the manager omits one."""
+        details = self.state.federation_manager.get_details(NOOP_FEDERATION_ID)
+        details.member_count = None
+
+        with patch.object(
+            self.state.federation_manager, "get_details", return_value=details
+        ):
+            response = self.servicer.ShowFederation(
+                ShowFederationRequest(federation_name=NOOP_FEDERATION_ID), Mock()
+            )
+
+        self.assertEqual(response.federation.member_count, len(details.members))
+
+    def test_list_federations_includes_summary_fields(self) -> None:
+        """Test ListFederations surfaces federation summary fields."""
         objectstore_factory = Mock(store=Mock(return_value=self.store))
         servicer = ControlServicer(
             linkstate_factory=LinkStateFactory(
@@ -1294,9 +1329,32 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         )
 
         self.assertEqual(len(response.federations), 1)
+        self.assertEqual(len(response.federations[0].members), 1)
+        self.assertEqual(
+            response.federations[0].members[0].account.name, NOOP_ACCOUNT_NAME
+        )
+        self.assertEqual(response.federations[0].members[0].account.id, NOOP_FLWR_AID)
+        self.assertEqual(response.federations[0].members[0].role, "owner")
+        self.assertEqual(response.federations[0].member_count, 1)
         self.assertTrue(response.federations[0].simulation)
         self.assertFalse(response.federations[0].can_invite_members)
         self.assertFalse(response.federations[0].can_add_supernodes)
+
+    def test_federation_member_count_wire_round_trip(self) -> None:
+        """Test member count presence and value survive protobuf serialization."""
+        response = ListFederationsResponse()
+        response.federations.add()
+        federation_with_count = response.federations.add(member_count=300)
+
+        serialized_federation = federation_with_count.SerializeToString(
+            deterministic=True
+        )
+        round_tripped = ListFederationsResponse.FromString(response.SerializeToString())
+
+        self.assertEqual(serialized_federation, b"\x58\xac\x02")
+        self.assertFalse(round_tripped.federations[0].HasField("member_count"))
+        self.assertTrue(round_tripped.federations[1].HasField("member_count"))
+        self.assertEqual(round_tripped.federations[1].member_count, 300)
 
     def test_create_federation_success(self) -> None:
         """Test CreateFederation succeeds when federation_manager.create_federation
@@ -1317,6 +1375,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             id=expected_fed_id,
             description=description,
             members=mock_members,
+            member_count=7,
             simulation=True,
             can_invite_members=True,
             can_add_supernodes=True,
@@ -1369,6 +1428,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(response.federation.members), 1)
         self.assertEqual(response.federation.members[0].account.id, self.aid)
         self.assertEqual(response.federation.members[0].role, "owner")
+        self.assertEqual(response.federation.member_count, 7)
         self.assertTrue(response.federation.simulation)
         self.assertTrue(response.federation.can_invite_members)
         self.assertTrue(response.federation.can_add_supernodes)

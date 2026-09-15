@@ -156,18 +156,24 @@ class TestHandleTask(unittest.TestCase):
         assert secret not in "".join(traceback.format_exception(error.exception))
         assert error.exception.__context__ is None
 
-    def test_exposes_secret_safe_provider_errors(self) -> None:
-        """Credential-backed providers should return actionable safe errors."""
+    def test_exposes_provider_error_details(self) -> None:
+        """Credential-backed providers should return readable error details."""
         self._configure_connector("notion", connector_ref="notion")
-        self.provider.side_effect = NotionTestApiError("validation_error", 400)
+        self.provider.side_effect = NotionTestApiError(
+            "validation_error", 400, "Participants must be email addresses"
+        )
 
         with self.assertRaisesRegex(
             RuntimeError,
-            r"Notion API request failed: validation_error \(400\)\.",
+            r"Notion API request failed: validation_error \(400\): "
+            r"Participants must be email addresses\.",
         ):
             handle_task(client=self.stub, task_id=22, run_id=7)
 
         assert _pushed_response(self.stub).payload["error"] == {
             "code": "connector_error",
-            "message": "Notion API request failed: validation_error (400).",
+            "message": (
+                "Notion API request failed: validation_error (400): "
+                "Participants must be email addresses."
+            ),
         }

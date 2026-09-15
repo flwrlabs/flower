@@ -14,15 +14,16 @@
 # ==============================================================================
 """Common Flower arguments."""
 
-
 import argparse
+import re
 import sys
+from io import BufferedReader
 from logging import DEBUG, ERROR, INFO, WARN
 from os.path import isfile
 from pathlib import Path
 from typing import cast
 
-from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
+from flwr.common.constant import FLWR_TASK_TOKEN_LENGTH, RUNTIME_DEPENDENCY_INSTALL
 from flwr.supercore import log
 
 
@@ -65,7 +66,9 @@ def add_args_runtime_dependency_install(
     )
 
 
-def add_args_flwr_app_common(parser: argparse.ArgumentParser) -> None:
+def add_args_flwr_app_common(
+    parser: argparse.ArgumentParser, *, include_token_stdin: bool = False
+) -> None:
     """Add common Flower arguments for flwr-*app to the provided parser."""
     token_group = parser.add_mutually_exclusive_group(required=True)
     token_group.add_argument(
@@ -81,6 +84,12 @@ def add_args_flwr_app_common(parser: argparse.ArgumentParser) -> None:
             "for each app execution"
         ),
     )
+    if include_token_stdin:
+        token_group.add_argument(
+            "--token-stdin",
+            action="store_true",
+            help=argparse.SUPPRESS,
+        )
     parser.add_argument(
         "--insecure",
         action="store_true",
@@ -107,7 +116,10 @@ def add_args_flwr_app_common(parser: argparse.ArgumentParser) -> None:
 
 
 def try_obtain_flwr_app_token(args: argparse.Namespace) -> str:
-    """Validate and return the token from CLI args or a token file."""
+    """Validate and return the token from a CLI argument, file, or standard input."""
+    if bool(getattr(args, "token_stdin", False)):
+        return _try_obtain_flwr_app_token_from_stdin()
+
     token = cast(str | None, getattr(args, "token", None))
     if token is not None:
         token = token.strip()
@@ -130,6 +142,35 @@ def try_obtain_flwr_app_token(args: argparse.Namespace) -> str:
     return token
 
 
+_TASK_TOKEN_PATTERN = re.compile(rf"[0-9a-f]{{{FLWR_TASK_TOKEN_LENGTH * 2}}}")
+_TOKEN_STDIN_READ_LIMIT = FLWR_TASK_TOKEN_LENGTH * 2 + 2
+
+
+def _try_obtain_flwr_app_token_from_stdin() -> str:
+    """Return one bounded task token received over standard input."""
+    try:
+        token_bytes = bytearray()
+        token_stdin = cast(BufferedReader, sys.stdin.buffer)
+        while b"\n" not in token_bytes and len(token_bytes) < _TOKEN_STDIN_READ_LIMIT:
+            chunk = token_stdin.read1(_TOKEN_STDIN_READ_LIMIT - len(token_bytes))
+            if not chunk:
+                break
+            token_bytes.extend(chunk)
+        token_input = token_bytes.decode("ascii")
+    except (AttributeError, OSError, UnicodeError):
+        sys.exit("Standard input does not contain exactly one valid task token.")
+    finally:
+        try:
+            sys.stdin.close()
+        except OSError:
+            pass
+
+    token = token_input.removesuffix("\n")
+    if _TASK_TOKEN_PATTERN.fullmatch(token) is None:
+        sys.exit("Standard input does not contain exactly one valid task token.")
+    return token
+
+
 def try_obtain_root_certificates(
     args: argparse.Namespace,
     grpc_server_address: str,
@@ -146,7 +187,7 @@ def try_obtain_root_certificates(
             )
         log(
             WARN,
-            "Option `--insecure` was set. Starting insecure HTTP channel to %s.",
+            "Option `--insecure` was set. Starting insecure channel to %s.",
             grpc_server_address,
         )
         root_certificates = None
@@ -191,8 +232,7 @@ def try_obtain_server_certificates(
     if args.ssl_certfile or args.ssl_keyfile or args.ssl_ca_certfile:
         sys.exit(
             "You need to provide valid file paths to `--ssl-certfile`, "
-            "`--ssl-keyfile`, and `—-ssl-ca-certfile` to create a secure "
-            "connection in Fleet API server (gRPC-rere)."
+            "`--ssl-keyfile`, and `—-ssl-ca-certfile` to host an SSL-enabled server."
         )
     log(
         ERROR,

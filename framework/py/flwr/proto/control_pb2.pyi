@@ -451,18 +451,22 @@ class GetRunSeriesResponse(google.protobuf.message.Message):
 
     SERIES_FIELD_NUMBER: builtins.int
     CONTEXT_FIELD_NUMBER: builtins.int
+    RUNS_FIELD_NUMBER: builtins.int
     @property
     def series(self) -> flwr.proto.runseries_pb2.RunSeries: ...
     @property
     def context(self) -> flwr.proto.message_pb2.Context: ...
+    @property
+    def runs(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.run_pb2.Run]: ...
     def __init__(
         self,
         *,
         series: flwr.proto.runseries_pb2.RunSeries | None = ...,
         context: flwr.proto.message_pb2.Context | None = ...,
+        runs: collections.abc.Iterable[flwr.proto.run_pb2.Run] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["context", b"context", "series", b"series"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["context", b"context", "series", b"series"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["context", b"context", "runs", b"runs", "series", b"series"]) -> None: ...
 
 global___GetRunSeriesResponse = GetRunSeriesResponse
 
@@ -1444,3 +1448,38 @@ class StreamRunEventsResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["task_event", b"task_event"]) -> None: ...
 
 global___StreamRunEventsResponse = StreamRunEventsResponse
+
+@typing.final
+class UpdateRunSeriesDescriptionRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SERIES_ID_FIELD_NUMBER: builtins.int
+    DESCRIPTION_FIELD_NUMBER: builtins.int
+    series_id: builtins.int
+    description: builtins.str
+    def __init__(
+        self,
+        *,
+        series_id: builtins.int = ...,
+        description: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["description", b"description", "series_id", b"series_id"]) -> None: ...
+
+global___UpdateRunSeriesDescriptionRequest = UpdateRunSeriesDescriptionRequest
+
+@typing.final
+class UpdateRunSeriesDescriptionResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SERIES_FIELD_NUMBER: builtins.int
+    @property
+    def series(self) -> flwr.proto.runseries_pb2.RunSeries: ...
+    def __init__(
+        self,
+        *,
+        series: flwr.proto.runseries_pb2.RunSeries | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["series", b"series"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["series", b"series"]) -> None: ...
+
+global___UpdateRunSeriesDescriptionResponse = UpdateRunSeriesDescriptionResponse

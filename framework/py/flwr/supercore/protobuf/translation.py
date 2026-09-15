@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterator
 from typing import cast
 
 from fastapi import Depends, Request
@@ -63,6 +63,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsRequest,
     StreamRunEventsRequest,
     UnregisterNodeRequest,
+    UpdateRunSeriesDescriptionRequest,
 )
 from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
@@ -75,6 +76,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     GetConnectorRequest,
     GetNodesRequest,
+    GetRunSeriesEventsRequest,
     PullAppMessagesRequest,
     PullPendingTasksRequest,
     PullTaskInputRequest,
@@ -105,6 +107,10 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/control/list-runs"): ListRunsRequest,
     ("POST", "/v1/control/list-run-series"): ListRunSeriesRequest,
     ("POST", "/v1/control/get-run-series"): GetRunSeriesRequest,
+    (
+        "POST",
+        "/v1/control/update-run-series-description",
+    ): UpdateRunSeriesDescriptionRequest,
     ("POST", "/v1/control/list-run-series-events"): ListRunSeriesEventsRequest,
     ("POST", "/v1/control/stop-run"): StopRunRequest,
     ("POST", "/v1/control/start-automation"): StartAutomationRequest,
@@ -163,6 +169,7 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/runtime/start-automation"): StartAutomationRequest,
     ("POST", "/v1/runtime/push-task-message"): PushTaskMessageRequest,
     ("POST", "/v1/runtime/push-task-events"): PushTaskEventsRequest,
+    ("POST", "/v1/runtime/get-run-series-events"): GetRunSeriesEventsRequest,
     ("POST", "/v1/runtime/pull-task-message"): PullTaskMessageRequest,
     ("POST", "/v1/runtime/record-task-usage"): RecordTaskUsageRequest,
     ("POST", "/v1/runtime/get-connector"): GetConnectorRequest,
@@ -257,11 +264,11 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
                 content=result.SerializeToString(), media_type=PROTOBUF_MEDIA_TYPE
             )
 
-        # Synchronous generators and other iterables are streamed lazily too.
+        # Synchronous iterators are streamed lazily.
         # Starlette advances a synchronous iterator outside the event loop.
-        if isinstance(result, Iterable):
+        if isinstance(result, Iterator):
             content = (
-                frame_message(message) for message in cast(Iterable[Message], result)
+                frame_message(message) for message in cast(Iterator[Message], result)
             )
             return CancellableProtobufStreamingResponse(
                 content,
@@ -272,7 +279,7 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         raise FlowerError(
             ApiErrorCode.INVALID_HANDLER_RESPONSE,
             "Invalid response returned from Control handler: expected a protobuf "
-            "Message or Iterable[Message], got "
+            "Message or Iterator[Message], got "
             f"{result!r} ({type(result).__name__})",
         )
 

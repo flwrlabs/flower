@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fl-tabular"
-version = "1.1.10"
+version = "1.1.11"
 description = "Adult Census Income Tabular Dataset and Federated Learning in Flower"
 license = { file = "LICENSE" }
 dependencies = [
-    "flwr[simulation]>=1.28.0",
-    "flwr-datasets>=0.6.0",
+    "flwr[simulation]>=1.36.0",
+    "flwr-datasets>=0.6.1",
     "torch==2.10.0",
     "scikit-learn==1.7.1",
 ]

@@ -12,4 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""FastAPI dependencies for SuperNode."""
+"""Tests for the inert warm executor process."""
+
+from pathlib import Path
+from threading import Event
+from typing import cast
+from unittest.mock import Mock
+
+from .warm_executor import run_warm_executor
+
+
+def test_run_warm_executor_reports_ready_and_cleans_up(tmp_path: Path) -> None:
+    """Test the marker represents a live process waiting for termination."""
+    ready_file = tmp_path / "ready"
+    stop_event = Mock()
+
+    def assert_ready() -> None:
+        assert ready_file.is_file()
+
+    stop_event.wait.side_effect = assert_ready
+
+    run_warm_executor(ready_file, cast(Event, stop_event))
+
+    stop_event.wait.assert_called_once_with()
+    assert not ready_file.exists()

@@ -14,6 +14,7 @@
 # ==============================================================================
 """Abstract base class CoreState."""
 
+# pylint: disable=too-many-lines
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -38,6 +39,10 @@ from ..object_store import ObjectStore
 
 class CoreState(ABC):  # pylint: disable=R0904
     """Abstract base class for core state."""
+
+    @abstractmethod
+    def get_node_id(self) -> int:
+        """Return the ID of the node owning this CoreState."""
 
     @property
     @abstractmethod
@@ -120,24 +125,23 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab | None,
+        fab: Fab,
         federation_id: str,
         app_id: str,
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
     ) -> str:
-        """Store an optional FAB and associate its app with a federation.
+        """Store a FAB and associate its app with a federation.
 
         A federation has at most one association for each app ID. Storing the app
-        again updates its FAB hash, when applicable, and type while preserving when
-        and by whom it was first added.
+        again updates its FAB hash and type while preserving when and by whom it was
+        first added.
 
         Parameters
         ----------
-        fab : Fab | None
-            FAB content and verification metadata to store. Required for custom
-            apps and optional for Hub apps.
+        fab : Fab
+            FAB content and verification metadata to store.
         federation_id : str
             ID of the federation to associate with the app.
         app_id : str
@@ -153,8 +157,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         Returns
         -------
         str
-            Canonical SHA-256 hash of the stored FAB, or an empty string when no
-            FAB was provided.
+            Canonical SHA-256 hash of the stored FAB.
         """
 
     @abstractmethod
@@ -164,6 +167,23 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def get_app(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
         """Return a FAB only when it matches the federation-app association."""
+
+    @abstractmethod
+    def get_hub_app(
+        self, federation_id: str, app_id: str
+    ) -> tuple[Fab, datetime] | None:
+        """Return the cached Hub FAB and its last update time, if present."""
+
+    @abstractmethod
+    def update_hub_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        federation_id: str,
+        app_id: str,
+        previous_fab_hash: str,
+        fab_hash: str,
+        app_type: str,
+    ) -> bool:
+        """Update a Hub app if it still points to the previous FAB."""
 
     @abstractmethod
     def list_apps(
@@ -381,6 +401,20 @@ class CoreState(ABC):  # pylint: disable=R0904
         -------
         Sequence[RunSeries]
             RunSeries records ordered by `updated_at` descending.
+        """
+
+    @abstractmethod
+    def set_run_series_description(self, series_id: int, description: str) -> None:
+        """Set the description of an existing RunSeries.
+
+        Empty descriptions are ignored and do not update the RunSeries.
+
+        Parameters
+        ----------
+        series_id : int
+            The ID of the RunSeries to update.
+        description : str
+            The non-empty description to store.
         """
 
     @abstractmethod

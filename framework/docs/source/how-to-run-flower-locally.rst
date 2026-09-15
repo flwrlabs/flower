@@ -29,17 +29,17 @@ different directory.
  What Flower starts for you
 ****************************
 
-On the first command that needs the local Control API (e.g. ``flwr run``, ``flwr list``,
-etc.), Flower starts a local ``flower-superlink`` process automatically. That process:
+On the first command that needs the local HTTP Control API (e.g. ``flwr run``, ``flwr
+list``, etc.), Flower starts a local ``flower-superlink`` process automatically. That
+process:
 
-- listens on ``127.0.0.1:39093`` for the Control API
-- binds the Runtime API to a free local port chosen by the OS
+- serves the Control and Runtime APIs over HTTP on ``127.0.0.1:39091``
 - keeps running in the background after your command finishes
 - is reused by later ``flwr run``, ``flwr list``, ``flwr log``, and ``flwr stop``
   commands
 
-You can override the default Control API port with the ``FLWR_LOCAL_CONTROL_API_PORT``
-environment variable.
+You can override the default HTTP API port with the
+``FLWR_LOCAL_SUPERLINK_HTTP_API_PORT`` environment variable.
 
 *********************************
  Runtime dependency installation
@@ -72,7 +72,7 @@ Representative output:
 
 .. code-block:: text
 
-    Starting local SuperLink on 127.0.0.1:39093...
+    Starting local SuperLink on 127.0.0.1:39091...
     Successfully started run 1859953118041441032
 
 Plain ``flwr run .`` submits the run, prints the run ID, and returns. If you want to
@@ -171,13 +171,13 @@ Inspect the process:
 
 .. code-block:: shell
 
-    $ ps aux | grep '[f]lower-superlink.*--control-api-address 127.0.0.1:39093'
+    $ ps aux | grep '[f]lower-superlink.*--port 39091'
 
 Stop the process:
 
 .. code-block:: shell
 
-    $ pkill -f 'flower-superlink.*--control-api-address 127.0.0.1:39093'
+    $ pkill -f 'flower-superlink.*--port 39091'
 
 Windows PowerShell
 ==================
@@ -188,7 +188,7 @@ Inspect the process:
 
     PS> Get-CimInstance Win32_Process |
     >>   Where-Object {
-    >>     $_.CommandLine -like '*flower-superlink*--control-api-address 127.0.0.1:39093*'
+    >>     $_.CommandLine -like '*flower-superlink*--port 39091*'
     >>   } |
     >>   Select-Object ProcessId, CommandLine
 
@@ -198,12 +198,12 @@ Stop the process:
 
     PS> Get-CimInstance Win32_Process |
     >>   Where-Object {
-    >>     $_.CommandLine -like '*flower-superlink*--control-api-address 127.0.0.1:39093*'
+    >>     $_.CommandLine -like '*flower-superlink*--port 39091*'
     >>   } |
     >>   ForEach-Object { Stop-Process -Id $_.ProcessId }
 
-If you changed the local Control API port with ``FLWR_LOCAL_CONTROL_API_PORT``, replace
-``39093`` in the commands above.
+If you changed the local HTTP API port with ``FLWR_LOCAL_SUPERLINK_HTTP_API_PORT``,
+replace ``39091`` in the commands above.
 
 *****************
  Troubleshooting
