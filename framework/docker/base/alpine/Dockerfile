@@ -23,7 +23,7 @@
 # https://pythonspeed.com/articles/multi-stage-docker-python/
 
 # hadolint global ignore=DL3018
-ARG PYTHON_VERSION=3.11
+ARG PYTHON_VERSION=3.12
 ARG DISTRO=alpine
 ARG DISTRO_VERSION=3.22
 FROM python:${PYTHON_VERSION}-${DISTRO}${DISTRO_VERSION} AS compile

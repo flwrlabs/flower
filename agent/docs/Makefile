@@ -5,7 +5,7 @@
 # from the environment for the first four.
 SPHINXOPTS    ?= -W --keep-going
 UV            ?= uv
-PYTHON_VERSION ?= 3.11.14
+PYTHON_VERSION ?= 3.12.13
 UVRUN         ?= $(UV) run --project .. --locked --python=$(PYTHON_VERSION)
 SPHINXBUILD   ?= $(UVRUN) sphinx-build
 PYTHON        ?= $(UVRUN) python

@@ -11,13 +11,9 @@ not need to create a separate project environment.
  Python Version
 ****************
 
-Flower requires at least `Python 3.11 <https://docs.python.org/3.11/>`_.
-
-.. note::
-
-    Due to a known incompatibility with `ray <https://docs.ray.io/en/latest/>`_, we
-    currently recommend utilizing at most `Python 3.11 <https://docs.python.org/3.11/>`_
-    for running Flower simulations.
+Flower requires at least `Python 3.11 <https://docs.python.org/3.11/>`_. For
+development, we recommend `Python 3.12 <https://docs.python.org/3.12/>`_, the current
+default version used in the Flower repository and CI.
 
 ********************
  Virtualenv with uv
@@ -35,7 +31,7 @@ version, pass it as the first argument:
 
 .. code-block:: shell
 
-    ./dev/bootstrap.sh 3.11.14
+    ./dev/bootstrap.sh 3.12.13
 
 Activate the created virtual environment with:
 
@@ -48,7 +44,7 @@ You can also run uv directly from the ``framework`` directory:
 .. code-block:: shell
 
     cd framework
-    uv sync --python=3.11.14 --locked --all-extras --all-groups
+    uv sync --python=3.12.13 --locked --all-extras --all-groups
 
 ****************************
  Python Versions with Pyenv
@@ -59,13 +55,13 @@ want uv to use:
 
 .. code-block:: shell
 
-    pyenv install 3.11.14
+    pyenv install 3.12.13
 
 Then pass that version to the bootstrap script:
 
 .. code-block:: shell
 
-    ./dev/bootstrap.sh 3.11.14
+    ./dev/bootstrap.sh 3.12.13
 
 *******************************
  Python Versions with Anaconda
@@ -78,6 +74,6 @@ installation instructions.
 
 .. code-block:: shell
 
-    conda create -n flower-3.11.14 python=3.11.14
-    conda activate flower-3.11.14
-    ./dev/bootstrap.sh 3.11.14
+    conda create -n flower-3.12.13 python=3.12.13
+    conda activate flower-3.12.13
+    ./dev/bootstrap.sh 3.12.13

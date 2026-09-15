@@ -133,7 +133,7 @@ follow_imports = "skip"
 follow_imports_for_stubs = true
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
 line-length = 88
 exclude = [
     ".bzr",

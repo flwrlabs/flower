@@ -10,7 +10,7 @@ Four datasets have been selected for this evaluation: [PubMedQA](https://hugging
 git clone --depth=1 https://github.com/flwrlabs/flower.git && mv flower/benchmarks/flowertune-llm/evaluation/medical ./flowertune-eval-medical && rm -rf flower && cd flowertune-eval-medical
 ```
 
-Create a new Python environment (we recommend Python 3.11), activate it, then install dependencies with:
+Create a new Python environment (we recommend Python 3.12), activate it, then install dependencies with:
 
 ```shell
 # From a new python environment, run:

@@ -204,7 +204,7 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' }}
         uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - name: Install build tools
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: |
@@ -442,7 +442,7 @@ jobs:
       fail-fast: false
       matrix:
         numpy-version: ["1.26"]
-        python-version: ["3.11"]
+        python-version: ["3.12"]
         directory: [e2e-bare-auth]
         connection: [insecure]
         engine: [deployment-engine, simulation-engine]
@@ -501,7 +501,7 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' }}
         uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - name: Install build tools
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: python -m pip install -U pip==26.0.1
@@ -524,7 +524,7 @@ jobs:
     strategy:
       matrix:
         engine: [deployment, simulation]
-        python-version: ["3.11"]
+        python-version: ["3.12"]
 
     if: ${{ needs.changes.outputs.framework == 'true' }}
     name: ServerApp/run heartbeat test with ${{ matrix.engine }} runtime / Python ${{ matrix.python-version }}

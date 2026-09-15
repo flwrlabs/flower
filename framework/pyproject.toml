@@ -236,7 +236,7 @@ module = "flwr.proto.*"
 warn_unused_ignores = false
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
 line-length = 88
 exclude = [
     ".bzr",

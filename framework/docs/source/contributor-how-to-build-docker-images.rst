@@ -52,7 +52,7 @@ environment.
     - - ``PYTHON_VERSION``
       - Version of ``python`` to be installed.
       - No
-      - ``3.11`` or ``3.11.1``
+      - ``3.12`` or ``3.12.1``
     - - ``PIP_VERSION``
       - Version of ``pip`` to be installed.
       - Yes
@@ -77,7 +77,7 @@ environment.
       - No
       - `Direct Reference Examples`_
 
-The following example creates a base Ubuntu/Alpine image with Python ``3.11.0``, pip
+The following example creates a base Ubuntu/Alpine image with Python ``3.12.14``, pip
 :substitution-code:`|pip_version|`, setuptools :substitution-code:`|setuptools_version|`
 and Flower :substitution-code:`|stable_flwr_version|`:
 
@@ -86,7 +86,7 @@ and Flower :substitution-code:`|stable_flwr_version|`:
 
     $ cd framework/docker/base/<ubuntu|alpine>
     $ docker build \
-      --build-arg PYTHON_VERSION=3.11.0 \
+      --build-arg PYTHON_VERSION=3.12.14 \
       --build-arg FLWR_VERSION=|stable_flwr_version| \
       --build-arg PIP_VERSION=|pip_version| \
       --build-arg SETUPTOOLS_VERSION=|setuptools_version| \
@@ -115,9 +115,9 @@ needs. These values serve as examples only.
     - - ``BASE_IMAGE``
       - The Tag of the Flower base image.
       - Yes
-      - :substitution-code:`|stable_flwr_version|-py3.11-ubuntu|ubuntu_version|`
+      - :substitution-code:`|stable_flwr_version|-py3.12-ubuntu|ubuntu_version|`
 
-For example, to build a SuperLink image with the latest Flower version, Python 3.11 and
+For example, to build a SuperLink image with the latest Flower version, Python 3.12 and
 Ubuntu 22.04, run the following:
 
 .. code-block:: bash
@@ -125,7 +125,7 @@ Ubuntu 22.04, run the following:
 
     $ cd framework/docker/superlink
     $ docker build \
-      --build-arg BASE_IMAGE=|stable_flwr_version|-py3.11-ubuntu22.04 \
+      --build-arg BASE_IMAGE=|stable_flwr_version|-py3.12-ubuntu22.04 \
       -t flwr_superlink:0.1.0 .
 
 If you want to use your own base image instead of the official Flower base image, all
