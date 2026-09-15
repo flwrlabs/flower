@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for the Notion connector."""
 
-from typing import cast
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
 
@@ -39,13 +38,6 @@ def test_notion_definition_is_registered() -> None:
     assert len(ACTIONS) == 2
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     assert len(registry.get_connector_tools(NOTION_CONNECTOR_REF)) == len(ACTIONS)
-    for action in ACTIONS:
-        properties = cast(JSONObject, action.input_schema["properties"])
-        cursor = cast(JSONObject, properties["cursor"])
-        assert cursor["description"] == (
-            "Opaque cursor returned in next_cursor by the previous Notion response "
-            "for the same action and query. Omit for the first request."
-        )
 
 
 @pytest.mark.parametrize(

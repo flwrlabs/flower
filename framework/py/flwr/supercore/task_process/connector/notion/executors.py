@@ -109,10 +109,7 @@ def _response_error_details(response: requests.Response) -> tuple[str, str | Non
         return "http_error", None
     code = payload.get("code")
     message = payload.get("message")
-    if not (
-        isinstance(code, str)
-        and code.replace("_", "").isalnum()
-        and code.islower()
-    ):
-        code = "rate_limited" if response.status_code == 429 else "http_error"
-    return code, message if isinstance(message, str) and message else None
+    return (
+        code if isinstance(code, str) and code else "http_error",
+        message if isinstance(message, str) and message else None,
+    )
