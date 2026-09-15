@@ -30,7 +30,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PyEnv and Python
-ARG PYTHON_VERSION=3.11
+ARG PYTHON_VERSION=3.12
 ENV PYENV_ROOT=/root/.pyenv
 ENV PATH=$PYENV_ROOT/bin:$PATH
 # https://github.com/hadolint/hadolint/wiki/DL4006
@@ -42,8 +42,8 @@ RUN git clone https://github.com/pyenv/pyenv.git \
     && cd pyenv/plugins/python-build || exit \
     && ./install.sh
 
-# Issue: python-build only accepts the exact Python version e.g. 3.11.1 but
-# we want to allow more general versions like 3.11
+# Issue: python-build only accepts the exact Python version e.g. 3.12.1 but
+# we want to allow more general versions like 3.12
 # Solution: first use pyenv to get the exact version and then pass it to python-build
 RUN LATEST=$(pyenv latest -k ${PYTHON_VERSION}) \
     && python-build "${LATEST}" /usr/local/bin/python
