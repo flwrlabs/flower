@@ -15,7 +15,11 @@
 """Flower server tests."""
 
 
+from typing import cast
+from unittest.mock import Mock
+
 import numpy as np
+import pytest
 
 from flwr.common import (
     Code,
@@ -30,10 +34,27 @@ from flwr.common import (
     GetPropertiesRes,
     Parameters,
     ReconnectIns,
+    Scalar,
     Status,
     ndarray_to_bytes,
 )
+from flwr.common.fl_event import (
+    FL_ROUND_COMPLETED,
+    FL_ROUND_EVALUATE_COMPLETED,
+    FL_ROUND_EVALUATE_STARTED,
+    FL_ROUND_FAILED,
+    FL_ROUND_FIT_COMPLETED,
+    FL_ROUND_FIT_FAILED,
+    FL_ROUND_FIT_STARTED,
+    FL_ROUND_STARTED,
+    FL_RUN_COMPLETED,
+    FL_RUN_FAILED,
+    FL_RUN_STARTED,
+)
 from flwr.server.client_manager import SimpleClientManager
+from flwr.server.strategy import FedAvg
+from flwr.supercore.typing import JSONObject
+from flwr.supercore.utils import strict_json_loads
 
 from .client_proxy import ClientProxy
 from .server import Server, evaluate_clients, fit_clients
@@ -114,6 +135,179 @@ class FailingClient(ClientProxy):
     ) -> DisconnectRes:
         """Raise a NotImplementedError to simulate failure in the client."""
         raise NotImplementedError()
+
+
+class EventClient(SuccessClient):
+    """Client that supports parameter initialization for event tests."""
+
+    def get_parameters(
+        self, ins: GetParametersIns, timeout: float | None, group_id: int | None
+    ) -> GetParametersRes:
+        """Return empty parameters."""
+        return GetParametersRes(
+            status=Status(code=Code.OK, message="Success"),
+            parameters=Parameters(tensors=[], tensor_type=""),
+        )
+
+
+class FailingAggregateStrategy(FedAvg):
+    """Strategy that raises during aggregation for event tests."""
+
+    def aggregate_fit(
+        self,
+        server_round: int,
+        results: list[tuple[ClientProxy, FitRes]],
+        failures: list[tuple[ClientProxy, FitRes] | BaseException],
+    ) -> tuple[Parameters | None, dict[str, Scalar]]:
+        """Raise an exception to simulate an aggregation failure."""
+        raise RuntimeError("aggregate failed")
+
+
+class NumpyLossStrategy(FedAvg):
+    """Strategy that returns a NumPy scalar loss for event tests."""
+
+    def aggregate_evaluate(
+        self,
+        server_round: int,
+        results: list[tuple[ClientProxy, EvaluateRes]],
+        failures: list[tuple[ClientProxy, EvaluateRes] | BaseException],
+    ) -> tuple[float | None, dict[str, Scalar]]:
+        """Return a NumPy scalar loss."""
+        return np.float64(0.5), {}
+
+
+class NonFiniteLossStrategy(FedAvg):
+    """Strategy that returns a non-finite loss for event tests."""
+
+    def aggregate_evaluate(
+        self,
+        server_round: int,
+        results: list[tuple[ClientProxy, EvaluateRes]],
+        failures: list[tuple[ClientProxy, EvaluateRes] | BaseException],
+    ) -> tuple[float | None, dict[str, Scalar]]:
+        """Return a NaN loss."""
+        return float("nan"), {}
+
+
+def test_fit_emits_lifecycle_events() -> None:
+    """Test that ``Server.fit`` emits the expected lifecycle events."""
+    # Prepare
+    client_manager = SimpleClientManager()
+    client_manager.register(EventClient("1"))
+    callback = Mock()
+    server = Server(
+        client_manager=client_manager,
+        strategy=FedAvg(
+            min_fit_clients=1, min_evaluate_clients=1, min_available_clients=1
+        ),
+        event_callback=callback,
+    )
+
+    # Execute
+    history, _ = server.fit(num_rounds=1, timeout=None)
+
+    # Assert
+    assert history is not None
+    events = [call.args[0].event for call in callback.call_args_list]
+    assert events == [
+        FL_RUN_STARTED,
+        FL_ROUND_STARTED,
+        FL_ROUND_FIT_STARTED,
+        FL_ROUND_FIT_COMPLETED,
+        FL_ROUND_EVALUATE_STARTED,
+        FL_ROUND_EVALUATE_COMPLETED,
+        FL_ROUND_COMPLETED,
+        FL_RUN_COMPLETED,
+    ]
+
+
+def test_fit_emits_failed_events_on_exception() -> None:
+    """Test that ``Server.fit`` emits failed events when training raises."""
+    # Prepare
+    client_manager = SimpleClientManager()
+    client_manager.register(EventClient("1"))
+    callback = Mock()
+    server = Server(
+        client_manager=client_manager,
+        strategy=FailingAggregateStrategy(
+            min_fit_clients=1, min_evaluate_clients=1, min_available_clients=1
+        ),
+        event_callback=callback,
+    )
+
+    # Execute and assert
+    with pytest.raises(RuntimeError, match="aggregate failed"):
+        server.fit(num_rounds=1, timeout=None)
+
+    events = [call.args[0].event for call in callback.call_args_list]
+    assert events == [
+        FL_RUN_STARTED,
+        FL_ROUND_STARTED,
+        FL_ROUND_FIT_STARTED,
+        FL_ROUND_FIT_FAILED,
+        FL_ROUND_FAILED,
+        FL_RUN_FAILED,
+    ]
+
+
+def test_fit_continues_when_event_delivery_fails() -> None:
+    """Test lifecycle event delivery failures do not affect training."""
+    client_manager = SimpleClientManager()
+    client_manager.register(EventClient("1"))
+    server = Server(
+        client_manager=client_manager,
+        strategy=FedAvg(
+            min_fit_clients=1, min_evaluate_clients=1, min_available_clients=1
+        ),
+        event_callback=Mock(side_effect=RuntimeError("event delivery failed")),
+    )
+
+    history, _ = server.fit(num_rounds=1, timeout=None)
+
+    assert history is not None
+
+
+def test_evaluate_event_serializes_numpy_loss() -> None:
+    """Test a NumPy loss is converted before event JSON serialization."""
+    client_manager = SimpleClientManager()
+    client_manager.register(EventClient("1"))
+    callback = Mock()
+    server = Server(
+        client_manager=client_manager,
+        strategy=NumpyLossStrategy(
+            min_fit_clients=1, min_evaluate_clients=1, min_available_clients=1
+        ),
+        event_callback=callback,
+    )
+
+    server.evaluate_round(server_round=1, timeout=None)
+
+    event_data = cast(
+        JSONObject, strict_json_loads(callback.call_args_list[-1].args[0].data)
+    )
+    assert event_data["loss"] == 0.5
+
+
+def test_evaluate_event_omits_non_finite_loss() -> None:
+    """Test a non-finite loss does not prevent the completion event."""
+    client_manager = SimpleClientManager()
+    client_manager.register(EventClient("1"))
+    callback = Mock()
+    server = Server(
+        client_manager=client_manager,
+        strategy=NonFiniteLossStrategy(
+            min_fit_clients=1, min_evaluate_clients=1, min_available_clients=1
+        ),
+        event_callback=callback,
+    )
+
+    server.evaluate_round(server_round=1, timeout=None)
+
+    event_data = cast(
+        JSONObject, strict_json_loads(callback.call_args_list[-1].args[0].data)
+    )
+    assert event_data["type"] == FL_ROUND_EVALUATE_COMPLETED
+    assert "loss" not in event_data
 
 
 def test_fit_clients() -> None:

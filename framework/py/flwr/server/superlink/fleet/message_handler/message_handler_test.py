@@ -21,14 +21,18 @@ from flwr.app import Metadata, RecordDict
 from flwr.app.message import make_message
 from flwr.common.serde import message_to_proto
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
+    FleetPushTaskEventsRequest,
     PullMessagesRequest,
     PushMessagesRequest,
 )
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.date import now
+from flwr.supercore.run import RunStatus
+from flwr.supercore.utils import strict_json_loads
 
-from .message_handler import pull_messages, push_messages
+from .message_handler import pull_messages, push_messages, push_task_events
 
 
 def test_pull_messages() -> None:
@@ -131,3 +135,43 @@ def test_push_messages() -> None:
     assert response.session_id == "session-id"
     state.get_message_res.assert_not_called()
     state.store_traffic.assert_called_once()
+
+
+def test_push_task_events_stamps_authenticated_node_and_primary_task() -> None:
+    """Lifecycle events become visible through the run's primary task stream."""
+    # Prepare
+    run_id = 123
+    node_id = 456
+    primary_task_id = 789
+    event = TaskEvent(
+        run_id=999,
+        task_id=888,
+        event="fl.node.fit.started",
+        data='{"type":"fl.node.fit.started","node_id":1}',
+    )
+    request = FleetPushTaskEventsRequest(
+        node=Node(node_id=node_id), run_id=run_id, events=[event]
+    )
+    state = MagicMock()
+    state.get_run_info.return_value = [
+        MagicMock(federation_id="federation", primary_task_id=primary_task_id)
+    ]
+    state.federation_manager.has_node.return_value = True
+    state.get_run_status.return_value = {
+        run_id: RunStatus(status="running", sub_status="", details="")
+    }
+
+    # Execute
+    response = push_task_events(request=request, state=state)
+
+    # Assert
+    assert response.ByteSize() == 0
+    state.federation_manager.has_node.assert_called_once_with(node_id, "federation")
+    state.store_task_events.assert_called_once()
+    stored_event = state.store_task_events.call_args.args[0][0]
+    assert stored_event.run_id == run_id
+    assert stored_event.task_id == primary_task_id
+    assert strict_json_loads(stored_event.data) == {
+        "type": "fl.node.fit.started",
+        "node_id": node_id,
+    }

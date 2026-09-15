@@ -41,8 +41,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushAppMessagesRequest,
+    PushTaskEventsRequest,
     PushTaskOutputRequest,
 )
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
@@ -185,6 +187,21 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         client_app: ClientApp = load_client_app_fn(
             run.fab_id, run.fab_version, fab.hash_str
         )
+
+        app_event_callback = client_app.get_event_callback()
+
+        def _push_event(task_event: TaskEvent) -> None:
+            if app_event_callback is not None:
+                try:
+                    app_event_callback(task_event)
+                except Exception:  # pylint: disable=broad-exception-caught
+                    pass
+            try:
+                client.PushTaskEvents(PushTaskEventsRequest(events=[task_event]))
+            except httpx.HTTPError as err:
+                log(DEBUG, "Failed to push task event: %s", err)
+
+        client_app.set_event_callback(_push_event)
 
         # Execute ClientApp
         reply_message = client_app(message=message, context=context)
