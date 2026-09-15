@@ -58,7 +58,7 @@ from flwr.supercore.routers.runtime import router
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.runtime import runtime_handlers
 
-_SERVERAPP_ONLY_CASES: list[tuple[str, Message]] = [
+_GRID_CASES: list[tuple[str, Message]] = [
     ("get-nodes", GetNodesRequest()),
     ("push-messages", PushAppMessagesRequest()),
     ("pull-messages", PullAppMessagesRequest()),
@@ -197,8 +197,21 @@ def test_get_nodes_allows_with_valid_metadata_token(
     assert isinstance(GetNodesResponse.FromString(response.content), GetNodesResponse)
 
 
-@pytest.mark.parametrize(("path", "proto_request"), _SERVERAPP_ONLY_CASES)
-def test_serverapp_only_endpoint_denied_for_simulation_run(
+def test_get_nodes_allows_agentapp_token(client: TestClient, state: LinkState) -> None:
+    """Grid routes should allow an AgentApp task token."""
+    response = _post(
+        client,
+        "get-nodes",
+        GetNodesRequest(),
+        token=_create_running_task(state, TaskType.AGENT_APP),
+    )
+
+    assert response.status_code == 200
+    assert isinstance(GetNodesResponse.FromString(response.content), GetNodesResponse)
+
+
+@pytest.mark.parametrize(("path", "proto_request"), _GRID_CASES)
+def test_grid_endpoint_denied_for_simulation_run(
     client: TestClient, state: LinkState, path: str, proto_request: Message
 ) -> None:
     """ServerApp-only routes should deny simulation-task tokens."""
