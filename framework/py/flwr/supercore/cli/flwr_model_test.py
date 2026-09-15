@@ -56,6 +56,8 @@ def test_parse_flwr_model_parses_tokenized_invocation() -> None:
             "--parent-pid",
             "1234",
             "--allow-runtime-dependency-installation",
+            "--runtime-timing-id",
+            "profile-model",
         ]
     )
 
@@ -64,6 +66,7 @@ def test_parse_flwr_model_parses_tokenized_invocation() -> None:
     assert args.insecure is True
     assert args.parent_pid == 1234
     assert args.runtime_dependency_install is True
+    assert args.runtime_timing_id == "profile-model"
 
 
 def test_parse_flwr_model_accepts_only_one_token_source() -> None:

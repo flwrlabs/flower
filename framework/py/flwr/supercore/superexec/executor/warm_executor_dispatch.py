@@ -34,6 +34,7 @@ from flwr.supercore.constant import (
     TASK_TYPE_TO_COMMAND,
     TaskType,
 )
+from flwr.supercore.runtime_timing import log_runtime_timing, runtime_timing_marker
 
 from .types import ExecutionSpec, LaunchResult
 from .warm_executor_pool import (
@@ -245,6 +246,10 @@ def warm_executor_command(
         )
     if spec.runtime_dependency_install:
         command.append("--allow-runtime-dependency-installation")
+    if runtime_timing_marker(spec.task_type, "process_entered") is not None and (
+        spec.runtime_timing_id is not None
+    ):
+        command.extend(["--runtime-timing-id", spec.runtime_timing_id])
     return command
 
 
@@ -619,6 +624,13 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             raise WarmExecutorUnavailable(
                 "Warm TaskExecutor Pod is unavailable for dispatch."
             ) from err
+        marker = runtime_timing_marker(spec.task_type, "executor_exec_opened")
+        if marker is not None:
+            log_runtime_timing(
+                marker,
+                timing_id=spec.runtime_timing_id,
+                executor="warm",
+            )
         return KubernetesWarmExecutorDispatch(response)
 
     def _consumed_pod_has_finished(self, pod: object) -> bool:

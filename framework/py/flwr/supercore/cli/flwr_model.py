@@ -22,6 +22,7 @@ from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
 from flwr.supercore import log
 from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore.logger import restore_output
+from flwr.supercore.runtime_timing import log_runtime_timing
 from flwr.supercore.task_process import run_model
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
@@ -34,6 +35,8 @@ def flwr_model() -> None:
     if bool(getattr(args, "token_stdin", False)):
         print(FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT, flush=True)
 
+    runtime_timing_id = getattr(args, "runtime_timing_id", None)
+    log_runtime_timing("model_process_entered", timing_id=runtime_timing_id)
     log(INFO, "Start `flwr-model` process")
     log(
         DEBUG,
@@ -48,6 +51,7 @@ def flwr_model() -> None:
             args.root_certificates, args.insecure
         ),
         parent_pid=args.parent_pid,
+        runtime_timing_id=runtime_timing_id,
     )
 
     # Restore stdout/stderr
@@ -66,6 +70,12 @@ def _parse_args_run_flwr_model() -> argparse.ArgumentParser:
         type=str,
         help="Address of SuperLink's Runtime API (IPv4, IPv6, or a domain name)."
         f"By default, it is set to {SUPERLINK_DEFAULT_CLIENT_ADDRESS}.",
+    )
+    parser.add_argument(
+        "--runtime-timing-id",
+        dest="runtime_timing_id",
+        default=None,
+        help=argparse.SUPPRESS,
     )
     add_args_flwr_app_common(parser=parser, include_token_stdin=True)
     return parser

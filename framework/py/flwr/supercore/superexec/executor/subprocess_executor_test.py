@@ -93,6 +93,25 @@ def test_launch_renders_runtime_dependency_install_flag() -> None:
     assert "--allow-runtime-dependency-installation" in popen_mock.call_args.args[0]
 
 
+@pytest.mark.parametrize("task_type", [TaskType.AGENT_APP, TaskType.MODEL])
+def test_launch_passes_runtime_timing_id_to_profiled_task_types(
+    task_type: TaskType,
+) -> None:
+    """Profiled subprocesses should receive the opaque profiling identifier."""
+    with patch.object(subprocess, "Popen") as popen_mock:
+        SubprocessExecutor().launch(
+            _execution_spec(
+                task_type=task_type,
+                runtime_timing_id="profile-task",
+            )
+        )
+
+    assert popen_mock.call_args.args[0][-2:] == [
+        "--runtime-timing-id",
+        "profile-task",
+    ]
+
+
 def test_launch_renders_parent_pid_flag() -> None:
     """Test subprocess executor renders subprocess parent PID flag."""
     with patch.object(subprocess, "Popen") as popen_mock:

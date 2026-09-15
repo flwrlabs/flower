@@ -29,6 +29,7 @@ from pathlib import Path
 from flwr.common.config import get_project_config
 from flwr.supercore import log
 from flwr.supercore.exit import add_exit_handler
+from flwr.supercore.runtime_timing import log_runtime_timing
 from flwr.supercore.utils import get_flwr_home
 
 _RUNTIME_ENV_DIR = "runtime-envs"
@@ -64,6 +65,7 @@ def install_app_dependencies(
     launch_id: str | None = None,
     run_id: int | None = None,
     index_context: RuntimeDependencyIndexContext | None = None,
+    runtime_timing_id: str | None = None,
 ) -> Path:
     """Install app dependencies from a project's pyproject.toml using ``uv sync``.
 
@@ -84,6 +86,8 @@ def install_app_dependencies(
     index_context : Optional[RuntimeDependencyIndexContext]
         Optional context passed to the EE runtime dependency index resolver.
         If EE provides an index URL, it is passed to uv as ``--index-url``.
+    runtime_timing_id : Optional[str]
+        Opaque identifier used only by opt-in trusted runtime timing logs.
 
     Returns
     -------
@@ -146,12 +150,18 @@ def install_app_dependencies(
 
     installed_packages: set[str] = set()
     sync_start_time = time.monotonic()
+    log_runtime_timing(
+        "runtime_dependency_uv_sync_started", timing_id=runtime_timing_id
+    )
     sync_error = _run_cmd(
         sync_cmd,
         cwd=project_dir,
         env=sync_env,
         log_output_level=DEBUG,
         installed_packages=installed_packages,
+    )
+    log_runtime_timing(
+        "runtime_dependency_uv_sync_finished", timing_id=runtime_timing_id
     )
     log(INFO, "uv sync took %.1f seconds.", time.monotonic() - sync_start_time)
     if sync_error is not None:

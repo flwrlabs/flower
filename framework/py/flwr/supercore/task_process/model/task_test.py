@@ -64,8 +64,9 @@ def test_handle_task_flushes_first_text_event_eagerly(
         *,
         on_stream_event: Callable[[JSONObject], None],
         usage_recorder: object,
+        runtime_timing_id: str | None = None,
     ) -> JSONObject:
-        del usage_recorder
+        del runtime_timing_id, usage_recorder
         on_stream_event(cast(JSONObject, {"type": "response.created"}))
         assert stub.PushTaskEvents.call_count == 0
         on_stream_event(

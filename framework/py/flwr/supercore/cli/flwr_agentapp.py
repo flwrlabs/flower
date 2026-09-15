@@ -24,6 +24,7 @@ from flwr.common.constant import FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT
 from flwr.supercore import log
 from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore.logger import mirror_output_to_queue, restore_output
+from flwr.supercore.runtime_timing import log_runtime_timing
 from flwr.supercore.task_process import run_agentapp
 
 
@@ -35,6 +36,9 @@ def flwr_agentapp() -> None:
     if bool(getattr(args, "token_stdin", False)):
         # Older SuperExec instances recognize this AgentApp-specific value only.
         print(FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT, flush=True)
+
+    runtime_timing_id = getattr(args, "runtime_timing_id", None)
+    log_runtime_timing("agent_process_entered", timing_id=runtime_timing_id)
 
     # Capture stdout/stderr
     log_queue: Queue[str | None] = Queue()
@@ -62,6 +66,7 @@ def flwr_agentapp() -> None:
         certificates_path=root_certificates_path,
         parent_pid=args.parent_pid,
         runtime_dependency_install=args.runtime_dependency_install,
+        runtime_timing_id=runtime_timing_id,
     )
 
     # Restore stdout/stderr
@@ -80,6 +85,12 @@ def _parse_args_run_flwr_agentapp() -> argparse.ArgumentParser:
         type=str,
         help="Address of SuperLink's Runtime API (IPv4, IPv6, or a domain name)."
         f"By default, it is set to {SUPERLINK_DEFAULT_CLIENT_ADDRESS}.",
+    )
+    parser.add_argument(
+        "--runtime-timing-id",
+        dest="runtime_timing_id",
+        default=None,
+        help=argparse.SUPPRESS,
     )
     add_args_flwr_app_common(parser=parser, include_token_stdin=True)
     return parser
