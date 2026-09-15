@@ -1145,20 +1145,28 @@ def test_warm_pool_preserves_surviving_tasks_until_their_processes_exit(
         runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
     config = _executor_config(
+        resources={"requests": {"cpu": "4", "memory": "1Gi"}},
+        warm_executor_resources={"requests": {"cpu": "1"}},
         warm_executor_owner="superexec-a",
         warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
     )
     pool = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
         client, config, lambda: 0
     )
-    consumed_pod = _ready_warm_pod(pool_key, config, name="consumed")
+    consumed_pod = _ready_warm_pod(
+        pool_key,
+        _executor_config(
+            resources={"requests": {"cpu": "4", "memory": "1Gi"}},
+            warm_executor_resources={"requests": {"cpu": "2"}},
+            warm_executor_owner="superexec-a",
+            warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+        ),
+        name="consumed",
+    )
     consumed_pod["metadata"]["annotations"][
         kube._WARM_EXECUTOR_CONSUMED_ANNOTATION  # pylint: disable=protected-access
     ] = "true"
-    # A changed Pod configuration must not override task preservation.
-    consumed_pod["metadata"]["annotations"][
-        WARM_EXECUTOR_CONFIGURATION_ANNOTATION
-    ] = "old"
+    # Changed warm resources must not override task preservation.
     response = Mock()
     response.read_all.return_value = ""
     stream = Mock(return_value=response)
@@ -1345,14 +1353,27 @@ def test_reconciliation_refills_after_terminating_pods_release_capacity() -> Non
     client.create_namespaced_pod.assert_called_once()
 
 
-def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
-    """Reconciliation removes stale Pods and retains Ready excess-pool Pods."""
+@pytest.mark.parametrize(
+    ("previous_resources", "current_resources"),
+    [
+        (None, {"requests": {"cpu": "1"}}),
+        ({"requests": {"cpu": "2"}}, {"requests": {"cpu": "1"}}),
+        ({"requests": {"cpu": "1"}}, None),
+    ],
+)
+def test_warm_pool_reconciles_obsolete_and_excess_idle_pods(
+    previous_resources: dict[str, Any] | None,
+    current_resources: dict[str, Any] | None,
+) -> None:
+    """Reconciliation replaces idle Pods after warm resources change."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     pool_key = _warm_executor_pool_key(
         runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
     config = _executor_config(
+        resources={"requests": {"cpu": "4", "memory": "1Gi"}},
+        warm_executor_resources=current_resources,
         warm_executor_owner="superexec-a",
         warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
     )
@@ -1362,7 +1383,8 @@ def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
     obsolete_pod = _ready_warm_pod(
         pool_key,
         _executor_config(
-            env=[{"name": "OLD_SETTING", "value": "1"}],
+            resources={"requests": {"cpu": "4", "memory": "1Gi"}},
+            warm_executor_resources=previous_resources,
             warm_executor_owner="superexec-a",
             warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
         ),
@@ -2108,6 +2130,78 @@ def test_build_taskexecutor_pod_supports_resources_and_placement() -> None:
     assert pod["spec"]["tolerations"] == tolerations
     assert pod["spec"]["affinity"] == affinity
     assert pod["spec"]["priorityClassName"] == "taskexecutor-priority"
+
+
+def test_warm_executor_resources_overlay_preserves_cold_resources() -> None:
+    """A partial warm override inherits base fields and leaves cold Pods unchanged."""
+    resources = {
+        "requests": {"cpu": "4", "memory": "1Gi"},
+        "limits": {"cpu": "4", "memory": "4Gi"},
+    }
+    warm_executor_resources = {
+        "requests": {"cpu": "1"},
+        "limits": {"cpu": "1"},
+    }
+    config = _executor_config(
+        resources=resources,
+        warm_executor_resources=warm_executor_resources,
+    )
+
+    cold_pod = _as_dict(
+        _build_taskexecutor_pod(
+            _execution_spec(), config, "root-ca", _LAUNCH_ATTEMPT_ID
+        )
+    )
+    warm_pod = _as_dict(
+        kube._build_warm_executor_pod(  # pylint: disable=protected-access
+            _warm_executor_pool_key(), config, "warm"
+        )
+    )
+
+    assert cold_pod["spec"]["containers"][0]["resources"] == resources
+    assert warm_pod["spec"]["containers"][0]["resources"] == {
+        "requests": {"cpu": "1", "memory": "1Gi"},
+        "limits": {"cpu": "1", "memory": "4Gi"},
+    }
+    assert resources["requests"]["cpu"] == "4"
+    assert warm_executor_resources == {
+        "requests": {"cpu": "1"},
+        "limits": {"cpu": "1"},
+    }
+
+
+@pytest.mark.parametrize("warm_executor_resources", [None, {}])
+def test_empty_warm_executor_resources_preserve_base_resources_and_hash(
+    warm_executor_resources: dict[str, Any] | None,
+) -> None:
+    """An unset or empty override preserves the existing warm Pod definition."""
+    resources = {
+        "requests": {"cpu": "4", "memory": "1Gi"},
+        "limits": {"cpu": "4", "memory": "4Gi"},
+    }
+    default_pod = _as_dict(
+        kube._build_warm_executor_pod(  # pylint: disable=protected-access
+            _warm_executor_pool_key(), _executor_config(resources=resources), "default"
+        )
+    )
+    override_pod = _as_dict(
+        kube._build_warm_executor_pod(  # pylint: disable=protected-access
+            _warm_executor_pool_key(),
+            _executor_config(
+                resources=resources,
+                warm_executor_resources=warm_executor_resources,
+            ),
+            "override",
+        )
+    )
+
+    assert override_pod["spec"]["containers"][0]["resources"] == resources
+    assert (
+        override_pod["metadata"]["annotations"][WARM_EXECUTOR_CONFIGURATION_ANNOTATION]
+        == default_pod["metadata"]["annotations"][
+            WARM_EXECUTOR_CONFIGURATION_ANNOTATION
+        ]
+    )
 
 
 def test_build_taskexecutor_pod_supports_labels_annotations_and_security() -> None:

@@ -225,6 +225,9 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
         Optional Flower resource-pool label value.
     resources : JSONObject | None
         Optional Kubernetes container resource requests and limits.
+    warm_executor_resources : JSONObject | None
+        Optional resource requests and limits merged over ``resources`` for warm
+        TaskExecutor Pods.
     env : list[JSONObject] | None
         Optional explicit TaskExecutor container environment. Only literal
         name/value entries are supported.
@@ -277,6 +280,7 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     # use one SuperExec replica per owner value unless they add leader election.
     warm_executor_owner: str | None = None
     warm_executor_pools: tuple[WarmExecutorPoolConfig, ...] = ()
+    warm_executor_resources: JSONObject | None = None
     sleep: Callable[[float], None] = time.sleep
     monotonic: Callable[[], float] = time.monotonic
     log_warm_executor_output: bool = False
@@ -295,6 +299,10 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
             self.warm_executor_owner, str
         ):
             raise ValueError("warm_executor_owner must be a string.")
+        if self.warm_executor_resources is not None and not isinstance(
+            self.warm_executor_resources, dict
+        ):
+            raise ValueError("warm_executor_resources must be a mapping.")
         if self.warm_executor_pools and not self.warm_executor_owner:
             raise ValueError(
                 "warm_executor_owner is required when warm_executor_pools are set."
@@ -862,6 +870,9 @@ def _build_warm_executor_pod(
         },
     }
     _apply_taskexecutor_container_config(container, config)
+    warm_executor_resources = _effective_warm_executor_resources(config)
+    if warm_executor_resources is not None:
+        container["resources"] = warm_executor_resources
 
     volumes.extend(config.volumes or [])
     return {
@@ -934,6 +945,27 @@ def _apply_taskexecutor_container_config(
         container["env"] = config.env
     if config.container_security_context is not None:
         container["securityContext"] = config.container_security_context
+
+
+def _merge_json_objects(base: JSONObject, overlay: JSONObject) -> JSONObject:
+    """Recursively merge one JSON object over another without mutating either."""
+    merged = dict(base)
+    for key, value in overlay.items():
+        existing = merged.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            merged[key] = _merge_json_objects(existing, value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _effective_warm_executor_resources(
+    config: KubernetesExecutorConfig,
+) -> JSONObject | None:
+    """Return resources for warm Pods after applying the optional override."""
+    if config.warm_executor_resources is None:
+        return config.resources
+    return _merge_json_objects(config.resources or {}, config.warm_executor_resources)
 
 
 def _taskexecutor_pod_spec(
@@ -1225,7 +1257,7 @@ def _warm_executor_configuration_hash(config: KubernetesExecutorConfig) -> str:
         "labels": _caller_labels(config),
         "annotations": config.annotations,
         "resource_pool": config.resource_pool,
-        "resources": config.resources,
+        "resources": _effective_warm_executor_resources(config),
         "env": config.env,
         "volumes": config.volumes,
         "volume_mounts": config.volume_mounts,
