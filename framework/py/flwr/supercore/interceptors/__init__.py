@@ -27,8 +27,6 @@ from .runtime_version_interceptor import (
     RuntimeVersionServerInterceptor,
     create_control_runtime_version_server_interceptor,
     create_fleet_runtime_version_server_interceptor,
-    create_superlink_runtime_version_server_interceptor,
-    create_supernode_runtime_version_server_interceptor,
 )
 
 __all__ = [
@@ -41,6 +39,4 @@ __all__ = [
     "TASK_TOKEN_HEADER",
     "create_control_runtime_version_server_interceptor",
     "create_fleet_runtime_version_server_interceptor",
-    "create_superlink_runtime_version_server_interceptor",
-    "create_supernode_runtime_version_server_interceptor",
 ]

@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower constants."""
 
-
 from __future__ import annotations
 
 import os
@@ -168,6 +167,8 @@ INT64_MAX_VALUE = 9223372036854775807  # (1 << 63) - 1
 
 # Constants for task-token generation
 FLWR_TASK_TOKEN_LENGTH = 128  # Number of bytes used to generate task tokens
+FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT = "FLWR_AGENTAPP_TOKEN_ACCEPTED"
+FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT = "FLWR_TASK_TOKEN_ACCEPTED"
 
 # SuperLink Fleet API constants
 PUBLIC_KEY_ALREADY_IN_USE_MESSAGE = "Public key already in use"

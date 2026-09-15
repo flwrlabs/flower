@@ -57,6 +57,10 @@ service Control {
   // Get run series
   rpc GetRunSeries(GetRunSeriesRequest) returns (GetRunSeriesResponse) {}
 
+  // Update run series description
+  rpc UpdateRunSeriesDescription(UpdateRunSeriesDescriptionRequest)
+      returns (UpdateRunSeriesDescriptionResponse) {}
+
   // List events for all runs in a run series
   rpc ListRunSeriesEvents(ListRunSeriesEventsRequest)
       returns (ListRunSeriesEventsResponse) {}
@@ -411,3 +415,9 @@ message StreamRunEventsRequest {
   optional uint64 after_task_event_id = 2;
 }
 message StreamRunEventsResponse { TaskEvent task_event = 1; }
+
+message UpdateRunSeriesDescriptionRequest {
+  uint64 series_id = 1;
+  string description = 2;
+}
+message UpdateRunSeriesDescriptionResponse { RunSeries series = 1; }
