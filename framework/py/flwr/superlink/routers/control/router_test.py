@@ -15,6 +15,7 @@
 """Tests for the Control API router."""
 
 
+import inspect
 from collections import Counter
 from collections.abc import Callable
 from datetime import datetime
@@ -122,6 +123,40 @@ def test_all_control_routes_have_protobuf_request_types() -> None:
         if route_key[1].startswith("/v1/control/")
     }
     assert route_keys == control_request_types
+
+
+def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
+    """Document every Control route as protobuf-over-HTTP."""
+    schema = _create_app().openapi()
+    control_routes = [route for route in router.routes if isinstance(route, APIRoute)]
+    stream_paths = {
+        "/v1/control/stream-logs",
+        "/v1/control/stream-run-events",
+    }
+
+    assert len(control_routes) == 37
+    for route in control_routes:
+        operation = schema["paths"][route.path]["post"]
+        request_body = operation["requestBody"]
+        success_content = operation["responses"]["200"]["content"]
+        expected_media_type = (
+            PROTOBUF_STREAM_MEDIA_TYPE
+            if route.path in stream_paths
+            else PROTOBUF_MEDIA_TYPE
+        )
+
+        assert operation["description"] == inspect.getdoc(
+            inspect.unwrap(route.endpoint)
+        )
+        assert request_body["required"] is True
+        assert request_body["content"] == {
+            PROTOBUF_MEDIA_TYPE: {"schema": {"type": "string", "format": "binary"}}
+        }
+        assert set(success_content) == {expected_media_type}
+        assert success_content[expected_media_type]["schema"] == {
+            "type": "string",
+            "format": "binary",
+        }
 
 
 def test_control_http_routes_cover_all_grpc_methods() -> None:
