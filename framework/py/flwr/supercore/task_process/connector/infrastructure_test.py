@@ -20,6 +20,8 @@ from unittest.mock import Mock, patch
 import pytest
 import requests
 
+from flwr.supercore.typing import JSONObject
+
 from .http import ConnectorApiError, request_json_object
 from .json_utils import optional_string
 from .registry import CONNECTORS
@@ -54,7 +56,7 @@ def test_string_property_rejects_empty_values() -> None:
 
 def test_function_tool_includes_output_schema() -> None:
     """Function tools should include an output schema when provided."""
-    output_schema = {"type": "object"}
+    output_schema: JSONObject = {"type": "object"}
     tool = function_tool(
         "example", "Example.", properties={}, output_schema=output_schema
     )
