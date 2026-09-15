@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for the Notion connector."""
 
+from typing import cast
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
 
@@ -38,6 +39,13 @@ def test_notion_definition_is_registered() -> None:
     assert len(ACTIONS) == 2
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     assert len(registry.get_connector_tools(NOTION_CONNECTOR_REF)) == len(ACTIONS)
+    for action in ACTIONS:
+        properties = cast(JSONObject, action.input_schema["properties"])
+        cursor = cast(JSONObject, properties["cursor"])
+        assert cursor["description"] == (
+            "Opaque cursor returned in next_cursor by the previous Notion response "
+            "for the same action and query. Omit for the first request."
+        )
 
 
 @pytest.mark.parametrize(
@@ -67,10 +75,13 @@ def test_notion_tools_call_read_endpoints(
     assert request.call_args.kwargs["headers"]["Notion-Version"] == "2026-03-11"
 
 
-def test_notion_api_errors_are_secret_safe() -> None:
-    """Notion failures should expose stable codes without credentials."""
-    response = Mock(status_code=401)
-    response.json.return_value = {"code": "unauthorized", "message": "ntn-secret"}
+def test_notion_api_errors_include_code_and_message() -> None:
+    """Notion's documented error fields should remain readable to callers."""
+    response = Mock(status_code=400)
+    response.json.return_value = {
+        "code": "validation_error",
+        "message": "Invalid start_cursor value",
+    }
     with (
         patch(_HTTP_REQUEST, return_value=response),
         pytest.raises(NotionApiError) as error,
@@ -78,7 +89,11 @@ def test_notion_api_errors_are_secret_safe() -> None:
         registry.invoke_connector(
             "notion_search", {"query": "release"}, Mock(), _CREDENTIALS, {}
         )
-    assert error.value.code == "unauthorized"
+    assert error.value.code == "validation_error"
+    assert str(error.value) == (
+        "Notion API request failed: validation_error (400): "
+        "Invalid start_cursor value."
+    )
     assert "ntn-secret" not in str(error.value)
 
 

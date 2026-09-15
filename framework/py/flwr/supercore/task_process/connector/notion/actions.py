@@ -17,7 +17,10 @@
 from ..definition import ActionAccess, ActionDefinition
 from ..tool_schema import integer_property, string_property
 
-_CURSOR = string_property("Cursor returned by the previous response.")
+_CURSOR = string_property(
+    "Opaque cursor returned in next_cursor by the previous Notion response for "
+    "the same action and query. Omit for the first request."
+)
 
 ACTIONS = (
     ActionDefinition(
