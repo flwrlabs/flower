@@ -35,9 +35,8 @@ and logs.
 ## AgentSession
 
 Flower creates an `AgentSession` for each AgentApp run and passes it to your
-main function. It exposes three capabilities:
+main function. It exposes two capabilities:
 
-- `agent.responses` provides a lower-level JSON model API
 - `agent.connectors` returns connector tools and executes function calls
 - `agent.events` publishes structured events selected by the AgentApp
 
@@ -86,10 +85,10 @@ The endpoint is authenticated for the current AgentApp task. It is not a public
 model API for an external client. See [Use the OpenAI SDK in an
 AgentApp](../how-to-guides/use-openai-sdk.md) for a complete example.
 
-`agent.responses.create(request)` remains available as a lower-level interface
-for JSON-based workflows. It returns a JSON response object and automatically
-appends its model output items to the Flower `Context`. New AgentApps should
-prefer the OpenAI SDK when they need typed responses or streaming events.
+The injected runtime credential authenticates the AgentApp to Flower; it does
+not authenticate a self-hosted SuperLink to an upstream provider. See
+{ref}`configure-local-model-provider` for the self-hosted configuration and
+supported endpoint protocol.
 
 The default model provider at `api.flower.ai` does not currently support
 continuing with `previous_response_id`. Rebuild `input` from stored messages for
@@ -151,9 +150,9 @@ as `get` when reading it through `context.state.config_records`.
 
 If `agent.input` is a non-empty string, the runtime records it as an Open
 Responses user-message item before calling the AgentApp. Connector calls append
-their outputs and built-in activity. The lower-level `agent.responses` API also
-appends model output, while SDK responses and events emitted with `agent.events`
-are persisted only when the app stores them explicitly.
+their outputs and built-in activity. Responses created through the OpenAI SDK
+and events emitted with `agent.events` are persisted only when the app stores
+them explicitly.
 
 Runs in the same series can receive the persisted context. The app chooses what
 to send to the model. A safe conversation loader selects only message items:

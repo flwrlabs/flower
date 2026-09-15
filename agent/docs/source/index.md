@@ -61,6 +61,7 @@ how-to-guides/connect-accounts
 how-to-guides/create-automations
 how-to-guides/use-flower-hub
 how-to-guides/use-openai-sdk
+how-to-guides/use-mcp-tools
 how-to-guides/run-on-supergrid
 how-to-guides/troubleshoot-agent-runs
 how-to-guides/run-with-local-superlink

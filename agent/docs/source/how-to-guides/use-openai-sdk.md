@@ -1,9 +1,10 @@
 # Use the OpenAI SDK in an AgentApp
 
 The OpenAI Python SDK is the standard way to make model requests from a Flower
-AgentApp. Flower provides an OpenAI-compatible Responses endpoint and its
-credentials while the AgentApp is running, so your code can use the SDK without
-a model-provider API key.
+AgentApp. Flower provides an OpenAI-compatible Responses endpoint and injects
+credentials for that endpoint while the AgentApp is running. These runtime
+credentials authenticate the AgentApp to Flower; they are not credentials for
+the upstream model provider.
 
 This guide targets Flower 1.35.0.
 
@@ -36,7 +37,11 @@ Then update its dependencies:
 $ uv add 'flwr>=1.35.0,<2.0' 'openai>=2.16.0,<3.0.0'
 ```
 
-Do not add a model-provider API key to the project or its configuration.
+Do not embed a model-provider API key in the AgentApp or its run configuration.
+On SuperGrid, Flower configures upstream model access for you. A self-hosted
+SuperLink must be configured separately with a model endpoint and any credential
+that endpoint requires. See [Run an AgentApp with a local
+SuperLink](run-with-local-superlink.md).
 
 ## Create the client inside the AgentApp
 

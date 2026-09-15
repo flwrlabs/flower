@@ -3,6 +3,12 @@
 Connectors give an AgentApp tools supplied by the runtime without embedding
 provider implementations or credentials in the app.
 
+Flower connectors are registered and hosted by the Flower runtime. They are not
+a general tool-registration interface: `AgentSession` does not currently expose
+an MCP client or a method for registering an arbitrary MCP toolset. To connect
+an AgentApp to an MCP server, use [Use tools from an MCP
+server](../how-to-guides/use-mcp-tools.md).
+
 ## Distinguish built-in and account connectors
 
 Built-in connectors need no external account:
@@ -91,6 +97,8 @@ directly, see {ref}`publish-agentapp-generated-text`.
 
 Account connector credentials are delivered to the runtime action, not returned
 to the AgentApp.
+
+(bound-connector-tool-loop)=
 
 ## Bound the tool loop
 
