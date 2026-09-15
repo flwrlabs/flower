@@ -49,23 +49,16 @@ def test_history_widget_restores_selected_events() -> None:
             TaskEvent(
                 event="message",
                 data=(
-                    '{"type":"message","role":"user",'
-                    '"content":"Previous question"}'
+                    '{"type":"message","role":"user","content":"Previous question"}'
                 ),
             ),
             TaskEvent(
                 event="response.output_text.delta",
-                data=(
-                    '{"type":"response.output_text.delta",'
-                    '"delta":"**Previous "}'
-                ),
+                data=('{"type":"response.output_text.delta","delta":"**Previous "}'),
             ),
             TaskEvent(
                 event="response.output_text.delta",
-                data=(
-                    '{"type":"response.output_text.delta",'
-                    '"delta":"answer**"}'
-                ),
+                data=('{"type":"response.output_text.delta","delta":"answer**"}'),
             ),
             TaskEvent(
                 event="response.completed",
