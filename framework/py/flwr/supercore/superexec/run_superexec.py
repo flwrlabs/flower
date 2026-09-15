@@ -273,50 +273,52 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             if tasks_res.tasks:
                 task = plugin.select_task(tasks_res.tasks)
 
-            # If a task was selected, claim it
-            if task is not None:
-                ready_to_claim = True
-                if isinstance(plugin, BaseEphemeralExecPlugin):
-                    try:
-                        task_type = TaskType(task.type)
-                    except ValueError:
-                        task_type = None
-                    executor.wait_for_capacity(
-                        task_type=task_type,
-                        insecure=insecure,
-                        root_certificates_path=root_certificates_path,
-                    )
-                else:
-                    # Snapshot executor resources before the atomic task claim.
-                    # If the claim succeeds, the executor can safely retire only
-                    # resources from an older claim without blocking this poll loop.
-                    ready_to_claim = executor.prepare_launch(task.task_id)
+            if task is None:
+                time.sleep(task_poll_interval)
+                continue
 
-                if ready_to_claim:
-                    claim_req = ClaimTaskRequest(task_id=task.task_id)
-                    claim_res = client.ClaimTask(claim_req)
+            ready_to_claim = True
+            if isinstance(plugin, BaseEphemeralExecPlugin):
+                try:
+                    task_type = TaskType(task.type)
+                except ValueError:
+                    task_type = None
+                executor.wait_for_capacity(
+                    task_type=task_type,
+                    insecure=insecure,
+                    root_certificates_path=root_certificates_path,
+                )
+            else:
+                # Snapshot executor resources before the atomic task claim.
+                # If the claim succeeds, the executor can safely retire only
+                # resources from an older claim without blocking this poll loop.
+                ready_to_claim = executor.prepare_launch(task.task_id)
 
-                    # Launch the app if a token was granted; do nothing if not
-                    if claim_res.token:
+            if not ready_to_claim:
+                time.sleep(task_poll_interval)
+                continue
 
-                        # Destroy the auth secret before launching the app
-                        # for ephemeral plugins
-                        if isinstance(plugin, BaseEphemeralExecPlugin):
+            claim_req = ClaimTaskRequest(task_id=task.task_id)
+            claim_res = client.ClaimTask(claim_req)
+            if not claim_res.token:
+                time.sleep(task_poll_interval)
+                continue
 
-                            def cleanup_auth_secret() -> None:
-                                nonlocal superexec_auth_secret
-                                if superexec_auth_secret is not None:
-                                    superexec_auth_secret = None
-                                if auth_interceptor is not None:
-                                    # pylint: disable-next=protected-access
-                                    auth_interceptor._auth_secret = b"\x00" * 32
+            # Destroy the auth secret before launching the app for ephemeral plugins
+            if isinstance(plugin, BaseEphemeralExecPlugin):
 
-                            plugin.cleanup_before_launch = cleanup_auth_secret
+                def cleanup_auth_secret() -> None:
+                    nonlocal superexec_auth_secret
+                    if superexec_auth_secret is not None:
+                        superexec_auth_secret = None
+                    if auth_interceptor is not None:
+                        # pylint: disable-next=protected-access
+                        auth_interceptor._auth_secret = b"\x00" * 32
 
-                        launch_result = plugin.launch_task(
-                            token=claim_res.token, task=task
-                        )
-                        _handle_launch_result(launch_result, task)
+                plugin.cleanup_before_launch = cleanup_auth_secret
+
+            launch_result = plugin.launch_task(token=claim_res.token, task=task)
+            _handle_launch_result(launch_result, task)
 
             # Sleep for a while before checking again
             time.sleep(task_poll_interval)

@@ -585,59 +585,88 @@ class KubernetesExecutor:
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Submit the TaskExecutor Pod and credential Secret."""
-        if not self._retire_prepared_launch_attempts(spec.task_id):
+        cleanup_succeeded, launch_deadline = self._retire_prepared_launch_attempts(
+            spec.task_id
+        )
+        if not cleanup_succeeded:
             return LaunchResult.capacity_rejected(
                 "Prior Kubernetes TaskExecutor attempts could not be retired safely."
             )
         try:
-            runtime_root_certificates = _get_runtime_root_certificates(
-                spec, self._config
+            runtime_root_certificates, launch_result = self._prepare_task_launch(
+                spec, launch_deadline
             )
-            allow_warm_dispatch = self._can_dispatch_warm(
-                spec.insecure, spec.root_certificates_path
+            if launch_result is not None:
+                return launch_result
+            return self._launch_cold_task(
+                spec, runtime_root_certificates, launch_deadline
             )
-            reservation = self._wait_for_capacity(
-                spec.task_type,
-                allow_warm_dispatch=allow_warm_dispatch,
-                reconcile_warm_pools=True,
-                block=False,
-            )
-            if reservation is None:
-                return LaunchResult.capacity_rejected(
-                    "Kubernetes TaskExecutor active Pod budget is full."
-                )
-            if reservation and self._warm_executor_pool_manager is not None:
-                warm_result = self._warm_executor_pool_manager.launch(
-                    spec, runtime_root_certificates
-                )
-                if warm_result is not None:
-                    return warm_result
-                # Readiness can disappear between reservation and token dispatch.
-                # Check cold capacity once without holding the task-poll loop.
-                if (
-                    self._wait_for_capacity(
-                        spec.task_type,
-                        allow_warm_dispatch=False,
-                        reconcile_warm_pools=False,
-                        block=False,
-                    )
-                    is None
-                ):
-                    return LaunchResult.capacity_rejected(
-                        "Kubernetes TaskExecutor active Pod budget is full."
-                    )
-            launch_attempt_id = _new_launch_attempt_id()
-            secret_name = _credential_secret_name(spec, launch_attempt_id)
-            secret = _build_appio_credentials_secret(
-                spec, self._config, runtime_root_certificates, launch_attempt_id
-            )
-            pod = _build_taskexecutor_pod(
-                spec, self._config, runtime_root_certificates, launch_attempt_id
-            )
-            self._client.create_namespaced_secret(self._config.namespace, secret)
         except Exception as exc:  # pylint: disable=broad-exception-caught
             return _launch_result_from_exception(exc)
 
+    def _prepare_task_launch(
+        self, spec: ExecutionSpec, launch_deadline: float | None
+    ) -> tuple[str | None, LaunchResult | None]:
+        """Resolve Runtime trust and reserve warm or cold launch capacity."""
+        if self._launch_deadline_expired(launch_deadline):
+            return None, _claim_expired()
+        runtime_root_certificates = _get_runtime_root_certificates(spec, self._config)
+        allow_warm_dispatch = self._can_dispatch_warm(
+            spec.insecure, spec.root_certificates_path
+        )
+        reservation = self._wait_for_capacity(
+            spec.task_type,
+            allow_warm_dispatch=allow_warm_dispatch,
+            reconcile_warm_pools=True,
+            block=False,
+        )
+        if reservation is None:
+            return runtime_root_certificates, _capacity_rejected()
+        if reservation and self._warm_executor_pool_manager is not None:
+            if self._launch_deadline_expired(launch_deadline):
+                return runtime_root_certificates, _claim_expired()
+            warm_result = self._warm_executor_pool_manager.launch(
+                spec,
+                runtime_root_certificates,
+                launch_deadline=launch_deadline,
+            )
+            if warm_result is not None:
+                return runtime_root_certificates, warm_result
+            # Readiness can disappear between reservation and token dispatch.
+            # Check cold capacity once without holding the task-poll loop.
+            cold_reservation = self._wait_for_capacity(
+                spec.task_type,
+                allow_warm_dispatch=False,
+                reconcile_warm_pools=False,
+                block=False,
+            )
+            if cold_reservation is None:
+                return runtime_root_certificates, _capacity_rejected()
+        return runtime_root_certificates, None
+
+    def _launch_cold_task(
+        self,
+        spec: ExecutionSpec,
+        runtime_root_certificates: str | None,
+        launch_deadline: float | None,
+    ) -> LaunchResult:
+        """Submit one cold TaskExecutor without using an expired task claim."""
+        if self._launch_deadline_expired(launch_deadline):
+            return _claim_expired()
+        launch_attempt_id = _new_launch_attempt_id()
+        secret_name = _credential_secret_name(spec, launch_attempt_id)
+        secret = _build_appio_credentials_secret(
+            spec, self._config, runtime_root_certificates, launch_attempt_id
+        )
+        pod = _build_taskexecutor_pod(
+            spec, self._config, runtime_root_certificates, launch_attempt_id
+        )
+        self._client.create_namespaced_secret(self._config.namespace, secret)
+        if self._launch_deadline_expired(launch_deadline):
+            _delete_secret_best_effort(
+                self._client, self._config.namespace, secret_name
+            )
+            return _claim_expired()
         try:
             self._client.create_namespaced_pod(self._config.namespace, pod)
         except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -650,19 +679,19 @@ class KubernetesExecutor:
 
         return LaunchResult.accepted()
 
-    def _retire_prepared_launch_attempts(self, task_id: int) -> bool:
+    def _retire_prepared_launch_attempts(
+        self, task_id: int
+    ) -> tuple[bool, float | None]:
         """Retire only attempts observed before the successful task claim."""
         prepared = self._prepared_launch
         self._prepared_launch = None
         if prepared is None:
-            return True
+            return True, None
         if prepared.task_id != task_id:
-            return False
-        if (
-            self._config.monotonic() - prepared.prepared_at
-            >= HEARTBEAT_DEFAULT_INTERVAL
-        ):
-            return False
+            return False, None
+        launch_deadline = prepared.prepared_at + HEARTBEAT_DEFAULT_INTERVAL
+        if self._launch_deadline_expired(launch_deadline):
+            return False, launch_deadline
 
         secrets = {secret.name: secret for secret in prepared.secrets}
         retired_secret_names: set[str] = set()
@@ -688,7 +717,13 @@ class KubernetesExecutor:
                 cleanup_succeeded = (
                     self._delete_prepared_secret(secret) and cleanup_succeeded
                 )
-        return cleanup_succeeded
+        return cleanup_succeeded, launch_deadline
+
+    def _launch_deadline_expired(self, launch_deadline: float | None) -> bool:
+        """Return whether the conservative task claim deadline has passed."""
+        return (
+            launch_deadline is not None and self._config.monotonic() >= launch_deadline
+        )
 
     def _delete_prepared_pod(self, pod: _KubernetesObjectRef) -> bool:
         """Delete a snapshotted Pod with a UID precondition."""
@@ -1606,6 +1641,20 @@ def _launch_result_from_exception(exc: Exception) -> LaunchResult:
         return LaunchResult.unknown(message)
 
     return LaunchResult.failed(message)
+
+
+def _capacity_rejected() -> LaunchResult:
+    """Return the common result for a full TaskExecutor Pod budget."""
+    return LaunchResult.capacity_rejected(
+        "Kubernetes TaskExecutor active Pod budget is full."
+    )
+
+
+def _claim_expired() -> LaunchResult:
+    """Return a retryable result when launch outlives its task claim window."""
+    return LaunchResult.capacity_rejected(
+        "Task claim may have expired before Kubernetes launch submission."
+    )
 
 
 def _is_definite_pod_rejection(exc: Exception) -> bool:

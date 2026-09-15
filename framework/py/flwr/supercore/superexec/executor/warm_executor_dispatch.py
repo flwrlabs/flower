@@ -376,7 +376,11 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
 
     # pylint: disable-next=too-many-return-statements
     def launch(
-        self, spec: ExecutionSpec, runtime_root_certificates: str | None
+        self,
+        spec: ExecutionSpec,
+        runtime_root_certificates: str | None,
+        *,
+        launch_deadline: float | None = None,
     ) -> LaunchResult | None:
         """Dispatch a compatible task to a ready Pod or use the cold fallback."""
         pool = self._pool_for_task(spec.task_type)
@@ -408,6 +412,14 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             self._retire_unavailable_pod(pod_name, pool.key)
             self._log_dispatch(pool, "setup_unavailable")
             return None
+
+        if launch_deadline is not None and self._config.monotonic() >= launch_deadline:
+            dispatch.close()
+            self._retire_unavailable_pod(pod_name, pool.key)
+            self._log_dispatch(pool, "claim_expired")
+            return LaunchResult.capacity_rejected(
+                "Task claim may have expired before Kubernetes launch submission."
+            )
 
         try:
             dispatch.send_token(spec.token)
