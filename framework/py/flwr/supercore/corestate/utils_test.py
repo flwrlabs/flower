@@ -30,6 +30,7 @@ def create_task_message(  # pylint: disable=too-many-arguments
     dst_task_id: int | None = 2,
     run_id: int = 1,
     *,
+    node_id: int = SUPERLINK_NODE_ID,
     reply_to_message_id: str = "",
     created_at: float | None = None,
     ttl: float = 60.0,
@@ -41,8 +42,8 @@ def create_task_message(  # pylint: disable=too-many-arguments
     metadata = Metadata(
         run_id=run_id,
         message_id="",
-        src_node_id=SUPERLINK_NODE_ID,
-        dst_node_id=SUPERLINK_NODE_ID,
+        src_node_id=node_id,
+        dst_node_id=node_id,
         reply_to_message_id=reply_to_message_id,
         group_id="",
         created_at=created_at if created_at is not None else now().timestamp(),
@@ -84,14 +85,23 @@ class UtilsTest(unittest.TestCase):
             with self.subTest(has_error=has_error):
                 message = create_task_message(has_error=has_error)
 
-                self.assertEqual(validate_task_message(message), [])
+                self.assertEqual(validate_task_message(message, SUPERLINK_NODE_ID), [])
+
+    def test_validate_task_message_rejects_other_corestate_node(self) -> None:
+        """Reject Task Messages addressed to a different CoreState node."""
+        message = create_task_message(node_id=123)
+
+        errors = validate_task_message(message, node_id=456)
+
+        _assert_has_error(errors, "metadata.src_node_id")
+        _assert_has_error(errors, "metadata.dst_node_id")
 
     def test_validate_task_message_rejects_missing_message_id(self) -> None:
         """Test that message_id must be set."""
         message = create_task_message()
         message.metadata.__dict__["_message_id"] = ""
 
-        errors = validate_task_message(message)
+        errors = validate_task_message(message, SUPERLINK_NODE_ID)
 
         _assert_has_error(errors, "metadata.message_id")
 
@@ -99,7 +109,7 @@ class UtilsTest(unittest.TestCase):
         """Test that run_id must be set."""
         message = create_task_message(run_id=0)
 
-        errors = validate_task_message(message)
+        errors = validate_task_message(message, SUPERLINK_NODE_ID)
 
         _assert_has_error(errors, "metadata.run_id")
 
@@ -107,7 +117,7 @@ class UtilsTest(unittest.TestCase):
         """Test that source task ID must be set."""
         message = create_task_message(src_task_id=None)
 
-        errors = validate_task_message(message)
+        errors = validate_task_message(message, SUPERLINK_NODE_ID)
 
         _assert_has_error(errors, "metadata.src_task_id")
 
@@ -115,7 +125,7 @@ class UtilsTest(unittest.TestCase):
         """Test that destination task ID must be set."""
         message = create_task_message(dst_task_id=None)
 
-        errors = validate_task_message(message)
+        errors = validate_task_message(message, SUPERLINK_NODE_ID)
 
         _assert_has_error(errors, "metadata.dst_task_id")
 
@@ -123,7 +133,7 @@ class UtilsTest(unittest.TestCase):
         """Test that source and destination task IDs must differ."""
         message = create_task_message(src_task_id=1, dst_task_id=1)
 
-        errors = validate_task_message(message)
+        errors = validate_task_message(message, SUPERLINK_NODE_ID)
 
         _assert_has_error(errors, "must be different")
 
@@ -131,7 +141,7 @@ class UtilsTest(unittest.TestCase):
         """Test that created_at must be a plausible timestamp."""
         message = create_task_message(created_at=0.0)
 
-        errors = validate_task_message(message)
+        errors = validate_task_message(message, SUPERLINK_NODE_ID)
 
         _assert_has_error(errors, "metadata.created_at")
 
@@ -139,7 +149,7 @@ class UtilsTest(unittest.TestCase):
         """Test that ttl must be positive."""
         message = create_task_message(ttl=0.0)
 
-        errors = validate_task_message(message)
+        errors = validate_task_message(message, SUPERLINK_NODE_ID)
 
         _assert_has_error(errors, "metadata.ttl")
 
@@ -147,7 +157,7 @@ class UtilsTest(unittest.TestCase):
         """Test that task messages must not be expired."""
         message = create_task_message(created_at=now().timestamp() - 10.0, ttl=1.0)
 
-        errors = validate_task_message(message)
+        errors = validate_task_message(message, SUPERLINK_NODE_ID)
 
         _assert_has_error(errors, "TTL has expired")
 
@@ -156,7 +166,7 @@ class UtilsTest(unittest.TestCase):
         message = create_task_message()
         message.metadata.__dict__["_message_type"] = ""
 
-        errors = validate_task_message(message)
+        errors = validate_task_message(message, SUPERLINK_NODE_ID)
 
         _assert_has_error(errors, "metadata.message_type")
 
@@ -165,7 +175,7 @@ class UtilsTest(unittest.TestCase):
         message = create_task_message()
         message.__dict__["_content"] = None
 
-        errors = validate_task_message(message)
+        errors = validate_task_message(message, SUPERLINK_NODE_ID)
 
         _assert_has_error(errors, "content` or `error")
 
@@ -174,6 +184,6 @@ class UtilsTest(unittest.TestCase):
         message = create_task_message()
         message.__dict__["_error"] = Error(0)
 
-        errors = validate_task_message(message)
+        errors = validate_task_message(message, SUPERLINK_NODE_ID)
 
         _assert_has_error(errors, "content` or `error")

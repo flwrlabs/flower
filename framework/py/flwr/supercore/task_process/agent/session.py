@@ -26,7 +26,7 @@ from typing import cast
 
 from google.protobuf.json_format import ParseDict
 
-from flwr.agentapp import AgentConnectors, AgentEvents, AgentResponses, AgentSession
+from flwr.agentapp import AgentConnectors, AgentEvents, AgentSession
 from flwr.app import Message
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -46,7 +46,6 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
-from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
@@ -56,8 +55,8 @@ from flwr.supercore.task_process.connector.registry import (
 from flwr.supercore.typing import JSONObject, JSONValue
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
-_DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
-_DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
+_DEFAULT_TASK_REPLY_TIMEOUT = 300.0
+_DEFAULT_TASK_REPLY_POLL_INTERVAL = 0.25
 _EVENT_PUBLISH_BATCH_SIZE = 16
 _EVENT_PUBLISH_QUEUE_SIZE = 256
 _EVENT_PUBLISH_BATCH_WAIT = 0.05
@@ -172,18 +171,11 @@ class RuntimeAgentSession(AgentSession):
 
     def __init__(
         self,
-        responses: AgentResponses,
         connectors: AgentConnectors,
         events: AgentEvents,
     ) -> None:
-        self._responses = responses
         self._connectors = connectors
         self._events = events
-
-    @property
-    def responses(self) -> AgentResponses:
-        """Model response creation API."""
-        return self._responses
 
     @property
     def connectors(self) -> AgentConnectors:
@@ -199,8 +191,8 @@ class RuntimeAgentSession(AgentSession):
 class RuntimeAgentConnectors(AgentConnectors):
     """AgentConnectors implementation for model tools."""
 
-    def __init__(self, responses: RuntimeAgentResponses) -> None:
-        self._responses = responses
+    def __init__(self, agent_runtime: AgentRuntime) -> None:
+        self._agent_runtime = agent_runtime
 
     def tools(self, names: Sequence[str]) -> list[JSONObject]:
         """Return model-facing tool schemas for the requested connectors."""
@@ -217,19 +209,19 @@ class RuntimeAgentConnectors(AgentConnectors):
         arguments_obj = cast(JSONObject, arguments)
 
         if name == START_AUTOMATION_TOOL_NAME:
-            return self._responses.call_automation_with_events(
+            return self._agent_runtime.call_automation_with_events(
                 call_id=call_id,
                 arguments=arguments_obj,
             )
-        return self._responses.call_connector_with_events(
+        return self._agent_runtime.call_connector_with_events(
             name=name,
             call_id=call_id,
             arguments=arguments_obj,
         )
 
 
-class RuntimeAgentResponses(AgentResponses):
-    """AgentResponses implementation backed by Runtime task messages."""
+class AgentRuntime:
+    """Coordinate AgentApp operations with Runtime services."""
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
@@ -245,43 +237,6 @@ class RuntimeAgentResponses(AgentResponses):
         self._task_id = task_id
         self._start_run_request = start_run_request
         self._events = events
-
-    def create(self, request: JSONObject) -> JSONObject:
-        """Create a model response through a child model task."""
-        return self._create_model_response(request)
-
-    def _create_model_response(self, request: JSONObject) -> JSONObject:
-        """Create one model response through a child model task."""
-        model = request.get("model")
-        if not isinstance(model, str) or not model:
-            raise ValueError(
-                "AgentResponses request requires a non-empty string 'model' field."
-            )
-
-        create_res = self._stub.CreateTask(
-            CreateTaskRequest(type=TaskType.MODEL, model_ref=model)
-        )
-        if not create_res.HasField("task_id"):
-            raise RuntimeError("Model task could not be created.")
-
-        model_task_id = create_res.task_id
-        message = ModelRequest(
-            dst_task_id=model_task_id,
-            input_=cast(str | Sequence[JSONObject], request.get("input")),
-            model=model,
-            stream=cast(bool, request.get("stream", False)),
-            tools=cast(Sequence[JSONObject] | None, request.get("tools")),
-            tool_choice=request.get("tool_choice"),
-            reasoning=cast(JSONObject | None, request.get("reasoning")),
-            previous_response_id=cast(str | None, request.get("previous_response_id")),
-            instructions=cast(str | None, request.get("instructions")),
-            max_output_tokens=cast(int | None, request.get("max_output_tokens")),
-            metadata=cast(JSONObject | None, request.get("metadata")),
-            text=cast(JSONObject | None, request.get("text")),
-        )
-        response_message = self._send_and_receive(message)
-        response = ModelResponse.from_message(response_message)
-        return response.payload
 
     def create_connector_response(
         self, *, name: str, call_id: str, arguments: JSONObject
@@ -457,7 +412,7 @@ class RuntimeAgentResponses(AgentResponses):
         message_id = message.metadata.message_id
 
         # Pull until a message arrives that replies to the pushed message, or timeout
-        deadline = time.monotonic() + _DEFAULT_MODEL_REPLY_TIMEOUT
+        deadline = time.monotonic() + _DEFAULT_TASK_REPLY_TIMEOUT
         while True:
             # The request destination becomes the source of its reply.
             for pulled_msg in self._pull_task_messages(src_task_id=child_task_id):
@@ -469,6 +424,6 @@ class RuntimeAgentResponses(AgentResponses):
 
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise TimeoutError("Timed out waiting for model response.")
+                raise TimeoutError("Timed out waiting for child task response.")
 
-            time.sleep(min(_DEFAULT_MODEL_REPLY_POLL_INTERVAL, remaining))
+            time.sleep(min(_DEFAULT_TASK_REPLY_POLL_INTERVAL, remaining))
