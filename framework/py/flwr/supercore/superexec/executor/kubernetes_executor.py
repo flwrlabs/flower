@@ -445,7 +445,7 @@ class KubernetesExecutor:
         # Keep only one bounded snapshot because SuperExec dispatches serially.
         self._prepared_launch = None
         try:
-            selector = _task_attempt_label_selector(self._config, task_id)
+            selector = _task_attempt_label_selector(task_id)
             # Cold launch creates the credential Secret before its Pod. Listing
             # in the same order lets cleanup detect a launch that crosses the
             # snapshot boundary without assuming the two lists are atomic.
@@ -1491,10 +1491,13 @@ def _taskexecutor_pool_label_selector(config: KubernetesExecutorConfig) -> str:
     return _label_selector(_taskexecutor_pool_labels(config))
 
 
-def _task_attempt_label_selector(config: KubernetesExecutorConfig, task_id: int) -> str:
-    """Return a selector for cold launch attempts belonging to one task."""
-    labels = _taskexecutor_pool_labels(config)
-    labels[_TASK_ID_LABEL] = str(task_id)
+def _task_attempt_label_selector(task_id: int) -> str:
+    """Return a pool-independent selector for cold attempts of one random task ID."""
+    labels = {
+        _NAME_LABEL: "flower",
+        _COMPONENT_LABEL: "taskexecutor",
+        _TASK_ID_LABEL: str(task_id),
+    }
     return f"{_label_selector(labels)},{LAUNCH_ATTEMPT_LABEL}"
 
 

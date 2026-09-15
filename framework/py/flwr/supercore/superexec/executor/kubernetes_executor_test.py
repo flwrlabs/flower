@@ -2990,15 +2990,16 @@ def test_reclaimed_task_retires_all_prior_attempts_before_replacement(
     )
 
 
-def test_restarted_executor_finds_attempt_after_caller_labels_change(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("old_resource_pool", ["gpu-pool", "previous-pool"])
+def test_restarted_executor_finds_attempt_after_metadata_changes(
+    monkeypatch: pytest.MonkeyPatch, old_resource_pool: str
 ) -> None:
-    """Caller label changes must not hide old attempts from pool operations."""
+    """Metadata changes must not hide old attempts from per-task cleanup."""
     client = Mock()
     old_labels = {
         **_task_labels(123),
         LAUNCH_ATTEMPT_LABEL: _LAUNCH_ATTEMPT_ID,
-        "flower.ai/resource-pool": "gpu-pool",
+        "flower.ai/resource-pool": old_resource_pool,
         "flower.ai/team": "previous",
     }
     client.list_namespaced_pod.return_value = {
@@ -3041,12 +3042,20 @@ def test_restarted_executor_finds_attempt_after_caller_labels_change(
         "app.kubernetes.io/name=flower,"
         "flower.ai/resource-pool=gpu-pool"
     )
-    attempt_selector = client.list_namespaced_secret.call_args_list[0].kwargs[
-        "label_selector"
-    ]
-    assert attempt_selector.startswith(f"{pool_selector},")
-    assert _TASK_ID_LABEL in attempt_selector
-    assert LAUNCH_ATTEMPT_LABEL in attempt_selector
+    attempt_selector = (
+        "app.kubernetes.io/component=taskexecutor,"
+        "app.kubernetes.io/name=flower,"
+        "flower.ai/superexec-task-id=123,"
+        f"{LAUNCH_ATTEMPT_LABEL}"
+    )
+    assert (
+        client.list_namespaced_secret.call_args_list[0].kwargs["label_selector"]
+        == attempt_selector
+    )
+    assert (
+        client.list_namespaced_pod.call_args_list[0].kwargs["label_selector"]
+        == attempt_selector
+    )
     assert all(
         "flower.ai/team" not in call_args.kwargs["label_selector"]
         for call_args in (
@@ -3056,6 +3065,10 @@ def test_restarted_executor_finds_attempt_after_caller_labels_change(
     )
     assert (
         client.list_namespaced_pod.call_args_list[-1].kwargs["label_selector"]
+        == pool_selector
+    )
+    assert (
+        client.list_namespaced_secret.call_args_list[-1].kwargs["label_selector"]
         == pool_selector
     )
 
