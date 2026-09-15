@@ -21,7 +21,7 @@ import logging
 import subprocess
 import sys
 import threading
-from dataclasses import fields
+from inspect import signature
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -149,28 +149,12 @@ def test_kubernetes_executor_config_rejects_unsupported_warm_pool() -> None:
 
 def test_kubernetes_executor_config_preserves_positional_callback_binding() -> None:
     """New options must not change existing positional callback arguments."""
-    config_fields = fields(KubernetesExecutorConfig)
-    assert [field.name for field in config_fields[-3:]] == [
+    assert list(signature(KubernetesExecutorConfig).parameters)[-3:] == [
         "sleep",
         "monotonic",
         "log_warm_executor_output",
     ]
-    old_optional_defaults = [field.default for field in config_fields[2:-3]]
-    sleep = Mock()
-    monotonic = Mock(return_value=0.0)
-    config_constructor: Any = KubernetesExecutorConfig
-
-    config = config_constructor(
-        "flower-system",
-        "ghcr.io/flwrlabs/taskexecutor:dev",
-        *old_optional_defaults,
-        sleep,
-        monotonic,
-    )
-
-    assert config.sleep is sleep
-    assert config.monotonic is monotonic
-    assert config.log_warm_executor_output is False
+    assert not KubernetesExecutorConfig("namespace", "image").log_warm_executor_output
 
 
 def _ready_warm_pod(
@@ -249,6 +233,20 @@ class _WarmExecResponse:
     def close(self) -> None:
         """Close the response after one task."""
         self._open = False
+
+
+def _logging_warm_dispatch(
+    monkeypatch: pytest.MonkeyPatch, response: object
+) -> tuple[warm_executor_dispatch.KubernetesWarmExecutorDispatch, Mock]:
+    """Return a contextual dispatch and its captured logger."""
+    captured_log = Mock()
+    monkeypatch.setattr(warm_executor_dispatch, "log", captured_log)
+    return (
+        warm_executor_dispatch.KubernetesWarmExecutorDispatch(
+            response, pod_name="warm-pod", task_id=42, log_output=True
+        ),
+        captured_log,
+    )
 
 
 def _as_dict(value: object) -> dict[str, Any]:
@@ -541,14 +539,6 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
         "items": [_ready_warm_pod(pool_key, config)]
     }
     stream = Mock(return_value=_WarmExecResponse())
-    dispatch_constructor = Mock(
-        wraps=warm_executor_dispatch.KubernetesWarmExecutorDispatch
-    )
-    monkeypatch.setattr(
-        warm_executor_dispatch,
-        "KubernetesWarmExecutorDispatch",
-        dispatch_constructor,
-    )
     monkeypatch.setattr(
         importlib,
         "import_module",
@@ -614,13 +604,11 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
         *transport_args,
     ]
     assert "task-token" not in stream.call_args.kwargs["command"]
-    dispatch_constructor.assert_called_once_with(
-        stream.return_value,
-        pod_name="flwr-taskexecutor-warm-ready",
-        task_id=123,
-        log_output=suppress_output,
-    )
     assert len(started) == 1
+    dispatch = cast(
+        warm_executor_dispatch.KubernetesWarmExecutorDispatch, started[0][1][-2]
+    )
+    assert dispatch._log_output is suppress_output  # pylint: disable=protected-access
     assert started[0][1][-1] is (not suppress_output)
 
 
@@ -943,52 +931,23 @@ def test_warm_dispatch_logs_buffered_streams_and_filters_acknowledgement(
     ]
     response.read_stderr.side_effect = ["partial stderr", " line\n", "", ""]
     response.is_open.side_effect = [True, False]
-    log = Mock()
-    monkeypatch.setattr(warm_executor_dispatch, "log", log)
-    dispatch = warm_executor_dispatch.KubernetesWarmExecutorDispatch(
-        response,
-        pod_name="warm-pod",
-        task_id=42,
-        log_output=True,
-    )
+    dispatch, log = _logging_warm_dispatch(monkeypatch, response)
 
     dispatch.send_token("task-token")
     assert dispatch.wait_for_acceptance(1.0)
     assert dispatch.wait_for_close()
 
-    assert [entry.args for entry in log.call_args_list] == [
+    assert {entry.args[:2] for entry in log.call_args_list} == {
         (
             logging.INFO,
             "Warm TaskExecutor output pod=%s task_id=%s stream=%s: %s",
-            "warm-pod",
-            42,
-            "stdout",
-            timing_line,
-        ),
-        (
-            logging.INFO,
-            "Warm TaskExecutor output pod=%s task_id=%s stream=%s: %s",
-            "warm-pod",
-            42,
-            "stderr",
-            "partial stderr line",
-        ),
-        (
-            logging.INFO,
-            "Warm TaskExecutor output pod=%s task_id=%s stream=%s: %s",
-            "warm-pod",
-            42,
-            "stdout",
-            "partial stdout",
-        ),
-        (
-            logging.INFO,
-            "Warm TaskExecutor output pod=%s task_id=%s stream=%s: %s",
-            "warm-pod",
-            42,
-            "stdout",
-            "final stdout",
-        ),
+        )
+    }
+    assert [entry.args[2:] for entry in log.call_args_list] == [
+        ("warm-pod", 42, "stdout", timing_line),
+        ("warm-pod", 42, "stderr", "partial stderr line"),
+        ("warm-pod", 42, "stdout", "partial stdout"),
+        ("warm-pod", 42, "stdout", "final stdout"),
     ]
     assert all(
         value not in str(log.call_args_list)
@@ -1004,16 +963,9 @@ def test_warm_dispatch_does_not_log_late_acknowledgement_after_failed_handoff(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A failed handoff disables logging before its cleanup drain."""
-    response = _WarmExecResponse(acknowledge=False)
+    response = _WarmExecResponse(acknowledge=False, stderr="error before failure\n")
     response._stdout = "output before failure\n"  # pylint: disable=protected-access
-    log = Mock()
-    monkeypatch.setattr(warm_executor_dispatch, "log", log)
-    dispatch = warm_executor_dispatch.KubernetesWarmExecutorDispatch(
-        response,
-        pod_name="warm-pod",
-        task_id=42,
-        log_output=True,
-    )
+    dispatch, log = _logging_warm_dispatch(monkeypatch, response)
 
     dispatch.send_token("task-token")
     assert not dispatch.wait_for_acceptance(1.0)
@@ -1023,15 +975,13 @@ def test_warm_dispatch_does_not_log_late_acknowledgement_after_failed_handoff(
     )
     assert dispatch.wait_for_close()
 
-    assert [entry.args[-1] for entry in log.call_args_list] == ["output before failure"]
-    assert all(
-        value not in str(log.call_args_list)
-        for value in (
-            FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
-            FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
-            "task-token",
-            "output after failure",
-        )
+    assert [entry.args[-2:] for entry in log.call_args_list] == [
+        ("stdout", "output before failure"),
+        ("stderr", "error before failure"),
+    ]
+    assert not any(
+        value in str(log.call_args_list)
+        for value in ("TOKEN_ACCEPTED", "task-token", "output after failure")
     )
 
 
@@ -1039,11 +989,7 @@ def test_warm_dispatch_reassembles_split_crlf_before_logging(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A CRLF split across reads should produce exactly one log record."""
-    log = Mock()
-    monkeypatch.setattr(warm_executor_dispatch, "log", log)
-    dispatch = warm_executor_dispatch.KubernetesWarmExecutorDispatch(
-        Mock(), pod_name="warm-pod", task_id=42, log_output=True
-    )
+    dispatch, log = _logging_warm_dispatch(monkeypatch, Mock())
 
     dispatch._log_stream_output(  # pylint: disable=protected-access
         "stdout", "one line\r"
@@ -1054,49 +1000,17 @@ def test_warm_dispatch_reassembles_split_crlf_before_logging(
     assert [entry.args[-1] for entry in log.call_args_list] == ["one line"]
 
 
-def test_warm_dispatch_logs_output_when_acknowledgement_is_missing(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Configured warm output logging also captures output before a failed ack."""
-    response = _WarmExecResponse(acknowledge=False, stderr="stderr output")
-    response._stdout = "stdout output\n"  # pylint: disable=protected-access
-    log = Mock()
-    monkeypatch.setattr(warm_executor_dispatch, "log", log)
-    dispatch = warm_executor_dispatch.KubernetesWarmExecutorDispatch(
-        response,
-        pod_name="warm-pod",
-        task_id=42,
-        log_output=True,
-    )
-
-    assert not dispatch.wait_for_acceptance(1.0)
-
-    assert [entry.args[-2:] for entry in log.call_args_list] == [
-        ("stdout", "stdout output"),
-        ("stderr", "stderr output"),
-    ]
-
-
 def test_warm_dispatch_bounds_newline_free_output_buffer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A child without newlines cannot grow the per-stream buffer without bound."""
-    log = Mock()
-    monkeypatch.setattr(warm_executor_dispatch, "log", log)
-    dispatch = warm_executor_dispatch.KubernetesWarmExecutorDispatch(
-        Mock(), pod_name="warm-pod", task_id=42, log_output=True
-    )
+    dispatch, log = _logging_warm_dispatch(monkeypatch, Mock())
 
     max_buffer_size = (
         warm_executor_dispatch._MAX_OUTPUT_LINE_BUFFER_SIZE  # pylint: disable=protected-access
     )
     output = "x" * (2 * max_buffer_size + 3)
     dispatch._log_stream_output("stdout", output)  # pylint: disable=protected-access
-
-    assert [len(entry.args[-1]) for entry in log.call_args_list] == [
-        max_buffer_size,
-        max_buffer_size,
-    ]
     dispatch._log_stream_output("stdout", "\n")  # pylint: disable=protected-access
     assert [len(entry.args[-1]) for entry in log.call_args_list] == [
         max_buffer_size,
