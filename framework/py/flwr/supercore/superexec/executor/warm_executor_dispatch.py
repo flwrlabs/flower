@@ -161,7 +161,10 @@ class KubernetesWarmExecutorDispatch:
         stderr_before_acceptance: list[str],
     ) -> None:
         """Log output observed before a child failed to acknowledge its token."""
-        if not self._log_output:
+        log_output = self._log_output
+        # A later cleanup drain must not log a queued token acknowledgement.
+        self._log_output = False
+        if not log_output:
             return
         self._log_stream_output("stdout", "".join((*stdout_before_acceptance, stdout)))
         self._log_stream_output("stderr", "".join(stderr_before_acceptance))
@@ -185,6 +188,8 @@ class KubernetesWarmExecutorDispatch:
 
     def close(self) -> None:
         """Close the Kubernetes exec stream best-effort."""
+        # Closing before acceptance also disables logging in the cleanup drain.
+        self._log_output = False
         close = getattr(self._response, "close", None)
         if callable(close):
             try:
@@ -255,13 +260,21 @@ class KubernetesWarmExecutorDispatch:
     def _log_stream_output(self, stream: str, output: str) -> None:
         """Log complete child-output lines while retaining a partial suffix."""
         buffered = self._output_buffers[stream] + output
+        trailing_carriage_return = buffered.endswith("\r")
+        if trailing_carriage_return:
+            buffered = buffered[:-1]
         lines = buffered.splitlines(keepends=True)
         self._output_buffers[stream] = ""
         if lines and not lines[-1].endswith(("\n", "\r")):
             self._output_buffers[stream] = lines.pop()
+        if trailing_carriage_return:
+            self._output_buffers[stream] += "\r"
         for line in lines:
             self._log_output_line(stream, line.rstrip("\r\n"))
-        while len(self._output_buffers[stream]) > _MAX_OUTPUT_LINE_BUFFER_SIZE:
+        while (
+            len(self._output_buffers[stream].removesuffix("\r"))
+            > _MAX_OUTPUT_LINE_BUFFER_SIZE
+        ):
             chunk = self._output_buffers[stream][:_MAX_OUTPUT_LINE_BUFFER_SIZE]
             self._output_buffers[stream] = self._output_buffers[stream][
                 _MAX_OUTPUT_LINE_BUFFER_SIZE:
@@ -272,18 +285,23 @@ class KubernetesWarmExecutorDispatch:
         """Log any final partial child-output lines."""
         for stream, output in self._output_buffers.items():
             if output:
-                self._log_output_line(stream, output)
+                self._log_output_line(stream, output.removesuffix("\r"))
         self._output_buffers = {"stdout": "", "stderr": ""}
 
     def _log_output_line(self, stream: str, output: str) -> None:
         """Log one child-output line with enough dispatch context to correlate it."""
+        filtered_output = output
+        for acknowledgement in _TOKEN_STDIN_ACKNOWLEDGEMENTS:
+            filtered_output = filtered_output.replace(acknowledgement, "")
+        if output and not filtered_output:
+            return
         log(
             INFO,
             "Warm TaskExecutor output pod=%s task_id=%s stream=%s: %s",
             self._pod_name or "unknown",
             self._task_id if self._task_id is not None else "unknown",
             stream,
-            output,
+            filtered_output,
         )
 
     def _discard_combined_output(self) -> None:
@@ -695,7 +713,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             response,
             pod_name=pod_name,
             task_id=spec.task_id,
-            log_output=self._config.log_warm_executor_output,
+            log_output=self._config.log_warm_executor_output and spec.suppress_output,
         )
 
     def _consumed_pod_has_finished(self, pod: object) -> bool:
