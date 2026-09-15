@@ -11,6 +11,7 @@ README.md @jafermarq @tanertopal @danieljanes
 
 # Flower Baselines
 /baselines @chongshenng @jafermarq @tanertopal @danieljanes
+/baselines/docs/source/conf.py @chongshenng @jafermarq @panh99 @tanertopal @danieljanes
 
 # Flower Benchmarks
 /benchmarks @jafermarq @tanertopal @danieljanes
@@ -37,6 +38,7 @@ README.md @jafermarq @tanertopal @danieljanes
 /.github/workflows @tanertopal @danieljanes
 /.github/workflows/datasets-e2e.yml @jafermarq @tanertopal @danieljanes
 /.github/workflows/datasets-test.yml @jafermarq @tanertopal @danieljanes
+/.github/framework-release.json @panh99 @tanertopal @danieljanes
 
 # Docker-related files
 **/*.Dockerfile @tanertopal @danieljanes
