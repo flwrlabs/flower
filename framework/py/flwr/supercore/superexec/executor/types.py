@@ -101,6 +101,9 @@ class Executor(Protocol):
     ) -> None:
         """Wait until the executor can accept one TaskExecutor launch."""
 
+    def prepare_launch(self, task_id: int) -> bool:
+        """Return whether executor state is ready for a task claim."""
+
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""
 
