@@ -2438,7 +2438,8 @@ def test_sweeper_deletes_terminal_pod_and_matching_secret(phase: str) -> None:
     selector = (
         "app.kubernetes.io/component=taskexecutor,"
         "app.kubernetes.io/name=flower,"
-        "flower.ai/resource-pool=gpu-pool"
+        "flower.ai/resource-pool=gpu-pool,"
+        "flower.ai/team=platform"
     )
     client.list_namespaced_pod.assert_called_once_with(
         "flower-system", label_selector=selector
@@ -3040,7 +3041,8 @@ def test_restarted_executor_finds_attempt_after_metadata_changes(
     pool_selector = (
         "app.kubernetes.io/component=taskexecutor,"
         "app.kubernetes.io/name=flower,"
-        "flower.ai/resource-pool=gpu-pool"
+        "flower.ai/resource-pool=gpu-pool,"
+        "flower.ai/team=current"
     )
     attempt_selector = (
         "app.kubernetes.io/component=taskexecutor,"
@@ -3057,19 +3059,12 @@ def test_restarted_executor_finds_attempt_after_metadata_changes(
         == attempt_selector
     )
     assert all(
-        "flower.ai/team" not in call_args.kwargs["label_selector"]
-        for call_args in (
-            *client.list_namespaced_pod.call_args_list,
-            *client.list_namespaced_secret.call_args_list,
-        )
+        call_args.kwargs["label_selector"] == pool_selector
+        for call_args in client.list_namespaced_pod.call_args_list[1:]
     )
-    assert (
-        client.list_namespaced_pod.call_args_list[-1].kwargs["label_selector"]
-        == pool_selector
-    )
-    assert (
-        client.list_namespaced_secret.call_args_list[-1].kwargs["label_selector"]
-        == pool_selector
+    assert all(
+        call_args.kwargs["label_selector"] == pool_selector
+        for call_args in client.list_namespaced_secret.call_args_list[1:]
     )
 
 

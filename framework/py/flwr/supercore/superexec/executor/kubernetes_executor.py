@@ -1502,11 +1502,14 @@ def _task_attempt_label_selector(task_id: int) -> str:
 
 
 def _taskexecutor_pool_labels(config: KubernetesExecutorConfig) -> dict[str, str]:
-    """Return stable executor-owned labels identifying a TaskExecutor pool."""
-    labels = {
-        _NAME_LABEL: "flower",
-        _COMPONENT_LABEL: "taskexecutor",
-    }
+    """Return labels identifying a scoped TaskExecutor pool."""
+    labels = _caller_labels(config)
+    labels.update(
+        {
+            _NAME_LABEL: "flower",
+            _COMPONENT_LABEL: "taskexecutor",
+        }
+    )
     if config.resource_pool is not None:
         labels[_RESOURCE_POOL_LABEL] = config.resource_pool
     return labels
