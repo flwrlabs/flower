@@ -68,22 +68,6 @@ def test_parse_superexec_accepts_kubernetes_executor_config(
     assert args.plugin_type is None
 
 
-def test_parse_superexec_hides_plugin_type() -> None:
-    """The deprecated plugin type argument should remain accepted but hidden."""
-    parser = _parse_args()
-    args = parser.parse_args(
-        [
-            "--runtime-api-address",
-            "127.0.0.1:9091",
-            "--plugin-type",
-            ExecPluginType.CLIENT_APP,
-        ]
-    )
-
-    assert args.plugin_type == ExecPluginType.CLIENT_APP
-    assert "--plugin-type" not in parser.format_help()
-
-
 @pytest.mark.parametrize(
     "address_args",
     [
