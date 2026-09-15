@@ -18,7 +18,6 @@
 import argparse
 import sys
 from logging import INFO, WARN
-from pathlib import Path
 from typing import Any
 
 import yaml
@@ -39,13 +38,7 @@ from flwr.supercore.superexec.executor.config import (
     ExecutorConfigError,
     load_executor_config,
 )
-from flwr.supercore.superexec.plugin import (
-    AutoExecPlugin,
-    ClientAppExecPlugin,
-    ExecPlugin,
-    ServerAppEphemeralExecPlugin,
-    ServerAppExecPlugin,
-)
+from flwr.supercore.superexec.plugin import AutoExecPlugin
 from flwr.supercore.superexec.run_superexec import run_superexec
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.update_check import warn_if_flwr_update_available
@@ -75,14 +68,11 @@ def flower_superexec() -> None:
     if args.plugin_type is not None:
         log(
             WARN,
-            "`--plugin-type` is usually unnecessary. Omit it unless "
-            "you need to pin SuperExec to a specific plugin.",
+            "The `--plugin-type` argument is deprecated and ignored; SuperExec "
+            "selects execution from the task type.",
         )
 
-    event(
-        EventType.RUN_SUPEREXEC_ENTER,
-        {"plugin_type": args.plugin_type or "auto"},
-    )
+    event(EventType.RUN_SUPEREXEC_ENTER, {"plugin_type": "auto"})
 
     # Load plugin config from YAML file if provided
     plugin_config = None
@@ -103,28 +93,6 @@ def flower_superexec() -> None:
         getattr(args, "executor_config", None), args.executor
     )
 
-    # Get the plugin and Runtime HTTP client classes based on the plugin type
-    if args.plugin_type == ExecPluginType.SIMULATION:
-        log(
-            WARN,
-            "The '%s' plugin type is deprecated and will be removed in a future "
-            "release. Please use '%s' instead, which supports both simulation "
-            "and deployment.",
-            ExecPluginType.SIMULATION,
-            ExecPluginType.SERVER_APP,
-        )
-        args.plugin_type = ExecPluginType.SERVER_APP
-
-    if args.plugin_type == ExecPluginType.SERVER_APP_EPHEMERAL:
-        log(
-            WARN,
-            "The '%s' plugin type is experimental and may be removed in a future "
-            "release. Please use '%s' for production deployments.",
-            ExecPluginType.SERVER_APP_EPHEMERAL,
-            ExecPluginType.SERVER_APP,
-        )
-
-    plugin_class, client_class = _get_plugin_and_client_class(args.plugin_type)
     superexec_auth_secret = None
     if args.superexec_auth_secret_file is not None:
         try:
@@ -137,18 +105,9 @@ def flower_superexec() -> None:
                 f"Failed to load SuperExec authentication secret: {err}",
             )
 
-        # Destroy the auth secret file immediately after loading
-        if args.plugin_type == ExecPluginType.SERVER_APP_EPHEMERAL:
-            try:
-                secret_path = Path(args.superexec_auth_secret_file).expanduser()
-                secret_path.write_bytes(b"\x00" * secret_path.stat().st_size)
-                secret_path.unlink()
-            except OSError as e:
-                log(WARN, "Failed to destroy authentication secret file: %s", e)
-
     run_superexec(
-        plugin_class=plugin_class,
-        client_class=client_class,
+        plugin_class=AutoExecPlugin,
+        client_class=RuntimeHttpClient,
         runtime_api_address=args.runtime_api_address,
         insecure=args.insecure,
         root_certificates_path=args.root_certificates,
@@ -190,7 +149,7 @@ def _parse_args() -> argparse.ArgumentParser:
         "--plugin-type",
         type=str,
         choices=ExecPluginType.all(),
-        help="The plugin to use. Omit to select execution from the task type.",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--insecure",
@@ -244,21 +203,3 @@ def _load_executor_config(
         return load_executor_config(executor_config_path, executor_type)
     except ExecutorConfigError as err:
         flwr_exit(ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG, str(err))
-
-
-def _get_plugin_and_client_class(
-    plugin_type: str | None,
-) -> tuple[type[ExecPlugin], type[RuntimeHttpClient]]:
-    """Get the plugin and Runtime HTTP client classes for a plugin type."""
-    mapping: dict[str | None, tuple[type[ExecPlugin], type[RuntimeHttpClient]]] = {
-        None: (AutoExecPlugin, RuntimeHttpClient),
-        ExecPluginType.CLIENT_APP: (ClientAppExecPlugin, RuntimeHttpClient),
-        ExecPluginType.SERVER_APP: (ServerAppExecPlugin, RuntimeHttpClient),
-        ExecPluginType.SERVER_APP_EPHEMERAL: (
-            ServerAppEphemeralExecPlugin,
-            RuntimeHttpClient,
-        ),
-    }
-    if plugin_type in mapping:
-        return mapping[plugin_type]
-    raise ValueError(f"Unknown plugin type: {plugin_type}")

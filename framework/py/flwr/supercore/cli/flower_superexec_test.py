@@ -24,15 +24,10 @@ import pytest
 
 from flwr.common.constant import ExecPluginType
 from flwr.supercore.constant import ExecutorType
-from flwr.supercore.runtime import RuntimeHttpClient
-from flwr.supercore.superexec.plugin import (
-    AutoExecPlugin,
-    ClientAppExecPlugin,
-    ExecPlugin,
-)
+from flwr.supercore.superexec.plugin import AutoExecPlugin
 from flwr.supercore.version import package_version
 
-from .flower_superexec import _get_plugin_and_client_class, _parse_args
+from .flower_superexec import _parse_args
 
 flower_superexec_module = importlib.import_module("flwr.supercore.cli.flower_superexec")
 
@@ -73,27 +68,20 @@ def test_parse_superexec_accepts_kubernetes_executor_config(
     assert args.plugin_type is None
 
 
-@pytest.mark.parametrize(
-    ("plugin_args", "expected_plugin_class"),
-    [
-        ([], AutoExecPlugin),
-        (["--plugin-type", ExecPluginType.CLIENT_APP], ClientAppExecPlugin),
-    ],
-)
-def test_parse_superexec_selects_plugin(
-    plugin_args: list[str], expected_plugin_class: type[ExecPlugin]
-) -> None:
-    """SuperExec should select automatically unless a plugin is explicit."""
-    args = _parse_args().parse_args(
+def test_parse_superexec_hides_plugin_type() -> None:
+    """The deprecated plugin type argument should remain accepted but hidden."""
+    parser = _parse_args()
+    args = parser.parse_args(
         [
             "--runtime-api-address",
             "127.0.0.1:9091",
-            *plugin_args,
+            "--plugin-type",
+            ExecPluginType.CLIENT_APP,
         ]
     )
 
-    plugin_class, _ = _get_plugin_and_client_class(args.plugin_type)
-    assert plugin_class is expected_plugin_class
+    assert args.plugin_type == ExecPluginType.CLIENT_APP
+    assert "--plugin-type" not in parser.format_help()
 
 
 @pytest.mark.parametrize(
@@ -169,10 +157,10 @@ def test_flower_superexec_checks_for_update(
     assert captured == ["update", "flower-superexec"]
 
 
-def test_flower_superexec_clientapp_allows_missing_secret(
+def test_flower_superexec_ignores_plugin_type(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """ClientApp plugin should not require a SuperExec auth secret."""
+    """The deprecated plugin type should not override automatic execution."""
     args = SimpleNamespace(
         insecure=True,
         plugin_type=ExecPluginType.CLIENT_APP,
@@ -201,61 +189,12 @@ def test_flower_superexec_clientapp_allows_missing_secret(
         lambda **_: None,
     )
     monkeypatch.setattr(flower_superexec_module, "_parse_args", _Parser)
-    monkeypatch.setattr(
-        flower_superexec_module,
-        "_get_plugin_and_client_class",
-        lambda _plugin_type: (object, RuntimeHttpClient),
-    )
     monkeypatch.setattr(flower_superexec_module, "run_superexec", _run_superexec)
 
     flower_superexec_module.flower_superexec()
 
     assert captured["superexec_auth_secret"] is None
-
-
-def test_flower_superexec_serverapp_allows_missing_secret(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """ServerApp plugin should allow missing secret in subprocess-mode flows."""
-    args = SimpleNamespace(
-        insecure=True,
-        plugin_type=ExecPluginType.SERVER_APP,
-        plugin_config=None,
-        root_certificates=None,
-        superexec_auth_secret_file=None,
-        runtime_api_address="127.0.0.1:9091",
-        parent_pid=None,
-        health_server_address=None,
-        runtime_dependency_install=False,
-        executor=ExecutorType.SUBPROCESS,
-    )
-
-    class _Parser:
-        def parse_args(self) -> SimpleNamespace:
-            """Return parsed arguments for the test path."""
-            return args
-
-    captured: dict[str, object] = {}
-
-    def _run_superexec(**kwargs: object) -> None:
-        captured.update(kwargs)
-
-    monkeypatch.setattr(
-        flower_superexec_module,
-        "warn_if_flwr_update_available",
-        lambda **_: None,
-    )
-    monkeypatch.setattr(flower_superexec_module, "_parse_args", _Parser)
-    monkeypatch.setattr(
-        flower_superexec_module,
-        "_get_plugin_and_client_class",
-        lambda _plugin_type: (object, RuntimeHttpClient),
-    )
-    monkeypatch.setattr(flower_superexec_module, "run_superexec", _run_superexec)
-
-    flower_superexec_module.flower_superexec()
-
-    assert captured["superexec_auth_secret"] is None
+    assert captured["plugin_class"] is AutoExecPlugin
 
 
 def test_flower_superexec_passes_executor_to_run_superexec(
@@ -285,11 +224,6 @@ def test_flower_superexec_passes_executor_to_run_superexec(
     )
     monkeypatch.setattr(
         flower_superexec_module, "_parse_args", Mock(return_value=parser)
-    )
-    monkeypatch.setattr(
-        flower_superexec_module,
-        "_get_plugin_and_client_class",
-        lambda _plugin_type: (object, RuntimeHttpClient),
     )
     monkeypatch.setattr(flower_superexec_module, "run_superexec", run_superexec_mock)
 
