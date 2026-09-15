@@ -7,7 +7,7 @@ continue an earlier conversation.
 Prefer the browser? Start with [Chat in your browser](quickstart.md).
 
 ```{note}
-This tutorial targets Flower 1.35.0. Flower Agent and `flwr chat` are
+This tutorial targets Flower {{ stable_flwr_version }}. Flower Agent and `flwr chat` are
 experimental and may change between releases.
 ```
 
@@ -26,9 +26,11 @@ You don't need to provide model credentials for a SuperGrid run.
 
 Use `uvx` to run the documented version in an isolated environment:
 
-```console
-$ uvx --from flwr==1.35.0 flwr --version
-flwr, version 1.35.0
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr --version
+flwr, version |stable_flwr_version|
 ```
 
 Running an explicit version keeps every command in this tutorial on the same
@@ -47,8 +49,10 @@ address = "api.flower.ai"
 
 If you maintain a custom file, ensure that section exists. Then log in:
 
-```console
-$ uvx --from flwr==1.35.0 flwr login supergrid
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr login supergrid
 ```
 
 Open the printed authentication link and complete sign-in. The CLI stores the
@@ -56,8 +60,10 @@ resulting account credentials for later SuperGrid commands.
 
 ## Start a chat
 
-```console
-$ uvx --from flwr==1.35.0 flwr chat
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr chat
 ```
 
 ```{figure} ../_static/screenshots/flwr-chat.png
@@ -135,6 +141,7 @@ Type `/` to open the command menu:
 - `/new` makes the next message start a new run series
 - `/federation` selects a federation and starts a new conversation there
 - `/history` shows conversations from the active federation
+- `/load` builds and selects an AgentApp from a local project directory
 - `/quit` leaves Flower Chat
 
 After entering `/history`, use the arrow keys to select a conversation, press

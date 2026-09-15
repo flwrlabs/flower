@@ -39,9 +39,11 @@ restricted to personal-workspace runs.
 Authenticate first, then ask SuperGrid for the federations visible to your
 account:
 
-```console
-$ uvx --from flwr==1.35.0 flwr login supergrid
-$ uvx --from flwr==1.35.0 flwr federation list supergrid
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr login supergrid
+$ uvx --from flwr==|stable_flwr_version| flwr federation list supergrid
 ```
 
 Use the full federation ID shown by this command, including its leading `@`, in
@@ -51,7 +53,7 @@ later commands.
 
 The following `uv run` examples use the Flower version installed in your local
 project environment. To stay consistent with the rest of this guide, ensure
-that environment has `flwr==1.35.0` installed.
+that environment has {substitution-code}`flwr==|stable_flwr_version|` installed.
 
 Flower selects the federation in this order:
 
@@ -75,8 +77,10 @@ $ uv run flwr run . supergrid \
 
 The app can also be a published app spec:
 
-```console
-$ uvx --from flwr==1.35.0 flwr run @publisher/agent supergrid \
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr run @publisher/agent supergrid \
     --federation @account/federation-name \
     --run-config 'agent.input="Summarize this federation task."'
 ```
@@ -157,7 +161,7 @@ them again. Flower excludes non-AgentApp run series from this chat history.
 
 Built-in tools such as `web_search` and `web_fetch` are chosen in AgentApp code.
 Slack, Notion, GitHub, and Attio are account connectors selected for a browser
-run. Flower 1.35.0 rejects account-connector references for a collaborative
+run. Flower {{ stable_flwr_version }} rejects account-connector references for a collaborative
 federation; run that task in your personal workspace instead.
 
 See [Connect accounts](connect-accounts.md) for setup and the exact read-only
