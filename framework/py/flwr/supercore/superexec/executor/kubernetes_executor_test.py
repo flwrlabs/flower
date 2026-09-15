@@ -149,12 +149,49 @@ def test_kubernetes_executor_config_rejects_unsupported_warm_pool() -> None:
 
 def test_kubernetes_executor_config_preserves_positional_callback_binding() -> None:
     """New options must not change existing positional callback arguments."""
-    assert list(signature(KubernetesExecutorConfig).parameters)[-3:] == [
+    parameters = list(signature(KubernetesExecutorConfig).parameters.values())
+    assert [parameter.name for parameter in parameters[-4:]] == [
         "sleep",
         "monotonic",
         "log_warm_executor_output",
+        "warm_executor_resources",
     ]
-    assert not KubernetesExecutorConfig("namespace", "image").log_warm_executor_output
+    sleep = Mock()
+    monotonic = Mock(return_value=1.0)
+
+    config = KubernetesExecutorConfig(
+        "namespace",
+        "image",
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        1.0,
+        None,
+        None,
+        (),
+        sleep,
+        monotonic,
+        True,
+    )
+
+    assert config.sleep is sleep
+    assert config.monotonic is monotonic
+    assert config.log_warm_executor_output is True
+    assert config.warm_executor_resources is None
 
 
 def _ready_warm_pod(
@@ -2170,15 +2207,22 @@ def test_warm_executor_resources_overlay_preserves_cold_resources() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    "resources",
+    [
+        None,
+        {
+            "requests": {"cpu": "4", "memory": "1Gi"},
+            "limits": {"cpu": "4", "memory": "4Gi"},
+        },
+    ],
+)
 @pytest.mark.parametrize("warm_executor_resources", [None, {}])
 def test_empty_warm_executor_resources_preserve_base_resources_and_hash(
+    resources: dict[str, Any] | None,
     warm_executor_resources: dict[str, Any] | None,
 ) -> None:
     """An unset or empty override preserves the existing warm Pod definition."""
-    resources = {
-        "requests": {"cpu": "4", "memory": "1Gi"},
-        "limits": {"cpu": "4", "memory": "4Gi"},
-    }
     default_pod = _as_dict(
         kube._build_warm_executor_pod(  # pylint: disable=protected-access
             _warm_executor_pool_key(), _executor_config(resources=resources), "default"
@@ -2195,7 +2239,7 @@ def test_empty_warm_executor_resources_preserve_base_resources_and_hash(
         )
     )
 
-    assert override_pod["spec"]["containers"][0]["resources"] == resources
+    assert override_pod["spec"]["containers"][0].get("resources") == resources
     assert (
         override_pod["metadata"]["annotations"][WARM_EXECUTOR_CONFIGURATION_ANNOTATION]
         == default_pod["metadata"]["annotations"][

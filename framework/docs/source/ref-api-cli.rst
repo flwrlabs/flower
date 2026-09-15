@@ -52,12 +52,11 @@
 Warm executor resource overrides
 --------------------------------
 
-The Kubernetes executor applies ``resources`` to cold and warm TaskExecutor
-Pods by default. Set ``warm-executor-resources`` to change only warm Pods. The
-executor recursively merges this mapping over ``resources``, so fields omitted
-from the warm override keep their base values. For example, this configuration
-uses four CPUs for cold Pods and one CPU for warm Pods while both use the same
-memory settings:
+The Kubernetes executor applies ``resources`` to cold and warm TaskExecutor Pods by
+default. Set ``warm-executor-resources`` to change only warm Pods. The executor
+recursively merges this mapping over ``resources``, so fields omitted from the warm
+override keep their base values. For example, this configuration uses four CPUs for cold
+Pods and one CPU for warm Pods while both use the same memory settings:
 
 .. code-block:: yaml
 
@@ -81,6 +80,6 @@ memory settings:
         cpu: "1"
 
 When the effective warm resource configuration changes, the executor replaces
-incompatible idle warm Pods. A warm Pod that is already running a task remains
-active until its task process exits. The warm resource settings remain on a Pod
-after it accepts a task, so the one-CPU setting applies while that task runs.
+incompatible idle warm Pods. A warm Pod that is already running a task remains active
+until its task process exits. The warm resource settings remain on a Pod after it
+accepts a task, so the one-CPU setting applies while that task runs.

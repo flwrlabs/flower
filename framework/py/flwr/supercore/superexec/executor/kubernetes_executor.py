@@ -225,9 +225,6 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
         Optional Flower resource-pool label value.
     resources : JSONObject | None
         Optional Kubernetes container resource requests and limits.
-    warm_executor_resources : JSONObject | None
-        Optional resource requests and limits merged over ``resources`` for warm
-        TaskExecutor Pods.
     env : list[JSONObject] | None
         Optional explicit TaskExecutor container environment. Only literal
         name/value entries are supported.
@@ -252,6 +249,9 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
         decided outside this executor.
     log_warm_executor_output : bool
         Whether to log stdout and stderr that warm TaskExecutor dispatch suppresses.
+    warm_executor_resources : JSONObject | None
+        Optional resource requests and limits merged over ``resources`` for warm
+        TaskExecutor Pods.
     """
 
     namespace: str
@@ -280,10 +280,10 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     # use one SuperExec replica per owner value unless they add leader election.
     warm_executor_owner: str | None = None
     warm_executor_pools: tuple[WarmExecutorPoolConfig, ...] = ()
-    warm_executor_resources: JSONObject | None = None
     sleep: Callable[[float], None] = time.sleep
     monotonic: Callable[[], float] = time.monotonic
     log_warm_executor_output: bool = False
+    warm_executor_resources: JSONObject | None = None
 
     def __post_init__(self) -> None:
         """Validate config values used to build TaskExecutor Pods."""
@@ -963,7 +963,7 @@ def _effective_warm_executor_resources(
     config: KubernetesExecutorConfig,
 ) -> JSONObject | None:
     """Return resources for warm Pods after applying the optional override."""
-    if config.warm_executor_resources is None:
+    if not config.warm_executor_resources:
         return config.resources
     return _merge_json_objects(config.resources or {}, config.warm_executor_resources)
 
