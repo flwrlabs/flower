@@ -24,7 +24,7 @@
   - uses Python 3.13 and Ubuntu 24.04
 - `unstable`
   - points to the last successful build of the `main` branch
-- `nightly`, `<version>.dev<YYYYMMDD>` e.g. `1.38.0.dev20260914`
+- `nightly`, `<version>.dev<YYYYMMDD>` e.g. `1.38.0.dev20260915`
   - uses Python 3.13 and Ubuntu 24.04
 - `1.37.0`, `1.37.0-py3.13-ubuntu24.04`, `latest`
 - `1.37.0-py3.12-ubuntu24.04`
