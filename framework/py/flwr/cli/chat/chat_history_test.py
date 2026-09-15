@@ -48,9 +48,7 @@ def test_history_widget_restores_selected_events() -> None:
         events=[
             TaskEvent(
                 event="message",
-                data=(
-                    '{"type":"message","role":"user","content":"Previous question"}'
-                ),
+                data=('{"type":"message","role":"user","content":"Previous question"}'),
             ),
             TaskEvent(
                 event="response.output_text.delta",
