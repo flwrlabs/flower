@@ -39,6 +39,11 @@ class SubprocessExecutor:
         """Return immediately because subprocess launches have no capacity gate."""
         del task_type, insecure, root_certificates_path
 
+    def prepare_launch(self, task_id: int) -> bool:
+        """Skip launch preparation because subprocesses have no stale resources."""
+        del task_id
+        return True
+
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""
         args = [

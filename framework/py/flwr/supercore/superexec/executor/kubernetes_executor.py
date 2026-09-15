@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Protocol, cast
 from uuid import uuid4
 
+from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL
 from flwr.supercore import log
 from flwr.supercore.constant import (
     TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
@@ -133,7 +134,9 @@ class KubernetesClient(Protocol):
     def create_namespaced_pod(self, namespace: str, body: JSONObject) -> object:
         """Create a Kubernetes Pod in the selected namespace."""
 
-    def delete_namespaced_secret(self, name: str, namespace: str) -> object:
+    def delete_namespaced_secret(
+        self, name: str, namespace: str, body: JSONObject | None = None
+    ) -> object:
         """Delete a Kubernetes Secret from the selected namespace."""
 
     def list_namespaced_secret(
@@ -142,7 +145,11 @@ class KubernetesClient(Protocol):
         """List Kubernetes Secrets in the selected namespace."""
 
     def delete_namespaced_pod(
-        self, name: str, namespace: str, grace_period_seconds: int = 0
+        self,
+        name: str,
+        namespace: str,
+        grace_period_seconds: int = 0,
+        body: JSONObject | None = None,
     ) -> object:
         """Delete a Kubernetes Pod in the selected namespace."""
 
@@ -326,6 +333,24 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
             )
 
 
+@dataclass(frozen=True)
+class _KubernetesObjectRef:
+    """Identify one Kubernetes object without allowing name-reuse races."""
+
+    name: str
+    uid: str
+
+
+@dataclass(frozen=True)
+class _PreparedLaunch:
+    """Resources observed before SuperExec atomically claims one task."""
+
+    task_id: int
+    pods: tuple[_KubernetesObjectRef, ...]
+    secrets: tuple[_KubernetesObjectRef, ...]
+    prepared_at: float
+
+
 class _WarmExecutorPoolManager(WarmExecutorPoolManager):
     """Wire the warm executor pool lifecycle to Kubernetes executor helpers."""
 
@@ -390,6 +415,7 @@ class KubernetesExecutor:
         self._config = config
         self._completed_pod_sweeper = CompletedPodSweeper(client=client, config=config)
         self._last_completed_pod_sweep_at: float | None = None
+        self._prepared_launch: _PreparedLaunch | None = None
         self._warm_executor_pool_manager = (
             _WarmExecutorPoolManager(
                 client, config, self._active_pod_count, exec_client
@@ -414,6 +440,39 @@ class KubernetesExecutor:
             reconcile_warm_pools=True,
         )
 
+    def prepare_launch(self, task_id: int) -> bool:
+        """Snapshot prior attempts before SuperExec tries to claim a pending task."""
+        # Keep only one bounded snapshot because SuperExec dispatches serially.
+        self._prepared_launch = None
+        try:
+            selector = _task_attempt_label_selector(self._config, task_id)
+            pods = _object_refs(
+                self._client.list_namespaced_pod(
+                    self._config.namespace, label_selector=selector
+                )
+            )
+            secrets = _object_refs(
+                self._client.list_namespaced_secret(
+                    self._config.namespace, label_selector=selector
+                )
+            )
+        except Exception:  # pylint: disable=broad-exception-caught
+            log(
+                WARNING,
+                "Failed to snapshot prior Kubernetes launch attempts for task_id %d; "
+                "skipping the task claim.",
+                task_id,
+                exc_info=True,
+            )
+            return False
+        self._prepared_launch = _PreparedLaunch(
+            task_id=task_id,
+            pods=tuple(pods),
+            secrets=tuple(secrets),
+            prepared_at=self._config.monotonic(),
+        )
+        return True
+
     def reconcile(self) -> None:
         """Maintain warm capacity even when there are no pending tasks."""
         if self._warm_executor_pool_manager is not None:
@@ -426,8 +485,9 @@ class KubernetesExecutor:
         *,
         allow_warm_dispatch: bool,
         reconcile_warm_pools: bool,
-    ) -> bool:
-        """Wait for capacity and return True for warm dispatch or False for cold."""
+        block: bool = True,
+    ) -> bool | None:
+        """Reserve capacity; return None when a nonblocking check is full."""
         self._sweep_completed_pods_if_due()
         if reconcile_warm_pools and self._warm_executor_pool_manager is not None:
             has_ready_warm_pod = (
@@ -470,6 +530,9 @@ class KubernetesExecutor:
                     self._last_completed_pod_sweep_at = self._config.monotonic()
                     self._sweep_completed_pods()
                 return False
+
+            if not block:
+                return None
 
             if self._config.capacity_log_interval is not None:
                 now = self._config.monotonic()
@@ -522,29 +585,47 @@ class KubernetesExecutor:
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Submit the TaskExecutor Pod and credential Secret."""
+        if not self._retire_prepared_launch_attempts(spec.task_id):
+            return LaunchResult.capacity_rejected(
+                "Prior Kubernetes TaskExecutor attempts could not be retired safely."
+            )
         try:
             runtime_root_certificates = _get_runtime_root_certificates(
                 spec, self._config
             )
-            if self._warm_executor_pool_manager is not None:
-                allow_warm_dispatch = self._can_dispatch_warm(
-                    spec.insecure, spec.root_certificates_path
+            allow_warm_dispatch = self._can_dispatch_warm(
+                spec.insecure, spec.root_certificates_path
+            )
+            reservation = self._wait_for_capacity(
+                spec.task_type,
+                allow_warm_dispatch=allow_warm_dispatch,
+                reconcile_warm_pools=True,
+                block=False,
+            )
+            if reservation is None:
+                return LaunchResult.capacity_rejected(
+                    "Kubernetes TaskExecutor active Pod budget is full."
                 )
-                while True:
-                    if allow_warm_dispatch:
-                        warm_result = self._warm_executor_pool_manager.launch(
-                            spec, runtime_root_certificates
-                        )
-                        if warm_result is not None:
-                            return warm_result
-                    # Before token delivery, a warm Pod may recover while cold
-                    # capacity is full. Retry reservation when that happens.
-                    if not self._wait_for_capacity(
+            if reservation and self._warm_executor_pool_manager is not None:
+                warm_result = self._warm_executor_pool_manager.launch(
+                    spec, runtime_root_certificates
+                )
+                if warm_result is not None:
+                    return warm_result
+                # Readiness can disappear between reservation and token dispatch.
+                # Check cold capacity once without holding the task-poll loop.
+                if (
+                    self._wait_for_capacity(
                         spec.task_type,
-                        allow_warm_dispatch=allow_warm_dispatch,
+                        allow_warm_dispatch=False,
                         reconcile_warm_pools=False,
-                    ):
-                        break
+                        block=False,
+                    )
+                    is None
+                ):
+                    return LaunchResult.capacity_rejected(
+                        "Kubernetes TaskExecutor active Pod budget is full."
+                    )
             launch_attempt_id = _new_launch_attempt_id()
             secret_name = _credential_secret_name(spec, launch_attempt_id)
             secret = _build_appio_credentials_secret(
@@ -568,6 +649,90 @@ class KubernetesExecutor:
             return result
 
         return LaunchResult.accepted()
+
+    def _retire_prepared_launch_attempts(self, task_id: int) -> bool:
+        """Retire only attempts observed before the successful task claim."""
+        prepared = self._prepared_launch
+        self._prepared_launch = None
+        if prepared is None:
+            return True
+        if prepared.task_id != task_id:
+            return False
+        if (
+            self._config.monotonic() - prepared.prepared_at
+            >= HEARTBEAT_DEFAULT_INTERVAL
+        ):
+            return False
+
+        secrets = {secret.name: secret for secret in prepared.secrets}
+        retired_secret_names: set[str] = set()
+        cleanup_succeeded = True
+        for pod in prepared.pods:
+            if not self._delete_prepared_pod(pod):
+                cleanup_succeeded = False
+                continue
+            secret_name = _credential_secret_name_from_pod_name(pod.name)
+            if secret := secrets.get(secret_name):
+                cleanup_succeeded = (
+                    self._delete_prepared_secret(secret) and cleanup_succeeded
+                )
+                retired_secret_names.add(secret_name)
+
+        # Remove credential Secrets whose Pod was absent from the snapshot.
+        pod_names = {pod.name for pod in prepared.pods}
+        for secret in prepared.secrets:
+            if secret.name in retired_secret_names:
+                continue
+            pod_name = _pod_name_from_credential_secret_name(secret.name)
+            if pod_name is not None and pod_name not in pod_names:
+                cleanup_succeeded = (
+                    self._delete_prepared_secret(secret) and cleanup_succeeded
+                )
+        return cleanup_succeeded
+
+    def _delete_prepared_pod(self, pod: _KubernetesObjectRef) -> bool:
+        """Delete a snapshotted Pod with a UID precondition."""
+        try:
+            self._client.delete_namespaced_pod(
+                name=pod.name,
+                namespace=self._config.namespace,
+                body={
+                    "gracePeriodSeconds": 0,
+                    "preconditions": {"uid": pod.uid},
+                },
+            )
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            if _exception_status(exc) == 404:
+                return True
+            log(
+                WARNING,
+                "Failed to retire prior Kubernetes Pod %r for a reclaimed task.",
+                pod.name,
+                exc_info=True,
+            )
+            return False
+        return True
+
+    def _delete_prepared_secret(self, secret: _KubernetesObjectRef) -> bool:
+        """Delete a snapshotted credential Secret with a UID precondition."""
+        try:
+            self._client.delete_namespaced_secret(
+                name=secret.name,
+                namespace=self._config.namespace,
+                body={"preconditions": {"uid": secret.uid}},
+            )
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            if _exception_status(exc) == 404:
+                return True
+            log(
+                WARNING,
+                "Failed to retire prior Kubernetes credential Secret %r for a "
+                "reclaimed task.",
+                secret.name,
+                exc_info=True,
+            )
+            return False
+        return True
 
     def close(self) -> None:
         """Delete idle warm Pods owned by this SuperExec instance."""
@@ -1284,6 +1449,13 @@ def _taskexecutor_pool_label_selector(config: KubernetesExecutorConfig) -> str:
     return _label_selector(_taskexecutor_pool_labels(config))
 
 
+def _task_attempt_label_selector(config: KubernetesExecutorConfig, task_id: int) -> str:
+    """Return a selector for cold launch attempts belonging to one task."""
+    labels = _taskexecutor_pool_labels(config)
+    labels[_TASK_ID_LABEL] = str(task_id)
+    return f"{_label_selector(labels)},{LAUNCH_ATTEMPT_LABEL}"
+
+
 def _taskexecutor_pool_labels(config: KubernetesExecutorConfig) -> dict[str, str]:
     """Return labels identifying a scoped TaskExecutor pool."""
     labels = _caller_labels(config)
@@ -1338,6 +1510,21 @@ def _secret_items(secret_list: KubernetesList | Mapping[str, object]) -> list[ob
     if isinstance(items, Sequence) and not isinstance(items, str):
         return list(items)
     return []
+
+
+def _object_refs(
+    object_list: KubernetesList | Mapping[str, object],
+) -> list[_KubernetesObjectRef]:
+    """Return exact object identities from a Kubernetes list response."""
+    refs: list[_KubernetesObjectRef] = []
+    for item in _pod_items(object_list):
+        metadata = _object_field(item, "metadata")
+        name = _object_field(metadata, "name")
+        uid = _object_field(metadata, "uid")
+        if not (isinstance(name, str) and name and isinstance(uid, str) and uid):
+            raise ValueError("Kubernetes object is missing a metadata name or UID.")
+        refs.append(_KubernetesObjectRef(name=name, uid=uid))
+    return refs
 
 
 def _is_active_pod(pod: object) -> bool:

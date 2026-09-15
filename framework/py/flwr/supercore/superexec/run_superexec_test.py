@@ -17,11 +17,11 @@
 
 from logging import ERROR, WARNING
 from typing import Any
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 
-from flwr.supercore.constant import ExecutorType
+from flwr.supercore.constant import ExecutorType, TaskType
 from flwr.supercore.interceptors import (
     RuntimeVersionHttpInterceptor,
     SuperExecAuthHttpInterceptor,
@@ -193,6 +193,84 @@ def test_run_superexec_preserves_accepted_launch_behavior(
     plugin.launch_task.assert_called_once()
     log.assert_not_called()
     sleep_mock.assert_called_once_with(1.0)
+
+
+def test_run_superexec_polls_next_task_after_capacity_rejection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A blocked cold task must not prevent a later warm task from being claimed."""
+    cold_task = Mock(task_id=123, type=TaskType.SERVER_APP.value)
+    warm_task = Mock(task_id=456, type=TaskType.AGENT_APP.value)
+    client = Mock()
+    client.PullPendingTasks.side_effect = [
+        Mock(tasks=[cold_task, warm_task]),
+        Mock(tasks=[warm_task]),
+    ]
+    client.ClaimTask.side_effect = [Mock(token="cold-token"), Mock(token="warm-token")]
+    client_class = Mock()
+    client_class.from_server_address.return_value = client
+    plugin = Mock()
+    plugin.select_task.side_effect = lambda tasks: tasks[0]
+    plugin.launch_task.side_effect = [
+        LaunchResult.capacity_rejected("active Pod budget is full"),
+        LaunchResult.accepted(),
+    ]
+    executor = Mock()
+    executor.prepare_launch.return_value = True
+    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
+    monkeypatch.setattr(
+        run_superexec_module, "get_executor", Mock(return_value=executor)
+    )
+    sleep = Mock(side_effect=[None, KeyboardInterrupt()])
+    monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep)
+
+    with pytest.raises(KeyboardInterrupt):
+        run_superexec_module.run_superexec(
+            plugin_class=Mock(return_value=plugin),
+            client_class=client_class,
+            runtime_api_address="127.0.0.1:9091",
+            insecure=True,
+        )
+
+    assert [
+        call_args.args[0].task_id for call_args in client.ClaimTask.call_args_list
+    ] == [123, 456]
+    assert executor.prepare_launch.call_args_list == [call(123), call(456)]
+    executor.wait_for_capacity.assert_not_called()
+
+
+def test_run_superexec_does_not_claim_when_launch_snapshot_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A managed executor must establish its cleanup snapshot before claiming."""
+    task = Mock(task_id=123, type=TaskType.SERVER_APP.value)
+    client = Mock()
+    client.PullPendingTasks.return_value = Mock(tasks=[task])
+    client_class = Mock()
+    client_class.from_server_address.return_value = client
+    plugin = Mock()
+    plugin.select_task.return_value = task
+    executor = Mock()
+    executor.prepare_launch.return_value = False
+    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
+    monkeypatch.setattr(
+        run_superexec_module, "get_executor", Mock(return_value=executor)
+    )
+    monkeypatch.setattr(
+        "flwr.supercore.superexec.run_superexec.time.sleep",
+        Mock(side_effect=KeyboardInterrupt()),
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        run_superexec_module.run_superexec(
+            plugin_class=Mock(return_value=plugin),
+            client_class=client_class,
+            runtime_api_address="127.0.0.1:9091",
+            insecure=True,
+        )
+
+    client.ClaimTask.assert_not_called()
+    plugin.launch_task.assert_not_called()
 
 
 @pytest.mark.parametrize(

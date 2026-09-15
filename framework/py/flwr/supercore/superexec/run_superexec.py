@@ -275,38 +275,48 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
             # If a task was selected, claim it
             if task is not None:
-                try:
-                    task_type = TaskType(task.type)
-                except ValueError:
-                    task_type = None
-                executor.wait_for_capacity(
-                    task_type=task_type,
-                    insecure=insecure,
-                    root_certificates_path=root_certificates_path,
-                )
+                ready_to_claim = True
+                if isinstance(plugin, BaseEphemeralExecPlugin):
+                    try:
+                        task_type = TaskType(task.type)
+                    except ValueError:
+                        task_type = None
+                    executor.wait_for_capacity(
+                        task_type=task_type,
+                        insecure=insecure,
+                        root_certificates_path=root_certificates_path,
+                    )
+                else:
+                    # Snapshot executor resources before the atomic task claim.
+                    # If the claim succeeds, the executor can safely retire only
+                    # resources from an older claim without blocking this poll loop.
+                    ready_to_claim = executor.prepare_launch(task.task_id)
 
-                claim_req = ClaimTaskRequest(task_id=task.task_id)
-                claim_res = client.ClaimTask(claim_req)
+                if ready_to_claim:
+                    claim_req = ClaimTaskRequest(task_id=task.task_id)
+                    claim_res = client.ClaimTask(claim_req)
 
-                # Launch the app if a token was granted; do nothing if not
-                if claim_res.token:
+                    # Launch the app if a token was granted; do nothing if not
+                    if claim_res.token:
 
-                    # Destroy the auth secret before launching the app
-                    # for ephemeral plugins
-                    if isinstance(plugin, BaseEphemeralExecPlugin):
+                        # Destroy the auth secret before launching the app
+                        # for ephemeral plugins
+                        if isinstance(plugin, BaseEphemeralExecPlugin):
 
-                        def cleanup_auth_secret() -> None:
-                            nonlocal superexec_auth_secret
-                            if superexec_auth_secret is not None:
-                                superexec_auth_secret = None
-                            if auth_interceptor is not None:
-                                # pylint: disable-next=protected-access
-                                auth_interceptor._auth_secret = b"\x00" * 32
+                            def cleanup_auth_secret() -> None:
+                                nonlocal superexec_auth_secret
+                                if superexec_auth_secret is not None:
+                                    superexec_auth_secret = None
+                                if auth_interceptor is not None:
+                                    # pylint: disable-next=protected-access
+                                    auth_interceptor._auth_secret = b"\x00" * 32
 
-                        plugin.cleanup_before_launch = cleanup_auth_secret
+                            plugin.cleanup_before_launch = cleanup_auth_secret
 
-                    launch_result = plugin.launch_task(token=claim_res.token, task=task)
-                    _handle_launch_result(launch_result, task)
+                        launch_result = plugin.launch_task(
+                            token=claim_res.token, task=task
+                        )
+                        _handle_launch_result(launch_result, task)
 
             # Sleep for a while before checking again
             time.sleep(task_poll_interval)
