@@ -2438,8 +2438,7 @@ def test_sweeper_deletes_terminal_pod_and_matching_secret(phase: str) -> None:
     selector = (
         "app.kubernetes.io/component=taskexecutor,"
         "app.kubernetes.io/name=flower,"
-        "flower.ai/resource-pool=gpu-pool,"
-        "flower.ai/team=platform"
+        "flower.ai/resource-pool=gpu-pool"
     )
     client.list_namespaced_pod.assert_called_once_with(
         "flower-system", label_selector=selector
@@ -2988,6 +2987,76 @@ def test_reclaimed_task_retires_all_prior_attempts_before_replacement(
     assert (
         client.create_namespaced_pod.call_args.args[1]["metadata"]["name"]
         == "flwr-taskexecutor-123-new123abc456"
+    )
+
+
+def test_restarted_executor_finds_attempt_after_caller_labels_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Caller label changes must not hide old attempts from pool operations."""
+    client = Mock()
+    old_labels = {
+        **_task_labels(123),
+        LAUNCH_ATTEMPT_LABEL: _LAUNCH_ATTEMPT_ID,
+        "flower.ai/resource-pool": "gpu-pool",
+        "flower.ai/team": "previous",
+    }
+    client.list_namespaced_pod.return_value = {
+        "items": [_pod("Pending", labels=old_labels, uid="old-pod-uid")]
+    }
+    client.list_namespaced_secret.return_value = {
+        "items": [_secret(_SECRET_NAME, old_labels, uid="old-secret-uid")]
+    }
+    monkeypatch.setattr(
+        kube, "_new_launch_attempt_id", Mock(return_value=_NEXT_LAUNCH_ATTEMPT_ID)
+    )
+    executor = KubernetesExecutor(
+        client=client,
+        config=_executor_config(
+            labels={"flower.ai/team": "current"},
+            resource_pool="gpu-pool",
+            active_pod_budget=2,
+        ),
+    )
+
+    assert executor.prepare_launch(123)
+    result = executor.launch(_execution_spec(token="fresh-token"))
+
+    assert result.status == LaunchResultStatus.ACCEPTED
+    client.delete_namespaced_pod.assert_called_once_with(
+        name=_POD_NAME,
+        namespace="flower-system",
+        body={
+            "gracePeriodSeconds": 0,
+            "preconditions": {"uid": "old-pod-uid"},
+        },
+    )
+    client.delete_namespaced_secret.assert_called_once_with(
+        name=_SECRET_NAME,
+        namespace="flower-system",
+        body={"preconditions": {"uid": "old-secret-uid"}},
+    )
+    pool_selector = (
+        "app.kubernetes.io/component=taskexecutor,"
+        "app.kubernetes.io/name=flower,"
+        "flower.ai/resource-pool=gpu-pool"
+    )
+    attempt_selector = client.list_namespaced_secret.call_args_list[0].kwargs[
+        "label_selector"
+    ]
+    assert attempt_selector.startswith(f"{pool_selector},")
+    assert _TASK_ID_LABEL in attempt_selector
+    assert LAUNCH_ATTEMPT_LABEL in attempt_selector
+    assert all(
+        "flower.ai/team" not in call_args.kwargs["label_selector"]
+        for call_args in (
+            *client.list_namespaced_pod.call_args_list,
+            *client.list_namespaced_secret.call_args_list,
+        )
+    )
+    assert (
+        client.list_namespaced_pod.call_args_list[-1].kwargs["label_selector"]
+        == pool_selector
     )
 
 
