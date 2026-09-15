@@ -17,6 +17,7 @@
 from .profile import (
     _split_entries,
     _summarize_transport_wall_clock,
+    _transport_event_round,
     _union_duration_ms,
 )
 
@@ -65,6 +66,31 @@ def test_transport_wall_clock_does_not_double_count_overlap() -> None:
 def test_interval_union_merges_parallel_transfers() -> None:
     """The interval union should count overlapping clients only once."""
     assert _union_duration_ms([(0.0, 10.0), (2.0, 8.0), (8.0, 15.0)]) == 15.0
+
+
+def test_transport_round_falls_back_to_numeric_group_id() -> None:
+    """Node-side events should retain their ServerApp round correlation."""
+    assert _transport_event_round({"group_id": "3"}) == 3
+    assert _transport_event_round({"group_id": "evaluation"}) is None
+    assert _transport_event_round({"round": 2, "group_id": "3"}) == 2
+
+    rows = _summarize_transport_wall_clock(
+        {
+            "events": [
+                {
+                    "scope": "transport",
+                    "task": "superlink_supernode_downstream",
+                    "group_id": "3",
+                    "node_id": 7,
+                    "timestamp_ms": 1000.0,
+                    "duration_ms": 100.0,
+                    "network_mb": 10.0,
+                }
+            ]
+        }
+    )
+
+    assert {row["round"] for row in rows} == {3}
 
 
 def test_transport_round_total_merges_parallel_clients() -> None:

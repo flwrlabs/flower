@@ -351,6 +351,20 @@ def _union_duration_ms(intervals: list[tuple[float, float]]) -> float:
     return total_ms + current_end - current_start
 
 
+def _transport_event_round(event: dict) -> int | None:
+    """Return the explicit round or recover it from a numeric message group."""
+    round_value = event.get("round")
+    if isinstance(round_value, int) and not isinstance(round_value, bool):
+        return round_value
+    group_id = event.get("group_id")
+    if not isinstance(group_id, str):
+        return None
+    try:
+        return int(group_id)
+    except ValueError:
+        return None
+
+
 def _summarize_transport_wall_clock(summary: dict) -> list[dict]:
     """Summarize non-overlapping communication wall time from raw events."""
     hop_labels = {
@@ -386,13 +400,14 @@ def _summarize_transport_wall_clock(summary: dict) -> list[dict]:
             continue
         direction = "downstream" if task.endswith("_downstream") else "upstream"
         node_id = "all" if hop == "serverapp_superlink" else event.get("node_id")
-        key = (hop, event.get("round"), node_id)
+        round_value = _transport_event_round(event)
+        key = (hop, round_value, node_id)
         group = grouped.setdefault(
             key,
             {
                 "hop": hop_labels[hop],
                 "hop_key": hop,
-                "round": event.get("round"),
+                "round": round_value,
                 "node_id": node_id,
                 "node_name": event.get("node_name"),
                 "downstream_intervals": [],
