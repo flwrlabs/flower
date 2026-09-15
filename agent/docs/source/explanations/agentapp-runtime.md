@@ -47,7 +47,7 @@ AgentApps normally make model requests with the OpenAI SDK and use
 
 ### Model responses
 
-Flower 1.35.0 exposes an OpenAI-compatible Responses endpoint inside the
+Flower {{ stable_flwr_version }} exposes an OpenAI-compatible Responses endpoint inside the
 AgentApp process. The runtime injects its URL and credential as
 `FLWR_RUNTIME_BASE_URL` and `FLWR_RUNTIME_API_KEY`. Pass them to the OpenAI
 client, then use its standard typed Responses API:
@@ -122,19 +122,37 @@ for event in stream:
     agent.events.emit(event.to_dict())
 ```
 
-Publishing an event does not append it to `Context`. This lets the AgentApp
-separate frontend-visible progress from conversation state.
+Publishing an event makes it available to run-event clients and stores it in
+the current run-series trace. It does not append the event to `Context`.
 
 These operations have distinct destinations:
 
-| Operation                               | Destination                                                |
-| --------------------------------------- | ---------------------------------------------------------- |
-| `print(...)`                            | AgentApp logs                                              |
-| `agent.events.emit(...)`                | Run-event stream consumed by Flower Chat and other clients |
-| Store an assistant message in `Context` | Persistent conversation state                              |
+| Operation                           | Destination                                   |
+| ----------------------------------- | --------------------------------------------- |
+| `print(...)`                        | AgentApp logs                                 |
+| `agent.events.emit(...)`            | Run-event stream and current run-series trace |
+| Store app-defined data in `Context` | Additional state persisted for the run series |
 
 See {ref}`publish-agentapp-generated-text` for the event sequence used to
 present text that does not come from an SDK stream.
+
+`agent.events.get_trace()` returns the events from every run in the current run
+series. This includes the user-message event Flower creates from `agent.input`,
+events published by the AgentApp, and connector activity:
+
+```python
+trace = agent.events.get_trace()
+for entry in trace:
+    event_type = entry["event"]
+    event_data = entry["data"]
+```
+
+Each entry is an envelope containing `id`, `timestamp`, `run_id`, `task_id`,
+`event`, and the parsed JSON `data`. Filter the envelopes before constructing
+model input. For example, user messages use the `message` event, while streamed
+assistant text uses `response.output_text.delta` and
+`response.refusal.delta`. Connector and reasoning events should not be treated
+as conversation messages.
 
 ## Context
 
@@ -145,38 +163,15 @@ Alongside the `AgentSession`, your main function receives a Flower `Context`:
 - `context.state` stores records persisted for the run series
 - `context.run_id` identifies the current run
 
-The runtime stores conversation items in a `ConfigRecord` named `items`. A
-`ConfigRecord` is a specialized Python dictionary, so you can use methods such
-as `get` when reading it through `context.state.config_records`.
+The runtime does not automatically append user input or model responses to
+`Context`. User input, connector activity, and events explicitly published with
+`agent.events.emit(...)` are available through `agent.events.get_trace()`. Use
+`context.state` only for additional app-defined state that should persist across
+runs in the series.
 
-If `agent.input` is a non-empty string, the runtime records it as an Open
-Responses user-message item before calling the AgentApp. Connector calls append
-their outputs and built-in activity. The lower-level `agent.responses` API also
-appends model output, while SDK responses and events emitted with `agent.events`
-are persisted only when the app stores them explicitly.
-
-Runs in the same series can receive the persisted context. The app chooses what
-to send to the model. A safe conversation loader selects only message items:
-
-```python
-import json
-
-messages = []
-items_record = context.state.config_records.get("items")
-items = items_record.get("json", []) if items_record is not None else []
-for item_json in items:
-    item = json.loads(item_json)
-    if item.get("type") == "message":
-        messages.append(item)
-```
-
-Connector activity types such as `response.tool_call.started` are useful for
-inspection but are not valid model conversation messages.
-
-The current default Flower Agent converts stored user and assistant messages
-back into model input. A simple custom AgentApp that forwards only
-`context.run_config["agent.input"]` treats every run independently even when
-the runs share a series.
+Conversation continuity is an AgentApp behavior, not automatic runtime
+behavior. An AgentApp can convert stored user and assistant events from the
+trace back into model input.
 
 ## Run series and federations
 
