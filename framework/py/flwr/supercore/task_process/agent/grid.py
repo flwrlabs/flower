@@ -183,9 +183,7 @@ class RuntimeAgentGrid(AgentGrid):
             config_record = ConfigRecord(
                 {AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: payload_json}
             )
-            content = RecordDict(
-                {AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: config_record}
-            )
+            content = RecordDict({AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: config_record})
 
             message = Message(
                 content,
