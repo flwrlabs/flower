@@ -231,6 +231,41 @@ The generated templates also export `FLWR_TORCHTITAN_CONVERSION_PROFILE`; the
 conversion worker writes JSONL phase telemetry there, and the ClientApp reports
 conversion duration and peak RSS as `profile.client.dcp.*` metrics.
 
+For large models, the two conversions can instead run as independent scheduler
+jobs around the training job:
+
+```text
+trainer.backend='torchtitan'
+aggregation.mode='layerwise'
+trainer.torchtitan.dcp-enabled=true
+trainer.torchtitan.dcp-convert-on-client=false
+trainer.torchtitan.dcp-separate-jobs=true
+```
+
+The ClientApp submits `layers -> DCP`, training, and `DCP -> layers` jobs with
+`afterok` dependencies. It waits for the final conversion job before making the
+trained layers available for upload. If the first-round DCP cache is already
+valid, the first conversion job is skipped. Conversion jobs inherit the normal
+`scheduler.*` resources unless overridden with
+`scheduler.conversion.{account,partition,qos,gpus,cpus-per-task,mem,time}`.
+Additional conversion-only scheduler flags can be supplied through
+`scheduler.conversion.extra-args`, plus
+`scheduler.slurm.conversion-extra-args` or
+`scheduler.flux.conversion-extra-args`.
+
+Custom three-job templates can be set independently:
+
+```text
+scheduler.slurm.to-dcp-script-template='/path/site/convert_to_dcp.sh.j2'
+scheduler.slurm.script-template='/path/site/train_job.sh.j2'
+scheduler.slurm.from-dcp-script-template='/path/site/convert_from_dcp.sh.j2'
+```
+
+The corresponding `scheduler.flux.*-script-template` keys are available for
+Flux. Separate Flux jobs use `scheduler.flux.submit-command` (default
+`flux submit`) and wait through `scheduler.flux.attach-command` (default
+`flux job attach --read-only`).
+
 Dry-run (render scripts/config but skip submission/training):
 
 ```bash

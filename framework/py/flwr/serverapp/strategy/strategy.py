@@ -22,6 +22,7 @@ from collections.abc import Callable, Iterable
 from logging import INFO
 
 from flwr.common import ArrayRecord, ConfigRecord, Message, MetricRecord, log
+from flwr.common.profiling import set_current_round
 from flwr.server import Grid
 
 from .result import Result
@@ -189,6 +190,7 @@ class Strategy(ABC):
 
         t_start = time.time()
         # Evaluate starting global parameters
+        set_current_round(0)
         if evaluate_fn:
             res = evaluate_fn(0, initial_arrays)
             log(INFO, "Initial global evaluation results: %s", res)
@@ -198,6 +200,7 @@ class Strategy(ABC):
         arrays = initial_arrays
 
         for current_round in range(1, num_rounds + 1):
+            set_current_round(current_round)
             log(INFO, "")
             log(INFO, "[ROUND %s/%s]", current_round, num_rounds)
 
@@ -279,4 +282,5 @@ class Strategy(ABC):
             log(INFO, "\t%s", line.strip("\n"))
         log(INFO, "")
 
+        set_current_round(None)
         return result

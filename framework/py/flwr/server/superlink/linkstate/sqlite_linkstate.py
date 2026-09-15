@@ -193,6 +193,16 @@ CREATE TABLE IF NOT EXISTS delivery_timings(
 );
 """
 
+SQL_CREATE_TABLE_PROFILE_EVENTS = """
+CREATE TABLE IF NOT EXISTS profile_events(
+    row_id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id          TEXT UNIQUE,
+    run_id            INTEGER,
+    event_json        TEXT,
+    FOREIGN KEY(run_id) REFERENCES run(run_id)
+);
+"""
+
 
 class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
     """SQLite-based LinkState implementation."""
@@ -218,6 +228,7 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
             SQL_CREATE_TABLE_MESSAGE_INS,
             SQL_CREATE_TABLE_MESSAGE_RES,
             SQL_CREATE_TABLE_DELIVERY_TIMINGS,
+            SQL_CREATE_TABLE_PROFILE_EVENTS,
             SQL_CREATE_TABLE_NODE,
             SQL_CREATE_TABLE_PUBLIC_KEY,
             SQL_CREATE_INDEX_ONLINE_UNTIL,
@@ -237,10 +248,6 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
         if any(errors):
             log(ERROR, errors)
             return None
-
-        # Anchor reply enqueue in SuperLink clock for upstream delivery metrics.
-        enqueued_at_ms = now().timestamp() * 1000.0
-        message.metadata.created_at = enqueued_at_ms / 1000.0
 
         # Store Message
         data = (message_to_dict(message),)
@@ -340,8 +347,8 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
                 if len(filtered) != 2:  # Not both nodes are in the federation
                     invalid_msg_ids.add(msg_id)
 
-            # Delete all invalid messages
-            self.delete_messages(invalid_msg_ids)
+        # Avoid nesting the deletion transaction in the validation transaction.
+        self.delete_messages(invalid_msg_ids)
 
     def get_message_ins(self, node_id: int, limit: int | None) -> list[Message]:
         """Get all Messages that have not been delivered yet."""
@@ -602,6 +609,10 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
                             metric_record
                         )
                     metric_record["downstream_ms"] = downstream_ms
+                    metric_record["ins_enqueued_at_ms"] = float(ins_enqueued_at_ms)
+                    metric_record["clientapp_delivered_at_ms"] = float(
+                        clientapp_delivered_at_ms
+                    )
             message_res_ids = [
                 message_res.metadata.message_id for message_res in ret.values()
             ]
@@ -1487,6 +1498,38 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
                     },
                 )
             )
+
+    def add_profile_events(
+        self, run_id: int, events: Sequence[dict[str, object]]
+    ) -> None:
+        """Store externally measured profile events for a run."""
+        sint64_run_id = uint64_to_int64(run_id)
+        with self.conn:
+            exists = self.conn.execute(
+                "SELECT 1 FROM run WHERE run_id = ?;", (sint64_run_id,)
+            ).fetchone()
+            if exists is None:
+                raise ValueError(f"Run {run_id} not found")
+            self.conn.executemany(
+                "INSERT OR IGNORE INTO profile_events "
+                "(event_id, run_id, event_json) VALUES (?, ?, ?);",
+                [
+                    (
+                        str(event["event_id"]),
+                        sint64_run_id,
+                        json.dumps(dict(event)),
+                    )
+                    for event in events
+                ],
+            )
+
+    def get_profile_events(self, run_id: int) -> list[dict[str, object]]:
+        """Return externally measured profile events for a run."""
+        rows = self.conn.execute(
+            "SELECT event_json FROM profile_events WHERE run_id = ? ORDER BY row_id;",
+            (uint64_to_int64(run_id),),
+        ).fetchall()
+        return [json.loads(row["event_json"]) for row in rows]
 
 
 def message_to_dict(message: Message) -> dict[str, Any]:

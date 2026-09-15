@@ -25,20 +25,24 @@ TurboQuant MSE
 --------------
 
 ``TurboQuantMSEPipeline`` is a block-normalized lossy quantizer designed for
-large model deltas.
+large model deltas. Its randomized rotation follows the concentration step in
+the `TurboQuant paper <https://arxiv.org/abs/2504.19874>`_.
 
 For each array:
 
 1. Flatten the array.
 2. Split it into fixed-size blocks.
-3. Compute one RMS scale per block.
-4. Normalize each block by its scale.
-5. Quantize normalized values with a Lloyd-Max-style normal codebook.
-6. Pack centroid indices into ``n`` bits.
-7. Store packed indices plus fp16 block scales in the compressed payload.
+3. Apply a deterministic randomized Walsh-Hadamard rotation, which spreads
+   outliers and makes block coordinates close to normally distributed.
+4. Compute one RMS scale per rotated block.
+5. Normalize each rotated block by its scale.
+6. Quantize normalized values with a Lloyd-Max-style normal codebook.
+7. Pack centroid indices into ``n`` bits.
+8. Store packed indices plus fp16 block scales in the compressed payload.
 
 On decode, the centroid indices are unpacked, multiplied by their block scales,
-reshaped, and cast back to the original dtype.
+inverse-rotated, reshaped, and cast back to the original dtype. Rotation requires
+a power-of-two block size and is enabled by default.
 
 Delta compression
 -----------------
@@ -108,13 +112,13 @@ constructing ``TurboQuantMSEPipeline`` or, in ``flowertune-llm``, with:
 
     flwr run . --run-config "compression.enabled=true compression.n-bits=3 compression.cuda-enabled=true"
 
-The current CUDA implementation is used for 3-bit TurboQuant MSE. Other bit
-widths automatically fall back to the CPU path. The CUDA path keeps model deltas
+The current CUDA implementation is used for 3- and 4-bit TurboQuant MSE. Other
+bit widths automatically fall back to the CPU path. The CUDA path keeps model deltas
 on device and streams them in chunks:
 
 1. Generate or receive a CUDA delta tensor.
 2. Quantize with CUDA tensor operations.
-3. Pack 3-bit centroid IDs on CUDA.
+3. Pack 3- or 4-bit centroid IDs on CUDA.
 4. Copy only the compressed payload and fp16 scales to host/network buffers.
 5. Copy compressed payloads back to CUDA on receive.
 6. Unpack and dequantize on CUDA.
@@ -130,7 +134,7 @@ the compressed payload was 25.87 GB, a 5.33x reduction.
 Current limitations
 -------------------
 
-* CUDA acceleration currently targets the 3-bit packed TurboQuant MSE path.
+* CUDA acceleration currently targets the 3- and 4-bit packed TurboQuant MSE paths.
 * The implementation uses PyTorch CUDA tensor operations. A future production
   optimization should replace the Python CUDA tensor implementation with a fused
   CUDA or Triton extension.

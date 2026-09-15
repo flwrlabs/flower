@@ -15,7 +15,7 @@
 """Flower ClientApp process."""
 
 from logging import DEBUG, ERROR, INFO
-from time import perf_counter
+from time import perf_counter, time
 
 import grpc
 
@@ -42,6 +42,7 @@ from flwr.common.inflatable_protobuf_utils import (
 from flwr.common.inflatable_utils import pull_and_inflate_object_from_tree, push_objects
 from flwr.common.logger import log
 from flwr.common.message import remove_content_from_message
+from flwr.common.record import ConfigRecord, MetricRecord
 from flwr.common.retry_invoker import _make_simple_grpc_retry_invoker, _wrap_stub
 from flwr.common.serde import (
     context_from_proto,
@@ -214,7 +215,9 @@ def pull_clientappinputs(
     """Pull ClientAppInputs from SuperNode."""
     masked_token = mask_string(token)
     log(INFO, "[flwr-clientapp] Pull `ClientAppInputs` for token %s", masked_token)
+    inputs_started_at_ms = time() * 1000.0
     inputs_start = perf_counter()
+    input_bytes = 0
     try:
         # Pull Context, Run and (optional) FAB
         res: PullAppInputsResponse = stub.PullClientAppInputs(
@@ -241,12 +244,28 @@ def pull_clientappinputs(
         run_id = context.run_id
         node = Node(node_id=context.node_id)
         object_tree = pull_msg_res.message_object_trees[0]
+        input_bytes += len(res.SerializeToString()) + len(
+            pull_msg_res.SerializeToString()
+        )
+        pull_object_fn = make_pull_object_fn_protobuf(stub.PullObject, node, run_id)
+
+        def tracked_pull_object(object_id: str) -> bytes:
+            nonlocal input_bytes
+            content = pull_object_fn(object_id)
+            input_bytes += len(content)
+            return content
+
+        confirm_message_received = make_confirm_message_received_fn_protobuf(
+            stub.ConfirmMessageReceived, node, run_id
+        )
+
+        def tracked_confirm_message_received(object_id: str) -> None:
+            confirm_message_received(object_id)
+
         message = pull_and_inflate_object_from_tree(
             object_tree,
-            make_pull_object_fn_protobuf(stub.PullObject, node, run_id),
-            make_confirm_message_received_fn_protobuf(
-                stub.ConfirmMessageReceived, node, run_id
-            ),
+            tracked_pull_object,
+            tracked_confirm_message_received,
             return_type=Message,
         )
         log(
@@ -262,6 +281,14 @@ def pull_clientappinputs(
         # Set the message ID
         # The deflated message doesn't contain the message_id (its own object_id)
         message.metadata.__dict__["_message_id"] = object_tree.object_id
+        if bool(context.run_config.get("profile.enabled", False)):
+            context.__dict__["_transport_input_profile"] = {
+                "instruction_id": object_tree.object_id,
+                "group_id": message.metadata.group_id,
+                "timestamp_ms": inputs_started_at_ms,
+                "duration_ms": (perf_counter() - inputs_start) * 1000.0,
+                "network_bytes": input_bytes,
+            }
         return message, context, run, fab
     except grpc.RpcError as e:
         log(ERROR, "[PullClientAppInputs] gRPC error occurred: %s", str(e))
@@ -275,10 +302,14 @@ def push_clientappoutputs(
     masked_token = mask_string(token)
     log(INFO, "[flwr-clientapp] Push `ClientAppOutputs` for token %s", masked_token)
     output_start = perf_counter()
+    output_started_at_ms = time() * 1000.0
+    if message.has_content():
+        message.content.metric_records["_flwr_full_path"] = MetricRecord(
+            {"upstream_started_at_ms": output_started_at_ms}
+        )
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
     proto_message = message_to_proto(remove_content_from_message(message))
-    proto_context = context_to_proto(context)
 
     try:
 
@@ -288,6 +319,7 @@ def push_clientappoutputs(
 
             # Push Message
             # This is temporary. The message should not contain its content
+            output_wall_start = perf_counter()
             push_msg_res = stub.PushMessage(
                 PushAppMessagesRequest(
                     token=token,
@@ -319,13 +351,21 @@ def push_clientappoutputs(
                 object_id: all_objects[object_id] for object_id in object_push_order
             }
             del message
+            output_bytes = 0
+            push_object_fn = make_push_object_fn_protobuf(
+                stub.PushObject,
+                Node(node_id=context.node_id),
+                run_id=context.run_id,
+            )
+
+            def tracked_push_object(object_id: str, content: bytes) -> None:
+                nonlocal output_bytes
+                output_bytes += len(content)
+                push_object_fn(object_id, content)
+
             push_objects(
                 all_objects,
-                make_push_object_fn_protobuf(
-                    stub.PushObject,
-                    Node(node_id=context.node_id),
-                    run_id=context.run_id,
-                ),
+                tracked_push_object,
                 object_ids_to_push=object_ids_to_push,
             )
             log(
@@ -337,7 +377,24 @@ def push_clientappoutputs(
                 (perf_counter() - output_start) * 1000.0,
             )
 
-        # Push Context
+        input_profile = context.__dict__.pop("_transport_input_profile", None)
+        if input_profile is not None:
+            context.state.config_records["_flwr_transport_profile"] = ConfigRecord(
+                {
+                    "instruction_id": str(input_profile.get("instruction_id", "")),
+                    "group_id": str(input_profile.get("group_id", "")),
+                    "input_timestamp_ms": float(input_profile.get("timestamp_ms", 0.0)),
+                    "input_duration_ms": float(input_profile.get("duration_ms", 0.0)),
+                    "input_network_bytes": int(input_profile.get("network_bytes", 0)),
+                    "output_timestamp_ms": output_started_at_ms,
+                    "output_duration_ms": (perf_counter() - output_wall_start) * 1000.0,
+                    "output_network_bytes": output_bytes,
+                }
+            )
+        proto_context = context_to_proto(context)
+        context.state.config_records.pop("_flwr_transport_profile", None)
+
+        # Push Context and the internal transport measurements.
         res: PushAppOutputsResponse = stub.PushClientAppOutputs(
             PushAppOutputsRequest(token=token, context=proto_context)
         )

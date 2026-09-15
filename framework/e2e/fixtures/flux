@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+if [[ "${1:-}" != "run" ]]; then
+    echo "The E2E Flux fixture supports only 'flux run'." >&2
+    exit 2
+fi
+shift
+
+while (($#)); do
+    case "$1" in
+        --)
+            shift
+            break
+            ;;
+        -N* | -n* | -c* | -g* | --nodes=* | --ntasks=* | --cores-per-task=* | \
+            --gpus-per-task=* | --gpus-per-node=* | --job-name=* | \
+            --time-limit=* | --output=* | --error=*)
+            shift
+            ;;
+        -N | -n | -c | -g | --nodes | --ntasks | --cores-per-task | \
+            --gpus-per-task | --gpus-per-node | --job-name | --time-limit | \
+            --output | --error)
+            shift 2
+            ;;
+        -* )
+            echo "Unsupported flux run option in E2E fixture: $1" >&2
+            exit 2
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if (($# == 0)); then
+    echo "The E2E Flux fixture requires a command." >&2
+    exit 2
+fi
+
+export FLUX_JOB_ID="${FLUX_JOB_ID:-e2e-$$}"
+export FLUX_JOB_NNODES="${FLUX_JOB_NNODES:-1}"
+export FLUX_JOB_TMPDIR="${FLUX_JOB_TMPDIR:-${TMPDIR:-/tmp}/flux-${FLUX_JOB_ID}}"
+mkdir -p "${FLUX_JOB_TMPDIR}"
+
+exec "$@"

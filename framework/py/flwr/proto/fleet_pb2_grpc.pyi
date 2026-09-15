@@ -113,6 +113,12 @@ class FleetStub:
     ]
     """Confirm Message Received"""
 
+    PushNodeProfileEvents: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.fleet_pb2.PushNodeProfileEventsRequest,
+        flwr.proto.fleet_pb2.PushNodeProfileEventsResponse,
+    ]
+    """Report transport profiling events measured by the SuperNode."""
+
 class FleetAsyncStub:
     RegisterNode: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.fleet_pb2.RegisterNodeFleetRequest,
@@ -189,6 +195,12 @@ class FleetAsyncStub:
         flwr.proto.message_pb2.ConfirmMessageReceivedResponse,
     ]
     """Confirm Message Received"""
+
+    PushNodeProfileEvents: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.fleet_pb2.PushNodeProfileEventsRequest,
+        flwr.proto.fleet_pb2.PushNodeProfileEventsResponse,
+    ]
+    """Report transport profiling events measured by the SuperNode."""
 
 class FleetServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -290,5 +302,13 @@ class FleetServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.message_pb2.ConfirmMessageReceivedResponse, collections.abc.Awaitable[flwr.proto.message_pb2.ConfirmMessageReceivedResponse]]:
         """Confirm Message Received"""
+
+    @abc.abstractmethod
+    def PushNodeProfileEvents(
+        self,
+        request: flwr.proto.fleet_pb2.PushNodeProfileEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.fleet_pb2.PushNodeProfileEventsResponse, collections.abc.Awaitable[flwr.proto.fleet_pb2.PushNodeProfileEventsResponse]]:
+        """Report transport profiling events measured by the SuperNode."""
 
 def add_FleetServicer_to_server(servicer: FleetServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

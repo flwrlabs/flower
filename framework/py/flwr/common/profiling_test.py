@@ -20,6 +20,7 @@ from .message import Message
 from .profiling import (
     ProfileRecorder,
     clear_active_profiler,
+    merge_profile_events,
     record_network_delivery_metrics_from_messages,
     record_profile_metrics_from_messages,
     set_active_profiler,
@@ -233,3 +234,48 @@ class TestProfileRecorder(unittest.TestCase):
         self.assertEqual(client_entry["node_name"], "client-a")
         self.assertEqual(upstream_entry["sender_node_id"], 7)
         self.assertEqual(upstream_entry["sender_node_name"], "client-a")
+
+    def test_external_transport_events_are_merged_with_totals(self) -> None:
+        """Transport events should expose cumulative time and preserve wall time."""
+        recorder = ProfileRecorder(run_id=1)
+        recorder.record("client", "train", 1, 7, 100.0, timestamp_ms=1000.0)
+        summary = recorder.summarize()
+        summary["total_execution_ms"] = 999.0
+        original_entry = dict(summary["entries"][0])
+
+        merged = merge_profile_events(
+            summary,
+            [
+                {
+                    "timestamp_ms": 2000.0,
+                    "scope": "transport",
+                    "task": "superlink_supernode_downstream",
+                    "round": 1,
+                    "node_id": 7,
+                    "duration_ms": 25.0,
+                    "network_bytes": 1024,
+                    "sender_node_id": "superlink",
+                    "receiver_node_id": "7",
+                },
+                {
+                    "timestamp_ms": 2100.0,
+                    "scope": "transport",
+                    "task": "superlink_supernode_downstream",
+                    "round": 1,
+                    "node_id": 7,
+                    "duration_ms": 75.0,
+                    "network_bytes": 2048,
+                    "sender_node_id": "superlink",
+                    "receiver_node_id": "7",
+                },
+            ],
+        )
+
+        transport = next(
+            entry for entry in merged["entries"] if entry["scope"] == "transport"
+        )
+        self.assertEqual(transport["total_ms"], 100.0)
+        self.assertEqual(transport["avg_ms"], 50.0)
+        self.assertEqual(transport["count"], 2)
+        self.assertEqual(merged["total_execution_ms"], 999.0)
+        self.assertEqual(merged["entries"][0], original_entry)

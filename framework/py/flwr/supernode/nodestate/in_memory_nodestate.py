@@ -21,12 +21,12 @@ from threading import Lock, RLock
 
 from flwr.common import Context, Error, Message, now
 from flwr.common.constant import ErrorCode
-from flwr.common.logger import log
 from flwr.common.inflatable import (
     get_all_nested_objects,
     get_object_tree,
     no_object_id_recompute,
 )
+from flwr.common.logger import log
 from flwr.common.typing import Run
 from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
@@ -77,6 +77,8 @@ class InMemoryNodeState(
         # Store msg ID to TimeEntry mapping
         self.time_store: dict[str, TimeEntry] = {}
         self.lock_time_store = Lock()
+        self.transport_profile_store: dict[str, list[dict[str, object]]] = {}
+        self.lock_transport_profile_store = Lock()
 
     def set_node_id(self, node_id: int | None) -> None:
         """Set the node ID."""
@@ -289,6 +291,18 @@ class InMemoryNodeState(
 
             duration = entry.finished_at - entry.starting_at
             return duration
+
+    def add_transport_profile_event(
+        self, message_id: str, event: dict[str, object]
+    ) -> None:
+        """Store a transport profile event until the reply is uploaded."""
+        with self.lock_transport_profile_store:
+            self.transport_profile_store.setdefault(message_id, []).append(event)
+
+    def pop_transport_profile_events(self, message_id: str) -> list[dict[str, object]]:
+        """Return and remove transport profile events for a message."""
+        with self.lock_transport_profile_store:
+            return self.transport_profile_store.pop(message_id, [])
 
     def _cleanup_old_message_times(self) -> None:
         """Remove time entries older than MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS."""

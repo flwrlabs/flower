@@ -75,12 +75,14 @@ def test_run_torchtitan_training_cleans_successful_dcp_handoff(
 
     def fake_run(*args, **kwargs):
         env = kwargs["env"]
-        paths.update({
-            "cache": env["FLWR_TORCHTITAN_DCP_CACHE_DIR"],
-            "input": env["FLWR_TORCHTITAN_INPUT_DCP_DIR"],
-            "output": env["FLWR_TORCHTITAN_OUTPUT_DCP_DIR"],
-            "step0": env["FLWR_TORCHTITAN_STEP0_DCP_DIR"],
-        })
+        paths.update(
+            {
+                "cache": env["FLWR_TORCHTITAN_DCP_CACHE_DIR"],
+                "input": env["FLWR_TORCHTITAN_INPUT_DCP_DIR"],
+                "output": env["FLWR_TORCHTITAN_OUTPUT_DCP_DIR"],
+                "step0": env["FLWR_TORCHTITAN_STEP0_DCP_DIR"],
+            }
+        )
         assert not stale_output_state.exists()
         os.makedirs(os.path.dirname(paths["step0"]), exist_ok=True)
         os.symlink(env["FLWR_TORCHTITAN_INPUT_DCP_DIR"], paths["step0"])
@@ -88,7 +90,9 @@ def test_run_torchtitan_training_cleans_successful_dcp_handoff(
         Path(env["FLWR_TORCHTITAN_OUTPUT_DCP_DIR"], "__0_0.distcp").write_bytes(
             b"trained"
         )
-        return subprocess.CompletedProcess(args=args[0], returncode=0, stdout="", stderr="")
+        return subprocess.CompletedProcess(
+            args=args[0], returncode=0, stdout="", stderr=""
+        )
 
     def fake_load_state_dict_from_dcp(input_dir, **_kwargs):
         assert input_dir == paths["output"]
@@ -101,7 +105,9 @@ def test_run_torchtitan_training_cleans_successful_dcp_handoff(
         task_module, "_save_state_dict_as_dcp", fake_save_state_dict_as_dcp
     )
     monkeypatch.setattr(task_module.subprocess, "run", fake_run)
-    monkeypatch.setattr(task_module, "_load_state_dict_from_dcp", fake_load_state_dict_from_dcp)
+    monkeypatch.setattr(
+        task_module, "_load_state_dict_from_dcp", fake_load_state_dict_from_dcp
+    )
 
     trained_state = task_module.run_torchtitan_training(
         cfg, context, {"weight": torch.zeros(1)}, server_round=1
@@ -174,6 +180,212 @@ def test_layerwise_dcp_dry_run_renders_job_side_conversion(tmp_path) -> None:
     client_script_text = script.read_text(encoding="utf-8")
     assert 'FLWR_TORCHTITAN_DCP_CONVERT_ON_CLIENT="true"' in client_script_text
     assert "flowertune_llm.dcp_converter" not in client_script_text
+
+
+def test_layerwise_dcp_dry_run_renders_three_scheduler_jobs(tmp_path) -> None:
+    """Separate conversion mode should render three single-purpose scripts."""
+    layer_directory = tmp_path / "layers" / "10" / "20"
+    layer_directory.mkdir(parents=True)
+    layer_path = layer_directory / "layer.a.pt"
+    _write_layer_file(layer_path, "layer.a", torch.ones(2))
+    context = Context(
+        run_id=10,
+        node_id=20,
+        node_config={},
+        state=RecordDict(),
+        run_config={
+            "aggregation.layer-write-dir": str(tmp_path / "layers"),
+            "client.workspace": str(tmp_path / "workspace"),
+            "model.name": "test/model",
+            "trainer.backend": "torchtitan",
+            "trainer.dry-run": True,
+            "trainer.python-exec": "python",
+            "trainer.torchtitan.dcp-enabled": True,
+            "trainer.torchtitan.dcp-separate-jobs": True,
+            "scheduler.backend": "slurm",
+        },
+    )
+    cfg = types.SimpleNamespace(
+        trainer=types.SimpleNamespace(
+            torchtitan=types.SimpleNamespace(command="true", workdir="")
+        )
+    )
+
+    task_module.run_torchtitan_training(
+        cfg,
+        context,
+        None,
+        layer_paths=[str(layer_path)],
+        output_layer_dir=str(layer_directory),
+    )
+
+    script_dir = layer_directory / "torchtitan"
+    to_dcp = script_dir / "torchtitan_slurm_to_dcp.sh"
+    train = script_dir / "torchtitan_slurm_train.sh"
+    from_dcp = script_dir / "torchtitan_slurm_from_dcp.sh"
+    for script in (to_dcp, train, from_dcp):
+        subprocess.run(["bash", "-n", str(script)], check=True)
+    assert "--direction to-dcp" in to_dcp.read_text(encoding="utf-8")
+    assert "true" in train.read_text(encoding="utf-8")
+    assert "--direction to-layers" in from_dcp.read_text(encoding="utf-8")
+    report = (script_dir / "dry_run_summary.txt").read_text(encoding="utf-8")
+    assert "separate_dcp_jobs=true" in report
+
+
+def test_layerwise_dcp_submits_dependent_slurm_jobs(tmp_path, monkeypatch) -> None:
+    """Slurm conversion and training phases should form an afterok chain."""
+    layer_directory = tmp_path / "layers" / "10" / "20"
+    layer_directory.mkdir(parents=True)
+    layer_path = layer_directory / "layer.a.pt"
+    _write_layer_file(layer_path, "layer.a", torch.ones(2))
+    workspace = tmp_path / "workspace"
+    context = Context(
+        run_id=10,
+        node_id=20,
+        node_config={},
+        state=RecordDict(),
+        run_config={
+            "aggregation.layer-write-dir": str(tmp_path / "layers"),
+            "client.workspace": str(workspace),
+            "client.train-steps": 5,
+            "model.name": "test/model",
+            "trainer.backend": "torchtitan",
+            "trainer.torchtitan.dcp-enabled": True,
+            "trainer.torchtitan.dcp-separate-jobs": True,
+            "scheduler.backend": "slurm",
+            "scheduler.mem": "64G",
+            "scheduler.conversion.mem": "256G",
+        },
+    )
+    cfg = types.SimpleNamespace(
+        trainer=types.SimpleNamespace(
+            torchtitan=types.SimpleNamespace(command="true", workdir="")
+        )
+    )
+    submissions: list[list[str]] = []
+
+    def fake_run(args, **_kwargs):
+        command = [str(arg) for arg in args]
+        submissions.append(command)
+        script = Path(command[-1])
+        env = _kwargs["env"]
+        if script.name.endswith("_to_dcp.sh"):
+            os.makedirs(env["FLWR_TORCHTITAN_DCP_CONVERSION_DIR"], exist_ok=True)
+            os.symlink(
+                env["FLWR_TORCHTITAN_DCP_CONVERSION_DIR"],
+                env["FLWR_TORCHTITAN_INPUT_DCP_DIR"],
+            )
+            job_id = "101"
+        elif script.name.endswith("_train.sh"):
+            os.makedirs(env["FLWR_TORCHTITAN_FINAL_DCP_DIR"], exist_ok=True)
+            job_id = "102"
+        else:
+            os.makedirs(env["FLWR_TORCHTITAN_OUTPUT_DCP_DIR"], exist_ok=True)
+            Path(env["FLWR_TORCHTITAN_OUTPUT_LAYERS_READY"]).write_text(
+                "ready\n", encoding="utf-8"
+            )
+            job_id = "103"
+        return subprocess.CompletedProcess(
+            args=args, returncode=0, stdout=f"{job_id}\n", stderr=""
+        )
+
+    monkeypatch.setattr(task_module.subprocess, "run", fake_run)
+
+    result = task_module.run_torchtitan_training(
+        cfg,
+        context,
+        None,
+        server_round=1,
+        layer_paths=[str(layer_path)],
+        output_layer_dir=str(layer_directory),
+    )
+
+    assert result is None
+    assert len(submissions) == 3
+    assert "--mem" in submissions[0] and "256G" in submissions[0]
+    assert not any(arg.startswith("--dependency=") for arg in submissions[0])
+    assert "--dependency=afterok:101" in submissions[1]
+    assert "64G" in submissions[1]
+    assert "--dependency=afterok:102" in submissions[2]
+    assert "--wait" in submissions[2]
+
+
+def test_layerwise_dcp_submits_dependent_flux_jobs(tmp_path, monkeypatch) -> None:
+    """Flux conversion and training phases should form an afterok chain."""
+    layer_directory = tmp_path / "layers" / "10" / "20"
+    layer_directory.mkdir(parents=True)
+    layer_path = layer_directory / "layer.a.pt"
+    _write_layer_file(layer_path, "layer.a", torch.ones(2))
+    context = Context(
+        run_id=10,
+        node_id=20,
+        node_config={},
+        state=RecordDict(),
+        run_config={
+            "aggregation.layer-write-dir": str(tmp_path / "layers"),
+            "client.workspace": str(tmp_path / "workspace"),
+            "client.train-steps": 5,
+            "model.name": "test/model",
+            "trainer.backend": "torchtitan",
+            "trainer.torchtitan.dcp-enabled": True,
+            "trainer.torchtitan.dcp-separate-jobs": True,
+            "scheduler.backend": "flux",
+            "scheduler.flux.conversion-extra-args": "--queue=high-memory",
+        },
+    )
+    cfg = types.SimpleNamespace(
+        trainer=types.SimpleNamespace(
+            torchtitan=types.SimpleNamespace(command="true", workdir="")
+        )
+    )
+    commands: list[list[str]] = []
+
+    def fake_run(args, **kwargs):
+        command = [str(arg) for arg in args]
+        commands.append(command)
+        if command[:3] == ["flux", "job", "attach"]:
+            return subprocess.CompletedProcess(
+                args=args, returncode=0, stdout="", stderr=""
+            )
+        script = Path(command[-1])
+        env = kwargs["env"]
+        if script.name.endswith("_to_dcp.sh"):
+            os.makedirs(env["FLWR_TORCHTITAN_DCP_CONVERSION_DIR"], exist_ok=True)
+            os.symlink(
+                env["FLWR_TORCHTITAN_DCP_CONVERSION_DIR"],
+                env["FLWR_TORCHTITAN_INPUT_DCP_DIR"],
+            )
+            job_id = "f101"
+        elif script.name.endswith("_train.sh"):
+            os.makedirs(env["FLWR_TORCHTITAN_FINAL_DCP_DIR"], exist_ok=True)
+            job_id = "f102"
+        else:
+            os.makedirs(env["FLWR_TORCHTITAN_OUTPUT_DCP_DIR"], exist_ok=True)
+            Path(env["FLWR_TORCHTITAN_OUTPUT_LAYERS_READY"]).write_text(
+                "ready\n", encoding="utf-8"
+            )
+            job_id = "f103"
+        return subprocess.CompletedProcess(
+            args=args, returncode=0, stdout=f"{job_id}\n", stderr=""
+        )
+
+    monkeypatch.setattr(task_module.subprocess, "run", fake_run)
+
+    result = task_module.run_torchtitan_training(
+        cfg,
+        context,
+        None,
+        server_round=1,
+        layer_paths=[str(layer_path)],
+        output_layer_dir=str(layer_directory),
+    )
+
+    assert result is None
+    assert len(commands) == 4
+    assert "--queue=high-memory" in commands[0]
+    assert "--dependency=afterok:f101" in commands[1]
+    assert "--dependency=afterok:f102" in commands[2]
+    assert commands[3][-1] == "f103"
 
 
 def test_layerwise_dcp_client_conversion_runs_outside_job(

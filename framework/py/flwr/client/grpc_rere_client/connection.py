@@ -45,10 +45,12 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
     ActivateNodeResponse,
     DeactivateNodeRequest,
+    NodeProfileEvent,
     PullMessagesRequest,
     PullMessagesResponse,
     PushMessagesRequest,
     PushMessagesResponse,
+    PushNodeProfileEventsRequest,
     RegisterNodeFleetRequest,
     UnregisterNodeFleetRequest,
 )
@@ -65,6 +67,12 @@ from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_
 
 from .grpc_adapter import GrpcAdapter
 from .node_auth_client_interceptor import NodeAuthClientInterceptor
+
+
+def _event_number(event: dict[str, object], key: str) -> int | float:
+    """Return a numeric profile event value."""
+    value = event.get(key, 0)
+    return value if isinstance(value, (int, float)) else 0
 
 
 @contextmanager
@@ -88,6 +96,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         Callable[[int, str], bytes],
         Callable[[int, str, bytes], None],
         Callable[[int, str], None],
+        Callable[[list[dict[str, object]]], None],
     ]
 ]:
     """Primitives for request/response-based interaction with a server.
@@ -378,6 +387,30 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         )
         fn(object_id)
 
+    def push_node_profile_events(events: list[dict[str, object]]) -> None:
+        """Report completed transport profile events to SuperLink."""
+        if node is None or not events:
+            return
+        stub.PushNodeProfileEvents(
+            request=PushNodeProfileEventsRequest(
+                node=node,
+                events=[
+                    NodeProfileEvent(
+                        event_id=str(event["event_id"]),
+                        run_id=int(_event_number(event, "run_id")),
+                        group_id=str(event.get("group_id") or ""),
+                        task=str(event["task"]),
+                        timestamp_ms=float(_event_number(event, "timestamp_ms")),
+                        duration_ms=float(_event_number(event, "duration_ms")),
+                        network_bytes=int(_event_number(event, "network_bytes")),
+                        sender=str(event["sender"]),
+                        receiver=str(event["receiver"]),
+                    )
+                    for event in events
+                ],
+            )
+        )
+
     try:
         if self_registered:
             register_node()
@@ -392,6 +425,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
             pull_object,
             push_object,
             confirm_message_received,
+            push_node_profile_events,
         )
     except Exception as exc:  # pylint: disable=broad-except
         log(ERROR, exc)

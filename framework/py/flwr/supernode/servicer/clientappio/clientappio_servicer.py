@@ -245,8 +245,51 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
             mask_string(request.token),
         )
 
-        # Save the context to the state
-        state.store_context(context_from_proto(request.context))
+        # Save the context, but retain internal transport metrics in NodeState
+        # until the reply has been uploaded to SuperLink.
+        app_context = context_from_proto(request.context)
+        profile_record = app_context.state.config_records.pop(
+            "_flwr_transport_profile", None
+        )
+        if profile_record is not None:
+
+            def number(key: str) -> int | float:
+                value = profile_record.get(key, 0)
+                return value if isinstance(value, (int, float)) else 0
+
+            instruction_id = str(profile_record.get("instruction_id", ""))
+            if instruction_id:
+                node_id = state.get_node_id()
+                group_id = str(profile_record.get("group_id", ""))
+                state.add_transport_profile_event(
+                    instruction_id,
+                    {
+                        "event_id": f"{instruction_id}:supernode_clientapp_downstream",
+                        "run_id": run_id,
+                        "group_id": group_id,
+                        "task": "supernode_clientapp_downstream",
+                        "timestamp_ms": float(number("input_timestamp_ms")),
+                        "duration_ms": float(number("input_duration_ms")),
+                        "network_bytes": int(number("input_network_bytes")),
+                        "sender": str(node_id),
+                        "receiver": "clientapp",
+                    },
+                )
+                state.add_transport_profile_event(
+                    instruction_id,
+                    {
+                        "event_id": f"{instruction_id}:supernode_clientapp_upstream",
+                        "run_id": run_id,
+                        "group_id": group_id,
+                        "task": "supernode_clientapp_upstream",
+                        "timestamp_ms": float(number("output_timestamp_ms")),
+                        "duration_ms": float(number("output_duration_ms")),
+                        "network_bytes": int(number("output_network_bytes")),
+                        "sender": "clientapp",
+                        "receiver": str(node_id),
+                    },
+                )
+        state.store_context(app_context)
 
         # Remove the token to make the run eligible for processing
         # A run associated with a token cannot be handled until its token is cleared

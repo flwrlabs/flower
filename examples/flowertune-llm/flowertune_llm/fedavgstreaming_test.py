@@ -225,6 +225,33 @@ def test_apply_aggregated_upload_chunk_has_no_network_arguments() -> None:
     assert torch.equal(state_dict["layer"], torch.ones(2))
 
 
+def test_apply_aggregated_upload_chunk_preserves_global_dtype() -> None:
+    """A wider client delta must not promote the persistent global model."""
+    strategy = FedAvgStreaming(
+        initial_state_dict={"layer": torch.zeros(2, dtype=torch.float16)}
+    )
+    state_dict = {"layer": torch.zeros(2, dtype=torch.float16)}
+    strategy._apply_aggregated_upload_chunk(  # pylint: disable=protected-access
+        entry={
+            "layer_idx": 0,
+            "layer_name": "layer",
+            "start": 0,
+            "end": 2,
+            "is_last_chunk": True,
+        },
+        chunk_tensor=torch.ones(2, dtype=torch.float32),
+        state_dict=state_dict,
+        aggregated_layers={},
+        offload_enabled=False,
+        offload_dir="",
+        chunk_count_by_layer={"layer": 1},
+        layer_names=["layer"],
+    )
+
+    assert state_dict["layer"].dtype == torch.float16
+    assert torch.equal(state_dict["layer"], torch.ones(2, dtype=torch.float16))
+
+
 def test_layerwise_download_failure_aborts_before_training() -> None:
     """A missing download acknowledgement must fail instead of being ignored."""
     strategy = FedAvgStreaming(initial_state_dict={"layer": torch.ones(2)})

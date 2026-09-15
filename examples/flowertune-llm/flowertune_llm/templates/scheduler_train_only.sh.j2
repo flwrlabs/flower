@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+{{ env_setup }}
+
+if [ -n "{{ workdir }}" ]; then
+  cd "{{ workdir }}"
+fi
+
+export FLWR_TORCHTITAN_INPUT_STATE="{{ input_checkpoint_path }}"
+export FLWR_TORCHTITAN_OUTPUT_STATE="{{ output_checkpoint_path }}"
+export FLWR_TORCHTITAN_INPUT_DCP_DIR="{{ input_dcp_dir }}"
+export FLWR_TORCHTITAN_OUTPUT_DCP_DIR="{{ output_dcp_dir }}"
+export FLWR_TORCHTITAN_DCP_CACHE_DIR="{{ dcp_cache_dir }}"
+export FLWR_TORCHTITAN_CHECKPOINT_DIR="{{ checkpoint_dir }}"
+export FLWR_TORCHTITAN_STEP0_DCP_DIR="{{ step0_dcp_dir }}"
+export FLWR_TORCHTITAN_FINAL_DCP_DIR="{{ final_dcp_dir }}"
+export FLWR_TORCHTITAN_INPUT_LAYERS_DIR="{{ input_layers_dir }}"
+export FLWR_TORCHTITAN_DCP_CONVERSION_DIR="{{ dcp_conversion_dir }}"
+export FLWR_TORCHTITAN_OUTPUT_LAYERS_DIR="{{ output_layers_dir }}"
+export FLWR_TORCHTITAN_OUTPUT_LAYERS_READY="{{ output_layers_ready }}"
+export FLWR_TORCHTITAN_CONVERSION_PROFILE="{{ conversion_profile_path }}"
+export FLWR_FLOWERTUNE_LLM_ROOT="{{ flowertune_llm_root }}"
+export PYTHONPATH="${FLWR_FLOWERTUNE_LLM_ROOT}:${PYTHONPATH:-}"
+export FLWR_RUN_ID="{{ run_id }}"
+export FLWR_NODE_ID="{{ node_id }}"
+export FLWR_CLIENT_NAME="{{ client_name }}"
+export FLWR_CLIENT_WORKSPACE="{{ client_workspace }}"
+export FLWR_DATASET_NAME="{{ dataset_name }}"
+export FLWR_DATASET_PATH="{{ dataset_path }}"
+export FLWR_HF_ASSETS_PATH="{{ hf_assets_path }}"
+export FLWR_TRAIN_STEPS="{{ train_steps }}"
+export FLWR_STEPS_PER_ROUND="{{ steps_per_round }}"
+export FLWR_DUMP_FOLDER="{{ dump_folder }}"
+export FLWR_NUM_NODES="{{ num_nodes }}"
+export FLWR_TORCHTITAN_CONFIG_FILENAME="{{ config_filename }}"
+export FLWR_TORCHTITAN_CONFIG_PATH="{{ torchtitan_config_path }}"
+
+if [ ! -d "${FLWR_TORCHTITAN_INPUT_DCP_DIR}" ]; then
+  echo "Expected converted input DCP not found: ${FLWR_TORCHTITAN_INPUT_DCP_DIR}" >&2
+  exit 1
+fi
+mkdir -p "${FLWR_TORCHTITAN_CHECKPOINT_DIR}"
+if [ -e "${FLWR_TORCHTITAN_STEP0_DCP_DIR}" ] || [ -L "${FLWR_TORCHTITAN_STEP0_DCP_DIR}" ]; then
+  rm -rf "${FLWR_TORCHTITAN_STEP0_DCP_DIR}"
+fi
+ln -s "${FLWR_TORCHTITAN_INPUT_DCP_DIR}" "${FLWR_TORCHTITAN_STEP0_DCP_DIR}"
+
+{{ torchtitan_command }}
+
+if [ ! -d "${FLWR_TORCHTITAN_FINAL_DCP_DIR}" ]; then
+  echo "Expected TorchTitan DCP checkpoint not found: ${FLWR_TORCHTITAN_FINAL_DCP_DIR}" >&2
+  exit 1
+fi

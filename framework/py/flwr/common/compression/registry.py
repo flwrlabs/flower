@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Any
 
 from .pipeline import NoCompressionPipeline, TransformationPipeline
-from .turboquant import TurboQuantMSEPipeline
+from .turboquant import EdenUnbiasedPipeline, TurboQuantMSEPipeline
 
 
 def _as_bool(value: Any) -> bool:
@@ -27,5 +27,15 @@ def create_pipeline(name: str, **params: Any) -> TransformationPipeline:
             n_bits=int(params.get("n_bits", params.get("bits", 3))),
             block_size=int(params.get("block_size", 262_144)),
             use_cuda=_as_bool(params.get("use_cuda", params.get("cuda", False))),
+            rotation=_as_bool(params.get("rotation", True)),
+            rotation_seed=int(params.get("rotation_seed", 2025)),
+        )
+    if normalized in {"eden", "eden_unbiased", "eden-unbiased"}:
+        return EdenUnbiasedPipeline(
+            n_bits=int(params.get("n_bits", params.get("bits", 3))),
+            block_size=int(params.get("block_size", 262_144)),
+            use_cuda=_as_bool(params.get("use_cuda", params.get("cuda", False))),
+            rotation=_as_bool(params.get("rotation", True)),
+            rotation_seed=int(params.get("rotation_seed", 2025)),
         )
     raise ValueError(f"Unknown compression pipeline: {name}")

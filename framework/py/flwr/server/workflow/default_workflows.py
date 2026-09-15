@@ -33,6 +33,7 @@ from flwr.common import (
     log,
 )
 from flwr.common.constant import MessageType, MessageTypeLegacy
+from flwr.common.profiling import set_current_round
 
 from ..client_proxy import ClientProxy
 from ..compat.app_utils import start_update_client_manager_thread
@@ -74,6 +75,7 @@ class DefaultWorkflow:
 
         # Initialize parameters
         log(INFO, "[INIT]")
+        set_current_round(0)
         default_init_params_workflow(grid, context)
 
         # Run federated learning for num_rounds
@@ -83,6 +85,7 @@ class DefaultWorkflow:
         context.state.config_records[MAIN_CONFIGS_RECORD] = cfg
 
         for current_round in range(1, context.config.num_rounds + 1):
+            set_current_round(current_round)
             log(INFO, "")
             log(INFO, "[ROUND %s]", current_round)
             cfg[Key.CURRENT_ROUND] = current_round
@@ -116,6 +119,7 @@ class DefaultWorkflow:
         log(INFO, "")
 
         # Terminate the thread
+        set_current_round(None)
         f_stop.set()
         thread.join()
 

@@ -20,13 +20,18 @@ from .message import (
 )
 from .pipeline import NoCompressionPipeline, TransformationPipeline, Transformer
 from .registry import create_pipeline
-from .turboquant import TurboQuantMSEPipeline, TurboQuantMSETransformer
+from .turboquant import (
+    EdenUnbiasedPipeline,
+    TurboQuantMSEPipeline,
+    TurboQuantMSETransformer,
+)
 
 __all__ = [
     "ArrayRecordDelta",
     "CompressionEnvelope",
     "CompressionStats",
     "DeltaState",
+    "EdenUnbiasedPipeline",
     "NoCompressionPipeline",
     "TransformationPipeline",
     "Transformer",

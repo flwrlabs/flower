@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import pickle
 import warnings
+from contextlib import nullcontext
 from time import perf_counter
 from typing import Any
 
@@ -19,7 +20,10 @@ from flwr.common.config import unflatten_dict
 from omegaconf import DictConfig
 
 from flowertune_llm.dataset import replace_keys
-from flowertune_llm.models import get_model
+from flowertune_llm.compression import add_compression_metrics, compress_if_enabled
+from flowertune_llm.benchmark import run_instruction_training
+from flowertune_llm.models import get_model, is_adapter_parameter
+from flowertune_llm.pretraining import run_continued_pretraining
 from flowertune_llm.task import (
     CachedLayer,
     chunk_key,
@@ -210,6 +214,189 @@ def _debug_add_noise_to_state_dict(
         return layer_name, before, after
 
     return None
+
+
+def _run_minimal_training_step(
+    model: torch.nn.Module, context: Context
+) -> tuple[float, float]:
+    """Run a small number of real SGD steps on one model parameter."""
+    for parameter in model.parameters():
+        parameter.requires_grad_(False)
+
+    candidates = [
+        (name, parameter)
+        for name, parameter in model.named_parameters()
+        if parameter.is_floating_point() and 0 < parameter.numel() <= 1_000_000
+    ]
+    if not candidates:
+        raise ValueError("Minimal training requires a floating parameter <= 1M values")
+    _, parameter = candidates[-1]
+    parameter.requires_grad_(True)
+
+    device = parameter.device
+    seq_length = int(context.run_config.get("train.minimal-seq-length", 8))
+    num_steps = int(context.run_config.get("train.minimal-steps", 1))
+    if num_steps < 1:
+        raise ValueError("train.minimal-steps must be at least 1")
+    learning_rate = float(
+        context.run_config.get("train.minimal-learning-rate", 1e-4)
+    )
+    generator = torch.Generator(device=device).manual_seed(
+        2026 + int(context.node_id)
+    )
+    vocab_size = int(getattr(model.config, "vocab_size"))
+    before = parameter.detach().float().clone()
+    optimizer = torch.optim.SGD([parameter], lr=learning_rate)
+    model.train()
+    total_loss = 0.0
+    for _ in range(num_steps):
+        input_ids = torch.randint(
+            0,
+            vocab_size,
+            (1, seq_length),
+            generator=generator,
+            device=device,
+        )
+        optimizer.zero_grad(set_to_none=True)
+        loss = model(input_ids=input_ids, labels=input_ids, use_cache=False).loss
+        loss.backward()
+        optimizer.step()
+        total_loss += float(loss.detach().float().item())
+    delta_norm = float((parameter.detach().float() - before).norm().item())
+    optimizer.zero_grad(set_to_none=True)
+    return total_loss / num_steps, delta_norm
+
+
+_TRAINING_TEXT = """
+Federated learning coordinates model improvement across independent participants
+without collecting their original data in one place. Each participant trains on
+local examples and returns an update which the server aggregates. Compression can
+reduce network cost, but the reconstructed update must preserve model behavior.
+
+Machine learning systems should be evaluated with repeatable experiments, explicit
+metrics, and careful accounting of both numerical error and downstream predictions.
+Reliable distributed systems also need bounded memory use, fault isolation, and
+clear evidence that every expected participant contributed successfully.
+
+Large language models learn statistical relationships between tokens. During
+causal language modeling, each token is predicted from the tokens which precede it.
+Optimization adjusts model parameters to increase the likelihood of the observed
+continuation while validation checks that useful behavior remains stable.
+""".strip()
+
+
+def _run_substantial_training(
+    model: torch.nn.Module,
+    context: Context,
+    *,
+    server_round: int,
+) -> tuple[float, float, int]:
+    """Train the final transformer blocks for multiple natural-text steps."""
+    if not torch.cuda.is_available():
+        raise RuntimeError("Substantial training requires a CUDA device")
+
+    num_steps = int(context.run_config.get("train.substantial-steps", 25))
+    seq_length = int(context.run_config.get("train.substantial-seq-length", 128))
+    learning_rate = float(
+        context.run_config.get("train.substantial-learning-rate", 1e-3)
+    )
+    num_layers = int(context.run_config.get("train.substantial-last-layers", 2))
+    if num_steps < 1 or seq_length < 2 or num_layers < 1:
+        raise ValueError("Substantial training steps, sequence length, and layers > 0")
+
+    backbone = getattr(model, "model", None)
+    layers = getattr(backbone, "layers", None)
+    if layers is None or len(layers) < num_layers:
+        raise ValueError("Model does not expose enough transformer layers")
+
+    lock_path = str(
+        context.run_config.get("train.substantial-gpu-lock", "/tmp/flwr-gpu.lock")
+    )
+    os.makedirs(os.path.dirname(os.path.abspath(lock_path)), exist_ok=True)
+    lock_file = open(lock_path, "a+", encoding="utf-8")  # pylint: disable=R1732
+    try:
+        try:
+            import fcntl
+
+            lock_context = nullcontext()
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        except ImportError:
+            lock_context = nullcontext()
+
+        with lock_context:
+            for parameter in model.parameters():
+                parameter.requires_grad_(False)
+            for layer in layers[-num_layers:]:
+                for parameter in layer.parameters():
+                    parameter.requires_grad_(True)
+            final_norm = getattr(backbone, "norm", None)
+            if final_norm is not None:
+                for parameter in final_norm.parameters():
+                    parameter.requires_grad_(True)
+
+            device = torch.device("cuda")
+            model.to(device)
+            model.train()
+            model.config.use_cache = False
+            trainable = [parameter for parameter in model.parameters() if parameter.requires_grad]
+            trainable_count = sum(parameter.numel() for parameter in trainable)
+            before = [parameter.detach().clone() for parameter in trainable]
+
+            from transformers import AutoTokenizer
+
+            tokenizer = AutoTokenizer.from_pretrained(model.config._name_or_path)
+            token_ids = tokenizer.encode(
+                (_TRAINING_TEXT + "\n\n") * (num_steps + 8),
+                add_special_tokens=True,
+            )
+            required = seq_length + 1
+            if len(token_ids) < required:
+                repeats = (required // max(1, len(token_ids))) + 1
+                token_ids = (token_ids * repeats)[:required]
+
+            optimizer = torch.optim.SGD(
+                trainable, lr=learning_rate, momentum=0.9
+            )
+            total_loss = 0.0
+            span = max(1, len(token_ids) - seq_length)
+            offset = (int(context.node_id) + server_round * 97) % span
+            for step in range(num_steps):
+                start = (offset + step * seq_length) % span
+                batch_ids = token_ids[start : start + seq_length]
+                if len(batch_ids) < seq_length:
+                    batch_ids += token_ids[: seq_length - len(batch_ids)]
+                input_ids = torch.tensor(
+                    batch_ids, dtype=torch.long, device=device
+                ).unsqueeze(0)
+                optimizer.zero_grad(set_to_none=True)
+                loss = model(
+                    input_ids=input_ids,
+                    labels=input_ids,
+                    use_cache=False,
+                ).loss
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(trainable, max_norm=1.0)
+                optimizer.step()
+                total_loss += float(loss.detach().float().item())
+
+            squared_delta = 0.0
+            for parameter, original in zip(trainable, before, strict=True):
+                difference = parameter.detach().float() - original.float()
+                squared_delta += float(torch.sum(difference * difference).item())
+            delta_norm = squared_delta**0.5
+            optimizer.zero_grad(set_to_none=True)
+            del optimizer, before, trainable
+            model.to("cpu")
+            torch.cuda.empty_cache()
+            return total_loss / num_steps, delta_norm, trainable_count
+    finally:
+        try:
+            import fcntl
+
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        except ImportError:
+            pass
+        lock_file.close()
 
 
 @app.train("layer_wise_download")
@@ -579,7 +766,22 @@ def train(msg: Message, context: Context):
     # Load model
     model = get_model(cfg.model)
     if incoming_state is not None:
-        model.load_state_dict(incoming_state, strict=True)
+        adapter_only = trainer_backend in {
+            "benchmark-lora",
+            "benchmark-qlora",
+            "benchmark-dora",
+            "benchmark-qdora",
+            "benchmark-rslora",
+            "benchmark-qffa",
+            "pretraining-lora",
+            "pretraining-qlora",
+            "pretraining-dora",
+            "pretraining-qdora",
+            "pretraining-rslora",
+            "pretraining-ffa",
+            "pretraining-qffa",
+        }
+        model.load_state_dict(incoming_state, strict=not adapter_only)
         if incoming_state_loaded_from_layers:
             _cleanup_layer_files_for_context(context)
     input_fingerprint = state_dict_fingerprint(model.state_dict())
@@ -592,16 +794,79 @@ def train(msg: Message, context: Context):
         elif "current-round" in config:
             server_round = int(config["current-round"])
 
+    minimal_step: tuple[float, float] | None = None
+    substantial_step: tuple[float, float, int] | None = None
+    benchmark_step: tuple[float, float, int, int, int, int] | None = None
+    pretraining_step: tuple[float, int, int, int, int, int] | None = None
     if trainer_backend == "torchtitan":
         trained_state = run_torchtitan_training(
             cfg, context, model.state_dict(), server_round=server_round
         )
         model.load_state_dict(trained_state, strict=True)
+    elif trainer_backend == "minimal":
+        minimal_step = _run_minimal_training_step(model, context)
+    elif trainer_backend == "substantial":
+        substantial_step = _run_substantial_training(
+            model, context, server_round=int(server_round or 0)
+        )
+    elif trainer_backend in {
+        "benchmark-dense",
+        "benchmark-lora",
+        "benchmark-qlora",
+        "benchmark-dora",
+        "benchmark-qdora",
+        "benchmark-rslora",
+        "benchmark-qffa",
+    }:
+        benchmark_step = run_instruction_training(
+            model,
+            context,
+            server_round=int(server_round or 0),
+            method=trainer_backend.removeprefix("benchmark-"),
+        )
+    elif trainer_backend in {
+        "pretraining-dense",
+        "pretraining-lora",
+        "pretraining-relora",
+        "pretraining-qlora",
+        "pretraining-dora",
+        "pretraining-qdora",
+        "pretraining-rslora",
+        "pretraining-galore",
+        "pretraining-ffa",
+        "pretraining-qffa",
+    }:
+        method = trainer_backend.removeprefix("pretraining-")
+        pretraining_step = run_continued_pretraining(
+            model,
+            context,
+            server_round=int(server_round or 0),
+            method=method,
+        )
     elif trainer_backend != "none":
         raise ValueError(f"Unsupported trainer.backend: {trainer_backend}")
 
-    state_dict = model.state_dict()
-    output_fingerprint = state_dict_fingerprint(state_dict)
+    trained_state_dict = model.state_dict()
+    output_fingerprint = state_dict_fingerprint(trained_state_dict)
+    updates_are_deltas = str(
+        context.run_config.get("aggregation.updates", "weights")
+    ).lower() == "delta"
+    if updates_are_deltas:
+        if incoming_state is None:
+            raise ValueError("Delta updates require the downloaded base model state")
+        names_to_send = (
+            incoming_state.keys()
+            if any(is_adapter_parameter(name) for name in incoming_state)
+            else trained_state_dict.keys()
+        )
+        state_dict = {
+            name: tensor.detach().cpu()
+            - incoming_state[name].detach().cpu().to(dtype=tensor.dtype)
+            for name in names_to_send
+            for tensor in (trained_state_dict[name],)
+        }
+    else:
+        state_dict = trained_state_dict
     layer_names = list(state_dict.keys())
     if "layer_names" in config:
         layer_names = list(config["layer_names"])
@@ -617,7 +882,60 @@ def train(msg: Message, context: Context):
         "model.input_fingerprint": input_fingerprint,
         "model.output_fingerprint": output_fingerprint,
         "model.fingerprint_delta": output_fingerprint - input_fingerprint,
+        "train.sent_delta": 1 if updates_are_deltas else 0,
     }
+    if minimal_step is not None:
+        loss, delta_norm = minimal_step
+        metrics["train_loss"] = loss
+        metrics["train.minimal_steps"] = int(
+            context.run_config.get("train.minimal-steps", 1)
+        )
+        metrics["train.minimal_delta_norm"] = delta_norm
+    if substantial_step is not None:
+        loss, delta_norm, trainable_count = substantial_step
+        metrics["train_loss"] = loss
+        metrics["train.substantial_steps"] = int(
+            context.run_config.get("train.substantial-steps", 25)
+        )
+        metrics["train.substantial_delta_norm"] = delta_norm
+        metrics["train.trainable_parameters"] = trainable_count
+    if benchmark_step is not None:
+        (
+            loss,
+            delta_norm,
+            trainable_count,
+            supervised_tokens,
+            peak_allocated,
+            peak_reserved,
+        ) = benchmark_step
+        metrics["train_loss"] = loss
+        metrics["train.benchmark_steps"] = int(
+            context.run_config.get("train.benchmark.steps", 25)
+        )
+        if delta_norm >= 0:
+            metrics["train.benchmark_delta_norm"] = delta_norm
+        metrics["train.trainable_parameters"] = trainable_count
+        metrics["train.supervised_tokens"] = supervised_tokens
+        metrics["train.peak_cuda_allocated_bytes"] = peak_allocated
+        metrics["train.peak_cuda_reserved_bytes"] = peak_reserved
+    if pretraining_step is not None:
+        (
+            loss,
+            trainable_count,
+            trained_tokens,
+            merged_modules,
+            peak_allocated,
+            peak_reserved,
+        ) = pretraining_step
+        metrics["train_loss"] = loss
+        metrics["train.pretraining_steps"] = int(
+            context.run_config.get("train.pretraining.steps", 50)
+        )
+        metrics["train.trainable_parameters"] = trainable_count
+        metrics["train.pretraining_tokens"] = trained_tokens
+        metrics["train.relora_merged_modules"] = merged_modules
+        metrics["train.peak_cuda_allocated_bytes"] = peak_allocated
+        metrics["train.peak_cuda_reserved_bytes"] = peak_reserved
 
     metric_record = MetricRecord(metrics)
     content = _profiled_content(
@@ -767,18 +1085,27 @@ def train_comms(msg: Message, context: Context):
         if STATE_NUM_EXAMPLES in context.state
         else 1
     )
+    array_record, compression_stats, compression_ms = compress_if_enabled(
+        ArrayRecord(arrays), config
+    )
     metric_record = MetricRecord({"num-examples": num_examples})
 
     t1 = perf_counter()
     config_record = ConfigRecord({"send_complete": send_complete})
     content = RecordDict(
         {
-            "arrays": ArrayRecord(arrays),
+            "arrays": array_record,
             "metrics": metric_record,
             "config": config_record,
         }
     )
     metric_record["profile.client.train_comms.ms"] = (t1 - t0) * 1000.0
+    add_compression_metrics(
+        metric_record,
+        prefix="profile.client.upload_compression",
+        stats=compression_stats,
+        elapsed_ms=compression_ms,
+    )
     if send_complete:
         _cleanup_layer_files_for_context(context, layer_paths)
 

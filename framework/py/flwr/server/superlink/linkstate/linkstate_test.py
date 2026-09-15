@@ -506,6 +506,49 @@ class StateTest(CoreStateTest):
             "serverapp_delivered_at_ms": 450.0,
         }
 
+    def test_reply_contains_full_path_downstream_anchors(self) -> None:
+        """A valid reply should carry exact downstream lifecycle anchors."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg_ins = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=node_id,
+                run_id=run_id,
+            )
+        )
+        assert state.store_message_ins(msg_ins)
+        delivered_ins = state.get_message_ins(node_id=node_id, limit=None)[0]
+        msg_res = Message(RecordDict(), reply_to=delivered_ins)
+        msg_res.metadata.__dict__["_message_id"] = msg_res.object_id
+        assert state.store_message_res(msg_res)
+        message_id = delivered_ins.metadata.message_id
+        state.record_instruction_enqueued(message_id, 1000.0)
+        state.record_clientapp_delivered(run_id, message_id, 1250.0)
+
+        retrieved = state.get_message_res(message_ids={message_id})[0]
+        sidecar = retrieved.content.metric_records["_flwr_network_delivery"]
+
+        assert sidecar["downstream_ms"] == 250.0
+        assert sidecar["ins_enqueued_at_ms"] == 1000.0
+        assert sidecar["clientapp_delivered_at_ms"] == 1250.0
+
+    def test_profile_events_are_stored_per_run(self) -> None:
+        """Externally measured profile events should be retained per run."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        event = {
+            "event_id": "message-1:superlink_supernode_downstream",
+            "task": "superlink_supernode_downstream",
+            "duration_ms": 123.0,
+        }
+
+        state.add_profile_events(run_id, [event, event])
+
+        # Retried profile reports must not inflate cumulative transport time.
+        assert state.get_profile_events(run_id) == [event]
+
     def test_get_message_ids_from_run_id(self) -> None:
         """Test get_message_ids_from_run_id."""
         # Prepare
@@ -1709,16 +1752,15 @@ class StateTest(CoreStateTest):
             state.store_traffic(invalid_run_id, bytes_sent=1000, bytes_recv=2000)
 
     def test_store_traffic_both_zero(self) -> None:
-        """Test that both bytes_sent and bytes_recv being zero raises ValueError."""
+        """Test that a zero-delta transport sample is a no-op."""
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
 
-        # Execute & Assert
-        with self.assertRaises(ValueError) as context:
-            state.store_traffic(run_id, bytes_sent=0, bytes_recv=0)
+        # Execute
+        state.store_traffic(run_id, bytes_sent=0, bytes_recv=0)
 
-        assert "cannot be zero" in str(context.exception)
+        # Assert
         run = state.get_run(run_id)
         assert run is not None
         assert run.bytes_sent == 0
@@ -1876,7 +1918,7 @@ class SqliteInMemoryStateTest(StateTest, unittest.TestCase):
         result = state.query("SELECT name FROM sqlite_schema;")
 
         # Assert
-        assert len(result) == 22
+        assert len(result) == 25
 
 
 class SqliteFileBasedTest(StateTest, unittest.TestCase):
@@ -1905,7 +1947,7 @@ class SqliteFileBasedTest(StateTest, unittest.TestCase):
         result = state.query("SELECT name FROM sqlite_schema;")
 
         # Assert
-        assert len(result) == 22
+        assert len(result) == 25
 
 
 if __name__ == "__main__":

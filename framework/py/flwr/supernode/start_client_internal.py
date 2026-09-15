@@ -52,7 +52,6 @@ from flwr.common.grpc import generic_create_grpc_server
 from flwr.common.inflatable import (
     get_all_nested_objects,
     get_object_tree,
-    iterate_object_tree,
     iterate_object_trees_breadth_first,
     no_object_id_recompute,
 )
@@ -81,6 +80,12 @@ from flwr.supernode.servicer.clientappio import ClientAppIoServicer
 DEFAULT_FFS_DIR = get_flwr_dir() / "supernode" / "ffs"
 
 FAB_VERIFICATION_ERROR = Error(ErrorCode.INVALID_FAB, "The FAB could not be verified.")
+
+
+def _profile_enabled(state: NodeState, run_id: int) -> bool:
+    """Return whether profiling is enabled for a run."""
+    context = state.get_context(run_id)
+    return bool(context and context.run_config.get("profile.enabled", False))
 
 
 # pylint: disable=import-outside-toplevel
@@ -237,6 +242,7 @@ def start_client_internal(
             pull_object,
             push_object,
             confirm_message_received,
+            push_node_profile_events,
         ) = conn
         clientappio_servicer.set_confirm_message_received_fn(confirm_message_received)
         # Store node_id in state
@@ -270,6 +276,7 @@ def start_client_internal(
                 object_store=store,
                 send=send,
                 push_object=push_object,
+                push_node_profile_events=push_node_profile_events,
             )
 
 
@@ -309,6 +316,9 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
     """
     # pylint: disable=too-many-nested-blocks
     message = None
+    transfer_bytes = 0
+    transfer_started_at_ms = time.time() * 1000.0
+    transfer_wall_start = time.perf_counter()
     try:
         # Pull message
         if (recv := receive()) is None:
@@ -343,6 +353,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
 
             # Pull and store the FAB
             fab = get_fab(run_info.fab_hash, run_id)
+            transfer_bytes += len(fab.content)
 
             # Verify the received FAB
             # FAB must be signed if trust entities provided
@@ -387,9 +398,15 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
 
         try:
             # Pull and store objects of the message in the ObjectStore
+            def tracked_pull_object(obj_id: str) -> bytes:
+                nonlocal transfer_bytes
+                content = pull_object(run_id, obj_id)
+                transfer_bytes += len(content)
+                return content
+
             obj_contents = pull_objects(
                 obj_ids_to_pull,
-                pull_object_fn=lambda obj_id: pull_object(run_id, obj_id),
+                pull_object_fn=tracked_pull_object,
             )
             for obj_id in list(obj_contents.keys()):
                 object_store.put(obj_id, obj_contents.pop(obj_id))
@@ -398,6 +415,25 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
             # locally. Otherwise SuperExec can hand a partial object tree to
             # ClientApp, which fails while inflating the message.
             state.store_message(message)
+            if _profile_enabled(state, run_id):
+                state.add_transport_profile_event(
+                    message.metadata.message_id,
+                    {
+                        "event_id": (
+                            f"{message.metadata.message_id}:"
+                            "superlink_supernode_downstream"
+                        ),
+                        "run_id": run_id,
+                        "group_id": message.metadata.group_id,
+                        "task": "superlink_supernode_downstream",
+                        "timestamp_ms": transfer_started_at_ms,
+                        "duration_ms": (time.perf_counter() - transfer_wall_start)
+                        * 1000.0,
+                        "network_bytes": transfer_bytes,
+                        "sender": "superlink",
+                        "receiver": str(state.get_node_id()),
+                    },
+                )
 
             log(INFO, "Received successfully")
         except Exception as err:  # pylint: disable=broad-except
@@ -434,6 +470,7 @@ def _push_messages(
     object_store: ObjectStore,
     send: Callable[[Message, ObjectTree, float], set[str]],
     push_object: Callable[[int, str, bytes], None],
+    push_node_profile_events: Callable[[list[dict[str, object]]], None],
 ) -> None:
     """Push reply messages to the SuperLink."""
     # This is to ensure that only one message is processed at a time
@@ -465,9 +502,12 @@ def _push_messages(
 
         # Define the iterator for yielding object contents
         # This will yield (object_id, content) pairs
+        transfer_bytes = 0
+
         def yield_object_contents(
             _obj_tree: ObjectTree, obj_id_set: set[str]
         ) -> Iterator[tuple[str, bytes]]:
+            nonlocal transfer_bytes
             for tree in iterate_object_trees_breadth_first([_obj_tree]):
                 if tree.object_id not in obj_id_set:
                     continue
@@ -476,10 +516,29 @@ def _push_messages(
                     time.sleep(0.5)
                 # At this point, content is guaranteed to be available
                 # therefore we can yield it after casting it to bytes
-                yield tree.object_id, cast(bytes, content)
+                typed_content = cast(bytes, content)
+                transfer_bytes += len(typed_content)
+                yield tree.object_id, typed_content
 
         # Send the message
         try:
+            run_id = message.metadata.run_id
+            instruction_id = message.metadata.reply_to_message_id
+            profile_events: list[dict[str, object]] = []
+            if _profile_enabled(state, run_id) and not message.has_error():
+                metrics_deadline = time.monotonic() + 600.0
+                while time.monotonic() < metrics_deadline:
+                    profile_events.extend(
+                        state.pop_transport_profile_events(instruction_id)
+                    )
+                    if any(
+                        event.get("task") == "supernode_clientapp_upstream"
+                        for event in profile_events
+                    ):
+                        break
+                    time.sleep(0.05)
+            transfer_started_at_ms = time.time() * 1000.0
+            transfer_wall_start = time.perf_counter()
             clientapp_runtime = state.get_message_processing_duration(
                 message_id=message.metadata.reply_to_message_id,
             )
@@ -487,16 +546,39 @@ def _push_messages(
             # Get the IDs of objects to send
             ids_obj_to_send = send(message, object_tree, clientapp_runtime)
 
+            def tracked_push_object(
+                run_id: int, object_id: str, content: bytes
+            ) -> None:
+                push_object(run_id, object_id, content)
+
             # Push object contents from the ObjectStore
-            run_id = message.metadata.run_id
             push_object_contents_from_iterable(
                 yield_object_contents(object_tree, ids_obj_to_send),
                 # Use functools.partial to bind run_id explicitly,
                 # avoiding late binding issues and satisfying flake8 (B023)
                 # Equivalent to:
                 # lambda object_id, content: push_object(run_id, object_id, content)
-                push_object_fn=partial(push_object, run_id),
+                push_object_fn=partial(tracked_push_object, run_id),
             )
+            if _profile_enabled(state, run_id):
+                profile_events.append(
+                    {
+                        "event_id": f"{instruction_id}:superlink_supernode_upstream",
+                        "run_id": run_id,
+                        "group_id": message.metadata.group_id,
+                        "task": "superlink_supernode_upstream",
+                        "timestamp_ms": transfer_started_at_ms,
+                        "duration_ms": (time.perf_counter() - transfer_wall_start)
+                        * 1000.0,
+                        "network_bytes": transfer_bytes,
+                        "sender": str(state.get_node_id()),
+                        "receiver": "superlink",
+                    }
+                )
+                try:
+                    push_node_profile_events(profile_events)
+                except Exception as err:  # pylint: disable=broad-except
+                    log(WARN, "Failed to report transport profile events: %s", err)
             log(INFO, "Sent successfully")
         except RunNotRunningException:
             log(
@@ -548,6 +630,7 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
         Callable[[int, str], bytes],
         Callable[[int, str, bytes], None],
         Callable[[int, str], None],
+        Callable[[list[dict[str, object]]], None],
     ]
 ]:
     """Establish a connection to the Fleet API server at SuperLink."""
@@ -597,7 +680,10 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
         root_certificates,
         authentication_keys,
     ) as conn:
-        yield conn
+        if len(conn) == 8:
+            yield (*conn, lambda _events: None)
+        else:
+            yield conn
 
 
 def _make_fleet_connection_retry_invoker(

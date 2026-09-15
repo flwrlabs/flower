@@ -51,6 +51,7 @@ def grpc_adapter(  # pylint: disable=R0913,too-many-positional-arguments
         Callable[[int, str], bytes],
         Callable[[int, str, bytes], None],
         Callable[[int, str], None],
+        Callable[[list[dict[str, object]]], None],
     ]
 ]:
     """Primitives for request/response-based interaction with a server via GrpcAdapter.

@@ -32,6 +32,7 @@ from flwr.common import (
     Scalar,
 )
 from flwr.common.logger import log
+from flwr.common.profiling import set_current_round
 from flwr.common.typing import GetParametersIns
 from flwr.server.client_manager import ClientManager, SimpleClientManager
 from flwr.server.client_proxy import ClientProxy
@@ -89,6 +90,7 @@ class Server:
 
         # Initialize parameters
         log(INFO, "[INIT]")
+        set_current_round(0)
         self.parameters = self._get_initial_parameters(server_round=0, timeout=timeout)
         log(INFO, "Starting evaluation of initial global parameters")
         res = self.strategy.evaluate(0, parameters=self.parameters)
@@ -108,6 +110,7 @@ class Server:
         start_time = timeit.default_timer()
 
         for current_round in range(1, num_rounds + 1):
+            set_current_round(current_round)
             log(INFO, "")
             log(INFO, "[ROUND %s]", current_round)
             # Train model and replace previous global model
@@ -155,6 +158,7 @@ class Server:
         # Bookkeeping
         end_time = timeit.default_timer()
         elapsed = end_time - start_time
+        set_current_round(None)
         return history, elapsed
 
     def evaluate_round(

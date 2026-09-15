@@ -27,6 +27,7 @@ sys.modules.setdefault("omegaconf", omegaconf_stub)
 
 transformers_stub = types.ModuleType("transformers")
 transformers_stub.AutoModelForCausalLM = object()
+transformers_stub.BitsAndBytesConfig = object()
 sys.modules.setdefault("transformers", transformers_stub)
 
 from flowertune_llm.client_app import (  # noqa: E402

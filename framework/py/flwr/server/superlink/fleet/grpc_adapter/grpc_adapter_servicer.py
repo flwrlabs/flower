@@ -38,6 +38,7 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     DeactivateNodeRequest,
     PullMessagesRequest,
     PushMessagesRequest,
+    PushNodeProfileEventsRequest,
     RegisterNodeFleetRequest,
     UnregisterNodeFleetRequest,
 )
@@ -109,6 +110,13 @@ class GrpcAdapterServicer(grpcadapter_pb2_grpc.GrpcAdapterServicer, FleetService
             return _handle(request, context, PullMessagesRequest, self.PullMessages)
         if request.grpc_message_name == PushMessagesRequest.__qualname__:
             return _handle(request, context, PushMessagesRequest, self.PushMessages)
+        if request.grpc_message_name == PushNodeProfileEventsRequest.__qualname__:
+            return _handle(
+                request,
+                context,
+                PushNodeProfileEventsRequest,
+                self.PushNodeProfileEvents,
+            )
         if request.grpc_message_name == PushObjectRequest.__qualname__:
             return _handle(request, context, PushObjectRequest, self.PushObject)
         if request.grpc_message_name == PullObjectRequest.__qualname__:

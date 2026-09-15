@@ -70,11 +70,16 @@ from flwr.serverapp.strategy.strategy_utils import (
     sample_nodes,
 )
 
+from flowertune_llm.compression import compress_if_enabled, compression_config
 from flowertune_llm.task import state_dict_fingerprint
+from flowertune_llm.pretraining import merge_relora_state_dict
 
 SAFE_GRPC_BYTES = int(GRPC_MAX_MESSAGE_LENGTH * 0.75)
 DEFAULT_LAYERWISE_CHUNKS_PER_MESSAGE = 0
-DEFAULT_LAYERWISE_DOWNLOAD_PIPELINE_DEPTH = 4
+# A node's layer chunks are assembled through read/modify/write files. Multiple
+# in-flight batches can race when a tensor is larger than the chunk size, so keep
+# downloads ordered until that storage path has transactional per-layer locking.
+DEFAULT_LAYERWISE_DOWNLOAD_PIPELINE_DEPTH = 1
 
 
 def _chunk_slices(tensor: torch.Tensor, max_bytes: int) -> list[tuple[int, int]]:
@@ -144,6 +149,7 @@ class _StreamedReply:
     created_at_ms: float
     delivered_at_ms: float
     downstream_ms: float | None
+    upstream_started_at_ms: float | None
     array_refs: dict[str, str]
     metrics: MetricRecord
     client_name: str | None = None
@@ -166,6 +172,7 @@ class _StreamObjectReader:
         self.pull_ms = 0.0
         self._pull_ms_by_owner: dict[str, float] = {}
         self._object_sizes: dict[str, int] = {}
+        self._last_pull_completed_at_ms: dict[str, float] = {}
 
     def pull(self, object_id: str, *, owner_key: str | None = None) -> bytes:
         """Pull one deflated object through the Grid's private object RPC."""
@@ -192,6 +199,7 @@ class _StreamObjectReader:
             self._pull_ms_by_owner[owner_key] = (
                 self._pull_ms_by_owner.get(owner_key, 0.0) + elapsed_ms
             )
+            self._last_pull_completed_at_ms[owner_key] = time.time() * 1000.0
         return content
 
     def pull_ms_for(self, owner_key: str) -> float:
@@ -201,6 +209,10 @@ class _StreamObjectReader:
     def bytes_for(self, object_ids: set[str]) -> int:
         """Return the bytes pulled for the selected object IDs."""
         return sum(self._object_sizes.get(object_id, 0) for object_id in object_ids)
+
+    def last_pull_completed_at_ms(self, owner_key: str) -> float | None:
+        """Return when the final object for one reply became available."""
+        return self._last_pull_completed_at_ms.get(owner_key)
 
     def confirm(self, object_id: str) -> None:
         """Confirm a streamed message so SuperLink can release objects."""
@@ -214,12 +226,12 @@ class _StreamObjectReader:
 
     def array_refs(
         self, message_object_id: str, *, owner_key: str
-    ) -> tuple[dict[str, str], MetricRecord, float | None]:
+    ) -> tuple[dict[str, str], MetricRecord, MetricRecord, float | None]:
         """Pull a reply's small metadata objects and return array-name refs."""
         message_content = self.pull(message_object_id, owner_key=owner_key)
         record_dict_ids = get_object_children_ids_from_object_content(message_content)
         if not record_dict_ids:
-            return {}, MetricRecord(), None
+            return {}, MetricRecord(), MetricRecord(), None
 
         record_refs = _json_body(
             self.pull(record_dict_ids[0], owner_key=owner_key), RecordDict
@@ -229,14 +241,20 @@ class _StreamObjectReader:
         if metrics_id := record_refs.get("metrics"):
             metrics = MetricRecord.inflate(self.pull(metrics_id, owner_key=owner_key))
 
-        downstream_ms = None
+        delivery_metrics = MetricRecord()
         if delivery_id := record_refs.get("_flwr_network_delivery"):
             delivery_metrics = MetricRecord.inflate(
                 self.pull(delivery_id, owner_key=owner_key)
             )
-            value = delivery_metrics.get("downstream_ms")
+
+        upstream_started_at_ms = None
+        if full_path_id := record_refs.get("_flwr_full_path"):
+            full_path_metrics = MetricRecord.inflate(
+                self.pull(full_path_id, owner_key=owner_key)
+            )
+            value = full_path_metrics.get("upstream_started_at_ms")
             if isinstance(value, (int, float)):
-                downstream_ms = max(float(value), 0.0)
+                upstream_started_at_ms = float(value)
 
         array_refs: dict[str, str] = {}
         if arrays_id := record_refs.get("arrays"):
@@ -247,7 +265,7 @@ class _StreamObjectReader:
                 ).items()
             }
 
-        return array_refs, metrics, downstream_ms
+        return array_refs, metrics, delivery_metrics, upstream_started_at_ms
 
     def array(self, array_object_id: str, *, owner_key: str) -> Array:
         """Pull and inflate one Array from a streamed reply object tree."""
@@ -312,8 +330,7 @@ def _batch_entries_by_size(
             current_batch and (current_nbytes + entry_nbytes) > max_batch_bytes
         )
         would_exceed_chunks = (
-            max_chunks_per_message > 0
-            and len(current_batch) >= max_chunks_per_message
+            max_chunks_per_message > 0 and len(current_batch) >= max_chunks_per_message
         )
         if would_exceed_bytes or would_exceed_chunks:
             batches.append(current_batch)
@@ -353,7 +370,9 @@ def _downstream_duration_from_message(message: Message) -> float | None:
     return max(float(duration_ms), 0.0)
 
 
-def _record_server_profile(task: str, duration_ms: float, metadata: dict[str, Any]) -> None:
+def _record_server_profile(
+    task: str, duration_ms: float, metadata: dict[str, Any]
+) -> None:
     profiler = get_active_profiler()
     if profiler is None:
         return
@@ -411,7 +430,9 @@ def _sanitize_layer_name(name: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_.-]", "_", name)
 
 
-def _rehydrate_state_dict(layer_names: list[str], offload_dir: str) -> dict[str, torch.Tensor]:
+def _rehydrate_state_dict(
+    layer_names: list[str], offload_dir: str
+) -> dict[str, torch.Tensor]:
     state: dict[str, torch.Tensor] = {}
     for idx, name in enumerate(layer_names):
         file_name = f"{idx:04d}_{_sanitize_layer_name(name)}.pt"
@@ -471,6 +492,7 @@ class FedAvgStreaming(FedAvg):
         self._download_max_chunk_bytes = max_chunk_bytes
         self._chunks_per_message = DEFAULT_LAYERWISE_CHUNKS_PER_MESSAGE
         self._download_pipeline_depth = DEFAULT_LAYERWISE_DOWNLOAD_PIPELINE_DEPTH
+        self._updates_are_deltas = False
 
     def _download_layers_to_clients(
         self,
@@ -479,10 +501,12 @@ class FedAvgStreaming(FedAvg):
         node_ids: list[int],
         state_dict: dict[str, Any],
         timeout: float,
+        train_config: ConfigRecord | None = None,
     ) -> None:
         """Stream current model layers/chunks from server to selected clients."""
         if not node_ids:
             return
+        train_config = ConfigRecord() if train_config is None else train_config
 
         layer_names = self._layer_names or []
         max_bytes_per_layer_chunk = max(1, int(self._download_max_chunk_bytes))
@@ -554,9 +578,33 @@ class FedAvgStreaming(FedAvg):
                     "download_chunks_in_message": len(batch_entries),
                 }
             )
+            download_config = ConfigRecord(dict(train_config))
+            download_config["compression.enabled"] = bool(
+                train_config.get("compression.download-enabled", False)
+            )
+            arrays, compression_stats, compression_ms = compress_if_enabled(
+                ArrayRecord(arrays_dict), download_config
+            )
+            for key, value in compression_config(train_config).items():
+                config[key] = value
+            if compression_stats is not None:
+                log(
+                    INFO,
+                    "[Layer download] TurboQuant batch %s/%s: %.2f MB -> "
+                    "%.2f MB (%.2fx) in %.2f ms; relative RMSE %.6g, "
+                    "cosine %.8f",
+                    batch_idx + 1,
+                    len(batches),
+                    compression_stats.raw_bytes / (1024 * 1024),
+                    compression_stats.compressed_bytes / (1024 * 1024),
+                    compression_stats.ratio,
+                    compression_ms,
+                    compression_stats.relative_rmse,
+                    compression_stats.cosine_similarity,
+                )
             record = RecordDict(
                 {
-                    self.arrayrecord_key: ArrayRecord(arrays_dict),
+                    self.arrayrecord_key: arrays,
                     self.configrecord_key: config,
                 }
             )
@@ -581,9 +629,7 @@ class FedAvgStreaming(FedAvg):
             valid_count: int,
             error_replies: list[Message],
         ) -> None:
-            error_nodes = sorted(
-                {msg.metadata.src_node_id for msg in error_replies}
-            )
+            error_nodes = sorted({msg.metadata.src_node_id for msg in error_replies})
             raise RuntimeError(
                 "Layer download failed before training: "
                 f"batch {batch_idx + 1}/{len(batches)} received "
@@ -635,9 +681,7 @@ class FedAvgStreaming(FedAvg):
                         len(node_ids),
                     )
                 if error_replies or len(valid_replies) < len(node_ids):
-                    raise_download_failure(
-                        batch_idx, len(valid_replies), error_replies
-                    )
+                    raise_download_failure(batch_idx, len(valid_replies), error_replies)
                 log_download_progress(batch_idx)
             return
 
@@ -657,9 +701,7 @@ class FedAvgStreaming(FedAvg):
                 next_batch_idx < len(batches)
                 and len(batch_pending_counts) < self._download_pipeline_depth
             ):
-                record = build_download_record(
-                    next_batch_idx, batches[next_batch_idx]
-                )
+                record = build_download_record(next_batch_idx, batches[next_batch_idx])
                 messages = list(
                     self._construct_messages(
                         record,
@@ -668,9 +710,7 @@ class FedAvgStreaming(FedAvg):
                     )
                 )
                 push_start = perf_counter()
-                msg_ids = [
-                    msg_id for msg_id in grid.push_messages(messages) if msg_id
-                ]
+                msg_ids = [msg_id for msg_id in grid.push_messages(messages) if msg_id]
                 downstream_bytes = grid.pop_pushed_message_sizes(msg_ids)
                 _record_server_profile(
                     "network_downstream",
@@ -808,9 +848,7 @@ class FedAvgStreaming(FedAvg):
                         len(node_ids),
                     )
                 if error_replies or valid_count < len(node_ids):
-                    raise_download_failure(
-                        batch_idx, valid_count, error_replies
-                    )
+                    raise_download_failure(batch_idx, valid_count, error_replies)
                 completed_batches += 1
                 log_download_progress(batch_idx)
 
@@ -836,17 +874,30 @@ class FedAvgStreaming(FedAvg):
         is_last_chunk = bool(entry["is_last_chunk"])
 
         tensor = state_dict[layer_name]
+        # Aggregated deltas can arrive in a wider dtype (for example after a
+        # mixed-precision client subtraction). Keep the global model in its
+        # configured dtype so one round cannot silently double later traffic.
+        chunk_tensor = chunk_tensor.to(dtype=tensor.dtype)
         full_layer_chunk = tensor.ndim == 0 or (
             start == 0 and getattr(tensor, "ndim", 0) > 0 and end >= tensor.shape[0]
         )
         if full_layer_chunk:
-            aggregated_layers[layer_name] = chunk_tensor
+            aggregated_layers[layer_name] = (
+                tensor.detach().cpu() + chunk_tensor
+                if self._updates_are_deltas
+                else chunk_tensor
+            )
         else:
             agg_tensor = aggregated_layers.get(layer_name)
             if agg_tensor is None:
-                base_tensor = tensor.detach().cpu() if hasattr(tensor, "cpu") else tensor
+                base_tensor = (
+                    tensor.detach().cpu() if hasattr(tensor, "cpu") else tensor
+                )
                 agg_tensor = base_tensor.clone()
-            agg_tensor[start:end] = chunk_tensor
+            if self._updates_are_deltas:
+                agg_tensor[start:end] += chunk_tensor
+            else:
+                agg_tensor[start:end] = chunk_tensor
             aggregated_layers[layer_name] = agg_tensor
 
         if is_last_chunk:
@@ -896,7 +947,9 @@ class FedAvgStreaming(FedAvg):
         if not msg_ids:
             return
         if not _has_streaming_object_pull(grid):
-            raise RuntimeError("Grid does not expose private streaming object pull RPCs")
+            raise RuntimeError(
+                "Grid does not expose private streaming object pull RPCs"
+            )
 
         run_id = getattr(getattr(grid, "_run"), "run_id")
         stub = getattr(grid, "_stub")
@@ -955,9 +1008,16 @@ class FedAvgStreaming(FedAvg):
                 object_ids = {
                     str(tree.object_id) for tree in iterate_object_tree(msg_tree)
                 }
-                array_refs, metrics, downstream_ms = object_reader.array_refs(
-                    msg_tree.object_id, owner_key=owner_key
-                )
+                (
+                    array_refs,
+                    metrics,
+                    delivery_metrics,
+                    upstream_started_at_ms,
+                ) = object_reader.array_refs(msg_tree.object_id, owner_key=owner_key)
+                downstream_ms = None
+                value = delivery_metrics.get("downstream_ms")
+                if isinstance(value, (int, float)):
+                    downstream_ms = max(float(value), 0.0)
                 log(
                     INFO,
                     "[Layer upload] batch %s/%s metadata ready from node %s: "
@@ -967,6 +1027,18 @@ class FedAvgStreaming(FedAvg):
                     light_msg.metadata.src_node_id,
                     len(array_refs),
                 )
+                compression_metrics = {
+                    key: value
+                    for key, value in metrics.items()
+                    if key.startswith("profile.client.upload_compression.")
+                }
+                if compression_metrics:
+                    log(
+                        INFO,
+                        "[Layer upload] node %s compression metrics: %s",
+                        light_msg.metadata.src_node_id,
+                        compression_metrics,
+                    )
                 # Streamed replies are pulled from the raw ServerAppIo response, so
                 # the delivery sidecar is inline in ``msg_proto`` rather than part of
                 # the object tree. Keep the object-tree fallback for compatibility,
@@ -974,6 +1046,19 @@ class FedAvgStreaming(FedAvg):
                 sidecar_downstream_ms = _downstream_duration_from_message(light_msg)
                 if sidecar_downstream_ms is not None:
                     downstream_ms = sidecar_downstream_ms
+                    inline_delivery = light_msg.content.metric_records.get(
+                        "_flwr_network_delivery"
+                    )
+                    if inline_delivery is not None:
+                        delivery_metrics = inline_delivery
+                if light_msg.has_content():
+                    inline_full_path = light_msg.content.metric_records.get(
+                        "_flwr_full_path"
+                    )
+                    if inline_full_path is not None:
+                        value = inline_full_path.get("upstream_started_at_ms")
+                        if isinstance(value, (int, float)):
+                            upstream_started_at_ms = float(value)
                 streamed_replies.append(
                     _StreamedReply(
                         object_id=msg_tree.object_id,
@@ -988,6 +1073,7 @@ class FedAvgStreaming(FedAvg):
                         created_at_ms=float(light_msg.metadata.created_at) * 1000.0,
                         delivered_at_ms=replies_received_at_ms,
                         downstream_ms=downstream_ms,
+                        upstream_started_at_ms=upstream_started_at_ms,
                         array_refs=array_refs,
                         metrics=metrics,
                         client_name=client_names_by_node_id.get(
@@ -995,6 +1081,33 @@ class FedAvgStreaming(FedAvg):
                         ),
                     )
                 )
+                lifecycle = getattr(grid, "_full_path_downstream", {}).pop(
+                    light_msg.metadata.reply_to_message_id, None
+                )
+                clientapp_delivered_at_ms = delivery_metrics.get(
+                    "clientapp_delivered_at_ms"
+                )
+                profiler = get_active_profiler()
+                if (
+                    profiler is not None
+                    and lifecycle is not None
+                    and isinstance(clientapp_delivered_at_ms, (int, float))
+                ):
+                    started_at_ms, node_id, size_bytes = lifecycle
+                    profiler.record(
+                        scope="transport",
+                        task="serverapp_clientapp_downstream",
+                        round=get_current_round(),
+                        node_id=node_id,
+                        duration_ms=max(
+                            float(clientapp_delivered_at_ms) - started_at_ms, 0.0
+                        ),
+                        timestamp_ms=started_at_ms,
+                        metadata={
+                            "network_bytes": size_bytes,
+                            "node_name": client_names_by_node_id.get(node_id),
+                        },
+                    )
 
         for msg in error_replies:
             log(
@@ -1117,17 +1230,38 @@ class FedAvgStreaming(FedAvg):
             object_reader.confirm(reply.object_id)
 
         for reply in streamed_replies:
-            reply.network_bytes = (
-                reply.message_bytes
-                + object_reader.bytes_for(reply.object_ids)
+            reply.network_bytes = reply.message_bytes + object_reader.bytes_for(
+                reply.object_ids
             )
+            full_path_completed_at_ms = object_reader.last_pull_completed_at_ms(
+                reply.owner_key
+            )
+            profiler = get_active_profiler()
+            if (
+                profiler is not None
+                and reply.upstream_started_at_ms is not None
+                and full_path_completed_at_ms is not None
+            ):
+                profiler.record(
+                    scope="transport",
+                    task="serverapp_clientapp_upstream",
+                    round=get_current_round(),
+                    node_id=reply.node_id,
+                    duration_ms=max(
+                        full_path_completed_at_ms - reply.upstream_started_at_ms,
+                        0.0,
+                    ),
+                    timestamp_ms=reply.upstream_started_at_ms,
+                    metadata={
+                        "network_bytes": reply.network_bytes,
+                        "node_name": reply.client_name,
+                    },
+                )
             upstream_duration_ms = max(
                 reply.delivered_at_ms - reply.created_at_ms,
                 0.0,
             ) + object_reader.pull_ms_for(reply.owner_key)
-            downstream_bytes = downstream_bytes_by_id.get(
-                reply.reply_to_message_id, 0
-            )
+            downstream_bytes = downstream_bytes_by_id.get(reply.reply_to_message_id, 0)
             _record_network_profile(
                 "upstream",
                 upstream_duration_ms,
@@ -1165,9 +1299,7 @@ class FedAvgStreaming(FedAvg):
                 "batch_idx": batch_idx,
                 "replies": len(streamed_replies),
                 "chunks_in_message": len(batch_entries),
-                "network_bytes": sum(
-                    reply.network_bytes for reply in streamed_replies
-                ),
+                "network_bytes": sum(reply.network_bytes for reply in streamed_replies),
             },
         )
         _record_server_profile(
@@ -1257,6 +1389,9 @@ class FedAvgStreaming(FedAvg):
         train_config = ConfigRecord() if train_config is None else train_config
         evaluate_config = ConfigRecord() if evaluate_config is None else evaluate_config
         result = Result()
+        self._updates_are_deltas = (
+            str(train_config.get("aggregation.updates", "weights")).lower() == "delta"
+        )
 
         process = psutil.Process()
         upload_target_message_size_mb = train_config.get(
@@ -1283,9 +1418,7 @@ class FedAvgStreaming(FedAvg):
             )
         )
         if download_target_message_size_mb <= 0:
-            raise ValueError(
-                "aggregation.download-target-message-size must be > 0"
-            )
+            raise ValueError("aggregation.download-target-message-size must be > 0")
         download_target_message_bytes = max(
             1, int(download_target_message_size_mb * 1024 * 1024)
         )
@@ -1293,7 +1426,14 @@ class FedAvgStreaming(FedAvg):
             download_target_message_bytes, SAFE_GRPC_BYTES
         )
         self._chunks_per_message = DEFAULT_LAYERWISE_CHUNKS_PER_MESSAGE
-        self._download_pipeline_depth = DEFAULT_LAYERWISE_DOWNLOAD_PIPELINE_DEPTH
+        self._download_pipeline_depth = int(
+            train_config.get(
+                "aggregation.download-pipeline-depth",
+                DEFAULT_LAYERWISE_DOWNLOAD_PIPELINE_DEPTH,
+            )
+        )
+        if self._download_pipeline_depth < 1:
+            raise ValueError("aggregation.download-pipeline-depth must be >= 1")
         log(
             INFO,
             (
@@ -1315,7 +1455,9 @@ class FedAvgStreaming(FedAvg):
 
         if self._state_dict is None:
             if len(initial_arrays) == 0:
-                raise ValueError("initial_state_dict required when initial_arrays empty")
+                raise ValueError(
+                    "initial_state_dict required when initial_arrays empty"
+                )
             self._state_dict = initial_arrays.to_torch_state_dict()
         state_dict = self._state_dict
         self._layer_names = list(state_dict.keys())
@@ -1377,6 +1519,7 @@ class FedAvgStreaming(FedAvg):
                     grid=grid,
                     node_ids=selected_node_ids,
                     state_dict=state_dict,
+                    train_config=train_config,
                     timeout=timeout,
                 )
 
@@ -1400,7 +1543,11 @@ class FedAvgStreaming(FedAvg):
                 if client_name:
                     client_names_by_node_id[int(msg.metadata.src_node_id)] = client_name
             if not node_ids:
-                log(WARNING, "No valid training replies, skipping round %s", current_round)
+                log(
+                    WARNING,
+                    "No valid training replies, skipping round %s",
+                    current_round,
+                )
                 continue
 
             # -----------------------------------------------------------------
@@ -1465,9 +1612,7 @@ class FedAvgStreaming(FedAvg):
                     )
                     continue
 
-                chunk_count_by_layer = {
-                    layer_name: 0 for layer_name in layer_names
-                }
+                chunk_count_by_layer = {layer_name: 0 for layer_name in layer_names}
                 for entry in upload_entries:
                     layer_name = str(entry["layer_name"])
                     chunk_count_by_layer[layer_name] = (
@@ -1516,6 +1661,8 @@ class FedAvgStreaming(FedAvg):
                             "upload_chunks_in_message": len(batch_entries),
                         }
                     )
+                    for key, value in compression_config(train_config).items():
+                        config[key] = value
                     return RecordDict({self.configrecord_key: config})
 
                 def log_upload_progress(batch_idx: int) -> None:
@@ -1587,6 +1734,28 @@ class FedAvgStreaming(FedAvg):
                     for layer_name, agg_tensor in aggregated_layers.items():
                         state_dict[layer_name] = agg_tensor
                     aggregated_layers.clear()
+
+            relora_merge_frequency = int(
+                train_config.get("train.pretraining.relora-merge-frequency", 1)
+            )
+            if relora_merge_frequency < 1:
+                raise ValueError("ReLoRA merge frequency must be positive")
+            if (
+                str(train_config.get("trainer.backend", ""))
+                == "pretraining-relora"
+                and current_round % relora_merge_frequency == 0
+            ):
+                merged_modules = merge_relora_state_dict(
+                    state_dict,
+                    rank=int(train_config.get("model.lora.rank", 8)),
+                    alpha=int(train_config.get("model.lora.alpha", 16)),
+                    seed=int(train_config.get("model.seed", 2026)) + current_round,
+                )
+                log(
+                    INFO,
+                    "[ReLoRA] merged and restarted %s adapter modules",
+                    merged_modules,
+                )
 
             server_output_fingerprint = state_dict_fingerprint(state_dict)
             log(

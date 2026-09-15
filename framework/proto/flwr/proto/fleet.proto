@@ -65,6 +65,10 @@ service Fleet {
   // Confirm Message Received
   rpc ConfirmMessageReceived(ConfirmMessageReceivedRequest)
       returns (ConfirmMessageReceivedResponse) {}
+
+  // Report transport profiling events measured by the SuperNode.
+  rpc PushNodeProfileEvents(PushNodeProfileEventsRequest)
+      returns (PushNodeProfileEventsResponse) {}
 }
 
 // RegisterNode messages (add prefix to avoid name clash)
@@ -109,5 +113,23 @@ message PushMessagesResponse {
   map<string, uint32> results = 2;
   repeated string objects_to_push = 3;
 }
+
+message NodeProfileEvent {
+  uint64 run_id = 1;
+  string group_id = 2;
+  string task = 3;
+  double timestamp_ms = 4;
+  double duration_ms = 5;
+  uint64 network_bytes = 6;
+  string sender = 7;
+  string receiver = 8;
+  // Stable across retries so the SuperLink can deduplicate this event.
+  string event_id = 9;
+}
+message PushNodeProfileEventsRequest {
+  Node node = 1;
+  repeated NodeProfileEvent events = 2;
+}
+message PushNodeProfileEventsResponse {}
 
 message Reconnect { uint64 reconnect = 1; }

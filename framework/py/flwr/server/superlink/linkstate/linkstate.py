@@ -514,7 +514,9 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
-    def record_instruction_enqueued(self, message_id: str, enqueued_at_ms: float) -> None:
+    def record_instruction_enqueued(
+        self, message_id: str, enqueued_at_ms: float
+    ) -> None:
         """Record when a ServerApp instruction is enqueued at SuperLink."""
 
     @abc.abstractmethod
@@ -545,3 +547,13 @@ class LinkState(CoreState):  # pylint: disable=R0904
     @abc.abstractmethod
     def get_delivery_timings(self, message_id: str) -> dict[str, float | None]:
         """Get delivery timing anchors for a specific instruction message ID."""
+
+    @abc.abstractmethod
+    def add_profile_events(
+        self, run_id: int, events: Sequence[dict[str, object]]
+    ) -> None:
+        """Store externally measured profile events for a run."""
+
+    @abc.abstractmethod
+    def get_profile_events(self, run_id: int) -> list[dict[str, object]]:
+        """Return externally measured profile events for a run."""

@@ -68,6 +68,33 @@ def _normal_codebook(bits: int, device):  # type: ignore[no-untyped-def]
     return centroids.to(device=device), boundaries.to(device=device)
 
 
+def _hadamard_rotate(blocks, signs):  # type: ignore[no-untyped-def]
+    """Apply an orthonormal randomized Walsh-Hadamard transform to rows."""
+    import math
+
+    width = blocks.shape[1]
+    rotated = blocks * signs.view(1, -1)
+    stride = 1
+    while stride < width:
+        grouped = rotated.view(-1, width // (2 * stride), 2, stride)
+        left = grouped[:, :, 0, :].clone()
+        right = grouped[:, :, 1, :].clone()
+        grouped[:, :, 0, :] = left + right
+        grouped[:, :, 1, :] = left - right
+        stride *= 2
+    return rotated * (1.0 / math.sqrt(width))
+
+
+def _rotation_signs(block_size: int, seed: int, device):  # type: ignore[no-untyped-def]
+    """Build the same deterministic signs used by the NumPy implementation."""
+    import numpy as np
+    import torch
+
+    rng = np.random.default_rng(seed)
+    signs = rng.choice(np.array([-1.0, 1.0], dtype=np.float32), block_size)
+    return torch.from_numpy(signs).to(device=device)
+
+
 def pack_3bit(values):  # type: ignore[no-untyped-def]
     """Pack uint8 values in [0, 7] into a CUDA/CPU 3-bit byte tensor."""
     import torch
@@ -109,8 +136,36 @@ def unpack_3bit(packed, count: int):  # type: ignore[no-untyped-def]
     return out.flatten()[:count]
 
 
+def pack_4bit(values):  # type: ignore[no-untyped-def]
+    """Pack uint8 values in [0, 15] into a CUDA/CPU 4-bit byte tensor."""
+    import torch
+    import torch.nn.functional as F
+
+    flat = values.flatten().to(torch.uint8)
+    if flat.numel() % 2:
+        flat = F.pad(flat, (0, 1))
+    vals = flat.view(-1, 2).to(torch.int16)
+    return (vals[:, 0] | (vals[:, 1] << 4)).to(torch.uint8)
+
+
+def unpack_4bit(packed, count: int):  # type: ignore[no-untyped-def]
+    """Unpack a 4-bit byte tensor into uint8 values in [0, 15]."""
+    import torch
+
+    raw = packed.flatten().to(torch.int16)
+    out = torch.empty((raw.numel(), 2), device=packed.device, dtype=torch.uint8)
+    out[:, 0] = (raw & 0x0F).to(torch.uint8)
+    out[:, 1] = (raw >> 4).to(torch.uint8)
+    return out.flatten()[:count]
+
+
 def quantize_mse_cuda(  # type: ignore[no-untyped-def]
-    delta, bits: int = 3, block_size: int = 262_144
+    delta,
+    bits: int = 3,
+    block_size: int = 262_144,
+    rotation: bool = True,
+    rotation_seed: int = 2025,
+    scale_mode: str = "rms",
 ):
     """Quantize a CUDA tensor with TurboQuant MSE primitives."""
     import torch
@@ -124,12 +179,58 @@ def quantize_mse_cuda(  # type: ignore[no-untyped-def]
     if pad:
         flat = F.pad(flat, (0, pad))
     blocks = flat.view(-1, block_size)
-    scale = blocks.pow(2).mean(dim=1).sqrt().clamp_min(1e-12)
-    standardized = blocks / scale[:, None]
+    signs = None
+    if rotation:
+        signs = _rotation_signs(block_size, rotation_seed, blocks.device)
+        blocks = _hadamard_rotate(blocks, signs)
+    normalization_scale = blocks.pow(2).mean(dim=1).sqrt().clamp_min(1e-12)
+    standardized = blocks / normalization_scale[:, None]
     centroids, boundaries = _normal_codebook(bits, standardized.device)
     indices = torch.bucketize(standardized, boundaries).to(torch.uint8)
-    packed = pack_3bit(indices) if bits == 3 else indices.flatten()
-    return packed, scale.to(torch.float16), centroids, indices.numel(), numel
+    if bits == 3:
+        packed = pack_3bit(indices)
+    elif bits == 4:
+        packed = pack_4bit(indices)
+    else:
+        packed = indices.flatten()
+    unscaled_reconstruction = centroids[indices.long()]
+    if scale_mode == "unbiased":
+        numerator = torch.sum(blocks * blocks, dim=1)
+        denominator = torch.sum(unscaled_reconstruction * blocks, dim=1)
+        scale = torch.where(
+            denominator.abs() > 1e-30,
+            numerator / denominator,
+            torch.zeros_like(numerator),
+        )
+    elif scale_mode == "rms":
+        scale = normalization_scale
+    else:
+        raise ValueError("scale_mode must be 'rms' or 'unbiased'")
+    reconstructed = unscaled_reconstruction * scale[:, None]
+    if rotation:
+        assert signs is not None
+        reconstructed = _hadamard_rotate(
+            reconstructed, reconstructed.new_ones(block_size)
+        ) * signs
+    reconstructed = reconstructed.flatten()[:numel]
+    original = delta.float().flatten()
+    error = reconstructed - original
+    distortion = {
+        "squared_error": float(torch.sum(error * error).item()),
+        "squared_norm": float(torch.sum(original * original).item()),
+        "reconstructed_squared_norm": float(
+            torch.sum(reconstructed * reconstructed).item()
+        ),
+        "dot_product": float(torch.sum(original * reconstructed).item()),
+    }
+    return (
+        packed,
+        scale.to(torch.float16),
+        centroids,
+        indices.numel(),
+        numel,
+        distortion,
+    )
 
 
 def dequantize_mse_cuda(
@@ -140,6 +241,8 @@ def dequantize_mse_cuda(
     numel: int,
     bits: int = 3,
     output_dtype=None,  # type: ignore[no-untyped-def]
+    rotation: bool = True,
+    rotation_seed: int = 2025,
 ):  # type: ignore[no-untyped-def]
     """Dequantize CUDA TurboQuant MSE payloads."""
     import torch
@@ -148,9 +251,15 @@ def dequantize_mse_cuda(
         centroids, _ = _normal_codebook(bits, packed.device)
     if bits == 3:
         indices = unpack_3bit(packed, padded_numel)
+    elif bits == 4:
+        indices = unpack_4bit(packed, padded_numel)
     else:
         indices = packed.flatten()[:padded_numel]
     block_size = padded_numel // scale.numel()
     dtype = output_dtype or torch.float32
     values = centroids[indices.long()].to(dtype=dtype).view(-1, block_size)
-    return (values * scale.to(dtype=dtype)[:, None]).flatten()[:numel]
+    restored = values * scale.to(dtype=dtype)[:, None]
+    if rotation:
+        signs = _rotation_signs(block_size, rotation_seed, restored.device)
+        restored = _hadamard_rotate(restored, signs.new_ones(block_size)) * signs
+    return restored.flatten()[:numel]

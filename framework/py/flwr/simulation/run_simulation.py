@@ -151,7 +151,7 @@ def run_simulation_from_cli() -> None:
         run_config=fused_config,
     )
 
-    _ = _run_simulation(
+    updated_context = _run_simulation(
         server_app_attr=server_app_attr,
         client_app_attr=client_app_attr,
         num_supernodes=args.num_supernodes,
@@ -165,6 +165,13 @@ def run_simulation_from_cli() -> None:
         is_app=True,
         exit_event=EventType.CLI_FLOWER_SIMULATION_LEAVE,
     )
+    profile_output = str(fused_config.get("profile.output", "")).strip()
+    if profile_output and "profile_summary" in updated_context.state:
+        profile_json = updated_context.state["profile_summary"].get("json")
+        if isinstance(profile_json, bytes):
+            output_path = Path(profile_output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(profile_json + b"\n")
 
 
 # Entry point from Python session (script or notebook)

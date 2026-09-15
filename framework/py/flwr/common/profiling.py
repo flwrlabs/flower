@@ -16,11 +16,11 @@
 
 from __future__ import annotations
 
+import threading
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import time
-import threading
 from typing import Any
 
 from .message import Message
@@ -264,9 +264,7 @@ class ProfileRecorder:
             if event.metadata.get("sender_node_name"):
                 stat["sender_node_names"].add(event.metadata["sender_node_name"])
             if event.metadata.get("receiver_node_name"):
-                stat["receiver_node_names"].add(
-                    event.metadata["receiver_node_name"]
-                )
+                stat["receiver_node_names"].add(event.metadata["receiver_node_name"])
 
         entries: list[dict[str, Any]] = []
         for stat in stats.values():
@@ -323,6 +321,7 @@ class ProfileRecorder:
                     "task": stat["task"],
                     "round": stat["round"],
                     "count": stat["count"],
+                    "total_ms": stat["sum_ms"],
                     "avg_ms": avg_ms,
                     "min_ms": stat["min_ms"] or 0.0,
                     "max_ms": stat["max_ms"] or 0.0,
@@ -389,6 +388,7 @@ class ProfileRecorder:
                         "task": "network",
                         "round": round_id,
                         "count": 1,
+                        "total_ms": network_ms,
                         "avg_ms": network_ms,
                         "min_ms": network_ms,
                         "max_ms": network_ms,
@@ -418,13 +418,13 @@ class ProfileRecorder:
             )
         )
 
-        event_entries = []
+        event_entries: list[dict[str, Any]] = []
         for event in events:
             metadata = event.metadata or {}
-            network_bytes = metadata.get("network_bytes")
+            event_network_bytes: Any = metadata.get("network_bytes")
             network_mb = (
-                network_bytes / (1024**2)
-                if isinstance(network_bytes, (int, float))
+                event_network_bytes / (1024**2)
+                if isinstance(event_network_bytes, (int, float))
                 else None
             )
             event_entries.append(
@@ -442,7 +442,7 @@ class ProfileRecorder:
                     "disk_read_mb": metadata.get("disk_read_mb"),
                     "disk_write_mb": metadata.get("disk_write_mb"),
                     "disk_source": metadata.get("disk_source"),
-                    "network_bytes": network_bytes,
+                    "network_bytes": event_network_bytes,
                     "network_mb": network_mb,
                     "sender_node_id": metadata.get("sender_node_id"),
                     "receiver_node_id": metadata.get("receiver_node_id"),
@@ -460,6 +460,78 @@ class ProfileRecorder:
             "entries": entries,
             "events": event_entries,
         }
+
+
+def merge_profile_events(
+    summary: dict[str, Any], extra_events: Iterable[dict[str, Any]]
+) -> dict[str, Any]:
+    """Merge externally measured events into a profile summary."""
+    external_events = list(extra_events)
+    if not external_events:
+        return summary
+
+    recorder = ProfileRecorder(run_id=int(summary.get("run_id", 0)))
+    node_names = {
+        event.get("node_id"): event.get("node_name")
+        for event in list(summary.get("events", [])) + list(summary.get("entries", []))
+        if event.get("node_id") is not None and event.get("node_name")
+    }
+    for event in external_events:
+        metadata = {
+            key: event.get(key)
+            for key in (
+                "memory_start_mb",
+                "memory_end_mb",
+                "memory_delta_mb",
+                "disk_read_mb",
+                "disk_write_mb",
+                "disk_source",
+                "network_bytes",
+                "sender_node_id",
+                "receiver_node_id",
+                "sender_node_name",
+                "receiver_node_name",
+            )
+            if event.get(key) is not None
+        }
+        node_id = event.get("node_id")
+        node_name = event.get("node_name") or node_names.get(node_id)
+        if node_name:
+            metadata["node_name"] = node_name
+            if metadata.get("sender_node_id") == node_id:
+                metadata.setdefault("sender_node_name", node_name)
+            if metadata.get("receiver_node_id") == node_id:
+                metadata.setdefault("receiver_node_name", node_name)
+        recorder.record(
+            scope=str(event.get("scope", "transport")),
+            task=str(event.get("task", "unknown")),
+            round=event.get("round"),
+            node_id=node_id,
+            duration_ms=float(event.get("duration_ms", 0.0)),
+            metadata=metadata,
+            timestamp_ms=float(event.get("timestamp_ms", 0.0)),
+        )
+    external_summary = recorder.summarize()
+    for entry in external_summary["entries"]:
+        node_id = entry.get("node_id")
+        node_name = node_names.get(node_id)
+        if node_name:
+            entry["node_name"] = node_name
+            if entry.get("sender_node_id") == str(node_id):
+                entry["sender_node_name"] = node_name
+            if entry.get("receiver_node_id") == str(node_id):
+                entry["receiver_node_name"] = node_name
+
+    # Preserve the ServerApp summary exactly and append only external transport
+    # measurements. Node clocks are intentionally excluded from run wall time.
+    merged = dict(summary)
+    merged["entries"] = list(summary.get("entries", [])) + list(
+        external_summary["entries"]
+    )
+    merged["events"] = list(summary.get("events", [])) + list(
+        external_summary["events"]
+    )
+    return merged
 
 
 _profile_state = threading.local()
@@ -580,7 +652,7 @@ def record_profile_metrics_from_messages(messages: Iterable[Message]) -> None:
                         task = key[len("profile.client.") : -12]
                         disk_sources[task] = value
                 for task, duration in durations.items():
-                    metadata = {}
+                    metadata: dict[str, Any] = {}
                     if task in mem_starts:
                         metadata["memory_start_mb"] = mem_starts[task]
                     if task in mem_ends:

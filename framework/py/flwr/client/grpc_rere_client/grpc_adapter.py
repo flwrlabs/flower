@@ -43,6 +43,8 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     PullMessagesResponse,
     PushMessagesRequest,
     PushMessagesResponse,
+    PushNodeProfileEventsRequest,
+    PushNodeProfileEventsResponse,
     RegisterNodeFleetRequest,
     RegisterNodeFleetResponse,
     UnregisterNodeFleetRequest,
@@ -167,6 +169,12 @@ class GrpcAdapter:
     ) -> PushMessagesResponse:
         """."""
         return self._send_and_receive(request, PushMessagesResponse, **kwargs)
+
+    def PushNodeProfileEvents(  # pylint: disable=C0103
+        self, request: PushNodeProfileEventsRequest, **kwargs: Any
+    ) -> PushNodeProfileEventsResponse:
+        """Report SuperNode transport profile events."""
+        return self._send_and_receive(request, PushNodeProfileEventsResponse, **kwargs)
 
     def GetRun(  # pylint: disable=C0103
         self, request: GetRunRequest, **kwargs: Any

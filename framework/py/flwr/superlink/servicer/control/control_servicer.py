@@ -43,6 +43,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.logger import log
+from flwr.common.profiling import merge_profile_events
 from flwr.common.serde import (
     config_record_from_proto,
     run_to_proto,
@@ -57,7 +58,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunProfileRequest,
     GetRunProfileResponse,
-    StreamRunProfileRequest,
     ListFederationsRequest,
     ListFederationsResponse,
     ListNodesRequest,
@@ -76,6 +76,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopRunResponse,
     StreamLogsRequest,
     StreamLogsResponse,
+    StreamRunProfileRequest,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
 )
@@ -316,6 +317,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         serverapp_context = state.get_serverapp_context(run_id)
         if serverapp_context is None:
             context.abort(grpc.StatusCode.NOT_FOUND, "Profile summary not found.")
+        serverapp_context = cast(Context, serverapp_context)
 
         if "profile_summary" not in serverapp_context.state:
             context.abort(grpc.StatusCode.NOT_FOUND, "Profile summary not found.")
@@ -324,8 +326,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         if "json" not in record:
             context.abort(grpc.StatusCode.NOT_FOUND, "Profile summary not found.")
 
-        summary_json = cast(bytes, record["json"])
-        return GetRunProfileResponse(summary_json=summary_json)
+        summary = json.loads(cast(bytes, record["json"]))
+        summary = merge_profile_events(summary, state.get_profile_events(run_id))
+        return GetRunProfileResponse(summary_json=json.dumps(summary).encode())
 
     def StreamRunProfile(
         self, request: StreamRunProfileRequest, context: grpc.ServicerContext
@@ -351,7 +354,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             ):
                 record = serverapp_context.state["profile_summary"]
                 if "json" in record:
-                    summary_json = cast(bytes, record["json"])
+                    summary = json.loads(cast(bytes, record["json"]))
+                    summary_json = json.dumps(
+                        merge_profile_events(summary, state.get_profile_events(run_id))
+                    ).encode()
                     if summary_json != last_summary:
                         last_summary = summary_json
                         yield GetRunProfileResponse(summary_json=summary_json)

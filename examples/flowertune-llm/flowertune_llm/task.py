@@ -14,10 +14,12 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass
+from logging import INFO
 from textwrap import dedent
 from typing import TYPE_CHECKING, Any
 
 import torch
+from flwr.common.logger import log
 
 if TYPE_CHECKING:
     from flwr.app import Context
@@ -98,8 +100,7 @@ def _python_module_command(
     """Build a shell-safe Python module command for a scheduler script."""
     executable = shlex.split(python_exec) or ["python"]
     return " ".join(
-        shlex.quote(part)
-        for part in [*executable, "-m", module, *arguments]
+        shlex.quote(part) for part in [*executable, "-m", module, *arguments]
     )
 
 
@@ -139,9 +140,7 @@ def _max_rss_mb() -> float:
     return max_rss / 1024.0
 
 
-def _append_conversion_profile_event(
-    profile_path: str, event: dict[str, Any]
-) -> None:
+def _append_conversion_profile_event(profile_path: str, event: dict[str, Any]) -> None:
     """Append one client-side conversion event when profiling is enabled."""
     if not profile_path:
         return
@@ -150,9 +149,7 @@ def _append_conversion_profile_event(
         file.write(json.dumps(event, sort_keys=True) + "\n")
 
 
-def run_profiled_conversion(
-    profile_path: str, phase: str, function: Any
-) -> None:
+def run_profiled_conversion(profile_path: str, phase: str, function: Any) -> None:
     """Run a conversion phase and persist duration/peak-RSS telemetry."""
     started_at = time.time() * 1000.0
     started = time.perf_counter()
@@ -269,29 +266,20 @@ def _state_dict_signature(
         if not torch.is_tensor(tensor) or tensor.ndim != 2:
             continue
         shape = tuple(int(x) for x in tensor.shape)
-        if (
-            dim is None
-            and (
-                name.endswith("embed_tokens.weight")
-                or name.endswith("tok_embeddings.weight")
-                or name == "wte.weight"
-            )
+        if dim is None and (
+            name.endswith("embed_tokens.weight")
+            or name.endswith("tok_embeddings.weight")
+            or name == "wte.weight"
         ):
             vocab_size, dim = shape
-        if (
-            q_out_dim is None
-            and (
-                name.endswith("self_attn.q_proj.weight")
-                or name.endswith("attention.wq.weight")
-            )
+        if q_out_dim is None and (
+            name.endswith("self_attn.q_proj.weight")
+            or name.endswith("attention.wq.weight")
         ):
             q_out_dim, dim = shape
-        if (
-            kv_out_dim is None
-            and (
-                name.endswith("self_attn.k_proj.weight")
-                or name.endswith("attention.wk.weight")
-            )
+        if kv_out_dim is None and (
+            name.endswith("self_attn.k_proj.weight")
+            or name.endswith("attention.wk.weight")
         ):
             kv_out_dim = shape[0]
 
@@ -552,9 +540,7 @@ def flush_caches_for_context(
 ) -> None:
     run_id = int(context.run_id)
     node_id = int(context.node_id)
-    keys_to_clear = [
-        key for key in cache if key[0] == run_id and key[1] == node_id
-    ]
+    keys_to_clear = [key for key in cache if key[0] == run_id and key[1] == node_id]
     for key in keys_to_clear:
         if flush_before_drop:
             flush_cached_layer(cache, key)
@@ -610,8 +596,7 @@ def layer_file_paths(layer_directory: str) -> list[str]:
     return [
         os.path.join(layer_directory, name)
         for name in sorted(os.listdir(layer_directory))
-        if name.endswith(".pt")
-        and os.path.isfile(os.path.join(layer_directory, name))
+        if name.endswith(".pt") and os.path.isfile(os.path.join(layer_directory, name))
     ]
 
 
@@ -794,10 +779,7 @@ def _empty_like_tensor_structure(value: Any) -> Any:
     if torch.is_tensor(value):
         return torch.empty_like(value.detach(), device="cpu")
     if isinstance(value, dict):
-        return {
-            key: _empty_like_tensor_structure(item)
-            for key, item in value.items()
-        }
+        return {key: _empty_like_tensor_structure(item) for key, item in value.items()}
     return value
 
 
@@ -976,6 +958,15 @@ def run_torchtitan_training(
         )
     layerwise_dcp = dcp_enabled and layer_paths is not None
     client_layerwise_conversion = layerwise_dcp and dcp_convert_on_client
+    separate_dcp_jobs_requested = _as_bool(
+        _config_value(context, "trainer.torchtitan.dcp-separate-jobs", False),
+        default=False,
+    )
+    separate_dcp_jobs = (
+        layerwise_dcp
+        and not client_layerwise_conversion
+        and separate_dcp_jobs_requested
+    )
     dcp_train_spec = str(
         _config_value(
             context,
@@ -999,9 +990,9 @@ def run_torchtitan_training(
     )
 
     workdir = str(getattr(titan_cfg, "workdir", "")).strip() or None
-    scheduler_backend = str(
-        _config_value(context, "scheduler.backend", "local")
-    ).strip().lower()
+    scheduler_backend = (
+        str(_config_value(context, "scheduler.backend", "local")).strip().lower()
+    )
     dry_run = _as_bool(
         _config_value(
             context,
@@ -1072,21 +1063,15 @@ def run_torchtitan_training(
         model_name,
         f"{dcp_train_spec}-{resolved_dcp_model_args}",
     )
-    dcp_cache_dir = os.path.join(
-        client_workspace, "flower_dcp_cache", model_cache_path
-    )
+    dcp_cache_dir = os.path.join(client_workspace, "flower_dcp_cache", model_cache_path)
     checkpoint_dir = os.path.join(dump_folder, "checkpoint")
     step0_dcp_dir = os.path.join(checkpoint_dir, "step-0")
     final_dcp_dir = os.path.join(checkpoint_dir, f"step-{train_steps}")
     input_layer_dir = (
-        os.path.abspath(os.path.dirname(layer_paths[0]))
-        if layer_paths
-        else ""
+        os.path.abspath(os.path.dirname(layer_paths[0])) if layer_paths else ""
     )
     output_layer_dir = (
-        os.path.abspath(output_layer_dir or input_layer_dir)
-        if layerwise_dcp
-        else ""
+        os.path.abspath(output_layer_dir or input_layer_dir) if layerwise_dcp else ""
     )
     output_layers_ready = (
         os.path.join(output_layer_dir, ".torchtitan_layers_ready")
@@ -1094,9 +1079,7 @@ def run_torchtitan_training(
         else ""
     )
     cache_available = round_id <= 1 and _dcp_checkpoint_exists(dcp_cache_dir)
-    conversion_dir = (
-        dcp_cache_dir if round_id <= 1 else input_dcp_dir
-    )
+    conversion_dir = dcp_cache_dir if round_id <= 1 else input_dcp_dir
     env = os.environ.copy()
     scheduler_env = {
         "FLWR_TORCHTITAN_INPUT_STATE": input_state_path,
@@ -1128,6 +1111,13 @@ def run_torchtitan_training(
     scheduler_mem = _config_str(context, "scheduler.mem", "")
     scheduler_time = _config_str(context, "scheduler.time", "")
     scheduler_extra_args = _config_str(context, "scheduler.extra-args", "")
+    conversion_extra_args = _config_str(context, "scheduler.conversion.extra-args", "")
+    slurm_conversion_extra_args = _config_str(
+        context, "scheduler.slurm.conversion-extra-args", ""
+    )
+    flux_conversion_extra_args = _config_str(
+        context, "scheduler.flux.conversion-extra-args", ""
+    )
     env_setup = _config_str(context, "trainer.env-setup", "")
 
     dcp_conversion_command = ""
@@ -1205,6 +1195,7 @@ def run_torchtitan_training(
         "dcp_conversion_command": dcp_conversion_command,
         "dcp_to_layers_command": dcp_to_layers_command,
         "dcp_conversion_on_client": str(client_layerwise_conversion).lower(),
+        "dcp_separate_jobs": str(separate_dcp_jobs).lower(),
         "work_dir": output_dir,
         "client_workspace": client_workspace,
         "dump_folder": dump_folder,
@@ -1232,6 +1223,18 @@ def run_torchtitan_training(
             f"Unsupported scheduler.backend '{scheduler_backend}'. "
             "Use local, slurm, or flux."
         )
+    if separate_dcp_jobs_requested and not separate_dcp_jobs:
+        raise ValueError(
+            "trainer.torchtitan.dcp-separate-jobs=true requires layerwise "
+            "TorchTitan DCP conversion in scheduler jobs: set "
+            "aggregation.mode=layerwise, trainer.torchtitan.dcp-enabled=true, "
+            "and trainer.torchtitan.dcp-convert-on-client=false."
+        )
+    if separate_dcp_jobs and scheduler_backend not in {"slurm", "flux"}:
+        raise ValueError(
+            "trainer.torchtitan.dcp-separate-jobs=true requires "
+            "scheduler.backend=slurm or scheduler.backend=flux."
+        )
 
     if _config_str(context, "trainer.torchtitan.config-template", "").strip():
         config_template = _template_path(
@@ -1245,8 +1248,8 @@ def run_torchtitan_training(
         ) as file:
             file.write(rendered_toml)
 
-    def write_scheduler_script(backend: str) -> str:
-        """Render the configured scheduler script and return its path."""
+    def write_scheduler_script(backend: str, phase: str = "combined") -> str:
+        """Render one scheduler phase and return its script path."""
         if backend == "local":
             script_path = os.path.join(output_dir, "torchtitan_local.sh")
             template_path = _template_path(
@@ -1254,20 +1257,27 @@ def run_torchtitan_training(
                 "scheduler.slurm.script-template",
                 "slurm_train.sh.j2",
             )
-        elif backend == "slurm":
-            script_path = os.path.join(output_dir, "torchtitan_slurm.sh")
-            template_path = _template_path(
-                context,
-                "scheduler.slurm.script-template",
-                "slurm_train.sh.j2",
-            )
-        elif backend == "flux":
-            script_path = os.path.join(output_dir, "torchtitan_flux.sh")
-            template_path = _template_path(
-                context,
-                "scheduler.flux.script-template",
-                "flux_train.sh.j2",
-            )
+        elif backend in {"slurm", "flux"}:
+            if phase == "combined":
+                script_name = f"torchtitan_{backend}.sh"
+                template_key = f"scheduler.{backend}.script-template"
+                fallback_name = f"{backend}_train.sh.j2"
+            elif phase == "to_dcp":
+                script_name = f"torchtitan_{backend}_to_dcp.sh"
+                template_key = f"scheduler.{backend}.to-dcp-script-template"
+                fallback_name = "scheduler_to_dcp.sh.j2"
+            elif phase == "train":
+                script_name = f"torchtitan_{backend}_train.sh"
+                template_key = f"scheduler.{backend}.script-template"
+                fallback_name = "scheduler_train_only.sh.j2"
+            elif phase == "from_dcp":
+                script_name = f"torchtitan_{backend}_from_dcp.sh"
+                template_key = f"scheduler.{backend}.from-dcp-script-template"
+                fallback_name = "scheduler_from_dcp.sh.j2"
+            else:
+                raise ValueError(f"Unsupported scheduler phase: {phase}")
+            script_path = os.path.join(output_dir, script_name)
+            template_path = _template_path(context, template_key, fallback_name)
         else:
             return ""
 
@@ -1300,8 +1310,65 @@ def run_torchtitan_training(
             check=False,
         )
 
+    def cleanup_failed_scheduler_run() -> None:
+        """Remove an incomplete DCP handoff after submission or execution failure."""
+        _remove_path(step0_dcp_dir)
+        _remove_path(input_dcp_dir)
+        _remove_path(output_dcp_dir)
+        if layerwise_dcp and not cache_available:
+            _remove_path(conversion_dir)
+
+    def parse_job_id(result: subprocess.CompletedProcess[str], phase: str) -> str:
+        """Return a scheduler job ID or raise with the submission diagnostics."""
+        if result.returncode != 0:
+            cleanup_failed_scheduler_run()
+            raise RuntimeError(
+                f"Failed to submit TorchTitan {phase} job with exit code "
+                f"{result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+            )
+        output_lines = [
+            line.strip() for line in result.stdout.splitlines() if line.strip()
+        ]
+        if not output_lines:
+            cleanup_failed_scheduler_run()
+            raise RuntimeError(
+                f"Scheduler did not return a job ID for TorchTitan {phase} job."
+            )
+        # Slurm may append a cluster name (JOBID;CLUSTER). Flux IDs have no suffix.
+        job_id = output_lines[-1].split(";", maxsplit=1)[0]
+        log(INFO, "[TorchTitan] submitted %s job: %s", phase, job_id)
+        return job_id
+
+    def completed_pipeline_result(
+        results: list[subprocess.CompletedProcess[str]], job_ids: list[str]
+    ) -> subprocess.CompletedProcess[str]:
+        """Combine scheduler submission diagnostics into the existing result shape."""
+        return subprocess.CompletedProcess(
+            args=[result.args for result in results],
+            returncode=results[-1].returncode,
+            stdout=(
+                f"Submitted dependent jobs: {' -> '.join(job_ids)}\n"
+                + "\n".join(result.stdout for result in results if result.stdout)
+            ),
+            stderr="\n".join(result.stderr for result in results if result.stderr),
+        )
+
+    def conversion_setting(name: str, fallback: str) -> str:
+        """Return a conversion-job resource override, inheriting when empty."""
+        return (
+            _config_str(context, f"scheduler.conversion.{name}", "").strip() or fallback
+        )
+
     if dry_run:
-        script_path = write_scheduler_script(scheduler_backend)
+        if separate_dcp_jobs:
+            phase_scripts = {
+                phase: write_scheduler_script(scheduler_backend, phase)
+                for phase in ("to_dcp", "train", "from_dcp")
+            }
+            script_path = phase_scripts["train"]
+        else:
+            phase_scripts = {}
+            script_path = write_scheduler_script(scheduler_backend)
         dry_run_report = os.path.join(output_dir, "dry_run_summary.txt")
         with open(dry_run_report, "w", encoding="utf-8") as file:
             file.write(
@@ -1310,8 +1377,12 @@ def run_torchtitan_training(
                     dry_run=true
                     scheduler.backend={scheduler_backend}
                     command={command}
-                    workdir={workdir or ''}
+                    workdir={workdir or ""}
                     script_path={script_path}
+                    separate_dcp_jobs={str(separate_dcp_jobs).lower()}
+                    to_dcp_script_path={phase_scripts.get("to_dcp", "")}
+                    train_script_path={phase_scripts.get("train", "")}
+                    from_dcp_script_path={phase_scripts.get("from_dcp", "")}
                     run_id={context.run_id}
                     node_id={context.node_id}
                     client.name={client_name}
@@ -1321,9 +1392,7 @@ def run_torchtitan_training(
                 )
             )
         return (
-            _normalize_state_dict_for_hf(state_dict)
-            if state_dict is not None
-            else None
+            _normalize_state_dict_for_hf(state_dict) if state_dict is not None else None
         )
 
     if not command and (
@@ -1401,9 +1470,12 @@ def run_torchtitan_training(
         else:
             result = run_local()
     elif scheduler_backend == "slurm":
-        slurm_submit = str(
-            _config_value(context, "scheduler.slurm.submit-command", "sbatch")
-        ).strip() or "sbatch"
+        slurm_submit = (
+            str(
+                _config_value(context, "scheduler.slurm.submit-command", "sbatch")
+            ).strip()
+            or "sbatch"
+        )
         slurm_extra_args = str(
             _config_value(context, "scheduler.slurm.extra-args", "")
         ).strip()
@@ -1411,77 +1483,247 @@ def run_torchtitan_training(
             _config_value(context, "scheduler.slurm.wait", True), default=True
         )
 
-        submit_parts = [slurm_submit]
-        if slurm_wait:
-            submit_parts.append("--wait")
-        submit_parts.append("--parsable")
-        if scheduler_account:
-            submit_parts.extend(["--account", scheduler_account])
-        if scheduler_partition:
-            submit_parts.extend(["--partition", scheduler_partition])
-        if scheduler_qos:
-            submit_parts.extend(["--qos", scheduler_qos])
-        if scheduler_time:
-            submit_parts.extend(["--time", scheduler_time])
-        if scheduler_mem:
-            submit_parts.extend(["--mem", scheduler_mem])
-        if scheduler_gpus:
-            submit_parts.extend(["--gpus", scheduler_gpus])
-        if scheduler_cpus_per_task:
-            submit_parts.extend(["--cpus-per-task", scheduler_cpus_per_task])
-        if scheduler_extra_args:
-            submit_parts.extend(shlex.split(scheduler_extra_args))
-        if slurm_extra_args:
-            submit_parts.extend(shlex.split(slurm_extra_args))
-        submit_parts.append(write_scheduler_script("slurm"))
+        def submit_slurm_phase(
+            phase: str,
+            *,
+            dependency: str | None = None,
+            wait: bool = False,
+            conversion: bool = False,
+        ) -> tuple[str, subprocess.CompletedProcess[str]]:
+            account = (
+                conversion_setting("account", scheduler_account)
+                if conversion
+                else scheduler_account
+            )
+            partition = (
+                conversion_setting("partition", scheduler_partition)
+                if conversion
+                else scheduler_partition
+            )
+            qos = (
+                conversion_setting("qos", scheduler_qos)
+                if conversion
+                else scheduler_qos
+            )
+            job_time = (
+                conversion_setting("time", scheduler_time)
+                if conversion
+                else scheduler_time
+            )
+            memory = (
+                conversion_setting("mem", scheduler_mem)
+                if conversion
+                else scheduler_mem
+            )
+            gpus = (
+                conversion_setting("gpus", scheduler_gpus)
+                if conversion
+                else scheduler_gpus
+            )
+            cpus = (
+                conversion_setting("cpus-per-task", scheduler_cpus_per_task)
+                if conversion
+                else scheduler_cpus_per_task
+            )
 
-        result = subprocess.run(
-            submit_parts,
-            env=env,
-            cwd=workdir,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+            submit_parts = [slurm_submit, "--parsable"]
+            if wait:
+                submit_parts.append("--wait")
+            if dependency:
+                submit_parts.append(f"--dependency=afterok:{dependency}")
+            for option, value in (
+                ("--account", account),
+                ("--partition", partition),
+                ("--qos", qos),
+                ("--time", job_time),
+                ("--mem", memory),
+                ("--gpus", gpus),
+                ("--cpus-per-task", cpus),
+            ):
+                if value:
+                    submit_parts.extend([option, value])
+            if scheduler_extra_args:
+                submit_parts.extend(shlex.split(scheduler_extra_args))
+            if slurm_extra_args:
+                submit_parts.extend(shlex.split(slurm_extra_args))
+            if conversion and conversion_extra_args:
+                submit_parts.extend(shlex.split(conversion_extra_args))
+            if conversion and slurm_conversion_extra_args:
+                submit_parts.extend(shlex.split(slurm_conversion_extra_args))
+            submit_parts.append(write_scheduler_script("slurm", phase))
+            phase_result = subprocess.run(
+                submit_parts,
+                env=env,
+                cwd=workdir,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            return parse_job_id(phase_result, phase), phase_result
+
+        if separate_dcp_jobs:
+            slurm_results: list[subprocess.CompletedProcess[str]] = []
+            slurm_job_ids: list[str] = []
+            dependency = None
+            if not cache_available:
+                dependency, phase_result = submit_slurm_phase("to_dcp", conversion=True)
+                slurm_results.append(phase_result)
+                slurm_job_ids.append(dependency)
+            dependency, phase_result = submit_slurm_phase(
+                "train", dependency=dependency
+            )
+            slurm_results.append(phase_result)
+            slurm_job_ids.append(dependency)
+            final_job_id, phase_result = submit_slurm_phase(
+                "from_dcp",
+                dependency=dependency,
+                wait=True,
+                conversion=True,
+            )
+            slurm_results.append(phase_result)
+            slurm_job_ids.append(final_job_id)
+            result = completed_pipeline_result(slurm_results, slurm_job_ids)
+        else:
+            submit_parts = [slurm_submit]
+            if slurm_wait:
+                submit_parts.append("--wait")
+            submit_parts.append("--parsable")
+            if scheduler_account:
+                submit_parts.extend(["--account", scheduler_account])
+            if scheduler_partition:
+                submit_parts.extend(["--partition", scheduler_partition])
+            if scheduler_qos:
+                submit_parts.extend(["--qos", scheduler_qos])
+            if scheduler_time:
+                submit_parts.extend(["--time", scheduler_time])
+            if scheduler_mem:
+                submit_parts.extend(["--mem", scheduler_mem])
+            if scheduler_gpus:
+                submit_parts.extend(["--gpus", scheduler_gpus])
+            if scheduler_cpus_per_task:
+                submit_parts.extend(["--cpus-per-task", scheduler_cpus_per_task])
+            if scheduler_extra_args:
+                submit_parts.extend(shlex.split(scheduler_extra_args))
+            if slurm_extra_args:
+                submit_parts.extend(shlex.split(slurm_extra_args))
+            submit_parts.append(write_scheduler_script("slurm"))
+
+            result = subprocess.run(
+                submit_parts,
+                env=env,
+                cwd=workdir,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
     elif scheduler_backend == "flux":
-        flux_run = str(
-            _config_value(context, "scheduler.flux.run-command", "flux run")
-        ).strip() or "flux run"
+        flux_run = (
+            str(
+                _config_value(context, "scheduler.flux.run-command", "flux run")
+            ).strip()
+            or "flux run"
+        )
         flux_extra_args = str(
             _config_value(context, "scheduler.flux.extra-args", "")
         ).strip()
-        flux_parts = shlex.split(flux_run)
-        if (
-            len(flux_parts) >= 2
-            and os.path.basename(flux_parts[0]) == "flux"
-            and flux_parts[1] == "batch"
-        ):
-            raise ValueError(
-                "scheduler.flux.run-command must run the generated script in "
-                "the foreground, for example 'flux run'. 'flux batch' submits "
-                "asynchronously, so Flower cannot wait for TorchTitan to write "
-                "FLWR_TORCHTITAN_OUTPUT_DCP_DIR."
+        if separate_dcp_jobs:
+            flux_submit = (
+                _config_str(
+                    context, "scheduler.flux.submit-command", "flux submit"
+                ).strip()
+                or "flux submit"
             )
-        if scheduler_extra_args:
-            flux_parts.extend(shlex.split(scheduler_extra_args))
-        if flux_extra_args:
-            flux_parts.extend(shlex.split(flux_extra_args))
-        flux_parts.append(write_scheduler_script("flux"))
+            flux_attach = (
+                _config_str(
+                    context,
+                    "scheduler.flux.attach-command",
+                    "flux job attach --read-only",
+                ).strip()
+                or "flux job attach --read-only"
+            )
 
-        result = subprocess.run(
-            flux_parts,
-            env=env,
-            cwd=workdir,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+            def submit_flux_phase(
+                phase: str,
+                *,
+                dependency: str | None = None,
+                conversion: bool = False,
+            ) -> tuple[str, subprocess.CompletedProcess[str]]:
+                flux_parts = shlex.split(flux_submit)
+                if dependency:
+                    flux_parts.append(f"--dependency=afterok:{dependency}")
+                if scheduler_extra_args:
+                    flux_parts.extend(shlex.split(scheduler_extra_args))
+                if flux_extra_args:
+                    flux_parts.extend(shlex.split(flux_extra_args))
+                if conversion and conversion_extra_args:
+                    flux_parts.extend(shlex.split(conversion_extra_args))
+                if conversion and flux_conversion_extra_args:
+                    flux_parts.extend(shlex.split(flux_conversion_extra_args))
+                flux_parts.append(write_scheduler_script("flux", phase))
+                phase_result = subprocess.run(
+                    flux_parts,
+                    env=env,
+                    cwd=workdir,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                return parse_job_id(phase_result, phase), phase_result
+
+            flux_results: list[subprocess.CompletedProcess[str]] = []
+            flux_job_ids: list[str] = []
+            dependency = None
+            if not cache_available:
+                dependency, phase_result = submit_flux_phase("to_dcp", conversion=True)
+                flux_results.append(phase_result)
+                flux_job_ids.append(dependency)
+            dependency, phase_result = submit_flux_phase("train", dependency=dependency)
+            flux_results.append(phase_result)
+            flux_job_ids.append(dependency)
+            final_job_id, phase_result = submit_flux_phase(
+                "from_dcp", dependency=dependency, conversion=True
+            )
+            flux_results.append(phase_result)
+            flux_job_ids.append(final_job_id)
+            attach_result = subprocess.run(
+                [*shlex.split(flux_attach), final_job_id],
+                env=env,
+                cwd=workdir,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            flux_results.append(attach_result)
+            result = completed_pipeline_result(flux_results, flux_job_ids)
+        else:
+            flux_parts = shlex.split(flux_run)
+            if (
+                len(flux_parts) >= 2
+                and os.path.basename(flux_parts[0]) == "flux"
+                and flux_parts[1] == "batch"
+            ):
+                raise ValueError(
+                    "scheduler.flux.run-command must run the generated script in "
+                    "the foreground, for example 'flux run'. 'flux batch' submits "
+                    "asynchronously, so Flower cannot wait for TorchTitan to write "
+                    "FLWR_TORCHTITAN_OUTPUT_DCP_DIR."
+                )
+            if scheduler_extra_args:
+                flux_parts.extend(shlex.split(scheduler_extra_args))
+            if flux_extra_args:
+                flux_parts.extend(shlex.split(flux_extra_args))
+            flux_parts.append(write_scheduler_script("flux"))
+
+            result = subprocess.run(
+                flux_parts,
+                env=env,
+                cwd=workdir,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
     if result.returncode != 0:
-        _remove_path(step0_dcp_dir)
-        _remove_path(input_dcp_dir)
-        _remove_path(output_dcp_dir)
-        if layerwise_dcp and not cache_available:
-            _remove_path(conversion_dir)
+        cleanup_failed_scheduler_run()
         raise RuntimeError(
             "TorchTitan command failed with exit code "
             f"{result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"

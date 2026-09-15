@@ -21,8 +21,9 @@ from collections.abc import Iterable
 from typing import cast
 from uuid import uuid4
 
-from flwr.common import Message, RecordDict
+from flwr.common import Message, MetricRecord, RecordDict
 from flwr.common.profiling import (
+    client_name_from_message,
     get_active_profiler,
     get_current_round,
     publish_profile_summary,
@@ -81,6 +82,7 @@ class InMemoryGrid(Grid):
         self.pull_interval = pull_interval
         self.node = Node(node_id=SUPERLINK_NODE_ID)
         self._pushed_message_size_bytes: dict[str, int] = {}
+        self._full_path_downstream: dict[str, tuple[float, int, int]] = {}
 
     def _check_message(self, message: Message) -> None:
         # Check if the message is valid
@@ -137,6 +139,7 @@ class InMemoryGrid(Grid):
         """
         messages = list(messages)
         track_network_bytes = get_active_profiler() is not None
+        dispatch_started_at_ms = time.time() * 1000.0
         msg_ids: list[str] = []
         for msg in messages:
             # Populate metadata
@@ -150,8 +153,13 @@ class InMemoryGrid(Grid):
             if msg_id:
                 msg_ids.append(str(msg_id))
                 if track_network_bytes:
-                    self._pushed_message_size_bytes[str(msg_id)] = _message_size_bytes(
-                        msg
+                    size_bytes = _message_size_bytes(msg)
+                    message_id = str(msg_id)
+                    self._pushed_message_size_bytes[message_id] = size_bytes
+                    self._full_path_downstream[message_id] = (
+                        dispatch_started_at_ms,
+                        msg.metadata.dst_node_id,
+                        size_bytes,
                     )
 
         return msg_ids
@@ -175,6 +183,7 @@ class InMemoryGrid(Grid):
         # Pull Messages
         message_res_list = self.state.get_message_res(message_ids=msg_ids)
         for msg_res in message_res_list:
+            delivered_at_ms = time.time() * 1000.0
             if track_network_bytes:
                 msg_res.metadata.__dict__["_network_upstream_bytes"] = (
                     _message_size_bytes(msg_res)
@@ -189,7 +198,12 @@ class InMemoryGrid(Grid):
                         msg_res.metadata.__dict__["_network_downstream_ms"] = float(
                             downstream_ms
                         )
+                    self._record_full_path_downstream(msg_res, metric_record)
                     del msg_res.content.metric_records["_flwr_network_delivery"]
+                full_path = msg_res.content.metric_records.get("_flwr_full_path")
+                if full_path is not None:
+                    self._record_full_path_upstream(msg_res, full_path, delivered_at_ms)
+                    del msg_res.content.metric_records["_flwr_full_path"]
         # Get IDs of Messages these replies are for
         message_ins_ids_to_delete = {
             msg_res.metadata.reply_to_message_id for msg_res in message_res_list
@@ -198,6 +212,59 @@ class InMemoryGrid(Grid):
         self.state.delete_messages(message_ins_ids=message_ins_ids_to_delete)
 
         return message_res_list
+
+    def _record_full_path_downstream(
+        self, message: Message, delivery: MetricRecord
+    ) -> None:
+        """Record dispatch until the complete instruction reaches ClientApp."""
+        profiler = get_active_profiler()
+        lifecycle = self._full_path_downstream.pop(
+            message.metadata.reply_to_message_id, None
+        )
+        delivered_at_ms = delivery.get("clientapp_delivered_at_ms")
+        if (
+            profiler is None
+            or lifecycle is None
+            or not isinstance(delivered_at_ms, (int, float))
+        ):
+            return
+        started_at_ms, node_id, size_bytes = lifecycle
+        client_name = client_name_from_message(message)
+        profiler.record(
+            scope="transport",
+            task="serverapp_clientapp_downstream",
+            round=get_current_round(),
+            node_id=node_id,
+            duration_ms=max(float(delivered_at_ms) - started_at_ms, 0.0),
+            timestamp_ms=started_at_ms,
+            metadata={
+                "network_bytes": size_bytes,
+                "node_name": client_name,
+            },
+        )
+
+    def _record_full_path_upstream(
+        self, message: Message, full_path: MetricRecord, delivered_at_ms: float
+    ) -> None:
+        """Record reply publication until the complete update reaches ServerApp."""
+        profiler = get_active_profiler()
+        started_at_ms = full_path.get("upstream_started_at_ms")
+        size_bytes = message.metadata.__dict__.get("_network_upstream_bytes")
+        if profiler is None or not isinstance(started_at_ms, (int, float)):
+            return
+        client_name = client_name_from_message(message)
+        metadata = {"node_name": client_name}
+        if isinstance(size_bytes, (int, float)):
+            metadata["network_bytes"] = int(size_bytes)
+        profiler.record(
+            scope="transport",
+            task="serverapp_clientapp_upstream",
+            round=get_current_round(),
+            node_id=message.metadata.src_node_id,
+            duration_ms=max(delivered_at_ms - float(started_at_ms), 0.0),
+            timestamp_ms=float(started_at_ms),
+            metadata=metadata,
+        )
 
     def send_and_receive(
         self,
@@ -249,6 +316,7 @@ class InMemoryGrid(Grid):
 
         # Push messages
         push_start = perf_counter() if profiler is not None else None
+        push_started_at_ms = time.time() * 1000.0 if profiler is not None else None
         mem_start_mb = None
         disk_start = None
         if proc is not None:
@@ -263,6 +331,16 @@ class InMemoryGrid(Grid):
                     downstream_bytes_by_id[msg_id] = size_bytes
         downstream_bytes_total = sum(downstream_bytes_by_id.values())
         if profiler is not None and push_start is not None:
+            push_duration_ms = (perf_counter() - push_start) * 1000.0
+            profiler.record(
+                scope="transport",
+                task="serverapp_superlink_downstream",
+                round=get_current_round(),
+                node_id=None,
+                duration_ms=push_duration_ms,
+                timestamp_ms=push_started_at_ms,
+                metadata={"network_bytes": downstream_bytes_total},
+            )
             mem_end_mb = None
             mem_delta_mb = None
             disk_read_mb = None
@@ -281,7 +359,8 @@ class InMemoryGrid(Grid):
                 task="network_downstream",
                 round=get_current_round(),
                 node_id=None,
-                duration_ms=(perf_counter() - push_start) * 1000.0,
+                duration_ms=push_duration_ms,
+                timestamp_ms=push_started_at_ms,
                 metadata={
                     "expected_replies": len(msg_ids),
                     "memory_start_mb": mem_start_mb,
@@ -311,14 +390,18 @@ class InMemoryGrid(Grid):
         ret: list[Message] = []
         while timeout is None or time.time() < end_time:
             iter_start = perf_counter() if profiler is not None else None
+            iter_started_at_ms = time.time() * 1000.0 if profiler is not None else None
             res_msgs = self.pull_messages(msg_ids)
+            iter_duration_ms = None
             if iter_start is not None:
-                pull_active_ms += (perf_counter() - iter_start) * 1000.0
+                iter_duration_ms = (perf_counter() - iter_start) * 1000.0
+                pull_active_ms += iter_duration_ms
             ret.extend(res_msgs)
             msg_ids.difference_update(
                 {msg.metadata.reply_to_message_id for msg in res_msgs}
             )
             if profiler is not None and res_msgs:
+                iteration_upstream_bytes = 0
                 for msg in res_msgs:
                     downstream_bytes = downstream_bytes_by_id.get(
                         msg.metadata.reply_to_message_id
@@ -332,11 +415,32 @@ class InMemoryGrid(Grid):
                     )
                     if isinstance(upstream_bytes, (int, float)):
                         upstream_bytes_total += int(upstream_bytes)
+                        iteration_upstream_bytes += int(upstream_bytes)
+                if iter_duration_ms is not None:
+                    profiler.record(
+                        scope="transport",
+                        task="serverapp_superlink_upstream",
+                        round=get_current_round(),
+                        node_id=None,
+                        duration_ms=iter_duration_ms,
+                        timestamp_ms=iter_started_at_ms,
+                        metadata={"network_bytes": iteration_upstream_bytes},
+                    )
                 record_network_delivery_metrics_from_messages(
                     res_msgs, delivered_at_ms=time.time() * 1000.0
                 )
                 record_profile_metrics_from_messages(res_msgs)
                 publish_profile_summary()
+            elif profiler is not None and iter_duration_ms is not None:
+                profiler.record(
+                    scope="transport",
+                    task="serverapp_superlink_upstream",
+                    round=get_current_round(),
+                    node_id=None,
+                    duration_ms=iter_duration_ms,
+                    timestamp_ms=iter_started_at_ms,
+                    metadata={"network_bytes": 0},
+                )
             if len(msg_ids) == 0:
                 break
             # Sleep

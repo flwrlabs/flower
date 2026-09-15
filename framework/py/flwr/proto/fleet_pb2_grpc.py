@@ -98,6 +98,11 @@ class FleetStub(object):
                 request_serializer=flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedResponse.FromString,
                 _registered_method=True)
+        self.PushNodeProfileEvents = channel.unary_unary(
+                '/flwr.proto.Fleet/PushNodeProfileEvents',
+                request_serializer=flwr_dot_proto_dot_fleet__pb2.PushNodeProfileEventsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_fleet__pb2.PushNodeProfileEventsResponse.FromString,
+                _registered_method=True)
 
 
 class FleetServicer(object):
@@ -189,6 +194,13 @@ class FleetServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def PushNodeProfileEvents(self, request, context):
+        """Report transport profiling events measured by the SuperNode.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_FleetServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -251,6 +263,11 @@ def add_FleetServicer_to_server(servicer, server):
                     servicer.ConfirmMessageReceived,
                     request_deserializer=flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedResponse.SerializeToString,
+            ),
+            'PushNodeProfileEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.PushNodeProfileEvents,
+                    request_deserializer=flwr_dot_proto_dot_fleet__pb2.PushNodeProfileEventsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_fleet__pb2.PushNodeProfileEventsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -577,6 +594,33 @@ class Fleet(object):
             '/flwr.proto.Fleet/ConfirmMessageReceived',
             flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedRequest.SerializeToString,
             flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PushNodeProfileEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Fleet/PushNodeProfileEvents',
+            flwr_dot_proto_dot_fleet__pb2.PushNodeProfileEventsRequest.SerializeToString,
+            flwr_dot_proto_dot_fleet__pb2.PushNodeProfileEventsResponse.FromString,
             options,
             channel_credentials,
             insecure,

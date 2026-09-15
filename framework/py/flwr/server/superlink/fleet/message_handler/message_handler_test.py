@@ -21,12 +21,14 @@ from flwr.common import Metadata, RecordDict, now
 from flwr.common.message import make_message
 from flwr.common.serde import message_to_proto
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
+    NodeProfileEvent,
     PullMessagesRequest,
     PushMessagesRequest,
+    PushNodeProfileEventsRequest,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 
-from .message_handler import pull_messages, push_messages
+from .message_handler import pull_messages, push_messages, push_node_profile_events
 
 
 def test_pull_messages() -> None:
@@ -119,3 +121,46 @@ def test_push_messages() -> None:
     state.store_message_res.assert_called_once()
     state.get_message_res.assert_not_called()
     state.store_traffic.assert_called_once()
+
+
+def test_push_node_profile_events() -> None:
+    """Test storing a SuperNode transport profile event."""
+    state = MagicMock()
+    state.get_run.return_value.federation = "fed"
+    state.federation_manager.has_node.return_value = True
+    request = PushNodeProfileEventsRequest(
+        node=Node(node_id=42),
+        events=[
+            NodeProfileEvent(
+                event_id="message-1:superlink_supernode_downstream",
+                run_id=123,
+                group_id="7",
+                task="superlink_supernode_downstream",
+                timestamp_ms=1000.0,
+                duration_ms=250.0,
+                network_bytes=1024,
+                sender="superlink",
+                receiver="42",
+            )
+        ],
+    )
+
+    push_node_profile_events(request, state)
+
+    state.add_profile_events.assert_called_once_with(
+        123,
+        [
+            {
+                "event_id": "message-1:superlink_supernode_downstream",
+                "timestamp_ms": 1000.0,
+                "scope": "transport",
+                "task": "superlink_supernode_downstream",
+                "round": 7,
+                "node_id": 42,
+                "duration_ms": 250.0,
+                "network_bytes": 1024,
+                "sender_node_id": "superlink",
+                "receiver_node_id": "42",
+            }
+        ],
+    )

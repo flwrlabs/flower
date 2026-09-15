@@ -35,6 +35,8 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     PullMessagesResponse,
     PushMessagesRequest,
     PushMessagesResponse,
+    PushNodeProfileEventsRequest,
+    PushNodeProfileEventsResponse,
     RegisterNodeFleetRequest,
     RegisterNodeFleetResponse,
     UnregisterNodeFleetRequest,
@@ -345,3 +347,15 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
             abort_grpc_context(e.message, context)
 
         return res
+
+    def PushNodeProfileEvents(
+        self, request: PushNodeProfileEventsRequest, context: grpc.ServicerContext
+    ) -> PushNodeProfileEventsResponse:
+        """Store transport profile events measured by a SuperNode."""
+        try:
+            return message_handler.push_node_profile_events(
+                request=request, state=self.state_factory.state()
+            )
+        except ValueError as err:
+            context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(err))
+            raise RuntimeError("unreachable") from err

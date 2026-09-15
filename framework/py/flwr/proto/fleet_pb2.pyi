@@ -270,6 +270,77 @@ class PushMessagesResponse(google.protobuf.message.Message):
 global___PushMessagesResponse = PushMessagesResponse
 
 @typing.final
+class NodeProfileEvent(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    RUN_ID_FIELD_NUMBER: builtins.int
+    GROUP_ID_FIELD_NUMBER: builtins.int
+    TASK_FIELD_NUMBER: builtins.int
+    TIMESTAMP_MS_FIELD_NUMBER: builtins.int
+    DURATION_MS_FIELD_NUMBER: builtins.int
+    NETWORK_BYTES_FIELD_NUMBER: builtins.int
+    SENDER_FIELD_NUMBER: builtins.int
+    RECEIVER_FIELD_NUMBER: builtins.int
+    EVENT_ID_FIELD_NUMBER: builtins.int
+    run_id: builtins.int
+    group_id: builtins.str
+    task: builtins.str
+    timestamp_ms: builtins.float
+    duration_ms: builtins.float
+    network_bytes: builtins.int
+    sender: builtins.str
+    receiver: builtins.str
+    event_id: builtins.str
+    """Stable across retries so the SuperLink can deduplicate this event."""
+    def __init__(
+        self,
+        *,
+        run_id: builtins.int = ...,
+        group_id: builtins.str = ...,
+        task: builtins.str = ...,
+        timestamp_ms: builtins.float = ...,
+        duration_ms: builtins.float = ...,
+        network_bytes: builtins.int = ...,
+        sender: builtins.str = ...,
+        receiver: builtins.str = ...,
+        event_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["duration_ms", b"duration_ms", "event_id", b"event_id", "group_id", b"group_id", "network_bytes", b"network_bytes", "receiver", b"receiver", "run_id", b"run_id", "sender", b"sender", "task", b"task", "timestamp_ms", b"timestamp_ms"]) -> None: ...
+
+global___NodeProfileEvent = NodeProfileEvent
+
+@typing.final
+class PushNodeProfileEventsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODE_FIELD_NUMBER: builtins.int
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def node(self) -> flwr.proto.node_pb2.Node: ...
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___NodeProfileEvent]: ...
+    def __init__(
+        self,
+        *,
+        node: flwr.proto.node_pb2.Node | None = ...,
+        events: collections.abc.Iterable[global___NodeProfileEvent] | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["node", b"node"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events", "node", b"node"]) -> None: ...
+
+global___PushNodeProfileEventsRequest = PushNodeProfileEventsRequest
+
+@typing.final
+class PushNodeProfileEventsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___PushNodeProfileEventsResponse = PushNodeProfileEventsResponse
+
+@typing.final
 class Reconnect(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

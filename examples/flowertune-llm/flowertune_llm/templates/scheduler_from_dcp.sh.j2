@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+{{ env_setup }}
+
+if [ -n "{{ workdir }}" ]; then
+  cd "{{ workdir }}"
+fi
+
+export FLWR_TORCHTITAN_OUTPUT_DCP_DIR="{{ output_dcp_dir }}"
+export FLWR_TORCHTITAN_FINAL_DCP_DIR="{{ final_dcp_dir }}"
+export FLWR_TORCHTITAN_INPUT_LAYERS_DIR="{{ input_layers_dir }}"
+export FLWR_TORCHTITAN_OUTPUT_LAYERS_DIR="{{ output_layers_dir }}"
+export FLWR_TORCHTITAN_OUTPUT_LAYERS_READY="{{ output_layers_ready }}"
+export FLWR_TORCHTITAN_CONVERSION_PROFILE="{{ conversion_profile_path }}"
+export FLWR_FLOWERTUNE_LLM_ROOT="{{ flowertune_llm_root }}"
+export PYTHONPATH="${FLWR_FLOWERTUNE_LLM_ROOT}:${PYTHONPATH:-}"
+
+if [ ! -d "${FLWR_TORCHTITAN_FINAL_DCP_DIR}" ]; then
+  echo "Expected TorchTitan DCP checkpoint not found: ${FLWR_TORCHTITAN_FINAL_DCP_DIR}" >&2
+  exit 1
+fi
+
+{{ dcp_to_layers_command }}
+
+if [ ! -f "${FLWR_TORCHTITAN_OUTPUT_LAYERS_READY}" ]; then
+  echo "DCP-to-layer conversion did not publish ${FLWR_TORCHTITAN_OUTPUT_LAYERS_READY}" >&2
+  exit 1
+fi
+mv "${FLWR_TORCHTITAN_FINAL_DCP_DIR}" "${FLWR_TORCHTITAN_OUTPUT_DCP_DIR}"

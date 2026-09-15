@@ -85,6 +85,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         self.message_ins_id_to_message_res_id: dict[str, str] = {}
         # Instruction-scoped delivery anchors used for network delivery profiling.
         self.delivery_timings: dict[str, dict[str, float | None]] = {}
+        self.profile_events: dict[int, dict[str, dict[str, object]]] = defaultdict(dict)
 
         # Map flwr_aid to run_ids for O(1) reverse index lookup
         self.flwr_aid_to_run_ids: dict[str, set[int]] = defaultdict(set)
@@ -367,6 +368,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                             metric_record
                         )
                     metric_record["downstream_ms"] = downstream_ms
+                    metric_record["ins_enqueued_at_ms"] = float(ins_enqueued_at_ms)
+                    metric_record["clientapp_delivered_at_ms"] = float(
+                        clientapp_delivered_at_ms
+                    )
 
         return list(ret.values())
 
@@ -934,3 +939,21 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     "serverapp_delivered_at_ms": None,
                 }
             return dict(timings)
+
+    def add_profile_events(
+        self, run_id: int, events: Sequence[dict[str, object]]
+    ) -> None:
+        """Store externally measured profile events for a run."""
+        with self.lock:
+            if run_id not in self.run_ids:
+                raise ValueError(f"Run {run_id} not found")
+            for event in events:
+                event_id = str(event["event_id"])
+                self.profile_events[run_id].setdefault(event_id, dict(event))
+
+    def get_profile_events(self, run_id: int) -> list[dict[str, object]]:
+        """Return externally measured profile events for a run."""
+        with self.lock:
+            return [
+                dict(event) for event in self.profile_events.get(run_id, {}).values()
+            ]

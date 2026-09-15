@@ -24,8 +24,9 @@ from typing import cast
 import grpc
 
 from flwr.app.error import Error
-from flwr.common import Message, Metadata, RecordDict, now
+from flwr.common import Message, Metadata, MetricRecord, RecordDict, now
 from flwr.common.profiling import (
+    client_name_from_message,
     get_active_profiler,
     get_current_round,
     publish_profile_summary,
@@ -147,6 +148,7 @@ class GrpcGrid(Grid):
         self.node = Node(node_id=SUPERLINK_NODE_ID)
         self._object_size_bytes: dict[str, int] = {}
         self._pushed_message_size_bytes: dict[str, int] = {}
+        self._full_path_downstream: dict[str, tuple[float, int, int]] = {}
         self._retry_invoker = _make_simple_grpc_retry_invoker()
         self.pull_interval = pull_interval
         super().__init__()
@@ -338,6 +340,7 @@ class GrpcGrid(Grid):
         # Construct Messages
         run_id = cast(Run, self._run).run_id
         messages = list(messages)
+        dispatch_started_at_ms = time.time() * 1000.0
         message_ids: list[str] = []
         if not messages:
             return message_ids
@@ -371,6 +374,18 @@ class GrpcGrid(Grid):
                         # in object preregistration/object upload under load.
                         max_concurrent_pushes=1,
                     )
+
+                if get_active_profiler() is not None:
+                    for message, message_id in zip(messages, message_ids, strict=False):
+                        if message_id is None:
+                            continue
+                        size_bytes = self._pushed_message_size_bytes.get(message_id)
+                        if size_bytes is not None:
+                            self._full_path_downstream[message_id] = (
+                                dispatch_started_at_ms,
+                                message.metadata.dst_node_id,
+                                size_bytes,
+                            )
 
         except grpc.RpcError as e:
             if e.code() == grpc.StatusCode.RESOURCE_EXHAUSTED:  # pylint: disable=E1101
@@ -495,11 +510,23 @@ class GrpcGrid(Grid):
                         message.metadata.__dict__["_network_downstream_ms"] = float(
                             downstream_ms
                         )
+                    self._record_full_path_downstream(message, net_delivery_record)
                     if (
                         message.has_content()
                         and "_flwr_network_delivery" in message.content.metric_records
                     ):
                         del message.content.metric_records["_flwr_network_delivery"]
+                full_path_record = None
+                if message.has_content():
+                    full_path_record = message.content.metric_records.get(
+                        "_flwr_full_path"
+                    )
+                if full_path_record is None:
+                    proto_msg = message_from_proto(msg_proto)
+                    if proto_msg.has_content():
+                        full_path_record = proto_msg.content.metric_records.get(
+                            "_flwr_full_path"
+                        )
                 if track_network_bytes:
                     # Capture this after the reply's objects have been inflated and
                     # confirmed. Strategies can use the per-message value instead of
@@ -507,6 +534,16 @@ class GrpcGrid(Grid):
                     message.metadata.__dict__["_network_delivered_at_ms"] = (
                         time.time() * 1000.0
                     )
+                delivered_at_ms = time.time() * 1000.0
+                if full_path_record is not None:
+                    self._record_full_path_upstream(
+                        message, full_path_record, delivered_at_ms
+                    )
+                    if (
+                        message.has_content()
+                        and "_flwr_full_path" in message.content.metric_records
+                    ):
+                        del message.content.metric_records["_flwr_full_path"]
                 message.metadata.__dict__["_message_id"] = msg_id
                 inflated_msgs.append(message)
 
@@ -517,6 +554,59 @@ class GrpcGrid(Grid):
                 log(ERROR, ERROR_MESSAGE_PULL_MESSAGES_RESOURCE_EXHAUSTED)
                 return []
             raise
+
+    def _record_full_path_downstream(
+        self, message: Message, delivery: MetricRecord
+    ) -> None:
+        """Record dispatch until the complete instruction reaches ClientApp."""
+        profiler = get_active_profiler()
+        lifecycle = self._full_path_downstream.pop(
+            message.metadata.reply_to_message_id, None
+        )
+        delivered_at_ms = delivery.get("clientapp_delivered_at_ms")
+        if (
+            profiler is None
+            or lifecycle is None
+            or not isinstance(delivered_at_ms, (int, float))
+        ):
+            return
+        started_at_ms, node_id, size_bytes = lifecycle
+        client_name = client_name_from_message(message)
+        profiler.record(
+            scope="transport",
+            task="serverapp_clientapp_downstream",
+            round=get_current_round(),
+            node_id=node_id,
+            duration_ms=max(float(delivered_at_ms) - started_at_ms, 0.0),
+            timestamp_ms=started_at_ms,
+            metadata={
+                "network_bytes": size_bytes,
+                "node_name": client_name,
+            },
+        )
+
+    def _record_full_path_upstream(
+        self, message: Message, full_path: MetricRecord, delivered_at_ms: float
+    ) -> None:
+        """Record reply publication until the complete update reaches ServerApp."""
+        profiler = get_active_profiler()
+        started_at_ms = full_path.get("upstream_started_at_ms")
+        size_bytes = message.metadata.__dict__.get("_network_upstream_bytes")
+        if profiler is None or not isinstance(started_at_ms, (int, float)):
+            return
+        client_name = client_name_from_message(message)
+        metadata = {"node_name": client_name}
+        if isinstance(size_bytes, (int, float)):
+            metadata["network_bytes"] = int(size_bytes)
+        profiler.record(
+            scope="transport",
+            task="serverapp_clientapp_upstream",
+            round=get_current_round(),
+            node_id=message.metadata.src_node_id,
+            duration_ms=max(delivered_at_ms - float(started_at_ms), 0.0),
+            timestamp_ms=float(started_at_ms),
+            metadata=metadata,
+        )
 
     def send_and_receive(
         self,
@@ -570,6 +660,7 @@ class GrpcGrid(Grid):
 
         # Push messages
         push_start = perf_counter() if profiler is not None else None
+        push_started_at_ms = time.time() * 1000.0 if profiler is not None else None
         mem_start_mb = None
         disk_start = None
         if proc is not None:
@@ -584,6 +675,16 @@ class GrpcGrid(Grid):
                     downstream_bytes_by_id[msg_id] = size_bytes
         downstream_bytes_total = sum(downstream_bytes_by_id.values())
         if profiler is not None and push_start is not None:
+            push_duration_ms = (perf_counter() - push_start) * 1000.0
+            profiler.record(
+                scope="transport",
+                task="serverapp_superlink_downstream",
+                round=get_current_round(),
+                node_id=None,
+                duration_ms=push_duration_ms,
+                timestamp_ms=push_started_at_ms,
+                metadata={"network_bytes": downstream_bytes_total},
+            )
             mem_end_mb = None
             mem_delta_mb = None
             disk_read_mb = None
@@ -602,7 +703,8 @@ class GrpcGrid(Grid):
                 task="network_downstream",
                 round=get_current_round(),
                 node_id=None,
-                duration_ms=(perf_counter() - push_start) * 1000.0,
+                duration_ms=push_duration_ms,
+                timestamp_ms=push_started_at_ms,
                 metadata={
                     "expected_replies": len(msg_ids),
                     "memory_start_mb": mem_start_mb,
@@ -632,14 +734,18 @@ class GrpcGrid(Grid):
         ret: list[Message] = []
         while timeout is None or time.time() < end_time:
             iter_start = perf_counter() if profiler is not None else None
+            iter_started_at_ms = time.time() * 1000.0 if profiler is not None else None
             res_msgs = self.pull_messages(msg_ids)
+            iter_duration_ms = None
             if iter_start is not None:
-                pull_active_ms += (perf_counter() - iter_start) * 1000.0
+                iter_duration_ms = (perf_counter() - iter_start) * 1000.0
+                pull_active_ms += iter_duration_ms
             ret.extend(res_msgs)
             msg_ids.difference_update(
                 {msg.metadata.reply_to_message_id for msg in res_msgs}
             )
             if profiler is not None and res_msgs:
+                iteration_upstream_bytes = 0
                 for msg in res_msgs:
                     downstream_bytes = downstream_bytes_by_id.get(
                         msg.metadata.reply_to_message_id
@@ -653,11 +759,32 @@ class GrpcGrid(Grid):
                     )
                     if isinstance(upstream_bytes, (int, float)):
                         upstream_bytes_total += int(upstream_bytes)
+                        iteration_upstream_bytes += int(upstream_bytes)
+                if iter_duration_ms is not None:
+                    profiler.record(
+                        scope="transport",
+                        task="serverapp_superlink_upstream",
+                        round=get_current_round(),
+                        node_id=None,
+                        duration_ms=iter_duration_ms,
+                        timestamp_ms=iter_started_at_ms,
+                        metadata={"network_bytes": iteration_upstream_bytes},
+                    )
                 record_network_delivery_metrics_from_messages(
                     res_msgs, delivered_at_ms=time.time() * 1000.0
                 )
                 record_profile_metrics_from_messages(res_msgs)
                 publish_profile_summary()
+            elif profiler is not None and iter_duration_ms is not None:
+                profiler.record(
+                    scope="transport",
+                    task="serverapp_superlink_upstream",
+                    round=get_current_round(),
+                    node_id=None,
+                    duration_ms=iter_duration_ms,
+                    timestamp_ms=iter_started_at_ms,
+                    metadata={"network_bytes": 0},
+                )
             if len(msg_ids) == 0:
                 break
             # Sleep

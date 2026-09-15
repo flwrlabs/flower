@@ -33,6 +33,8 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     PullMessagesResponse,
     PushMessagesRequest,
     PushMessagesResponse,
+    PushNodeProfileEventsRequest,
+    PushNodeProfileEventsResponse,
     RegisterNodeFleetRequest,
     RegisterNodeFleetResponse,
     UnregisterNodeFleetRequest,
@@ -219,6 +221,15 @@ async def get_run(request: GetRunRequest) -> GetRunResponse:
 
     # Handle message
     return message_handler.get_run(request=request, state=state, store=store)
+
+
+@rest_request_response(PushNodeProfileEventsRequest)
+async def push_node_profile_events(
+    request: PushNodeProfileEventsRequest,
+) -> PushNodeProfileEventsResponse:
+    """Store transport profile events measured by a SuperNode."""
+    state: LinkState = cast(LinkStateFactory, app.state.STATE_FACTORY).state()
+    return message_handler.push_node_profile_events(request=request, state=state)
 
 
 @rest_request_response(GetFabRequest)

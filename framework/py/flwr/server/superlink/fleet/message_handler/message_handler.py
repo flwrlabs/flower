@@ -45,6 +45,8 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     PullMessagesResponse,
     PushMessagesRequest,
     PushMessagesResponse,
+    PushNodeProfileEventsRequest,
+    PushNodeProfileEventsResponse,
     Reconnect,
     RegisterNodeFleetRequest,
     RegisterNodeFleetResponse,
@@ -239,6 +241,41 @@ def push_messages(
     return response
 
 
+def push_node_profile_events(
+    request: PushNodeProfileEventsRequest, state: LinkState
+) -> PushNodeProfileEventsResponse:
+    """Store transport profile events measured by a SuperNode."""
+    node_id = request.node.node_id
+    by_run: dict[int, list[dict[str, object]]] = {}
+    for event in request.events:
+        _validate_node_in_federation(state, node_id, event.run_id)
+        try:
+            round_id = int(event.group_id) if event.group_id else None
+        except ValueError:
+            round_id = None
+        by_run.setdefault(event.run_id, []).append(
+            {
+                "event_id": event.event_id
+                or (
+                    f"{node_id}:{event.run_id}:{event.group_id}:{event.task}:"
+                    f"{event.timestamp_ms}:{event.duration_ms}"
+                ),
+                "timestamp_ms": event.timestamp_ms,
+                "scope": "transport",
+                "task": event.task,
+                "round": round_id,
+                "node_id": node_id,
+                "duration_ms": event.duration_ms,
+                "network_bytes": event.network_bytes,
+                "sender_node_id": event.sender,
+                "receiver_node_id": event.receiver,
+            }
+        )
+    for run_id, events in by_run.items():
+        state.add_profile_events(run_id, events)
+    return PushNodeProfileEventsResponse()
+
+
 def get_run(
     request: GetRunRequest, state: LinkState, store: ObjectStore
 ) -> GetRunResponse:
@@ -303,9 +340,7 @@ def push_object(
         # Record bytes traffic pushed from SuperNode
         bytes_recv = len(request.object_content)
         if bytes_recv > 0:
-            state.store_traffic(
-                request.run_id, bytes_sent=0, bytes_recv=bytes_recv
-            )
+            state.store_traffic(request.run_id, bytes_sent=0, bytes_recv=bytes_recv)
     except (NoObjectInStoreError, ValueError) as e:
         log(ERROR, str(e))
         if isinstance(e, NoObjectInStoreError):
