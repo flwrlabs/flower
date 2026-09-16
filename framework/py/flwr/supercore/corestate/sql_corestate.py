@@ -49,7 +49,6 @@ from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
     SERIES_ID_NUM_BYTES,
-    SUPERLINK_NODE_ID,
     TASK_ID_NUM_BYTES,
     Status,
     SubStatus,
@@ -418,50 +417,44 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab | None,
+        fab: Fab,
         federation_id: str,
         app_id: str,
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
     ) -> str:
-        """Store an optional FAB and associate its app with a federation."""
+        """Store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
             raise ValueError(
                 "Federation ID, app ID, app type, and added by are required"
             )
-        if fab is None and not is_hub_app:
-            raise ValueError("A FAB is required for custom apps")
-        fab_hash = None
-        fab_stmt = None
-        if fab is not None:
-            fab_hash = hashlib.sha256(fab.content).hexdigest()
-            if fab.hash_str and fab.hash_str != fab_hash:
-                raise ValueError(
-                    f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
-                )
-            # Keep launch behavior: last write wins for metadata under the same
-            # content hash.
-            fab_stmt = self.dialect_insert(FabModel).values(
-                fab_hash=fab_hash,
-                content=fab.content,
-                verifications=json.dumps(fab.verifications),
+        fab_hash = hashlib.sha256(fab.content).hexdigest()
+        if fab.hash_str and fab.hash_str != fab_hash:
+            raise ValueError(
+                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
             )
-            fab_stmt = fab_stmt.on_conflict_do_update(
-                index_elements=[FabModel.fab_hash],
-                set_={
-                    "content": fab_stmt.excluded.content,
-                    "verifications": fab_stmt.excluded.verifications,
-                },
-            )
+        fab_stmt = self.dialect_insert(FabModel).values(
+            fab_hash=fab_hash,
+            content=fab.content,
+            verifications=json.dumps(fab.verifications),
+        )
+        fab_stmt = fab_stmt.on_conflict_do_update(
+            index_elements=[FabModel.fab_hash],
+            set_={
+                "content": fab_stmt.excluded.content,
+                "verifications": fab_stmt.excluded.verifications,
+            },
+        )
         app_stmt = self.dialect_insert(FederationAppModel).values(
             federation_id=federation_id,
             app_id=app_id,
-            fab_hash=None if is_hub_app else fab_hash,
+            fab_hash=fab_hash,
             app_type=app_type,
             is_hub_app=is_hub_app,
             added_by=added_by,
             added_at=now(),
+            updated_at=now(),
         )
         app_stmt = app_stmt.on_conflict_do_update(
             index_elements=[
@@ -472,13 +465,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 "fab_hash": app_stmt.excluded.fab_hash,
                 "app_type": app_stmt.excluded.app_type,
                 "is_hub_app": app_stmt.excluded.is_hub_app,
+                "updated_at": app_stmt.excluded.updated_at,
             },
         )
         with self.session() as session:
-            if fab_stmt is not None:
-                session.execute(fab_stmt)
+            session.execute(fab_stmt)
             session.execute(app_stmt)
-        return fab_hash or ""
+        return fab_hash
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
@@ -520,6 +513,56 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 verifications=json.loads(row.verifications),
             )
 
+    def get_hub_app(
+        self, federation_id: str, app_id: str
+    ) -> tuple[Fab, datetime] | None:
+        """Return the cached Hub FAB and its last update time, if present."""
+        query = (
+            select(FabModel, FederationAppModel.updated_at)
+            .join(
+                FederationAppModel,
+                FederationAppModel.fab_hash == FabModel.fab_hash,
+            )
+            .where(
+                FederationAppModel.federation_id == federation_id,
+                FederationAppModel.app_id == app_id,
+                FederationAppModel.is_hub_app.is_(True),
+            )
+        )
+        with self.session() as session:
+            row = session.execute(query).one_or_none()
+            if row is None:
+                return None
+            fab, updated_at = row
+            return (
+                Fab(fab.fab_hash, fab.content, json.loads(fab.verifications)),
+                updated_at,
+            )
+
+    def update_hub_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        federation_id: str,
+        app_id: str,
+        previous_fab_hash: str,
+        fab_hash: str,
+        app_type: str,
+    ) -> bool:
+        """Update a Hub app if it still points to the previous FAB."""
+        stmt = (
+            update(FederationAppModel)
+            .where(
+                FederationAppModel.federation_id == federation_id,
+                FederationAppModel.app_id == app_id,
+                FederationAppModel.is_hub_app.is_(True),
+                FederationAppModel.fab_hash == previous_fab_hash,
+                exists().where(FabModel.fab_hash == fab_hash),
+            )
+            .values(fab_hash=fab_hash, app_type=app_type, updated_at=now())
+            .returning(FederationAppModel.app_id)
+        )
+        with self.session() as session:
+            return session.scalar(stmt) is not None
+
     def list_apps(
         self, federation_id: str, limit: int | None = None
     ) -> Sequence[AppInfo]:
@@ -548,7 +591,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return [
                 AppInfo(
                     app_id=app.app_id,
-                    fab_hash=app.fab_hash or "",
+                    fab_hash=app.fab_hash,
                     app_type=app.app_type,
                     is_hub_app=app.is_hub_app,
                 )
@@ -1488,7 +1531,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def store_task_message(self, message: Message) -> bool:
         """Store one task-addressed Message."""
-        if validate_task_message(message):
+        if validate_task_message(message, self.get_node_id()):
             return False
 
         with self.session() as session:
@@ -1585,7 +1628,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 dst_task_ids, src_task_ids, order_by, limit
             )
             snapshots = [_task_message_snapshot_from_model(row) for row in rows]
-        return [_task_message_from_snapshot(row) for row in snapshots]
+        node_id = self.get_node_id()
+        return [_task_message_from_snapshot(row, node_id) for row in snapshots]
 
     def store_task_events(
         self,
@@ -1987,7 +2031,7 @@ def _task_message_snapshot_from_model(model: TaskMessageModel) -> dict[str, Any]
     }
 
 
-def _task_message_from_snapshot(row: dict[str, Any]) -> Message:
+def _task_message_from_snapshot(row: dict[str, Any], node_id: int) -> Message:
     """Convert a claimed task_message snapshot to a Message."""
     content, error = None, None
     if row["content"] is not None:
@@ -1998,8 +2042,8 @@ def _task_message_from_snapshot(row: dict[str, Any]) -> Message:
     metadata = Metadata(
         run_id=int64_to_uint64(row["run_id"]),
         message_id=row["message_id"],
-        src_node_id=SUPERLINK_NODE_ID,
-        dst_node_id=SUPERLINK_NODE_ID,
+        src_node_id=node_id,
+        dst_node_id=node_id,
         reply_to_message_id=row["reply_to_message_id"] or "",
         group_id="",  # Task messages don't have this field for now
         created_at=row["created_at"],

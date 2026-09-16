@@ -24,9 +24,10 @@ from parameterized import parameterized
 
 from flwr.app import ConfigRecord, Message, Metadata, RecordDict
 from flwr.app.message import make_message
-from flwr.common.constant import ErrorCode
+from flwr.common.constant import SUPERLINK_NODE_ID, ErrorCode
 from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
+from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import get_object_tree
@@ -72,9 +73,31 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
 
     def test_get_node_id_fails(self) -> None:
         """Test get_node_id fails correctly if node_id is not set."""
-        # Execute and assert
+        state = InMemoryNodeState(ObjectStoreFactory().store())
+
         with self.assertRaises(ValueError):
-            self.state.get_node_id()
+            state.get_node_id()
+
+    def test_store_task_message_uses_supernode_id(self) -> None:
+        """Task Messages should use the node ID of their CoreState."""
+        node_id = 123
+        self.state.set_node_id(node_id)
+        src_task_id = self.state.create_task(task_type=TaskType.CLIENT_APP, run_id=42)
+        dst_task_id = self.state.create_task(task_type=TaskType.MODEL, run_id=42)
+        assert src_task_id is not None and dst_task_id is not None
+        message = create_task_message(
+            src_task_id=src_task_id,
+            dst_task_id=dst_task_id,
+            run_id=42,
+            node_id=node_id,
+        )
+
+        self.assertTrue(self.state.store_task_message(message))
+        pulled = self.state.get_task_message(dst_task_ids=[dst_task_id])
+
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual(pulled[0].metadata.src_node_id, node_id)
+        self.assertEqual(pulled[0].metadata.dst_node_id, node_id)
 
     def test_store_and_get_run(self) -> None:
         """Test storing and retrieving a run."""
@@ -457,4 +480,6 @@ class InMemoryStateTest(StateTest):
 
     def state_factory(self) -> NodeState:
         """Return InMemoryState."""
-        return InMemoryNodeState(ObjectStoreFactory().store())
+        state = InMemoryNodeState(ObjectStoreFactory().store())
+        state.set_node_id(SUPERLINK_NODE_ID)
+        return state

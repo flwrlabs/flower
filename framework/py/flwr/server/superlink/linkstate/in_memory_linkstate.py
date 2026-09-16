@@ -198,7 +198,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             missing_objects = self.preregister_object_tree(object_tree, session_id)
             return True, missing_objects
 
-    def _check_stored_messages(self, message_ids: set[str]) -> None:
+    def _check_stored_messages(
+        self, message_ids: set[str], run_id: int | None = None
+    ) -> None:
         """Check and delete the message if it's invalid."""
         with self.lock:
             invalid_msg_ids: set[str] = set()
@@ -206,6 +208,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             for msg_id in message_ids:
                 if not (message := self.message_ins_store.get(msg_id)):
                     continue
+                if run_id is not None and message.metadata.run_id != run_id:
+                    raise ValueError("`message_ids` contains invalid IDs")
 
                 # Check if the message has expired
                 available_until = message.metadata.created_at + message.metadata.ttl
@@ -270,6 +274,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             message_id = res_metadata.message_id
             # Check if the Message it is replying to exists and is valid
             msg_ins_id = res_metadata.reply_to_message_id
+            msg_ins = self.message_ins_store.get(msg_ins_id)
+            if msg_ins and msg_ins.metadata.run_id != res_metadata.run_id:
+                log(ERROR, "`metadata.run_id` is invalid")
+                return None
             self._check_stored_messages({msg_ins_id})
             msg_ins = self.message_ins_store.get(msg_ins_id)
 
@@ -338,18 +346,22 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         # Return the new message_id
         return message_id
 
-    def get_message_res(self, message_ids: set[str]) -> list[Message]:
+    def get_message_res(self, message_ids: set[str], run_id: int) -> list[Message]:
         """Get reply Messages for the given Message IDs."""
         ret: dict[str, Message] = {}
 
         with self.lock:
-            self._check_stored_messages(message_ids)
+            self._check_stored_messages(message_ids, run_id)
             current = now().timestamp()
-
+            found_message_ins_dict = {
+                message_id: self.message_ins_store[message_id]
+                for message_id in message_ids
+                if message_id in self.message_ins_store
+            }
             # Verify Message IDs
             ret = verify_message_ids(
                 inquired_message_ids=message_ids,
-                found_message_ins_dict=self.message_ins_store,
+                found_message_ins_dict=found_message_ins_dict,
                 current_time=current,
             )
 
@@ -360,7 +372,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             }
             tmp_ret_dict = check_node_availability_for_in_message(
                 inquired_in_message_ids=message_ids,
-                found_in_message_dict=self.message_ins_store,
+                found_in_message_dict=found_message_ins_dict,
                 node_id_to_online_until={
                     node_id: self.nodes[node_id].online_until
                     for node_id in dst_node_ids
@@ -383,7 +395,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         message_res_found.append(message_res)
             tmp_ret_dict = verify_found_message_replies(
                 inquired_message_ids=message_ids,
-                found_message_ins_dict=self.message_ins_store,
+                found_message_ins_dict=found_message_ins_dict,
                 found_message_res_list=message_res_found,
                 current_time=current,
             )

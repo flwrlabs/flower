@@ -27,6 +27,9 @@ WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION = "flower.ai/warm-executor-runtime-image"
 WARM_EXECUTOR_CONFIGURATION_ANNOTATION = "flower.ai/warm-executor-config-sha256"
 _TASK_ID_LABEL = "flower.ai/superexec-task-id"
 _TASK_TYPE_LABEL = "flower.ai/task-type"
+WARM_EXECUTOR_TASK_TYPES = frozenset(
+    {TaskType.AGENT_APP, TaskType.MODEL, TaskType.CONNECTOR}
+)
 
 
 @dataclass(frozen=True)

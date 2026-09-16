@@ -395,7 +395,9 @@ class TestFleetSimulationEngineRayBackend(TestCase):
             LinkState marks replies as delivered when they are read, so retain each
             batch across polls instead of expecting one poll to return every reply.
             """
-            for message_res in state_factory.state().get_message_res(set(message_ids)):
+            for message_res in state_factory.state().get_message_res(
+                set(message_ids), 1234
+            ):
                 message_res_by_id[message_res.metadata.reply_to_message_id] = (
                     message_res
                 )

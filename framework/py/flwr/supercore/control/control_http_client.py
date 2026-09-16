@@ -93,6 +93,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
 )
 from flwr.supercore.protobuf.client import ProtobufClient
 
@@ -187,6 +189,17 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/GetRunSeries",
             request=request,
             response_type=GetRunSeriesResponse,
+        )
+
+    def UpdateRunSeriesDescription(
+        self, request: UpdateRunSeriesDescriptionRequest
+    ) -> UpdateRunSeriesDescriptionResponse:
+        """Update a run series description."""
+        return self._unary_unary(
+            path="/v1/control/update-run-series-description",
+            rpc_method="/flwr.proto.Control/UpdateRunSeriesDescription",
+            request=request,
+            response_type=UpdateRunSeriesDescriptionResponse,
         )
 
     def ListRunSeriesEvents(

@@ -33,6 +33,10 @@ from flwr.superlink.federation import FederationManager
 class LinkState(CoreState):  # pylint: disable=R0904
     """Abstract LinkState."""
 
+    def get_node_id(self) -> int:
+        """Return the SuperLink node ID."""
+        return SUPERLINK_NODE_ID
+
     @property
     @abc.abstractmethod
     def federation_manager(self) -> FederationManager:
@@ -89,7 +93,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
-    def get_message_res(self, message_ids: set[str]) -> list[Message]:
+    def get_message_res(self, message_ids: set[str], run_id: int) -> list[Message]:
         """Get reply Messages for the given Message IDs.
 
         This method is typically called by the Runtime API to obtain
@@ -107,6 +111,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
         ----------
         message_ids : set[str]
             A set of Message IDs used to retrieve reply Messages responding to them.
+        run_id : int
+            The run ID the Messages must belong to.
 
         Returns
         -------

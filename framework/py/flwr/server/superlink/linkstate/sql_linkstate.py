@@ -231,7 +231,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             return True, missing_objects
 
     # pylint: disable-next=too-many-locals
-    def _check_stored_messages(self, message_ids: set[str]) -> None:
+    def _check_stored_messages(
+        self, message_ids: set[str], run_id: int | None = None
+    ) -> None:
         """Check and delete the message if it's invalid."""
         if not message_ids:
             return
@@ -245,6 +247,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
             if not message_rows:
                 return
+            if run_id is not None and any(
+                model.run_id != uint64_to_int64(run_id) for model in message_rows
+            ):
+                raise ValueError("`message_ids` contains invalid IDs")
 
             # Build message lookup dict
             message_dict: dict[str, MessageInsModel] = {
@@ -283,8 +289,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     continue
 
                 # Check if run exists and get federation ID
-                run_id = cast(int, message_model.run_id)
-                federation_id = run_id_to_federation_id.get(run_id)
+                message_run_id = cast(int, message_model.run_id)
+                federation_id = run_id_to_federation_id.get(message_run_id)
                 if not federation_id:
                     invalid_msg_ids.add(msg_id)
                     continue
@@ -409,6 +415,17 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     return None
 
                 msg_ins_id = res_metadata.reply_to_message_id
+                msg_ins_run_id = session.scalar(
+                    select(MessageInsModel.run_id).where(
+                        MessageInsModel.message_id == msg_ins_id
+                    )
+                )
+                if (
+                    msg_ins_run_id is not None
+                    and int64_to_uint64(msg_ins_run_id) != res_metadata.run_id
+                ):
+                    log(ERROR, "`metadata.run_id` is invalid")
+                    return None
                 msg_ins = self.get_valid_message_ins(msg_ins_id)
                 if msg_ins is None:
                     log(
@@ -420,7 +437,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         msg_ins_id,
                     )
                     return None
-
                 # Ensure that the dst_node_id of the original message matches the
                 # src_node_id of reply being processed.
                 if int64_to_uint64(msg_ins["dst_node_id"]) != res_metadata.src_node_id:
@@ -477,7 +493,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         return message_id
 
-    def get_message_res(self, message_ids: set[str]) -> list[Message]:
+    def get_message_res(self, message_ids: set[str], run_id: int) -> list[Message]:
         """Get reply Messages for the given Message IDs."""
         # pylint: disable=too-many-locals
         if not message_ids:
@@ -487,7 +503,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session() as session:
             # Verify Message IDs
-            self._check_stored_messages(message_ids)
+            self._check_stored_messages(message_ids, run_id)
             current = now().timestamp()
             rows = [
                 _message_model_to_dict(model)
@@ -503,7 +519,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     row, ["run_id", "src_node_id", "dst_node_id"]
                 )
                 found_message_ins_dict[row["message_id"]] = dict_to_message(row)
-
             ret = verify_message_ids(
                 inquired_message_ids=message_ids,
                 found_message_ins_dict=found_message_ins_dict,

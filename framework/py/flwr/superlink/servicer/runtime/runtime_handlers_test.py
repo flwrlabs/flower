@@ -665,6 +665,28 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             # Ins message was deleted
             assert self.state.num_message_ins() == 0
 
+    def test_pull_messages_rejects_message_from_another_run(self) -> None:
+        """Reject message IDs not owned by the authenticated run."""
+        other_run_id = self.state.create_run(
+            "", "", "", {}, NOOP_FEDERATION_ID, None, "", TaskType.SERVER_APP
+        )
+        self._transition_run_status(other_run_id, 2)
+        message = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=self.node_id,
+                run_id=other_run_id,
+            )
+        )
+        message_id = self.state.store_message_ins(message)
+        assert message_id
+
+        request = PullAppMessagesRequest(message_ids=[message_id])
+        with self.assertRaisesRegex(ValueError, "contains invalid IDs"):
+            runtime_handlers.pull_messages(request, self.state, self._auth_task)
+
+        assert self.state.num_message_ins() == 1
+
     @parameterized.expand(
         [
             # Reply with Message

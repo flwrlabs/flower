@@ -5,14 +5,16 @@ run it on SuperGrid. The app makes one model request through the OpenAI SDK so
 you can focus on the AgentApp lifecycle before adding connectors.
 
 Complete [Chat in your terminal](get-started-with-flower-agent.md) first. This
-tutorial targets Flower 1.35.0.
+tutorial targets Flower {{ stable_flwr_version }}.
 
 ## Create the project
 
 Download the AgentApp template from Flower Hub:
 
-```console
-$ uvx --from flwr==1.35.0 flwr new @flwrlabs/agent
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr new @flwrlabs/agent
 $ cd agent
 ```
 
@@ -96,14 +98,17 @@ completed answer only to the AgentApp logs.
 
 ## Review the Flower configuration
 
-The generated `pyproject.toml` includes the SDK and targets Flower 1.35.0:
+The generated `pyproject.toml` includes the SDK and targets Flower
+{{ stable_flwr_version }}:
 
-```toml
+```{code-block} toml
+:substitutions:
+
 [project]
-dependencies = ["flwr>=1.35.0,<2.0", "openai>=2.16.0,<3.0.0"]
+dependencies = ["flwr>=|stable_flwr_version|,<2.0", "openai>=2.16.0,<3.0.0"]
 
 [tool.flwr.app]
-flwr-version-target = "1.35.0"
+flwr-version-target = "|stable_flwr_version|"
 
 [tool.flwr.app.config.agent]
 input = "Explain why flowers turn toward light."
@@ -135,8 +140,8 @@ environment because the following commands use `uv run`.
 ```{admonition} Checkpoint
 :class: tip
 
-`uv sync` should resolve Flower 1.35 and the OpenAI SDK without a dependency
-error.
+`uv sync` should resolve Flower {{ stable_flwr_version }} and the OpenAI SDK
+without a dependency error.
 ```
 
 ## Validate the bundle

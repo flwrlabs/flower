@@ -14,35 +14,27 @@
 # ==============================================================================
 """`flwr-agentapp` command."""
 
-
 import argparse
-import re
-import sys
-from io import BufferedReader
 from logging import DEBUG, INFO
 from pathlib import Path
 from queue import Queue
-from typing import cast
 
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
-from flwr.common.constant import FLWR_TASK_TOKEN_LENGTH
+from flwr.common.constant import FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT
 from flwr.supercore import log
 from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore.logger import mirror_output_to_queue, restore_output
 from flwr.supercore.task_process import run_agentapp
 
-_TOKEN_STDIN_ACKNOWLEDGEMENT = "FLWR_AGENTAPP_TOKEN_ACCEPTED"
-_TASK_TOKEN_PATTERN = re.compile(rf"[0-9a-f]{{{FLWR_TASK_TOKEN_LENGTH * 2}}}")
-_TOKEN_STDIN_READ_LIMIT = FLWR_TASK_TOKEN_LENGTH * 2 + 2
-
 
 def flwr_agentapp() -> None:
     """Run process-isolated Flower AgentApp."""
     args = _parse_args_run_flwr_agentapp().parse_args()
-    token = _try_obtain_agentapp_token(args)
+    token = try_obtain_flwr_app_token(args)
 
-    if cast(bool, getattr(args, "token_stdin", False)):
-        print(_TOKEN_STDIN_ACKNOWLEDGEMENT, flush=True)
+    if bool(getattr(args, "token_stdin", False)):
+        # Older SuperExec instances recognize this AgentApp-specific value only.
+        print(FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT, flush=True)
 
     # Capture stdout/stderr
     log_queue: Queue[str | None] = Queue()
@@ -91,31 +83,3 @@ def _parse_args_run_flwr_agentapp() -> argparse.ArgumentParser:
     )
     add_args_flwr_app_common(parser=parser, include_token_stdin=True)
     return parser
-
-
-def _try_obtain_agentapp_token(args: argparse.Namespace) -> str:
-    """Return the AgentApp token from an existing source or private stdin mode."""
-    if not cast(bool, getattr(args, "token_stdin", False)):
-        return try_obtain_flwr_app_token(args)
-
-    try:
-        token_bytes = bytearray()
-        token_stdin = cast(BufferedReader, sys.stdin.buffer)
-        while b"\n" not in token_bytes and len(token_bytes) < _TOKEN_STDIN_READ_LIMIT:
-            chunk = token_stdin.read1(_TOKEN_STDIN_READ_LIMIT - len(token_bytes))
-            if not chunk:
-                break
-            token_bytes.extend(chunk)
-        token_input = token_bytes.decode("ascii")
-    except (AttributeError, OSError, UnicodeError):
-        sys.exit("Standard input does not contain exactly one valid task token.")
-    finally:
-        try:
-            sys.stdin.close()
-        except OSError:
-            pass
-
-    token = token_input.removesuffix("\n")
-    if _TASK_TOKEN_PATTERN.fullmatch(token) is None:
-        sys.exit("Standard input does not contain exactly one valid task token.")
-    return token
