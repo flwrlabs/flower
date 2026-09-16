@@ -58,6 +58,31 @@ def test_get_file_content_decodes_utf8() -> None:
     assert result["content"] == 'print("hi")\n'
 
 
+def test_github_search_forwards_page() -> None:
+    """Code search should forward GitHub's numeric page parameter."""
+    response = _response({"total_count": 12, "items": []})
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "github_search_code",
+            {
+                "owner": "acme",
+                "repo": "repo",
+                "query": "Flower",
+                "limit": 5,
+                "page": 2,
+            },
+            Mock(),
+            {"access_token": "secret"},
+            {},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.kwargs["params"] == {
+        "q": "Flower repo:acme/repo",
+        "per_page": "5",
+        "page": "2",
+    }
+
+
 def test_github_api_errors_include_message() -> None:
     """GitHub's documented error message should remain readable to callers."""
     response = _response({"message": "Validation Failed"}, status_code=422)

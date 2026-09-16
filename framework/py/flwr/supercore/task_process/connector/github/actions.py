@@ -37,6 +37,12 @@ ACTIONS = (
                 "limit": integer_property(
                     "Maximum number of matches to return.", minimum=1, maximum=10
                 ),
+                "page": integer_property(
+                    "Page number to return. Omit for the first request and increment "
+                    "for subsequent requests.",
+                    minimum=1,
+                    maximum=100,
+                ),
             },
             "required": ["owner", "repo", "query"],
             "additionalProperties": False,

@@ -49,6 +49,7 @@ def search_messages(
         {
             "query": require_string(arguments.get("query"), "Slack", "query"),
             "count": _limit(arguments, default=5, maximum=15),
+            "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
         },
     )
 

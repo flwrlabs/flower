@@ -18,7 +18,15 @@ from ..definition import ActionAccess, ActionDefinition
 from ..tool_schema import integer_property, string_property
 
 SLACK_CONVERSATION_TYPES = ("public_channel", "private_channel", "mpim", "im")
-_CURSOR = string_property("Cursor returned by the previous Slack response.")
+_CURSOR = string_property(
+    "Opaque cursor returned in response_metadata.next_cursor by the previous Slack "
+    "response for the same action and filters. Omit for the first request."
+)
+_SEARCH_CURSOR = string_property(
+    "Use '*' for the first cursor-paginated search. For subsequent requests, use "
+    "the opaque response_metadata.next_cursor from the previous response with the "
+    "same query."
+)
 _MESSAGE_LIMIT = integer_property(
     "Maximum number of messages to return.", minimum=1, maximum=15
 )
@@ -35,6 +43,7 @@ ACTIONS = (
                 "limit": integer_property(
                     "Maximum number of matches to return.", minimum=1, maximum=15
                 ),
+                "cursor": _SEARCH_CURSOR,
             },
             "required": ["query"],
             "additionalProperties": False,

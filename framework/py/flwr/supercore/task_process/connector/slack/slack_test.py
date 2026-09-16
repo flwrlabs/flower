@@ -40,13 +40,18 @@ def test_slack_actions_are_registered_and_executable() -> None:
     with patch(_HTTP_REQUEST, return_value=response) as request:
         result = registry.invoke_connector(
             "slack_search_messages",
-            {"query": "release"},
+            {"query": "release", "cursor": "*"},
             Mock(),
             {"access_token": "xoxp-secret"},
             {},
         )
     assert result == response.json.return_value
     assert request.call_args.args == ("GET", "https://slack.com/api/search.messages")
+    assert request.call_args.kwargs["params"] == {
+        "query": "release",
+        "count": "5",
+        "cursor": "*",
+    }
 
 
 def test_slack_http_errors_include_code_and_message() -> None:

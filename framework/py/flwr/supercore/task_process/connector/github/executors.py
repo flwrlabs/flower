@@ -51,10 +51,15 @@ def search_code(
     if _REPOSITORY_QUALIFIER.search(query) is not None:
         raise ValueError("GitHub query must not contain a repo qualifier.")
     limit = require_int_range(arguments.get("limit", 5), "GitHub", "limit", maximum=10)
+    params = {"q": f"{query} repo:{owner}/{repo}", "per_page": str(limit)}
+    if "page" in arguments:
+        params["page"] = str(
+            require_int_range(arguments["page"], "GitHub", "page", maximum=100)
+        )
     return _call_api(
         "/search/code",
         context.credentials,
-        params={"q": f"{query} repo:{owner}/{repo}", "per_page": str(limit)},
+        params=params,
         accept=_TEXT_MATCH_ACCEPT,
     )
 
