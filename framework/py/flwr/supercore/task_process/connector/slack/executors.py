@@ -94,6 +94,7 @@ def list_conversations(
         ),
         "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
         "types": ",".join(dict.fromkeys(selected_types)),
+        "team_id": optional_string(arguments.get("team_id"), "Slack", "team_id"),
     }
     if "exclude_archived" in arguments:
         params["exclude_archived"] = str(
@@ -116,7 +117,7 @@ def get_channel_messages(
     }
     if "limit" in arguments:
         params["limit"] = str(
-            require_int_range(arguments["limit"], "Slack", "limit", maximum=100)
+            require_int_range(arguments["limit"], "Slack", "limit", maximum=15)
         )
     return _call_slack_api(
         "conversations.history",
@@ -127,16 +128,19 @@ def get_channel_messages(
 
 def get_thread(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
     """Get messages in a Slack thread."""
+    params: dict[str, str | None] = {
+        "channel": require_string(arguments.get("channel_id"), "Slack", "channel_id"),
+        "ts": require_string(arguments.get("thread_ts"), "Slack", "thread_ts"),
+        "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
+    }
+    if "limit" in arguments:
+        params["limit"] = str(
+            require_int_range(arguments["limit"], "Slack", "limit", maximum=15)
+        )
     return _call_slack_api(
         "conversations.replies",
         context.credentials,
-        {
-            "channel": require_string(
-                arguments.get("channel_id"), "Slack", "channel_id"
-            ),
-            "ts": require_string(arguments.get("thread_ts"), "Slack", "thread_ts"),
-            "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
-        },
+        params,
     )
 
 

@@ -25,7 +25,7 @@ _CURSOR: JSONObject = {
     "description": "The Slack pagination cursor.",
 }
 _MESSAGE_LIMIT = integer_property(
-    "The maximum number of messages to return.", minimum=1, maximum=100
+    "The maximum number of messages to return.", minimum=1, maximum=15
 )
 
 ACTIONS = (
@@ -108,6 +108,12 @@ ACTIONS = (
                     "type": "boolean",
                     "description": "Whether to exclude archived conversations.",
                 },
+                "team_id": {
+                    "type": "string",
+                    "description": (
+                        "The encoded team ID to list when using an org-level token."
+                    ),
+                },
             },
             "additionalProperties": False,
         },
@@ -136,6 +142,7 @@ ACTIONS = (
             "properties": {
                 "channel_id": string_property("The Slack conversation or channel ID."),
                 "thread_ts": string_property("The timestamp of the parent message."),
+                "limit": _MESSAGE_LIMIT,
                 "cursor": _CURSOR,
             },
             "required": ["channel_id", "thread_ts"],

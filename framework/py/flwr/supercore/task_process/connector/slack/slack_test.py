@@ -90,13 +90,18 @@ def test_slack_history_actions_forward_cursor() -> None:
     cases: tuple[tuple[str, JSONObject, dict[str, str]], ...] = (
         (
             "slack_get_channel_messages",
-            {"channel_id": "C1", "cursor": "next"},
-            {"channel": "C1", "cursor": "next"},
+            {"channel_id": "C1", "cursor": "next", "limit": 15},
+            {"channel": "C1", "cursor": "next", "limit": "15"},
         ),
         (
             "slack_get_thread",
-            {"channel_id": "C1", "thread_ts": "1.0", "cursor": "next"},
-            {"channel": "C1", "ts": "1.0", "cursor": "next"},
+            {
+                "channel_id": "C1",
+                "thread_ts": "1.0",
+                "cursor": "next",
+                "limit": 15,
+            },
+            {"channel": "C1", "ts": "1.0", "cursor": "next", "limit": "15"},
         ),
     )
     response = Mock(status_code=200)
