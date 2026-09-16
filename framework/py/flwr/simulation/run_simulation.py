@@ -296,6 +296,7 @@ def _main_loop(
         state.task_store[primary_task_id] = Task(
             task_id=primary_task_id, run_id=run.run_id
         )
+        # Set here to also support the legacy `run_simulation` API.
         TaskIdentity.task_id = primary_task_id
         TaskIdentity.run_id = run.run_id
         TaskIdentity.node_id = server_app_context.node_id
