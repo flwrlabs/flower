@@ -34,43 +34,48 @@ class NotionApiError(ConnectorApiError):
 
 def search(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
     """Search pages and data sources shared with the Notion connection."""
-    body: JSONObject = {
-        "query": require_string(arguments.get("query"), "Notion", "query"),
-        "page_size": require_int_range(
-            arguments.get("limit", 10), "Notion", "limit", maximum=100
-        ),
-    }
-    if cursor := optional_string(arguments.get("cursor"), "Notion", "cursor"):
+    query = arguments.get("query")
+    if not isinstance(query, str):
+        raise ValueError("Notion query must be a string.")
+    body: JSONObject = {"query": query}
+    if (filter_ := _optional_object(arguments.get("filter"), "filter")) is not None:
+        body["filter"] = filter_
+    if (sort := _optional_object(arguments.get("sort"), "sort")) is not None:
+        body["sort"] = sort
+    if "page_size" in arguments:
+        body["page_size"] = require_int_range(
+            arguments["page_size"], "Notion", "page_size", maximum=100
+        )
+    if cursor := optional_string(
+        arguments.get("start_cursor"), "Notion", "start_cursor"
+    ):
         body["start_cursor"] = cursor
     return _call_notion_api("POST", "/search", context.credentials, body=body)
 
 
-def get_page_content(
-    arguments: JSONObject, context: ConnectorExecutionContext
-) -> JSONObject:
-    """Read one page of a Notion page's block content."""
-    params = {
-        "page_size": str(
-            require_int_range(
-                arguments.get("max_blocks", 100),
-                "Notion",
-                "max_blocks",
-                maximum=100,
-            )
-        )
-    }
-    if cursor := optional_string(arguments.get("cursor"), "Notion", "cursor"):
-        params["start_cursor"] = cursor
+def get_page(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """Get one Notion page and its first-level child blocks."""
     page_id = require_string(arguments.get("page_id"), "Notion", "page_id")
-    return _call_notion_api(
-        "GET", f"/blocks/{page_id}/children", context.credentials, params=params
+    page = _call_notion_api("GET", f"/pages/{page_id}", context.credentials)
+    block_children = _call_notion_api(
+        "GET", f"/blocks/{page_id}/children", context.credentials, params={}
     )
+    return {"page": page, "block_children": block_children}
 
 
 EXECUTORS: dict[str, ConnectorExecutor] = {
     "search": search,
-    "get_page_content": get_page_content,
+    "get_page": get_page,
 }
+
+
+def _optional_object(value: object, name: str) -> JSONObject | None:
+    """Validate an optional Notion object argument."""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError(f"Notion {name} must be an object.")
+    return value
 
 
 def _call_notion_api(

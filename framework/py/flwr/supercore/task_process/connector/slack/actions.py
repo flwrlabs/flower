@@ -14,36 +14,69 @@
 # ==============================================================================
 """Slack action definitions."""
 
+from flwr.supercore.typing import JSONObject
+
 from ..definition import ActionAccess, ActionDefinition
 from ..tool_schema import integer_property, string_property
 
 SLACK_CONVERSATION_TYPES = ("public_channel", "private_channel", "mpim", "im")
-_CURSOR = string_property(
-    "Opaque cursor returned in response_metadata.next_cursor by the previous Slack "
-    "response for the same action and filters. Omit for the first request."
-)
-_SEARCH_CURSOR = string_property(
-    "Use '*' for the first cursor-paginated search. For subsequent requests, use "
-    "the opaque response_metadata.next_cursor from the previous response with the "
-    "same query."
-)
+_CURSOR: JSONObject = {
+    "type": "string",
+    "description": "The Slack pagination cursor.",
+}
 _MESSAGE_LIMIT = integer_property(
-    "Maximum number of messages to return.", minimum=1, maximum=15
+    "The maximum number of messages to return.", minimum=1, maximum=100
 )
 
 ACTIONS = (
     ActionDefinition(
         name="search_messages",
-        description="Search messages visible to the connected Slack user.",
+        description=(
+            "Search Slack messages visible to the connected user. Supports Slack "
+            "search modifiers such as in:channel_name and from:<@UserID>."
+        ),
         access=ActionAccess.READ,
         input_schema={
             "type": "object",
             "properties": {
-                "query": string_property("Slack message search query."),
-                "limit": integer_property(
-                    "Maximum number of matches to return.", minimum=1, maximum=15
+                "query": string_property("The Slack search query."),
+                "count": integer_property(
+                    "The number of results to return per page.",
+                    minimum=1,
+                    maximum=100,
                 ),
-                "cursor": _SEARCH_CURSOR,
+                "page": integer_property(
+                    "The Slack page number to fetch.", minimum=1, maximum=100
+                ),
+                "cursor": {
+                    "type": "string",
+                    "description": (
+                        "The Slack cursor for cursormark pagination. Use '*' for the "
+                        "first request."
+                    ),
+                },
+                "highlight": {
+                    "type": "boolean",
+                    "description": (
+                        "Whether Slack should mark query terms in matching text."
+                    ),
+                },
+                "sort": {
+                    "type": "string",
+                    "enum": ["score", "timestamp"],
+                    "description": "How Slack should sort search results.",
+                },
+                "sort_dir": {
+                    "type": "string",
+                    "enum": ["asc", "desc"],
+                    "description": "The sort direction for Slack search results.",
+                },
+                "team_id": {
+                    "type": "string",
+                    "description": (
+                        "The encoded team ID to search when using an org-level token."
+                    ),
+                },
             },
             "required": ["query"],
             "additionalProperties": False,
@@ -59,7 +92,7 @@ ACTIONS = (
                 "limit": integer_property(
                     "Maximum number of conversations to return.",
                     minimum=1,
-                    maximum=50,
+                    maximum=200,
                 ),
                 "cursor": _CURSOR,
                 "types": {
@@ -80,35 +113,30 @@ ACTIONS = (
         },
     ),
     ActionDefinition(
-        name="get_conversation_history",
-        description="Read recent messages from one Slack conversation.",
+        name="get_channel_messages",
+        description="Get recent messages from a Slack conversation.",
         access=ActionAccess.READ,
         input_schema={
             "type": "object",
             "properties": {
-                "conversation_id": string_property("Slack conversation ID."),
+                "channel_id": string_property("The Slack conversation or channel ID."),
                 "limit": _MESSAGE_LIMIT,
-                "cursor": _CURSOR,
             },
-            "required": ["conversation_id"],
+            "required": ["channel_id"],
             "additionalProperties": False,
         },
     ),
     ActionDefinition(
-        name="get_thread_replies",
-        description="Read a Slack thread's parent message and replies.",
+        name="get_thread",
+        description="Get messages in a Slack thread.",
         access=ActionAccess.READ,
         input_schema={
             "type": "object",
             "properties": {
-                "conversation_id": string_property("Slack conversation ID."),
-                "thread_ts": string_property(
-                    "Timestamp of the thread's parent message."
-                ),
-                "limit": _MESSAGE_LIMIT,
-                "cursor": _CURSOR,
+                "channel_id": string_property("The Slack conversation or channel ID."),
+                "thread_ts": string_property("The timestamp of the parent message."),
             },
-            "required": ["conversation_id", "thread_ts"],
+            "required": ["channel_id", "thread_ts"],
             "additionalProperties": False,
         },
     ),

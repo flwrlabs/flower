@@ -33,10 +33,20 @@ _OAUTH_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
 def test_slack_actions_are_registered_and_executable() -> None:
     """Slack read actions should be registered and executable."""
     assert len(ACTIONS) == 4
+    assert [action.name for action in ACTIONS] == [
+        "search_messages",
+        "list_conversations",
+        "get_channel_messages",
+        "get_thread",
+    ]
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     assert len(registry.get_connector_tools(SLACK_CONNECTOR_REF)) == len(ACTIONS)
     response = Mock(status_code=200)
-    response.json.return_value = {"ok": True, "messages": {"matches": []}}
+    response.json.return_value = {
+        "ok": True,
+        "query": "release",
+        "messages": {"matches": [], "total": 0},
+    }
     with patch(_HTTP_REQUEST, return_value=response) as request:
         result = registry.invoke_connector(
             "slack_search_messages",
@@ -45,13 +55,58 @@ def test_slack_actions_are_registered_and_executable() -> None:
             {"access_token": "xoxp-secret"},
             {},
         )
-    assert result == response.json.return_value
+    assert result == {
+        "query": "release",
+        "matches": [],
+        "total": 0,
+        "pagination": {},
+        "paging": {},
+        "next_cursor": None,
+    }
     assert request.call_args.args == ("GET", "https://slack.com/api/search.messages")
     assert request.call_args.kwargs["params"] == {
         "query": "release",
-        "count": "5",
         "cursor": "*",
     }
+
+
+def test_slack_conversation_actions_match_open_connector_contract() -> None:
+    """Slack conversation reads should use Open Connector names and shapes."""
+    history = _slack_response(
+        {"ok": True, "messages": [{"ts": "1.0", "user": "U1", "text": "Hi"}]}
+    )
+    with patch(_HTTP_REQUEST, return_value=history) as request:
+        result = registry.invoke_connector(
+            "slack_get_channel_messages",
+            {"channel_id": "C1", "limit": 20},
+            Mock(),
+            {"access_token": "xoxp-secret"},
+            {},
+        )
+    assert result == {
+        "messages": [{"ts": "1.0", "user_id": "U1", "text": "Hi"}],
+        "has_more": False,
+    }
+    assert request.call_args.kwargs["params"] == {"channel": "C1", "limit": "20"}
+
+    thread = _slack_response({"ok": True, "messages": [], "has_more": True})
+    with patch(_HTTP_REQUEST, return_value=thread) as request:
+        result = registry.invoke_connector(
+            "slack_get_thread",
+            {"channel_id": "C1", "thread_ts": "1.0"},
+            Mock(),
+            {"access_token": "xoxp-secret"},
+            {},
+        )
+    assert result == {"messages": [], "has_more": True}
+    assert request.call_args.kwargs["params"] == {"channel": "C1", "ts": "1.0"}
+
+
+def _slack_response(payload: object) -> Mock:
+    """Return a minimal Slack HTTP response."""
+    response = Mock(status_code=200)
+    response.json.return_value = payload
+    return response
 
 
 def test_slack_http_errors_include_code_and_message() -> None:

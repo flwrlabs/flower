@@ -15,8 +15,6 @@
 """GitHub action executors."""
 
 import base64
-import binascii
-import re
 from urllib.parse import quote
 
 import requests
@@ -25,15 +23,12 @@ from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
 from ..http import ConnectorApiError, request_json_object
-from ..json_utils import optional_string, require_int_range, require_string
+from ..json_utils import optional_string, require_string
 
 _API_BASE_URL = "https://api.github.com"
 _API_VERSION = "2026-03-10"
 _JSON_ACCEPT = "application/vnd.github+json"
 _TEXT_MATCH_ACCEPT = "application/vnd.github.text-match+json"
-_OWNER = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
-_REPOSITORY = re.compile(r"^[A-Za-z0-9._-]{1,100}$")
-_REPOSITORY_QUALIFIER = re.compile(r"(?:^|\s)repo:", re.IGNORECASE)
 
 
 class GitHubApiError(ConnectorApiError):
@@ -45,29 +40,36 @@ class GitHubApiError(ConnectorApiError):
 def search_code(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
-    """Search code in one public GitHub repository."""
-    owner, repo = _repository_ref(arguments.get("owner"), arguments.get("repo"))
+    """Search GitHub code with GitHub search syntax."""
     query = require_string(arguments.get("query"), "GitHub", "query")
-    if _REPOSITORY_QUALIFIER.search(query) is not None:
-        raise ValueError("GitHub query must not contain a repo qualifier.")
-    limit = require_int_range(arguments.get("limit", 5), "GitHub", "limit", maximum=10)
-    params = {"q": f"{query} repo:{owner}/{repo}", "per_page": str(limit)}
-    if "page" in arguments:
-        params["page"] = str(
-            require_int_range(arguments["page"], "GitHub", "page", maximum=100)
-        )
-    return _call_api(
+    params = {"q": query}
+    for name in ("sort", "order"):
+        if string_value := optional_string(arguments.get(name), "GitHub", name):
+            params[name] = string_value
+    for name in ("per_page", "page"):
+        if name in arguments:
+            integer_value = arguments[name]
+            if isinstance(integer_value, bool) or not isinstance(integer_value, int):
+                raise ValueError(f"GitHub {name} must be an integer.")
+            params[name] = str(integer_value)
+    payload = _call_api(
         "/search/code",
         context.credentials,
         params=params,
         accept=_TEXT_MATCH_ACCEPT,
     )
+    items = payload.get("items")
+    return {
+        "total_count": _number(payload.get("total_count")),
+        "incomplete_results": bool(payload.get("incomplete_results")),
+        "items": items if isinstance(items, list) else [],
+    }
 
 
-def get_file_content(
+def get_file_contents(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
-    """Read one UTF-8 text file from a public GitHub repository."""
+    """Read one repository file as base64 and decoded text."""
     owner, repo = _repository_ref(arguments.get("owner"), arguments.get("repo"))
     path = _repository_path(arguments.get("path"))
     ref = optional_string(arguments.get("ref"), "GitHub", "ref")
@@ -77,26 +79,20 @@ def get_file_content(
         context.credentials,
         params={"ref": ref} if ref else {},
     )
-    if payload.get("type") != "file" or payload.get("encoding") != "base64":
+    if payload.get("type") != "file":
         raise GitHubApiError("unsupported_content")
     encoded = payload.get("content")
-    if not isinstance(encoded, str) or not encoded:
-        raise GitHubApiError("unsupported_content")
-    try:
-        content = base64.b64decode(encoded.replace("\n", ""), validate=True).decode(
-            "utf-8"
-        )
-    except UnicodeDecodeError:
-        raise GitHubApiError("unsupported_content") from None
-    except (ValueError, binascii.Error):
-        raise GitHubApiError("invalid_response") from None
-    payload["content"] = content
+    content_base64 = encoded.replace("\n", "") if isinstance(encoded, str) else ""
+    payload["content_base64"] = content_base64
+    payload["decoded_content"] = _decode_content(
+        content_base64, payload.get("encoding")
+    )
     return payload
 
 
 EXECUTORS: dict[str, ConnectorExecutor] = {
     "search_code": search_code,
-    "get_file_content": get_file_content,
+    "get_file_contents": get_file_contents,
 }
 
 
@@ -145,16 +141,29 @@ def _repository_ref(owner: object, repo: object) -> tuple[str, str]:
     """Validate a public repository reference."""
     owner = require_string(owner, "GitHub", "owner")
     repo = require_string(repo, "GitHub", "repo")
-    if _OWNER.fullmatch(owner) is None or _REPOSITORY.fullmatch(repo) is None:
-        raise ValueError("GitHub repository is invalid.")
-    if repo in {".", ".."}:
-        raise ValueError("GitHub repository is invalid.")
     return owner, repo
+
+
+def _number(value: object) -> int | float:
+    """Return a JSON number or zero."""
+    return (
+        value if isinstance(value, (int, float)) and not isinstance(value, bool) else 0
+    )
+
+
+def _decode_content(content_base64: str, encoding: object) -> str | None:
+    """Decode GitHub's file content when it is valid UTF-8 Base64."""
+    if not content_base64:
+        return ""
+    if isinstance(encoding, str) and encoding != "base64":
+        return None
+    try:
+        return base64.b64decode(content_base64).decode("utf-8")
+    except (UnicodeDecodeError, ValueError):
+        return None
 
 
 def _repository_path(value: object) -> str:
     """Validate a repository-relative file path."""
-    path = require_string(value, "GitHub", "path").lstrip("/")
-    if not path or any(part in {"", ".", ".."} for part in path.split("/")):
-        raise ValueError("GitHub path must point to a file.")
-    return path
+    path = require_string(value, "GitHub", "path").strip("/")
+    return "/".join(part for part in path.split("/") if part)

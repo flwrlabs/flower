@@ -36,7 +36,7 @@ def _response(payload: object, status_code: int = 200) -> Mock:
     return response
 
 
-def test_get_file_content_decodes_utf8() -> None:
+def test_get_file_contents_returns_base64_and_decoded_text() -> None:
     """File reads should decode GitHub's Base64 content."""
     response = _response(
         {
@@ -48,14 +48,15 @@ def test_get_file_content_decodes_utf8() -> None:
     )
     with patch(_HTTP_REQUEST, return_value=response):
         result = registry.invoke_connector(
-            "github_get_file_content",
+            "github_get_file_contents",
             {"owner": "acme", "repo": "repo", "path": "src/app.py"},
             Mock(),
             {"access_token": "secret"},
             {},
         )
     assert isinstance(result, dict)
-    assert result["content"] == 'print("hi")\n'
+    assert result["content_base64"] == response.json.return_value["content"]
+    assert result["decoded_content"] == 'print("hi")\n'
 
 
 def test_github_search_forwards_page() -> None:
@@ -65,19 +66,25 @@ def test_github_search_forwards_page() -> None:
         result = registry.invoke_connector(
             "github_search_code",
             {
-                "owner": "acme",
-                "repo": "repo",
-                "query": "Flower",
-                "limit": 5,
+                "query": "Flower repo:acme/repo",
+                "sort": "indexed",
+                "order": "desc",
+                "per_page": 5,
                 "page": 2,
             },
             Mock(),
             {"access_token": "secret"},
             {},
         )
-    assert result == response.json.return_value
+    assert result == {
+        "total_count": 12,
+        "incomplete_results": False,
+        "items": [],
+    }
     assert request.call_args.kwargs["params"] == {
         "q": "Flower repo:acme/repo",
+        "sort": "indexed",
+        "order": "desc",
         "per_page": "5",
         "page": "2",
     }
@@ -92,7 +99,7 @@ def test_github_api_errors_include_message() -> None:
     ):
         registry.invoke_connector(
             "github_search_code",
-            {"owner": "acme", "repo": "repo", "query": "Flower"},
+            {"query": "Flower repo:acme/repo"},
             Mock(),
             {"access_token": "secret"},
             {},
