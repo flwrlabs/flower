@@ -16,6 +16,8 @@
 
 from typing import cast
 
+import requests
+
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
@@ -126,9 +128,7 @@ def _call_slack_api(
         error=SlackApiError,
         headers={"Authorization": f"Bearer {token}"},
         params={key: value for key, value in params.items() if value is not None},
-        http_error_code=lambda response: (
-            "rate_limited" if response.status_code == 429 else "http_error"
-        ),
+        http_error_details=_response_error_details,
     )
     if payload.get("ok") is not True:
         error = payload.get("error")
@@ -141,6 +141,23 @@ def _call_slack_api(
         )
         raise SlackApiError(code)
     return payload
+
+
+def _response_error_details(response: requests.Response) -> tuple[str, str | None]:
+    """Return Slack's documented error code and message."""
+    fallback_code = "rate_limited" if response.status_code == 429 else "http_error"
+    try:
+        payload = response.json()
+    except ValueError:
+        return fallback_code, None
+    if not isinstance(payload, dict):
+        return fallback_code, None
+    code = payload.get("error")
+    message = payload.get("message")
+    return (
+        code if isinstance(code, str) and code else fallback_code,
+        message if isinstance(message, str) and message else None,
+    )
 
 
 def _conversation_params(arguments: JSONObject) -> dict[str, str | None]:

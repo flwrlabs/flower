@@ -24,6 +24,7 @@ from ..definition import ActionAccess
 from ..oauth import OAuthFlow
 from .actions import ACTIONS
 from .definition import PROVIDER, SLACK_CONNECTOR_REF, SLACK_USER_SCOPES
+from .executors import SlackApiError
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
 _OAUTH_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
@@ -46,6 +47,30 @@ def test_slack_actions_are_registered_and_executable() -> None:
         )
     assert result == response.json.return_value
     assert request.call_args.args == ("GET", "https://slack.com/api/search.messages")
+
+
+def test_slack_http_errors_include_code_and_message() -> None:
+    """Slack's documented error fields should remain readable to callers."""
+    response = Mock(status_code=400)
+    response.json.return_value = {
+        "ok": False,
+        "error": "invalid_arguments",
+        "message": "Invalid cursor",
+    }
+    with (
+        patch(_HTTP_REQUEST, return_value=response),
+        pytest.raises(SlackApiError) as error,
+    ):
+        registry.invoke_connector(
+            "slack_search_messages",
+            {"query": "release"},
+            Mock(),
+            {"access_token": "xoxp-secret"},
+            {},
+        )
+    assert str(error.value) == (
+        "Slack API request failed: invalid_arguments (400): Invalid cursor."
+    )
 
 
 def test_slack_oauth_flow() -> None:

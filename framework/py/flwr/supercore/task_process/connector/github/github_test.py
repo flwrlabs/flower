@@ -23,6 +23,7 @@ import pytest
 from .. import registry
 from ..oauth import OAuthFlow
 from .definition import PROVIDER
+from .executors import GitHubApiError
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
 _TOKEN_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
@@ -55,6 +56,25 @@ def test_get_file_content_decodes_utf8() -> None:
         )
     assert isinstance(result, dict)
     assert result["content"] == 'print("hi")\n'
+
+
+def test_github_api_errors_include_message() -> None:
+    """GitHub's documented error message should remain readable to callers."""
+    response = _response({"message": "Validation Failed"}, status_code=422)
+    with (
+        patch(_HTTP_REQUEST, return_value=response),
+        pytest.raises(GitHubApiError) as error,
+    ):
+        registry.invoke_connector(
+            "github_search_code",
+            {"owner": "acme", "repo": "repo", "query": "Flower"},
+            Mock(),
+            {"access_token": "secret"},
+            {},
+        )
+    assert str(error.value) == (
+        "GitHub API request failed: http_error (422): Validation Failed."
+    )
 
 
 def test_github_oauth_requests_no_scope() -> None:
