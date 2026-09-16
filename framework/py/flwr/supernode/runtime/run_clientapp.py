@@ -21,7 +21,7 @@ import httpx
 
 from flwr.app import Context, Message
 from flwr.app.error import Error
-from flwr.app.message import make_message, remove_content_from_message
+from flwr.app.message import remove_content_from_message
 from flwr.cli.install import install_from_fab
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
@@ -209,9 +209,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
         # Create error message
         if message:
-            reply_message = make_message(
-                error=Error(code=e_code, reason=reason), reply_to=message
-            )
+            reply_message = Message(Error(code=e_code, reason=reason), reply_to=message)
 
         # Set exit code
         exit_code = ExitCode.TASK_PROC_EXCEPTION

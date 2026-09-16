@@ -447,22 +447,12 @@ class Message(InflatableObject):
 
 
 def make_message(
-    metadata: Metadata | None = None,
+    metadata: Metadata,
     content: RecordDict | None = None,
     error: Error | None = None,
-    *,
-    reply_to: Message | None = None,
 ) -> Message:
-    """Create a message from explicit metadata or as a reply."""
-    return cast(
-        Message,
-        Message(  # type: ignore[call-overload]
-            metadata=metadata,
-            content=content,
-            error=error,
-            reply_to=reply_to,
-        ),
-    )
+    """Create a message with the provided metadata, content, and error."""
+    return Message(metadata=metadata, content=content, error=error)  # type: ignore
 
 
 def remove_content_from_message(message: Message) -> Message:

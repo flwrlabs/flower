@@ -18,9 +18,9 @@
 import unittest
 from collections.abc import Callable
 from itertools import product
+from unittest.mock import patch
 
-from flwr.app import ConfigRecord, Context, Message, Metadata, RecordDict
-from flwr.app.message import make_message
+from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.app.message_type import MessageType
 from flwr.app.typing import ConfigRecordValues
 from flwr.client.mod import make_ffn
@@ -30,7 +30,7 @@ from flwr.common.secure_aggregation.secaggplus_constants import (
     Key,
     Stage,
 )
-from flwr.supercore.date import now
+from flwr.supercore.task_identity import TaskIdentity
 
 from .secaggplus_mod import SecAggPlusState, check_configs, secaggplus_mod
 
@@ -46,19 +46,10 @@ def get_test_handler(
     app = make_ffn(empty_ffn, [secaggplus_mod])
 
     def func(configs: dict[str, ConfigRecordValues]) -> ConfigRecord:
-        in_msg = make_message(
-            content=RecordDict({RECORD_KEY_CONFIGS: ConfigRecord(configs)}),
-            metadata=Metadata(
-                run_id=234,
-                message_id="message-id",
-                src_node_id=0,
-                dst_node_id=123,
-                reply_to_message_id="",
-                group_id="",
-                created_at=now().timestamp(),
-                ttl=10.0,
-                message_type=MessageType.TRAIN,
-            ),
+        in_msg = Message(
+            RecordDict({RECORD_KEY_CONFIGS: ConfigRecord(configs)}),
+            dst_node_id=123,
+            message_type=MessageType.TRAIN,
         )
         out_msg = app(in_msg, ctxt)
         return out_msg.content.config_records[RECORD_KEY_CONFIGS]
@@ -91,6 +82,14 @@ def _make_set_state_fn(
 
 class TestSecAggPlusHandler(unittest.TestCase):
     """Test the SecAgg+ protocol handler."""
+
+    def setUp(self) -> None:
+        """Set the task identity used by instruction message tests."""
+        identity_patcher = patch.multiple(
+            TaskIdentity, _task_id=123, _run_id=234, _node_id=0
+        )
+        identity_patcher.start()
+        self.addCleanup(identity_patcher.stop)
 
     def test_stage_transition(self) -> None:
         """Test stage transition."""

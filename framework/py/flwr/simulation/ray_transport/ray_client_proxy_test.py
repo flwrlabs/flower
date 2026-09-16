@@ -17,15 +17,15 @@
 
 from math import pi
 from random import shuffle
+from unittest.mock import patch
 
 import ray
 
-from flwr.app import DEFAULT_TTL, ConfigRecord, Context, Metadata, RecordDict
-from flwr.app.message import make_message
+from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.client import Client, NumPyClient
 from flwr.clientapp import ClientApp
 from flwr.common import Config, MessageTypeLegacy, Scalar
-from flwr.common.constant import NUM_PARTITIONS_KEY, PARTITION_ID_KEY, SUPERLINK_NODE_ID
+from flwr.common.constant import NUM_PARTITIONS_KEY, PARTITION_ID_KEY
 from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
 from flwr.compat.common.recorddict_compat import (
     getpropertiesins_to_recorddict,
@@ -42,7 +42,7 @@ from flwr.simulation.ray_transport.ray_actor import (
     VirtualClientEngineActorPool,
 )
 from flwr.simulation.ray_transport.ray_client_proxy import RayActorClientProxy
-from flwr.supercore.date import now
+from flwr.supercore.task_identity import TaskIdentity
 
 
 class DummyClient(NumPyClient):
@@ -207,29 +207,24 @@ def test_cid_consistency_without_proxies() -> None:
     # submit all jobs (collect later)
     shuffle(node_ids)
     run_id = 0
-    for node_id in node_ids:
-        message = make_message(
-            content=recorddict,
-            metadata=Metadata(
-                run_id=run_id,
-                message_id="",
-                src_node_id=SUPERLINK_NODE_ID,
+    with patch.multiple(TaskIdentity, _task_id=123, _run_id=run_id, _node_id=0):
+        for node_id in node_ids:
+            message = Message(
+                content=recorddict,
                 dst_node_id=node_id,
-                reply_to_message_id="",
-                group_id=str(0),
-                created_at=now().timestamp(),
-                ttl=DEFAULT_TTL,
                 message_type=MessageTypeLegacy.GET_PROPERTIES,
-            ),
-        )
-        # register and retrieve context
-        node_info_stores[node_id].register_context(run_id=run_id)
-        context = node_info_stores[node_id].retrieve_context(run_id=run_id)
-        partition_id_str = str(context.node_config[PARTITION_ID_KEY])
-        pool.submit_client_job(
-            lambda a, c_fn, j_fn, nid_, state: a.run.remote(c_fn, j_fn, nid_, state),
-            (_load_app, message, partition_id_str, context),
-        )
+                group_id=str(0),
+            )
+            # register and retrieve context
+            node_info_stores[node_id].register_context(run_id=run_id)
+            context = node_info_stores[node_id].retrieve_context(run_id=run_id)
+            partition_id_str = str(context.node_config[PARTITION_ID_KEY])
+            pool.submit_client_job(
+                lambda a, c_fn, j_fn, nid_, state: a.run.remote(
+                    c_fn, j_fn, nid_, state
+                ),
+                (_load_app, message, partition_id_str, context),
+            )
 
     # fetch results one at a time
     shuffle(node_ids)
