@@ -52,6 +52,8 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.supercore import log
+from flwr.supercore.error import FlowerError
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.fab import Fab
 from flwr.supercore.grpc import (
     GRPC_MAX_MESSAGE_LENGTH,
@@ -71,6 +73,21 @@ from flwr.supercore.run import Run
 
 from .grpc_adapter import GrpcAdapter
 from .node_auth_client_interceptor import NodeAuthClientInterceptor
+
+
+def _format_connection_error(err: Exception) -> str:
+    """Format a connection initialization error for the SuperNode CLI."""
+    error_message = str(err)
+    if isinstance(err, grpc.RpcError):
+        rpc_details = err.details() if hasattr(err, "details") else None
+        if flower_error := FlowerError.from_json(rpc_details):
+            error_message = f"[code: {flower_error.code}] {flower_error.message}"
+            if flower_error.public_details:
+                error_message += f"\n{flower_error.public_details}"
+        elif rpc_details:
+            error_message = rpc_details
+
+    return "Failed to initialize the connection to the SuperLink.\n" + error_message
 
 
 @contextmanager
@@ -365,10 +382,12 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         )
         fn(object_id)
 
+    connection_initialized = False
     try:
         if self_registered:
             register_node()
         node_id = activate_node()
+        connection_initialized = True
         # Yield methods
         yield (
             node_id,
@@ -381,6 +400,11 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
             confirm_message_received,
         )
     except Exception as exc:  # pylint: disable=broad-except
+        if not connection_initialized:
+            flwr_exit(
+                ExitCode.SUPERNODE_CONNECTION_ERROR,
+                _format_connection_error(exc),
+            )
         log(ERROR, exc)
     # Cleanup
     finally:
