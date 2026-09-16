@@ -55,6 +55,7 @@ _KUBERNETES_CONFIG_FIELD_MAP = {
     "container-security-context": "container_security_context",
     "service-account-name": "service_account_name",
     "warm-executor-owner": "warm_executor_owner",
+    "log-warm-executor-output": "log_warm_executor_output",
 }
 
 
