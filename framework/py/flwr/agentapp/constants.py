@@ -12,21 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Public Flower AgentApp APIs."""
+"""AgentApp constants."""
 
-
-from .agent_app import AgentApp as AgentApp
-from .agent_app import LoadAgentAppError as LoadAgentAppError
-from .base import AgentConnectors as AgentConnectors
-from .base import AgentEvents as AgentEvents
-from .base import AgentGrid as AgentGrid
-from .base import AgentSession as AgentSession
-
-__all__ = [
-    "AgentApp",
-    "AgentConnectors",
-    "AgentEvents",
-    "AgentGrid",
-    "AgentSession",
-    "LoadAgentAppError",
-]
+AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY = "payload"
+AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY = "json"

@@ -17,16 +17,15 @@
 
 from flwr.supercore.constant import TaskType
 
-from .base_exec_plugin import BaseExecPlugin
+from .base_exec_plugin import AutoExecPlugin
 
 
-class ServerAppExecPlugin(BaseExecPlugin):
-    """Simple Flower SuperExec plugin for task processes.
+class ServerAppExecPlugin(AutoExecPlugin):
+    """Simple Flower SuperExec plugin for server task processes.
 
     The plugin always selects the first candidate task.
     """
 
-    suppress_output = True
     visible_output_task_types = frozenset({TaskType.CONNECTOR, TaskType.MODEL})
     supported_task_types = frozenset(
         {
