@@ -452,7 +452,8 @@ def _run_simulation(
         run = Run.create_empty(run_id=run_id)
         run.primary_task_id = task_id
         run.federation_id = NOOP_FEDERATION_ID
-        TaskIdentity.task_id = task_id
+        # Use a dummy task identity for this legacy Python API.
+        TaskIdentity.task_id = 1
         TaskIdentity.run_id = run_id
         TaskIdentity.node_id = SUPERLINK_NODE_ID
 
