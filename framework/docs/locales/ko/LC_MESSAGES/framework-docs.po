@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-11 00:10+0000\n"
+"POT-Creation-Date: 2026-09-16 00:09+0000\n"
 "PO-Revision-Date: 2026-05-23 06:53+0000\n"
 "Last-Translator: Seulki Yun <icstuckyi@gmail.com>\n"
 "Language: ko\n"
@@ -48,8 +48,8 @@ msgstr "문제 중심의 방법 가이드는 특정 목표를 달성하는 방�
 msgid "Changelog"
 msgstr ""
 
-#: ../../source/changelog/v1.36.0.md:2
-msgid "v1.36.0 (2026-09-01)"
+#: ../../source/changelog/v1.37.0.md:2
+msgid "v1.37.0 (2026-09-15)"
 msgstr ""
 
 #: ../../source/changelog/v1.0.0.md:11 ../../source/changelog/v1.1.0.md:4
@@ -70,10 +70,10 @@ msgstr ""
 #: ../../source/changelog/v1.31.0.md:4 ../../source/changelog/v1.32.0.md:4
 #: ../../source/changelog/v1.32.1.md:4 ../../source/changelog/v1.33.0.md:4
 #: ../../source/changelog/v1.34.0.md:4 ../../source/changelog/v1.35.0.md:4
-#: ../../source/changelog/v1.36.0.md:4 ../../source/changelog/v1.4.0.md:4
-#: ../../source/changelog/v1.5.0.md:4 ../../source/changelog/v1.6.0.md:4
-#: ../../source/changelog/v1.7.0.md:4 ../../source/changelog/v1.8.0.md:4
-#: ../../source/changelog/v1.9.0.md:4
+#: ../../source/changelog/v1.36.0.md:4 ../../source/changelog/v1.37.0.md:4
+#: ../../source/changelog/v1.4.0.md:4 ../../source/changelog/v1.5.0.md:4
+#: ../../source/changelog/v1.6.0.md:4 ../../source/changelog/v1.7.0.md:4
+#: ../../source/changelog/v1.8.0.md:4 ../../source/changelog/v1.9.0.md:4
 msgid "Thanks to our contributors"
 msgstr ""
 
@@ -94,19 +94,20 @@ msgstr ""
 #: ../../source/changelog/v1.31.0.md:6 ../../source/changelog/v1.32.0.md:6
 #: ../../source/changelog/v1.32.1.md:6 ../../source/changelog/v1.33.0.md:6
 #: ../../source/changelog/v1.34.0.md:6 ../../source/changelog/v1.35.0.md:6
-#: ../../source/changelog/v1.36.0.md:6 ../../source/changelog/v1.4.0.md:6
-#: ../../source/changelog/v1.5.0.md:6 ../../source/changelog/v1.6.0.md:6
-#: ../../source/changelog/v1.7.0.md:6 ../../source/changelog/v1.8.0.md:6
-#: ../../source/changelog/v1.9.0.md:6
+#: ../../source/changelog/v1.36.0.md:6 ../../source/changelog/v1.37.0.md:6
+#: ../../source/changelog/v1.4.0.md:6 ../../source/changelog/v1.5.0.md:6
+#: ../../source/changelog/v1.6.0.md:6 ../../source/changelog/v1.7.0.md:6
+#: ../../source/changelog/v1.8.0.md:6 ../../source/changelog/v1.9.0.md:6
 msgid ""
 "We would like to give our special thanks to all the contributors who made"
 " the new version of Flower possible (in `git shortlog` order):"
 msgstr ""
 
-#: ../../source/changelog/v1.36.0.md:8
+#: ../../source/changelog/v1.37.0.md:8
 msgid ""
-"`Charles Beauville`, `Daniel J. Beutel`, `Dimitris Stripelis`, `Heng "
-"Pan`, `Javier`, `Lorenzo Sani`, `Taner Topal`, `Yan Gao`, `jafermarq`"
+"`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata "
+"Nugraha`, `Dimitris Stripelis`, `Heng Pan`, `Javier`, `Julian Rußmeyer`, "
+"`Paul Thomas`, `Silvio Cretti`, `Taner Topal`, `Zhewen Tan`"
 msgstr ""
 
 #: ../../source/changelog/v0.13.0.md:4 ../../source/changelog/v0.14.0.md:4
@@ -130,11 +131,268 @@ msgstr ""
 #: ../../source/changelog/v1.31.0.md:10 ../../source/changelog/v1.32.0.md:10
 #: ../../source/changelog/v1.32.1.md:10 ../../source/changelog/v1.33.0.md:10
 #: ../../source/changelog/v1.34.0.md:10 ../../source/changelog/v1.35.0.md:10
-#: ../../source/changelog/v1.36.0.md:10 ../../source/changelog/v1.4.0.md:10
-#: ../../source/changelog/v1.5.0.md:10 ../../source/changelog/v1.6.0.md:10
-#: ../../source/changelog/v1.7.0.md:10 ../../source/changelog/v1.8.0.md:10
-#: ../../source/changelog/v1.9.0.md:10
+#: ../../source/changelog/v1.36.0.md:10 ../../source/changelog/v1.37.0.md:10
+#: ../../source/changelog/v1.4.0.md:10 ../../source/changelog/v1.5.0.md:10
+#: ../../source/changelog/v1.6.0.md:10 ../../source/changelog/v1.7.0.md:10
+#: ../../source/changelog/v1.8.0.md:10 ../../source/changelog/v1.9.0.md:10
 msgid "What's new?"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:12
+msgid ""
+"With this release, both RuntimeAPI and ControlAPI now use HTTP, making "
+"traffic easier to inspect, debug, and integrate with standard HTTP "
+"tooling. Logging is also richer, and the default log output has changed "
+"slightly to improve readability. To see all logs, enable [verbose "
+"logging](https://flower.ai/docs/framework/1.37/en/how-to-configure-"
+"logging.html) for SuperLink, SuperNode, or SuperExec. SuperLink no longer"
+" periodically logs which SuperNodes are connected; you can query this "
+"information at any time by running `flwr supernode ls`."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:14
+msgid ""
+"**Flower CLI switches to HTTP** "
+"([#8028](https://github.com/flwrlabs/flower/pull/8028), "
+"[#8045](https://github.com/flwrlabs/flower/pull/8045), "
+"[#8046](https://github.com/flwrlabs/flower/pull/8046), "
+"[#8047](https://github.com/flwrlabs/flower/pull/8047), "
+"[#8055](https://github.com/flwrlabs/flower/pull/8055), "
+"[#8057](https://github.com/flwrlabs/flower/pull/8057), "
+"[#8070](https://github.com/flwrlabs/flower/pull/8070), "
+"[#8072](https://github.com/flwrlabs/flower/pull/8072), "
+"[#8073](https://github.com/flwrlabs/flower/pull/8073), "
+"[#8076](https://github.com/flwrlabs/flower/pull/8076), "
+"[#8077](https://github.com/flwrlabs/flower/pull/8077), "
+"[#8084](https://github.com/flwrlabs/flower/pull/8084), "
+"[#8085](https://github.com/flwrlabs/flower/pull/8085), "
+"[#8087](https://github.com/flwrlabs/flower/pull/8087), "
+"[#8089](https://github.com/flwrlabs/flower/pull/8089), "
+"[#8093](https://github.com/flwrlabs/flower/pull/8093), "
+"[#8099](https://github.com/flwrlabs/flower/pull/8099))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:16
+msgid ""
+"The Flower CLI now sends Control API requests over HTTP. The gRPC Control"
+" API is disabled by default, and `--control-api-address` is deprecated in"
+" favor of `--host` and `--port`. SuperGrid configuration and deployment "
+"guides now use `api.flower.ai`. If your [Flower "
+"Configuration](https://flower.ai/docs/framework/1.37/en/ref-flower-"
+"configuration.html) file defines a custom `SuperLink` connection, you "
+"must update it for the switch from gRPC to HTTP; in most cases, only the "
+"port needs to change."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:18
+msgid ""
+"**Improve AgentApp conversations with history, connectors, titles, and "
+"local app loading** "
+"([#8048](https://github.com/flwrlabs/flower/pull/8048), "
+"[#8058](https://github.com/flwrlabs/flower/pull/8058), "
+"[#8060](https://github.com/flwrlabs/flower/pull/8060), "
+"[#8101](https://github.com/flwrlabs/flower/pull/8101), "
+"[#8102](https://github.com/flwrlabs/flower/pull/8102), "
+"[#8104](https://github.com/flwrlabs/flower/pull/8104), "
+"[#8105](https://github.com/flwrlabs/flower/pull/8105), "
+"[#8110](https://github.com/flwrlabs/flower/pull/8110), "
+"[#8123](https://github.com/flwrlabs/flower/pull/8123), "
+"[#8127](https://github.com/flwrlabs/flower/pull/8127), "
+"[#8128](https://github.com/flwrlabs/flower/pull/8128), "
+"[#8131](https://github.com/flwrlabs/flower/pull/8131), "
+"[#8133](https://github.com/flwrlabs/flower/pull/8133), "
+"[#8148](https://github.com/flwrlabs/flower/pull/8148))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:20
+msgid ""
+"`flwr chat` can now load and interactively test local AgentApps with the "
+"`/load <path>` command. Users can name or rename conversation titles, and"
+" titles can also be generated automatically. Within an `AgentApp`, "
+"persisted conversation history is now accessible through "
+"`agent.events.get_trace()`, with user inputs and tool calls recorded as "
+"standard events. `flwr chat` can also use connected connectors: select "
+"them with `/connector`, view the current selection in the context bar, "
+"and clear it with `/connector clear`. Connector setup remains available "
+"through the Web UI."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:22
+msgid ""
+"**Configure Runtime API TLS with consistent options** "
+"([#8109](https://github.com/flwrlabs/flower/pull/8109), "
+"[#8113](https://github.com/flwrlabs/flower/pull/8113))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:24
+msgid ""
+"SuperNode now uses `--ssl-certfile`, `--ssl-keyfile`, and `--ssl-ca-"
+"certfile` for Runtime API TLS while retaining the former `--appio-ssl-*` "
+"options as deprecated aliases. SuperLink help now clarifies that the same"
+" `--ssl-*` options secure its Fleet, Control, and Runtime APIs."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:26
+msgid ""
+"**Deploy SuperNodes using Slurm** "
+"([#8074](https://github.com/flwrlabs/flower/pull/8074))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:28
+msgid ""
+"A new guide covers running SuperNodes as Slurm jobs with subprocess or "
+"process isolation, including separate SuperExec jobs, GPU allocation, and"
+" scheduler-selected nodes."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:30
+msgid ""
+"**Reject invalid `FedTrimmedAvg` trimming fractions** "
+"([#7946](https://github.com/flwrlabs/flower/pull/7946))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:32
+msgid ""
+"ServerApp and legacy `FedTrimmedAvg` strategies now require `beta` to be "
+"in `[0, 0.5)`, preventing invalid trimming from producing `NaN` model "
+"parameters."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:34
+msgid ""
+"**Run adaptive federated DDoS attack detection with FLAD** "
+"([#8083](https://github.com/flwrlabs/flower/pull/8083))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:36
+msgid ""
+"The new FLAD baseline implements the strategy and a subset of the "
+"convergence experiments from its paper on a highly non-IID dataset of "
+"heterogeneous DDoS attacks. FLAD dynamically assigns more computation to "
+"clients whose attack profiles are harder to learn without sharing test "
+"data."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:38
+msgid ""
+"**General improvements** "
+"([#8049](https://github.com/flwrlabs/flower/pull/8049), "
+"[#8056](https://github.com/flwrlabs/flower/pull/8056), "
+"[#8064](https://github.com/flwrlabs/flower/pull/8064), "
+"[#8066](https://github.com/flwrlabs/flower/pull/8066), "
+"[#8067](https://github.com/flwrlabs/flower/pull/8067), "
+"[#8068](https://github.com/flwrlabs/flower/pull/8068), "
+"[#8071](https://github.com/flwrlabs/flower/pull/8071), "
+"[#8075](https://github.com/flwrlabs/flower/pull/8075), "
+"[#8078](https://github.com/flwrlabs/flower/pull/8078), "
+"[#8080](https://github.com/flwrlabs/flower/pull/8080), "
+"[#8082](https://github.com/flwrlabs/flower/pull/8082), "
+"[#8088](https://github.com/flwrlabs/flower/pull/8088), "
+"[#8095](https://github.com/flwrlabs/flower/pull/8095), "
+"[#8096](https://github.com/flwrlabs/flower/pull/8096), "
+"[#8098](https://github.com/flwrlabs/flower/pull/8098), "
+"[#8103](https://github.com/flwrlabs/flower/pull/8103), "
+"[#8108](https://github.com/flwrlabs/flower/pull/8108), "
+"[#8112](https://github.com/flwrlabs/flower/pull/8112), "
+"[#8114](https://github.com/flwrlabs/flower/pull/8114), "
+"[#8115](https://github.com/flwrlabs/flower/pull/8115), "
+"[#8116](https://github.com/flwrlabs/flower/pull/8116), "
+"[#8118](https://github.com/flwrlabs/flower/pull/8118), "
+"[#8119](https://github.com/flwrlabs/flower/pull/8119), "
+"[#8120](https://github.com/flwrlabs/flower/pull/8120), "
+"[#8124](https://github.com/flwrlabs/flower/pull/8124), "
+"[#8125](https://github.com/flwrlabs/flower/pull/8125), "
+"[#8126](https://github.com/flwrlabs/flower/pull/8126), "
+"[#8129](https://github.com/flwrlabs/flower/pull/8129), "
+"[#8134](https://github.com/flwrlabs/flower/pull/8134), "
+"[#8135](https://github.com/flwrlabs/flower/pull/8135), "
+"[#8136](https://github.com/flwrlabs/flower/pull/8136), "
+"[#8137](https://github.com/flwrlabs/flower/pull/8137), "
+"[#8139](https://github.com/flwrlabs/flower/pull/8139), "
+"[#8140](https://github.com/flwrlabs/flower/pull/8140), "
+"[#8142](https://github.com/flwrlabs/flower/pull/8142), "
+"[#8144](https://github.com/flwrlabs/flower/pull/8144), "
+"[#8149](https://github.com/flwrlabs/flower/pull/8149))"
+msgstr ""
+
+#: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
+#: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
+#: ../../source/changelog/v1.13.1.md:32 ../../source/changelog/v1.14.0.md:63
+#: ../../source/changelog/v1.15.0.md:80 ../../source/changelog/v1.16.0.md:54
+#: ../../source/changelog/v1.17.0.md:85 ../../source/changelog/v1.18.0.md:50
+#: ../../source/changelog/v1.19.0.md:68 ../../source/changelog/v1.20.0.md:66
+#: ../../source/changelog/v1.21.0.md:56 ../../source/changelog/v1.22.0.md:40
+#: ../../source/changelog/v1.23.0.md:48 ../../source/changelog/v1.24.0.md:42
+#: ../../source/changelog/v1.25.0.md:36 ../../source/changelog/v1.26.0.md:44
+#: ../../source/changelog/v1.27.0.md:50 ../../source/changelog/v1.28.0.md:50
+#: ../../source/changelog/v1.29.0.md:46 ../../source/changelog/v1.30.0.md:34
+#: ../../source/changelog/v1.31.0.md:50 ../../source/changelog/v1.32.0.md:44
+#: ../../source/changelog/v1.33.0.md:50 ../../source/changelog/v1.34.0.md:54
+#: ../../source/changelog/v1.35.0.md:50 ../../source/changelog/v1.36.0.md:30
+#: ../../source/changelog/v1.37.0.md:40
+msgid ""
+"As always, many parts of the Flower framework and quality infrastructure "
+"were improved and updated."
+msgstr ""
+
+#: ../../source/changelog/v0.16.0.md:21 ../../source/changelog/v0.17.0.md:33
+#: ../../source/changelog/v0.18.0.md:62 ../../source/changelog/v0.19.0.md:58
+#: ../../source/changelog/v1.0.0.md:17 ../../source/changelog/v1.1.0.md:60
+#: ../../source/changelog/v1.10.0.md:90 ../../source/changelog/v1.11.0.md:78
+#: ../../source/changelog/v1.11.1.md:30 ../../source/changelog/v1.12.0.md:66
+#: ../../source/changelog/v1.13.0.md:77 ../../source/changelog/v1.14.0.md:65
+#: ../../source/changelog/v1.15.0.md:82 ../../source/changelog/v1.16.0.md:56
+#: ../../source/changelog/v1.18.0.md:52 ../../source/changelog/v1.2.0.md:67
+#: ../../source/changelog/v1.20.0.md:68 ../../source/changelog/v1.21.0.md:58
+#: ../../source/changelog/v1.23.0.md:50 ../../source/changelog/v1.24.0.md:44
+#: ../../source/changelog/v1.25.0.md:38 ../../source/changelog/v1.26.0.md:46
+#: ../../source/changelog/v1.27.0.md:52 ../../source/changelog/v1.28.0.md:52
+#: ../../source/changelog/v1.29.0.md:48 ../../source/changelog/v1.3.0.md:56
+#: ../../source/changelog/v1.30.0.md:36 ../../source/changelog/v1.31.0.md:52
+#: ../../source/changelog/v1.32.0.md:46 ../../source/changelog/v1.33.0.md:52
+#: ../../source/changelog/v1.34.0.md:56 ../../source/changelog/v1.35.0.md:52
+#: ../../source/changelog/v1.37.0.md:42 ../../source/changelog/v1.4.0.md:62
+#: ../../source/changelog/v1.5.0.md:82 ../../source/changelog/v1.6.0.md:90
+#: ../../source/changelog/v1.7.0.md:73 ../../source/changelog/v1.8.0.md:62
+#: ../../source/changelog/v1.9.0.md:88
+msgid "Incompatible changes"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:44
+msgid ""
+"**Remove deprecated SuperLink Exec API options** "
+"([#8100](https://github.com/flwrlabs/flower/pull/8100))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:46
+msgid ""
+"SuperLink no longer accepts `--exec-api-address`, `--executor`, "
+"`--executor-dir`, or `--executor-config`. Remove these long-deprecated "
+"options from SuperLink launch configurations."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:48
+msgid ""
+"**Update SuperLink TLS configuration** "
+"([#8106](https://github.com/flwrlabs/flower/pull/8106))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:50
+msgid ""
+"SuperLink now uses `--ssl-certfile`, `--ssl-keyfile`, and `--ssl-ca-"
+"certfile` to secure its Fleet, Control, and Runtime APIs with one "
+"certificate set. Replace any `--appio-ssl-*` options with these shared "
+"options; the removed flags now terminate startup."
+msgstr ""
+
+#: ../../source/changelog/v1.36.0.md:2
+msgid "v1.36.0 (2026-09-01)"
+msgstr ""
+
+#: ../../source/changelog/v1.36.0.md:8
+msgid ""
+"`Charles Beauville`, `Daniel J. Beutel`, `Dimitris Stripelis`, `Heng "
+"Pan`, `Javier`, `Lorenzo Sani`, `Taner Topal`, `Yan Gao`, `jafermarq`"
 msgstr ""
 
 #: ../../source/changelog/v1.36.0.md:12
@@ -233,25 +491,6 @@ msgid ""
 "[#8042](https://github.com/flwrlabs/flower/pull/8042), "
 "[#8043](https://github.com/flwrlabs/flower/pull/8043), "
 "[#8044](https://github.com/flwrlabs/flower/pull/8044))"
-msgstr ""
-
-#: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
-#: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
-#: ../../source/changelog/v1.13.1.md:32 ../../source/changelog/v1.14.0.md:63
-#: ../../source/changelog/v1.15.0.md:80 ../../source/changelog/v1.16.0.md:54
-#: ../../source/changelog/v1.17.0.md:85 ../../source/changelog/v1.18.0.md:50
-#: ../../source/changelog/v1.19.0.md:68 ../../source/changelog/v1.20.0.md:66
-#: ../../source/changelog/v1.21.0.md:56 ../../source/changelog/v1.22.0.md:40
-#: ../../source/changelog/v1.23.0.md:48 ../../source/changelog/v1.24.0.md:42
-#: ../../source/changelog/v1.25.0.md:36 ../../source/changelog/v1.26.0.md:44
-#: ../../source/changelog/v1.27.0.md:50 ../../source/changelog/v1.28.0.md:50
-#: ../../source/changelog/v1.29.0.md:46 ../../source/changelog/v1.30.0.md:34
-#: ../../source/changelog/v1.31.0.md:50 ../../source/changelog/v1.32.0.md:44
-#: ../../source/changelog/v1.33.0.md:50 ../../source/changelog/v1.34.0.md:54
-#: ../../source/changelog/v1.35.0.md:50 ../../source/changelog/v1.36.0.md:30
-msgid ""
-"As always, many parts of the Flower framework and quality infrastructure "
-"were improved and updated."
 msgstr ""
 
 #: ../../source/changelog/v1.35.0.md:2
@@ -436,28 +675,6 @@ msgid ""
 "[#7982](https://github.com/flwrlabs/flower/pull/7982), "
 "[#7989](https://github.com/flwrlabs/flower/pull/7989), "
 "[#7995](https://github.com/flwrlabs/flower/pull/7995))"
-msgstr ""
-
-#: ../../source/changelog/v0.16.0.md:21 ../../source/changelog/v0.17.0.md:33
-#: ../../source/changelog/v0.18.0.md:62 ../../source/changelog/v0.19.0.md:58
-#: ../../source/changelog/v1.0.0.md:17 ../../source/changelog/v1.1.0.md:60
-#: ../../source/changelog/v1.10.0.md:90 ../../source/changelog/v1.11.0.md:78
-#: ../../source/changelog/v1.11.1.md:30 ../../source/changelog/v1.12.0.md:66
-#: ../../source/changelog/v1.13.0.md:77 ../../source/changelog/v1.14.0.md:65
-#: ../../source/changelog/v1.15.0.md:82 ../../source/changelog/v1.16.0.md:56
-#: ../../source/changelog/v1.18.0.md:52 ../../source/changelog/v1.2.0.md:67
-#: ../../source/changelog/v1.20.0.md:68 ../../source/changelog/v1.21.0.md:58
-#: ../../source/changelog/v1.23.0.md:50 ../../source/changelog/v1.24.0.md:44
-#: ../../source/changelog/v1.25.0.md:38 ../../source/changelog/v1.26.0.md:46
-#: ../../source/changelog/v1.27.0.md:52 ../../source/changelog/v1.28.0.md:52
-#: ../../source/changelog/v1.29.0.md:48 ../../source/changelog/v1.3.0.md:56
-#: ../../source/changelog/v1.30.0.md:36 ../../source/changelog/v1.31.0.md:52
-#: ../../source/changelog/v1.32.0.md:46 ../../source/changelog/v1.33.0.md:52
-#: ../../source/changelog/v1.34.0.md:56 ../../source/changelog/v1.35.0.md:52
-#: ../../source/changelog/v1.4.0.md:62 ../../source/changelog/v1.5.0.md:82
-#: ../../source/changelog/v1.6.0.md:90 ../../source/changelog/v1.7.0.md:73
-#: ../../source/changelog/v1.8.0.md:62 ../../source/changelog/v1.9.0.md:88
-msgid "Incompatible changes"
 msgstr ""
 
 #: ../../source/changelog/v1.35.0.md:54
