@@ -17,11 +17,33 @@
 
 import datetime
 
+from sphinx.application import Sphinx
+
 project = "Flower Agent"
 copyright = f"{datetime.date.today().year} Flower Labs GmbH"
 author = "The Flower Authors"
 
-extensions = ["myst_parser"]
+release = "1.37.0"
+
+extensions = ["myst_parser", "sphinx_substitution_extensions"]
+
+rst_prolog = f"""
+.. |stable_flwr_version| replace:: {release}
+"""
+myst_enable_extensions = ["substitution"]
+myst_substitutions = {"stable_flwr_version": release}
+
+
+def _substitute_version_in_code(
+    _app: Sphinx, _docname: str, source: list[str]
+) -> None:
+    """Replace the version token in literal code before MyST parses it."""
+    source[0] = source[0].replace("|stable_flwr_version|", release)
+
+
+def setup(app: Sphinx) -> None:
+    """Register documentation build hooks."""
+    app.connect("source-read", _substitute_version_in_code)
 
 source_suffix = {
     ".md": "markdown",
