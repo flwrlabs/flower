@@ -67,7 +67,7 @@ uv run --no-sync --python=3.11.14 python -m mypy py
 uv run --no-sync --python=3.11.14 python -m ruff check py/flwr --no-respect-gitignore
 uv run --no-sync --python=3.11.14 python -m pylint --ignore=py/flwr/proto py/flwr
 
-# Targeted format checks (run after every Python edit; add --check-only to verify)
+# Targeted format checks (run after every Python edit; use --check-only for isort and --check for black)
 uv run --no-sync --python=3.11.14 python -m isort py/flwr/path/to_file.py
 uv run --no-sync --python=3.11.14 python -m black py/flwr/path/to_file.py
 ```
