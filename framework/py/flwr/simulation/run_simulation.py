@@ -32,7 +32,7 @@ from flwr.app import Context, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.cli.utils import get_sha256_hash
 from flwr.clientapp import ClientApp
-from flwr.common.constant import RUN_ID_NUM_BYTES, TASK_ID_NUM_BYTES
+from flwr.common.constant import RUN_ID_NUM_BYTES, SUPERLINK_NODE_ID, TASK_ID_NUM_BYTES
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.run_serverapp import run as _run
 from flwr.server.superlink.fleet import vce
@@ -454,7 +454,7 @@ def _run_simulation(
         run.federation_id = NOOP_FEDERATION_ID
         TaskIdentity.task_id = task_id
         TaskIdentity.run_id = run_id
-        TaskIdentity.node_id = 0
+        TaskIdentity.node_id = SUPERLINK_NODE_ID
 
     args = (
         num_supernodes,
