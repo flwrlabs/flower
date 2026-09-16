@@ -78,6 +78,7 @@ from flwr.superlink.servicer.control.control_handlers import (
     start_automation as start_control_automation,
 )
 
+
 def get_run_series_events(
     request: GetRunSeriesEventsRequest,
     state: LinkState,
