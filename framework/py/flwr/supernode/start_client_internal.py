@@ -399,7 +399,13 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
 
         # Create task
         task_id = state.create_task(
-            task_type=TaskType.CLIENT_APP, run_id=run_id, fab_hash=run_info.fab_hash
+            task_type=(
+                TaskType.AGENT_APP
+                if run_info.primary_task_type == TaskType.AGENT_APP
+                else TaskType.CLIENT_APP
+            ),
+            run_id=run_id,
+            fab_hash=run_info.fab_hash,
         )
         if task_id is None:
             # Task creation can fail if the generated uint64 task ID collides

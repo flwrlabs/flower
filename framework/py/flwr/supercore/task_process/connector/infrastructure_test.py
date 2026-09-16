@@ -20,10 +20,12 @@ from unittest.mock import Mock, patch
 import pytest
 import requests
 
+from flwr.supercore.typing import JSONObject
+
 from .http import ConnectorApiError, request_json_object
 from .json_utils import optional_string
 from .registry import CONNECTORS
-from .tool_schema import string_property
+from .tool_schema import function_tool, string_property
 
 
 class ExampleApiError(ConnectorApiError):
@@ -50,6 +52,17 @@ def test_connector_input_schemas_are_strict() -> None:
 def test_string_property_rejects_empty_values() -> None:
     """Connector string schemas should reject empty values."""
     assert string_property("Example.")["minLength"] == 1
+
+
+def test_function_tool_includes_output_schema() -> None:
+    """Function tools should include an output schema when provided."""
+    output_schema: JSONObject = {"type": "object"}
+    tool = function_tool(
+        "example", "Example.", properties={}, output_schema=output_schema
+    )
+
+    assert tool["output_schema"] is output_schema
+    assert "output_schema" not in function_tool("example", "Example.", properties={})
 
 
 @pytest.mark.parametrize("value", [None, "", "   "])

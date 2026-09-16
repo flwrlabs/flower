@@ -95,18 +95,21 @@ def _call_notion_api(
         },
         params=params,
         json=body,
-        http_error_code=_response_error_code,
+        http_error_details=_response_error_details,
     )
 
 
-def _response_error_code(response: requests.Response) -> str:
-    """Return a documented Notion error code without response details."""
-    if response.status_code == 429:
-        return "rate_limited"
+def _response_error_details(response: requests.Response) -> tuple[str, str | None]:
+    """Return Notion's documented error code and message."""
     try:
-        code = response.json().get("code")
-    except (AttributeError, ValueError):
-        return "http_error"
-    if isinstance(code, str) and code.replace("_", "").isalnum() and code.islower():
-        return code
-    return "http_error"
+        payload = response.json()
+    except ValueError:
+        return "http_error", None
+    if not isinstance(payload, dict):
+        return "http_error", None
+    code = payload.get("code")
+    message = payload.get("message")
+    return (
+        code if isinstance(code, str) and code else "http_error",
+        message if isinstance(message, str) and message else None,
+    )

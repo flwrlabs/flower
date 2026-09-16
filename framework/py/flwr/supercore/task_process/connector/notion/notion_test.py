@@ -67,10 +67,13 @@ def test_notion_tools_call_read_endpoints(
     assert request.call_args.kwargs["headers"]["Notion-Version"] == "2026-03-11"
 
 
-def test_notion_api_errors_are_secret_safe() -> None:
-    """Notion failures should expose stable codes without credentials."""
-    response = Mock(status_code=401)
-    response.json.return_value = {"code": "unauthorized", "message": "ntn-secret"}
+def test_notion_api_errors_include_code_and_message() -> None:
+    """Notion's documented error fields should remain readable to callers."""
+    response = Mock(status_code=400)
+    response.json.return_value = {
+        "code": "validation_error",
+        "message": "Invalid start_cursor value",
+    }
     with (
         patch(_HTTP_REQUEST, return_value=response),
         pytest.raises(NotionApiError) as error,
@@ -78,7 +81,11 @@ def test_notion_api_errors_are_secret_safe() -> None:
         registry.invoke_connector(
             "notion_search", {"query": "release"}, Mock(), _CREDENTIALS, {}
         )
-    assert error.value.code == "unauthorized"
+    assert error.value.code == "validation_error"
+    assert str(error.value) == (
+        "Notion API request failed: validation_error (400): "
+        "Invalid start_cursor value."
+    )
     assert "ntn-secret" not in str(error.value)
 
 
