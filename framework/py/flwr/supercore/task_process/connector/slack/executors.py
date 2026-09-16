@@ -63,47 +63,11 @@ def search_messages(
         params["highlight"] = str(
             require_bool(arguments["highlight"], "Slack", "highlight")
         ).lower()
-    payload = _call_slack_api(
+    return _call_slack_api(
         "search.messages",
         context.credentials,
         params,
     )
-    messages = payload.get("messages")
-    message_data = messages if isinstance(messages, dict) else {}
-    matches = message_data.get("matches")
-    metadata = payload.get("response_metadata")
-    return {
-        "query": (
-            payload.get("query")
-            if isinstance(payload.get("query"), str)
-            else params["query"]
-        ),
-        "matches": (
-            [
-                _normalize_search_match(match)
-                for match in matches
-                if isinstance(match, dict)
-            ]
-            if isinstance(matches, list)
-            else []
-        ),
-        "total": (
-            message_data.get("total")
-            if isinstance(message_data.get("total"), int)
-            else 0
-        ),
-        "pagination": (
-            message_data.get("pagination")
-            if isinstance(message_data.get("pagination"), dict)
-            else {}
-        ),
-        "paging": (
-            message_data.get("paging")
-            if isinstance(message_data.get("paging"), dict)
-            else {}
-        ),
-        "next_cursor": _next_cursor(metadata),
-    }
 
 
 def list_conversations(
@@ -135,24 +99,11 @@ def list_conversations(
         params["exclude_archived"] = str(
             require_bool(arguments["exclude_archived"], "Slack", "exclude_archived")
         ).lower()
-    payload = _call_slack_api(
+    return _call_slack_api(
         "conversations.list",
         context.credentials,
         params,
     )
-    channels = payload.get("channels")
-    return {
-        "conversations": (
-            [
-                _normalize_conversation(channel)
-                for channel in channels
-                if isinstance(channel, dict)
-            ]
-            if isinstance(channels, list)
-            else []
-        ),
-        "next_cursor": _next_cursor(payload.get("response_metadata")),
-    }
 
 
 def get_channel_messages(
@@ -166,17 +117,16 @@ def get_channel_messages(
         params["limit"] = str(
             require_int_range(arguments["limit"], "Slack", "limit", maximum=100)
         )
-    payload = _call_slack_api(
+    return _call_slack_api(
         "conversations.history",
         context.credentials,
         params,
     )
-    return _normalize_messages(payload)
 
 
 def get_thread(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
     """Get messages in a Slack thread."""
-    payload = _call_slack_api(
+    return _call_slack_api(
         "conversations.replies",
         context.credentials,
         {
@@ -186,7 +136,6 @@ def get_thread(arguments: JSONObject, context: ConnectorExecutionContext) -> JSO
             "ts": require_string(arguments.get("thread_ts"), "Slack", "thread_ts"),
         },
     )
-    return _normalize_messages(payload)
 
 
 EXECUTORS: dict[str, ConnectorExecutor] = {
@@ -240,118 +189,3 @@ def _response_error_details(response: requests.Response) -> tuple[str, str | Non
         code if isinstance(code, str) and code else fallback_code,
         message if isinstance(message, str) and message else None,
     )
-
-
-def _normalize_messages(payload: JSONObject) -> JSONObject:
-    """Normalize a Slack message-list response."""
-    messages = payload.get("messages")
-    return {
-        "messages": (
-            [
-                {
-                    "ts": _string(message.get("ts")),
-                    "user_id": _string(message.get("user")),
-                    "text": _string(message.get("text")),
-                }
-                for message in messages
-                if isinstance(message, dict)
-            ]
-            if isinstance(messages, list)
-            else []
-        ),
-        "has_more": payload.get("has_more") is True,
-    }
-
-
-def _normalize_search_match(match: JSONObject) -> JSONObject:
-    """Normalize one Slack message search match using snake_case fields."""
-    channel = match.get("channel")
-    channel_data = channel if isinstance(channel, dict) else {}
-    normalized: JSONObject = {
-        "channel_name": (
-            channel_data.get("name")
-            if isinstance(channel_data.get("name"), str)
-            else None
-        ),
-        "text": _string(match.get("text")),
-    }
-    for output_name, value in (
-        ("match_id", match.get("iid")),
-        ("channel_id", channel_data.get("id")),
-        ("ts", match.get("ts")),
-        ("user_id", match.get("user")),
-        ("username", match.get("username")),
-        ("permalink", match.get("permalink")),
-        ("team_id", match.get("team")),
-        ("type", match.get("type")),
-    ):
-        if isinstance(value, str):
-            normalized[output_name] = value
-    return normalized
-
-
-def _normalize_conversation(conversation: JSONObject) -> JSONObject:
-    """Normalize one Slack conversation using snake_case fields."""
-    topic = conversation.get("topic")
-    purpose = conversation.get("purpose")
-    normalized: JSONObject = {
-        "channel_id": _string(conversation.get("id")),
-        "name": (
-            conversation.get("name")
-            if isinstance(conversation.get("name"), str)
-            else None
-        ),
-        "type": _conversation_type(conversation),
-        "is_archived": _optional_bool(conversation.get("is_archived")),
-        "is_private": _optional_bool(conversation.get("is_private")),
-        "is_member": _optional_bool(conversation.get("is_member")),
-        "topic": (
-            topic.get("value")
-            if isinstance(topic, dict) and isinstance(topic.get("value"), str)
-            else None
-        ),
-        "purpose": (
-            purpose.get("value")
-            if isinstance(purpose, dict) and isinstance(purpose.get("value"), str)
-            else None
-        ),
-    }
-    for name, value in (
-        ("member_count", conversation.get("num_members")),
-        ("user_id", conversation.get("user")),
-        ("locale", conversation.get("locale")),
-    ):
-        if isinstance(value, (str, int)) and not isinstance(value, bool):
-            normalized[name] = value
-    return normalized
-
-
-def _conversation_type(conversation: JSONObject) -> str:
-    """Return Open Connector's normalized Slack conversation type."""
-    if conversation.get("is_im") is True:
-        return "im"
-    if conversation.get("is_mpim") is True:
-        return "mpim"
-    if conversation.get("is_private") is True or conversation.get("is_group") is True:
-        return "private_channel"
-    if conversation.get("is_channel") is True:
-        return "public_channel"
-    return "unknown"
-
-
-def _next_cursor(metadata: object) -> str | None:
-    """Read Slack's next cursor from response metadata."""
-    if not isinstance(metadata, dict):
-        return None
-    cursor = metadata.get("next_cursor")
-    return cursor if isinstance(cursor, str) and cursor else None
-
-
-def _optional_bool(value: object) -> bool | None:
-    """Return a boolean value or None."""
-    return value if isinstance(value, bool) else None
-
-
-def _string(value: object) -> str:
-    """Return a string value or an empty string."""
-    return value if isinstance(value, str) else ""

@@ -55,14 +55,7 @@ def test_slack_actions_are_registered_and_executable() -> None:
             {"access_token": "xoxp-secret"},
             {},
         )
-    assert result == {
-        "query": "release",
-        "matches": [],
-        "total": 0,
-        "pagination": {},
-        "paging": {},
-        "next_cursor": None,
-    }
+    assert result == response.json.return_value
     assert request.call_args.args == ("GET", "https://slack.com/api/search.messages")
     assert request.call_args.kwargs["params"] == {
         "query": "release",
@@ -83,10 +76,7 @@ def test_slack_conversation_actions_match_open_connector_contract() -> None:
             {"access_token": "xoxp-secret"},
             {},
         )
-    assert result == {
-        "messages": [{"ts": "1.0", "user_id": "U1", "text": "Hi"}],
-        "has_more": False,
-    }
+    assert result == history.json.return_value
     assert request.call_args.kwargs["params"] == {"channel": "C1", "limit": "20"}
 
     thread = _slack_response({"ok": True, "messages": [], "has_more": True})
@@ -98,7 +88,7 @@ def test_slack_conversation_actions_match_open_connector_contract() -> None:
             {"access_token": "xoxp-secret"},
             {},
         )
-    assert result == {"messages": [], "has_more": True}
+    assert result == thread.json.return_value
     assert request.call_args.kwargs["params"] == {"channel": "C1", "ts": "1.0"}
 
 
