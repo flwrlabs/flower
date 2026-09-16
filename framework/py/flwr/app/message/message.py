@@ -447,9 +447,7 @@ class Message(InflatableObject):
 
 
 def make_message(
-    metadata: Metadata,
-    content: RecordDict | None = None,
-    error: Error | None = None,
+    metadata: Metadata, content: RecordDict | None = None, error: Error | None = None
 ) -> Message:
     """Create a message with the provided metadata, content, and error."""
     return Message(metadata=metadata, content=content, error=error)  # type: ignore
