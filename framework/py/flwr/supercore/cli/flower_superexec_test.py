@@ -27,7 +27,7 @@ from flwr.supercore.constant import ExecutorType
 from flwr.supercore.superexec.plugin import AutoExecPlugin
 from flwr.supercore.version import package_version
 
-from .flower_superexec import _get_plugin_and_client_class, _parse_args
+from .flower_superexec import _parse_args
 
 flower_superexec_module = importlib.import_module("flwr.supercore.cli.flower_superexec")
 
