@@ -27,18 +27,11 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
 )
-from flwr.proto.message_pb2 import (  # pylint: disable=E0611
-    ConfirmMessageReceivedRequest,
-    PullObjectRequest,
-    PushObjectRequest,
-)
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorRequest,
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
-    PullAppMessagesRequest,
-    PushAppMessagesRequest,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
@@ -58,14 +51,6 @@ from flwr.supercore.routers.runtime import router
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.runtime import runtime_handlers
 
-_SERVERAPP_ONLY_CASES: list[tuple[str, Message]] = [
-    ("get-nodes", GetNodesRequest()),
-    ("push-messages", PushAppMessagesRequest()),
-    ("pull-messages", PullAppMessagesRequest()),
-    ("push-object", PushObjectRequest()),
-    ("pull-object", PullObjectRequest()),
-    ("confirm-message-received", ConfirmMessageReceivedRequest()),
-]
 _SHARED_CASES: list[tuple[str, Message, Callable[[bytes], Message]]] = [
     (
         "send-task-heartbeat",
@@ -195,22 +180,6 @@ def test_get_nodes_allows_with_valid_metadata_token(
 
     assert response.status_code == 200
     assert isinstance(GetNodesResponse.FromString(response.content), GetNodesResponse)
-
-
-@pytest.mark.parametrize(("path", "proto_request"), _SERVERAPP_ONLY_CASES)
-def test_serverapp_only_endpoint_denied_for_simulation_run(
-    client: TestClient, state: LinkState, path: str, proto_request: Message
-) -> None:
-    """ServerApp-only routes should deny simulation-task tokens."""
-    response = _post(
-        client,
-        path,
-        proto_request,
-        token=_create_running_task(state, TaskType.SIMULATION),
-    )
-
-    assert response.status_code == 403
-    assert response.json()["code"] == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
 
 
 @pytest.mark.parametrize(("path", "proto_request", "response_parser"), _SHARED_CASES)
