@@ -69,6 +69,7 @@ class ModelRequest(JSONMessage):
     @classmethod
     def from_payload(cls, *, dst_task_id: int, payload: JSONObject) -> ModelRequest:
         """Create a model request from a Responses request payload."""
+        payload = cls.normalize_payload(payload)
         return cls(
             dst_task_id=dst_task_id,
             input_=cast(str | Sequence[JSONObject], payload.get("input")),
@@ -83,6 +84,26 @@ class ModelRequest(JSONMessage):
             metadata=cast(JSONObject | None, payload.get("metadata")),
             text=cast(JSONObject | None, payload.get("text")),
         )
+
+    @classmethod
+    def normalize_payload(cls, payload: JSONObject) -> JSONObject:
+        """Normalize and validate a Responses request payload."""
+        normalized: JSONObject = {
+            "model": payload.get("model"),
+            "input": payload.get("input"),
+            "stream": payload.get("stream", False),
+            "tools": payload.get("tools"),
+            "tool_choice": payload.get("tool_choice"),
+            "reasoning": payload.get("reasoning"),
+            "previous_response_id": payload.get("previous_response_id"),
+            "instructions": payload.get("instructions"),
+            "max_output_tokens": payload.get("max_output_tokens"),
+            "metadata": payload.get("metadata"),
+            "text": payload.get("text"),
+        }
+        normalized = cls._remove_none(normalized)
+        cls._validate_payload(normalized)
+        return normalized
 
     @classmethod
     def _validate_payload(cls, payload: JSONObject) -> None:

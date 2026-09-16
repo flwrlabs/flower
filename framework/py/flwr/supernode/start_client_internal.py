@@ -31,6 +31,7 @@ from cryptography.hazmat.primitives.serialization.ssh import load_ssh_public_key
 from grpc import RpcError
 
 from flwr.app import Context, Error, Message, RecordDict
+from flwr.app.message import make_message
 from flwr.app.user_config import UserConfig
 from flwr.client.grpc_adapter_client.connection import grpc_adapter
 from flwr.client.grpc_rere_client.connection import grpc_request_response
@@ -361,7 +362,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                         "The FAB could not be verified. App verification is "
                         "not supported by the connected SuperLink.",
                     )
-                    reply = Message(FAB_VERIFICATION_ERROR, reply_to=message)
+                    reply = make_message(error=FAB_VERIFICATION_ERROR, reply_to=message)
                     _insert_message(reply, state, object_store)
                     return run_id
 
@@ -375,7 +376,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                         "could not verify the FAB. An error reply "
                         "has been generated.",
                     )
-                    reply = Message(FAB_VERIFICATION_ERROR, reply_to=message)
+                    reply = make_message(error=FAB_VERIFICATION_ERROR, reply_to=message)
                     _insert_message(reply, state, object_store)
                     return run_id
 

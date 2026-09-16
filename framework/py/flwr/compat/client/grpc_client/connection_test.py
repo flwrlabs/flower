@@ -21,7 +21,8 @@ from unittest.mock import patch
 
 import grpc
 
-from flwr.app import ConfigRecord, Message, RecordDict
+from flwr.app import ConfigRecord, Metadata, RecordDict
+from flwr.app.message import make_message
 from flwr.common import Code, GetPropertiesRes, Status
 from flwr.common.constant import MessageTypeLegacy
 from flwr.compat.common import recorddict_compat as compat
@@ -31,6 +32,7 @@ from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.client_manager import SimpleClientManager
 from flwr.server.superlink.fleet.grpc_bidi.grpc_server import start_grpc_server
+from flwr.supercore.date import now
 from flwr.supercore.retry import RetryInvoker, exponential
 
 from .connection import grpc_connection
@@ -40,17 +42,35 @@ EXPECTED_NUM_SERVER_MESSAGE = 10
 SERVER_MESSAGE = ServerMessage(get_properties_ins=ServerMessage.GetPropertiesIns())
 SERVER_MESSAGE_RECONNECT = ServerMessage(reconnect_ins=ServerMessage.ReconnectIns())
 
-MESSAGE_GET_PROPERTIES = Message(
+MESSAGE_GET_PROPERTIES = make_message(
     content=compat.getpropertiesres_to_recorddict(
         GetPropertiesRes(Status(Code.OK, ""), {})
     ),
-    dst_node_id=0,
-    message_type=MessageTypeLegacy.GET_PROPERTIES,
+    metadata=Metadata(
+        run_id=0,
+        message_id="",
+        src_node_id=0,
+        dst_node_id=0,
+        reply_to_message_id="",
+        group_id="",
+        created_at=now().timestamp(),
+        ttl=1.0,
+        message_type=MessageTypeLegacy.GET_PROPERTIES,
+    ),
 )
-MESSAGE_DISCONNECT = Message(
+MESSAGE_DISCONNECT = make_message(
     content=RecordDict({"config": ConfigRecord({"reason": 0})}),
-    dst_node_id=0,
-    message_type="reconnect",
+    metadata=Metadata(
+        run_id=0,
+        message_id="",
+        src_node_id=0,
+        dst_node_id=0,
+        reply_to_message_id="",
+        group_id="",
+        created_at=now().timestamp(),
+        ttl=1.0,
+        message_type="reconnect",
+    ),
 )
 
 

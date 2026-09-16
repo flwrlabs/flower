@@ -18,10 +18,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Self
+from typing import Self, TypeVar
 
 from flwr.app.constants import DEFAULT_TTL
-from flwr.app.message import ConfigRecord, Message, RecordDict
+from flwr.app.message import ConfigRecord, Message, RecordDict, make_message
 from flwr.app.message_type import MessageType
 from flwr.app.metadata import Metadata
 from flwr.supercore.date import now
@@ -30,6 +30,8 @@ from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
 from .constant import TASK_MESSAGE_PAYLOAD_JSON_KEY, TASK_MESSAGE_PAYLOAD_RECORD_KEY
+
+JSONMessageT = TypeVar("JSONMessageT", bound="JSONMessage")
 
 
 class JSONMessage(Message, ABC):
@@ -152,10 +154,10 @@ def _build_metadata_and_content(
 ) -> tuple[Metadata, RecordDict]:
     """Build task message metadata and content from a JSON object payload."""
     metadata = Metadata(
-        run_id=TaskIdentity.run_id or 0,
+        run_id=TaskIdentity.run_id,
         message_id="",
-        src_node_id=TaskIdentity.node_id or 0,
-        dst_node_id=TaskIdentity.node_id or 0,
+        src_node_id=TaskIdentity.node_id,
+        dst_node_id=TaskIdentity.node_id,
         reply_to_message_id=reply_to_message_id,
         group_id="",
         created_at=now().timestamp(),
@@ -165,6 +167,15 @@ def _build_metadata_and_content(
         dst_task_id=dst_task_id,
     )
     return metadata, _payload_to_content(payload)
+
+
+def make_json_message(
+    message_type: type[JSONMessageT], *, metadata: Metadata, payload: JSONObject
+) -> JSONMessageT:
+    """Create a typed JSON message with explicit metadata."""
+    message_type._validate_payload(payload)  # pylint: disable=protected-access
+    message = make_message(metadata=metadata, content=_payload_to_content(payload))
+    return message_type.from_message(message)
 
 
 def _payload_to_content(payload: JSONObject) -> RecordDict:

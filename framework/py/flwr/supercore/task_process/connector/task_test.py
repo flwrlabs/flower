@@ -27,6 +27,7 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
+from flwr.supercore.task_identity import TaskIdentity
 
 from . import registry
 from .definition import ConnectorExecutionContext
@@ -65,6 +66,11 @@ class TestHandleTask(unittest.TestCase):
 
     def setUp(self) -> None:
         """Set up the common connector task mocks and registry patches."""
+        identity_patcher = patch.multiple(
+            TaskIdentity, _task_id=22, _run_id=7, _node_id=1
+        )
+        identity_patcher.start()
+        self.addCleanup(identity_patcher.stop)
         self.stub = Mock()
         self.stub.GetConnector.return_value = GetConnectorResponse(
             connector_ref="notion",

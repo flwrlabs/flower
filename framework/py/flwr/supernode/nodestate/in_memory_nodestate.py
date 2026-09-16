@@ -21,6 +21,7 @@ from logging import ERROR
 from threading import Lock, RLock
 
 from flwr.app import Error, Message
+from flwr.app.message import make_message
 from flwr.common.constant import ErrorCode
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
@@ -197,7 +198,7 @@ class InMemoryNodeState(
 
             # Create and store error replies for each message
             for msg in messages_to_reply:
-                error_reply = Message(CLIENT_APP_CRASHED_ERROR, reply_to=msg)
+                error_reply = make_message(error=CLIENT_APP_CRASHED_ERROR, reply_to=msg)
 
                 # Insert objects of the error reply into the object store
                 with no_object_id_recompute():

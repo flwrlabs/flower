@@ -78,11 +78,20 @@ dummy_client_app = ClientApp(
 
 def _make_vce_test_message(run_id: int = 1234, node_id: int = 1) -> Message:
     """Create a Message with metadata populated like an InMemoryGrid message."""
-    message = Message(RecordDict(), node_id, "query")
-    message.metadata.__dict__["_run_id"] = run_id
-    message.metadata.__dict__["_src_node_id"] = SUPERLINK_NODE_ID
-    message.metadata.__dict__["_message_id"] = "test-message-id"
-    return message
+    return make_message(
+        content=RecordDict(),
+        metadata=Metadata(
+            run_id=run_id,
+            message_id="test-message-id",
+            src_node_id=SUPERLINK_NODE_ID,
+            dst_node_id=node_id,
+            reply_to_message_id="",
+            group_id="",
+            created_at=now().timestamp(),
+            ttl=DEFAULT_TTL,
+            message_type="query",
+        ),
+    )
 
 
 def terminate_simulation(

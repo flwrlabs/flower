@@ -29,6 +29,7 @@ from uuid import uuid4
 
 from flwr.app import Message
 from flwr.app.error import Error
+from flwr.app.message import make_message
 from flwr.clientapp.client_app import ClientApp, ClientAppException, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common.constant import (
@@ -151,7 +152,9 @@ def worker(
                 e_code = ErrorCode.UNKNOWN
 
             reason = str(type(ex)) + ":<'" + str(ex) + "'>"
-            out_mssg = Message(Error(code=e_code, reason=reason), reply_to=message)
+            out_mssg = make_message(
+                error=Error(code=e_code, reason=reason), reply_to=message
+            )
 
         finally:
             if processing_started_at is not None:

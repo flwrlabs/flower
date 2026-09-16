@@ -23,9 +23,18 @@ from unittest.mock import Mock
 import pytest
 
 from flwr.supercore.json_message.model_message import ModelRequest
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.typing import JSONObject
 
 from . import task
+
+
+@pytest.fixture(autouse=True)
+def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the task identity used by Model task messages."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 22)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 7)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 1)
 
 
 def _model_request() -> ModelRequest:

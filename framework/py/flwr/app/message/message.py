@@ -197,9 +197,9 @@ class Message(InflatableObject):
 
             # Set metadata
             metadata = Metadata(
-                run_id=TaskIdentity.run_id or 0,
+                run_id=TaskIdentity.run_id,
                 message_id="",  # Will be set by the SuperLink
-                src_node_id=TaskIdentity.node_id or 0,
+                src_node_id=TaskIdentity.node_id,
                 dst_node_id=dst_node_id,
                 # Instruction messages do not reply to any message
                 reply_to_message_id="",
@@ -447,10 +447,22 @@ class Message(InflatableObject):
 
 
 def make_message(
-    metadata: Metadata, content: RecordDict | None = None, error: Error | None = None
+    metadata: Metadata | None = None,
+    content: RecordDict | None = None,
+    error: Error | None = None,
+    *,
+    reply_to: Message | None = None,
 ) -> Message:
-    """Create a message with the provided metadata, content, and error."""
-    return Message(metadata=metadata, content=content, error=error)  # type: ignore
+    """Create a message from explicit metadata or as a reply."""
+    return cast(
+        Message,
+        Message(  # type: ignore[call-overload]
+            metadata=metadata,
+            content=content,
+            error=error,
+            reply_to=reply_to,
+        ),
+    )
 
 
 def remove_content_from_message(message: Message) -> Message:

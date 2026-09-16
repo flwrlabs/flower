@@ -15,9 +15,46 @@
 """Identity of the task running in the current process."""
 
 
-class TaskIdentity:
+class _TaskIdentityMeta(type):
+    """Metaclass providing strict class-level identity properties."""
+
+    @property
+    def task_id(cls) -> int:
+        """Return the current task ID."""
+        if cls._task_id is None:
+            raise RuntimeError("TaskIdentity.task_id is not set.")
+        return cls._task_id
+
+    @task_id.setter
+    def task_id(cls, value: int) -> None:
+        cls._task_id = value
+
+    @property
+    def run_id(cls) -> int:
+        """Return the current run ID."""
+        if cls._run_id is None:
+            raise RuntimeError("TaskIdentity.run_id is not set.")
+        return cls._run_id
+
+    @run_id.setter
+    def run_id(cls, value: int) -> None:
+        cls._run_id = value
+
+    @property
+    def node_id(cls) -> int:
+        """Return the current node ID."""
+        if cls._node_id is None:
+            raise RuntimeError("TaskIdentity.node_id is not set.")
+        return cls._node_id
+
+    @node_id.setter
+    def node_id(cls, value: int) -> None:
+        cls._node_id = value
+
+
+class TaskIdentity(metaclass=_TaskIdentityMeta):
     """Identity of the task running in the current process."""
 
-    task_id: int | None = None
-    run_id: int | None = None
-    node_id: int | None = None
+    _task_id: int | None = None
+    _run_id: int | None = None
+    _node_id: int | None = None

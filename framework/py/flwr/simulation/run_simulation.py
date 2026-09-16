@@ -60,6 +60,7 @@ from flwr.supercore.logger import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.run import Run
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.grid import InMemoryGrid
@@ -248,7 +249,7 @@ def run_serverapp_th(
     return serverapp_th
 
 
-# pylint: disable=too-many-locals,too-many-positional-arguments
+# pylint: disable=too-many-locals,too-many-positional-arguments,too-many-statements
 def _main_loop(
     num_supernodes: int,
     backend_name: str,
@@ -295,6 +296,9 @@ def _main_loop(
         state.task_store[primary_task_id] = Task(
             task_id=primary_task_id, run_id=run.run_id
         )
+        TaskIdentity.task_id = primary_task_id
+        TaskIdentity.run_id = run.run_id
+        TaskIdentity.node_id = server_app_context.node_id
 
         # Initialize Grid
         grid = InMemoryGrid(state_factory=state_factory)
