@@ -170,10 +170,13 @@ async def _read_request_payload(request: Request) -> JSONObject:
 
 def _normalize_model_request_payload(payload: JSONObject) -> JSONObject:
     """Normalize and validate a model request payload."""
+    payload = {key: value for key, value in payload.items() if value is not None}
+    payload.setdefault("stream", False)
     try:
-        return ModelRequest.normalize_payload(payload)
+        ModelRequest.validate_payload(payload)
     except (TypeError, ValueError) as err:
         raise _ResponsesError(400, str(err), "invalid_request") from err
+    return payload
 
 
 def _start_exchange(

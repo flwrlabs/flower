@@ -45,7 +45,7 @@ class JSONMessage(Message, ABC):
         reply_to_message_id: str = "",
         ttl: float = DEFAULT_TTL,
     ) -> None:
-        type(self)._validate_payload(payload)
+        type(self).validate_payload(payload)
         metadata, content = _build_metadata_and_content(
             dst_task_id,
             payload,
@@ -71,14 +71,14 @@ class JSONMessage(Message, ABC):
             raise ValueError("Expected a message with content.")
 
         payload = _payload_from_content(message.content)
-        cls._validate_payload(payload)
+        cls.validate_payload(payload)
         typed_message = cls.__new__(cls)
         typed_message.__dict__.update(message.__dict__)
         return typed_message
 
     @classmethod
     @abstractmethod
-    def _validate_payload(cls, payload: JSONObject) -> None:
+    def validate_payload(cls, payload: JSONObject) -> None:
         """Validate this task message type's payload."""
 
     @staticmethod
@@ -173,7 +173,7 @@ def make_json_message(
     message_type: type[JSONMessageT], *, metadata: Metadata, payload: JSONObject
 ) -> JSONMessageT:
     """Create a typed JSON message with explicit metadata."""
-    message_type._validate_payload(payload)  # pylint: disable=protected-access
+    message_type.validate_payload(payload)
     message = make_message(metadata=metadata, content=_payload_to_content(payload))
     return message_type.from_message(message)
 

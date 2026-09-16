@@ -33,7 +33,7 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.constant import TaskType
 from flwr.supercore.date import now
 from flwr.supercore.json_message.base import make_json_message
-from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
+from flwr.supercore.json_message.model_message import ModelResponse
 from flwr.supercore.typing import JSONObject
 from flwr.superlink.dependencies.linkstate import get_linkstate
 
@@ -104,9 +104,7 @@ def _event(event_id: int, event: str, data: str | None = None) -> TaskEvent:
 
 def _stream_request() -> JSONObject:
     """Create one normalized streaming model request payload."""
-    return ModelRequest.normalize_payload(
-        {"model": "model", "input": "hello", "stream": True}
-    )
+    return {"model": "model", "input": "hello", "stream": True}
 
 
 @pytest.mark.parametrize("authorization", [None, "Basic task-token"])
