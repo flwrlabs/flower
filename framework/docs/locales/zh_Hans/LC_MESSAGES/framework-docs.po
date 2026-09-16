@@ -51,7 +51,7 @@ msgstr "更新日志"
 #: ../../source/changelog/v1.37.0.md:2
 #, fuzzy
 msgid "v1.37.0 (2026-09-15)"
-msgstr "v1.3.0 (2023-02-06)"
+msgstr ""
 
 #: ../../source/changelog/v1.0.0.md:11 ../../source/changelog/v1.1.0.md:4
 #: ../../source/changelog/v1.10.0.md:4 ../../source/changelog/v1.11.0.md:4
@@ -111,11 +111,6 @@ msgid ""
 "Nugraha`, `Dimitris Stripelis`, `Heng Pan`, `Javier`, `Julian Rußmeyer`, "
 "`Paul Thomas`, `Silvio Cretti`, `Taner Topal`, `Zhewen Tan`"
 msgstr ""
-"`Adam Narozniak`, `Anass Anhari`, `Charles Beauville`, `Dana-Farber`, "
-"`Daniel J. Beutel`, `Daniel Nata Nugraha`, `Edoardo Gabrielli`, `Gustavo "
-"Bertoli`, `Heng Pan`, `Javier`, `Mahdi`, `Steven Hé (Sīchàng)`, `Taner "
-"Topal`, `achiverram28`, `danielnugraha`, `eunchung`, `ruthgal` <!---"
-"TOKEN_v1.5.0-->"
 
 #: ../../source/changelog/v0.13.0.md:4 ../../source/changelog/v0.14.0.md:4
 #: ../../source/changelog/v0.15.0.md:4 ../../source/changelog/v0.16.0.md:4
@@ -179,12 +174,6 @@ msgid ""
 "[#8093](https://github.com/flwrlabs/flower/pull/8093), "
 "[#8099](https://github.com/flwrlabs/flower/pull/8099))"
 msgstr ""
-"**改进教程** ([#1468](https://github.com/adap/flower/pull/1468), "
-"[#1470](https://github.com/adap/flower/pull/1470), "
-"[#1472](https://github.com/adap/flower/pull/1472), "
-"[#1473](https://github.com/adap/flower/pull/1473), "
-"[#1474](https://github.com/adap/flower/pull/1474), "
-"[#1475](https://github.com/adap/flower/pull/1475)))"
 
 #: ../../source/changelog/v1.37.0.md:16
 msgid ""
@@ -218,13 +207,6 @@ msgid ""
 "[#8133](https://github.com/flwrlabs/flower/pull/8133), "
 "[#8148](https://github.com/flwrlabs/flower/pull/8148))"
 msgstr ""
-"**引入（试验性）REST API** ([#1594](https://github.com/adap/flower/pull/1594), "
-"[#1690](https://github.com/adap/flower/pull/1690), "
-"[#1695](https://github.com/adap/flower/pull/1695), "
-"[#1712](https://github.com/adap/flower/pull/1712), "
-"[#1802](https://github.com/adap/flower/pull/1802), "
-"[#1770](https://github.com/adap/flower/pull/1770), "
-"[#1733](https://github.com/adap/flower/pull/1733))"
 
 #: ../../source/changelog/v1.37.0.md:20
 msgid ""
@@ -246,9 +228,6 @@ msgid ""
 "([#8109](https://github.com/flwrlabs/flower/pull/8109), "
 "[#8113](https://github.com/flwrlabs/flower/pull/8113))"
 msgstr ""
-"**介绍 Flower Swift SDK** "
-"([#1858](https://github.com/adap/flower/pull/1858), "
-"[#1897](https://github.com/adap/flower/pull/1897))"
 
 #: ../../source/changelog/v1.37.0.md:24
 msgid ""
@@ -263,7 +242,7 @@ msgstr ""
 msgid ""
 "**Deploy SuperNodes using Slurm** "
 "([#8074](https://github.com/flwrlabs/flower/pull/8074))"
-msgstr "**新的 scikit-learn 代码示例** ([#748](https://github.com/adap/flower/pull/748))"
+msgstr ""
 
 #: ../../source/changelog/v1.37.0.md:28
 msgid ""
@@ -277,7 +256,7 @@ msgstr ""
 msgid ""
 "**Reject invalid `FedTrimmedAvg` trimming fractions** "
 "([#7946](https://github.com/flwrlabs/flower/pull/7946))"
-msgstr "**新的联邦医疗策略** ([#1461](https://github.com/adap/flower/pull/1461))"
+msgstr ""
 
 #: ../../source/changelog/v1.37.0.md:32
 msgid ""
@@ -292,8 +271,6 @@ msgid ""
 "**Run adaptive federated DDoS attack detection with FLAD** "
 "([#8083](https://github.com/flwrlabs/flower/pull/8083))"
 msgstr ""
-"** 添加使用 fastai 和 Flower 进行联邦学习的新示例** "
-"([#1598](https://github.com/adap/flower/pull/1598))"
 
 #: ../../source/changelog/v1.37.0.md:36
 msgid ""
@@ -394,7 +371,7 @@ msgstr "不兼容的更改"
 msgid ""
 "**Remove deprecated SuperLink Exec API options** "
 "([#8100](https://github.com/flwrlabs/flower/pull/8100))"
-msgstr "**移除过时的 KerasClient**（[#857](https://github.com/adap/flower/pull/857)）"
+msgstr ""
 
 #: ../../source/changelog/v1.37.0.md:46
 msgid ""
@@ -408,7 +385,7 @@ msgstr ""
 msgid ""
 "**Update SuperLink TLS configuration** "
 "([#8106](https://github.com/flwrlabs/flower/pull/8106))"
-msgstr "** 添加一个新的 gRPC 选项**（[#2197](https://github.com/adap/flower/pull/2197)）"
+msgstr ""
 
 #: ../../source/changelog/v1.37.0.md:50
 msgid ""
@@ -88703,4 +88680,3 @@ msgstr ""
 
 #~ msgid "Model response creation API."
 #~ msgstr ""
-
