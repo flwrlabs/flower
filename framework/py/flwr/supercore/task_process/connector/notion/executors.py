@@ -38,10 +38,9 @@ def search(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObj
     if not isinstance(query, str):
         raise ValueError("Notion query must be a string.")
     body: JSONObject = {"query": query}
-    if (filter_ := _optional_object(arguments.get("filter"), "filter")) is not None:
-        body["filter"] = filter_
-    if (sort := _optional_object(arguments.get("sort"), "sort")) is not None:
-        body["sort"] = sort
+    for name in ("filter", "sort"):
+        if name in arguments:
+            body[name] = arguments[name]
     if "page_size" in arguments:
         body["page_size"] = require_int_range(
             arguments["page_size"], "Notion", "page_size", maximum=100
@@ -89,15 +88,6 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
     "search": search,
     "get_page": get_page,
 }
-
-
-def _optional_object(value: object, name: str) -> JSONObject | None:
-    """Validate an optional Notion object argument."""
-    if value is None:
-        return None
-    if not isinstance(value, dict):
-        raise ValueError(f"Notion {name} must be an object.")
-    return value
 
 
 def _call_notion_api(
