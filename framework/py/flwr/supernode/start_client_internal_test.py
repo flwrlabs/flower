@@ -134,7 +134,9 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         # Prepare
         self._prepare_for_pull_and_store_message()
         fab_hash = "abc123"
-        self.mock_state.get_run.return_value = Mock(fab_hash=fab_hash)
+        self.mock_state.get_run.return_value = Mock(
+            fab_hash=fab_hash, primary_task_type=TaskType.SERVER_APP
+        )
         self.mock_state.create_task.return_value = 123
 
         # Execute
@@ -253,6 +255,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             fab_hash=fab.hash_str,
             override_config={},
             series_id=self.series_id,
+            primary_task_type=TaskType.AGENT_APP,
         )
         self.mock_get_run.return_value = mock_run
         self.mock_get_fab.return_value = fab
@@ -294,6 +297,11 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state.store_fab.assert_called_once_with(fab)
         self.mock_state.store_run.assert_called_once_with(mock_run)
         self.mock_state.get_run_series_context.assert_called_once_with(self.series_id)
+        self.mock_state.create_task.assert_called_once_with(
+            task_type=TaskType.AGENT_APP,
+            run_id=self.run_id,
+            fab_hash=fab.hash_str,
+        )
 
         # Assert: the Context should be created and stored if run_id is unknown
         self.mock_state.set_run_series_context.assert_called_once()
