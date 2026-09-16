@@ -54,12 +54,14 @@ CHAT_EXIT_COMMAND = "/quit"
 CHAT_NEW_COMMAND = "/new"
 CHAT_LOAD_COMMAND = "/load"
 CHAT_FEDERATION_COMMAND = "/federation"
+CHAT_CONNECTOR_COMMAND = "/connector"
 CHAT_HISTORY_COMMAND = "/history"
 CHAT_COMMANDS = {
     CHAT_HELP_COMMAND: "Show available commands.",
     CHAT_NEW_COMMAND: "Start a new conversation.",
     CHAT_LOAD_COMMAND: "Build and select a local AgentApp.",
     CHAT_FEDERATION_COMMAND: "Select a federation.",
+    CHAT_CONNECTOR_COMMAND: "Select or clear connectors.",
     CHAT_HISTORY_COMMAND: "Show or continue conversation history.",
     CHAT_EXIT_COMMAND: "Exit Flower Chat.",
 }

@@ -69,6 +69,7 @@ def test_get_executor_builds_kubernetes_executor_from_config(
             "volume-mounts": [{"name": "shmem", "mountPath": "/dev/shm"}],
             "resources": {"requests": {"cpu": "1"}},
             "node-selector": {"kubernetes.io/os": "linux"},
+            "log-warm-executor-output": True,
             "unknown-field": "ignored",
         },
     )
@@ -90,8 +91,21 @@ def test_get_executor_builds_kubernetes_executor_from_config(
     assert config.volume_mounts == [{"name": "shmem", "mountPath": "/dev/shm"}]
     assert config.resources == {"requests": {"cpu": "1"}}
     assert config.node_selector == {"kubernetes.io/os": "linux"}
+    assert config.log_warm_executor_output is True
     assert not hasattr(config, "unknown_field")
     create_clients.assert_called_once_with()
+
+
+def test_get_executor_rejects_non_boolean_warm_output_logging() -> None:
+    """Warm output logging must be configured with a YAML boolean."""
+    with pytest.raises(ValueError, match="log_warm_executor_output must be a boolean"):
+        factory_module._kubernetes_executor_config_from_mapping(  # pylint: disable=protected-access
+            {
+                "namespace": "flower-system",
+                "image": "ghcr.io/flwrlabs/taskexecutor:dev",
+                "log-warm-executor-output": "true",
+            }
+        )
 
 
 @pytest.mark.parametrize("insecure", [False, True])

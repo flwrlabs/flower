@@ -102,7 +102,9 @@ text to the process log.
 
 Create `pyproject.toml`:
 
-```toml
+```{code-block} toml
+:substitutions:
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -114,7 +116,7 @@ description = "A local Flower AgentApp backed by Ollama"
 license = "Apache-2.0"
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "flwr>=1.37.0,<2.0",
+    "flwr>=|stable_flwr_version|,<2.0",
     "openai>=2.16.0,<3.0.0",
 ]
 
@@ -124,7 +126,7 @@ packages = ["agent"]
 [tool.flwr.app]
 publisher = "local"
 display-name = "Ollama Agent"
-flwr-version-target = "1.37.0"
+flwr-version-target = "|stable_flwr_version|"
 fab-include = ["agent/**/*.py"]
 
 [tool.flwr.app.components]
