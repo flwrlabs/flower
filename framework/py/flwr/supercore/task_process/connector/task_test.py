@@ -102,7 +102,7 @@ class TestHandleTask(unittest.TestCase):
         )
         self.provider.return_value = {"pages": 3}
 
-        handle_task(client=self.stub, task_id=22, run_id=7)
+        handle_task(client=self.stub)
 
         self.stub.GetConnector.assert_called_once_with(GetConnectorRequest())
         arguments, context = self.provider.call_args.args
@@ -126,7 +126,7 @@ class TestHandleTask(unittest.TestCase):
         with self.assertRaisesRegex(
             RuntimeError, "Credential-backed connector execution failed."
         ):
-            handle_task(client=self.stub, task_id=22, run_id=7)
+            handle_task(client=self.stub)
 
         self.provider.assert_not_called()
 
@@ -142,7 +142,7 @@ class TestHandleTask(unittest.TestCase):
         self.provider.side_effect = RuntimeError(f"Provider rejected {secret}")
 
         with self.assertRaises(RuntimeError) as error:
-            handle_task(client=self.stub, task_id=22, run_id=7)
+            handle_task(client=self.stub)
 
         response = _pushed_response(self.stub)
         self.provider.assert_called_once()
@@ -168,7 +168,7 @@ class TestHandleTask(unittest.TestCase):
             r"Notion API request failed: validation_error \(400\): "
             r"Participants must be email addresses\.",
         ):
-            handle_task(client=self.stub, task_id=22, run_id=7)
+            handle_task(client=self.stub)
 
         assert _pushed_response(self.stub).payload["error"] == {
             "code": "connector_error",

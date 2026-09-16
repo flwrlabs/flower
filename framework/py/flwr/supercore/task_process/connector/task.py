@@ -44,8 +44,6 @@ from .registry import (
 
 def handle_task(
     client: RuntimeHttpClient,
-    task_id: int,
-    run_id: int,
 ) -> None:
     """Run one connector task request."""
     request_message = _pull_connector_request(client)

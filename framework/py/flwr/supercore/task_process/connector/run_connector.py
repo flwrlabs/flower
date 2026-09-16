@@ -103,11 +103,7 @@ def run_connector(  # pylint: disable=too-many-locals
 
         event(EventType.FLWR_CONNECTOR_RUN_ENTER)
 
-        handle_task(
-            client=client,
-            task_id=task_input.task_id,
-            run_id=task_input.run.run_id,
-        )
+        handle_task(client=client)
 
         sub_status = SubStatus.COMPLETED
         details = ""

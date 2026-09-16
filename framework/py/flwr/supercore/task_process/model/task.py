@@ -41,7 +41,7 @@ _TEXT_DELTA_EVENTS = frozenset(
 )
 
 
-def handle_task(client: RuntimeHttpClient, task_id: int, run_id: int) -> None:
+def handle_task(client: RuntimeHttpClient) -> None:
     """Run one model task request."""
     request_message = _pull_model_request(client)
     is_stream = request_message.payload.get("stream") is True

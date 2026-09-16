@@ -81,7 +81,7 @@ def test_handle_task_flushes_first_text_event_eagerly(
 
     monkeypatch.setattr(task, "invoke_model_provider", invoke_provider)
 
-    task.handle_task(client=stub, task_id=22, run_id=7)
+    task.handle_task(client=stub)
 
     batches = [call.args[0].events for call in stub.PushTaskEvents.call_args_list]
     assert [len(batch) for batch in batches] == [2, 16]

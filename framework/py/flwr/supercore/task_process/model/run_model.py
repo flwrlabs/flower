@@ -111,11 +111,7 @@ def run_model(  # pylint: disable=too-many-locals
 
         event(EventType.FLWR_MODEL_RUN_ENTER)
 
-        handle_task(
-            client=client,
-            task_id=task_input.task_id,
-            run_id=task_input.run.run_id,
-        )
+        handle_task(client=client)
 
         # Update sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED
