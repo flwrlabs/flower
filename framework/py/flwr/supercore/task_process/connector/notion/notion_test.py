@@ -51,8 +51,6 @@ def test_notion_search_forwards_api_inputs() -> None:
             "notion_search",
             {
                 "query": "release",
-                "filter": {"property": "object", "value": "page"},
-                "sort": {"direction": "descending", "timestamp": "last_edited_time"},
                 "page_size": 100,
                 "start_cursor": "cursor-1",
             },
@@ -65,8 +63,6 @@ def test_notion_search_forwards_api_inputs() -> None:
     assert request.call_args.kwargs["headers"]["Notion-Version"] == "2026-03-11"
     assert request.call_args.kwargs["json"] == {
         "query": "release",
-        "filter": {"property": "object", "value": "page"},
-        "sort": {"direction": "descending", "timestamp": "last_edited_time"},
         "page_size": 100,
         "start_cursor": "cursor-1",
     }
@@ -76,9 +72,23 @@ def test_notion_get_page_returns_page_and_block_children() -> None:
     """Get page should aggregate the page and its first-level child blocks."""
     page_response = Mock(status_code=200)
     page_response.json.return_value = {"object": "page", "id": "page-1"}
-    blocks_response = Mock(status_code=200)
-    blocks_response.json.return_value = {"object": "list", "results": []}
-    with patch(_HTTP_REQUEST, side_effect=[page_response, blocks_response]) as request:
+    first_blocks = Mock(status_code=200)
+    first_blocks.json.return_value = {
+        "object": "list",
+        "results": [{"id": "block-1"}],
+        "has_more": True,
+        "next_cursor": "cursor-1",
+    }
+    last_blocks = Mock(status_code=200)
+    last_blocks.json.return_value = {
+        "object": "list",
+        "results": [{"id": "block-2"}],
+        "has_more": False,
+        "next_cursor": None,
+    }
+    with patch(
+        _HTTP_REQUEST, side_effect=[page_response, first_blocks, last_blocks]
+    ) as request:
         result = registry.invoke_connector(
             "notion_get_page",
             {"page_id": "page-1"},
@@ -88,12 +98,17 @@ def test_notion_get_page_returns_page_and_block_children() -> None:
         )
     assert result == {
         "page": page_response.json.return_value,
-        "block_children": blocks_response.json.return_value,
+        "block_children": {
+            **last_blocks.json.return_value,
+            "results": [{"id": "block-1"}, {"id": "block-2"}],
+        },
     }
     assert [call.args[:2] for call in request.call_args_list] == [
         ("GET", "https://api.notion.com/v1/pages/page-1"),
         ("GET", "https://api.notion.com/v1/blocks/page-1/children"),
+        ("GET", "https://api.notion.com/v1/blocks/page-1/children"),
     ]
+    assert request.call_args_list[-1].kwargs["params"] == {"start_cursor": "cursor-1"}
 
 
 def test_notion_api_errors_include_code_and_message() -> None:

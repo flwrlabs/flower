@@ -35,15 +35,7 @@ class AttioApiError(ConnectorApiError):
 def identify(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
     """Identify the current Attio token and workspace."""
     del arguments
-    payload = _call_attio_api("GET", "/self", context.credentials)
-    return {
-        "active": payload.get("active") is True,
-        "workspace_id": _optional_string(payload.get("workspace_id")),
-        "workspace_name": _optional_string(payload.get("workspace_name")),
-        "workspace_slug": _optional_string(payload.get("workspace_slug")),
-        "scope": _optional_string(payload.get("scope")),
-        "raw": payload,
-    }
+    return _call_attio_api("GET", "/self", context.credentials)
 
 
 def get_workspace_member(
@@ -172,11 +164,6 @@ def _path_segment(value: object, name: str) -> str:
     if not isinstance(value, str):
         raise TypeError(f"Attio {name} must be a string.")
     return quote(value, safe="")
-
-
-def _optional_string(value: object) -> str | None:
-    """Return a string value or None."""
-    return value if isinstance(value, str) else None
 
 
 def _query_params(arguments: JSONObject, names: tuple[str, ...]) -> dict[str, str]:

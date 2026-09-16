@@ -14,7 +14,6 @@
 # ==============================================================================
 """GitHub action executors."""
 
-import base64
 from urllib.parse import quote
 
 import requests
@@ -49,21 +48,21 @@ def search_code(
     for name in ("per_page", "page"):
         if name in arguments:
             integer_value = arguments[name]
-            if isinstance(integer_value, bool) or not isinstance(integer_value, int):
-                raise ValueError(f"GitHub {name} must be an integer.")
+            if (
+                isinstance(integer_value, bool)
+                or not isinstance(integer_value, int)
+                or integer_value < 1
+                or (name == "per_page" and integer_value > 100)
+            ):
+                constraint = "between 1 and 100" if name == "per_page" else "positive"
+                raise ValueError(f"GitHub {name} must be {constraint}.")
             params[name] = str(integer_value)
-    payload = _call_api(
+    return _call_api(
         "/search/code",
         context.credentials,
         params=params,
         accept=_TEXT_MATCH_ACCEPT,
     )
-    items = payload.get("items")
-    return {
-        "total_count": _number(payload.get("total_count")),
-        "incomplete_results": bool(payload.get("incomplete_results")),
-        "items": items if isinstance(items, list) else [],
-    }
 
 
 def get_file_contents(
@@ -73,21 +72,12 @@ def get_file_contents(
     owner, repo = _repository_ref(arguments.get("owner"), arguments.get("repo"))
     path = _repository_path(arguments.get("path"))
     ref = optional_string(arguments.get("ref"), "GitHub", "ref")
-    payload = _call_api(
+    return _call_api(
         f"/repos/{quote(owner, safe='')}/{quote(repo, safe='')}/"
         f"contents/{quote(path, safe='/')}",
         context.credentials,
         params={"ref": ref} if ref else {},
     )
-    if payload.get("type") != "file":
-        raise GitHubApiError("unsupported_content")
-    encoded = payload.get("content")
-    content_base64 = encoded.replace("\n", "") if isinstance(encoded, str) else ""
-    payload["content_base64"] = content_base64
-    payload["decoded_content"] = _decode_content(
-        content_base64, payload.get("encoding")
-    )
-    return payload
 
 
 EXECUTORS: dict[str, ConnectorExecutor] = {
@@ -142,25 +132,6 @@ def _repository_ref(owner: object, repo: object) -> tuple[str, str]:
     owner = require_string(owner, "GitHub", "owner")
     repo = require_string(repo, "GitHub", "repo")
     return owner, repo
-
-
-def _number(value: object) -> int | float:
-    """Return a JSON number or zero."""
-    return (
-        value if isinstance(value, (int, float)) and not isinstance(value, bool) else 0
-    )
-
-
-def _decode_content(content_base64: str, encoding: object) -> str | None:
-    """Decode GitHub's file content when it is valid UTF-8 Base64."""
-    if not content_base64:
-        return ""
-    if isinstance(encoding, str) and encoding != "base64":
-        return None
-    try:
-        return base64.b64decode(content_base64).decode("utf-8")
-    except (UnicodeDecodeError, ValueError):
-        return None
 
 
 def _repository_path(value: object) -> str:

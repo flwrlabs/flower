@@ -35,7 +35,7 @@ ACTIONS = (
                 "query": string_property("GitHub code search query."),
                 "sort": {
                     "type": "string",
-                    "enum": ["indexed", "updated"],
+                    "enum": ["indexed"],
                     "description": "Field used to sort results.",
                 },
                 "order": {
@@ -45,10 +45,13 @@ ACTIONS = (
                 },
                 "per_page": {
                     "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
                     "description": "Number of results to return per page.",
                 },
                 "page": {
                     "type": "integer",
+                    "minimum": 1,
                     "description": "Page number to return.",
                 },
             },
@@ -58,10 +61,7 @@ ACTIONS = (
     ),
     ActionDefinition(
         name="get_file_contents",
-        description=(
-            "Read a repository file and return both base64 and decoded text when "
-            "available."
-        ),
+        description="Read a repository file.",
         access=ActionAccess.READ,
         input_schema={
             "type": "object",

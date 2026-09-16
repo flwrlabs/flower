@@ -111,7 +111,8 @@ def get_channel_messages(
 ) -> JSONObject:
     """Get recent messages from a Slack conversation."""
     params: dict[str, str | None] = {
-        "channel": require_string(arguments.get("channel_id"), "Slack", "channel_id")
+        "channel": require_string(arguments.get("channel_id"), "Slack", "channel_id"),
+        "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
     }
     if "limit" in arguments:
         params["limit"] = str(
@@ -134,6 +135,7 @@ def get_thread(arguments: JSONObject, context: ConnectorExecutionContext) -> JSO
                 arguments.get("channel_id"), "Slack", "channel_id"
             ),
             "ts": require_string(arguments.get("thread_ts"), "Slack", "thread_ts"),
+            "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
         },
     )
 
@@ -162,15 +164,8 @@ def _call_slack_api(
         http_error_details=_response_error_details,
     )
     if payload.get("ok") is not True:
-        error = payload.get("error")
-        code = (
-            error
-            if isinstance(error, str)
-            and error.replace("_", "").isalnum()
-            and error.islower()
-            else "api_error"
-        )
-        raise SlackApiError(code)
+        code, message = _payload_error_details(payload, "api_error")
+        raise SlackApiError(code, message=message)
     return payload
 
 
@@ -183,9 +178,22 @@ def _response_error_details(response: requests.Response) -> tuple[str, str | Non
         return fallback_code, None
     if not isinstance(payload, dict):
         return fallback_code, None
-    code = payload.get("error")
+    return _payload_error_details(cast(JSONObject, payload), fallback_code)
+
+
+def _payload_error_details(
+    payload: JSONObject, fallback_code: str
+) -> tuple[str, str | None]:
+    """Return Slack error details from either response envelope shape."""
+    error = payload.get("error")
+    code = error if isinstance(error, str) and error else fallback_code
     message = payload.get("message")
-    return (
-        code if isinstance(code, str) and code else fallback_code,
-        message if isinstance(message, str) and message else None,
-    )
+    if isinstance(message, str) and message:
+        return code, message
+    metadata = payload.get("response_metadata")
+    messages = metadata.get("messages") if isinstance(metadata, dict) else None
+    if isinstance(messages, list):
+        diagnostics = [item for item in messages if isinstance(item, str) and item]
+        if diagnostics:
+            return code, "; ".join(diagnostics)
+    return code, None

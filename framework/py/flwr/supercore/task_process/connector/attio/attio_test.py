@@ -101,6 +101,7 @@ def test_attio_actions_forward_requests() -> None:
         "timezone": "Europe/Berlin",
     }
     cases: list[tuple[str, JSONObject, str, str, JSONObject]] = [
+        ("attio_identify", {}, "GET", "/self", {"params": {}}),
         (
             "attio_get_workspace_member",
             {"workspace_member_id": member_id},
@@ -132,26 +133,6 @@ def test_attio_actions_forward_requests() -> None:
         assert request.call_args.args == (method, f"https://api.attio.com/v2{path}")
         for key, value in expected_kwargs.items():
             assert request.call_args.kwargs[key] == value
-
-
-def test_identify_matches_open_connector_output() -> None:
-    """Attio identify should return Open Connector's normalized fields."""
-    payload = {
-        "active": True,
-        "workspace_id": "workspace-id",
-        "workspace_name": "Flower",
-        "workspace_slug": "flower",
-        "scope": "record_permission:read",
-    }
-    with patch(_HTTP_REQUEST, return_value=_response(payload)):
-        assert _invoke("attio_identify", {}) == {
-            "active": True,
-            "workspace_id": "workspace-id",
-            "workspace_name": "Flower",
-            "workspace_slug": "flower",
-            "scope": "record_permission:read",
-            "raw": payload,
-        }
 
 
 def test_api_errors_include_attio_code_and_message() -> None:

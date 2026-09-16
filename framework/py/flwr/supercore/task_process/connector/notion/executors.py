@@ -54,12 +54,32 @@ def search(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObj
 
 
 def get_page(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
-    """Get one Notion page and its first-level child blocks."""
+    """Get one Notion page and all its first-level child blocks."""
     page_id = require_string(arguments.get("page_id"), "Notion", "page_id")
     page = _call_notion_api("GET", f"/pages/{page_id}", context.credentials)
     block_children = _call_notion_api(
         "GET", f"/blocks/{page_id}/children", context.credentials, params={}
     )
+    results = block_children.get("results")
+    if not isinstance(results, list):
+        raise NotionApiError("invalid_response")
+    cursors: set[str] = set()
+    while block_children.get("has_more") is True:
+        cursor = block_children.get("next_cursor")
+        if not isinstance(cursor, str) or not cursor or cursor in cursors:
+            raise NotionApiError("invalid_response")
+        cursors.add(cursor)
+        block_children = _call_notion_api(
+            "GET",
+            f"/blocks/{page_id}/children",
+            context.credentials,
+            params={"start_cursor": cursor},
+        )
+        next_results = block_children.get("results")
+        if not isinstance(next_results, list):
+            raise NotionApiError("invalid_response")
+        results.extend(next_results)
+    block_children["results"] = results
     return {"page": page, "block_children": block_children}
 
 

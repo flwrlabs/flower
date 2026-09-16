@@ -121,6 +121,7 @@ ACTIONS = (
             "properties": {
                 "channel_id": string_property("The Slack conversation or channel ID."),
                 "limit": _MESSAGE_LIMIT,
+                "cursor": _CURSOR,
             },
             "required": ["channel_id"],
             "additionalProperties": False,
@@ -135,6 +136,7 @@ ACTIONS = (
             "properties": {
                 "channel_id": string_property("The Slack conversation or channel ID."),
                 "thread_ts": string_property("The timestamp of the parent message."),
+                "cursor": _CURSOR,
             },
             "required": ["channel_id", "thread_ts"],
             "additionalProperties": False,

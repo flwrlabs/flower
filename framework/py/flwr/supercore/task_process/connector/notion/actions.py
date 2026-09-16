@@ -63,8 +63,8 @@ ACTIONS = (
     ActionDefinition(
         name="get_page",
         description=(
-            "Get a Notion page together with its first-level child blocks. This is "
-            "an aggregate helper over page retrieval plus block-children listing."
+            "Get a Notion page together with all its first-level child blocks. This "
+            "is an aggregate helper over page retrieval plus block-children listing."
         ),
         access=ActionAccess.READ,
         input_schema={

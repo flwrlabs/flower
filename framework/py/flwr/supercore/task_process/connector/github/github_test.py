@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for the GitHub connector."""
 
-from base64 import b64encode
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
 
@@ -36,13 +35,13 @@ def _response(payload: object, status_code: int = 200) -> Mock:
     return response
 
 
-def test_get_file_contents_returns_base64_and_decoded_text() -> None:
-    """File reads should decode GitHub's Base64 content."""
+def test_get_file_contents_returns_raw_response() -> None:
+    """File reads should return GitHub's response unchanged."""
     response = _response(
         {
             "type": "file",
             "encoding": "base64",
-            "content": b64encode(b'print("hi")\n').decode("ascii"),
+            "content": "cHJpbnQoImhpIikK",
             "path": "src/app.py",
         }
     )
@@ -54,9 +53,7 @@ def test_get_file_contents_returns_base64_and_decoded_text() -> None:
             {"access_token": "secret"},
             {},
         )
-    assert isinstance(result, dict)
-    assert result["content_base64"] == response.json.return_value["content"]
-    assert result["decoded_content"] == 'print("hi")\n'
+    assert result == response.json.return_value
 
 
 def test_github_search_forwards_page() -> None:
@@ -70,24 +67,29 @@ def test_github_search_forwards_page() -> None:
                 "sort": "indexed",
                 "order": "desc",
                 "per_page": 5,
-                "page": 2,
+                "page": 101,
             },
             Mock(),
             {"access_token": "secret"},
             {},
         )
-    assert result == {
-        "total_count": 12,
-        "incomplete_results": False,
-        "items": [],
-    }
+    assert result == response.json.return_value
     assert request.call_args.kwargs["params"] == {
         "q": "Flower repo:acme/repo",
         "sort": "indexed",
         "order": "desc",
         "per_page": "5",
-        "page": "2",
+        "page": "101",
     }
+
+    with pytest.raises(ValueError):
+        registry.invoke_connector(
+            "github_search_code",
+            {"query": "Flower", "per_page": 101},
+            Mock(),
+            {"access_token": "secret"},
+            {},
+        )
 
 
 def test_github_api_errors_include_message() -> None:
