@@ -10,7 +10,7 @@ The finished project uses:
 - `agent.connectors.tools` for runtime-provided schemas
 - `agent.connectors.call` for function calls
 - `agent.events.emit` for frontend-visible model events
-- Flower `Context` for conversation state
+- `agent.events.get_trace` for conversation history
 
 It uses only `web_search` and `web_fetch`. Neither requires an external account.
 
@@ -18,8 +18,10 @@ It uses only `web_search` and `web_fetch`. Neither requires an external account.
 
 Start from the AgentApp template on Flower Hub:
 
-```console
-$ uvx --from flwr==1.35.0 flwr new @flwrlabs/agent
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr new @flwrlabs/agent
 $ cd agent
 ```
 
@@ -42,19 +44,21 @@ agent/
 Keep the generated build-system and Hatch sections. Update the AgentApp-related
 parts of `pyproject.toml`:
 
-```toml
+```{code-block} toml
+:substitutions:
+
 [project]
 name = "research-agent"
 version = "0.1.0"
 description = "A bounded public-web research AgentApp"
 license = { file = "LICENSE" }
 requires-python = ">=3.11,<4.0"
-dependencies = ["flwr>=1.35.0,<2.0", "openai>=2.16.0,<3.0.0"]
+dependencies = ["flwr>=|stable_flwr_version|,<2.0", "openai>=2.16.0,<3.0.0"]
 
 [tool.flwr.app]
 publisher = "local"
 fab-format-version = 1
-flwr-version-target = "1.35.0"
+flwr-version-target = "|stable_flwr_version|"
 fab-include = ["agent/**/*.py", "LICENSE"]
 
 [tool.flwr.app.config.agent]
@@ -92,7 +96,7 @@ import os
 from typing import Any
 
 from flwr.agentapp import AgentApp, AgentSession
-from flwr.app import ConfigRecord, Context
+from flwr.app import Context
 from openai import OpenAI
 
 MODEL = "openai/gpt-5.6-sol"
@@ -108,9 +112,9 @@ Each chat message starts a new run. Flower keeps related runs in a run series,
 but the model sees only the input passed to `client.responses.create`. To
 support follow-up questions, replay the stored user and assistant messages.
 
-Conversation items live in a `ConfigRecord` named `items`. The state also
-contains tool activity, so load only message items and normalize their content
-to plain text:
+Flower stores the user input and AgentApp-published events in the run-series
+trace. The trace also contains connector and reasoning activity, so load only
+user-message events and completed assistant output:
 
 ```python
 def message_text(content: Any) -> str:
@@ -130,54 +134,59 @@ def message_text(content: Any) -> str:
     raise TypeError("Message content must be text or a list of content parts")
 
 
-def conversation_messages(context: Context) -> list[dict[str, Any]]:
-    """Replay only user and assistant messages from the run series."""
-    messages: list[dict[str, Any]] = []
-    items_record = context.state.config_records.get("items")
-    items = items_record.get("json", []) if items_record is not None else []
-    for item_json in items:
-        item = json.loads(item_json)
-        if item.get("type") != "message":
+def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
+    """Rebuild completed user and assistant messages from the event trace."""
+    run_order: list[int] = []
+    turns_by_run: dict[int, list[dict[str, Any]]] = {}
+    assistant_parts_by_run: dict[int, list[str]] = {}
+
+    for entry in agent.events.get_trace():
+        run_id = entry.get("run_id")
+        event_type = entry.get("event")
+        data = entry.get("data")
+        if not isinstance(run_id, int) or not isinstance(data, dict):
             continue
-        messages.append(
-            {
-                "type": "message",
-                "role": item["role"],
-                "content": message_text(item["content"]),
-            }
-        )
-    return messages
+
+        if event_type == "message" and data.get("role") == "user":
+            assistant_parts_by_run.pop(run_id, None)
+            if run_id not in turns_by_run:
+                run_order.append(run_id)
+            turns_by_run[run_id] = [
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": message_text(data.get("content")),
+                }
+            ]
+        elif event_type in {
+            "response.output_text.delta",
+            "response.refusal.delta",
+        }:
+            delta = data.get("delta")
+            if isinstance(delta, str):
+                assistant_parts_by_run.setdefault(run_id, []).append(delta)
+        elif event_type == "response.completed":
+            assistant_parts = assistant_parts_by_run.pop(run_id, [])
+            turn = turns_by_run.get(run_id)
+            if assistant_parts and turn is not None:
+                turn.append(
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": "".join(assistant_parts),
+                    }
+                )
+        elif event_type in {"error", "response.failed", "response.incomplete"}:
+            assistant_parts_by_run.pop(run_id, None)
+
+    return [message for run_id in run_order for message in turns_by_run[run_id]]
 ```
 
 `message_text` raises an error for an unexpected shape instead of silently
-sending incomplete history to the model.
-
-(persist-final-assistant-message)=
-
-### Persist the final answer
-
-The runtime records a non-empty `agent.input` as a user message before calling
-the app. SDK responses are not automatically added to `Context`, which keeps
-private planning turns out of the conversation by default.
-
-Store only the final assistant message after its stream completes:
-
-```python
-def append_assistant_message(context: Context, text: str) -> None:
-    """Persist the final assistant message for the next run in the series."""
-    message = {"type": "message", "role": "assistant", "content": text}
-    with context.locked():
-        items_record = context.state.config_records.setdefault(
-            "items", ConfigRecord({"json": []})
-        )
-        items = items_record.get("json")
-        if not isinstance(items, list):
-            raise TypeError("Context items must be a list")
-        items.append(json.dumps(message))
-```
-
-Locking the context keeps the update atomic if the app later introduces
-parallel work.
+sending incomplete history to the model. The loader groups each user message
+and completed assistant response by run, then flattens those turns in user-event
+order. Overlapping runs therefore cannot mix or reorder their output, and a
+failed or incomplete response is not replayed as a finished answer.
 
 ### Let the model recover from connector failures
 
@@ -202,11 +211,11 @@ def connector_error_output(
 
 The main function has five phases:
 
-1. Validate `agent.input` and rebuild the conversation messages
+1. Validate `agent.input` and rebuild the conversation messages from the trace
 1. Create the OpenAI client and request the connector tool schemas
 1. Execute up to `MAX_TOOL_TURNS` rounds of model-requested function calls
 1. Make one final model request without tools and publish its stream
-1. Persist and log the completed assistant message
+1. Log the completed assistant message
 
 Add the entry point:
 
@@ -223,14 +232,7 @@ def main(agent: AgentSession, context: Context) -> None:
         api_key=os.environ["FLWR_RUNTIME_API_KEY"],
         max_retries=0,
     )
-    input_items = conversation_messages(context)
-    if not any(
-        item["role"] == "user" and item["content"].strip() == prompt.strip()
-        for item in input_items
-    ):
-        input_items.append(
-            {"type": "message", "role": "user", "content": prompt.strip()}
-        )
+    input_items = conversation_messages(agent)
 
     tools = agent.connectors.tools(TOOL_REFS)
     allowed_tool_names = {
@@ -301,25 +303,26 @@ def main(agent: AgentSession, context: Context) -> None:
             output_text.append(event.delta)
 
     final_text = "".join(output_text)
-    append_assistant_message(context, final_text)
     print(final_text)
 ```
 
-The duplicate check accounts for the user message Flower already stored. The
-planning calls remain local to this run because SDK responses are not appended
-to `Context`. The app keeps each complete model output next to its connector
-outputs so later turns retain function-call context.
+The trace already contains the current `agent.input` event when the AgentApp
+starts. The planning calls remain local to this run because the app publishes
+only the final streamed response. The complete planning output and connector
+outputs stay in `input_items` for subsequent tool turns within this run; the
+trace loader does not replay them on later runs.
 
 The allowed names come from the returned schemas because one connector
 reference can expose several tools. The final request omits `tools`, which
 forces an answer instead of another connector round. The stream collects both
-answer and refusal text, then publishes and persists that result. If the stream
-is incomplete, the app raises an error before updating the conversation state.
+answer and refusal text, then publishes that result. If the stream is
+incomplete, the app raises an error and the trace loader discards its partial
+text on the next run.
 
 ```{note}
 Connector calls still record their outputs and activity for run inspection.
-The app replays only message items on the next run, so connector activity and
-function outputs are not treated as conversation messages.
+The trace loader ignores those event types, so connector activity and function
+outputs are not treated as conversation messages.
 ```
 
 ### Copy the complete file
@@ -340,7 +343,7 @@ import os
 from typing import Any
 
 from flwr.agentapp import AgentApp, AgentSession
-from flwr.app import ConfigRecord, Context
+from flwr.app import Context
 from openai import OpenAI
 
 MODEL = "openai/gpt-5.6-sol"
@@ -367,36 +370,52 @@ def message_text(content: Any) -> str:
     raise TypeError("Message content must be text or a list of content parts")
 
 
-def conversation_messages(context: Context) -> list[dict[str, Any]]:
-    """Replay only user and assistant messages from the run series."""
-    messages: list[dict[str, Any]] = []
-    items_record = context.state.config_records.get("items")
-    items = items_record.get("json", []) if items_record is not None else []
-    for item_json in items:
-        item = json.loads(item_json)
-        if item.get("type") != "message":
+def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
+    """Rebuild completed user and assistant messages from the event trace."""
+    run_order: list[int] = []
+    turns_by_run: dict[int, list[dict[str, Any]]] = {}
+    assistant_parts_by_run: dict[int, list[str]] = {}
+
+    for entry in agent.events.get_trace():
+        run_id = entry.get("run_id")
+        event_type = entry.get("event")
+        data = entry.get("data")
+        if not isinstance(run_id, int) or not isinstance(data, dict):
             continue
-        messages.append(
-            {
-                "type": "message",
-                "role": item["role"],
-                "content": message_text(item["content"]),
-            }
-        )
-    return messages
 
+        if event_type == "message" and data.get("role") == "user":
+            assistant_parts_by_run.pop(run_id, None)
+            if run_id not in turns_by_run:
+                run_order.append(run_id)
+            turns_by_run[run_id] = [
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": message_text(data.get("content")),
+                }
+            ]
+        elif event_type in {
+            "response.output_text.delta",
+            "response.refusal.delta",
+        }:
+            delta = data.get("delta")
+            if isinstance(delta, str):
+                assistant_parts_by_run.setdefault(run_id, []).append(delta)
+        elif event_type == "response.completed":
+            assistant_parts = assistant_parts_by_run.pop(run_id, [])
+            turn = turns_by_run.get(run_id)
+            if assistant_parts and turn is not None:
+                turn.append(
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": "".join(assistant_parts),
+                    }
+                )
+        elif event_type in {"error", "response.failed", "response.incomplete"}:
+            assistant_parts_by_run.pop(run_id, None)
 
-def append_assistant_message(context: Context, text: str) -> None:
-    """Persist the final assistant message for the next run in the series."""
-    message = {"type": "message", "role": "assistant", "content": text}
-    with context.locked():
-        items_record = context.state.config_records.setdefault(
-            "items", ConfigRecord({"json": []})
-        )
-        items = items_record.get("json")
-        if not isinstance(items, list):
-            raise TypeError("Context items must be a list")
-        items.append(json.dumps(message))
+    return [message for run_id in run_order for message in turns_by_run[run_id]]
 
 
 def connector_error_output(
@@ -422,14 +441,7 @@ def main(agent: AgentSession, context: Context) -> None:
         api_key=os.environ["FLWR_RUNTIME_API_KEY"],
         max_retries=0,
     )
-    input_items = conversation_messages(context)
-    if not any(
-        item["role"] == "user" and item["content"].strip() == prompt.strip()
-        for item in input_items
-    ):
-        input_items.append(
-            {"type": "message", "role": "user", "content": prompt.strip()}
-        )
+    input_items = conversation_messages(agent)
 
     tools = agent.connectors.tools(TOOL_REFS)
     allowed_tool_names = {
@@ -500,7 +512,6 @@ def main(agent: AgentSession, context: Context) -> None:
             output_text.append(event.delta)
 
     final_text = "".join(output_text)
-    append_assistant_message(context, final_text)
     print(final_text)
 ```
 
