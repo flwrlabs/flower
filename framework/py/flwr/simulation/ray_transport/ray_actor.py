@@ -27,6 +27,7 @@ from ray.util.actor_pool import ActorPool
 
 from flwr.app import Context, Message
 from flwr.clientapp.client_app import ClientApp, ClientAppException, LoadClientAppError
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore import log
 
 ClientAppFn = Callable[[], ClientApp]
@@ -46,14 +47,23 @@ class VirtualClientEngineActor(ABC):
         message: Message,
         cid: str,
         context: Context,
-    ) -> tuple[str, Message, Context]:
+    ) -> tuple[str, Message, Context, list[TaskEvent]]:
         """Run a client run."""
         # Pass message through ClientApp and return a message
         # return also cid which is needed to ensure results
         # from the pool are correctly assigned to each ClientProxy
+        events: list[TaskEvent] = []
         try:
             # Load app
             app: ClientApp = client_app_fn()
+            existing_callback = app.get_event_callback()
+
+            def _capture_event(event: TaskEvent) -> None:
+                events.append(event)
+                if existing_callback is not None:
+                    existing_callback(event)
+
+            app.set_event_callback(_capture_event)
 
             # Handle task message
             out_message = app(message=message, context=context)
@@ -62,9 +72,9 @@ class VirtualClientEngineActor(ABC):
             raise load_ex
 
         except Exception as ex:
-            raise ClientAppException(str(ex)) from ex
+            raise ClientAppException(str(ex), task_events=events) from ex
 
-        return cid, out_message, context
+        return cid, out_message, context, events
 
 
 @ray.remote
@@ -280,9 +290,11 @@ class VirtualClientEngineActorPool(ActorPool):
         """
         try:
             future: ObjectRef[Any] = self._cid_to_future[cid]["future"]  # type: ignore
-            res_cid, out_mssg, updated_context = ray.get(
-                future
-            )  # type: (str, Message, Context)
+            result: (
+                tuple[str, Message, Context]
+                | tuple[str, Message, Context, list[TaskEvent]]
+            ) = ray.get(future)
+            res_cid, out_mssg, updated_context = result[:3]
         except ray.exceptions.RayActorError as ex:
             log(ERROR, ex)
             if hasattr(ex, "actor_id"):
@@ -474,11 +486,11 @@ class BasicActorPool:
 
     def fetch_result_and_return_actor_to_pool(
         self, future: Any
-    ) -> tuple[Message, Context]:
+    ) -> tuple[Message, Context, list[TaskEvent]]:
         """Pull result given a future and add actor back to pool."""
         # Retrieve result for object store
         # Instead of doing ray.get(future) we await it
-        _, out_mssg, updated_context = ray.get(future)
+        _, out_mssg, updated_context, events = ray.get(future)
         # Get actor that ran job
         self.add_actor_back_to_pool(future)
-        return out_mssg, updated_context
+        return out_mssg, updated_context, events

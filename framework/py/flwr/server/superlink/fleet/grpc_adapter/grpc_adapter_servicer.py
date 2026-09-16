@@ -34,6 +34,7 @@ from flwr.proto.fab_pb2 import GetFabRequest  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
     DeactivateNodeRequest,
+    FleetPushTaskEventsRequest,
     PullMessagesRequest,
     PushMessagesRequest,
     RegisterNodeFleetRequest,
@@ -109,6 +110,10 @@ class GrpcAdapterServicer(grpcadapter_pb2_grpc.GrpcAdapterServicer, FleetService
             return _handle(request, context, PullMessagesRequest, self.PullMessages)
         if request.grpc_message_name == PushMessagesRequest.__qualname__:
             return _handle(request, context, PushMessagesRequest, self.PushMessages)
+        if request.grpc_message_name == FleetPushTaskEventsRequest.__qualname__:
+            return _handle(
+                request, context, FleetPushTaskEventsRequest, self.PushTaskEvents
+            )
         if request.grpc_message_name == PushObjectRequest.__qualname__:
             return _handle(request, context, PushObjectRequest, self.PushObject)
         if request.grpc_message_name == PullObjectRequest.__qualname__:

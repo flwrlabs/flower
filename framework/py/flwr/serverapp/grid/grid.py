@@ -16,9 +16,10 @@
 
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 from flwr.app import Message, RecordDict
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.run import Run
 
 
@@ -154,3 +155,18 @@ class Grid(ABC):
         replies for all sent messages. A message remains valid until its TTL,
         which is not affected by ``timeout``.
         """
+
+    def push_task_events(self, events: Sequence[TaskEvent]) -> None:
+        """Push task events to the Runtime API.
+
+        Parameters
+        ----------
+        events : Sequence[TaskEvent]
+            A sequence of task events to push.
+
+        Notes
+        -----
+        The default implementation is a no-op. Subclasses that interface with a
+        Runtime API should override this method.
+        """
+        _ = events

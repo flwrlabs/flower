@@ -21,6 +21,7 @@ from collections.abc import Callable
 from flwr.app.message import Context, Message
 from flwr.app.typing import ConfigRecordValues
 from flwr.clientapp.client_app import ClientApp
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 
 BackendConfig = dict[str, dict[str, ConfigRecordValues]]
 
@@ -61,5 +62,5 @@ class Backend(ABC):
         self,
         message: Message,
         context: Context,
-    ) -> tuple[Message, Context]:
+    ) -> tuple[Message, Context, list[TaskEvent]]:
         """Submit a job to the backend."""

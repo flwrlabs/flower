@@ -16,7 +16,7 @@
 
 
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from logging import DEBUG, ERROR, WARNING
 from typing import cast
 
@@ -38,7 +38,9 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullAppMessagesResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
+    PushTaskEventsRequest,
 )
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.serverapp.grid import Grid
 from flwr.supercore import log
 from flwr.supercore.constant import SUPERLINK_UVICORN_DEFAULT_PORT, SYSTEM_MESSAGE_TYPE
@@ -410,6 +412,14 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
             # Sleep
             time.sleep(3)
         return ret
+
+    def push_task_events(self, events: Sequence[TaskEvent]) -> None:
+        """Push task events to the Runtime API."""
+        event_list = list(events)
+        if event_list:
+            self._runtime_client.PushTaskEvents(
+                PushTaskEventsRequest(events=event_list)
+            )
 
     def close(self) -> None:
         """Disconnect from the SuperLink if connected."""
