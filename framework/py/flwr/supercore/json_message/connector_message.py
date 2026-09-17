@@ -46,7 +46,7 @@ class ConnectorRequest(JSONMessage):
         )
 
     @classmethod
-    def _validate_payload(cls, payload: JSONObject) -> None:
+    def validate_payload(cls, payload: JSONObject) -> None:
         """Validate the connector request payload shape."""
         cls._validate_non_empty_string(payload, "name")
         cls._validate_non_empty_string(payload, "call_id")
@@ -87,7 +87,7 @@ class ConnectorResponse(JSONMessage):
         )
 
     @classmethod
-    def _validate_payload(cls, payload: JSONObject) -> None:
+    def validate_payload(cls, payload: JSONObject) -> None:
         """Validate the connector response payload shape."""
         cls._validate_non_empty_string(payload, "name")
         cls._validate_non_empty_string(payload, "call_id")

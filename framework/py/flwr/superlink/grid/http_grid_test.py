@@ -45,6 +45,7 @@ from flwr.supercore.interceptors import (
     RuntimeVersionHttpInterceptor,
 )
 from flwr.supercore.run import Run
+from flwr.supercore.task_identity import TaskIdentity
 
 from .http_grid import HttpGrid
 
@@ -64,6 +65,14 @@ class TestHttpGrid(unittest.TestCase):
         self.grid = HttpGrid(token="test-token")
         self.grid._client = self.mock_client  # pylint: disable=protected-access
         self.grid.set_run(self.mock_run)
+        identity_patcher = patch.multiple(
+            TaskIdentity,
+            _task_id=123,
+            _run_id=self.mock_run.run_id,
+            _node_id=SUPERLINK_NODE_ID,
+        )
+        identity_patcher.start()
+        self.addCleanup(identity_patcher.stop)
 
     def test_init_http_grid(self) -> None:
         """Test Runtime HTTP client initialization."""
@@ -96,10 +105,6 @@ class TestHttpGrid(unittest.TestCase):
         # in the mocked responses, due to this we need to set
         # elements in the metadata that would be normally be
         # set when pushing a message.
-        # pylint: disable-next=W0212
-        message.metadata._run_id = 61016  # type: ignore
-        # pylint: disable-next=W0212
-        message.metadata._src_node_id = SUPERLINK_NODE_ID  # type: ignore
         message.metadata.__dict__["_message_id"] = message.object_id
         return message
 

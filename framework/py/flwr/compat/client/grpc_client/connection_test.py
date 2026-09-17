@@ -20,6 +20,7 @@ from collections.abc import Iterator
 from unittest.mock import patch
 
 import grpc
+import pytest
 
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common import Code, GetPropertiesRes, Status
@@ -32,6 +33,7 @@ from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
 from flwr.server.client_manager import SimpleClientManager
 from flwr.server.superlink.fleet.grpc_bidi.grpc_server import start_grpc_server
 from flwr.supercore.retry import RetryInvoker, exponential
+from flwr.supercore.task_identity import TaskIdentity
 
 from .connection import grpc_connection
 
@@ -40,18 +42,13 @@ EXPECTED_NUM_SERVER_MESSAGE = 10
 SERVER_MESSAGE = ServerMessage(get_properties_ins=ServerMessage.GetPropertiesIns())
 SERVER_MESSAGE_RECONNECT = ServerMessage(reconnect_ins=ServerMessage.ReconnectIns())
 
-MESSAGE_GET_PROPERTIES = Message(
-    content=compat.getpropertiesres_to_recorddict(
-        GetPropertiesRes(Status(Code.OK, ""), {})
-    ),
-    dst_node_id=0,
-    message_type=MessageTypeLegacy.GET_PROPERTIES,
-)
-MESSAGE_DISCONNECT = Message(
-    content=RecordDict({"config": ConfigRecord({"reason": 0})}),
-    dst_node_id=0,
-    message_type="reconnect",
-)
+
+@pytest.fixture(autouse=True)
+def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the task identity used by instruction message tests."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 123)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 456)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 789)
 
 
 def mock_join(  # type: ignore # pylint: disable=invalid-name
@@ -91,6 +88,18 @@ def test_integration_connection() -> None:
     roundtrips between server and client.
     """
     # Prepare
+    message_get_properties = Message(
+        compat.getpropertiesres_to_recorddict(
+            GetPropertiesRes(Status(Code.OK, ""), {})
+        ),
+        dst_node_id=0,
+        message_type=MessageTypeLegacy.GET_PROPERTIES,
+    )
+    message_disconnect = Message(
+        RecordDict({"config": ConfigRecord({"reason": 0})}),
+        dst_node_id=0,
+        message_type="reconnect",
+    )
     server = start_grpc_server(
         client_manager=SimpleClientManager(), server_address="[::]:0"
     )
@@ -119,11 +128,11 @@ def test_integration_connection() -> None:
 
                 messages_received += 1
                 if message.metadata.message_type == "reconnect":  # type: ignore
-                    send(MESSAGE_DISCONNECT)
+                    send(message_disconnect)
                     break
 
                 # Process server_message and send client_message...
-                send(MESSAGE_GET_PROPERTIES)
+                send(message_get_properties)
 
         return messages_received
 

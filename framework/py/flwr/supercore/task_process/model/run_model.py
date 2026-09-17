@@ -49,6 +49,7 @@ from flwr.supercore.interceptors import (
 )
 from flwr.supercore.retry import RetryInvoker, make_simple_http_retry_invoker
 from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
 
 from .task import handle_task
@@ -92,13 +93,12 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
             task_input: PullTaskInputResponse = self._client.PullTaskInput(
                 PullTaskInputRequest()
             )
+            TaskIdentity.task_id = task_input.task_id
+            TaskIdentity.run_id = task_input.run.run_id
+            TaskIdentity.node_id = task_input.context.node_id
 
             event(EventType.FLWR_MODEL_RUN_ENTER)
-            handle_task(
-                client=self._client,
-                task_id=task_input.task_id,
-                run_id=task_input.run.run_id,
-            )
+            handle_task(client=self._client)
 
             with self._lock:
                 self._sub_status = SubStatus.COMPLETED

@@ -30,10 +30,12 @@ from unittest.mock import Mock, patch
 import pytest
 
 from flwr.common.constant import SubStatus
+from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
 from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import PullTaskInputResponse  # pylint: disable=E0611
 from flwr.supercore.exit import ExitCode
 from flwr.supercore.exit.exit_handler import registered_exit_handlers
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType
 
 run_model_module = importlib.import_module(
@@ -63,7 +65,9 @@ def test_run_model_once_uses_fresh_task_scoped_state_and_cleans_up(
     """One invocation should own and close its Runtime and heartbeat state."""
     client = Mock()
     client.PullTaskInput.return_value = PullTaskInputResponse(
-        task_id=17, run=ProtoRun(run_id=42)
+        task_id=17,
+        run=ProtoRun(run_id=42),
+        context=ProtoContext(node_id=99),
     )
     retry_invoker = Mock(max_tries=10)
     create_client = Mock(return_value=(client, retry_invoker))
@@ -91,7 +95,10 @@ def test_run_model_once_uses_fresh_task_scoped_state_and_cleans_up(
         certificates=None,
     )
     heartbeat_sender.start.assert_called_once_with()
-    handle_task.assert_called_once_with(client=client, task_id=17, run_id=42)
+    handle_task.assert_called_once_with(client=client)
+    assert TaskIdentity.task_id == 17
+    assert TaskIdentity.run_id == 42
+    assert TaskIdentity.node_id == 99
     output = client.PushTaskOutput.call_args.args[0]
     assert output.sub_status == expected_status
     assert output.details == expected_details

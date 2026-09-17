@@ -74,6 +74,7 @@ from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
 
 
@@ -235,6 +236,9 @@ def pull_task_input(client: RuntimeHttpClient) -> tuple[Message, Context, Run, F
     """Pull TaskInput from SuperNode."""
     # Pull Context, Run and FAB
     res: PullTaskInputResponse = client.PullTaskInput(PullTaskInputRequest())
+    TaskIdentity.task_id = res.task_id
+    TaskIdentity.run_id = res.run.run_id
+    TaskIdentity.node_id = res.context.node_id
     context = context_from_proto(res.context)
     run = run_from_proto(res.run)
     fab = fab_from_proto(res.fab)

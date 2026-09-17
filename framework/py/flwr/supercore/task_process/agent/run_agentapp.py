@@ -59,6 +59,7 @@ from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.superlink.grid import HttpGrid
@@ -166,6 +167,9 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)
         task_id = res.task_id
+        TaskIdentity.task_id = task_id
+        TaskIdentity.run_id = run.run_id
+        TaskIdentity.node_id = context.node_id
 
         hash_run_id = get_sha256_hash(run.run_id)
 
