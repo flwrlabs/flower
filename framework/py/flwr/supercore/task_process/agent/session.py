@@ -391,8 +391,6 @@ class AgentRuntime:
 
     def _push_task_message(self, message: Message) -> None:
         """Push one task message and return its message ID."""
-        message.metadata.__dict__["_run_id"] = self._run_id
-        message.metadata.src_task_id = self._task_id
         message.metadata.__dict__["_message_id"] = message.object_id
         self._stub.PushTaskMessage(
             PushTaskMessageRequest(message=message_to_proto(message))
