@@ -73,10 +73,6 @@ def validate_message(message: Message, is_reply_message: bool) -> list[str]:
             validation_errors.append(
                 f"`metadata.src_node_id` is not {SUPERLINK_NODE_ID} (SuperLink node ID)"
             )
-        if metadata.dst_node_id == SUPERLINK_NODE_ID:
-            validation_errors.append(
-                f"`metadata.dst_node_id` is {SUPERLINK_NODE_ID} (SuperLink node ID)"
-            )
     else:
         if metadata.reply_to_message_id == "":
             validation_errors.append("`metadata.reply_to_message_id` MUST be set.")

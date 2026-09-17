@@ -54,18 +54,33 @@ class LinkState(CoreState):  # pylint: disable=R0904
 
         Constraints
         -----------
-        `message.metadata.dst_node_id` MUST be set (not constant.SUPERLINK_NODE_ID)
+        `message.metadata.dst_node_id` MUST be set.
 
         If `message.metadata.run_id` is invalid, then
         storing the `message` MUST fail.
         """
 
     @abc.abstractmethod
-    def get_message_ins(self, node_id: int, limit: int | None) -> list[Message]:
+    def get_message_ins(
+        self,
+        node_id: int,
+        limit: int | None,
+        *,
+        run_id: int | None = None,
+    ) -> list[Message]:
         """Get zero or more `Message` objects for the provided `node_id`.
 
         Usually, the Fleet API calls this for Nodes planning to work on one or more
         Message.
+
+        Parameters
+        ----------
+        node_id : int
+            The node ID to retrieve Messages for.
+        limit : Optional[int]
+            Maximum number of Messages to return. If None, no limit is applied.
+        run_id : Optional[int] (default: None)
+            The run ID to filter by.
 
         Constraints
         -----------
