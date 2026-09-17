@@ -76,7 +76,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         Parameters
         ----------
         node_id : int
-            The node ID to retrieve Messages for.
+            The destination node ID to filter Messages by.
         limit : Optional[int]
             Maximum number of Messages to return. If None, no limit is applied.
         run_id : Optional[int] (default: None)
