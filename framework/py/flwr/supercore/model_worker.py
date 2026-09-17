@@ -18,38 +18,33 @@ from __future__ import annotations
 
 import argparse
 import json
+import signal
 import socket
 import sys
+import threading
 from collections.abc import Callable
+from contextlib import ExitStack
 from dataclasses import asdict, dataclass
 from logging import ERROR
 from pathlib import Path
-from typing import Any, Protocol
+from types import FrameType
+from typing import Any
 
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
 from flwr.supercore import log
+from flwr.supercore import model_worker_protocol as protocol
 from flwr.supercore.warm_executor_constants import (
     WARM_EXECUTOR_BUSY_FILE,
     WARM_EXECUTOR_READY_FILE,
     WARM_MODEL_EXECUTOR_SOCKET,
 )
 
-_MAX_PROTOCOL_MESSAGE_BYTES = 16_384
-_RunModelOnce = Callable[[str, str, bool, bytes | None], int]
-
-
-class _MessageChannel(Protocol):
-    """Minimal buffered byte-stream interface used by the worker protocol."""
-
-    def readline(self, size: int = -1, /) -> bytes:
-        """Read at most one protocol line."""
-
-    def write(self, data: bytes, /) -> int:
-        """Write protocol bytes."""
-
-    def flush(self) -> None:
-        """Flush pending protocol bytes."""
+_OUTPUT_SEND_TIMEOUT_SECONDS = 0.1
+_RunModelOnce = Callable[
+    [str, str, bool, bytes | None, Callable[[], None]],
+    int,
+]
 
 
 @dataclass(frozen=True)
@@ -126,6 +121,7 @@ def serve_prestarted_model_worker(
         run_model_once,
     )
 
+    _register_idle_signal_handlers()
     socket_path.parent.mkdir(parents=True, exist_ok=True)
     socket_path.unlink(missing_ok=True)
     ready_file.unlink(missing_ok=True)
@@ -161,7 +157,7 @@ def _serve_ready_worker(
         busy_file.unlink(missing_ok=True)
 
 
-def dispatch_prestarted_model(
+def dispatch_prestarted_model(  # pylint: disable=too-many-return-statements
     invocation: ModelInvocation,
     socket_path: Path = Path(WARM_MODEL_EXECUTOR_SOCKET),
 ) -> int:
@@ -170,25 +166,50 @@ def dispatch_prestarted_model(
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
             connection.connect(str(socket_path))
             with connection.makefile("rwb") as channel:
-                _send_message(channel, asdict(invocation))
+                protocol.send_message(channel, asdict(invocation))
                 accepted = False
                 while True:
-                    response = _read_message(channel)
+                    response = protocol.read_message(channel)
                     event_name = response.get("event")
                     if event_name == "accepted":
+                        if accepted or set(response) != {"event"}:
+                            return 1
                         accepted = True
                         print(FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT, flush=True)
                     elif event_name == "rejected":
+                        reason = response.get("reason")
+                        if (
+                            accepted
+                            or set(response) != {"event", "reason"}
+                            or not isinstance(reason, str)
+                        ):
+                            return 1
                         print(
-                            str(response.get("reason", "Model invocation rejected.")),
+                            reason,
                             file=sys.stderr,
                         )
                         return 1
+                    elif event_name == "output":
+                        stream = response.get("stream")
+                        output = response.get("data")
+                        if (
+                            not accepted
+                            or set(response) != {"event", "stream", "data"}
+                            or stream not in {"stdout", "stderr"}
+                            or not isinstance(output, str)
+                        ):
+                            return 1
+                        output_stream = sys.stdout if stream == "stdout" else sys.stderr
+                        output_stream.write(output)
+                        output_stream.flush()
                     elif event_name == "finished":
                         returncode = response.get("returncode")
                         return (
                             returncode
-                            if accepted and isinstance(returncode, int)
+                            if accepted
+                            and set(response) == {"event", "returncode"}
+                            and isinstance(returncode, int)
+                            and not isinstance(returncode, bool)
                             else 1
                         )
                     else:
@@ -200,74 +221,125 @@ def dispatch_prestarted_model(
 
 def _serve_connection(connection: socket.socket, run_once: _RunModelOnce) -> int:
     """Consume one invocation after the worker has become exclusively busy."""
-    with connection.makefile("rwb") as channel:
-        return _serve_channel(channel, run_once)
+    channel = connection.makefile("rwb")
+    try:
+        return _serve_channel(
+            channel,
+            run_once,
+            prepare_output=lambda: connection.settimeout(_OUTPUT_SEND_TIMEOUT_SECONDS),
+        )
+    finally:
+        try:
+            channel.close()
+        except OSError:
+            # An accepted task must not fail because its exec-side reader left.
+            pass
 
 
-def _serve_channel(channel: _MessageChannel, run_once: _RunModelOnce) -> int:
+def _serve_channel(
+    channel: protocol.MessageChannel,
+    run_once: _RunModelOnce,
+    prepare_output: Callable[[], None] | None = None,
+) -> int:
     """Consume one invocation over a buffered JSON-lines channel."""
     try:
-        invocation = ModelInvocation.from_payload(_read_message(channel))
+        invocation = ModelInvocation.from_payload(protocol.read_message(channel))
     except ValueError as err:
         try:
-            _send_message(channel, {"event": "rejected", "reason": str(err)})
-        except OSError:
+            protocol.send_message(channel, {"event": "rejected", "reason": str(err)})
+        except (OSError, ValueError):
             pass
         return 1
 
-    try:
-        _send_message(channel, {"event": "accepted"})
-    except OSError:
-        # Authority has already reached the worker. Execute instead of risking
-        # duplicate task processing through a fallback path.
-        pass
+    sender: protocol.ProtocolOutputSender | None = None
+    accepted = False
+    output_context = ExitStack()
+
+    def accept_invocation() -> None:
+        nonlocal accepted, sender
+        if accepted:
+            raise RuntimeError("Model invocation was accepted more than once.")
+        accepted = True
+        try:
+            protocol.send_message(channel, {"event": "accepted"})
+        except Exception:  # pylint: disable=broad-exception-caught
+            # Authority has reached task-scoped state. Execute instead of
+            # risking duplicate processing through any fallback path.
+            pass
+        if prepare_output is not None:
+            try:
+                prepare_output()
+            except Exception:  # pylint: disable=broad-exception-caught
+                # Output delivery remains best effort after acceptance.
+                pass
+        sender = protocol.ProtocolOutputSender(channel)
+        try:
+            output_context.enter_context(
+                protocol.relay_task_output(sender, invocation.token)
+            )
+        except Exception:  # pylint: disable=broad-exception-caught
+            # Task execution must not depend on output relay setup.
+            pass
 
     returncode = 1
     try:
-        certificates = (
-            Path(invocation.root_certificates_path).read_bytes()
-            if invocation.root_certificates_path is not None
-            else None
-        )
-        returncode = run_once(
-            invocation.runtime_api_address,
-            invocation.token,
-            invocation.insecure,
-            certificates,
-        )
-    except Exception as err:  # pylint: disable=broad-exception-caught
-        log(ERROR, "Prestarted Model worker failed", exc_info=err)
-    try:
-        _send_message(channel, {"event": "finished", "returncode": returncode})
-    except OSError:
-        pass
+        try:
+            certificates = (
+                Path(invocation.root_certificates_path).read_bytes()
+                if invocation.root_certificates_path is not None
+                else None
+            )
+            returncode = run_once(
+                invocation.runtime_api_address,
+                invocation.token,
+                invocation.insecure,
+                certificates,
+                accept_invocation,
+            )
+            if not accepted:
+                raise RuntimeError("Model invocation was not accepted.")
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            log(ERROR, "Prestarted Model worker failed", exc_info=err)
+            if not accepted:
+                try:
+                    protocol.send_message(
+                        channel,
+                        {
+                            "event": "rejected",
+                            "reason": "Prestarted Model worker could not start task.",
+                        },
+                    )
+                except (OSError, ValueError):
+                    pass
+    finally:
+        output_context.close()
+        if sender is not None:
+            sender.close(returncode if sys.exc_info()[0] is None else None)
     return returncode
 
 
-def _send_message(channel: _MessageChannel, payload: dict[str, Any]) -> None:
-    """Send one bounded newline-delimited JSON protocol message."""
-    encoded = json.dumps(payload, separators=(",", ":")).encode() + b"\n"
-    if len(encoded) > _MAX_PROTOCOL_MESSAGE_BYTES:
-        raise ValueError("Model worker protocol message is too large.")
-    channel.write(encoded)
-    channel.flush()
+def _register_idle_signal_handlers() -> None:
+    """Let an idle PID 1 worker unwind marker and socket cleanup on signals."""
+    from flwr.supercore.exit.signal_handler import (  # pylint: disable=import-outside-toplevel
+        SIGNAL_TO_EXIT_CODE,
+    )
 
+    default_handlers: dict[int, Any] = {}
+    is_exiting = False
+    lock = threading.Lock()
 
-def _read_message(channel: _MessageChannel) -> dict[str, Any]:
-    """Read one bounded newline-delimited JSON protocol message."""
-    encoded = channel.readline(_MAX_PROTOCOL_MESSAGE_BYTES + 1)
-    if not encoded:
-        raise ValueError("Model worker protocol connection closed.")
-    if len(encoded) > _MAX_PROTOCOL_MESSAGE_BYTES or not encoded.endswith(b"\n"):
-        raise ValueError("Model worker protocol message is too large.")
-    raw = encoded[:-1]
-    try:
-        payload = json.loads(raw)
-    except (UnicodeDecodeError, json.JSONDecodeError) as err:
-        raise ValueError("Model worker protocol message must be valid JSON.") from err
-    if not isinstance(payload, dict):
-        raise ValueError("Model worker protocol message must be a JSON object.")
-    return payload
+    def graceful_exit_handler(_signalnum: int, _frame: FrameType | None) -> None:
+        nonlocal is_exiting
+        with lock:
+            if is_exiting:
+                return
+            is_exiting = True
+        for sig, default_handler in default_handlers.items():
+            signal.signal(sig, default_handler)
+        raise SystemExit(0)
+
+    for sig in SIGNAL_TO_EXIT_CODE:
+        default_handlers[sig] = signal.signal(sig, graceful_exit_handler)
 
 
 def _required_string(payload: dict[str, Any], name: str) -> str:
