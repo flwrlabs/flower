@@ -101,16 +101,19 @@ def test_protocol_preserves_coalesced_messages() -> None:
 
 
 @pytest.mark.parametrize("returncode", [0, 1])
-def test_ready_worker_cleans_up_markers(
+def test_worker_cleans_up_socket_and_markers(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     returncode: int,
 ) -> None:
-    """Ready and busy markers should be exclusive and always removed."""
+    """Worker files should be exclusive and removed for either result."""
+    socket_path = tmp_path / "model.sock"
     ready_file = tmp_path / "ready"
     busy_file = tmp_path / "busy"
     connection = MagicMock()
-    server = Mock()
+    server = MagicMock()
+    server.__enter__.return_value = server
+    server.bind.side_effect = lambda _: socket_path.touch()
 
     def accept() -> tuple[object, None]:
         assert ready_file.is_file()
@@ -122,43 +125,17 @@ def test_ready_worker_cleans_up_markers(
         return returncode
 
     server.accept.side_effect = accept
-    monkeypatch.setattr(model_worker, "_serve_connection", serve_connection)
-
-    assert (
-        model_worker._serve_ready_worker(server, ready_file, busy_file, Mock())
-        == returncode
-    )
-    assert not ready_file.exists()
-    assert not busy_file.exists()
-
-
-def test_worker_shutdown_cleans_up_files(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    """Worker shutdown should remove its socket and marker files."""
-    socket_path = tmp_path / "model.sock"
-    ready_file = tmp_path / "ready"
-    busy_file = tmp_path / "busy"
-    server = MagicMock()
-    server.__enter__.return_value = server
-    server.bind.side_effect = lambda _: socket_path.touch()
-
-    def stop(*_: object) -> int:
-        for path in (socket_path, ready_file, busy_file):
-            path.touch()
-        raise SystemExit(0)
-
     register_signals = Mock()
     monkeypatch.setattr(socket, "socket", Mock(return_value=server))
     monkeypatch.setattr(
         model_worker, "_register_idle_signal_handlers", register_signals
     )
-    monkeypatch.setattr(model_worker, "_serve_ready_worker", stop)
+    monkeypatch.setattr(model_worker, "_serve_connection", serve_connection)
 
-    with pytest.raises(SystemExit):
+    assert (
         model_worker.serve_prestarted_model_worker(socket_path, ready_file, busy_file)
-
+        == returncode
+    )
     register_signals.assert_called_once_with()
     assert not any(path.exists() for path in (socket_path, ready_file, busy_file))
 

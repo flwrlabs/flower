@@ -103,19 +103,18 @@ def test_run_model_once_cleans_up_fresh_task_state(
     )
 
 
-def test_model_task_completion_is_exactly_once(
+def test_resident_signal_finalization_is_exactly_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Racing completion paths should finalize and emit telemetry once."""
+    """A resident graceful signal should finalize and emit telemetry once."""
     client = Mock()
-    retry_invoker = Mock(max_tries=10)
     heartbeat = Mock(is_running=True)
     leave_future = Mock()
     telemetry = Mock(return_value=leave_future)
     monkeypatch.setattr(
         run_model_module,
         "_create_runtime_client",
-        Mock(return_value=(client, retry_invoker)),
+        Mock(return_value=(client, Mock(max_tries=10))),
     )
     monkeypatch.setattr(run_model_module, "event", telemetry)
     lifecycle = run_model_module._ModelTaskLifecycle(
@@ -123,43 +122,7 @@ def test_model_task_completion_is_exactly_once(
     )
     lifecycle.initialize()
     lifecycle._heartbeat_sender = heartbeat
-    lifecycle.mark_interrupted()
-
-    threads = [
-        threading.Thread(
-            target=lifecycle.complete,
-            args=(ExitCode.GRACEFUL_EXIT_SIGTERM,),
-        )
-        for _ in range(2)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(timeout=1.0)
-        assert not thread.is_alive()
-
-    output = client.PushTaskOutput.call_args.args[0]
-    assert (output.sub_status, output.details) == (
-        SubStatus.FAILED,
-        "Model task stopped by user.",
-    )
-    heartbeat.stop.assert_called_once_with()
-    client.close.assert_called_once_with()
-    telemetry.assert_called_once_with(
-        EventType.FLWR_MODEL_RUN_LEAVE,
-        {"exit_code": ExitCode.GRACEFUL_EXIT_SIGTERM},
-    )
-    leave_future.result.assert_called_once_with(
-        timeout=run_model_module.TELEMETRY_TIMEOUT_SECONDS
-    )
-
-
-def test_resident_signal_uses_flower_exit_semantics(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A resident graceful signal should delegate exactly-once cleanup."""
     handlers: dict[int, object] = {}
-    lifecycle = Mock()
     exit_handlers: list[object] = []
 
     def register(sig: int, handler: object) -> object:
@@ -177,12 +140,31 @@ def test_resident_signal_uses_flower_exit_semantics(
     assert callable(handler)
     handler(signal.SIGTERM, None)
 
-    lifecycle.mark_interrupted.assert_called_once_with()
     assert len(exit_handlers) == 1
     exit_handler = exit_handlers[0]
     assert callable(exit_handler)
-    exit_handler()
-    lifecycle.complete.assert_called_once_with(ExitCode.GRACEFUL_EXIT_SIGTERM)
+    threads = [threading.Thread(target=exit_handler) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=1.0)
+        assert not thread.is_alive()
+    lifecycle.complete(ExitCode.SUCCESS)
+
+    output = client.PushTaskOutput.call_args.args[0]
+    assert (output.sub_status, output.details) == (
+        SubStatus.FAILED,
+        "Model task stopped by user.",
+    )
+    heartbeat.stop.assert_called_once_with()
+    client.close.assert_called_once_with()
+    telemetry.assert_called_once_with(
+        EventType.FLWR_MODEL_RUN_LEAVE,
+        {"exit_code": ExitCode.GRACEFUL_EXIT_SIGTERM},
+    )
+    leave_future.result.assert_called_once_with(
+        timeout=run_model_module.TELEMETRY_TIMEOUT_SECONDS
+    )
     flwr_exit.assert_called_once_with(
         ExitCode.GRACEFUL_EXIT_SIGTERM,
         message="Run stopped by user.",
