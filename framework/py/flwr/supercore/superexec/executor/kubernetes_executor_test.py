@@ -517,7 +517,7 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
         (TaskType.CONNECTOR, "flwr-connector"),
     ],
 )
-def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
+def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(  # pylint: disable=too-many-locals
     monkeypatch: pytest.MonkeyPatch,
     insecure: bool,
     transport_args: list[str],
@@ -557,12 +557,16 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
         exec_client=client,
     )
     suppress_output = task_type == TaskType.AGENT_APP
+    runtime_timing_id = (
+        "profile-task" if task_type in {TaskType.AGENT_APP, TaskType.MODEL} else None
+    )
 
     result = executor.launch(
         _execution_spec(
             task_type=task_type,
             insecure=insecure,
             suppress_output=suppress_output,
+            runtime_timing_id=runtime_timing_id,
         )
     )
 
@@ -602,6 +606,11 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
         "appio.example.com:9092",
         "--token-stdin",
         *transport_args,
+        *(
+            ["--runtime-timing-id", "profile-task"]
+            if task_type in {TaskType.AGENT_APP, TaskType.MODEL}
+            else []
+        ),
     ]
     assert "task-token" not in stream.call_args.kwargs["command"]
     assert len(started) == 1

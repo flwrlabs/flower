@@ -54,6 +54,7 @@ from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
 from flwr.supercore.logger import flush_logs, start_log_uploader, stop_log_uploader
 from flwr.supercore.object_ref import load_app
+from flwr.supercore.runtime_timing import log_runtime_timing
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
@@ -85,6 +86,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     certificates_path: str | None = None,
     parent_pid: int | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
+    runtime_timing_id: str | None = None,
 ) -> None:
     """Run Flower AgentApp process."""
     # Monitor the main process in case of SIGKILL
@@ -161,6 +163,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         res: PullTaskInputResponse = grid._runtime_client.PullTaskInput(
             PullTaskInputRequest()
         )
+        log_runtime_timing("agent_task_input_received", timing_id=runtime_timing_id)
 
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
@@ -179,7 +182,9 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         )
 
         log(DEBUG, "[flwr-agentapp] Start FAB installation.")
+        log_runtime_timing("agent_fab_install_started", timing_id=runtime_timing_id)
         install_from_fab(fab.content, skip_prompt=True)
+        log_runtime_timing("agent_fab_install_finished", timing_id=runtime_timing_id)
 
         fab_id, fab_version = get_fab_metadata(fab.content)
 
@@ -187,6 +192,9 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
 
         if runtime_dependency_install:
             log(DEBUG, "[flwr-agentapp] Installing app dependencies.")
+            log_runtime_timing(
+                "agent_dependency_install_started", timing_id=runtime_timing_id
+            )
             runtime_env_dir = install_app_dependencies(
                 app_path,
                 launch_id=token,
@@ -200,6 +208,10 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
                     "fab_version": run.fab_version,
                     "fab_hash": fab.hash_str,
                 },
+                runtime_timing_id=runtime_timing_id,
+            )
+            log_runtime_timing(
+                "agent_dependency_install_finished", timing_id=runtime_timing_id
             )
         else:
             log(
@@ -235,12 +247,16 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         )
 
         # Load and run the AgentApp
+        log_runtime_timing("agent_app_load_started", timing_id=runtime_timing_id)
         agent_app = load_app(agent_app_attr, LoadAgentAppError, app_path)
         if not isinstance(agent_app, AgentApp):
             raise LoadAgentAppError(
                 f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
             ) from None
-        agent_events = RuntimeAgentEvents(grid._runtime_client)
+        log_runtime_timing("agent_app_load_finished", timing_id=runtime_timing_id)
+        agent_events = RuntimeAgentEvents(
+            grid._runtime_client, runtime_timing_id=runtime_timing_id
+        )
         agent_runtime = AgentRuntime(
             stub=grid._runtime_client,
             run_id=context.run_id,
@@ -259,6 +275,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             events=agent_events,
             grid=RuntimeAgentGrid(grid, agent_events),
         )
+        log_runtime_timing("agent_user_code_started", timing_id=runtime_timing_id)
         agent_app(agent=agent, context=context)
         agent_events.close()
 

@@ -58,6 +58,8 @@ def test_parse_flwr_agentapp_parses_tokenized_invocation() -> None:
             "--parent-pid",
             "1234",
             "--allow-runtime-dependency-installation",
+            "--runtime-timing-id",
+            "profile-agent",
         ]
     )
 
@@ -66,6 +68,7 @@ def test_parse_flwr_agentapp_parses_tokenized_invocation() -> None:
     assert args.insecure is True
     assert args.parent_pid == 1234
     assert args.runtime_dependency_install is True
+    assert args.runtime_timing_id == "profile-agent"
 
 
 def test_parse_flwr_agentapp_accepts_only_one_token_source() -> None:
@@ -111,6 +114,7 @@ def test_flwr_agentapp_forwards_cli_args() -> None:
         root_certificates=None,
         parent_pid=321,
         runtime_dependency_install=True,
+        runtime_timing_id="profile-agent",
     )
 
     class _Parser:
@@ -145,6 +149,7 @@ def test_flwr_agentapp_forwards_cli_args() -> None:
     assert kwargs["certificates_path"] is None
     assert kwargs["parent_pid"] == 321
     assert kwargs["runtime_dependency_install"] is True
+    assert kwargs["runtime_timing_id"] == "profile-agent"
 
 
 def test_flwr_agentapp_reads_stdin_token_and_acknowledges_start(
