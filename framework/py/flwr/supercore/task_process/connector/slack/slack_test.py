@@ -38,7 +38,7 @@ def test_slack_actions_are_registered_and_executable() -> None:
     assert [action.name for action in ACTIONS] == [
         "search_messages",
         "list_conversations",
-        "get_channel_messages",
+        "get_conversation_history",
         "get_thread",
     ]
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
@@ -89,7 +89,7 @@ def test_slack_history_actions_forward_cursor() -> None:
     """Slack history actions should expose cursor pagination."""
     cases: tuple[tuple[str, JSONObject, dict[str, str]], ...] = (
         (
-            "slack_get_channel_messages",
+            "slack_get_conversation_history",
             {"channel_id": "C1", "cursor": "next", "limit": 15},
             {"channel": "C1", "cursor": "next", "limit": "15"},
         ),

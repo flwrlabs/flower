@@ -107,7 +107,7 @@ def list_conversations(
     )
 
 
-def get_channel_messages(
+def get_conversation_history(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
     """Get recent messages from a Slack conversation."""
@@ -147,7 +147,7 @@ def get_thread(arguments: JSONObject, context: ConnectorExecutionContext) -> JSO
 EXECUTORS: dict[str, ConnectorExecutor] = {
     "search_messages": search_messages,
     "list_conversations": list_conversations,
-    "get_channel_messages": get_channel_messages,
+    "get_conversation_history": get_conversation_history,
     "get_thread": get_thread,
 }
 

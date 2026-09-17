@@ -120,7 +120,7 @@ ACTIONS = (
         },
     ),
     ActionDefinition(
-        name="get_channel_messages",
+        name="get_conversation_history",
         description="Get recent messages from a Slack conversation.",
         access=ActionAccess.READ,
         input_schema={
