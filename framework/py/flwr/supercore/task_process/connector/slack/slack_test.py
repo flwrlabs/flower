@@ -48,7 +48,7 @@ def test_slack_actions_are_registered_and_executable() -> None:
     with patch(_HTTP_REQUEST, return_value=response) as request:
         result = registry.invoke_connector(
             "slack_search_messages",
-            {"query": "release", "cursor": "*"},
+            {"query": "release", "cursor": "*", "page": 1},
             Mock(),
             {"access_token": "xoxp-secret"},
             {},
@@ -58,10 +58,11 @@ def test_slack_actions_are_registered_and_executable() -> None:
     assert request.call_args.kwargs["params"] == {
         "query": "release",
         "cursor": "*",
+        "page": "1",
     }
 
 
-def test_slack_http_errors_include_code_and_message() -> None:
+def test_slack_api_errors_include_code_and_message() -> None:
     """Slack's documented error fields should remain readable to callers."""
     response = Mock(status_code=200)
     response.json.return_value = {
@@ -83,6 +84,24 @@ def test_slack_http_errors_include_code_and_message() -> None:
     assert str(error.value) == (
         "Slack API request failed: invalid_cursor: Invalid cursor."
     )
+
+
+def test_slack_http_rate_limit_preserves_status() -> None:
+    """Slack HTTP rate-limit responses should retain their code and status."""
+    response = Mock(status_code=429)
+    response.json.return_value = {"ok": False, "error": "ratelimited"}
+    with (
+        patch(_HTTP_REQUEST, return_value=response),
+        pytest.raises(SlackApiError) as error,
+    ):
+        registry.invoke_connector(
+            "slack_search_messages",
+            {"query": "release"},
+            Mock(),
+            {"access_token": "xoxp-secret"},
+            {},
+        )
+    assert str(error.value) == "Slack API request failed: ratelimited (429)."
 
 
 def test_slack_history_actions_forward_cursor() -> None:

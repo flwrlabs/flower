@@ -43,8 +43,6 @@ def search_messages(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
     """Search messages visible to the connected Slack user."""
-    if arguments.get("page") is not None and arguments.get("cursor") is not None:
-        raise ValueError("Slack page and cursor cannot be used together.")
     params: dict[str, str | None] = {
         "query": require_string(arguments.get("query"), "Slack", "query"),
         "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
