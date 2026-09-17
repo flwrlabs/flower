@@ -216,6 +216,9 @@ AUTOMATION_BATCH_LIMIT = 1
 
 FLOWER_AGENT_APP_ID = "@flwrlabs/flwr-agent"
 
+AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY = "payload"
+AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY = "json"
+
 
 class AutomationStatus(StrEnum):
     """Status of an automation."""

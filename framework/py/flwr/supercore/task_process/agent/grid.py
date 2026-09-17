@@ -22,12 +22,12 @@ import time
 from typing import cast
 
 from flwr.agentapp import AgentEvents, AgentGrid
-from flwr.agentapp.constants import (
+from flwr.app import ConfigRecord, Message, RecordDict
+from flwr.serverapp import Grid
+from flwr.supercore.constant import (
     AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY,
     AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY,
 )
-from flwr.app import ConfigRecord, Message, RecordDict
-from flwr.serverapp import Grid
 from flwr.supercore.task_process.connector.tool_schema import (
     function_tool,
     string_property,

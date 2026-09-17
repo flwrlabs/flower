@@ -19,11 +19,11 @@ from unittest.mock import Mock
 
 import pytest
 
-from flwr.agentapp.constants import (
+from flwr.app import ConfigRecord, Message, RecordDict
+from flwr.supercore.constant import (
     AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY,
     AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY,
 )
-from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.supercore.task_identity import TaskIdentity
 
 from .grid import RuntimeAgentGrid
