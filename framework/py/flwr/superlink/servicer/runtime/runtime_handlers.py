@@ -181,12 +181,15 @@ def pull_messages(  # pylint: disable=R0914
     log(DEBUG, "Runtime.PullMessages")
     run_id = task.run_id
     message_ids = set(request.message_ids)
-    messages_res: list[Message] = state.get_message_res(
+    messages: list[Message] = state.get_message_res(
         message_ids=message_ids, run_id=run_id
+    )
+    messages += state.get_message_ins(
+        node_id=SUPERLINK_NODE_ID, limit=None, run_id=run_id
     )
 
     store = state.object_store
-    for msg_res in messages_res:
+    for msg_res in messages:
         if msg_res.metadata.src_node_id == SUPERLINK_NODE_ID:
             with no_object_id_recompute():
                 all_objects = get_all_nested_objects(msg_res)
@@ -194,15 +197,16 @@ def pull_messages(  # pylint: disable=R0914
                 for obj_id, obj in all_objects.items():
                     store.put(obj_id, obj.deflate())
 
+    # Gather all the instruction message IDs to delete
     message_ins_ids_to_delete = {
-        msg_res.metadata.reply_to_message_id for msg_res in messages_res
+        msg.metadata.reply_to_message_id or msg.metadata.message_id for msg in messages
     }
     state.delete_messages(message_ins_ids=message_ins_ids_to_delete)
 
     messages_list = []
     trees = []
-    while messages_res:
-        msg = messages_res.pop(0)
+    while messages:
+        msg = messages.pop(0)
         if msg.metadata.src_node_id != SUPERLINK_NODE_ID:
             _raise_if(
                 validation_error=run_id != msg.metadata.run_id,
