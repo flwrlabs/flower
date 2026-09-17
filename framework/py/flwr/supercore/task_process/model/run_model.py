@@ -80,6 +80,7 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
         self._details = "Model task failed with unknown error."
         self._lock = threading.RLock()
         self._finalized = False
+        self._task_finished = False
         self._leave_event_started = False
 
     def run(self) -> int:
@@ -107,11 +108,13 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
             with self._lock:
                 self._sub_status = SubStatus.COMPLETED
                 self._details = ""
+                self._task_finished = True
         except Exception as ex:  # pylint: disable=broad-exception-caught
             log(ERROR, "`flwr-model` failed", exc_info=ex)
             with self._lock:
                 self._sub_status = SubStatus.FAILED
                 self._details = f"Model task failed with exception: {str(ex)}"
+                self._task_finished = True
             exit_code = ExitCode.TASK_PROC_EXCEPTION
         return exit_code
 
@@ -129,7 +132,7 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
     def mark_interrupted(self) -> None:
         """Record a graceful interruption before final task output is pushed."""
         with self._lock:
-            if self._finalized or self._sub_status == SubStatus.COMPLETED:
+            if self._finalized or self._task_finished:
                 return
             self._sub_status = SubStatus.FAILED
             self._details = "Model task stopped by user."
@@ -153,7 +156,7 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
                     )
                 )
             except Exception as err:  # pylint: disable=broad-exception-caught
-                log(ERROR, "Failed to push task output: %s", str(err))
+                log(ERROR, "Failed to push task output", exc_info=err)
 
             try:
                 if self._heartbeat_sender and self._heartbeat_sender.is_running:

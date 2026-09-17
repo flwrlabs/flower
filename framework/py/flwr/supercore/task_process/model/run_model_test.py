@@ -115,14 +115,17 @@ def test_run_model_once_cleans_up_fresh_task_state(
     force_exit_timer.cancel.assert_called_once_with()
 
 
+@pytest.mark.parametrize(
+    "recorded_failure_details",
+    [None, "Model task failed with exception: provider failed"],
+)
 def test_resident_signal_finalization_is_exactly_once(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, recorded_failure_details: str | None
 ) -> None:
-    """A resident graceful signal should finalize and emit telemetry once."""
+    """A resident signal should finalize once without replacing prior outcomes."""
     client = Mock()
     heartbeat = Mock(is_running=True)
-    leave_future = Mock()
-    telemetry = Mock(return_value=leave_future)
+    telemetry = Mock()
     monkeypatch.setattr(
         run_model_module,
         "_create_runtime_client",
@@ -133,7 +136,14 @@ def test_resident_signal_finalization_is_exactly_once(
         "runtime.example:9092", "task-token", True, None
     )
     lifecycle.initialize()
-    lifecycle._heartbeat_sender = heartbeat
+    if recorded_failure_details is None:
+        lifecycle._heartbeat_sender = heartbeat
+    else:
+        client.PullTaskInput.side_effect = RuntimeError("provider failed")
+        monkeypatch.setattr(
+            run_model_module, "HeartbeatSender", Mock(return_value=heartbeat)
+        )
+        assert lifecycle.run() == ExitCode.TASK_PROC_EXCEPTION
     handlers: dict[int, object] = {}
     exit_handlers: list[object] = []
 
@@ -166,7 +176,7 @@ def test_resident_signal_finalization_is_exactly_once(
     output = client.PushTaskOutput.call_args.args[0]
     assert (output.sub_status, output.details) == (
         SubStatus.FAILED,
-        "Model task stopped by user.",
+        recorded_failure_details or "Model task stopped by user.",
     )
     heartbeat.stop.assert_called_once_with()
     client.close.assert_called_once_with()
@@ -174,7 +184,7 @@ def test_resident_signal_finalization_is_exactly_once(
         EventType.FLWR_MODEL_RUN_LEAVE,
         {"exit_code": ExitCode.GRACEFUL_EXIT_SIGTERM},
     )
-    leave_future.result.assert_called_once_with(
+    telemetry.return_value.result.assert_called_once_with(
         timeout=run_model_module.TELEMETRY_TIMEOUT_SECONDS
     )
     flwr_exit.assert_called_once_with(
