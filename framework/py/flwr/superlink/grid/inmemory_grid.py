@@ -110,9 +110,7 @@ class InMemoryGrid(Grid):
         """
         msg_ids: list[str] = []
         for msg in messages:
-            # Populate metadata
-            msg.metadata.__dict__["_run_id"] = cast(Run, self._run).run_id
-            msg.metadata.__dict__["_src_node_id"] = self.node.node_id
+            # Populate message ID
             msg.metadata.__dict__["_message_id"] = str(uuid4())
             # Check message
             self._check_message(msg)

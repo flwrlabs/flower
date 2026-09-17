@@ -17,13 +17,24 @@
 
 from unittest.mock import Mock
 
+import pytest
+
 from flwr.agentapp.constants import (
     AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY,
     AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY,
 )
 from flwr.app import ConfigRecord, Message, RecordDict
+from flwr.supercore.task_identity import TaskIdentity
 
 from .grid import RuntimeAgentGrid
+
+
+@pytest.fixture(autouse=True)
+def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the task identity used by Agent Grid messages."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 123)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 456)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 789)
 
 
 def test_runtime_agent_grid_tools() -> None:
