@@ -45,6 +45,15 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_children_ids_from_object_content,
     get_object_type_from_object_content,
 )
+from flwr.supercore.task_identity import TaskIdentity
+
+
+@pytest.fixture(autouse=True)
+def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the task identity used by instruction message tests."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 123)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 456)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 789)
 
 
 @pytest.mark.parametrize(
@@ -278,10 +287,10 @@ def test_create_ins_message_success(
     assert msg.metadata.ttl == (ttl or DEFAULT_TTL)
     assert msg.metadata.group_id == (group_id or "")
     assert current_time < msg.metadata.created_at < now().timestamp()
-    assert msg.metadata.run_id == 0  # Should be unset
+    assert msg.metadata.run_id == 456
     assert msg.metadata.message_id == ""  # Should be unset
-    assert msg.metadata.src_node_id == 0  # Should be unset
-    assert msg.metadata.src_task_id is None
+    assert msg.metadata.src_node_id == 789
+    assert msg.metadata.src_task_id == 123
     assert msg.metadata.dst_task_id is None
     assert msg.metadata.reply_to_message_id == ""  # Should be unset
 
@@ -297,7 +306,7 @@ def test_create_ins_message_with_dst_task_id_success() -> None:
     )
 
     # Assert
-    assert msg.metadata.src_task_id is None
+    assert msg.metadata.src_task_id == 123
     assert msg.metadata.dst_task_id == 789
 
 
@@ -358,7 +367,11 @@ def test_create_reply_message_success(
         ((RecordDict(), 123, "query"), {"error": Error(0)}),
         (
             (RecordDict(), 123, "query"),
-            {"reply_to": Message(RecordDict(), 123, "query")},
+            {
+                "reply_to": make_message(
+                    metadata=RecordMaker(1).metadata(), content=RecordDict()
+                )
+            },
         ),
         # Use invalid arg types
         (("wrong type", 123, "query"), {}),

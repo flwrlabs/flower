@@ -17,6 +17,8 @@
 
 import json
 
+import pytest
+
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.app.message_type import MessageType
 from flwr.supercore.corestate.utils_test import create_task_message
@@ -24,7 +26,16 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.typing import JSONObject
+
+
+@pytest.fixture(autouse=True)
+def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the task identity used by JSON message constructors."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 123)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 456)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 789)
 
 
 def _message_with_payload(

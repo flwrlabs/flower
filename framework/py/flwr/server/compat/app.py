@@ -17,6 +17,7 @@
 
 from logging import INFO
 
+from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.server.client_manager import ClientManager
 from flwr.server.history import History
 from flwr.server.server import Server, init_defaults, run_fl
@@ -24,6 +25,7 @@ from flwr.server.server_config import ServerConfig
 from flwr.server.strategy import Strategy
 from flwr.serverapp.grid import Grid
 from flwr.supercore import log
+from flwr.supercore.task_identity import TaskIdentity
 
 from .app_utils import start_update_client_manager_thread
 
@@ -63,6 +65,11 @@ def start_grid(  # pylint: disable=too-many-arguments, too-many-locals
     hist : flwr.server.history.History
         Object containing training and evaluation metrics.
     """
+    # Use a dummy task identity for this legacy Python API.
+    TaskIdentity.task_id = 1
+    TaskIdentity.run_id = grid.run.run_id
+    TaskIdentity.node_id = SUPERLINK_NODE_ID
+
     # Initialize the server and config
     initialized_server, initialized_config = init_defaults(
         server=server,
