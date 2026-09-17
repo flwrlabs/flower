@@ -193,11 +193,7 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
 
     def _check_message(self, message: Message) -> None:
         # Check if the message is valid
-        if not (
-            message.metadata.message_id != ""
-            and message.metadata.reply_to_message_id == ""
-            and message.metadata.ttl > 0
-        ):
+        if not (message.metadata.message_id != "" and message.metadata.ttl > 0):
             raise ValueError(f"Invalid message: {message}")
 
     def create_message(  # pylint: disable=too-many-arguments,R0917

@@ -42,8 +42,8 @@ ACTIONS = (
     ActionDefinition(
         name="identify",
         description=(
-            "Identify the current Attio access token, its workspace, permissions, "
-            "and authorizing workspace member."
+            "Identify the current Attio access token, its workspace, and the scopes "
+            "attached to it."
         ),
         access=ActionAccess.READ,
         input_schema={
