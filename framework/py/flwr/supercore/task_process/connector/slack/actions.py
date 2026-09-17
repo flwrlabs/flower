@@ -90,7 +90,8 @@ ACTIONS = (
             "type": "object",
             "properties": {
                 "limit": integer_property(
-                    "Maximum number of conversations to return.",
+                    "Maximum number of conversations to return. Omit to use "
+                    "Slack's default of 100.",
                     minimum=1,
                     maximum=999,
                 ),
