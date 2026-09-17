@@ -14,21 +14,18 @@
 # ==============================================================================
 """Notion action definitions."""
 
-from flwr.supercore.typing import JSONObject
-
 from ..definition import ActionAccess, ActionDefinition
-from ..tool_schema import string_property
+from ..tool_schema import integer_property, string_property
 
-_CURSOR: JSONObject = {
-    "type": "string",
-    "description": "The cursor for pagination.",
-}
-_PAGE_SIZE: JSONObject = {
-    "type": "integer",
-    "minimum": 1,
-    "maximum": 100,
-    "description": "The number of results per page.",
-}
+_CURSOR = string_property(
+    "Opaque cursor returned in next_cursor by the previous search response. "
+    "Omit for the first request."
+)
+_PAGE_SIZE = integer_property(
+    "Number of results per page. Omit to use Notion's default.",
+    minimum=1,
+    maximum=100,
+)
 
 ACTIONS = (
     ActionDefinition(
@@ -47,11 +44,44 @@ ACTIONS = (
                 ),
                 "filter": {
                     "type": "object",
-                    "description": "The filter object to narrow results.",
+                    "properties": {
+                        "property": {
+                            "type": "string",
+                            "enum": ["object"],
+                            "description": "Property being filtered.",
+                        },
+                        "value": {
+                            "type": "string",
+                            "enum": ["page", "data_source"],
+                            "description": "Type of Notion object to return.",
+                        },
+                        "in_trash": {
+                            "type": "boolean",
+                            "description": "Whether to return content in the trash.",
+                        },
+                    },
+                    "additionalProperties": False,
+                    "description": (
+                        "Filter results by object type and/or trash status."
+                    ),
                 },
                 "sort": {
                     "type": "object",
-                    "description": "The sort object to order results.",
+                    "properties": {
+                        "timestamp": {
+                            "type": "string",
+                            "enum": ["last_edited_time"],
+                            "description": "Timestamp used to sort results.",
+                        },
+                        "direction": {
+                            "type": "string",
+                            "enum": ["ascending", "descending"],
+                            "description": "Sort direction.",
+                        },
+                    },
+                    "required": ["timestamp", "direction"],
+                    "additionalProperties": False,
+                    "description": "Sort results by their last-edited time.",
                 },
                 "page_size": _PAGE_SIZE,
                 "start_cursor": _CURSOR,

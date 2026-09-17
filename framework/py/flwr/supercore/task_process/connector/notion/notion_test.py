@@ -51,6 +51,11 @@ def test_notion_search_forwards_api_inputs() -> None:
             "notion_search",
             {
                 "query": "release",
+                "filter": {"property": "object", "value": "page"},
+                "sort": {
+                    "timestamp": "last_edited_time",
+                    "direction": "descending",
+                },
                 "page_size": 100,
                 "start_cursor": "cursor-1",
             },
@@ -63,6 +68,11 @@ def test_notion_search_forwards_api_inputs() -> None:
     assert request.call_args.kwargs["headers"]["Notion-Version"] == "2026-03-11"
     assert request.call_args.kwargs["json"] == {
         "query": "release",
+        "filter": {"property": "object", "value": "page"},
+        "sort": {
+            "timestamp": "last_edited_time",
+            "direction": "descending",
+        },
         "page_size": 100,
         "start_cursor": "cursor-1",
     }
