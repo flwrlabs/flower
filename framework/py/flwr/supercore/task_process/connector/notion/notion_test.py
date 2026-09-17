@@ -67,6 +67,12 @@ def test_notion_search_forwards_api_inputs() -> None:
         "start_cursor": "cursor-1",
     }
 
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        registry.invoke_connector(
+            "notion_search", {}, Mock(), credentials=_CREDENTIALS, config={}
+        )
+    assert request.call_args.kwargs["json"] == {}
+
 
 def test_notion_get_page_returns_page_and_block_children() -> None:
     """Get page should aggregate the page and its first-level child blocks."""

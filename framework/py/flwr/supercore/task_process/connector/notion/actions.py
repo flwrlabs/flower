@@ -41,10 +41,10 @@ ACTIONS = (
         input_schema={
             "type": "object",
             "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "The search query text.",
-                },
+                "query": string_property(
+                    "Text to match against page and data-source titles. Omit to "
+                    "return all content shared with the connection."
+                ),
                 "filter": {
                     "type": "object",
                     "description": "The filter object to narrow results.",
@@ -56,15 +56,14 @@ ACTIONS = (
                 "page_size": _PAGE_SIZE,
                 "start_cursor": _CURSOR,
             },
-            "required": ["query"],
             "additionalProperties": False,
         },
     ),
     ActionDefinition(
         name="get_page",
         description=(
-            "Get a Notion page together with all its first-level child blocks. This "
-            "is an aggregate helper over page retrieval plus block-children listing."
+            "Get a Notion page together with all its direct child blocks. Nested "
+            "child blocks are not retrieved."
         ),
         access=ActionAccess.READ,
         input_schema={

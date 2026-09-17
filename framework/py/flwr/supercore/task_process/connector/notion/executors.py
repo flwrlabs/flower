@@ -34,10 +34,9 @@ class NotionApiError(ConnectorApiError):
 
 def search(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
     """Search pages and data sources shared with the Notion connection."""
-    query = arguments.get("query")
-    if not isinstance(query, str):
-        raise ValueError("Notion query must be a string.")
-    body: JSONObject = {"query": query}
+    body: JSONObject = {}
+    if "query" in arguments:
+        body["query"] = require_string(arguments["query"], "Notion", "query")
     for name in ("filter", "sort"):
         if name in arguments:
             body[name] = arguments[name]
@@ -53,7 +52,7 @@ def search(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObj
 
 
 def get_page(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
-    """Get one Notion page and all its first-level child blocks."""
+    """Get one Notion page and all direct, but not nested, child blocks."""
     page_id = require_string(arguments.get("page_id"), "Notion", "page_id")
     page = _call_notion_api("GET", f"/pages/{page_id}", context.credentials)
     block_children = _call_notion_api(
