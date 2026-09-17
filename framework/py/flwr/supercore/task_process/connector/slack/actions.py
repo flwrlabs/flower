@@ -92,7 +92,7 @@ ACTIONS = (
                 "limit": integer_property(
                     "Maximum number of conversations to return.",
                     minimum=1,
-                    maximum=200,
+                    maximum=999,
                 ),
                 "cursor": _CURSOR,
                 "types": {

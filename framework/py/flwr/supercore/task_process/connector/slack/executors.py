@@ -87,15 +87,14 @@ def list_conversations(
     ):
         raise ValueError("Slack conversation types are invalid.")
     params: dict[str, str | None] = {
-        "limit": str(
-            require_int_range(
-                arguments.get("limit", 200), "Slack", "limit", maximum=200
-            )
-        ),
         "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
         "types": ",".join(dict.fromkeys(selected_types)),
         "team_id": optional_string(arguments.get("team_id"), "Slack", "team_id"),
     }
+    if "limit" in arguments:
+        params["limit"] = str(
+            require_int_range(arguments["limit"], "Slack", "limit", maximum=999)
+        )
     if "exclude_archived" in arguments:
         params["exclude_archived"] = str(
             require_bool(arguments["exclude_archived"], "Slack", "exclude_archived")

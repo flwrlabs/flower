@@ -117,6 +117,22 @@ def test_slack_history_actions_forward_cursor() -> None:
         assert request.call_args.kwargs["params"] == params
 
 
+def test_slack_list_conversations_limit() -> None:
+    """Slack should apply its default when limit is omitted and accept up to 999."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"ok": True, "channels": []}
+    for arguments, expected_limit in (({}, None), ({"limit": 999}, "999")):
+        with patch(_HTTP_REQUEST, return_value=response) as request:
+            registry.invoke_connector(
+                "slack_list_conversations",
+                arguments,
+                Mock(),
+                {"access_token": "xoxp-secret"},
+                {},
+            )
+        assert request.call_args.kwargs["params"].get("limit") == expected_limit
+
+
 def test_slack_oauth_flow() -> None:
     """Slack OAuth should request read scopes and extract user credentials."""
     redirect_uri = "https://example.com/callback"
