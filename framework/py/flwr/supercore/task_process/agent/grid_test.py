@@ -81,7 +81,11 @@ def test_runtime_agent_grid_tools() -> None:
                         "dst_node_id": "11",
                         "payload": "hi",
                     },
-                    {"dst_node_id": "22", "payload": "hello"},
+                    {
+                        "dst_node_id": "22",
+                        "payload": "hello",
+                        "reply_to_message_id": "message-0",
+                    },
                 ]
             },
         }
@@ -96,6 +100,8 @@ def test_runtime_agent_grid_tools() -> None:
     assert second.metadata.dst_node_id == 22
     assert sent.metadata.message_type == "query"
     assert sent.metadata.group_id == ""
+    assert sent.metadata.reply_to_message_id == ""
+    assert second.metadata.reply_to_message_id == "message-0"
     assert (
         sent.content[AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY][
             AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY
