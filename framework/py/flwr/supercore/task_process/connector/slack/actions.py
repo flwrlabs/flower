@@ -135,7 +135,7 @@ ACTIONS = (
         },
     ),
     ActionDefinition(
-        name="get_thread",
+        name="get_conversation_replies",
         description="Get messages in a Slack thread.",
         access=ActionAccess.READ,
         input_schema={

@@ -126,7 +126,9 @@ def get_conversation_history(
     )
 
 
-def get_thread(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+def get_conversation_replies(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
     """Get messages in a Slack thread."""
     params: dict[str, str | None] = {
         "channel": require_string(arguments.get("channel_id"), "Slack", "channel_id"),
@@ -148,7 +150,7 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
     "search_messages": search_messages,
     "list_conversations": list_conversations,
     "get_conversation_history": get_conversation_history,
-    "get_thread": get_thread,
+    "get_conversation_replies": get_conversation_replies,
 }
 
 

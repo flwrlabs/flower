@@ -39,7 +39,7 @@ def test_slack_actions_are_registered_and_executable() -> None:
         "search_messages",
         "list_conversations",
         "get_conversation_history",
-        "get_thread",
+        "get_conversation_replies",
     ]
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     assert len(registry.get_connector_tools(SLACK_CONNECTOR_REF)) == len(ACTIONS)
@@ -94,7 +94,7 @@ def test_slack_history_actions_forward_cursor() -> None:
             {"channel": "C1", "cursor": "next", "limit": "15"},
         ),
         (
-            "slack_get_thread",
+            "slack_get_conversation_replies",
             {
                 "channel_id": "C1",
                 "thread_ts": "1.0",
