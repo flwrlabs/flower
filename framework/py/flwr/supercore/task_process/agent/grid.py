@@ -95,8 +95,9 @@ def _grid_tools() -> list[JSONObject]:
                             ),
                             "payload": string_property("String payload to send."),
                             "reply_to_message_id": string_property(
-                                "ID of the message being replied to. Required when replying to  "
-                                "another message; otherwise, this field must not be set."
+                                "ID of the message being replied to. Required when "
+                                "replying to another message; otherwise, this field "
+                                "must not be set."
                             ),
                             "ttl": {
                                 "type": "number",
