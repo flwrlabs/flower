@@ -115,6 +115,27 @@ def test_run_model_once_cleans_up_fresh_task_state(
     force_exit_timer.cancel.assert_called_once_with()
 
 
+def test_run_model_once_force_exits_if_cleanup_hangs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A resident task should force exit if cleanup exceeds its timeout."""
+    force_exit_called = threading.Event()
+    lifecycle = Mock()
+    lifecycle.complete.side_effect = lambda _: force_exit_called.wait(timeout=1.0)
+    force_exit = Mock(side_effect=lambda _: force_exit_called.set())
+    monkeypatch.setattr(
+        run_model_module,
+        "_run_model_task",
+        Mock(return_value=(lifecycle, ExitCode.SUCCESS)),
+    )
+    monkeypatch.setattr(run_model_module, "FORCE_EXIT_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr(run_model_module.os, "_exit", force_exit)
+
+    assert run_model_module.run_model_once("runtime.example:9092", "token", True) == 0
+
+    force_exit.assert_called_once_with(0)
+
+
 @pytest.mark.parametrize(
     "recorded_failure_details",
     [None, "Model task failed with exception: provider failed"],
