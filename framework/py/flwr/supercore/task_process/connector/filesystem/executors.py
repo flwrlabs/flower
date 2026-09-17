@@ -83,7 +83,11 @@ def list_directory(
         items.append(
             {
                 "name": name,
-                "type": "directory" if stat.S_ISDIR(entry_st.st_mode) else "file",
+                "type": (
+                    "directory"
+                    if stat.S_ISDIR(entry_st.st_mode)
+                    else "file" if stat.S_ISREG(entry_st.st_mode) else "other"
+                ),
             }
         )
     return {"entries": items}

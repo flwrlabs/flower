@@ -96,6 +96,24 @@ def test_list_directory_rejects_file() -> None:
             list_directory({"path": filepath}, _context(allowed_dirs=[root]))
 
 
+def test_list_directory_reports_special_entries_as_other() -> None:
+    """Symlinks and FIFOs should be reported as type 'other'."""
+    with tempfile.TemporaryDirectory() as root:
+        target = os.path.join(root, "target.txt")
+        with open(target, "w", encoding="utf-8") as handle:
+            handle.write("x")
+        os.symlink(target, os.path.join(root, "link"))
+        os.mkfifo(os.path.join(root, "fifo"))
+        result = list_directory({"path": root}, _context(allowed_dirs=[root]))
+        assert result == {
+            "entries": [
+                {"name": "fifo", "type": "other"},
+                {"name": "link", "type": "other"},
+                {"name": "target.txt", "type": "file"},
+            ]
+        }
+
+
 def test_list_directory_requires_path() -> None:
     """Missing path argument should raise a ValueError."""
     with pytest.raises(ValueError, match="must be a non-empty string"):

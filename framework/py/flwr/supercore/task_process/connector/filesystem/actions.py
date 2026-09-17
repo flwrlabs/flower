@@ -24,7 +24,9 @@ ACTIONS = (
         name="list_directory",
         description=(
             "List the entries of an allowed directory, sorted by name. Each entry "
-            "includes its name and whether it is a file or directory."
+            'includes its name and type: "file" for regular files, '
+            '"directory" for directories, and "other" for symbolic links, '
+            "FIFOs, sockets, and other special entries."
         ),
         access=ActionAccess.READ,
         input_schema={
