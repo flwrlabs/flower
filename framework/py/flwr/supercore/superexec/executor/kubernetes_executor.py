@@ -36,14 +36,14 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.typing import JSONObject
-
-from .types import ExecutionSpec, LaunchResult
-from .warm_executor import (
-    WARM_EXECUTOR_MODULE,
-    WARM_EXECUTOR_READINESS_COMMAND,
+from flwr.supercore.warm_executor_constants import (
     WARM_EXECUTOR_READY_DIRECTORY,
     WARM_EXECUTOR_READY_FILE,
+    WARM_MODEL_EXECUTOR_MODULE,
 )
+
+from .types import ExecutionSpec, LaunchResult
+from .warm_executor import WARM_EXECUTOR_MODULE, WARM_EXECUTOR_READINESS_COMMAND
 from .warm_executor_dispatch import (
     WARM_EXECUTOR_CONSUMED_ANNOTATION,
     WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH,
@@ -848,10 +848,13 @@ def _build_warm_executor_pod(
                 },
             }
         )
+    command = ["python", "-m", WARM_EXECUTOR_MODULE]
+    if pool_key.task_type == TaskType.MODEL:
+        command = ["python", "-m", WARM_MODEL_EXECUTOR_MODULE, "serve"]
     container: JSONObject = {
         "name": "taskexecutor",
         "image": pool_key.runtime_image,
-        "command": ["python", "-m", WARM_EXECUTOR_MODULE],
+        "command": command,
         "volumeMounts": [
             *volume_mounts,
             *(config.volume_mounts or []),

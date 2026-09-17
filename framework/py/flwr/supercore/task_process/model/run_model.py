@@ -42,6 +42,58 @@ from flwr.supercore.telemetry import EventType, event
 from .task import handle_task
 
 
+def run_model_once(
+    runtime_api_address: str,
+    token: str,
+    insecure: bool,
+    certificates: bytes | None = None,
+) -> int:
+    """Run one Model task without terminating the containing process."""
+    client, retry_invoker = _create_runtime_client(
+        runtime_api_address=runtime_api_address,
+        token=token,
+        insecure=insecure,
+        certificates=certificates,
+    )
+    heartbeat_sender = None
+    sub_status = SubStatus.FAILED
+    details = "Model task failed with unknown error."
+    exit_code = ExitCode.SUCCESS
+
+    try:
+        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_http(client))
+        heartbeat_sender.start()
+        task_input: PullTaskInputResponse = client.PullTaskInput(PullTaskInputRequest())
+
+        event(EventType.FLWR_MODEL_RUN_ENTER)
+        handle_task(
+            client=client,
+            task_id=task_input.task_id,
+            run_id=task_input.run.run_id,
+        )
+
+        sub_status = SubStatus.COMPLETED
+        details = ""
+    except Exception as ex:  # pylint: disable=broad-exception-caught
+        log(ERROR, "Prestarted `flwr-model` invocation failed", exc_info=ex)
+        details = f"Model task failed with exception: {str(ex)}"
+        exit_code = ExitCode.TASK_PROC_EXCEPTION
+    finally:
+        retry_invoker.max_tries = 1
+        try:
+            client.PushTaskOutput(
+                PushTaskOutputRequest(sub_status=sub_status, details=details)
+            )
+        except httpx.HTTPError as err:
+            log(ERROR, "Failed to push task output: %s", str(err))
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+        client.close()
+        event(EventType.FLWR_MODEL_RUN_LEAVE, {"exit_code": exit_code})
+
+    return 0 if exit_code == ExitCode.SUCCESS else 1
+
+
 def run_model(  # pylint: disable=too-many-locals
     runtime_api_address: str,
     token: str,

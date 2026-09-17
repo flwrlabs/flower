@@ -35,6 +35,12 @@ from flwr.common.constant import (
     FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
 )
 from flwr.supercore.constant import TaskType
+from flwr.supercore.warm_executor_constants import (
+    WARM_EXECUTOR_BUSY_FILE,
+    WARM_EXECUTOR_READY_DIRECTORY,
+    WARM_EXECUTOR_READY_FILE,
+    WARM_MODEL_EXECUTOR_MODULE,
+)
 
 from . import kubernetes_executor as kube
 from . import warm_executor_dispatch
@@ -54,12 +60,7 @@ from .kubernetes_executor import (
     _get_runtime_root_certificates,
 )
 from .types import ExecutionSpec, LaunchResultStatus
-from .warm_executor import (
-    WARM_EXECUTOR_MODULE,
-    WARM_EXECUTOR_READINESS_COMMAND,
-    WARM_EXECUTOR_READY_DIRECTORY,
-    WARM_EXECUTOR_READY_FILE,
-)
+from .warm_executor import WARM_EXECUTOR_MODULE, WARM_EXECUTOR_READINESS_COMMAND
 from .warm_executor_pool import (
     WARM_EXECUTOR_CONFIGURATION_ANNOTATION,
     WARM_EXECUTOR_LABEL,
@@ -523,7 +524,7 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     transport_args: list[str],
     task_type: TaskType,
     task_command: str,
-) -> None:
+) -> None:  # pylint: disable=too-many-locals
     """A dispatched warm Pod should be replaced before its child exits."""
     client = Mock()
     pool_key = _warm_executor_pool_key(
@@ -589,20 +590,38 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     client.create_namespaced_pod.assert_called_once()
     assert _as_dict(client.create_namespaced_pod.call_args.args[1])["spec"][
         "containers"
-    ][0]["command"] == [
-        "python",
-        "-m",
-        WARM_EXECUTOR_MODULE,
-    ]
+    ][0]["command"] == (
+        [
+            "python",
+            "-m",
+            WARM_MODEL_EXECUTOR_MODULE,
+            "serve",
+        ]
+        if task_type == TaskType.MODEL
+        else ["python", "-m", WARM_EXECUTOR_MODULE]
+    )
     assert stream.call_args.args[0] is client.connect_get_namespaced_pod_exec
     assert stream.call_args.kwargs["container"] == "taskexecutor"
-    assert stream.call_args.kwargs["command"] == [
-        task_command,
-        "--runtime-api-address",
-        "appio.example.com:9092",
-        "--token-stdin",
-        *transport_args,
-    ]
+    assert stream.call_args.kwargs["command"] == (
+        [
+            "python",
+            "-m",
+            WARM_MODEL_EXECUTOR_MODULE,
+            "dispatch",
+            "--runtime-api-address",
+            "appio.example.com:9092",
+            "--token-stdin",
+            *transport_args,
+        ]
+        if task_type == TaskType.MODEL
+        else [
+            task_command,
+            "--runtime-api-address",
+            "appio.example.com:9092",
+            "--token-stdin",
+            *transport_args,
+        ]
+    )
     assert "task-token" not in stream.call_args.kwargs["command"]
     assert len(started) == 1
     dispatch = cast(
@@ -1087,6 +1106,25 @@ def test_warm_idle_probe_requires_all_task_processes_to_have_exited(
         [sys.executable, "-c", probe], capture_output=True, text=True, check=True
     )
     assert (result.stdout.strip() == "FLWR_WARM_EXECUTOR_IDLE") == (state == "Z")
+
+
+def test_warm_idle_probe_treats_prestarted_model_worker_as_busy(
+    tmp_path: Path,
+) -> None:
+    """A claimed Model worker remains busy even without a child process."""
+    busy_file = tmp_path / "busy"
+    busy_file.touch()
+    probe = warm_executor_dispatch._WARM_EXECUTOR_IDLE_CHECK.replace(  # pylint: disable=protected-access
+        repr(WARM_EXECUTOR_BUSY_FILE), repr(str(busy_file))
+    ).replace(
+        "Path('/proc')", f"Path({str(tmp_path)!r})"
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", probe], capture_output=True, text=True, check=True
+    )
+
+    assert result.stdout == ""
 
 
 def test_warm_pool_replaces_consumed_pod_and_cleans_up_idle_pods() -> None:
