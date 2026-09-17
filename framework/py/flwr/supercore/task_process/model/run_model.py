@@ -176,10 +176,10 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
                 if self._leave_event_started:
                     return
                 self._leave_event_started = True
-            future: Future[str] = event(
-                EventType.FLWR_MODEL_RUN_LEAVE, {"exit_code": exit_code}
-            )
             try:
+                future: Future[str] = event(
+                    EventType.FLWR_MODEL_RUN_LEAVE, {"exit_code": exit_code}
+                )
                 future.result(timeout=TELEMETRY_TIMEOUT_SECONDS)
             except Exception:  # pylint: disable=broad-exception-caught
                 pass
@@ -229,6 +229,7 @@ def _run_model_task(  # pylint: disable=too-many-arguments
             exit_message="Run stopped by user.",
             exit_handlers=[lifecycle.finalize],
         )
+    # Transfer task authority only after Runtime state and signal ownership exist
     if on_started is not None:
         on_started()
     return lifecycle, lifecycle.run()
@@ -283,6 +284,7 @@ def run_model_once(
         on_started=on_started,
     )
     returncode = 0 if exit_code == ExitCode.SUCCESS else 1
+    # Bound cleanup so a stalled Runtime or telemetry call cannot hang the worker
     force_exit_timer = threading.Timer(
         FORCE_EXIT_TIMEOUT_SECONDS,
         os._exit,
