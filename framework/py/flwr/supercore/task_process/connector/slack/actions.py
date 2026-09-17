@@ -111,7 +111,8 @@ ACTIONS = (
                 "team_id": {
                     "type": "string",
                     "description": (
-                        "The encoded team ID to list when using an org-level token."
+                        "The encoded team ID to list. Required when using an "
+                        "org-level token; omit when using a workspace-level token."
                     ),
                 },
             },
