@@ -20,8 +20,8 @@ import pytest
 
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.supercore.constant import (
-    AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY,
-    AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY,
+    AGENT_MESSAGE_CONTENT_RECORD_KEY,
+    AGENT_MESSAGE_TEXT_KEY,
 )
 from flwr.supercore.task_identity import TaskIdentity
 
@@ -41,8 +41,8 @@ def _payload_message(src_node_id: int) -> Message:
     message = Message(
         RecordDict(
             {
-                AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: ConfigRecord(
-                    {AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: "hello world!"}
+                AGENT_MESSAGE_CONTENT_RECORD_KEY: ConfigRecord(
+                    {AGENT_MESSAGE_TEXT_KEY: "hello world!"}
                 )
             }
         ),

@@ -52,8 +52,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import (
-    AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY,
-    AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY,
+    AGENT_MESSAGE_CONTENT_RECORD_KEY,
+    AGENT_MESSAGE_TEXT_KEY,
 )
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
@@ -91,9 +91,7 @@ def message_to_prompt(message: Message) -> str:
         "message_id": message.metadata.message_id,
         "payload": cast(
             str,
-            message.content[AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY][
-                AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY
-            ],
+            message.content[AGENT_MESSAGE_CONTENT_RECORD_KEY][AGENT_MESSAGE_TEXT_KEY],
         ),
     }
     if message.metadata.src_node_id != TaskIdentity.node_id:

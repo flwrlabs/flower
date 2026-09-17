@@ -21,8 +21,8 @@ import pytest
 
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.supercore.constant import (
-    AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY,
-    AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY,
+    AGENT_MESSAGE_CONTENT_RECORD_KEY,
+    AGENT_MESSAGE_TEXT_KEY,
 )
 from flwr.supercore.task_identity import TaskIdentity
 
@@ -45,8 +45,8 @@ def test_runtime_agent_grid_tools() -> None:
     reply = Message(
         RecordDict(
             {
-                AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: ConfigRecord(
-                    {AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: "done"}
+                AGENT_MESSAGE_CONTENT_RECORD_KEY: ConfigRecord(
+                    {AGENT_MESSAGE_TEXT_KEY: "done"}
                 )
             }
         ),
@@ -108,10 +108,7 @@ def test_runtime_agent_grid_tools() -> None:
     assert sent.metadata.message_type == "query"
     assert sent.metadata.group_id == ""
     assert (
-        sent.content[AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY][
-            AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY
-        ]
-        == "hi"
+        sent.content[AGENT_MESSAGE_CONTENT_RECORD_KEY][AGENT_MESSAGE_TEXT_KEY] == "hi"
     )
 
     pulled = agent_grid.call(
