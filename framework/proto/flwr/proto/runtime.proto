@@ -68,7 +68,16 @@ message PushTaskEventsResponse {}
 
 // GetRunSeriesEvents messages
 message GetRunSeriesEventsRequest {}
-message GetRunSeriesEventsResponse { repeated TaskEvent events = 1; }
+// The authenticated account that started one run in the series.
+message RunInitiator {
+  uint64 run_id = 1;
+  string flwr_aid = 2;
+  string account_name = 3;
+}
+message GetRunSeriesEventsResponse {
+  repeated TaskEvent events = 1;
+  repeated RunInitiator run_initiators = 2;
+}
 
 // PullTaskMessage messages
 message PullTaskMessageRequest {

@@ -17,7 +17,7 @@
 # pylint: disable=unused-argument
 
 from itertools import chain
-from logging import DEBUG, ERROR, INFO
+from logging import DEBUG, ERROR, INFO, WARNING
 
 from flwr.app import Message
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
@@ -59,6 +59,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
+    RunInitiator,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
@@ -73,6 +74,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     no_object_id_recompute,
 )
 from flwr.supercore.object_store import NoObjectInStoreError
+from flwr.supercore.utils import resolve_account_ids
 from flwr.superlink.servicer.control.control_handlers import process_due_automations
 from flwr.superlink.servicer.control.control_handlers import (
     start_automation as start_control_automation,
@@ -91,10 +93,32 @@ def get_run_series_events(
     series = state.get_run_series(series_ids=[run.series_id])[0]
     series_runs = state.get_run_info(run_ids=series.run_ids)
     primary_task_ids = [
-        run.primary_task_id for run in series_runs if run.primary_task_id is not None
+        series_run.primary_task_id
+        for series_run in series_runs
+        if series_run.primary_task_id is not None
     ]
     events = state.get_task_events(task_ids=primary_task_ids)
-    return GetRunSeriesEventsResponse(events=events)
+    account_ids = {
+        series_run.flwr_aid for series_run in series_runs if series_run.flwr_aid
+    }
+    try:
+        account_names = resolve_account_ids(account_ids)
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        log(WARNING, "Failed to resolve run initiator account names: %s", err)
+        account_names = {}
+    run_initiators = [
+        RunInitiator(
+            run_id=series_run.run_id,
+            flwr_aid=series_run.flwr_aid,
+            account_name=account_names.get(series_run.flwr_aid, ""),
+        )
+        for series_run in series_runs
+        if series_run.flwr_aid
+    ]
+    return GetRunSeriesEventsResponse(
+        events=events,
+        run_initiators=run_initiators,
+    )
 
 
 def pull_pending_tasks(

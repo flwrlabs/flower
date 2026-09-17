@@ -41,7 +41,7 @@ class AgentEvents(ABC):
 
     @abstractmethod
     def get_trace(self) -> list[JSONObject]:
-        """Get events from all runs in the current run series."""
+        """Get series events with ``run_initiator`` metadata when available."""
 
     @abstractmethod
     def emit(self, event: JSONObject) -> None:
