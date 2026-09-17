@@ -61,6 +61,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
+    RunInitiator,
 )
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
@@ -136,8 +137,16 @@ def test_raise_if_true() -> None:
 def test_get_run_series_events_uses_authenticated_task_series() -> None:
     """GetRunSeriesEvents should derive the series from task authentication."""
     state = Mock(spec=LinkState)
-    current_run = Mock(run_id=123, series_id=456, primary_task_id=789)
-    series_runs = [Mock(run_id=120, primary_task_id=780), current_run]
+    current_run = Mock(
+        run_id=123,
+        series_id=456,
+        primary_task_id=789,
+        flwr_aid="account-b",
+    )
+    series_runs = [
+        Mock(run_id=120, primary_task_id=780, flwr_aid="account-a"),
+        current_run,
+    ]
     state.get_run_info.side_effect = [[current_run], series_runs]
     state.get_run_series.return_value = [Mock(run_ids=[120, 123])]
     expected_event = TaskEvent(
@@ -150,16 +159,61 @@ def test_get_run_series_events_uses_authenticated_task_series() -> None:
     state.get_task_events.return_value = [expected_event]
     request = GetRunSeriesEventsRequest()
 
-    response = runtime_handlers.get_run_series_events(
-        request,
-        state,
-        Task(task_id=790, run_id=123, type=TaskType.MODEL),
-    )
+    with patch.object(
+        runtime_handlers,
+        "resolve_account_ids",
+        return_value={"account-a": "Alice", "account-b": "Bob"},
+    ) as resolve_account_ids:
+        response = runtime_handlers.get_run_series_events(
+            request,
+            state,
+            Task(task_id=790, run_id=123, type=TaskType.MODEL),
+        )
 
     assert isinstance(response, GetRunSeriesEventsResponse)
     assert list(response.events) == [expected_event]
+    assert list(response.run_initiators) == [
+        RunInitiator(run_id=120, flwr_aid="account-a", account_name="Alice"),
+        RunInitiator(run_id=123, flwr_aid="account-b", account_name="Bob"),
+    ]
     state.get_run_series.assert_called_once_with(series_ids=[456])
     state.get_task_events.assert_called_once_with(task_ids=[780, 789])
+    resolve_account_ids.assert_called_once_with({"account-a", "account-b"})
+
+
+def test_get_run_series_events_keeps_ids_when_account_name_resolution_fails() -> None:
+    """Return stable run initiator IDs even when names cannot be resolved."""
+    state = Mock(spec=LinkState)
+    current_run = Mock(
+        run_id=123,
+        series_id=456,
+        primary_task_id=789,
+        flwr_aid="account-a",
+    )
+    state.get_run_info.side_effect = [
+        [current_run],
+        [
+            Mock(run_id=120, primary_task_id=780, flwr_aid=""),
+            current_run,
+        ],
+    ]
+    state.get_run_series.return_value = [Mock(run_ids=[120, 123])]
+    state.get_task_events.return_value = []
+
+    with patch.object(
+        runtime_handlers,
+        "resolve_account_ids",
+        side_effect=RuntimeError("account service unavailable"),
+    ):
+        response = runtime_handlers.get_run_series_events(
+            GetRunSeriesEventsRequest(),
+            state,
+            Task(task_id=790, run_id=123, type=TaskType.MODEL),
+        )
+
+    assert list(response.run_initiators) == [
+        RunInitiator(run_id=123, flwr_aid="account-a", account_name="")
+    ]
 
 
 def _create_shared_runtime(
