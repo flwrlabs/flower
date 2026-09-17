@@ -121,7 +121,11 @@ def test_slack_list_conversations_limit() -> None:
     """Slack should apply its default when limit is omitted and accept up to 999."""
     response = Mock(status_code=200)
     response.json.return_value = {"ok": True, "channels": []}
-    for arguments, expected_limit in (({}, None), ({"limit": 999}, "999")):
+    cases: tuple[tuple[JSONObject, str | None], ...] = (
+        ({}, None),
+        ({"limit": 999}, "999"),
+    )
+    for arguments, expected_limit in cases:
         with patch(_HTTP_REQUEST, return_value=response) as request:
             registry.invoke_connector(
                 "slack_list_conversations",
