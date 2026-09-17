@@ -808,6 +808,27 @@ class StateTest(CoreStateTest):
         assert datetime.fromisoformat(actual_message_ins.metadata.delivered_at) > dt
         assert actual_message_ins.metadata.ttl > 0
 
+    def test_store_message_ins_to_superlink(self) -> None:
+        """Test storing and retrieving an instruction Message for the SuperLink."""
+        # Prepare: create an instruction Message for the SuperLink
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        message = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=SUPERLINK_NODE_ID,
+                run_id=run_id,
+            )
+        )
+
+        # Execute: store and retrieve the Message
+        message_id = state.store_message_ins(message)
+        retrieved = state.get_message_ins(node_id=SUPERLINK_NODE_ID, limit=1)
+
+        # Assert: the Message is stored and retrieved
+        assert message_id == message.metadata.message_id
+        assert [msg.metadata.message_id for msg in retrieved] == [message_id]
+
     def test_store_message_and_object_tree_ins(self) -> None:
         """Test store_message_and_object_tree with instruction Messages."""
         # Prepare
@@ -833,21 +854,6 @@ class StateTest(CoreStateTest):
         message_ins_list = state.get_message_ins(node_id=node_id, limit=1)
         assert len(message_ins_list) == 1
         assert message_ins_list[0].metadata.message_id == msg.metadata.message_id
-
-        # Invalid messages should not preregister objects.
-        invalid_msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=SUPERLINK_NODE_ID,
-                run_id=run_id,
-            )
-        )
-        stored, missing_objects = state.store_message_and_object_tree(
-            invalid_msg, get_object_tree(invalid_msg), session_id
-        )
-        assert not stored
-        assert missing_objects == []
-        assert invalid_msg.metadata.message_id not in state.object_store
 
     def test_store_message_and_object_tree_res(self) -> None:
         """Test store_message_and_object_tree with reply Messages."""
@@ -911,6 +917,34 @@ class StateTest(CoreStateTest):
         assert first_message_id == msg.metadata.message_id
         assert second_message_id == msg.metadata.message_id
         assert state.num_message_ins() == 1
+
+    def test_get_message_ins_filters_run_id(self) -> None:
+        """Test get_message_ins filters by run ID."""
+        # Prepare: store Messages for two runs
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        other_run_id = create_dummy_run(state)
+        messages = [
+            message_from_proto(
+                create_ins_message(
+                    src_node_id=SUPERLINK_NODE_ID,
+                    dst_node_id=node_id,
+                    run_id=current_run_id,
+                )
+            )
+            for current_run_id in [run_id, other_run_id]
+        ]
+        for message in messages:
+            assert state.store_message_ins(message)
+
+        # Execute: retrieve Messages for the first run
+        retrieved = state.get_message_ins(node_id=node_id, limit=None, run_id=run_id)
+
+        # Assert: only the Message for the first run is retrieved
+        assert [message.metadata.message_id for message in retrieved] == [
+            messages[0].metadata.message_id
+        ]
 
     def test_store_message_ins_invalid_node_id(self) -> None:
         """Test store_message_ins with invalid node_id."""
