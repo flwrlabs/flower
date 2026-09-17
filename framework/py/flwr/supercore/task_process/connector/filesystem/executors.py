@@ -29,6 +29,10 @@ class FilesystemApiError(ConnectorApiError):
     provider = "Filesystem"
 
 
+_MAX_DIRECTORY_ENTRIES = 1000
+_MAX_FILE_BYTES = 1024 * 1024
+
+
 def list_directory(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
@@ -39,11 +43,13 @@ def list_directory(
     if not os.path.isdir(resolved):
         raise FilesystemApiError("not_a_directory")
     try:
-        entries = sorted(os.listdir(resolved))
+        raw = sorted(os.listdir(resolved))
     except OSError:
         raise FilesystemApiError("access_denied") from None
+    if len(raw) > _MAX_DIRECTORY_ENTRIES:
+        raise FilesystemApiError("too_many_entries")
     items: list[JSONObject] = []
-    for name in entries:
+    for name in raw:
         entry_path = os.path.join(resolved, name)
         items.append(
             {
@@ -61,9 +67,12 @@ def read_file(arguments: JSONObject, context: ConnectorExecutionContext) -> JSON
     resolved = _safe_resolve(path, allowed)
     if not os.path.isfile(resolved):
         raise FilesystemApiError("not_a_file")
+    st = os.stat(resolved)
+    if st.st_size > _MAX_FILE_BYTES:
+        raise FilesystemApiError("file_too_large")
     try:
         with open(resolved, encoding="utf-8") as handle:
-            content = handle.read()
+            content = handle.read(_MAX_FILE_BYTES)
     except (OSError, UnicodeDecodeError):
         raise FilesystemApiError("access_denied") from None
     return {"content": content, "path": resolved}
@@ -77,9 +86,9 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
 
 def _safe_resolve(path: str, allowed: list[str]) -> str:
     """Resolve and sandbox an absolute path."""
-    real = os.path.realpath(path)
-    if not os.path.isabs(real):
+    if not os.path.isabs(path):
         raise FilesystemApiError("access_denied")
+    real = os.path.realpath(path)
     for root in allowed:
         resolved_root = os.path.realpath(root)
         if not resolved_root.endswith(os.sep):
@@ -92,6 +101,8 @@ def _safe_resolve(path: str, allowed: list[str]) -> str:
 def _allowed_dirs(context: ConnectorExecutionContext) -> list[str]:
     """Extract the list of allowed directories from connector config."""
     value = context.config.get("allowed_dirs")
-    if not isinstance(value, list) or not all(isinstance(d, str) for d in value):
+    if not isinstance(value, list) or not all(
+        isinstance(d, str) and d.strip() for d in value
+    ):
         raise FilesystemApiError("invalid_config")
-    return value
+    return [d.strip() for d in value]

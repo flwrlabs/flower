@@ -106,3 +106,26 @@ def test_read_file_requires_path() -> None:
     """Missing path argument should raise a ValueError."""
     with pytest.raises(ValueError, match="must be a non-empty string"):
         read_file({}, _context(allowed_dirs=["/tmp"]))
+
+
+def test_relative_path_rejected() -> None:
+    """A relative path should be rejected before realpath resolution."""
+    with tempfile.TemporaryDirectory() as root:
+        with pytest.raises(FilesystemApiError, match="access_denied"):
+            read_file({"path": "some/relative/path"}, _context(allowed_dirs=[root]))
+
+
+def test_allowed_dirs_rejects_empty_string() -> None:
+    """Empty-string allowed_dirs entries should trigger invalid_config."""
+    with pytest.raises(FilesystemApiError, match="invalid_config"):
+        list_directory({"path": "/tmp/x"}, _context(allowed_dirs=[""]))
+
+
+def test_read_file_enforces_max_size() -> None:
+    """Files larger than 1 MB should be rejected."""
+    with tempfile.TemporaryDirectory() as root:
+        big = os.path.join(root, "big.bin")
+        with open(big, "wb") as handle:
+            handle.write(b"\x00" * (1024 * 1024 + 1))
+        with pytest.raises(FilesystemApiError, match="file_too_large"):
+            read_file({"path": big}, _context(allowed_dirs=[root]))
