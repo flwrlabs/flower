@@ -33,28 +33,42 @@ class FilesystemApiError(ConnectorApiError):
 _MAX_DIRECTORY_ENTRIES = 1000
 _MAX_FILE_BYTES = 1024 * 1024
 
+# O_NOFOLLOW, O_DIRECTORY, and O_NONBLOCK are POSIX-only; degrade to 0 on
+# Windows so the module imports there. On Windows the realpath sandbox in
+# _safe_resolve remains the primary control.
+_O_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+_O_DIRECTORY = getattr(os, "O_DIRECTORY", 0)
+_O_NONBLOCK = getattr(os, "O_NONBLOCK", 0)
+
 
 def list_directory(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
     """List entries in an allowed directory.
 
-    Opens the directory atomically with O_NOFOLLOW | O_DIRECTORY so the
-    kernel rejects symlinks and non-directories in a single syscall,
-    closing one TOCTOU window after _safe_resolve. Entry types are
-    determined via os.stat(..., follow_symlinks=False) to avoid leaking
-    information about targets outside the allowed tree.
+    On POSIX the directory is opened atomically with O_NOFOLLOW |
+    O_DIRECTORY so the kernel rejects symlinks and non-directories in a
+    single syscall, closing one TOCTOU window after _safe_resolve.
+    On Windows those flags are unavailable; listdir falls back to the
+    path form with an is-directory check, and _safe_resolve remains the
+    sandbox control. Entry types are determined via
+    os.stat(..., follow_symlinks=False) to avoid leaking information
+    about targets outside the allowed tree.
     """
     path = require_string(arguments.get("path"), "Filesystem", "path")
     allowed = _allowed_dirs(context)
     resolved = _safe_resolve(path, allowed)
+    fd = None
     try:
-        fd = os.open(resolved, os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY)
-        entries = os.listdir(fd)
+        if _O_DIRECTORY:
+            fd = os.open(resolved, os.O_RDONLY | _O_NOFOLLOW | _O_DIRECTORY)
+            entries = os.listdir(fd)
+        else:
+            entries = os.listdir(resolved)
     except OSError:
         raise FilesystemApiError("access_denied") from None
     finally:
-        if "fd" in locals():
+        if fd is not None:
             os.close(fd)
     if len(entries) > _MAX_DIRECTORY_ENTRIES:
         raise FilesystemApiError("too_many_entries")
@@ -78,17 +92,18 @@ def list_directory(
 def read_file(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
     """Read one UTF-8 text file inside an allowed directory.
 
-    Opens the file atomically with O_NOFOLLOW so the kernel rejects
-    symlinks in a single syscall. fstat on the returned fd validates
-    the file is a regular file (S_ISREG) and checks the size against
-    _MAX_FILE_BYTES before reading. Reading and UTF-8 decoding are
-    done from the fd rather than re-resolving the path string.
+    Opens with O_NOFOLLOW so the kernel rejects symlinks in a single
+    syscall, and O_NONBLOCK to avoid hanging on named pipes or FIFOs.
+    fstat on the returned fd validates the file is a regular file
+    (S_ISREG). On Windows where these flags are unavailable, open falls
+    back to plain os.open and _safe_resolve remains the sandbox control.
     """
     path = require_string(arguments.get("path"), "Filesystem", "path")
     allowed = _allowed_dirs(context)
     resolved = _safe_resolve(path, allowed)
+    fd = None
     try:
-        fd = os.open(resolved, os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(resolved, os.O_RDONLY | _O_NOFOLLOW | _O_NONBLOCK)
         st = os.fstat(fd)
         if not stat.S_ISREG(st.st_mode):
             raise FilesystemApiError("not_a_file")
@@ -98,7 +113,7 @@ def read_file(arguments: JSONObject, context: ConnectorExecutionContext) -> JSON
     except OSError:
         raise FilesystemApiError("access_denied") from None
     finally:
-        if "fd" in locals():
+        if fd is not None:
             os.close(fd)
     try:
         content = raw.decode("utf-8")
@@ -162,4 +177,4 @@ def _allowed_dirs(context: ConnectorExecutionContext) -> list[str]:
         isinstance(d, str) and d.strip() for d in value
     ):
         raise FilesystemApiError("invalid_config")
-    return [d.strip() for d in value]
+    return value
