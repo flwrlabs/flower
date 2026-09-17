@@ -18,7 +18,13 @@ import os
 
 import pytest
 
-from .run_agentapp import _set_runtime_environment
+from flwr.agentapp.constants import (
+    AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY,
+    AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY,
+)
+from flwr.app import ConfigRecord, Message, RecordDict
+
+from .run_agentapp import _set_runtime_environment, message_to_prompt
 
 
 @pytest.mark.parametrize(("insecure", "scheme"), [(True, "http"), (False, "https")])
@@ -41,3 +47,24 @@ def test_set_runtime_environment(
     )
     assert os.environ["FLWR_RUNTIME_API_KEY"] == "task-token"
     assert os.environ["SSL_CERT_FILE"] == "/path/to/runtime-ca.pem"
+
+
+def test_message_to_prompt() -> None:
+    """Serialize message metadata and payload into a compact JSON prompt."""
+    message = Message(
+        RecordDict(
+            {
+                AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: ConfigRecord(
+                    {AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: "hello world!"}
+                )
+            }
+        ),
+        dst_node_id=0,
+        message_type="query",
+    )
+    message.metadata.__dict__["_message_id"] = "message-1"
+    message.metadata.__dict__["_src_node_id"] = 42
+
+    assert message_to_prompt(message) == (
+        '{"src_node_id":"42","message_id":"message-1","payload":"hello world!"}'
+    )
