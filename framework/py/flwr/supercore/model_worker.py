@@ -200,8 +200,12 @@ def dispatch_prestarted_model(  # pylint: disable=too-many-return-statements
                         ):
                             return 1
                         output_stream = sys.stdout if stream == "stdout" else sys.stderr
-                        output_stream.write(output)
-                        output_stream.flush()
+                        try:
+                            output_stream.write(output)
+                            output_stream.flush()
+                        except (OSError, ValueError):
+                            # Output remains best effort after task acceptance.
+                            pass
                     elif event_name == "finished":
                         returncode = response.get("returncode")
                         return (

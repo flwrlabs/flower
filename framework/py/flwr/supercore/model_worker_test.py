@@ -147,7 +147,7 @@ def test_worker_cleans_up_socket_and_markers(
     assert not any(path.exists() for path in (socket_path, ready_file, busy_file))
 
 
-def test_dispatch_acknowledges_and_relays_accepted_output(
+def test_dispatch_relays_accepted_output_best_effort(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -165,10 +165,21 @@ def test_dispatch_acknowledges_and_relays_accepted_output(
                 {"event": "accepted"},
                 {"event": "output", "stream": "stdout", "data": "out\n"},
                 {"event": "output", "stream": "stderr", "data": "err\n"},
+                {"event": "output", "stream": "stderr", "data": "é"},
                 {"event": "finished", "returncode": 0},
             ]
         ),
     )
+    captured_stderr = sys.stderr
+
+    def write_stderr(output: str) -> int:
+        if output == "é":
+            raise UnicodeEncodeError("ascii", output, 0, 1, "ordinal")
+        return captured_stderr.write(output)
+
+    stderr = Mock(wraps=captured_stderr)
+    stderr.write.side_effect = write_stderr
+    monkeypatch.setattr(sys, "stderr", stderr)
 
     assert (
         model_worker.dispatch_prestarted_model(
@@ -180,6 +191,7 @@ def test_dispatch_acknowledges_and_relays_accepted_output(
     captured = capsys.readouterr()
     assert captured.out == f"{FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT}\nout\n"
     assert captured.err == "err\n"
+    stderr.write.assert_any_call("é")
     assert b"task-token" in channel.write.call_args.args[0]
 
 
