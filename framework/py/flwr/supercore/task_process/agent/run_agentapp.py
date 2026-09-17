@@ -88,7 +88,6 @@ _SSL_CERT_FILE_ENV = "SSL_CERT_FILE"
 def message_to_prompt(message: Message) -> str:
     """Serialize a Grid message into a JSON prompt string."""
     prompt: JSONObject = {
-        "src_node_id": str(message.metadata.src_node_id),
         "message_id": message.metadata.message_id,
         "payload": cast(
             str,
@@ -97,6 +96,8 @@ def message_to_prompt(message: Message) -> str:
             ],
         ),
     }
+    if message.metadata.src_node_id != TaskIdentity.node_id:
+        prompt["src_node_id"] = str(message.metadata.src_node_id)
     return strict_json_dumps(prompt, compact=True)
 
 

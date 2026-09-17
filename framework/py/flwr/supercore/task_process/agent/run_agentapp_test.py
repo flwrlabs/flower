@@ -23,8 +23,35 @@ from flwr.agentapp.constants import (
     AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY,
 )
 from flwr.app import ConfigRecord, Message, RecordDict
+from flwr.supercore.task_identity import TaskIdentity
 
 from .run_agentapp import _set_runtime_environment, message_to_prompt
+
+
+@pytest.fixture(autouse=True)
+def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the task identity used by AgentApp process environment tests."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 123)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 456)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 789)
+
+
+def _payload_message(src_node_id: int) -> Message:
+    """Build a Grid message carrying a JSON payload record."""
+    message = Message(
+        RecordDict(
+            {
+                AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: ConfigRecord(
+                    {AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: "hello world!"}
+                )
+            }
+        ),
+        dst_node_id=0,
+        message_type="query",
+    )
+    message.metadata.__dict__["_message_id"] = "message-1"
+    message.metadata.__dict__["_src_node_id"] = src_node_id
+    return message
 
 
 @pytest.mark.parametrize(("insecure", "scheme"), [(True, "http"), (False, "https")])
@@ -49,22 +76,16 @@ def test_set_runtime_environment(
     assert os.environ["SSL_CERT_FILE"] == "/path/to/runtime-ca.pem"
 
 
-def test_message_to_prompt() -> None:
-    """Serialize message metadata and payload into a compact JSON prompt."""
-    message = Message(
-        RecordDict(
-            {
-                AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: ConfigRecord(
-                    {AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: "hello world!"}
-                )
-            }
+@pytest.mark.parametrize(
+    ("msg_src_node_id", "expected"),
+    [
+        (789, '{"message_id":"message-1","payload":"hello world!"}'),
+        (
+            99,
+            '{"message_id":"message-1","payload":"hello world!","src_node_id":"99"}',
         ),
-        dst_node_id=0,
-        message_type="query",
-    )
-    message.metadata.__dict__["_message_id"] = "message-1"
-    message.metadata.__dict__["_src_node_id"] = 42
-
-    assert message_to_prompt(message) == (
-        '{"src_node_id":"42","message_id":"message-1","payload":"hello world!"}'
-    )
+    ],
+)
+def test_message_to_prompt(msg_src_node_id: int, expected: str) -> None:
+    """Include src_node_id only when it differs from TaskIdentity.node_id."""
+    assert message_to_prompt(_payload_message(msg_src_node_id)) == expected
