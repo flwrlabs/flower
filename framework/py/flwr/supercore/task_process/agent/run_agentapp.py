@@ -19,11 +19,16 @@ import os
 from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
+from typing import cast
 
 import httpx
 
 from flwr.agentapp import AgentApp, LoadAgentAppError
-from flwr.app import Context
+from flwr.agentapp.constants import (
+    AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY,
+    AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY,
+)
+from flwr.app import Context, Message
 from flwr.app.exception import AppExitException
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
@@ -62,6 +67,8 @@ from flwr.supercore.superexec.dependency_installer import (
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
+from flwr.supercore.typing import JSONObject
+from flwr.supercore.utils import strict_json_dumps
 from flwr.superlink.grid import HttpGrid
 
 from .grid import RuntimeAgentGrid
@@ -76,6 +83,22 @@ _AGENT_INPUT_KEY = "agent.input"
 _RUNTIME_API_KEY_ENV = "FLWR_RUNTIME_API_KEY"
 _RUNTIME_BASE_URL_ENV = "FLWR_RUNTIME_BASE_URL"
 _SSL_CERT_FILE_ENV = "SSL_CERT_FILE"
+
+
+def message_to_prompt(message: Message) -> str:
+    """Serialize a Grid message into a JSON prompt string."""
+    prompt: JSONObject = {
+        "message_id": message.metadata.message_id,
+        "payload": cast(
+            str,
+            message.content[AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY][
+                AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY
+            ],
+        ),
+    }
+    if message.metadata.src_node_id != TaskIdentity.node_id:
+        prompt["src_node_id"] = str(message.metadata.src_node_id)
+    return strict_json_dumps(prompt, compact=True)
 
 
 def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
