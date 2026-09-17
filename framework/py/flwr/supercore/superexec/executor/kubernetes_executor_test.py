@@ -40,6 +40,7 @@ from flwr.supercore.warm_executor_constants import (
     WARM_EXECUTOR_READY_DIRECTORY,
     WARM_EXECUTOR_READY_FILE,
     WARM_MODEL_EXECUTOR_MODULE,
+    WARM_MODEL_EXECUTOR_SOCKET,
 )
 
 from . import kubernetes_executor as kube
@@ -1388,7 +1389,7 @@ def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     pool_key = _warm_executor_pool_key(
-        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+        task_type=TaskType.MODEL, runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
     config = _executor_config(
         warm_executor_owner="superexec-a",
@@ -1409,11 +1410,18 @@ def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
     client.reset_mock()
     pending_pod = _ready_warm_pod(pool_key, config, name="pending")
     pending_pod["status"] = {"phase": "Pending", "conditions": []}
+    legacy_pod = _ready_warm_pod(pool_key, config, name="legacy")
+    legacy_pod["spec"]["containers"][0]["command"] = [
+        "python",
+        "-m",
+        WARM_EXECUTOR_MODULE,
+    ]
     client.list_namespaced_pod.return_value = {
         "items": [
             pending_pod,
             _ready_warm_pod(pool_key, config, name="keep"),
             obsolete_pod,
+            legacy_pod,
         ]
     }
 
@@ -1423,10 +1431,20 @@ def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
         [
             call(name="pending", namespace="flower-system", grace_period_seconds=0),
             call(name="obsolete", namespace="flower-system", grace_period_seconds=0),
+            call(name="legacy", namespace="flower-system", grace_period_seconds=0),
         ],
         any_order=True,
     )
     client.create_namespaced_pod.assert_not_called()
+
+    client.reset_mock()
+    client.list_namespaced_pod.return_value = {"items": [legacy_pod]}
+    pool.ensure_capacity()
+
+    client.delete_namespaced_pod.assert_called_once_with(
+        name="legacy", namespace="flower-system", grace_period_seconds=0
+    )
+    client.create_namespaced_pod.assert_called_once()
 
     client.reset_mock()
     client.list_namespaced_pod.return_value = {"items": [obsolete_pod]}
@@ -1863,6 +1881,22 @@ def test_build_taskexecutor_pod_includes_configured_volumes() -> None:
             {
                 "volume_mounts": [
                     {"name": "ready-file", "mountPath": WARM_EXECUTOR_READY_FILE}
+                ]
+            },
+            "mount path",
+        ),
+        (
+            {
+                "volume_mounts": [
+                    {"name": "busy-file", "mountPath": WARM_EXECUTOR_BUSY_FILE}
+                ]
+            },
+            "mount path",
+        ),
+        (
+            {
+                "volume_mounts": [
+                    {"name": "model-socket", "mountPath": WARM_MODEL_EXECUTOR_SOCKET}
                 ]
             },
             "mount path",

@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import sys
 import threading
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from io import TextIOBase
@@ -30,7 +31,8 @@ from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
 MAX_PROTOCOL_MESSAGE_BYTES = 16_384
 _MAX_OUTPUT_FRAME_CHARS = 1_024
 _MAX_QUEUED_OUTPUT_FRAMES = 64
-_OUTPUT_DRAIN_TIMEOUT_SECONDS = 0.5
+_OUTPUT_DRAIN_BUDGET_SECONDS = 0.25
+_OUTPUT_CLOSE_TIMEOUT_SECONDS = 0.5
 
 
 class MessageChannel(Protocol):
@@ -55,11 +57,12 @@ class ProtocolOutputSender:
         self._done = threading.Event()
         self._failed = threading.Event()
         self._returncode: int | None = None
-        self._thread = threading.Thread(target=self._send, daemon=True)
-        self._started = False
+        self._drain_deadline: float | None = None
+        self._thread: threading.Thread | None = None
         try:
-            self._thread.start()
-            self._started = True
+            thread = threading.Thread(target=self._send, daemon=True)
+            thread.start()
+            self._thread = thread
         except RuntimeError:
             self._failed.set()
 
@@ -82,13 +85,20 @@ class ProtocolOutputSender:
     def close(self, returncode: int | None) -> None:
         """Finish output delivery best-effort within a fixed time bound."""
         self._returncode = returncode
+        self._drain_deadline = time.monotonic() + _OUTPUT_DRAIN_BUDGET_SECONDS
         self._done.set()
-        if self._started:
-            self._thread.join(timeout=_OUTPUT_DRAIN_TIMEOUT_SECONDS)
+        if self._thread is not None:
+            self._thread.join(timeout=_OUTPUT_CLOSE_TIMEOUT_SECONDS)
 
     def _send(self) -> None:
         try:
             while not self._done.is_set() or not self._queue.empty():
+                if (
+                    self._done.is_set()
+                    and self._drain_deadline is not None
+                    and time.monotonic() >= self._drain_deadline
+                ):
+                    break
                 try:
                     payload = self._queue.get(timeout=0.01)
                 except Empty:

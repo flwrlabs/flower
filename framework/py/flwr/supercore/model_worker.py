@@ -17,7 +17,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import signal
 import socket
 import sys
@@ -28,7 +27,7 @@ from dataclasses import asdict, dataclass
 from logging import ERROR
 from pathlib import Path
 from types import FrameType
-from typing import Any
+from typing import Any, Protocol
 
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
@@ -41,10 +40,21 @@ from flwr.supercore.warm_executor_constants import (
 )
 
 _OUTPUT_SEND_TIMEOUT_SECONDS = 0.1
-_RunModelOnce = Callable[
-    [str, str, bool, bytes | None, Callable[[], None]],
-    int,
-]
+
+
+class _RunModelOnce(Protocol):
+    """Execute one Model task after task-scoped state is initialized."""
+
+    def __call__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        runtime_api_address: str,
+        token: str,
+        insecure: bool,
+        root_certificates: bytes | None,
+        on_started: Callable[[], None],
+        /,
+    ) -> int:
+        """Execute one Model task and return its process exit code."""
 
 
 @dataclass(frozen=True)
@@ -55,16 +65,6 @@ class ModelInvocation:
     runtime_api_address: str
     insecure: bool
     root_certificates_path: str | None
-
-    @classmethod
-    def from_json(cls, raw: str) -> ModelInvocation:
-        """Parse and validate one invocation request."""
-        try:
-            payload = json.loads(raw)
-        except json.JSONDecodeError as err:
-            raise ValueError("Model invocation must be valid JSON.") from err
-
-        return cls.from_payload(payload)
 
     @classmethod
     def from_payload(cls, payload: object) -> ModelInvocation:
@@ -148,8 +148,8 @@ def _serve_ready_worker(
     """Publish readiness, then make one accepted connection exclusively busy."""
     ready_file.touch()
     connection, _ = server.accept()
-    ready_file.unlink(missing_ok=True)
     busy_file.touch()
+    ready_file.unlink(missing_ok=True)
     try:
         with connection:
             return _serve_connection(connection, run_once)
@@ -311,11 +311,23 @@ def _serve_channel(
                     )
                 except (OSError, ValueError):
                     pass
+        except SystemExit as err:
+            returncode = _system_exit_returncode(err)
+            raise
     finally:
         output_context.close()
         if sender is not None:
-            sender.close(returncode if sys.exc_info()[0] is None else None)
+            sender.close(returncode)
     return returncode
+
+
+def _system_exit_returncode(err: SystemExit) -> int:
+    """Convert a SystemExit value to a protocol return code."""
+    if err.code is None:
+        return 0
+    if isinstance(err.code, int):
+        return int(err.code)
+    return 1
 
 
 def _register_idle_signal_handlers() -> None:

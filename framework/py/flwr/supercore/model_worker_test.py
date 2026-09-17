@@ -114,6 +114,12 @@ def test_worker_cleans_up_socket_and_markers(
     server = MagicMock()
     server.__enter__.return_value = server
     server.bind.side_effect = lambda _: socket_path.touch()
+    unlink = Path.unlink
+
+    def unlink_after_busy(path: Path, missing_ok: bool = False) -> None:
+        if path == ready_file and path.exists():
+            assert busy_file.exists()
+        unlink(path, missing_ok=missing_ok)
 
     def accept() -> tuple[object, None]:
         assert ready_file.is_file()
@@ -131,6 +137,7 @@ def test_worker_cleans_up_socket_and_markers(
         model_worker, "_register_idle_signal_handlers", register_signals
     )
     monkeypatch.setattr(model_worker, "_serve_connection", serve_connection)
+    monkeypatch.setattr(Path, "unlink", unlink_after_busy)
 
     assert (
         model_worker.serve_prestarted_model_worker(socket_path, ready_file, busy_file)
@@ -265,6 +272,31 @@ def test_worker_rejects_failure_before_acceptance() -> None:
     ]
 
 
+def test_worker_reports_graceful_exit_after_acceptance() -> None:
+    """A graceful resident exit should still send its terminal result."""
+    channel = BytesIO(model_worker_protocol.encode_message(_invocation()))
+
+    def stop(
+        _runtime_api_address: str,
+        _token: str,
+        _insecure: bool,
+        _certificates: bytes | None,
+        on_started: Callable[[], None],
+    ) -> int:
+        on_started()
+        raise SystemExit(0)
+
+    with pytest.raises(SystemExit):
+        model_worker._serve_channel(channel, stop)
+
+    responses = BytesIO(channel.getvalue().partition(b"\n")[2])
+    assert model_worker_protocol.read_message(responses) == {"event": "accepted"}
+    assert model_worker_protocol.read_message(responses) == {
+        "event": "finished",
+        "returncode": 0,
+    }
+
+
 def test_disconnect_does_not_abort_accepted_task() -> None:
     """Losing the dispatcher must not change accepted-task execution."""
     server, client = socket.socketpair()
@@ -306,26 +338,25 @@ def test_disconnect_does_not_abort_accepted_task() -> None:
 
 
 def test_saturated_output_channel_does_not_abort_task() -> None:
-    """A blocked protocol writer should only drop logs, never block the task."""
+    """A slow protocol writer should drop logs and preserve completion."""
 
-    class BlockingChannel(BytesIO):
-        """Block every write after the synchronous acceptance frame."""
+    class SlowChannel(BytesIO):
+        """Delay every write after the synchronous acceptance frame."""
 
         def __init__(self, initial_bytes: bytes) -> None:
             super().__init__(initial_bytes)
             self.writes = 0
-            self.release = threading.Event()
 
         def write(self, data: Any, /) -> int:
             self.writes += 1
             if self.writes > 1:
-                self.release.wait(timeout=2.0)
-            return len(data)
+                time.sleep(0.02)
+            return super().write(data)
 
         def flush(self) -> None:
             return
 
-    channel = BlockingChannel(model_worker_protocol.encode_message(_invocation()))
+    channel = SlowChannel(model_worker_protocol.encode_message(_invocation()))
 
     def run_once(
         _runtime_api_address: str,
@@ -341,7 +372,7 @@ def test_saturated_output_channel_does_not_abort_task() -> None:
     started_at = time.monotonic()
     result = model_worker._serve_channel(channel, run_once)
     elapsed = time.monotonic() - started_at
-    channel.release.set()
 
     assert result == 0
-    assert elapsed < 1.5
+    assert elapsed < 1.0
+    assert b'{"event":"finished","returncode":0}\n' in channel.getvalue()

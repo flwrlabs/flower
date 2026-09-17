@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import os
 import signal
 import threading
 from collections.abc import Callable, Iterator
@@ -34,7 +35,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import TELEMETRY_TIMEOUT_SECONDS
+from flwr.supercore.constant import (
+    FORCE_EXIT_TIMEOUT_SECONDS,
+    TELEMETRY_TIMEOUT_SECONDS,
+)
 from flwr.supercore.exit import (
     ExitCode,
     add_exit_handler,
@@ -275,8 +279,19 @@ def run_model_once(
         resident=True,
         on_started=on_started,
     )
-    lifecycle.complete(exit_code)
-    return 0 if exit_code == ExitCode.SUCCESS else 1
+    returncode = 0 if exit_code == ExitCode.SUCCESS else 1
+    force_exit_timer = threading.Timer(
+        FORCE_EXIT_TIMEOUT_SECONDS,
+        os._exit,
+        args=(returncode,),
+    )
+    force_exit_timer.daemon = True
+    force_exit_timer.start()
+    try:
+        lifecycle.complete(exit_code)
+    finally:
+        force_exit_timer.cancel()
+    return returncode
 
 
 def run_model(

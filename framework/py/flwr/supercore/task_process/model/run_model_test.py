@@ -17,6 +17,7 @@
 # pylint: disable=protected-access
 
 import importlib
+import os
 import signal
 import threading
 from unittest.mock import Mock
@@ -67,6 +68,8 @@ def test_run_model_once_cleans_up_fresh_task_state(
     leave_future = Mock()
     leave_future.result.side_effect = TimeoutError
     telemetry = Mock(side_effect=[Mock(), leave_future])
+    force_exit_timer = Mock()
+    timer_cls = Mock(return_value=force_exit_timer)
     monkeypatch.setattr(
         run_model_module,
         "_create_runtime_client",
@@ -78,6 +81,7 @@ def test_run_model_once_cleans_up_fresh_task_state(
     monkeypatch.setattr(run_model_module, "handle_task", Mock(side_effect=failure))
     monkeypatch.setattr(run_model_module, "event", telemetry)
     monkeypatch.setattr(run_model_module, "_register_resident_signal_handlers", Mock())
+    monkeypatch.setattr(run_model_module.threading, "Timer", timer_cls)
 
     assert (
         run_model_module.run_model_once("runtime.example:9092", "task-token", True)
@@ -101,6 +105,14 @@ def test_run_model_once_cleans_up_fresh_task_state(
     leave_future.result.assert_called_once_with(
         timeout=run_model_module.TELEMETRY_TIMEOUT_SECONDS
     )
+    timer_cls.assert_called_once_with(
+        run_model_module.FORCE_EXIT_TIMEOUT_SECONDS,
+        os._exit,
+        args=(returncode,),
+    )
+    assert force_exit_timer.daemon
+    force_exit_timer.start.assert_called_once_with()
+    force_exit_timer.cancel.assert_called_once_with()
 
 
 def test_resident_signal_finalization_is_exactly_once(

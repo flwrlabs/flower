@@ -370,7 +370,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             None,
         ],
         has_warm_executor_configuration: Callable[
-            [object, KubernetesExecutorConfig], bool
+            [object, WarmExecutorPoolKey, KubernetesExecutorConfig], bool
         ],
         is_active_warm_executor: Callable[
             [object, WarmExecutorPoolKey, KubernetesExecutorConfig], bool
@@ -543,7 +543,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             and pod_name not in self._busy_pods
             and pod_name not in self._retiring_pods
             and not _is_consumed_warm_executor(pod)
-            and self._has_warm_executor_configuration(pod, self._config)
+            and self._has_warm_executor_configuration(pod, key, self._config)
             and is_warm_executor_ready(pod, key)
         )
 
