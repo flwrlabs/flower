@@ -139,7 +139,7 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
 
     def finalize(self) -> None:
         """Push final status and release task state exactly once."""
-        with _defer_graceful_signals(), self._lock:
+        with _ignore_graceful_signals(), self._lock:
             if self._finalized:
                 return
             self._finalized = True
@@ -170,7 +170,7 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
 
     def complete(self, exit_code: int) -> None:
         """Finalize and emit one bounded leave event for a resident worker."""
-        with _defer_graceful_signals():
+        with _ignore_graceful_signals():
             self.finalize()
             with self._lock:
                 if self._leave_event_started:
@@ -186,20 +186,20 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
 
 
 @contextmanager
-def _defer_graceful_signals() -> Iterator[None]:
-    """Defer graceful signals while exactly-once finalization is in progress."""
-    pthread_sigmask = getattr(signal, "pthread_sigmask", None)
-    if not callable(pthread_sigmask) or (
-        threading.current_thread() is not threading.main_thread()
-    ):
+def _ignore_graceful_signals() -> Iterator[None]:
+    """Ignore graceful signals process-wide while finalization is in progress."""
+    if threading.current_thread() is not threading.main_thread():
         yield
         return
 
-    previous_mask = pthread_sigmask(signal.SIG_BLOCK, set(SIGNAL_TO_EXIT_CODE))
+    previous_handlers: dict[int, Any] = {}
     try:
+        for sig in SIGNAL_TO_EXIT_CODE:
+            previous_handlers[sig] = signal.signal(sig, signal.SIG_IGN)
         yield
     finally:
-        pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+        for sig, previous_handler in previous_handlers.items():
+            signal.signal(sig, previous_handler)
 
 
 def _run_model_task(  # pylint: disable=too-many-arguments

@@ -136,6 +136,26 @@ def test_run_model_once_force_exits_if_cleanup_hangs(
     force_exit.assert_called_once_with(0)
 
 
+def test_finalization_ignores_graceful_signals_process_wide(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Finalization should restore the process-wide graceful signal handlers."""
+    previous_handlers = {sig: object() for sig in run_model_module.SIGNAL_TO_EXIT_CODE}
+    handlers = previous_handlers.copy()
+
+    def register(sig: int, handler: object) -> object:
+        previous = handlers[sig]
+        handlers[sig] = handler
+        return previous
+
+    monkeypatch.setattr(signal, "signal", register)
+
+    with run_model_module._ignore_graceful_signals():
+        assert all(handler == signal.SIG_IGN for handler in handlers.values())
+
+    assert handlers == previous_handlers
+
+
 @pytest.mark.parametrize(
     "recorded_failure_details",
     [None, "Model task failed with exception: provider failed"],
