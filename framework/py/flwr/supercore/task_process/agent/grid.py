@@ -94,6 +94,11 @@ def _grid_tools() -> list[JSONObject]:
                                 "to preserve precision."
                             ),
                             "payload": string_property("String payload to send."),
+                            "reply_to_message_id": string_property(
+                                "ID of the message being replied to. Required when "
+                                "replying to another message; otherwise, this field "
+                                "must not be set."
+                            ),
                             "ttl": {
                                 "type": "number",
                                 "exclusiveMinimum": 0,
@@ -282,6 +287,9 @@ class RuntimeAgentGrid(AgentGrid):
                 group_id="",
                 ttl=ttl,
             )
+            reply_to_message_id = cast(str | None, item.get("reply_to_message_id"))
+            if reply_to_message_id is not None:
+                message.metadata.__dict__["_reply_to_message_id"] = reply_to_message_id
             outgoing.append(message)
 
         message_ids = list(self._grid.push_messages(outgoing))
