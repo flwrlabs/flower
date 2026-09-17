@@ -15,6 +15,7 @@
 """File system action executors."""
 
 import os
+import stat
 
 from flwr.supercore.typing import JSONObject
 
@@ -36,44 +37,71 @@ _MAX_FILE_BYTES = 1024 * 1024
 def list_directory(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
-    """List entries in an allowed directory."""
+    """List entries in an allowed directory.
+
+    Opens the directory atomically with O_NOFOLLOW | O_DIRECTORY so the
+    kernel rejects symlinks and non-directories in a single syscall,
+    closing one TOCTOU window after _safe_resolve. Entry types are
+    determined via os.stat(..., follow_symlinks=False) to avoid leaking
+    information about targets outside the allowed tree.
+    """
     path = require_string(arguments.get("path"), "Filesystem", "path")
     allowed = _allowed_dirs(context)
     resolved = _safe_resolve(path, allowed)
-    if not os.path.isdir(resolved):
-        raise FilesystemApiError("not_a_directory")
     try:
-        raw = sorted(os.listdir(resolved))
+        fd = os.open(resolved, os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY)
+        raw = sorted(os.listdir(fd))
     except OSError:
         raise FilesystemApiError("access_denied") from None
+    finally:
+        if "fd" in locals():
+            os.close(fd)
     if len(raw) > _MAX_DIRECTORY_ENTRIES:
         raise FilesystemApiError("too_many_entries")
     items: list[JSONObject] = []
     for name in raw:
         entry_path = os.path.join(resolved, name)
+        try:
+            entry_st = os.stat(entry_path, follow_symlinks=False)
+        except OSError:
+            continue
         items.append(
             {
                 "name": name,
-                "type": "directory" if os.path.isdir(entry_path) else "file",
+                "type": "directory" if stat.S_ISDIR(entry_st.st_mode) else "file",
             }
         )
     return {"entries": items}
 
 
 def read_file(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
-    """Read one UTF-8 text file inside an allowed directory."""
+    """Read one UTF-8 text file inside an allowed directory.
+
+    Opens the file atomically with O_NOFOLLOW so the kernel rejects
+    symlinks in a single syscall. fstat on the returned fd validates
+    the file is a regular file (S_ISREG) and checks the size against
+    _MAX_FILE_BYTES before reading. Reading and UTF-8 decoding are
+    done from the fd rather than re-resolving the path string.
+    """
     path = require_string(arguments.get("path"), "Filesystem", "path")
     allowed = _allowed_dirs(context)
     resolved = _safe_resolve(path, allowed)
-    if not os.path.isfile(resolved):
-        raise FilesystemApiError("not_a_file")
-    st = os.stat(resolved)
-    if st.st_size > _MAX_FILE_BYTES:
-        raise FilesystemApiError("file_too_large")
     try:
-        with open(resolved, encoding="utf-8") as handle:
-            content = handle.read(_MAX_FILE_BYTES)
-    except (OSError, UnicodeDecodeError):
+        fd = os.open(resolved, os.O_RDONLY | os.O_NOFOLLOW)
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            raise FilesystemApiError("not_a_file")
+        if st.st_size > _MAX_FILE_BYTES:
+            raise FilesystemApiError("file_too_large")
+        raw = os.read(fd, _MAX_FILE_BYTES)
+    except OSError:
+        raise FilesystemApiError("access_denied") from None
+    finally:
+        if "fd" in locals():
+            os.close(fd)
+    try:
+        content = raw.decode("utf-8")
+    except UnicodeDecodeError:
         raise FilesystemApiError("access_denied") from None
     return {"content": content, "path": resolved}
 
@@ -85,7 +113,15 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
 
 
 def _safe_resolve(path: str, allowed: list[str]) -> str:
-    """Resolve and sandbox an absolute path."""
+    """Resolve and sandbox an absolute path.
+
+    realpath canonicalization catches symlinks and '..' components before
+    the path is used. The per-executor O_NOFOLLOW open then hardens against
+    a concurrent attacker who swaps the final path component between this
+    check and the open syscall. Intermediate directory components are not
+    re-verified after realpath; a full openat(O_NOFOLLOW) walk per level
+    would close that residual window if the threat model demands it.
+    """
     if not os.path.isabs(path):
         raise FilesystemApiError("access_denied")
     real = os.path.realpath(path)

@@ -92,7 +92,7 @@ def test_list_directory_rejects_file() -> None:
         filepath = os.path.join(root, "f.txt")
         with open(filepath, "w") as handle:
             handle.write("x")
-        with pytest.raises(FilesystemApiError, match="not_a_directory"):
+        with pytest.raises(FilesystemApiError, match="access_denied"):
             list_directory({"path": filepath}, _context(allowed_dirs=[root]))
 
 
