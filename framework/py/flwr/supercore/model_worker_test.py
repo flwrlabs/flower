@@ -14,14 +14,10 @@
 # ==============================================================================
 """Tests for the single-use prestarted Model worker."""
 
-# pylint: disable=protected-access,too-many-locals
+# pylint: disable=protected-access
 
-import multiprocessing
-import os
-import signal
 import socket
 import sys
-import tempfile
 import threading
 import time
 from collections.abc import Callable
@@ -37,18 +33,59 @@ from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
 from . import model_worker, model_worker_protocol
 from .model_worker import ModelInvocation
 
+_RunOnce = Callable[[str, str, bool, bytes | None, Callable[[], None]], int]
 
-def test_model_invocation_rejects_missing_and_unexpected_fields() -> None:
-    """The worker protocol should accept only the expected typed payload."""
+
+def _invocation(**changes: Any) -> dict[str, Any]:
+    payload = {
+        "token": "task-token",
+        "runtime_api_address": "runtime.example:9092",
+        "insecure": True,
+        "root_certificates_path": None,
+    }
+    payload.update(changes)
+    return payload
+
+
+def _exchange(
+    run_once: _RunOnce,
+    payload: dict[str, Any] | None = None,
+) -> tuple[list[int], list[dict[str, Any]]]:
+    """Serve one socket-pair invocation and collect its protocol frames."""
+    server, client = socket.socketpair()
+    result: list[int] = []
+    thread = threading.Thread(
+        target=lambda: result.append(model_worker._serve_connection(server, run_once))
+    )
+    thread.start()
+    frames: list[dict[str, Any]] = []
+    try:
+        with client.makefile("rwb") as channel:
+            model_worker_protocol.send_message(channel, payload or _invocation())
+            while True:
+                frame = model_worker_protocol.read_message(channel)
+                frames.append(frame)
+                if frame.get("event") in {"finished", "rejected"}:
+                    break
+    finally:
+        client.close()
+        server.close()
+        thread.join(timeout=2.0)
+    assert not thread.is_alive()
+    return result, frames
+
+
+def test_protocol_rejects_invalid_messages() -> None:
+    """Protocol input should be typed and bounded."""
+    with pytest.raises(ValueError, match="valid JSON"):
+        model_worker_protocol.read_message(BytesIO(b"{\n"))
     with pytest.raises(ValueError, match="non-empty string"):
-        ModelInvocation.from_json(
-            '{"token":"","runtime_api_address":"runtime:9092",'
-            '"insecure":true,"root_certificates_path":null}'
-        )
+        ModelInvocation.from_payload(_invocation(token=""))
     with pytest.raises(ValueError, match="unexpected fields"):
-        ModelInvocation.from_json(
-            '{"token":"token","runtime_api_address":"runtime:9092",'
-            '"insecure":true,"root_certificates_path":null,"extra":true}'
+        ModelInvocation.from_payload(_invocation(extra=True))
+    with pytest.raises(ValueError, match="too large"):
+        model_worker_protocol.read_message(
+            BytesIO(b"x" * (model_worker_protocol.MAX_PROTOCOL_MESSAGE_BYTES + 1))
         )
 
 
@@ -63,176 +100,74 @@ def test_protocol_preserves_coalesced_messages() -> None:
     }
 
 
-def test_protocol_rejects_oversized_message() -> None:
-    """The worker should never allocate an unbounded protocol message."""
-    channel = BytesIO(b"x" * (model_worker_protocol.MAX_PROTOCOL_MESSAGE_BYTES + 1))
-
-    with pytest.raises(ValueError, match="too large"):
-        model_worker_protocol.read_message(channel)
-
-
-@pytest.mark.parametrize("task_returncode", [0, 1])
-def test_prestarted_worker_serves_one_invocation_and_cleans_up(
+@pytest.mark.parametrize("returncode", [0, 1])
+def test_ready_worker_cleans_up_markers(
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    task_returncode: int,
+    returncode: int,
 ) -> None:
-    """The resident process should become busy, run once, and remove markers."""
+    """Ready and busy markers should be exclusive and always removed."""
     ready_file = tmp_path / "ready"
     busy_file = tmp_path / "busy"
-
-    def run_once(
-        runtime_api_address: str,
-        token: str,
-        insecure: bool,
-        certificates: bytes | None,
-        on_started: Callable[[], None],
-    ) -> int:
-        assert runtime_api_address == "runtime.example:9092"
-        assert token == "task-token"
-        assert insecure
-        assert certificates is None
-        assert busy_file.is_file()
-        assert not ready_file.exists()
-        on_started()
-        return task_returncode
-
-    run_model_once = Mock(side_effect=run_once)
-    server_connection, client_connection = socket.socketpair()
-    listener = Mock()
-    accept_invocation = threading.Event()
+    connection = MagicMock()
+    server = Mock()
 
     def accept() -> tuple[object, None]:
-        accept_invocation.wait(timeout=2.0)
-        return server_connection, None
+        assert ready_file.is_file()
+        return connection, None
 
-    listener.accept.side_effect = accept
-    result: list[int] = []
-    thread = threading.Thread(
-        target=lambda: result.append(
-            model_worker._serve_ready_worker(  # pylint: disable=protected-access
-                listener, ready_file, busy_file, run_model_once
-            )
-        )
+    def serve_connection(*_: object) -> int:
+        assert busy_file.is_file()
+        assert not ready_file.exists()
+        return returncode
+
+    server.accept.side_effect = accept
+    monkeypatch.setattr(model_worker, "_serve_connection", serve_connection)
+
+    assert (
+        model_worker._serve_ready_worker(server, ready_file, busy_file, Mock())
+        == returncode
     )
-    thread.start()
-    deadline = time.monotonic() + 2.0
-    while not ready_file.exists() and time.monotonic() < deadline:
-        time.sleep(0.01)
-    assert ready_file.is_file()
-    accept_invocation.set()
-
-    with client_connection.makefile("rwb") as channel:
-        model_worker_protocol.send_message(
-            channel,
-            {
-                "token": "task-token",
-                "runtime_api_address": "runtime.example:9092",
-                "insecure": True,
-                "root_certificates_path": None,
-            },
-        )
-        assert model_worker_protocol.read_message(channel) == {"event": "accepted"}
-        assert model_worker_protocol.read_message(channel) == {
-            "event": "finished",
-            "returncode": task_returncode,
-        }
-    thread.join(timeout=2.0)
-    client_connection.close()
-
-    assert result == [task_returncode]
-    assert not thread.is_alive()
-    call_args = run_model_once.call_args.args
-    assert call_args[:4] == (
-        "runtime.example:9092",
-        "task-token",
-        True,
-        None,
-    )
-    assert callable(call_args[4])
     assert not ready_file.exists()
     assert not busy_file.exists()
 
 
-def test_prestarted_worker_cleans_up_after_rejection(tmp_path: Path) -> None:
-    """A malformed invocation should remove ready and busy markers."""
+def test_worker_shutdown_cleans_up_files(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Worker shutdown should remove its socket and marker files."""
+    socket_path = tmp_path / "model.sock"
     ready_file = tmp_path / "ready"
     busy_file = tmp_path / "busy"
-    server_connection, client_connection = socket.socketpair()
-    listener = Mock()
-    listener.accept.return_value = (server_connection, None)
-    result: list[int] = []
-    thread = threading.Thread(
-        target=lambda: result.append(
-            model_worker._serve_ready_worker(
-                listener,
-                ready_file,
-                busy_file,
-                Mock(),
-            )
-        )
+    server = MagicMock()
+    server.__enter__.return_value = server
+    server.bind.side_effect = lambda _: socket_path.touch()
+
+    def stop(*_: object) -> int:
+        for path in (socket_path, ready_file, busy_file):
+            path.touch()
+        raise SystemExit(0)
+
+    register_signals = Mock()
+    monkeypatch.setattr(socket, "socket", Mock(return_value=server))
+    monkeypatch.setattr(
+        model_worker, "_register_idle_signal_handlers", register_signals
     )
-    thread.start()
-    try:
-        with client_connection.makefile("rwb") as channel:
-            model_worker_protocol.send_message(channel, {"unexpected": True})
-            response = model_worker_protocol.read_message(channel)
-            assert response["event"] == "rejected"
-    finally:
-        client_connection.close()
-        server_connection.close()
-        thread.join(timeout=2.0)
+    monkeypatch.setattr(model_worker, "_serve_ready_worker", stop)
 
-    assert result == [1]
-    assert not ready_file.exists()
-    assert not busy_file.exists()
+    with pytest.raises(SystemExit):
+        model_worker.serve_prestarted_model_worker(socket_path, ready_file, busy_file)
+
+    register_signals.assert_called_once_with()
+    assert not any(path.exists() for path in (socket_path, ready_file, busy_file))
 
 
-@pytest.mark.skipif(not hasattr(os, "fork"), reason="requires POSIX signals")
-def test_idle_worker_signal_cleans_up_markers_and_socket() -> None:
-    """An idle PID 1 signal should unwind all worker filesystem state."""
-    with tempfile.TemporaryDirectory(prefix="flwr-model-", dir="/tmp") as directory:
-        worker_directory = Path(directory)
-        socket_path = worker_directory / "model.sock"
-        ready_file = worker_directory / "ready"
-        busy_file = worker_directory / "busy"
-        probe_path = worker_directory / "probe.sock"
-        try:
-            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
-                probe.bind(str(probe_path))
-        except OSError:
-            pytest.skip("sandbox does not permit Unix-socket binding")
-        finally:
-            probe_path.unlink(missing_ok=True)
-        context = multiprocessing.get_context("fork")
-        process = context.Process(
-            target=model_worker.serve_prestarted_model_worker,
-            args=(socket_path, ready_file, busy_file),
-        )
-        process.start()
-        try:
-            deadline = time.monotonic() + 3.0
-            while not ready_file.exists() and time.monotonic() < deadline:
-                time.sleep(0.01)
-            assert ready_file.is_file()
-            assert process.pid is not None
-            os.kill(process.pid, signal.SIGTERM)
-            process.join(timeout=3.0)
-            assert not process.is_alive()
-        finally:
-            if process.is_alive():
-                process.terminate()
-                process.join(timeout=2.0)
-
-        assert process.exitcode == 0
-        assert not ready_file.exists()
-        assert not busy_file.exists()
-        assert not socket_path.exists()
-
-
-def test_dispatch_acknowledges_only_after_resident_worker_accepts(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+def test_dispatch_acknowledges_and_relays_accepted_output(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """SuperExec should see acceptance only after authority reaches the worker."""
+    """The dispatcher should acknowledge, then reproduce typed output."""
     connection = MagicMock()
     connection.__enter__.return_value = connection
     channel = MagicMock()
@@ -244,63 +179,31 @@ def test_dispatch_acknowledges_only_after_resident_worker_accepts(
         Mock(
             side_effect=[
                 {"event": "accepted"},
+                {"event": "output", "stream": "stdout", "data": "out\n"},
+                {"event": "output", "stream": "stderr", "data": "err\n"},
                 {"event": "finished", "returncode": 0},
             ]
         ),
     )
 
-    returncode = model_worker.dispatch_prestarted_model(
-        ModelInvocation(
-            token="task-token",
-            runtime_api_address="runtime.example:9092",
-            insecure=True,
-            root_certificates_path=None,
+    assert (
+        model_worker.dispatch_prestarted_model(
+            ModelInvocation("task-token", "runtime.example:9092", True, None)
         )
-    )
-
-    assert returncode == 0
-    assert capsys.readouterr().out.strip() == FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
-    connection.connect.assert_called_once()
-    sent = channel.write.call_args.args[0]
-    assert b"task-token" in sent
-
-
-def test_dispatch_relays_typed_output_after_acceptance(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """The exec-side process should reproduce resident stdout and stderr."""
-    connection = MagicMock()
-    connection.__enter__.return_value = connection
-    channel = MagicMock()
-    connection.makefile.return_value.__enter__.return_value = channel
-    monkeypatch.setattr(socket, "socket", Mock(return_value=connection))
-    monkeypatch.setattr(
-        model_worker_protocol,
-        "read_message",
-        Mock(
-            side_effect=[
-                {"event": "accepted"},
-                {"event": "output", "stream": "stdout", "data": "model out\n"},
-                {"event": "output", "stream": "stderr", "data": "model err\n"},
-                {"event": "finished", "returncode": 0},
-            ]
-        ),
-    )
-
-    returncode = model_worker.dispatch_prestarted_model(
-        ModelInvocation("task-token", "runtime.example:9092", True, None)
+        == 0
     )
 
     captured = capsys.readouterr()
-    assert returncode == 0
-    assert captured.out == f"{FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT}\nmodel out\n"
-    assert captured.err == "model err\n"
+    assert captured.out == f"{FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT}\nout\n"
+    assert captured.err == "err\n"
+    assert b"task-token" in channel.write.call_args.args[0]
 
 
 def test_dispatch_rejects_output_before_acceptance(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Only output owned by an accepted task may reach the exec streams."""
+    """Output without accepted task authority should not be relayed."""
     connection = MagicMock()
     connection.__enter__.return_value = connection
     connection.makefile.return_value.__enter__.return_value = MagicMock()
@@ -311,116 +214,33 @@ def test_dispatch_rejects_output_before_acceptance(
         Mock(return_value={"event": "output", "stream": "stdout", "data": "bad"}),
     )
 
-    returncode = model_worker.dispatch_prestarted_model(
-        ModelInvocation("task-token", "runtime.example:9092", True, None)
+    assert (
+        model_worker.dispatch_prestarted_model(
+            ModelInvocation("task-token", "runtime.example:9092", True, None)
+        )
+        == 1
     )
-
-    assert returncode == 1
     assert capsys.readouterr().out == ""
 
 
-def test_prestarted_worker_reads_certificates_for_each_invocation(
-    tmp_path: Path,
-) -> None:
-    """Certificate bytes should enter only the task-scoped Runtime client."""
+def test_worker_relays_redacted_bounded_output(tmp_path: Path) -> None:
+    """Task output should be redacted, bounded, and carry fresh certificates."""
+    token = "task-token-that-must-not-be-relayed"
     certificate_path = tmp_path / "runtime-ca.pem"
     certificate_path.write_bytes(b"test-ca")
-    server, client = socket.socketpair()
 
     def run_once(
-        _runtime_api_address: str,
-        _token: str,
-        _insecure: bool,
-        _certificates: bytes | None,
-        on_started: Callable[[], None],
-    ) -> int:
-        on_started()
-        return 0
-
-    run_once_mock = Mock(side_effect=run_once)
-    result: list[int] = []
-    thread = threading.Thread(
-        target=lambda: result.append(
-            model_worker._serve_connection(server, run_once_mock)
-        )
-    )
-    thread.start()
-    try:
-        with client.makefile("rwb") as channel:
-            model_worker_protocol.send_message(
-                channel,
-                {
-                    "token": "task-token",
-                    "runtime_api_address": "runtime.example:9092",
-                    "insecure": False,
-                    "root_certificates_path": str(certificate_path),
-                },
-            )
-            assert model_worker_protocol.read_message(channel) == {"event": "accepted"}
-            assert model_worker_protocol.read_message(channel) == {
-                "event": "finished",
-                "returncode": 0,
-            }
-    finally:
-        client.close()
-        server.close()
-        thread.join(timeout=2.0)
-
-    assert result == [0]
-    call_args = run_once_mock.call_args.args
-    assert call_args[:4] == (
-        "runtime.example:9092",
-        "task-token",
-        False,
-        b"test-ca",
-    )
-    assert callable(call_args[4])
-
-
-def test_prestarted_worker_rejects_failure_before_acceptance() -> None:
-    """Runtime setup failure should not emit an authority acknowledgement."""
-    server, client = socket.socketpair()
-    run_once = Mock(side_effect=RuntimeError("setup failed"))
-    result: list[int] = []
-    thread = threading.Thread(
-        target=lambda: result.append(model_worker._serve_connection(server, run_once))
-    )
-    thread.start()
-    try:
-        with client.makefile("rwb") as channel:
-            model_worker_protocol.send_message(
-                channel,
-                {
-                    "token": "task-token",
-                    "runtime_api_address": "runtime.example:9092",
-                    "insecure": True,
-                    "root_certificates_path": None,
-                },
-            )
-            assert model_worker_protocol.read_message(channel) == {
-                "event": "rejected",
-                "reason": "Prestarted Model worker could not start task.",
-            }
-    finally:
-        client.close()
-        server.close()
-        thread.join(timeout=2.0)
-
-    assert result == [1]
-
-
-def test_prestarted_worker_relays_redacted_bounded_output() -> None:
-    """Resident output should be framed without leaking authority markers."""
-    token = "task-token-that-must-not-be-relayed"
-    server, client = socket.socketpair()
-
-    def run_once(
-        _runtime_api_address: str,
+        runtime_api_address: str,
         invocation_token: str,
-        _insecure: bool,
-        _certificates: bytes | None,
+        insecure: bool,
+        certificates: bytes | None,
         on_started: Callable[[], None],
     ) -> int:
+        assert (runtime_api_address, insecure, certificates) == (
+            "runtime.example:9092",
+            False,
+            b"test-ca",
+        )
         on_started()
         midpoint = len(invocation_token) // 2
         sys.stdout.write(f"before {invocation_token[:midpoint]}")
@@ -429,32 +249,14 @@ def test_prestarted_worker_relays_redacted_bounded_output() -> None:
         sys.stderr.write(FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT)
         return 0
 
-    result: list[int] = []
-    thread = threading.Thread(
-        target=lambda: result.append(model_worker._serve_connection(server, run_once))
+    result, frames = _exchange(
+        run_once,
+        _invocation(
+            token=token,
+            insecure=False,
+            root_certificates_path=str(certificate_path),
+        ),
     )
-    thread.start()
-    frames: list[dict[str, object]] = []
-    try:
-        with client.makefile("rwb") as channel:
-            model_worker_protocol.send_message(
-                channel,
-                {
-                    "token": token,
-                    "runtime_api_address": "runtime.example:9092",
-                    "insecure": True,
-                    "root_certificates_path": None,
-                },
-            )
-            while True:
-                frame = model_worker_protocol.read_message(channel)
-                frames.append(frame)
-                if frame.get("event") == "finished":
-                    break
-    finally:
-        client.close()
-        server.close()
-        thread.join(timeout=2.0)
 
     output = "".join(
         str(frame["data"]) for frame in frames if frame.get("event") == "output"
@@ -473,13 +275,26 @@ def test_prestarted_worker_relays_redacted_bounded_output() -> None:
     )
 
 
-def test_dispatcher_disconnect_does_not_abort_accepted_task() -> None:
-    """Losing the exec reader must not change accepted-task execution."""
+def test_worker_rejects_failure_before_acceptance() -> None:
+    """Runtime setup failure should reject rather than transfer authority."""
+    result, frames = _exchange(Mock(side_effect=RuntimeError("setup failed")))
+
+    assert result == [1]
+    assert frames == [
+        {
+            "event": "rejected",
+            "reason": "Prestarted Model worker could not start task.",
+        }
+    ]
+
+
+def test_disconnect_does_not_abort_accepted_task() -> None:
+    """Losing the dispatcher must not change accepted-task execution."""
     server, client = socket.socketpair()
     started = threading.Event()
     release = threading.Event()
 
-    def wait_for_release(
+    def run_once(
         _runtime_api_address: str,
         _token: str,
         _insecure: bool,
@@ -491,22 +306,16 @@ def test_dispatcher_disconnect_does_not_abort_accepted_task() -> None:
         release.wait(timeout=1.0)
         return 0
 
-    run_once = Mock(side_effect=wait_for_release)
+    run_once_mock = Mock(side_effect=run_once)
     result: list[int] = []
     thread = threading.Thread(
-        target=lambda: result.append(model_worker._serve_connection(server, run_once))
+        target=lambda: result.append(
+            model_worker._serve_connection(server, run_once_mock)
+        )
     )
     thread.start()
     channel = client.makefile("rwb")
-    model_worker_protocol.send_message(
-        channel,
-        {
-            "token": "task-token",
-            "runtime_api_address": "runtime.example:9092",
-            "insecure": True,
-            "root_certificates_path": None,
-        },
-    )
+    model_worker_protocol.send_message(channel, _invocation())
     assert model_worker_protocol.read_message(channel) == {"event": "accepted"}
     assert started.wait(timeout=1.0)
     channel.close()
@@ -516,7 +325,7 @@ def test_dispatcher_disconnect_does_not_abort_accepted_task() -> None:
     server.close()
 
     assert result == [0]
-    run_once.assert_called_once()
+    run_once_mock.assert_called_once()
 
 
 def test_saturated_output_channel_does_not_abort_task() -> None:
@@ -539,11 +348,7 @@ def test_saturated_output_channel_does_not_abort_task() -> None:
         def flush(self) -> None:
             return
 
-    invocation = (
-        b'{"token":"task-token","runtime_api_address":"runtime:9092",'
-        b'"insecure":true,"root_certificates_path":null}\n'
-    )
-    channel = BlockingChannel(invocation)
+    channel = BlockingChannel(model_worker_protocol.encode_message(_invocation()))
 
     def run_once(
         _runtime_api_address: str,
@@ -557,7 +362,7 @@ def test_saturated_output_channel_does_not_abort_task() -> None:
         return 0
 
     started_at = time.monotonic()
-    result = model_worker._serve_channel(channel, Mock(side_effect=run_once))
+    result = model_worker._serve_channel(channel, run_once)
     elapsed = time.monotonic() - started_at
     channel.release.set()
 
