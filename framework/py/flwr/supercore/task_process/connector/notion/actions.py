@@ -82,7 +82,9 @@ ACTIONS = (
                         },
                     ],
                     "description": (
-                        "Filter results by object type and/or trash status."
+                        "Use either {property: 'object', value: 'page' or "
+                        "'data_source'}, optionally with in_trash, or use "
+                        "{in_trash: boolean} by itself."
                     ),
                 },
                 "sort": {
