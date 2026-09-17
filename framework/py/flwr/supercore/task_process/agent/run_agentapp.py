@@ -64,6 +64,7 @@ from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.superlink.grid import HttpGrid
 
+from .grid import RuntimeAgentGrid
 from .session import (
     AgentRuntime,
     RuntimeAgentConnectors,
@@ -272,6 +273,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         agent = RuntimeAgentSession(
             connectors=RuntimeAgentConnectors(agent_runtime),
             events=agent_events,
+            grid=RuntimeAgentGrid(grid, agent_events),
         )
         log_runtime_timing("agent_user_code_started", timing_id=runtime_timing_id)
         agent_app(agent=agent, context=context)

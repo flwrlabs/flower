@@ -33,13 +33,13 @@ class ExecPlugin(ABC):
         insecure: bool,
         root_certificates_path: str | None,
         runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
-        executor: Executor | None = None,
+        *,
+        executor: Executor,
     ) -> None:
         self.runtime_api_address = runtime_api_address
         self.insecure = insecure
         self.root_certificates_path = root_certificates_path
         self.runtime_dependency_install = runtime_dependency_install
-        # Non-ephemeral plugins use the executor to start task processes.
         self.executor = executor
 
     @abstractmethod
