@@ -32,9 +32,9 @@ def test_list_directory_in_temp_dir() -> None:
     """Listing should return sorted file and directory entries."""
     with tempfile.TemporaryDirectory() as root:
         os.makedirs(os.path.join(root, "subdir"))
-        with open(os.path.join(root, "a.txt"), "w") as handle:
+        with open(os.path.join(root, "a.txt"), "w", encoding="utf-8") as handle:
             handle.write("hello")
-        with open(os.path.join(root, "b.txt"), "w") as handle:
+        with open(os.path.join(root, "b.txt"), "w", encoding="utf-8") as handle:
             handle.write("world")
         result = list_directory({"path": root}, _context(allowed_dirs=[root]))
         assert result == {
@@ -50,7 +50,7 @@ def test_read_file_reads_content() -> None:
     """File reading should return UTF-8 content and resolved path."""
     with tempfile.TemporaryDirectory() as root:
         filepath = os.path.join(root, "note.txt")
-        with open(filepath, "w") as handle:
+        with open(filepath, "w", encoding="utf-8") as handle:
             handle.write("hello, world")
         result = read_file({"path": filepath}, _context(allowed_dirs=[root]))
         assert result["content"] == "hello, world"
@@ -72,7 +72,7 @@ def test_read_file_path_traversal_denied() -> None:
     with tempfile.TemporaryDirectory() as root:
         with tempfile.TemporaryDirectory() as outside:
             outside_file = os.path.join(outside, "secret.txt")
-            with open(outside_file, "w") as handle:
+            with open(outside_file, "w", encoding="utf-8") as handle:
                 handle.write("secret")
             path = os.path.join(root, "..", os.path.basename(outside), "secret.txt")
             with pytest.raises(FilesystemApiError, match="access_denied"):
@@ -90,7 +90,7 @@ def test_list_directory_rejects_file() -> None:
     """Calling list_directory on a file should raise."""
     with tempfile.TemporaryDirectory() as root:
         filepath = os.path.join(root, "f.txt")
-        with open(filepath, "w") as handle:
+        with open(filepath, "w", encoding="utf-8") as handle:
             handle.write("x")
         with pytest.raises(FilesystemApiError, match="access_denied"):
             list_directory({"path": filepath}, _context(allowed_dirs=[root]))

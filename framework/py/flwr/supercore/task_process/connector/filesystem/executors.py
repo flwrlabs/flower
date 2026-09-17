@@ -50,14 +50,15 @@ def list_directory(
     resolved = _safe_resolve(path, allowed)
     try:
         fd = os.open(resolved, os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY)
-        raw = sorted(os.listdir(fd))
+        entries = os.listdir(fd)
     except OSError:
         raise FilesystemApiError("access_denied") from None
     finally:
         if "fd" in locals():
             os.close(fd)
-    if len(raw) > _MAX_DIRECTORY_ENTRIES:
+    if len(entries) > _MAX_DIRECTORY_ENTRIES:
         raise FilesystemApiError("too_many_entries")
+    raw = sorted(entries)
     items: list[JSONObject] = []
     for name in raw:
         entry_path = os.path.join(resolved, name)
@@ -93,7 +94,7 @@ def read_file(arguments: JSONObject, context: ConnectorExecutionContext) -> JSON
             raise FilesystemApiError("not_a_file")
         if st.st_size > _MAX_FILE_BYTES:
             raise FilesystemApiError("file_too_large")
-        raw = os.read(fd, _MAX_FILE_BYTES)
+        raw = _read_all(fd)
     except OSError:
         raise FilesystemApiError("access_denied") from None
     finally:
@@ -110,6 +111,26 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
     "list_directory": list_directory,
     "read_file": read_file,
 }
+
+
+def _read_all(fd: int) -> bytes:
+    """Read from fd until EOF, capped at _MAX_FILE_BYTES.
+
+    A single os.read() may return fewer bytes than requested before EOF,
+    and a file may grow after the fstat size check, so keep reading in
+    bounded chunks and reject once the cap is exceeded.
+    """
+    chunks: list[bytes] = []
+    remaining = _MAX_FILE_BYTES
+    while remaining > 0:
+        chunk = os.read(fd, remaining)
+        if not chunk:
+            return b"".join(chunks)
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    if os.read(fd, 1):
+        raise FilesystemApiError("file_too_large")
+    return b"".join(chunks)
 
 
 def _safe_resolve(path: str, allowed: list[str]) -> str:
