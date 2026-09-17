@@ -30809,7 +30809,7 @@ msgstr ""
 #: flwr.agentapp.base.AgentGrid:1 of
 #, fuzzy
 msgid "Model-facing access to the federation Grid."
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 msgid ":py:obj:`AgentSession <flwr.agentapp.AgentSession>`\\ \\(\\)"
@@ -92546,4 +92546,3 @@ msgstr ""
 #~ "``127.0.0.1:9094``, and set ``--plugin-type"
 #~ " clientapp``."
 #~ msgstr ""
-

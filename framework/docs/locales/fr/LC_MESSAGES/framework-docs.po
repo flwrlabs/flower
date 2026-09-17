@@ -23046,11 +23046,6 @@ msgid ""
 "Flower and serves as a base for building your own image. SuperExec spawns"
 " the appropriate processes on demand based on the tasks it receives."
 msgstr ""
-"Le **image** SuperExec de conteneur vient avec une version pré-installée "
-"de Flower et sert de base pour construire votre propre image. Utilisez "
-"une seule image et sélectionnez le comportement souhaité (ServerApps vs "
-"ClientApps) au moment de l'exécution via le drapeau ``--plugin-type``. "
-"SuperExec démarre les processus correspondants à la demande."
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:178
 #, fuzzy
@@ -23058,8 +23053,6 @@ msgid ""
 "To execute ServerApps, pass ``--runtime-api-address`` pointing to the "
 "SuperLink's **Runtime API** endpoint."
 msgstr ""
-"Lorsque vous utilisez SuperExec avec le plugin *serverapp*, passez "
-"``--appio-api-address`` pointant vers l'API **ServerAppIO** de SuperLink."
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:181
 msgid ""
@@ -23212,9 +23205,6 @@ msgid ""
 "For ClientApps, reuse the **same** image and pass ``--runtime-api-"
 "address`` pointing to the SuperNode's **Runtime API** endpoint."
 msgstr ""
-"Pour les ClientApps, réutilisez l'image **même** et modifiez le plugin et"
-" l'adresse API. Lorsque vous utilisez le plugin *clientapp*, passez "
-"``--runtime-api-address`` pointant vers l'API **Runtime** de SuperNode."
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:263
 msgid "(No new Dockerfile is needed; reuse ``flwr_superexec:0.0.1``.)"
@@ -32853,9 +32843,6 @@ msgid ""
 "Next, use the same procedure for a ``ClientApp`` SuperExec, but pass the "
 "SuperNode's Runtime API address, e.g. ``127.0.0.1:9094``."
 msgstr ""
-"Ensuite, utilisez la même procédure pour un ``ClientApp`` SuperExec, mais"
-" passez l'adresse API ClientAppIo du SuperNode, par exemple "
-"``127.0.0.1:9094``, et définissez ``--plugin-type clientapp``."
 
 #: ../../source/how-to-enable-tls-connections.rst:199
 #, fuzzy
@@ -41769,13 +41756,13 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentGrid <flwr.agentapp.AgentGrid>`\\ \\(\\)"
-msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.base.AgentGrid:1 of
 #, fuzzy
 msgid "Model-facing access to the federation Grid."
-msgstr "Nom de la fédération à créer."
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 msgid ":py:obj:`AgentSession <flwr.agentapp.AgentSession>`\\ \\(\\)"
@@ -42069,7 +42056,7 @@ msgstr ""
 #: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`call <flwr.agentapp.AgentGrid.call>`\\ \\(tool\\_call\\)"
-msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentGrid.call:1
 #: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1 of
@@ -42079,7 +42066,7 @@ msgstr ""
 #: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`tools <flwr.agentapp.AgentGrid.tools>`\\ \\(\\)"
-msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentGrid.tools:1 of
@@ -42173,7 +42160,7 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`grid <flwr.agentapp.AgentSession.grid>`\\"
-msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
 #: flwr.agentapp.AgentSession.grid:1 of
@@ -66726,4 +66713,3 @@ msgstr ""
 #~ " processus d'applications que SuperExec "
 #~ "doit lancer. Utilisez ``serverapp`` pour "
 #~ "un ``ServerApp`` SuperExec."
-

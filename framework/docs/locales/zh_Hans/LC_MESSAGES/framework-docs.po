@@ -35340,13 +35340,13 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentGrid <flwr.agentapp.AgentGrid>`\\ \\(\\)"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.base.AgentGrid:1 of
 #, fuzzy
 msgid "Model-facing access to the federation Grid."
-msgstr "flower-superlink"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #, fuzzy
@@ -35648,7 +35648,7 @@ msgstr ""
 #: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`call <flwr.agentapp.AgentGrid.call>`\\ \\(tool\\_call\\)"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentGrid.call:1
 #: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1 of
@@ -35658,7 +35658,7 @@ msgstr ""
 #: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`tools <flwr.agentapp.AgentGrid.tools>`\\ \\(\\)"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentGrid.tools:1 of
@@ -35753,7 +35753,7 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`grid <flwr.agentapp.AgentSession.grid>`\\"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
 #: flwr.agentapp.AgentSession.grid:1 of
@@ -88803,4 +88803,3 @@ msgstr ""
 #~ "``127.0.0.1:9094``, and set ``--plugin-type"
 #~ " clientapp``."
 #~ msgstr ""
-
