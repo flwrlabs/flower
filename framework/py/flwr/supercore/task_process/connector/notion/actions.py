@@ -18,8 +18,8 @@ from ..definition import ActionAccess, ActionDefinition
 from ..tool_schema import integer_property, string_property
 
 _CURSOR = string_property(
-    "Opaque cursor returned in next_cursor by the previous search response. "
-    "Omit for the first request."
+    "Opaque cursor returned in next_cursor by the previous response for the same "
+    "search parameters. Omit to retrieve the first page."
 )
 _PAGE_SIZE = integer_property(
     "Number of results per page. Omit to use Notion's default.",
