@@ -43,24 +43,44 @@ ACTIONS = (
                     "return all content shared with the connection."
                 ),
                 "filter": {
-                    "type": "object",
-                    "properties": {
-                        "property": {
-                            "type": "string",
-                            "enum": ["object"],
-                            "description": "Property being filtered.",
+                    "anyOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "property": {
+                                    "type": "string",
+                                    "enum": ["object"],
+                                    "description": "Property being filtered.",
+                                },
+                                "value": {
+                                    "type": "string",
+                                    "enum": ["page", "data_source"],
+                                    "description": "Type of Notion object to return.",
+                                },
+                                "in_trash": {
+                                    "type": "boolean",
+                                    "description": (
+                                        "Whether to return content in the trash."
+                                    ),
+                                },
+                            },
+                            "required": ["property", "value"],
+                            "additionalProperties": False,
                         },
-                        "value": {
-                            "type": "string",
-                            "enum": ["page", "data_source"],
-                            "description": "Type of Notion object to return.",
+                        {
+                            "type": "object",
+                            "properties": {
+                                "in_trash": {
+                                    "type": "boolean",
+                                    "description": (
+                                        "Whether to return content in the trash."
+                                    ),
+                                },
+                            },
+                            "required": ["in_trash"],
+                            "additionalProperties": False,
                         },
-                        "in_trash": {
-                            "type": "boolean",
-                            "description": "Whether to return content in the trash.",
-                        },
-                    },
-                    "additionalProperties": False,
+                    ],
                     "description": (
                         "Filter results by object type and/or trash status."
                     ),

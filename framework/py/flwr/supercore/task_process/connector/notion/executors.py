@@ -14,6 +14,8 @@
 # ==============================================================================
 """Notion action executors."""
 
+from typing import cast
+
 import requests
 
 from flwr.supercore.typing import JSONObject
@@ -37,9 +39,10 @@ def search(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObj
     body: JSONObject = {}
     if "query" in arguments:
         body["query"] = require_string(arguments["query"], "Notion", "query")
-    for name in ("filter", "sort"):
-        if name in arguments:
-            body[name] = arguments[name]
+    if "filter" in arguments:
+        body["filter"] = _search_filter(arguments["filter"])
+    if "sort" in arguments:
+        body["sort"] = arguments["sort"]
     if "page_size" in arguments:
         body["page_size"] = require_int_range(
             arguments["page_size"], "Notion", "page_size", maximum=100
@@ -49,6 +52,24 @@ def search(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObj
     ):
         body["start_cursor"] = cursor
     return _call_notion_api("POST", "/search", context.credentials, body=body)
+
+
+def _search_filter(value: object) -> JSONObject:
+    """Validate a Notion search filter without changing it."""
+    if not isinstance(value, dict):
+        raise ValueError("Notion filter must be an object.")
+    keys = set(value)
+    trash_only = keys == {"in_trash"} and isinstance(value["in_trash"], bool)
+    object_filter = (
+        {"property", "value"} <= keys <= {"property", "value", "in_trash"}
+        and value["property"] == "object"
+        and isinstance(value["value"], str)
+        and value["value"] in {"page", "data_source"}
+        and ("in_trash" not in value or isinstance(value["in_trash"], bool))
+    )
+    if not trash_only and not object_filter:
+        raise ValueError("Notion filter is invalid.")
+    return cast(JSONObject, value)
 
 
 def get_page(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:

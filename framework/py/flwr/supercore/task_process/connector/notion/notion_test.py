@@ -51,7 +51,11 @@ def test_notion_search_forwards_api_inputs() -> None:
             "notion_search",
             {
                 "query": "release",
-                "filter": {"property": "object", "value": "page"},
+                "filter": {
+                    "property": "object",
+                    "value": "page",
+                    "in_trash": False,
+                },
                 "sort": {
                     "timestamp": "last_edited_time",
                     "direction": "descending",
@@ -68,7 +72,11 @@ def test_notion_search_forwards_api_inputs() -> None:
     assert request.call_args.kwargs["headers"]["Notion-Version"] == "2026-03-11"
     assert request.call_args.kwargs["json"] == {
         "query": "release",
-        "filter": {"property": "object", "value": "page"},
+        "filter": {
+            "property": "object",
+            "value": "page",
+            "in_trash": False,
+        },
         "sort": {
             "timestamp": "last_edited_time",
             "direction": "descending",
@@ -82,6 +90,38 @@ def test_notion_search_forwards_api_inputs() -> None:
             "notion_search", {}, Mock(), credentials=_CREDENTIALS, config={}
         )
     assert request.call_args.kwargs["json"] == {}
+
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        registry.invoke_connector(
+            "notion_search",
+            {"filter": {"in_trash": True}},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert request.call_args.kwargs["json"] == {"filter": {"in_trash": True}}
+
+
+@pytest.mark.parametrize(
+    "filter_",
+    [
+        {},
+        {"property": "object"},
+        {"value": "page"},
+        {"value": "page", "in_trash": True},
+    ],
+)
+def test_notion_search_rejects_invalid_filter(filter_: JSONObject) -> None:
+    """Notion search should reject incomplete and mixed filter shapes."""
+    with patch(_HTTP_REQUEST) as request, pytest.raises(ValueError):
+        registry.invoke_connector(
+            "notion_search",
+            {"filter": filter_},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    request.assert_not_called()
 
 
 def test_notion_get_page_returns_page_and_block_children() -> None:
