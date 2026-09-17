@@ -82,6 +82,11 @@ class LinkState(CoreState):  # pylint: disable=R0904
         run_id : Optional[int] (default: None)
             The run ID to filter by.
 
+        Returns
+        -------
+        list[Message]
+            A list of Messages matching the specified filters.
+
         Constraints
         -----------
         Retrieve all Message where the `message.metadata.dst_node_id` equals `node_id`.

@@ -347,7 +347,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         self,
         node_id: int,
         limit: int | None,
-        run_id: int | None,
+        run_id: int | None = None,
     ) -> list[dict[str, Any]]:
         """Atomically claim eligible instruction Messages for a node."""
         current_time = now()
