@@ -67,8 +67,6 @@ from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.supercore.constant import (
-    AGENT_MESSAGE_CONTENT_RECORD_KEY,
-    AGENT_MESSAGE_TEXT_KEY,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     AutomationStatus,
