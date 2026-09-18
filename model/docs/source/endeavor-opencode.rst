@@ -59,6 +59,9 @@ Keep ``@ai-sdk/openai`` as shown: it uses the Responses API required by this
 setup. See the `OpenCode provider documentation
 <https://opencode.ai/docs/providers/#custom-provider>`_ for details.
 
+For context window and API limit details, see :ref:`Context window and limits
+<endeavor-context-limits>`.
+
 2. Set your Flower API key
 --------------------------
 
