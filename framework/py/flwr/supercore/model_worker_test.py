@@ -201,7 +201,7 @@ def test_worker_relays_redacted_output(
     token = "task-token-that-must-not-be-relayed"
     certificate_path = tmp_path / "runtime-ca.pem"
     certificate_path.write_bytes(b"test-ca")
-    original_stdout = Mock(encoding="utf-8", buffer=BytesIO())
+    original_stdout = Mock(encoding="utf-8", buffer=Mock(raw=BytesIO()))
     original_stdout.fileno.return_value = 42
     monkeypatch.setattr(sys, "stdout", original_stdout)
 
@@ -219,8 +219,11 @@ def test_worker_relays_redacted_output(
         )
         on_started()
         assert sys.stdout.fileno() == 42
-        sys.stdout.buffer.write(f"binary {invocation_token}\n".encode())
-        sys.stdout.buffer.writelines([f"binary lines {invocation_token}\n".encode()])
+        binary_output: Any = sys.stdout.buffer
+        binary_output.write(f"binary {invocation_token}\n".encode())
+        binary_output.write1(f"write1 {invocation_token}\n".encode())
+        binary_output.raw.write(f"raw {invocation_token}\n".encode())
+        binary_output.writelines([f"binary lines {invocation_token}\n".encode()])
         sys.stdout.writelines(["text lines ", invocation_token, "\n"])
         midpoint = len(invocation_token) // 2
         sys.stdout.write(f"before {invocation_token[:midpoint]}")
@@ -245,6 +248,7 @@ def test_worker_relays_redacted_output(
     assert frames[0] == {"event": "accepted"}
     assert frames[-1] == {"event": "finished", "returncode": 0}
     assert "binary [REDACTED]\n" in output
+    assert "write1 [REDACTED]\nraw [REDACTED]\n" in output
     assert "binary lines [REDACTED]\ntext lines [REDACTED]\n" in output
     assert "before [REDACTED] after\n" in output
     assert "model error\n" in output
