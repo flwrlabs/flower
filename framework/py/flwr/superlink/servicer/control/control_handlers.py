@@ -1674,9 +1674,8 @@ def list_app_associations(
     accessible_federation_ids = [
         federation.id
         for federation in state.federation_manager.get_federations(flwr_aid)
+        if not federation.archived
     ]
-    if request.app_id == FLOWER_AGENT_APP_ID:
-        return ListAppAssociationsResponse(federation_ids=accessible_federation_ids)
     federation_ids = state.list_app_associations(
         request.app_id, accessible_federation_ids
     )

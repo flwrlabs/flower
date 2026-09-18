@@ -50,7 +50,11 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskUsage,
 )
 from flwr.supercore import log
-from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
+from flwr.supercore.constant import (
+    FLOWER_AGENT_APP_ID,
+    OBJECT_PUSH_SESSION_TTL_SECONDS,
+    AutomationStatus,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
@@ -473,6 +477,8 @@ class InMemoryCoreState(
         """List the provided federation IDs associated with an app."""
         if not app_id or not federation_ids:
             return []
+        if app_id == FLOWER_AGENT_APP_ID:
+            return list(federation_ids)
         federation_id_set = set(federation_ids)
         with self.lock_federation_app_store:
             return [

@@ -562,8 +562,12 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
 
     def test_list_app_associations_only_returns_accessible_federations(self) -> None:
-        """List app associations without exposing other federations."""
-        for federation_id in (NOOP_FEDERATION_ID, "@other/private"):
+        """Exclude non-member and archived federations from app associations."""
+        for federation_id in (
+            NOOP_FEDERATION_ID,
+            "@me/archived",
+            "@other/private",
+        ):
             self.state.store_app(
                 fab=Fab("", federation_id.encode(), {}),
                 federation_id=federation_id,
@@ -572,11 +576,21 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 added_by=self.account.flwr_aid,
             )
 
-        with patch.object(
-            self.state,
-            "list_app_associations",
-            wraps=self.state.list_app_associations,
-        ) as state_list_app_associations:
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "get_federations",
+                return_value=[
+                    Mock(id=NOOP_FEDERATION_ID, archived=False),
+                    Mock(id="@me/archived", archived=True),
+                ],
+            ),
+            patch.object(
+                self.state,
+                "list_app_associations",
+                wraps=self.state.list_app_associations,
+            ) as state_list_app_associations,
+        ):
             response = list_app_associations(
                 ListAppAssociationsRequest(app_id="@flwr/demo"),
                 self.account,
@@ -589,12 +603,20 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
 
     def test_list_app_associations_includes_default_flower_agent(self) -> None:
-        """List every accessible federation for the default Flower Agent."""
-        response = list_app_associations(
-            ListAppAssociationsRequest(app_id=FLOWER_AGENT_APP_ID),
-            self.account,
-            self.state,
-        )
+        """List active member federations for the default Flower Agent."""
+        with patch.object(
+            self.state.federation_manager,
+            "get_federations",
+            return_value=[
+                Mock(id=NOOP_FEDERATION_ID, archived=False),
+                Mock(id="@me/archived", archived=True),
+            ],
+        ):
+            response = list_app_associations(
+                ListAppAssociationsRequest(app_id=FLOWER_AGENT_APP_ID),
+                self.account,
+                self.state,
+            )
 
         self.assertEqual(list(response.federation_ids), [NOOP_FEDERATION_ID])
 
