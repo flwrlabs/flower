@@ -174,20 +174,16 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     """Test the Control API servicer."""
 
     def test_derive_run_series_description(self) -> None:
-        """Test normalizing, clipping, and omitting agent input."""
+        """Test normalizing, clipping, and omitting the user prompt."""
         self.assertEqual(
-            _derive_run_series_description(
-                {"agent.input": "  Hello\n  from\tthe agent  "}
-            ),
+            _derive_run_series_description("  Hello\n  from\tthe agent  "),
             "Hello from the agent",
         )
         self.assertEqual(
-            _derive_run_series_description({"agent.input": "a" * 81}),
+            _derive_run_series_description("a" * 81),
             f"{'a' * 79}…",
         )
-        self.assertEqual(_derive_run_series_description({"agent.input": 42}), "")
-        self.assertEqual(_derive_run_series_description({"agent.input": " \n\t "}), "")
-        self.assertEqual(_derive_run_series_description({}), "")
+        self.assertEqual(_derive_run_series_description(" \n\t "), "")
 
     def setUp(self) -> None:
         """Set up test fixtures."""
@@ -701,8 +697,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request.fab.content = fab_content
         request.federation = NOOP_FEDERATION_ID
         agent_input = "  Hello\n  from\tthe agent  "
-        for key, value in user_config_to_proto({"agent.input": agent_input}).items():
-            request.override_config[key].CopyFrom(value)
+        request.user_prompt = agent_input
 
         with (
             patch(
@@ -734,17 +729,20 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         tasks = self.state.get_tasks()
         series = self.state.get_run_series(series_ids=[response.series_id])
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
+        prompt_msgs = self.state.get_message_ins(
+            SUPERLINK_NODE_ID, limit=None, run_id=response.run_id
+        )
 
         self.assertEqual(len(runs), 1)
         self.assertEqual(runs[0].fab_id, "flwr/agent")
         self.assertEqual(runs[0].fab_version, "0.1.0")
         self.assertEqual(runs[0].primary_task_type, TaskType.AGENT_APP)
-        self.assertEqual(runs[0].override_config["agent.input"], agent_input)
         self.assertEqual(series[0].description, "Hello from the agent")
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
         self.assertEqual(tasks[0].fab_hash, runs[0].fab_hash)
+        self.assertEqual(len(prompt_msgs), 1)
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
             [("@flwr/agent", runs[0].fab_hash, TaskType.AGENT_APP)],

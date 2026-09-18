@@ -15,6 +15,7 @@
 """Tests for the AgentApp process environment."""
 
 import os
+from unittest.mock import Mock
 
 import pytest
 
@@ -25,7 +26,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.task_identity import TaskIdentity
 
-from .run_agentapp import _set_runtime_environment, message_to_prompt
+from .run_agentapp import _set_runtime_environment, message_to_prompt, pull_prompt
 
 
 @pytest.fixture(autouse=True)
@@ -89,3 +90,33 @@ def test_set_runtime_environment(
 def test_message_to_prompt(msg_src_node_id: int, expected: str) -> None:
     """Include src_node_id only when it differs from TaskIdentity.node_id."""
     assert message_to_prompt(_payload_message(msg_src_node_id)) == expected
+
+
+def test_pull_prompt_requires_instruction() -> None:
+    """Fail when the run has no initial instruction."""
+    grid = Mock()
+    grid.pull_messages.return_value = []
+
+    with pytest.raises(RuntimeError, match="exactly one"):
+        pull_prompt(grid)
+    grid.pull_messages.assert_called_once_with([])
+
+
+def test_pull_prompt_serializes_instruction() -> None:
+    """Pull and serialize the run's initial instruction."""
+    grid = Mock()
+    grid.pull_messages.return_value = [_payload_message(789)]
+
+    assert pull_prompt(grid) == '{"message_id":"message-1","payload":"hello world!"}'
+
+
+def test_pull_prompt_rejects_multiple_instructions() -> None:
+    """Reject ambiguous initial instructions for the singular prompt API."""
+    grid = Mock()
+    grid.pull_messages.return_value = [
+        _payload_message(789),
+        _payload_message(789),
+    ]
+
+    with pytest.raises(RuntimeError, match="exactly one"):
+        pull_prompt(grid)

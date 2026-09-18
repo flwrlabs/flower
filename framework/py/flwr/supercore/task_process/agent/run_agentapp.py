@@ -99,6 +99,14 @@ def message_to_prompt(message: Message) -> str:
     return strict_json_dumps(prompt, compact=True)
 
 
+def pull_prompt(grid: HttpGrid) -> str:
+    """Pull and serialize the initial AgentApp instruction."""
+    instructions = list(grid.pull_messages([]))
+    if len(instructions) != 1:
+        raise RuntimeError("Expected exactly one initial AgentApp instruction.")
+    return message_to_prompt(instructions[0])
+
+
 def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     runtime_api_address: str,
     log_queue: Queue[str | None],
@@ -195,6 +203,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         hash_run_id = get_sha256_hash(run.run_id)
 
         grid.set_run(run)
+        prompt = pull_prompt(grid)
 
         log_uploader = start_log_uploader(
             log_queue=log_queue,
@@ -280,6 +289,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             events=agent_events,
         )
         agent = RuntimeAgentSession(
+            prompt=prompt,
             connectors=RuntimeAgentConnectors(agent_runtime),
             events=agent_events,
             grid=RuntimeAgentGrid(grid, agent_events),
