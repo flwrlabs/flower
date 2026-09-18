@@ -26,21 +26,22 @@ from typing import cast
 
 from google.protobuf.json_format import ParseDict
 
-from flwr.agentapp import AgentConnectors, AgentEvents, AgentSession
+from flwr.agentapp import AgentConnectors, AgentEvents, AgentGrid, AgentSession
 from flwr.app import Message
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    StartAutomationRequest,
-    StartRunRequest,
-)
-from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+
+# pylint: disable=E0611
+from flwr.proto.control_pb2 import StartAutomationRequest, StartRunRequest
+from flwr.proto.runtime_pb2 import (
     CreateTaskRequest,
     GetRunSeriesEventsRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskMessageRequest,
 )
-from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent
+
+# pylint: enable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
@@ -173,9 +174,11 @@ class RuntimeAgentSession(AgentSession):
         self,
         connectors: AgentConnectors,
         events: AgentEvents,
+        grid: AgentGrid,
     ) -> None:
         self._connectors = connectors
         self._events = events
+        self._grid = grid
 
     @property
     def connectors(self) -> AgentConnectors:
@@ -186,6 +189,11 @@ class RuntimeAgentSession(AgentSession):
     def events(self) -> AgentEvents:
         """Frontend-visible structured run event API."""
         return self._events
+
+    @property
+    def grid(self) -> AgentGrid:
+        """Model-facing federation Grid API."""
+        return self._grid
 
 
 class RuntimeAgentConnectors(AgentConnectors):
@@ -383,8 +391,6 @@ class AgentRuntime:
 
     def _push_task_message(self, message: Message) -> None:
         """Push one task message and return its message ID."""
-        message.metadata.__dict__["_run_id"] = self._run_id
-        message.metadata.src_task_id = self._task_id
         message.metadata.__dict__["_message_id"] = message.object_id
         self._stub.PushTaskMessage(
             PushTaskMessageRequest(message=message_to_proto(message))

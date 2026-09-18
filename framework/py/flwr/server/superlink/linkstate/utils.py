@@ -129,11 +129,13 @@ def create_message_error_unavailable_res_message(
     return msg
 
 
-def create_message_error_unavailable_ins_message(reply_to_message_id: str) -> Message:
+def create_message_error_unavailable_ins_message(
+    reply_to_message_id: str, run_id: int
+) -> Message:
     """Error to indicate that the enquired Message had expired before reply arrived or
     that it isn't found."""
     metadata = Metadata(
-        run_id=0,  # Unknown
+        run_id=run_id,
         message_id="",
         src_node_id=SUPERLINK_NODE_ID,
         dst_node_id=SUPERLINK_NODE_ID,
@@ -163,6 +165,7 @@ def message_ttl_has_expired(message_metadata: Metadata, current_time: float) -> 
 def verify_message_ids(
     inquired_message_ids: set[str],
     found_message_ins_dict: dict[str, Message],
+    run_id: int,
     current_time: float | None = None,
     update_set: bool = True,
 ) -> dict[str, Message]:
@@ -174,6 +177,8 @@ def verify_message_ids(
         Set of Message IDs for which to generate error Message if invalid.
     found_message_ins_dict : dict[str, Message]
         Dictionary containing all found Message indexed by their IDs.
+    run_id : int
+        The run ID to use for generated error Messages.
     current_time : Optional[float] (default: None)
         The current time to check for expiration. If set to `None`, the current time
         will automatically be set to the current timestamp using `now().timestamp()`.
@@ -197,7 +202,9 @@ def verify_message_ids(
         ):
             if update_set:
                 inquired_message_ids.remove(message_id)
-            message_res = create_message_error_unavailable_ins_message(message_id)
+            message_res = create_message_error_unavailable_ins_message(
+                message_id, run_id
+            )
             ret_dict[message_id] = message_res
     return ret_dict
 

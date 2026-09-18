@@ -46,6 +46,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAppAssociationsRequest,
+    ListAppAssociationsResponse,
     ListAppsRequest,
     ListAppsResponse,
     ListAutomationsRequest,
@@ -334,6 +336,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     ) -> ListAppsResponse:
         """List apps in a federation."""
         return control_handlers.list_apps(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def ListAppAssociations(
+        self, request: ListAppAssociationsRequest, context: grpc.ServicerContext
+    ) -> ListAppAssociationsResponse:
+        """List federations associated with an app."""
+        return control_handlers.list_app_associations(
             request, _get_account(), self.linkstate_factory.state()
         )
 

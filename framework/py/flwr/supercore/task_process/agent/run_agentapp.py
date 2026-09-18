@@ -19,11 +19,12 @@ import os
 from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
+from typing import cast
 
 import httpx
 
 from flwr.agentapp import AgentApp, LoadAgentAppError
-from flwr.app import Context
+from flwr.app import Context, Message
 from flwr.app.exception import AppExitException
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
@@ -50,6 +51,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.constant import (
+    AGENT_MESSAGE_CONTENT_RECORD_KEY,
+    AGENT_MESSAGE_TEXT_KEY,
+)
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
 from flwr.supercore.logger import flush_logs, start_log_uploader, stop_log_uploader
@@ -59,10 +64,14 @@ from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
+from flwr.supercore.typing import JSONObject
+from flwr.supercore.utils import strict_json_dumps
 from flwr.superlink.grid import HttpGrid
 
+from .grid import RuntimeAgentGrid
 from .session import (
     AgentRuntime,
     RuntimeAgentConnectors,
@@ -74,6 +83,20 @@ _AGENT_INPUT_KEY = "agent.input"
 _RUNTIME_API_KEY_ENV = "FLWR_RUNTIME_API_KEY"
 _RUNTIME_BASE_URL_ENV = "FLWR_RUNTIME_BASE_URL"
 _SSL_CERT_FILE_ENV = "SSL_CERT_FILE"
+
+
+def message_to_prompt(message: Message) -> str:
+    """Serialize a Grid message into a JSON prompt string."""
+    prompt: JSONObject = {
+        "message_id": message.metadata.message_id,
+        "payload": cast(
+            str,
+            message.content[AGENT_MESSAGE_CONTENT_RECORD_KEY][AGENT_MESSAGE_TEXT_KEY],
+        ),
+    }
+    if message.metadata.src_node_id != TaskIdentity.node_id:
+        prompt["src_node_id"] = str(message.metadata.src_node_id)
+    return strict_json_dumps(prompt, compact=True)
 
 
 def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
@@ -165,6 +188,9 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)
         task_id = res.task_id
+        TaskIdentity.task_id = task_id
+        TaskIdentity.run_id = run.run_id
+        TaskIdentity.node_id = context.node_id
 
         hash_run_id = get_sha256_hash(run.run_id)
 
@@ -256,6 +282,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         agent = RuntimeAgentSession(
             connectors=RuntimeAgentConnectors(agent_runtime),
             events=agent_events,
+            grid=RuntimeAgentGrid(grid, agent_events),
         )
         agent_app(agent=agent, context=context)
         agent_events.close()

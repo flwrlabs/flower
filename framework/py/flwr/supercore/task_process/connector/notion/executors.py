@@ -14,6 +14,8 @@
 # ==============================================================================
 """Notion action executors."""
 
+from typing import cast
+
 import requests
 
 from flwr.supercore.typing import JSONObject
@@ -34,42 +36,77 @@ class NotionApiError(ConnectorApiError):
 
 def search(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
     """Search pages and data sources shared with the Notion connection."""
-    body: JSONObject = {
-        "query": require_string(arguments.get("query"), "Notion", "query"),
-        "page_size": require_int_range(
-            arguments.get("limit", 10), "Notion", "limit", maximum=100
-        ),
-    }
-    if cursor := optional_string(arguments.get("cursor"), "Notion", "cursor"):
+    body: JSONObject = {}
+    if "query" in arguments:
+        body["query"] = require_string(arguments["query"], "Notion", "query")
+    if "filter" in arguments:
+        body["filter"] = _search_filter(arguments["filter"])
+    if "sort" in arguments:
+        body["sort"] = arguments["sort"]
+    if "page_size" in arguments:
+        body["page_size"] = require_int_range(
+            arguments["page_size"], "Notion", "page_size", maximum=100
+        )
+    if cursor := optional_string(
+        arguments.get("start_cursor"), "Notion", "start_cursor"
+    ):
         body["start_cursor"] = cursor
     return _call_notion_api("POST", "/search", context.credentials, body=body)
 
 
-def get_page_content(
-    arguments: JSONObject, context: ConnectorExecutionContext
-) -> JSONObject:
-    """Read one page of a Notion page's block content."""
-    params = {
-        "page_size": str(
-            require_int_range(
-                arguments.get("max_blocks", 100),
-                "Notion",
-                "max_blocks",
-                maximum=100,
-            )
-        )
-    }
-    if cursor := optional_string(arguments.get("cursor"), "Notion", "cursor"):
-        params["start_cursor"] = cursor
-    page_id = require_string(arguments.get("page_id"), "Notion", "page_id")
-    return _call_notion_api(
-        "GET", f"/blocks/{page_id}/children", context.credentials, params=params
+def _search_filter(value: object) -> JSONObject:
+    """Validate a Notion search filter without changing it."""
+    if not isinstance(value, dict):
+        raise ValueError("Notion filter must be an object.")
+    keys = set(value)
+    trash_only = keys == {"in_trash"} and isinstance(value["in_trash"], bool)
+    object_filter = (
+        {"property", "value"} <= keys <= {"property", "value", "in_trash"}
+        and value["property"] == "object"
+        and isinstance(value["value"], str)
+        and value["value"] in {"page", "data_source"}
+        and ("in_trash" not in value or isinstance(value["in_trash"], bool))
     )
+    if not trash_only and not object_filter:
+        raise ValueError("Notion filter is invalid.")
+    return cast(JSONObject, value)
+
+
+def get_page(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """Get one Notion page and all direct, but not nested, child blocks."""
+    page_id = require_string(arguments.get("page_id"), "Notion", "page_id")
+    page = _call_notion_api("GET", f"/pages/{page_id}", context.credentials)
+    block_children = _call_notion_api(
+        "GET", f"/blocks/{page_id}/children", context.credentials, params={}
+    )
+    results = block_children.get("results")
+    if not isinstance(results, list):
+        raise NotionApiError("invalid_response")
+    cursors: set[str] = set()
+    # Retrieve every page of direct children as documented at:
+    # https://developers.notion.com/reference/get-block-children
+    while block_children.get("has_more") is True:
+        cursor = block_children.get("next_cursor")
+        if not isinstance(cursor, str) or not cursor or cursor in cursors:
+            raise NotionApiError("invalid_response")
+        cursors.add(cursor)
+        block_children = _call_notion_api(
+            "GET",
+            f"/blocks/{page_id}/children",
+            context.credentials,
+            params={"start_cursor": cursor},
+        )
+        next_results = block_children.get("results")
+        if not isinstance(next_results, list):
+            raise NotionApiError("invalid_response")
+        results.extend(next_results)
+    block_children["results"] = results
+    return {"page": page, "block_children": block_children}
 
 
 EXECUTORS: dict[str, ConnectorExecutor] = {
     "search": search,
-    "get_page_content": get_page_content,
+    "get_page": get_page,
 }
 
 
@@ -95,18 +132,21 @@ def _call_notion_api(
         },
         params=params,
         json=body,
-        http_error_code=_response_error_code,
+        http_error_details=_response_error_details,
     )
 
 
-def _response_error_code(response: requests.Response) -> str:
-    """Return a documented Notion error code without response details."""
-    if response.status_code == 429:
-        return "rate_limited"
+def _response_error_details(response: requests.Response) -> tuple[str, str | None]:
+    """Return Notion's documented error code and message."""
     try:
-        code = response.json().get("code")
-    except (AttributeError, ValueError):
-        return "http_error"
-    if isinstance(code, str) and code.replace("_", "").isalnum() and code.islower():
-        return code
-    return "http_error"
+        payload = response.json()
+    except ValueError:
+        return "http_error", None
+    if not isinstance(payload, dict):
+        return "http_error", None
+    code = payload.get("code")
+    message = payload.get("message")
+    return (
+        code if isinstance(code, str) and code else "http_error",
+        message if isinstance(message, str) and message else None,
+    )
