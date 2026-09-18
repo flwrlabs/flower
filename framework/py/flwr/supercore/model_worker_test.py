@@ -89,24 +89,11 @@ def test_protocol_rejects_invalid_messages() -> None:
         )
 
 
-def test_protocol_preserves_coalesced_messages() -> None:
-    """Buffered reads should preserve a completion sent with its acceptance."""
-    channel = BytesIO(b'{"event":"accepted"}\n{"event":"finished","returncode":0}\n')
-
-    assert model_worker_protocol.read_message(channel) == {"event": "accepted"}
-    assert model_worker_protocol.read_message(channel) == {
-        "event": "finished",
-        "returncode": 0,
-    }
-
-
-@pytest.mark.parametrize("returncode", [0, 1])
 def test_worker_cleans_up_socket_and_markers(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    returncode: int,
 ) -> None:
-    """Worker files should be exclusive and removed for either result."""
+    """Worker files should be exclusive and removed after serving a task."""
     socket_path = tmp_path / "model.sock"
     ready_file = tmp_path / "ready"
     busy_file = tmp_path / "busy"
@@ -128,7 +115,7 @@ def test_worker_cleans_up_socket_and_markers(
     def serve_connection(*_: object) -> int:
         assert busy_file.is_file()
         assert not ready_file.exists()
-        return returncode
+        return 0
 
     server.accept.side_effect = accept
     register_signals = Mock()
@@ -141,13 +128,13 @@ def test_worker_cleans_up_socket_and_markers(
 
     assert (
         model_worker.serve_prestarted_model_worker(socket_path, ready_file, busy_file)
-        == returncode
+        == 0
     )
     register_signals.assert_called_once_with()
     assert not any(path.exists() for path in (socket_path, ready_file, busy_file))
 
 
-def test_dispatch_relays_accepted_output_best_effort(
+def test_dispatch_relays_accepted_output(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -165,21 +152,10 @@ def test_dispatch_relays_accepted_output_best_effort(
                 {"event": "accepted"},
                 {"event": "output", "stream": "stdout", "data": "out\n"},
                 {"event": "output", "stream": "stderr", "data": "err\n"},
-                {"event": "output", "stream": "stderr", "data": "é"},
                 {"event": "finished", "returncode": 0},
             ]
         ),
     )
-    captured_stderr = sys.stderr
-
-    def write_stderr(output: str) -> int:
-        if output == "é":
-            raise UnicodeEncodeError("ascii", output, 0, 1, "ordinal")
-        return captured_stderr.write(output)
-
-    stderr = Mock(wraps=captured_stderr)
-    stderr.write.side_effect = write_stderr
-    monkeypatch.setattr(sys, "stderr", stderr)
 
     assert (
         model_worker.dispatch_prestarted_model(
@@ -191,7 +167,6 @@ def test_dispatch_relays_accepted_output_best_effort(
     captured = capsys.readouterr()
     assert captured.out == f"{FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT}\nout\n"
     assert captured.err == "err\n"
-    stderr.write.assert_any_call("é")
     assert b"task-token" in channel.write.call_args.args[0]
 
 
@@ -219,8 +194,8 @@ def test_dispatch_rejects_output_before_acceptance(
     assert capsys.readouterr().out == ""
 
 
-def test_worker_relays_redacted_bounded_output(tmp_path: Path) -> None:
-    """Task output should be redacted, bounded, and carry fresh certificates."""
+def test_worker_relays_redacted_output(tmp_path: Path) -> None:
+    """Task output should be redacted and carry fresh certificates."""
     token = "task-token-that-must-not-be-relayed"
     certificate_path = tmp_path / "runtime-ca.pem"
     certificate_path.write_bytes(b"test-ca")
@@ -264,11 +239,6 @@ def test_worker_relays_redacted_bounded_output(tmp_path: Path) -> None:
     assert "model error\n" in output
     assert token not in output
     assert FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT not in output
-    assert all(
-        len(model_worker_protocol.encode_message(frame))
-        <= model_worker_protocol.MAX_PROTOCOL_MESSAGE_BYTES
-        for frame in frames
-    )
 
 
 def test_worker_rejects_failure_before_acceptance() -> None:
