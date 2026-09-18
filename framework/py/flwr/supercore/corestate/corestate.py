@@ -192,6 +192,10 @@ class CoreState(ABC):  # pylint: disable=R0904
         """List apps associated with a federation, newest first."""
 
     @abstractmethod
+    def list_app_associations(self, app_id: str) -> Sequence[str]:
+        """List federation IDs associated with an app, newest first."""
+
+    @abstractmethod
     def delete_app(self, federation_id: str, app_id: str) -> bool:
         """Delete one federation-app association; its FAB remains in state."""
 

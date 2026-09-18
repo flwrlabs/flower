@@ -133,6 +133,12 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [app.app_id for app in state.list_apps("@me/fed-a", limit=1)],
             ["@me/z-agent"],
         )
+        self.assertEqual(
+            state.list_app_associations("@me/server"),
+            ["@me/fed-b", "@me/fed-a"],
+        )
+        self.assertEqual(state.list_app_associations("@me/missing"), [])
+        self.assertEqual(state.list_app_associations(""), [])
         self.assertEqual(state.list_apps("@me/fed-a", limit=0), [])
         with self.assertRaises(AssertionError):
             state.list_apps("@me/fed-a", limit=-1)
@@ -187,6 +193,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [app.app_id for app in state.list_apps("@me/fed-b")],
             ["@me/server"],
         )
+        self.assertEqual(state.list_app_associations("@me/server"), ["@me/fed-b"])
         self.assertIsNotNone(state.get_fab(updated_hash))
 
     def test_connector_upsert_get_and_delete(self) -> None:

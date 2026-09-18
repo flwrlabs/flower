@@ -1669,8 +1669,21 @@ def list_app_associations(
     request: ListAppAssociationsRequest, account: AccountInfo, state: LinkState
 ) -> ListAppAssociationsResponse:
     """List the caller's federations associated with an app."""
-    _ = request, account, state
-    raise NotImplementedError("ListAppAssociations is not implemented.")
+    flwr_aid = account.flwr_aid
+    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+    accessible_federation_ids = [
+        federation.id
+        for federation in state.federation_manager.get_federations(flwr_aid)
+    ]
+    if request.app_id == FLOWER_AGENT_APP_ID:
+        return ListAppAssociationsResponse(federation_ids=accessible_federation_ids)
+    accessible_federation_id_set = set(accessible_federation_ids)
+    federation_ids = [
+        federation_id
+        for federation_id in state.list_app_associations(request.app_id)
+        if federation_id in accessible_federation_id_set
+    ]
+    return ListAppAssociationsResponse(federation_ids=federation_ids)
 
 
 def add_app(

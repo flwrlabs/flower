@@ -598,6 +598,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 for app in apps
             ]
 
+    def list_app_associations(self, app_id: str) -> Sequence[str]:
+        """List federation IDs associated with an app, newest first."""
+        if not app_id:
+            return []
+        query = (
+            select(FederationAppModel.federation_id)
+            .where(FederationAppModel.app_id == app_id)
+            .order_by(
+                FederationAppModel.added_at.desc(),
+                FederationAppModel.federation_id.desc(),
+            )
+        )
+        with self.session() as session:
+            return session.scalars(query).all()
+
     def delete_app(self, federation_id: str, app_id: str) -> bool:
         """Delete one federation-app association; its FAB remains in state."""
         if not federation_id or not app_id:
