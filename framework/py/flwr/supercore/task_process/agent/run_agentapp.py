@@ -89,14 +89,17 @@ def message_to_prompt(message: Message) -> str:
     """Serialize a Grid message into a JSON prompt string."""
     prompt: JSONObject = {
         "message_id": message.metadata.message_id,
+        "src_node_id": str(message.metadata.src_node_id),
         "payload": cast(
             str,
             message.content[AGENT_MESSAGE_CONTENT_RECORD_KEY][AGENT_MESSAGE_TEXT_KEY],
         ),
     }
+    # Return JSON format prompt if the message is from a different node
     if message.metadata.src_node_id != TaskIdentity.node_id:
-        prompt["src_node_id"] = str(message.metadata.src_node_id)
-    return strict_json_dumps(prompt, compact=True)
+        return strict_json_dumps(prompt, compact=True)
+    # Otherwise, return the payload string directly
+    return prompt["payload"]
 
 
 def pull_prompt(grid: HttpGrid) -> str:
