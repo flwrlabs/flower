@@ -48,4 +48,4 @@ README.md @jafermarq @tanertopal @danieljanes
 /framework/py/flwr/cli/ @jafermarq @panh99 @tanertopal @danieljanes
 
 # Connectors
-/framework/py/flwr/supercore/task_process/connector @tanertopal @danieljanes @dstripelis @danielnugraha @charlesbvll
+/framework/py/flwr/supercore/task_process/connector/ @tanertopal @danieljanes @dstripelis @danielnugraha @charlesbvll
