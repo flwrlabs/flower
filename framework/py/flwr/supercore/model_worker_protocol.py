@@ -22,9 +22,8 @@ import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from io import TextIOBase
 from queue import Empty, Full, Queue
-from typing import Any, Protocol
+from typing import Any, BinaryIO, Protocol, TextIO, cast
 
 from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
 
@@ -113,23 +112,61 @@ class ProtocolOutputSender:
             self._failed.set()
 
 
-class _RelayedTextOutput(TextIOBase):
-    """Redact authority markers and enqueue one ordered text stream."""
+class _RelayedBinaryOutput:
+    """Relay binary writes while preserving the original stream interface."""
 
-    encoding = "utf-8"
+    def __init__(self, relay: _RelayedTextOutput, original: BinaryIO) -> None:
+        self._relay = relay
+        self._original = original
+
+    def write(self, output: bytes | bytearray | memoryview) -> int:
+        """Decode and relay one binary write without exposing task authority."""
+        raw = bytes(output)
+        self._relay.write(raw.decode(self._relay.encoding, errors="replace"))
+        return len(raw)
+
+    def flush(self) -> None:
+        """Keep the relay's redaction suffix buffered."""
+        self._relay.flush()
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate the remaining binary stream interface."""
+        return getattr(self._original, name)
+
+
+class _RelayedTextOutput:
+    """Redact authority markers and enqueue one ordered text stream."""
 
     def __init__(
         self,
         sender: ProtocolOutputSender,
         stream: str,
         secrets: tuple[str, ...],
+        original: TextIO,
     ) -> None:
         self._sender = sender
         self._stream = stream
         self._secrets = tuple(secret for secret in secrets if secret)
+        self._original = original
         self._pending = ""
         self._lock = threading.Lock()
         self._retained_chars = max(map(len, self._secrets), default=1) - 1
+
+    @property
+    def buffer(self) -> _RelayedBinaryOutput:
+        """Return a binary view that preserves redaction and output relay."""
+        return _RelayedBinaryOutput(
+            self, cast(BinaryIO, cast(Any, self._original).buffer)
+        )
+
+    @property
+    def encoding(self) -> str:
+        """Return the original stream encoding."""
+        return self._original.encoding or "utf-8"
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate the remaining text stream interface."""
+        return getattr(self._original, name)
 
     def writable(self) -> bool:
         """Return whether the relay accepts text writes."""
@@ -176,14 +213,14 @@ def relay_task_output(sender: ProtocolOutputSender, token: str) -> Iterator[None
     )
 
     secrets = (token, FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT)
-    stdout = _RelayedTextOutput(sender, "stdout", secrets)
-    stderr = _RelayedTextOutput(sender, "stderr", secrets)
     original_stdout = sys.stdout
     original_stderr = sys.stderr
+    stdout = _RelayedTextOutput(sender, "stdout", secrets, original_stdout)
+    stderr = _RelayedTextOutput(sender, "stderr", secrets, original_stderr)
     original_log_stream = console_handler.stream
-    sys.stdout = stdout
-    sys.stderr = stderr
-    console_handler.stream = stderr
+    sys.stdout = cast(TextIO, stdout)
+    sys.stderr = cast(TextIO, stderr)
+    console_handler.stream = cast(TextIO, stderr)
     try:
         yield
     finally:
