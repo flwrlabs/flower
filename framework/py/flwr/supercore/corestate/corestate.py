@@ -31,6 +31,11 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
+from flwr.supercore.inflatable.inflatable_object import (
+    get_all_nested_objects,
+    get_object_tree,
+    no_object_id_recompute,
+)
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..constant import AutomationStatus
@@ -48,6 +53,15 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def object_store(self) -> ObjectStore:
         """Return the ObjectStore instance used by this CoreState."""
+
+    def _store_generated_message(self, message: Message) -> None:
+        """Store a generated Message in the object store."""
+        with no_object_id_recompute():
+            self.object_store.preregister(
+                message.metadata.run_id, get_object_tree(message)
+            )
+            for object_id, obj in get_all_nested_objects(message).items():
+                self.object_store.put(object_id, obj.deflate())
 
     @abstractmethod
     def start_session(self, run_id: int) -> str:
