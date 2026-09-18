@@ -54,6 +54,7 @@ from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
+    SYSTEM_MESSAGE_TYPE,
 )
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
@@ -94,11 +95,11 @@ def message_to_prompt(message: Message) -> str:
             message.content[AGENT_MESSAGE_CONTENT_RECORD_KEY][AGENT_MESSAGE_TEXT_KEY],
         ),
     }
-    # Return JSON format prompt if the message is from a different node
-    if message.metadata.src_node_id != TaskIdentity.node_id:
-        return strict_json_dumps(prompt, compact=True)
-    # Otherwise, return the payload string directly
-    return cast(str, prompt["payload"])
+    # Return the payload string directly if the message is a system message
+    if message.metadata.message_type == SYSTEM_MESSAGE_TYPE:
+        return cast(str, prompt["payload"])
+    # Otherwise, return the full prompt as a compact JSON string
+    return strict_json_dumps(prompt, compact=True)
 
 
 def pull_prompt(grid: HttpGrid) -> str:
