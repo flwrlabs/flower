@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quickstart-cpp"
+version = "1.0.0"
+description = "Flower C++ quickstart example with synthetic linear regression"
+license = "Apache-2.0"
+dependencies = [
+  "flwr>=1.31.0,<2.0.0",
+  "numpy>=1.24.0",
+]
+# Flower requires Python >=3.11, so this project cannot claim 3.10 support.
+# Modern pip/uv resolve across every version in `requires-python`, so `>=3.10`
+# makes `uv sync` fail with "No solution found when resolving dependencies for
+# split (markers: python_full_version == '3.10.*')".
+requires-python = ">=3.11"
+
+[tool.flwr.app]
+publisher = "flower"
+
+[tool.flwr.app.components]
+serverapp = "server:app"
+clientapp = "client:app"
+
+
+# SuperLink connection used by `flwr run`.
+#
+# Flower 1.36 and earlier serve the Control API on 9093, which is the value
+# below, so this block is what those versions use.
+#
+# Flower 1.37 moved the Control API to HTTP on the SuperLink's `--host`/`--port`
+# (8000 by default) and, on the first `flwr run`, migrates this block into
+# `~/.flwr/config.toml` while keeping the port written here. That first run on
+# 1.37+ therefore fails with `502 Bad Gateway`. The migration also comments this
+# block out, after which `config.toml` is authoritative: set the HTTP port there
+# and re-run. Editing `config.toml` before the first `flwr run` does not stick,
+# because the migration overwrites it. See the "Flower version compatibility"
+# section in README.md.
+#
+# Docs: https://flower.ai/docs/framework/ref-flower-configuration.html
+[tool.flwr.federations]
+default = "local-deployment"
+
+[tool.flwr.federations.local-deployment]
+address = "127.0.0.1:9093"
+insecure = true
