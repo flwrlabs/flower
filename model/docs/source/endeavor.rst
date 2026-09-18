@@ -48,6 +48,8 @@ At a glance
        compaction at 96,000 tokens; the supported API limit varies by
        deployment. See
        :ref:`Context window and limits <endeavor-context-limits>`.
+   * - Maximum context length
+     - 1M tokens
    * - Model artifacts
      - Availability and formats are confirmed during private-deployment
        onboarding; no public checkpoint is listed for download during the
