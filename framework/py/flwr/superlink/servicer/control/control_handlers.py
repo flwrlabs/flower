@@ -82,6 +82,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAppAssociationsRequest,
+    ListAppAssociationsResponse,
     ListAppsRequest,
     ListAppsResponse,
     ListAutomationsRequest,
@@ -1661,6 +1663,14 @@ def list_apps(
             apps = apps[: limit - 1]
         apps.append(agent)
     return ListAppsResponse(apps=apps)
+
+
+def list_app_associations(
+    request: ListAppAssociationsRequest, account: AccountInfo, state: LinkState
+) -> ListAppAssociationsResponse:
+    """List the caller's federations associated with an app."""
+    _ = request, account, state
+    raise NotImplementedError("ListAppAssociations is not implemented.")
 
 
 def add_app(
