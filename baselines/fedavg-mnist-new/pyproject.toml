@@ -1,0 +1,23 @@
+[project]
+name = "fedavg-mnist-new"
+version = "0.1.0"
+description = "FedAvg on MNIST baseline using Flower"
+authors = [
+    { name="Risha", email="rishabhnegi780@gmail.com" }
+]
+requires-python = ">=3.9,<3.13"
+readme = "README.md"
+license = { file="LICENSE" }
+
+dependencies = [
+    "flwr==1.3.0",
+    "torch",
+    "torchvision"
+]
+
+[tool.flwr.app]
+module = "fedavg_mnist_new.main"
+
+[tool.setuptools.packages.find]
+include = ["fedavg_mnist_new"]
+exclude = ["data*"]
