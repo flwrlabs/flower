@@ -20,7 +20,7 @@ import json
 import sys
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from queue import Empty, Full, Queue
 from typing import Any, BinaryIO, Protocol, TextIO, cast
@@ -125,6 +125,11 @@ class _RelayedBinaryOutput:
         self._relay.write(raw.decode(self._relay.encoding, errors="replace"))
         return len(raw)
 
+    def writelines(self, lines: Iterable[bytes]) -> None:
+        """Relay binary lines through the redacting text stream."""
+        for line in lines:
+            self.write(line)
+
     def flush(self) -> None:
         """Keep the relay's redaction suffix buffered."""
         self._relay.flush()
@@ -187,6 +192,11 @@ class _RelayedTextOutput:
             else:
                 self._pending = redacted
         return len(output)
+
+    def writelines(self, lines: Iterable[str]) -> None:
+        """Relay lines instead of delegating writes to the original stream."""
+        for line in lines:
+            self.write(line)
 
     def flush(self) -> None:
         """Keep a bounded suffix so secrets split across writes stay redacted."""
