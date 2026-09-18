@@ -467,21 +467,19 @@ class InMemoryCoreState(
                 for record in records
             ]
 
-    def list_app_associations(self, app_id: str) -> Sequence[str]:
-        """List federation IDs associated with an app, newest first."""
-        if not app_id:
+    def list_app_associations(
+        self, app_id: str, federation_ids: Sequence[str]
+    ) -> Sequence[str]:
+        """List the provided federation IDs associated with an app."""
+        if not app_id or not federation_ids:
             return []
+        federation_id_set = set(federation_ids)
         with self.lock_federation_app_store:
-            records = [
-                record
+            return [
+                record.federation_id
                 for record in self.federation_app_store.values()
-                if record.app_id == app_id
+                if record.app_id == app_id and record.federation_id in federation_id_set
             ]
-            records.sort(
-                key=lambda record: (record.added_at, record.federation_id),
-                reverse=True,
-            )
-            return [record.federation_id for record in records]
 
     def delete_app(self, federation_id: str, app_id: str) -> bool:
         """Delete one federation-app association; its FAB remains in state."""

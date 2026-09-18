@@ -572,13 +572,21 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 added_by=self.account.flwr_aid,
             )
 
-        response = list_app_associations(
-            ListAppAssociationsRequest(app_id="@flwr/demo"),
-            self.account,
+        with patch.object(
             self.state,
-        )
+            "list_app_associations",
+            wraps=self.state.list_app_associations,
+        ) as state_list_app_associations:
+            response = list_app_associations(
+                ListAppAssociationsRequest(app_id="@flwr/demo"),
+                self.account,
+                self.state,
+            )
 
         self.assertEqual(list(response.federation_ids), [NOOP_FEDERATION_ID])
+        state_list_app_associations.assert_called_once_with(
+            "@flwr/demo", [NOOP_FEDERATION_ID]
+        )
 
     def test_list_app_associations_includes_default_flower_agent(self) -> None:
         """List every accessible federation for the default Flower Agent."""

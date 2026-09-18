@@ -1677,12 +1677,9 @@ def list_app_associations(
     ]
     if request.app_id == FLOWER_AGENT_APP_ID:
         return ListAppAssociationsResponse(federation_ids=accessible_federation_ids)
-    accessible_federation_id_set = set(accessible_federation_ids)
-    federation_ids = [
-        federation_id
-        for federation_id in state.list_app_associations(request.app_id)
-        if federation_id in accessible_federation_id_set
-    ]
+    federation_ids = state.list_app_associations(
+        request.app_id, accessible_federation_ids
+    )
     return ListAppAssociationsResponse(federation_ids=federation_ids)
 
 

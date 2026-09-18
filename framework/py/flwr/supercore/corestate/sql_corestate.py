@@ -598,17 +598,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 for app in apps
             ]
 
-    def list_app_associations(self, app_id: str) -> Sequence[str]:
-        """List federation IDs associated with an app, newest first."""
-        if not app_id:
+    def list_app_associations(
+        self, app_id: str, federation_ids: Sequence[str]
+    ) -> Sequence[str]:
+        """List the provided federation IDs associated with an app."""
+        if not app_id or not federation_ids:
             return []
-        query = (
-            select(FederationAppModel.federation_id)
-            .where(FederationAppModel.app_id == app_id)
-            .order_by(
-                FederationAppModel.added_at.desc(),
-                FederationAppModel.federation_id.desc(),
-            )
+        query = select(FederationAppModel.federation_id).where(
+            FederationAppModel.app_id == app_id,
+            FederationAppModel.federation_id.in_(federation_ids),
         )
         with self.session() as session:
             return session.scalars(query).all()
