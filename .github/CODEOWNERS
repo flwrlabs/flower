@@ -46,3 +46,6 @@ README.md @jafermarq @tanertopal @danieljanes
 
 # Flower `flwr` CLI
 /framework/py/flwr/cli/ @jafermarq @panh99 @tanertopal @danieljanes
+
+# Connectors
+/framework/py/flwr/supercore/task_process/connector/ @tanertopal @danieljanes @dstripelis @danielnugraha @charlesbvll @panh99

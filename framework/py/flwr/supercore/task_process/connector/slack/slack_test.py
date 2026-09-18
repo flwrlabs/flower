@@ -19,11 +19,14 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
+from flwr.supercore.typing import JSONObject
+
 from .. import registry
 from ..definition import ActionAccess
 from ..oauth import OAuthFlow
 from .actions import ACTIONS
 from .definition import PROVIDER, SLACK_CONNECTOR_REF, SLACK_USER_SCOPES
+from .executors import SlackApiError
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
 _OAUTH_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
@@ -32,6 +35,12 @@ _OAUTH_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
 def test_slack_actions_are_registered_and_executable() -> None:
     """Slack read actions should be registered and executable."""
     assert len(ACTIONS) == 4
+    assert [action.name for action in ACTIONS] == [
+        "search_messages",
+        "list_conversations",
+        "get_conversation_history",
+        "get_conversation_replies",
+    ]
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     assert len(registry.get_connector_tools(SLACK_CONNECTOR_REF)) == len(ACTIONS)
     response = Mock(status_code=200)
@@ -39,13 +48,112 @@ def test_slack_actions_are_registered_and_executable() -> None:
     with patch(_HTTP_REQUEST, return_value=response) as request:
         result = registry.invoke_connector(
             "slack_search_messages",
-            {"query": "release"},
+            {"query": "release", "cursor": "*", "page": 1},
             Mock(),
             {"access_token": "xoxp-secret"},
             {},
         )
     assert result == response.json.return_value
     assert request.call_args.args == ("GET", "https://slack.com/api/search.messages")
+    assert request.call_args.kwargs["params"] == {
+        "query": "release",
+        "cursor": "*",
+        "page": "1",
+    }
+
+
+def test_slack_api_errors_include_code_and_message() -> None:
+    """Slack's documented error fields should remain readable to callers."""
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "ok": False,
+        "error": "invalid_cursor",
+        "response_metadata": {"messages": ["Invalid cursor"]},
+    }
+    with (
+        patch(_HTTP_REQUEST, return_value=response),
+        pytest.raises(SlackApiError) as error,
+    ):
+        registry.invoke_connector(
+            "slack_search_messages",
+            {"query": "release"},
+            Mock(),
+            {"access_token": "xoxp-secret"},
+            {},
+        )
+    assert str(error.value) == (
+        "Slack API request failed: invalid_cursor: Invalid cursor."
+    )
+
+
+def test_slack_http_rate_limit_preserves_status() -> None:
+    """Slack HTTP rate-limit responses should retain their code and status."""
+    response = Mock(status_code=429)
+    response.json.return_value = {"ok": False, "error": "ratelimited"}
+    with (
+        patch(_HTTP_REQUEST, return_value=response),
+        pytest.raises(SlackApiError) as error,
+    ):
+        registry.invoke_connector(
+            "slack_search_messages",
+            {"query": "release"},
+            Mock(),
+            {"access_token": "xoxp-secret"},
+            {},
+        )
+    assert str(error.value) == "Slack API request failed: ratelimited (429)."
+
+
+def test_slack_history_actions_forward_cursor() -> None:
+    """Slack history actions should expose cursor pagination."""
+    cases: tuple[tuple[str, JSONObject, dict[str, str]], ...] = (
+        (
+            "slack_get_conversation_history",
+            {"channel_id": "C1", "cursor": "next", "limit": 15},
+            {"channel": "C1", "cursor": "next", "limit": "15"},
+        ),
+        (
+            "slack_get_conversation_replies",
+            {
+                "channel_id": "C1",
+                "thread_ts": "1.0",
+                "cursor": "next",
+                "limit": 15,
+            },
+            {"channel": "C1", "ts": "1.0", "cursor": "next", "limit": "15"},
+        ),
+    )
+    response = Mock(status_code=200)
+    response.json.return_value = {"ok": True, "response_metadata": {}}
+    for name, arguments, params in cases:
+        with patch(_HTTP_REQUEST, return_value=response) as request:
+            assert (
+                registry.invoke_connector(
+                    name, arguments, Mock(), {"access_token": "xoxp-secret"}, {}
+                )
+                == response.json.return_value
+            )
+        assert request.call_args.kwargs["params"] == params
+
+
+def test_slack_list_conversations_limit() -> None:
+    """Slack should apply its default when limit is omitted and accept up to 999."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"ok": True, "channels": []}
+    cases: tuple[tuple[JSONObject, str | None], ...] = (
+        ({}, None),
+        ({"limit": 999}, "999"),
+    )
+    for arguments, expected_limit in cases:
+        with patch(_HTTP_REQUEST, return_value=response) as request:
+            registry.invoke_connector(
+                "slack_list_conversations",
+                arguments,
+                Mock(),
+                {"access_token": "xoxp-secret"},
+                {},
+            )
+        assert request.call_args.kwargs["params"].get("limit") == expected_limit
 
 
 def test_slack_oauth_flow() -> None:
