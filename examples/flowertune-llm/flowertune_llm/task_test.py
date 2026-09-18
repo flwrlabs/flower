@@ -37,6 +37,17 @@ def _write_layer_file(path: Path, name: str, tensor: torch.Tensor) -> None:
         pickle.dump({name: tensor}, file)
 
 
+def test_parse_scheduler_job_id_supports_slurm_wrappers_and_flux() -> None:
+    """Scheduler output parsing should never put a sentence in a dependency."""
+    assert task_module._parse_scheduler_job_id("1312795\n") == "1312795"
+    assert (
+        task_module._parse_scheduler_job_id("Submitted batch job 1312795\n")
+        == "1312795"
+    )
+    assert task_module._parse_scheduler_job_id("1312795;cluster\n") == "1312795"
+    assert task_module._parse_scheduler_job_id("f3AbCDe\n") == "f3AbCDe"
+
+
 def test_run_torchtitan_training_cleans_successful_dcp_handoff(
     tmp_path, monkeypatch
 ) -> None:
@@ -329,7 +340,10 @@ def test_layerwise_dcp_submits_dependent_slurm_jobs(tmp_path, monkeypatch) -> No
             )
             job_id = "103"
         return subprocess.CompletedProcess(
-            args=args, returncode=0, stdout=f"{job_id}\n", stderr=""
+            args=args,
+            returncode=0,
+            stdout=f"Submitted batch job {job_id}\n",
+            stderr="",
         )
 
     monkeypatch.setattr(task_module.subprocess, "run", fake_run)

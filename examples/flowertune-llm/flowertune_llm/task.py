@@ -104,6 +104,28 @@ def _python_module_command(
     )
 
 
+def _parse_scheduler_job_id(stdout: str) -> str:
+    """Extract a job ID from native or wrapper scheduler output."""
+    output_lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    if not output_lines:
+        raise ValueError("scheduler returned no job ID")
+
+    candidate = output_lines[-1]
+    slurm_match = re.fullmatch(
+        r"(?:Submitted\s+batch\s+job\s+)?(?P<job_id>\d+)(?:;\S+)?",
+        candidate,
+        flags=re.IGNORECASE,
+    )
+    if slurm_match:
+        return slurm_match.group("job_id")
+
+    # Flux IDs are opaque strings. Accept one token, but never pass an entire
+    # status sentence through to a scheduler dependency argument.
+    if not any(character.isspace() for character in candidate):
+        return candidate.split(";", maxsplit=1)[0]
+    raise ValueError(f"unrecognized scheduler job ID output: {candidate!r}")
+
+
 def read_conversion_profile(profile_path: str) -> dict[str, float]:
     """Read successful DCP conversion phase metrics from a JSONL profile."""
     metrics: dict[str, float] = {}
@@ -1419,16 +1441,14 @@ def run_torchtitan_training(
                 f"Failed to submit TorchTitan {phase} job with exit code "
                 f"{result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
             )
-        output_lines = [
-            line.strip() for line in result.stdout.splitlines() if line.strip()
-        ]
-        if not output_lines:
+        try:
+            job_id = _parse_scheduler_job_id(result.stdout)
+        except ValueError as exc:
             cleanup_failed_scheduler_run()
             raise RuntimeError(
-                f"Scheduler did not return a job ID for TorchTitan {phase} job."
-            )
-        # Slurm may append a cluster name (JOBID;CLUSTER). Flux IDs have no suffix.
-        job_id = output_lines[-1].split(";", maxsplit=1)[0]
+                f"Scheduler did not return a valid job ID for TorchTitan {phase} "
+                f"job.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+            ) from exc
         log(INFO, "[TorchTitan] submitted %s job: %s", phase, job_id)
         return job_id
 
