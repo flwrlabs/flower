@@ -232,6 +232,49 @@ def test_layerwise_dcp_dry_run_renders_three_scheduler_jobs(tmp_path) -> None:
     assert "separate_dcp_jobs=true" in report
 
 
+def test_all_at_once_dcp_dry_run_renders_state_conversion_jobs(tmp_path) -> None:
+    """All-at-once dry-runs should render state-to-DCP conversion commands."""
+    context = Context(
+        run_id=10,
+        node_id=20,
+        node_config={},
+        state=RecordDict(),
+        run_config={
+            "aggregation.layer-write-dir": str(tmp_path / "layers"),
+            "aggregation.mode": "all_at_once",
+            "client.workspace": str(tmp_path / "workspace"),
+            "model.name": "test/model",
+            "trainer.backend": "torchtitan",
+            "trainer.dry-run": True,
+            "trainer.python-exec": "python",
+            "trainer.torchtitan.dcp-enabled": True,
+            "trainer.torchtitan.dcp-separate-jobs": True,
+            "scheduler.backend": "slurm",
+        },
+    )
+    cfg = types.SimpleNamespace(
+        trainer=types.SimpleNamespace(
+            torchtitan=types.SimpleNamespace(command="true", workdir="")
+        )
+    )
+
+    result = task_module.run_torchtitan_training(
+        cfg, context, {"weight": torch.zeros(2)}, server_round=1
+    )
+
+    assert result is not None
+    script_dir = tmp_path / "layers" / "10" / "20" / "torchtitan"
+    to_dcp = script_dir / "torchtitan_slurm_to_dcp.sh"
+    train = script_dir / "torchtitan_slurm_train.sh"
+    from_dcp = script_dir / "torchtitan_slurm_from_dcp.sh"
+    for script in (to_dcp, train, from_dcp):
+        subprocess.run(["bash", "-n", str(script)], check=True)
+    assert "--direction state-to-dcp" in to_dcp.read_text(encoding="utf-8")
+    assert "--input-state" in to_dcp.read_text(encoding="utf-8")
+    assert "--direction dcp-to-state" in from_dcp.read_text(encoding="utf-8")
+    assert "--output-state" in from_dcp.read_text(encoding="utf-8")
+
+
 def test_layerwise_dcp_submits_dependent_slurm_jobs(tmp_path, monkeypatch) -> None:
     """Slurm conversion and training phases should form an afterok chain."""
     layer_directory = tmp_path / "layers" / "10" / "20"
@@ -312,6 +355,79 @@ def test_layerwise_dcp_submits_dependent_slurm_jobs(tmp_path, monkeypatch) -> No
     assert "--nodes=1" in submissions[2]
     assert "--ntasks=1" in submissions[2]
     assert "--wait" in submissions[2]
+
+
+def test_all_at_once_dcp_submits_dependent_slurm_jobs(tmp_path, monkeypatch) -> None:
+    """All-at-once DCP conversion should run in dependent scheduler jobs."""
+    context = Context(
+        run_id=10,
+        node_id=20,
+        node_config={},
+        state=RecordDict(),
+        run_config={
+            "aggregation.layer-write-dir": str(tmp_path / "layers"),
+            "aggregation.mode": "all_at_once",
+            "client.workspace": str(tmp_path / "workspace"),
+            "client.train-steps": 5,
+            "model.name": "test/model",
+            "trainer.backend": "torchtitan",
+            "trainer.torchtitan.dcp-enabled": True,
+            "trainer.torchtitan.dcp-convert-on-client": False,
+            "trainer.torchtitan.dcp-separate-jobs": True,
+            "scheduler.backend": "slurm",
+        },
+    )
+    cfg = types.SimpleNamespace(
+        trainer=types.SimpleNamespace(
+            torchtitan=types.SimpleNamespace(command="true", workdir="")
+        )
+    )
+    submissions: list[list[str]] = []
+
+    def fail_client_conversion(*_args, **_kwargs) -> None:
+        raise AssertionError("DCP conversion must not run in the ClientApp")
+
+    def fake_run(args, **kwargs):
+        command = [str(arg) for arg in args]
+        submissions.append(command)
+        script = Path(command[-1])
+        env = kwargs["env"]
+        if script.name.endswith("_to_dcp.sh"):
+            saved = torch.load(env["FLWR_TORCHTITAN_INPUT_STATE"])
+            assert torch.equal(saved["weight"], torch.zeros(2))
+            os.makedirs(env["FLWR_TORCHTITAN_DCP_CONVERSION_DIR"], exist_ok=True)
+            os.symlink(
+                env["FLWR_TORCHTITAN_DCP_CONVERSION_DIR"],
+                env["FLWR_TORCHTITAN_INPUT_DCP_DIR"],
+            )
+            job_id = "201"
+        elif script.name.endswith("_train.sh"):
+            os.makedirs(env["FLWR_TORCHTITAN_FINAL_DCP_DIR"], exist_ok=True)
+            job_id = "202"
+        else:
+            torch.save(
+                {"weight": torch.ones(2)},
+                env["FLWR_TORCHTITAN_OUTPUT_STATE"],
+            )
+            job_id = "203"
+        return subprocess.CompletedProcess(
+            args=args, returncode=0, stdout=f"{job_id}\n", stderr=""
+        )
+
+    monkeypatch.setattr(task_module, "_save_state_dict_as_dcp", fail_client_conversion)
+    monkeypatch.setattr(task_module.subprocess, "run", fake_run)
+
+    result = task_module.run_torchtitan_training(
+        cfg, context, {"weight": torch.zeros(2)}, server_round=1
+    )
+
+    assert result is not None
+    assert torch.equal(result["weight"], torch.ones(2))
+    assert len(submissions) == 3
+    assert "--dependency=afterok:201" in submissions[1]
+    assert "--dependency=afterok:202" in submissions[2]
+    script_dir = tmp_path / "layers" / "10" / "20" / "torchtitan"
+    assert not script_dir.exists()
 
 
 def test_layerwise_dcp_submits_dependent_flux_jobs(tmp_path, monkeypatch) -> None:
@@ -506,6 +622,91 @@ def test_dcp_converter_records_phase_profile(tmp_path, monkeypatch) -> None:
     metrics = task_module.read_conversion_profile(str(profile_path))
     assert metrics["profile.client.dcp.to_dcp.ms"] >= 0
     assert metrics["profile.client.dcp.to_dcp.mem_mb"] > 0
+
+
+def test_dcp_converter_supports_state_file_directions(tmp_path, monkeypatch) -> None:
+    """The conversion worker should dispatch both all-at-once conversions."""
+    calls: list[tuple[str, tuple[object, ...]]] = []
+    monkeypatch.setattr(
+        dcp_converter,
+        "convert_state_file_to_dcp",
+        lambda *args, **_kwargs: calls.append(("to_dcp", args)),
+    )
+    monkeypatch.setattr(
+        dcp_converter,
+        "convert_dcp_to_state_file",
+        lambda *args, **_kwargs: calls.append(("to_state", args)),
+    )
+    input_state = tmp_path / "input.pt"
+    output_state = tmp_path / "output.pt"
+    dcp_dir = tmp_path / "checkpoint.dcp"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "dcp_converter",
+            "--direction",
+            "state-to-dcp",
+            "--input-state",
+            str(input_state),
+            "--output-dir",
+            str(dcp_dir),
+        ],
+    )
+    dcp_converter.main()
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "dcp_converter",
+            "--direction",
+            "dcp-to-state",
+            "--input-dir",
+            str(dcp_dir),
+            "--reference-state",
+            str(input_state),
+            "--output-state",
+            str(output_state),
+        ],
+    )
+    dcp_converter.main()
+
+    assert calls == [
+        ("to_dcp", (str(input_state), str(dcp_dir))),
+        ("to_state", (str(dcp_dir), str(input_state), str(output_state))),
+    ]
+
+
+def test_state_file_dcp_conversion_round_trip(tmp_path) -> None:
+    """All-at-once state files should survive a real PyTorch DCP round trip."""
+    input_state = tmp_path / "input.pt"
+    output_state = tmp_path / "output.pt"
+    dcp_dir = tmp_path / "checkpoint.dcp"
+    expected = {
+        "weight": torch.arange(6, dtype=torch.float32).reshape(2, 3),
+        "bias": torch.tensor([1.5, -2.0]),
+    }
+    torch.save(expected, input_state)
+
+    task_module.convert_state_file_to_dcp(
+        str(input_state),
+        str(dcp_dir),
+        train_spec_name="llama3",
+        model_args_key="auto",
+        dcp_threads=1,
+    )
+    task_module.convert_dcp_to_state_file(
+        str(dcp_dir),
+        str(input_state),
+        str(output_state),
+        train_spec_name="llama3",
+        model_args_key="auto",
+    )
+
+    actual = torch.load(output_state, map_location="cpu")
+    assert actual.keys() == expected.keys()
+    assert all(torch.equal(actual[name], tensor) for name, tensor in expected.items())
 
 
 def test_dcp_converter_reads_and_publishes_layer_files(tmp_path, monkeypatch) -> None:

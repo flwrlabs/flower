@@ -8,6 +8,8 @@ if [ -n "{{ workdir }}" ]; then
 fi
 
 export FLWR_TORCHTITAN_OUTPUT_DCP_DIR="{{ output_dcp_dir }}"
+export FLWR_TORCHTITAN_INPUT_STATE="{{ input_checkpoint_path }}"
+export FLWR_TORCHTITAN_OUTPUT_STATE="{{ output_checkpoint_path }}"
 export FLWR_TORCHTITAN_FINAL_DCP_DIR="{{ final_dcp_dir }}"
 export FLWR_TORCHTITAN_INPUT_LAYERS_DIR="{{ input_layers_dir }}"
 export FLWR_TORCHTITAN_OUTPUT_LAYERS_DIR="{{ output_layers_dir }}"
@@ -23,8 +25,13 @@ fi
 
 {{ dcp_to_layers_command }}
 
-if [ ! -f "${FLWR_TORCHTITAN_OUTPUT_LAYERS_READY}" ]; then
-  echo "DCP-to-layer conversion did not publish ${FLWR_TORCHTITAN_OUTPUT_LAYERS_READY}" >&2
+if [ -n "${FLWR_TORCHTITAN_OUTPUT_LAYERS_READY}" ]; then
+  if [ ! -f "${FLWR_TORCHTITAN_OUTPUT_LAYERS_READY}" ]; then
+    echo "DCP-to-layer conversion did not publish ${FLWR_TORCHTITAN_OUTPUT_LAYERS_READY}" >&2
+    exit 1
+  fi
+elif [ ! -f "${FLWR_TORCHTITAN_OUTPUT_STATE}" ]; then
+  echo "DCP-to-state conversion did not publish ${FLWR_TORCHTITAN_OUTPUT_STATE}" >&2
   exit 1
 fi
 mv "${FLWR_TORCHTITAN_FINAL_DCP_DIR}" "${FLWR_TORCHTITAN_OUTPUT_DCP_DIR}"

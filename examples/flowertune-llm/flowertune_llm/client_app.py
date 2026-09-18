@@ -10,7 +10,14 @@ from time import perf_counter
 from typing import Any
 
 import torch
-from flwr.app import ArrayRecord, ConfigRecord, Context, Message, MetricRecord, RecordDict
+from flwr.app import (
+    ArrayRecord,
+    ConfigRecord,
+    Context,
+    Message,
+    MetricRecord,
+    RecordDict,
+)
 from flwr.clientapp import ClientApp
 from flwr.common.profiling import (
     PROFILE_CLIENT_NAME_KEY,
@@ -45,7 +52,9 @@ from flowertune_llm.task import (
     state_dict_fingerprint,
     state_dict_fingerprint_from_layer_paths,
     training_disabled,
+    torchtitan_dcp_conversion_on_client,
     torchtitan_dcp_enabled,
+    torchtitan_dcp_separate_jobs,
 )
 
 # Avoid warnings
@@ -129,9 +138,7 @@ def _restore_layer_state_from_names(
 
 def _flush_download_caches_for_context(context: Context) -> None:
     """Flush and drop all cached download layers for a run/node."""
-    flush_caches_for_context(
-        _DOWNLOAD_LAYER_CACHE, context, flush_before_drop=True
-    )
+    flush_caches_for_context(_DOWNLOAD_LAYER_CACHE, context, flush_before_drop=True)
 
 
 def _flush_comms_caches_for_context(context: Context) -> None:
@@ -238,12 +245,8 @@ def _run_minimal_training_step(
     num_steps = int(context.run_config.get("train.minimal-steps", 1))
     if num_steps < 1:
         raise ValueError("train.minimal-steps must be at least 1")
-    learning_rate = float(
-        context.run_config.get("train.minimal-learning-rate", 1e-4)
-    )
-    generator = torch.Generator(device=device).manual_seed(
-        2026 + int(context.node_id)
-    )
+    learning_rate = float(context.run_config.get("train.minimal-learning-rate", 1e-4))
+    generator = torch.Generator(device=device).manual_seed(2026 + int(context.node_id))
     vocab_size = int(getattr(model.config, "vocab_size"))
     before = parameter.detach().float().clone()
     optimizer = torch.optim.SGD([parameter], lr=learning_rate)
@@ -338,7 +341,9 @@ def _run_substantial_training(
             model.to(device)
             model.train()
             model.config.use_cache = False
-            trainable = [parameter for parameter in model.parameters() if parameter.requires_grad]
+            trainable = [
+                parameter for parameter in model.parameters() if parameter.requires_grad
+            ]
             trainable_count = sum(parameter.numel() for parameter in trainable)
             before = [parameter.detach().clone() for parameter in trainable]
 
@@ -354,9 +359,7 @@ def _run_substantial_training(
                 repeats = (required // max(1, len(token_ids))) + 1
                 token_ids = (token_ids * repeats)[:required]
 
-            optimizer = torch.optim.SGD(
-                trainable, lr=learning_rate, momentum=0.9
-            )
+            optimizer = torch.optim.SGD(trainable, lr=learning_rate, momentum=0.9)
             total_loss = 0.0
             span = max(1, len(token_ids) - seq_length)
             offset = (int(context.node_id) + server_round * 97) % span
@@ -403,7 +406,11 @@ def _run_substantial_training(
 def train_download(msg: Message, context: Context):
     """Receive layer chunks from the server and persist to disk."""
     t0 = perf_counter()
-    if msg.content is None or "arrays" not in msg.content or "config" not in msg.content:
+    if (
+        msg.content is None
+        or "arrays" not in msg.content
+        or "config" not in msg.content
+    ):
         return Message(
             content=_profiled_content(context, {"metrics": MetricRecord()}),
             reply_to=msg,
@@ -750,15 +757,80 @@ def train(msg: Message, context: Context):
         }
         metrics_dict.update(
             read_conversion_profile(
-                os.path.join(
-                    layer_dir(context), "torchtitan_conversion_profile.jsonl"
-                )
+                os.path.join(layer_dir(context), "torchtitan_conversion_profile.jsonl")
             )
         )
         metrics = MetricRecord(metrics_dict)
         return Message(
             content=_profiled_content(
                 context, {"arrays": ArrayRecord(), "metrics": metrics}
+            ),
+            reply_to=msg,
+        )
+
+    all_at_once_separate_dcp = (
+        trainer_backend == "torchtitan"
+        and aggregation_mode == "all_at_once"
+        and torchtitan_dcp_enabled(context)
+        and not torchtitan_dcp_conversion_on_client(context)
+        and torchtitan_dcp_separate_jobs(context)
+    )
+    if all_at_once_separate_dcp:
+        if incoming_state is None:
+            raise ValueError(
+                "All-at-once TorchTitan DCP training requires the downloaded "
+                "model state"
+            )
+        input_fingerprint = state_dict_fingerprint(incoming_state)
+        server_round = None
+        if "server-round" in config:
+            server_round = int(config["server-round"])
+        elif "current-round" in config:
+            server_round = int(config["current-round"])
+
+        trained_state = run_torchtitan_training(
+            cfg, context, incoming_state, server_round=server_round
+        )
+        if trained_state is None:
+            raise RuntimeError(
+                "All-at-once TorchTitan training did not return a model state"
+            )
+        output_fingerprint = state_dict_fingerprint(trained_state)
+        updates_are_deltas = (
+            str(context.run_config.get("aggregation.updates", "weights")).lower()
+            == "delta"
+        )
+        if updates_are_deltas:
+            state_dict = {
+                name: tensor.detach().cpu()
+                - incoming_state[name].detach().cpu().to(dtype=tensor.dtype)
+                for name, tensor in trained_state.items()
+            }
+        else:
+            state_dict = trained_state
+
+        t1 = perf_counter()
+        metrics_dict = {
+            "train_loss": 0.0,
+            "num-examples": 1,
+            "profile.client.train.ms": (t1 - t0) * 1000.0,
+            "model.input_fingerprint": input_fingerprint,
+            "model.output_fingerprint": output_fingerprint,
+            "model.fingerprint_delta": output_fingerprint - input_fingerprint,
+            "train.sent_delta": 1 if updates_are_deltas else 0,
+        }
+        metrics_dict.update(
+            read_conversion_profile(
+                os.path.join(layer_dir(context), "torchtitan_conversion_profile.jsonl")
+            )
+        )
+        return Message(
+            content=_profiled_content(
+                context,
+                {
+                    "arrays": ArrayRecord(state_dict),
+                    "metrics": MetricRecord(metrics_dict),
+                },
             ),
             reply_to=msg,
         )
@@ -848,9 +920,9 @@ def train(msg: Message, context: Context):
 
     trained_state_dict = model.state_dict()
     output_fingerprint = state_dict_fingerprint(trained_state_dict)
-    updates_are_deltas = str(
-        context.run_config.get("aggregation.updates", "weights")
-    ).lower() == "delta"
+    updates_are_deltas = (
+        str(context.run_config.get("aggregation.updates", "weights")).lower() == "delta"
+    )
     if updates_are_deltas:
         if incoming_state is None:
             raise ValueError("Delta updates require the downloaded base model state")
@@ -1030,9 +1102,8 @@ def train_comms(msg: Message, context: Context):
 
         cache_key = context_path_key(context, layer_path)
         cached = _COMMS_LAYER_CACHE.get(cache_key)
-        if (
-            cached is None
-            or (expected_layer_name and cached.layer_name != expected_layer_name)
+        if cached is None or (
+            expected_layer_name and cached.layer_name != expected_layer_name
         ):
             loaded = load_layer_from_disk(layer_path, expected_layer_name)
             if loaded is None:

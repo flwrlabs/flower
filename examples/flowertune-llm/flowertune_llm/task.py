@@ -219,6 +219,14 @@ def torchtitan_dcp_conversion_on_client(context: Context) -> bool:
     )
 
 
+def torchtitan_dcp_separate_jobs(context: Context) -> bool:
+    """Return whether DCP conversion and training use separate scheduler jobs."""
+    return _as_bool(
+        _config_value(context, "trainer.torchtitan.dcp-separate-jobs", False),
+        default=False,
+    )
+
+
 def sanitize_layer_name(name: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_.-]", "_", name)
 
@@ -672,6 +680,20 @@ def _write_state_dict_as_layer_files(
         shutil.rmtree(temporary_directory, ignore_errors=True)
 
 
+def _resolve_dcp_model_args_for_state(
+    train_spec_name: str,
+    state_dict: dict[str, torch.Tensor],
+    model_args_key: str,
+) -> str:
+    """Resolve TorchTitan model args where TorchTitan is actually installed."""
+    try:
+        import torchtitan.protocols.train_spec as train_spec_module
+    except Exception:
+        return model_args_key
+    train_spec = train_spec_module.get_train_spec(train_spec_name)
+    return _resolve_torchtitan_model_args_key(train_spec, state_dict, model_args_key)
+
+
 def convert_layer_directory_to_dcp(
     input_directory: str,
     output_directory: str,
@@ -685,16 +707,9 @@ def convert_layer_directory_to_dcp(
     if not state_dict:
         raise ValueError(f"No layer files found in {input_directory}")
 
-    resolved_model_args = model_args_key
-    try:
-        import torchtitan.protocols.train_spec as train_spec_module
-    except Exception:
-        pass
-    else:
-        train_spec = train_spec_module.get_train_spec(train_spec_name)
-        resolved_model_args = _resolve_torchtitan_model_args_key(
-            train_spec, state_dict, model_args_key
-        )
+    resolved_model_args = _resolve_dcp_model_args_for_state(
+        train_spec_name, state_dict, model_args_key
+    )
 
     _save_state_dict_as_dcp(
         state_dict,
@@ -720,16 +735,9 @@ def convert_dcp_to_layer_directory(
     if not reference_state:
         raise ValueError(f"No reference layer files found in {reference_directory}")
 
-    resolved_model_args = model_args_key
-    try:
-        import torchtitan.protocols.train_spec as train_spec_module
-    except Exception:
-        pass
-    else:
-        train_spec = train_spec_module.get_train_spec(train_spec_name)
-        resolved_model_args = _resolve_torchtitan_model_args_key(
-            train_spec, reference_state, model_args_key
-        )
+    resolved_model_args = _resolve_dcp_model_args_for_state(
+        train_spec_name, reference_state, model_args_key
+    )
 
     state_dict = _load_state_dict_from_dcp(
         input_directory,
@@ -743,6 +751,58 @@ def convert_dcp_to_layer_directory(
         layer_names=list(reference_state.keys()),
         ready_marker=ready_marker,
     )
+
+
+def convert_state_file_to_dcp(
+    input_path: str,
+    output_directory: str,
+    *,
+    train_spec_name: str,
+    model_args_key: str,
+    dcp_threads: int,
+) -> None:
+    """Convert a serialized HF-like state dict into TorchTitan DCP."""
+    payload = torch.load(input_path, map_location="cpu")
+    state_dict = _normalize_state_dict_for_hf(extract_state_dict(payload))
+    if not state_dict:
+        raise ValueError(f"No tensors found in state file {input_path}")
+    resolved_model_args = _resolve_dcp_model_args_for_state(
+        train_spec_name, state_dict, model_args_key
+    )
+    _save_state_dict_as_dcp(
+        state_dict,
+        output_directory,
+        train_spec_name=train_spec_name,
+        model_args_key=resolved_model_args,
+        dcp_threads=dcp_threads,
+    )
+
+
+def convert_dcp_to_state_file(
+    input_directory: str,
+    reference_path: str,
+    output_path: str,
+    *,
+    train_spec_name: str,
+    model_args_key: str,
+) -> None:
+    """Convert TorchTitan DCP into an atomically published HF-like state file."""
+    payload = torch.load(reference_path, map_location="cpu")
+    reference_state = _normalize_state_dict_for_hf(extract_state_dict(payload))
+    if not reference_state:
+        raise ValueError(f"No reference tensors found in {reference_path}")
+    resolved_model_args = _resolve_dcp_model_args_for_state(
+        train_spec_name, reference_state, model_args_key
+    )
+    state_dict = _load_state_dict_from_dcp(
+        input_directory,
+        train_spec_name=train_spec_name,
+        model_args_key=resolved_model_args,
+        reference_state_dict=reference_state,
+    )
+    temporary_path = f"{output_path}.tmp"
+    torch.save(state_dict, temporary_path)
+    os.replace(temporary_path, output_path)
 
 
 def extract_state_dict(payload: object) -> dict[str, torch.Tensor]:
@@ -958,14 +1018,9 @@ def run_torchtitan_training(
         )
     layerwise_dcp = dcp_enabled and layer_paths is not None
     client_layerwise_conversion = layerwise_dcp and dcp_convert_on_client
-    separate_dcp_jobs_requested = _as_bool(
-        _config_value(context, "trainer.torchtitan.dcp-separate-jobs", False),
-        default=False,
-    )
+    separate_dcp_jobs_requested = torchtitan_dcp_separate_jobs(context)
     separate_dcp_jobs = (
-        layerwise_dcp
-        and not client_layerwise_conversion
-        and separate_dcp_jobs_requested
+        dcp_enabled and not dcp_convert_on_client and separate_dcp_jobs_requested
     )
     dcp_train_spec = str(
         _config_value(
@@ -1163,6 +1218,43 @@ def run_torchtitan_training(
                 str(dcp_threads),
             ],
         )
+    elif separate_dcp_jobs:
+        dcp_conversion_command = _python_module_command(
+            python_exec,
+            "flowertune_llm.dcp_converter",
+            [
+                "--direction",
+                "state-to-dcp",
+                "--input-state",
+                input_state_path,
+                "--output-dir",
+                conversion_dir,
+                "--train-spec",
+                dcp_train_spec,
+                "--model-args",
+                resolved_dcp_model_args,
+                "--threads",
+                str(dcp_threads),
+            ],
+        )
+        dcp_to_layers_command = _python_module_command(
+            python_exec,
+            "flowertune_llm.dcp_converter",
+            [
+                "--direction",
+                "dcp-to-state",
+                "--input-dir",
+                final_dcp_dir,
+                "--reference-state",
+                input_state_path,
+                "--output-state",
+                output_state_path,
+                "--train-spec",
+                dcp_train_spec,
+                "--model-args",
+                resolved_dcp_model_args,
+            ],
+        )
 
     render_context: dict[str, Any] = {
         "run_id": context.run_id,
@@ -1225,10 +1317,9 @@ def run_torchtitan_training(
         )
     if separate_dcp_jobs_requested and not separate_dcp_jobs:
         raise ValueError(
-            "trainer.torchtitan.dcp-separate-jobs=true requires layerwise "
-            "TorchTitan DCP conversion in scheduler jobs: set "
-            "aggregation.mode=layerwise, trainer.torchtitan.dcp-enabled=true, "
-            "and trainer.torchtitan.dcp-convert-on-client=false."
+            "trainer.torchtitan.dcp-separate-jobs=true requires "
+            "trainer.torchtitan.dcp-enabled=true and "
+            "trainer.torchtitan.dcp-convert-on-client=false."
         )
     if separate_dcp_jobs and scheduler_backend not in {"slurm", "flux"}:
         raise ValueError(
@@ -1315,7 +1406,9 @@ def run_torchtitan_training(
         _remove_path(step0_dcp_dir)
         _remove_path(input_dcp_dir)
         _remove_path(output_dcp_dir)
-        if layerwise_dcp and not cache_available:
+        _remove_path(input_state_path)
+        _remove_path(output_state_path)
+        if dcp_enabled and not cache_available:
             _remove_path(conversion_dir)
 
     def parse_job_id(result: subprocess.CompletedProcess[str], phase: str) -> str:
@@ -1435,22 +1528,25 @@ def run_torchtitan_training(
                 if conversion_dir != input_dcp_dir:
                     _replace_symlink(input_dcp_dir, conversion_dir)
     elif dcp_enabled:
+        if state_dict is None:
+            raise ValueError("state_dict is required for DCP training")
+        if separate_dcp_jobs:
+            torch.save(state_dict, input_state_path)
         if round_id <= 1 and cache_available:
             _replace_symlink(input_dcp_dir, dcp_cache_dir)
         else:
             conversion_dir = dcp_cache_dir if round_id <= 1 else input_dcp_dir
             _remove_path(conversion_dir)
-            if state_dict is None:
-                raise ValueError("state_dict is required for DCP training")
-            _save_state_dict_as_dcp(
-                state_dict,
-                conversion_dir,
-                train_spec_name=dcp_train_spec,
-                model_args_key=resolved_dcp_model_args,
-                dcp_threads=dcp_threads,
-            )
-            if conversion_dir == dcp_cache_dir:
-                _replace_symlink(input_dcp_dir, dcp_cache_dir)
+            if not separate_dcp_jobs:
+                _save_state_dict_as_dcp(
+                    state_dict,
+                    conversion_dir,
+                    train_spec_name=dcp_train_spec,
+                    model_args_key=resolved_dcp_model_args,
+                    dcp_threads=dcp_threads,
+                )
+                if conversion_dir == dcp_cache_dir:
+                    _replace_symlink(input_dcp_dir, dcp_cache_dir)
     else:
         if state_dict is None:
             raise ValueError("state_dict is required for non-DCP training")

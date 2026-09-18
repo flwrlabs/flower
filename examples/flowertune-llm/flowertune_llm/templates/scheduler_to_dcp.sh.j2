@@ -8,6 +8,7 @@ if [ -n "{{ workdir }}" ]; then
 fi
 
 export FLWR_TORCHTITAN_INPUT_DCP_DIR="{{ input_dcp_dir }}"
+export FLWR_TORCHTITAN_INPUT_STATE="{{ input_checkpoint_path }}"
 export FLWR_TORCHTITAN_INPUT_LAYERS_DIR="{{ input_layers_dir }}"
 export FLWR_TORCHTITAN_DCP_CONVERSION_DIR="{{ dcp_conversion_dir }}"
 export FLWR_TORCHTITAN_CONVERSION_PROFILE="{{ conversion_profile_path }}"
@@ -17,7 +18,7 @@ export PYTHONPATH="${FLWR_FLOWERTUNE_LLM_ROOT}:${PYTHONPATH:-}"
 {{ dcp_conversion_command }}
 
 if [ ! -d "${FLWR_TORCHTITAN_DCP_CONVERSION_DIR}" ]; then
-  echo "Layer-file to DCP conversion did not produce ${FLWR_TORCHTITAN_DCP_CONVERSION_DIR}" >&2
+  echo "DCP conversion did not produce ${FLWR_TORCHTITAN_DCP_CONVERSION_DIR}" >&2
   exit 1
 fi
 if [ "${FLWR_TORCHTITAN_DCP_CONVERSION_DIR}" != "${FLWR_TORCHTITAN_INPUT_DCP_DIR}" ]; then

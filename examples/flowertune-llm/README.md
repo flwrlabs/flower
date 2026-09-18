@@ -192,9 +192,14 @@ location is controlled by `trainer.torchtitan.dcp-convert-on-client`:
 | `true` | `false` | HPC job, which keeps ClientApp memory lower. |
 | `true` | `true` | ClientApp, which is simpler for smaller models but uses more client memory. |
 
-The conversion-location option affects the layerwise DCP path. For
-`aggregation.mode='all_at_once'`, enabling DCP already performs conversion in
-the ClientApp.
+For `aggregation.mode='all_at_once'`, the default path still converts DCP in
+the ClientApp. Setting `trainer.torchtitan.dcp-separate-jobs=true` moves both
+conversions into scheduler jobs instead: the ClientApp writes the received
+state to `input_state.pt`, and the conversion jobs produce the input DCP and
+the final `output_state.pt`. This avoids constructing an additional Hugging
+Face model in the ClientApp, but all-at-once transport still materializes the
+full state and therefore does not have the same low-memory behavior as the
+layerwise path.
 
 For the low-memory layerwise path, use these arguments together:
 
@@ -232,20 +237,22 @@ conversion worker writes JSONL phase telemetry there, and the ClientApp reports
 conversion duration and peak RSS as `profile.client.dcp.*` metrics.
 
 For large models, the two conversions can instead run as independent scheduler
-jobs around the training job:
+jobs around the training job. Both `layerwise` and `all_at_once` are supported:
 
 ```text
 trainer.backend='torchtitan'
-aggregation.mode='layerwise'
+aggregation.mode='all_at_once'
 trainer.torchtitan.dcp-enabled=true
 trainer.torchtitan.dcp-convert-on-client=false
 trainer.torchtitan.dcp-separate-jobs=true
 ```
 
-The ClientApp submits `layers -> DCP`, training, and `DCP -> layers` jobs with
-`afterok` dependencies. It waits for the final conversion job before making the
-trained layers available for upload. If the first-round DCP cache is already
-valid, the first conversion job is skipped. Conversion jobs inherit the normal
+For layerwise aggregation, the ClientApp submits `layers -> DCP`, training, and
+`DCP -> layers` jobs. For all-at-once aggregation, it submits `state -> DCP`,
+training, and `DCP -> state` jobs. Both variants use `afterok` dependencies and
+wait for the final conversion job before returning the trained update. If the
+first-round DCP cache is already valid, the first conversion job is skipped.
+Conversion jobs inherit the normal
 `scheduler.*` resources unless overridden with
 `scheduler.conversion.{account,partition,qos,gpus,cpus-per-task,mem,time}`.
 Additional conversion-only scheduler flags can be supplied through

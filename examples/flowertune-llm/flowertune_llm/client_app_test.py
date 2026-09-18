@@ -66,15 +66,19 @@ def test_train_comms_cleans_layer_files_after_final_send(tmp_path) -> None:
     assert all(os.path.exists(path) for path in layer_paths)
 
     message = Message(
-        content=RecordDict({
-            "config": ConfigRecord({
-                "upload_layer_idxs": [0, 1],
-                "upload_layer_names": ["layer.a", "layer.b"],
-                "upload_chunk_starts": [0, 0],
-                "upload_chunk_ends": [0, 0],
-                "upload_is_last_chunk": [True, True],
-            }),
-        }),
+        content=RecordDict(
+            {
+                "config": ConfigRecord(
+                    {
+                        "upload_layer_idxs": [0, 1],
+                        "upload_layer_names": ["layer.a", "layer.b"],
+                        "upload_chunk_starts": [0, 0],
+                        "upload_chunk_ends": [0, 0],
+                        "upload_is_last_chunk": [True, True],
+                    }
+                ),
+            }
+        ),
         dst_node_id=1,
         message_type="train.layer_wise_communication",
     )
@@ -105,19 +109,23 @@ def test_train_download_persists_split_chunks_across_processes(tmp_path) -> None
     )
 
     last_chunk = Message(
-        content=RecordDict({
-            "arrays": ArrayRecord({
-                "layer.big::chunk_2_4": torch.tensor([3.0, 4.0])
-            }),
-            "config": ConfigRecord({
-                "download_layer_idxs": [0],
-                "download_layer_names": ["layer.big"],
-                "download_layer_shapes": ["4"],
-                "download_chunk_starts": [2],
-                "download_chunk_ends": [4],
-                "download_is_last_chunk": [True],
-            }),
-        }),
+        content=RecordDict(
+            {
+                "arrays": ArrayRecord(
+                    {"layer.big::chunk_2_4": torch.tensor([3.0, 4.0])}
+                ),
+                "config": ConfigRecord(
+                    {
+                        "download_layer_idxs": [0],
+                        "download_layer_names": ["layer.big"],
+                        "download_layer_shapes": ["4"],
+                        "download_chunk_starts": [2],
+                        "download_chunk_ends": [4],
+                        "download_is_last_chunk": [True],
+                    }
+                ),
+            }
+        ),
         dst_node_id=1,
         message_type="train.layer_wise_download",
     )
@@ -125,19 +133,23 @@ def test_train_download_persists_split_chunks_across_processes(tmp_path) -> None
     _DOWNLOAD_LAYER_CACHE.clear()
 
     first_chunk = Message(
-        content=RecordDict({
-            "arrays": ArrayRecord({
-                "layer.big::chunk_0_2": torch.tensor([1.0, 2.0])
-            }),
-            "config": ConfigRecord({
-                "download_layer_idxs": [0],
-                "download_layer_names": ["layer.big"],
-                "download_layer_shapes": ["4"],
-                "download_chunk_starts": [0],
-                "download_chunk_ends": [2],
-                "download_is_last_chunk": [False],
-            }),
-        }),
+        content=RecordDict(
+            {
+                "arrays": ArrayRecord(
+                    {"layer.big::chunk_0_2": torch.tensor([1.0, 2.0])}
+                ),
+                "config": ConfigRecord(
+                    {
+                        "download_layer_idxs": [0],
+                        "download_layer_names": ["layer.big"],
+                        "download_layer_shapes": ["4"],
+                        "download_chunk_starts": [0],
+                        "download_chunk_ends": [2],
+                        "download_is_last_chunk": [False],
+                    }
+                ),
+            }
+        ),
         dst_node_id=1,
         message_type="train.layer_wise_download",
     )
@@ -165,12 +177,16 @@ def test_layerwise_torchtitan_dcp_does_not_load_hf_model(tmp_path, monkeypatch) 
     )
     _persist_layer_files(context, {"layer.a": torch.ones(2)}, ["layer.a"])
     message = Message(
-        content=RecordDict({
-            "config": ConfigRecord({
-                "model_preloaded": True,
-                "layer_names": ["layer.a"],
-            })
-        }),
+        content=RecordDict(
+            {
+                "config": ConfigRecord(
+                    {
+                        "model_preloaded": True,
+                        "layer_names": ["layer.a"],
+                    }
+                )
+            }
+        ),
         dst_node_id=1,
         message_type="train",
     )
@@ -196,6 +212,51 @@ def test_layerwise_torchtitan_dcp_does_not_load_hf_model(tmp_path, monkeypatch) 
     assert reply.content["_flwr_profile"]["client_name"] == "800"
 
 
+def test_all_at_once_separate_dcp_does_not_load_hf_model(tmp_path, monkeypatch) -> None:
+    """All-at-once separate DCP jobs should avoid an extra HF model copy."""
+    context = Context(
+        run_id=703,
+        node_id=803,
+        node_config={},
+        state=RecordDict(),
+        run_config={
+            "aggregation.mode": "all_at_once",
+            "aggregation.layer-write-dir": str(tmp_path),
+            "trainer.backend": "torchtitan",
+            "trainer.torchtitan.dcp-enabled": True,
+            "trainer.torchtitan.dcp-convert-on-client": False,
+            "trainer.torchtitan.dcp-separate-jobs": True,
+            "train.disable": False,
+        },
+    )
+    message = Message(
+        content=RecordDict(
+            {
+                "arrays": ArrayRecord({"weight": torch.zeros(2)}),
+                "config": ConfigRecord({"server-round": 1}),
+            }
+        ),
+        dst_node_id=1,
+        message_type="train",
+    )
+
+    def fail_get_model(_cfg):
+        raise AssertionError("HF model construction should be skipped")
+
+    def fake_run(_cfg, _context, state_dict, **_kwargs):
+        assert torch.equal(state_dict["weight"], torch.zeros(2))
+        return {"weight": torch.ones(2)}
+
+    monkeypatch.setattr(client_app_module, "get_model", fail_get_model)
+    monkeypatch.setattr(client_app_module, "run_torchtitan_training", fake_run)
+
+    reply = train(message, context)
+
+    returned = reply.content["arrays"].to_torch_state_dict()
+    assert torch.equal(returned["weight"], torch.ones(2))
+    assert reply.content["metrics"]["model.fingerprint_delta"] > 0.0
+
+
 def test_train_rejects_incomplete_layer_download(tmp_path) -> None:
     """Training must not start when any server-advertised layer is absent."""
     context = Context(
@@ -211,12 +272,16 @@ def test_train_rejects_incomplete_layer_download(tmp_path) -> None:
     )
     _persist_layer_files(context, {"layer.a": torch.ones(2)}, ["layer.a"])
     message = Message(
-        content=RecordDict({
-            "config": ConfigRecord({
-                "model_preloaded": True,
-                "layer_names": ["layer.a", "layer.b"],
-            })
-        }),
+        content=RecordDict(
+            {
+                "config": ConfigRecord(
+                    {
+                        "model_preloaded": True,
+                        "layer_names": ["layer.a", "layer.b"],
+                    }
+                )
+            }
+        ),
         dst_node_id=1,
         message_type="train",
     )
@@ -245,12 +310,16 @@ def test_train_rejects_incomplete_post_training_conversion(
     _persist_layer_files(context, {"layer.a": torch.ones(2)}, ["layer.a"])
     layer_path = context.state[STATE_LAYER_PATHS]["paths"][0]
     message = Message(
-        content=RecordDict({
-            "config": ConfigRecord({
-                "model_preloaded": True,
-                "layer_names": ["layer.a"],
-            })
-        }),
+        content=RecordDict(
+            {
+                "config": ConfigRecord(
+                    {
+                        "model_preloaded": True,
+                        "layer_names": ["layer.a"],
+                    }
+                )
+            }
+        ),
         dst_node_id=1,
         message_type="train",
     )
