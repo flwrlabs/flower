@@ -184,6 +184,7 @@ def pull_messages(  # pylint: disable=R0914
     messages: list[Message] = state.get_message_res(
         message_ids=message_ids, run_id=run_id
     )
+    # Allow pulling instruction message for `flwr-agentapp`
     messages += state.get_message_ins(
         node_id=SUPERLINK_NODE_ID, limit=None, run_id=run_id
     )
