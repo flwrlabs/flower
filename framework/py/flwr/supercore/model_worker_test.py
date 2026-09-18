@@ -194,11 +194,16 @@ def test_dispatch_rejects_output_before_acceptance(
     assert capsys.readouterr().out == ""
 
 
-def test_worker_relays_redacted_output(tmp_path: Path) -> None:
-    """Task output should be redacted and carry fresh certificates."""
+def test_worker_relays_redacted_output(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Task output should be compatible, redacted, and carry fresh certificates."""
     token = "task-token-that-must-not-be-relayed"
     certificate_path = tmp_path / "runtime-ca.pem"
     certificate_path.write_bytes(b"test-ca")
+    original_stdout = Mock(encoding="utf-8", buffer=BytesIO())
+    original_stdout.fileno.return_value = 42
+    monkeypatch.setattr(sys, "stdout", original_stdout)
 
     def run_once(
         runtime_api_address: str,
@@ -213,6 +218,8 @@ def test_worker_relays_redacted_output(tmp_path: Path) -> None:
             b"test-ca",
         )
         on_started()
+        assert sys.stdout.fileno() == 42
+        sys.stdout.buffer.write(f"binary {invocation_token}\n".encode())
         midpoint = len(invocation_token) // 2
         sys.stdout.write(f"before {invocation_token[:midpoint]}")
         sys.stdout.write(f"{invocation_token[midpoint:]} after\n")
@@ -235,6 +242,7 @@ def test_worker_relays_redacted_output(tmp_path: Path) -> None:
     assert result == [0]
     assert frames[0] == {"event": "accepted"}
     assert frames[-1] == {"event": "finished", "returncode": 0}
+    assert "binary [REDACTED]\n" in output
     assert "before [REDACTED] after\n" in output
     assert "model error\n" in output
     assert token not in output
