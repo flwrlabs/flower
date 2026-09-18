@@ -1531,11 +1531,12 @@ def run_torchtitan_training(
                 submit_parts.append("--wait")
             if dependency:
                 submit_parts.append(f"--dependency=afterok:{dependency}")
-            # Conversion workers are single-process Python jobs. Native Slurm
-            # defaults to one task, but Flux-backed sbatch wrappers require the
-            # task count to be explicit. Later extra arguments can override it.
+            # Conversion workers are single-node, single-process Python jobs.
+            # Native Slurm supplies defaults, but Flux-backed sbatch wrappers
+            # require the allocation to be explicit. Later extra arguments can
+            # override these values.
             if conversion:
-                submit_parts.append("--ntasks=1")
+                submit_parts.extend(["--nodes=1", "--ntasks=1"])
             for option, value in (
                 ("--account", account),
                 ("--partition", partition),
@@ -1656,11 +1657,11 @@ def run_torchtitan_training(
                 flux_parts = shlex.split(flux_submit)
                 if dependency:
                     flux_parts.append(f"--dependency=afterok:{dependency}")
-                # Flux requires the number of slots for each submitted job.
-                # Conversion workers use one process; site arguments appended
-                # below can override this default when needed.
+                # Flux requires an explicit allocation for submitted jobs.
+                # Conversion workers use one node and one process; site
+                # arguments appended below can override these defaults.
                 if conversion:
-                    flux_parts.append("-n1")
+                    flux_parts.extend(["-N1", "-n1"])
                 if scheduler_extra_args:
                     flux_parts.extend(shlex.split(scheduler_extra_args))
                 if flux_extra_args:
