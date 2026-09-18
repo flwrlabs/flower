@@ -99,7 +99,7 @@ def message_to_prompt(message: Message) -> str:
     if message.metadata.src_node_id != TaskIdentity.node_id:
         return strict_json_dumps(prompt, compact=True)
     # Otherwise, return the payload string directly
-    return prompt["payload"]
+    return cast(str, prompt["payload"])
 
 
 def pull_prompt(grid: HttpGrid) -> str:

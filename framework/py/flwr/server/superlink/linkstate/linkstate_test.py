@@ -189,7 +189,7 @@ class StateTest(CoreStateTest):
         assert stored_event.data == initial_event.data
         assert stored_event.task_id == run.primary_task_id
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[untyped-decorator]
         [
             (TaskType.AGENT_APP, "Hello AgentApp", 1),
             (TaskType.AGENT_APP, None, 0),
