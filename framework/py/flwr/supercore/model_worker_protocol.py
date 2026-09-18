@@ -125,10 +125,21 @@ class _RelayedBinaryOutput:
         self._relay.write(raw.decode(self._relay.encoding, errors="replace"))
         return len(raw)
 
+    def write1(self, output: bytes | bytearray | memoryview) -> int:
+        """Relay one buffered binary write."""
+        return self.write(output)
+
     def writelines(self, lines: Iterable[bytes]) -> None:
         """Relay binary lines through the redacting text stream."""
         for line in lines:
             self.write(line)
+
+    @property
+    def raw(self) -> _RelayedBinaryOutput:
+        """Return a redacting proxy for the underlying raw stream."""
+        return _RelayedBinaryOutput(
+            self._relay, cast(BinaryIO, cast(Any, self._original).raw)
+        )
 
     def flush(self) -> None:
         """Keep the relay's redaction suffix buffered."""
