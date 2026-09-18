@@ -46,6 +46,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAppAssociationsRequest,
+    ListAppAssociationsResponse,
     ListAppsRequest,
     ListAppsResponse,
     ListAutomationsRequest,
@@ -402,6 +404,16 @@ def list_apps(
 ) -> ListAppsResponse:
     """List apps associated with a federation."""
     return control_handlers.list_apps(request, account, linkstate)
+
+
+@router.post("/list-app-associations")
+def list_app_associations(
+    request: Annotated[ListAppAssociationsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListAppAssociationsResponse:
+    """List federations associated with an app."""
+    return control_handlers.list_app_associations(request, account, linkstate)
 
 
 @router.post("/add-app")

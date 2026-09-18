@@ -106,6 +106,10 @@ service Control {
   // List Apps in a Federation
   rpc ListApps(ListAppsRequest) returns (ListAppsResponse) {}
 
+  // List Federations associated with an App
+  rpc ListAppAssociations(ListAppAssociationsRequest)
+      returns (ListAppAssociationsResponse) {}
+
   // Add App to a Federation
   rpc AddApp(AddAppRequest) returns (AddAppResponse) {}
 
@@ -333,6 +337,9 @@ message ListAppsRequest {
   optional uint64 limit = 2;
 }
 message ListAppsResponse { repeated AppInfo apps = 1; }
+
+message ListAppAssociationsRequest { string app_id = 1; }
+message ListAppAssociationsResponse { repeated string federation_ids = 1; }
 
 message AddAppRequest {
   string federation_id = 1;
