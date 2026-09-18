@@ -302,11 +302,13 @@ def test_layerwise_dcp_submits_dependent_slurm_jobs(tmp_path, monkeypatch) -> No
 
     assert result is None
     assert len(submissions) == 3
+    assert "--ntasks=1" in submissions[0]
     assert "--mem" in submissions[0] and "256G" in submissions[0]
     assert not any(arg.startswith("--dependency=") for arg in submissions[0])
     assert "--dependency=afterok:101" in submissions[1]
     assert "64G" in submissions[1]
     assert "--dependency=afterok:102" in submissions[2]
+    assert "--ntasks=1" in submissions[2]
     assert "--wait" in submissions[2]
 
 
@@ -382,9 +384,11 @@ def test_layerwise_dcp_submits_dependent_flux_jobs(tmp_path, monkeypatch) -> Non
 
     assert result is None
     assert len(commands) == 4
+    assert "-n1" in commands[0]
     assert "--queue=high-memory" in commands[0]
     assert "--dependency=afterok:f101" in commands[1]
     assert "--dependency=afterok:f102" in commands[2]
+    assert "-n1" in commands[2]
     assert commands[3][-1] == "f103"
 
 
