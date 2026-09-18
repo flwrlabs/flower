@@ -59,7 +59,7 @@ def list_directory(
     fd = None
     try:
         if _O_NOFOLLOW:
-            fd = _open_sandboxed(resolved, os.O_RDONLY)
+            fd = _open_sandboxed(resolved, os.O_RDONLY | _O_DIRECTORY | _O_NONBLOCK)
             entries = os.listdir(fd)
         else:
             entries = os.listdir(resolved)
