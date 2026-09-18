@@ -20,12 +20,17 @@ from ..definition import ActionAccess, ActionDefinition
 from ..tool_schema import integer_property, string_property
 
 SLACK_CONVERSATION_TYPES = ("public_channel", "private_channel", "mpim", "im")
+SLACK_LIST_CONVERSATIONS_MAX_LIMIT = 999
+SLACK_MESSAGE_MAX_LIMIT = 15
+SLACK_SEARCH_MAXIMUM = 100
 _CURSOR: JSONObject = {
     "type": "string",
     "description": "The Slack pagination cursor.",
 }
 _MESSAGE_LIMIT = integer_property(
-    "The maximum number of messages to return.", minimum=1, maximum=15
+    "The maximum number of messages to return.",
+    minimum=1,
+    maximum=SLACK_MESSAGE_MAX_LIMIT,
 )
 
 ACTIONS = (
@@ -43,10 +48,12 @@ ACTIONS = (
                 "count": integer_property(
                     "The number of results to return per page.",
                     minimum=1,
-                    maximum=100,
+                    maximum=SLACK_SEARCH_MAXIMUM,
                 ),
                 "page": integer_property(
-                    "The Slack page number to fetch.", minimum=1, maximum=100
+                    "The Slack page number to fetch.",
+                    minimum=1,
+                    maximum=SLACK_SEARCH_MAXIMUM,
                 ),
                 "cursor": {
                     "type": "string",
@@ -93,7 +100,7 @@ ACTIONS = (
                     "Maximum number of conversations to return. Omit to use "
                     "Slack's default of 100.",
                     minimum=1,
-                    maximum=999,
+                    maximum=SLACK_LIST_CONVERSATIONS_MAX_LIMIT,
                 ),
                 "cursor": _CURSOR,
                 "types": {

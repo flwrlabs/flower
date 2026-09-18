@@ -28,7 +28,12 @@ from ..json_utils import (
     require_int_range,
     require_string,
 )
-from .actions import SLACK_CONVERSATION_TYPES
+from .actions import (
+    SLACK_CONVERSATION_TYPES,
+    SLACK_LIST_CONVERSATIONS_MAX_LIMIT,
+    SLACK_MESSAGE_MAX_LIMIT,
+    SLACK_SEARCH_MAXIMUM,
+)
 
 _SLACK_API_BASE_URL = "https://slack.com/api"
 
@@ -54,7 +59,11 @@ def search_messages(
         if name in arguments:
             params[name] = str(
                 require_int_range(
-                    arguments[name], "Slack", name, minimum=1, maximum=100
+                    arguments[name],
+                    "Slack",
+                    name,
+                    minimum=1,
+                    maximum=SLACK_SEARCH_MAXIMUM,
                 )
             )
     if "highlight" in arguments:
@@ -91,7 +100,12 @@ def list_conversations(
     }
     if "limit" in arguments:
         params["limit"] = str(
-            require_int_range(arguments["limit"], "Slack", "limit", maximum=999)
+            require_int_range(
+                arguments["limit"],
+                "Slack",
+                "limit",
+                maximum=SLACK_LIST_CONVERSATIONS_MAX_LIMIT,
+            )
         )
     if "exclude_archived" in arguments:
         params["exclude_archived"] = str(
@@ -114,7 +128,12 @@ def get_conversation_history(
     }
     if "limit" in arguments:
         params["limit"] = str(
-            require_int_range(arguments["limit"], "Slack", "limit", maximum=15)
+            require_int_range(
+                arguments["limit"],
+                "Slack",
+                "limit",
+                maximum=SLACK_MESSAGE_MAX_LIMIT,
+            )
         )
     return _call_slack_api(
         "conversations.history",
@@ -134,7 +153,12 @@ def get_conversation_replies(
     }
     if "limit" in arguments:
         params["limit"] = str(
-            require_int_range(arguments["limit"], "Slack", "limit", maximum=15)
+            require_int_range(
+                arguments["limit"],
+                "Slack",
+                "limit",
+                maximum=SLACK_MESSAGE_MAX_LIMIT,
+            )
         )
     return _call_slack_api(
         "conversations.replies",
