@@ -23,6 +23,7 @@ from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
+    SYSTEM_MESSAGE_TYPE,
 )
 from flwr.supercore.task_identity import TaskIdentity
 
@@ -31,13 +32,13 @@ from .run_agentapp import _set_runtime_environment, message_to_prompt, pull_prom
 
 @pytest.fixture(autouse=True)
 def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Set the task identity used by AgentApp process environment tests."""
+    """Set the task identity required to construct test messages."""
     monkeypatch.setattr(TaskIdentity, "_task_id", 123)
     monkeypatch.setattr(TaskIdentity, "_run_id", 456)
     monkeypatch.setattr(TaskIdentity, "_node_id", 789)
 
 
-def _payload_message(src_node_id: int) -> Message:
+def _payload_message(src_node_id: int, message_type: str = "query") -> Message:
     """Build a Grid message carrying a JSON payload record."""
     message = Message(
         RecordDict(
@@ -48,7 +49,7 @@ def _payload_message(src_node_id: int) -> Message:
             }
         ),
         dst_node_id=0,
-        message_type="query",
+        message_type=message_type,
     )
     message.metadata.__dict__["_message_id"] = "message-1"
     message.metadata.__dict__["_src_node_id"] = src_node_id
@@ -78,18 +79,28 @@ def test_set_runtime_environment(
 
 
 @pytest.mark.parametrize(
-    ("msg_src_node_id", "expected"),
+    ("message_type", "msg_src_node_id", "expected"),
     [
-        (789, "hello world!"),
+        (SYSTEM_MESSAGE_TYPE, 789, "hello world!"),
         (
+            "query",
+            789,
+            '{"message_id":"message-1","src_node_id":"789","payload":"hello world!"}',
+        ),
+        (
+            "query",
             99,
             '{"message_id":"message-1","src_node_id":"99","payload":"hello world!"}',
         ),
     ],
 )
-def test_message_to_prompt(msg_src_node_id: int, expected: str) -> None:
-    """Include src_node_id only when it differs from TaskIdentity.node_id."""
-    assert message_to_prompt(_payload_message(msg_src_node_id)) == expected
+def test_message_to_prompt(
+    message_type: str, msg_src_node_id: int, expected: str
+) -> None:
+    """Return system instructions as text and other messages as JSON."""
+    assert (
+        message_to_prompt(_payload_message(msg_src_node_id, message_type)) == expected
+    )
 
 
 def test_pull_prompt_requires_instruction() -> None:
@@ -105,7 +116,7 @@ def test_pull_prompt_requires_instruction() -> None:
 def test_pull_prompt_serializes_instruction() -> None:
     """Pull and serialize the run's initial instruction."""
     grid = Mock()
-    grid.pull_messages.return_value = [_payload_message(789)]
+    grid.pull_messages.return_value = [_payload_message(789, SYSTEM_MESSAGE_TYPE)]
 
     assert pull_prompt(grid) == "hello world!"
 
