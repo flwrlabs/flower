@@ -34,6 +34,10 @@ from flwr.supercore.constant import (
     TASK_TYPE_TO_COMMAND,
     TaskType,
 )
+from flwr.supercore.warm_executor_constants import (
+    WARM_EXECUTOR_BUSY_FILE,
+    WARM_MODEL_EXECUTOR_MODULE,
+)
 
 from .types import ExecutionSpec, LaunchResult
 from .warm_executor_pool import (
@@ -62,9 +66,11 @@ _WARM_EXECUTOR_ACK_TIMEOUT_SECONDS = 5.0
 # A surviving consumed Pod is safe to retire only after all task processes exit.
 # Ignore PID 1 (the idle parent), this probe, and zombies. A concurrent readiness
 # probe can delay retirement, but cannot make a running task appear finished.
-_WARM_EXECUTOR_IDLE_CHECK = """\
+_WARM_EXECUTOR_IDLE_CHECK = f"""\
 import os
 from pathlib import Path
+if Path({WARM_EXECUTOR_BUSY_FILE!r}).is_file():
+    raise SystemExit()
 for process in Path('/proc').iterdir():
     if not process.name.isdigit() or int(process.name) in (1, os.getpid()):
         continue
@@ -318,12 +324,23 @@ def warm_executor_command(
     spec: ExecutionSpec, runtime_root_certificates: str | None
 ) -> list[str]:
     """Build a one-task child command that receives authority on standard input."""
-    command = [
-        TASK_TYPE_TO_COMMAND[spec.task_type],
-        TASK_TYPE_TO_APPIO_API_ADDRESS_ARG[spec.task_type],
-        spec.runtime_api_address,
-        "--token-stdin",
-    ]
+    if spec.task_type == TaskType.MODEL:
+        command = [
+            "python",
+            "-m",
+            WARM_MODEL_EXECUTOR_MODULE,
+            "dispatch",
+            "--runtime-api-address",
+            spec.runtime_api_address,
+            "--token-stdin",
+        ]
+    else:
+        command = [
+            TASK_TYPE_TO_COMMAND[spec.task_type],
+            TASK_TYPE_TO_APPIO_API_ADDRESS_ARG[spec.task_type],
+            spec.runtime_api_address,
+            "--token-stdin",
+        ]
     if spec.insecure:
         command.append("--insecure")
     elif runtime_root_certificates is not None:
@@ -353,7 +370,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             None,
         ],
         has_warm_executor_configuration: Callable[
-            [object, KubernetesExecutorConfig], bool
+            [object, WarmExecutorPoolKey, KubernetesExecutorConfig], bool
         ],
         is_active_warm_executor: Callable[
             [object, WarmExecutorPoolKey, KubernetesExecutorConfig], bool
@@ -526,7 +543,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             and pod_name not in self._busy_pods
             and pod_name not in self._retiring_pods
             and not _is_consumed_warm_executor(pod)
-            and self._has_warm_executor_configuration(pod, self._config)
+            and self._has_warm_executor_configuration(pod, key, self._config)
             and is_warm_executor_ready(pod, key)
         )
 
