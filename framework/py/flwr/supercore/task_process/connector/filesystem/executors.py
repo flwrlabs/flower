@@ -47,12 +47,11 @@ def list_directory(
     """List entries in an allowed directory.
 
     On POSIX the directory is opened via a per-component O_NOFOLLOW walk
-    (_open_sandboxed) so no intermediate directory can be swapped for a
-    symlink after _safe_resolve. On Windows, where O_NOFOLLOW is
-    unavailable, listdir falls back to the path form and _safe_resolve
-    remains the sandbox control. Entry types are determined via
-    os.stat(..., follow_symlinks=False) to avoid leaking information
-    about targets outside the allowed tree.
+    (_open_sandboxed) and the descriptor is kept open through the entry
+    metadata loop so stat lookups are fd-relative and cannot escape the
+    sandbox. On Windows, where O_NOFOLLOW is unavailable, listdir and
+    stat fall back to path-based forms and _safe_resolve remains the
+    sandbox control.
     """
     path = require_string(arguments.get("path"), "Filesystem", "path")
     allowed = _allowed_dirs(context)
@@ -66,30 +65,33 @@ def list_directory(
             entries = os.listdir(resolved)
     except OSError:
         raise FilesystemApiError("access_denied") from None
+    try:
+        if len(entries) > _MAX_DIRECTORY_ENTRIES:
+            raise FilesystemApiError("too_many_entries")
+        items: list[JSONObject] = []
+        for name in sorted(entries):
+            try:
+                entry_st = (
+                    os.stat(name, follow_symlinks=False, dir_fd=fd)
+                    if fd is not None
+                    else os.stat(os.path.join(resolved, name), follow_symlinks=False)
+                )
+            except OSError:
+                continue
+            items.append(
+                {
+                    "name": name,
+                    "type": (
+                        "directory"
+                        if stat.S_ISDIR(entry_st.st_mode)
+                        else "file" if stat.S_ISREG(entry_st.st_mode) else "other"
+                    ),
+                }
+            )
+        return {"entries": items}
     finally:
         if fd is not None:
             os.close(fd)
-    if len(entries) > _MAX_DIRECTORY_ENTRIES:
-        raise FilesystemApiError("too_many_entries")
-    raw = sorted(entries)
-    items: list[JSONObject] = []
-    for name in raw:
-        entry_path = os.path.join(resolved, name)
-        try:
-            entry_st = os.stat(entry_path, follow_symlinks=False)
-        except OSError:
-            continue
-        items.append(
-            {
-                "name": name,
-                "type": (
-                    "directory"
-                    if stat.S_ISDIR(entry_st.st_mode)
-                    else "file" if stat.S_ISREG(entry_st.st_mode) else "other"
-                ),
-            }
-        )
-    return {"entries": items}
 
 
 def read_file(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
@@ -164,10 +166,9 @@ def _open_sandboxed(resolved: str, flags: int) -> int:
     """
     if not _O_NOFOLLOW:
         return os.open(resolved, flags)
-    components = resolved.split(os.sep)
-    parts = [c for c in components if c]
+    parts = [c for c in resolved.split(os.sep) if c]
     if not parts:
-        raise FilesystemApiError("access_denied")
+        return os.open(os.sep, flags | _O_NOFOLLOW | _O_DIRECTORY)
     fd = os.open(os.sep, os.O_RDONLY)
     try:
         for part in parts[:-1]:
