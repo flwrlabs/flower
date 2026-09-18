@@ -22,12 +22,12 @@ import time
 from typing import cast
 
 from flwr.agentapp import AgentEvents, AgentGrid
-from flwr.agentapp.constants import (
-    AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY,
-    AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY,
-)
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.serverapp import Grid
+from flwr.supercore.constant import (
+    AGENT_MESSAGE_CONTENT_RECORD_KEY,
+    AGENT_MESSAGE_TEXT_KEY,
+)
 from flwr.supercore.task_process.connector.tool_schema import (
     function_tool,
     string_property,
@@ -94,6 +94,11 @@ def _grid_tools() -> list[JSONObject]:
                                 "to preserve precision."
                             ),
                             "payload": string_property("String payload to send."),
+                            "reply_to_message_id": string_property(
+                                "ID of the message being replied to. Required when "
+                                "replying to another message; otherwise, this field "
+                                "must not be set."
+                            ),
                             "ttl": {
                                 "type": "number",
                                 "exclusiveMinimum": 0,
@@ -271,9 +276,9 @@ class RuntimeAgentGrid(AgentGrid):
             if ttl is not None and ttl <= 0:
                 raise ValueError("Grid message TTL must be positive.")
             config_record = ConfigRecord(
-                {AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: cast(str, item["payload"])}
+                {AGENT_MESSAGE_TEXT_KEY: cast(str, item["payload"])}
             )
-            content = RecordDict({AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: config_record})
+            content = RecordDict({AGENT_MESSAGE_CONTENT_RECORD_KEY: config_record})
 
             message = Message(
                 content,
@@ -282,6 +287,9 @@ class RuntimeAgentGrid(AgentGrid):
                 group_id="",
                 ttl=ttl,
             )
+            reply_to_message_id = cast(str | None, item.get("reply_to_message_id"))
+            if reply_to_message_id is not None:
+                message.metadata.__dict__["_reply_to_message_id"] = reply_to_message_id
             outgoing.append(message)
 
         message_ids = list(self._grid.push_messages(outgoing))
@@ -323,8 +331,8 @@ class RuntimeAgentGrid(AgentGrid):
             else:
                 payload = cast(
                     str,
-                    message.content[AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY][
-                        AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY
+                    message.content[AGENT_MESSAGE_CONTENT_RECORD_KEY][
+                        AGENT_MESSAGE_TEXT_KEY
                     ],
                 )
             messages.append(

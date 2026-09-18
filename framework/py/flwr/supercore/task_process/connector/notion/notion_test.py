@@ -37,34 +37,134 @@ def test_notion_definition_is_registered() -> None:
     """Notion schemas and handlers should form one account-scoped connector."""
     assert len(ACTIONS) == 2
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
-    assert len(registry.get_connector_tools(NOTION_CONNECTOR_REF)) == len(ACTIONS)
+    assert [
+        tool["name"] for tool in registry.get_connector_tools(NOTION_CONNECTOR_REF)
+    ] == ["notion_search", "notion_get_page"]
 
 
-@pytest.mark.parametrize(
-    ("name", "arguments", "method", "path"),
-    [
-        ("notion_search", {"query": "release"}, "POST", "/search"),
-        (
-            "notion_get_page_content",
-            {"page_id": "page-1"},
-            "GET",
-            "/blocks/page-1/children",
-        ),
-    ],
-)
-def test_notion_tools_call_read_endpoints(
-    name: str, arguments: JSONObject, method: str, path: str
-) -> None:
-    """Notion tools should call their read-only API endpoints."""
+def test_notion_search_forwards_api_inputs() -> None:
+    """Notion search should forward inputs using the API field names."""
     response = Mock(status_code=200)
     response.json.return_value = {"results": [], "has_more": False}
     with patch(_HTTP_REQUEST, return_value=response) as request:
         result = registry.invoke_connector(
-            name, arguments, Mock(), credentials=_CREDENTIALS, config={}
+            "notion_search",
+            {
+                "query": "release",
+                "filter": {
+                    "property": "object",
+                    "value": "page",
+                    "in_trash": False,
+                },
+                "sort": {
+                    "timestamp": "last_edited_time",
+                    "direction": "descending",
+                },
+                "page_size": 100,
+                "start_cursor": "cursor-1",
+            },
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
         )
     assert result == response.json.return_value
-    assert request.call_args.args == (method, f"https://api.notion.com/v1{path}")
+    assert request.call_args.args == ("POST", "https://api.notion.com/v1/search")
     assert request.call_args.kwargs["headers"]["Notion-Version"] == "2026-03-11"
+    assert request.call_args.kwargs["json"] == {
+        "query": "release",
+        "filter": {
+            "property": "object",
+            "value": "page",
+            "in_trash": False,
+        },
+        "sort": {
+            "timestamp": "last_edited_time",
+            "direction": "descending",
+        },
+        "page_size": 100,
+        "start_cursor": "cursor-1",
+    }
+
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        registry.invoke_connector(
+            "notion_search", {}, Mock(), credentials=_CREDENTIALS, config={}
+        )
+    assert request.call_args.kwargs["json"] == {}
+
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        registry.invoke_connector(
+            "notion_search",
+            {"filter": {"in_trash": True}},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert request.call_args.kwargs["json"] == {"filter": {"in_trash": True}}
+
+
+@pytest.mark.parametrize(
+    "filter_",
+    [
+        {},
+        {"property": "object"},
+        {"value": "page"},
+        {"value": "page", "in_trash": True},
+    ],
+)
+def test_notion_search_rejects_invalid_filter(filter_: JSONObject) -> None:
+    """Notion search should reject incomplete and mixed filter shapes."""
+    with patch(_HTTP_REQUEST) as request, pytest.raises(ValueError):
+        registry.invoke_connector(
+            "notion_search",
+            {"filter": filter_},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    request.assert_not_called()
+
+
+def test_notion_get_page_returns_page_and_block_children() -> None:
+    """Get page should aggregate the page and its first-level child blocks."""
+    page_response = Mock(status_code=200)
+    page_response.json.return_value = {"object": "page", "id": "page-1"}
+    first_blocks = Mock(status_code=200)
+    first_blocks.json.return_value = {
+        "object": "list",
+        "results": [{"id": "block-1"}],
+        "has_more": True,
+        "next_cursor": "cursor-1",
+    }
+    last_blocks = Mock(status_code=200)
+    last_blocks.json.return_value = {
+        "object": "list",
+        "results": [{"id": "block-2"}],
+        "has_more": False,
+        "next_cursor": None,
+    }
+    with patch(
+        _HTTP_REQUEST, side_effect=[page_response, first_blocks, last_blocks]
+    ) as request:
+        result = registry.invoke_connector(
+            "notion_get_page",
+            {"page_id": "page-1"},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == {
+        "page": page_response.json.return_value,
+        "block_children": {
+            **last_blocks.json.return_value,
+            "results": [{"id": "block-1"}, {"id": "block-2"}],
+        },
+    }
+    assert [call.args[:2] for call in request.call_args_list] == [
+        ("GET", "https://api.notion.com/v1/pages/page-1"),
+        ("GET", "https://api.notion.com/v1/blocks/page-1/children"),
+        ("GET", "https://api.notion.com/v1/blocks/page-1/children"),
+    ]
+    assert request.call_args_list[-1].kwargs["params"] == {"start_cursor": "cursor-1"}
 
 
 def test_notion_api_errors_include_code_and_message() -> None:

@@ -162,14 +162,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             federation_id = self.run_ids[message.metadata.run_id].run.federation_id
 
             # Validate destination node ID
-            dst_node = self.nodes.get(message.metadata.dst_node_id)
-            if (
+            dst_node_id = message.metadata.dst_node_id
+            dst_node = self.nodes.get(dst_node_id)
+            if dst_node_id != SUPERLINK_NODE_ID and (
                 # Node must exist
                 dst_node is None
                 # Node must be online or offline
                 or dst_node.status not in (NodeStatus.ONLINE, NodeStatus.OFFLINE)
                 # Node must belong to the same federation
-                or not self.federation_manager.has_node(dst_node.node_id, federation_id)
+                or not self.federation_manager.has_node(dst_node_id, federation_id)
             ):
                 log(
                     ERROR,
@@ -222,17 +223,24 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 src_node_id = message.metadata.src_node_id
                 dst_node_id = message.metadata.dst_node_id
                 federation_id = self.run_ids[message.metadata.run_id].run.federation_id
-                filtered = self.federation_manager.filter_nodes(
-                    {src_node_id, dst_node_id},
-                    federation_id,
-                )
-                if len(filtered) != 2:  # Not both nodes are in the federation
-                    invalid_msg_ids.add(msg_id)
+                if src_node_id != dst_node_id:
+                    filtered = self.federation_manager.filter_nodes(
+                        {src_node_id, dst_node_id},
+                        federation_id,
+                    )
+                    if len(filtered) != 2:  # Not both nodes are in the federation
+                        invalid_msg_ids.add(msg_id)
 
             # Delete all invalid messages
             self.delete_messages(invalid_msg_ids)
 
-    def get_message_ins(self, node_id: int, limit: int | None) -> list[Message]:
+    def get_message_ins(
+        self,
+        node_id: int,
+        limit: int | None,
+        *,
+        run_id: int | None = None,
+    ) -> list[Message]:
         """Get all Messages that have not been delivered yet."""
         if limit is not None and limit < 1:
             raise AssertionError("`limit` must be >= 1")
@@ -246,6 +254,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 if (
                     (msg_ins := self.message_ins_store.get(msg_id))
                     and msg_ins.metadata.dst_node_id == node_id
+                    and (run_id is None or msg_ins.metadata.run_id == run_id)
                     and msg_ins.metadata.delivered_at == ""
                 ):
                     message_ins_list.append(msg_ins)
