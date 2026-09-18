@@ -136,6 +136,11 @@ class FederationApp(FlwrBase):
             "federation_id",
             "added_at",
         ),
+        Index(
+            "idx_federation_app_app_id_federation_id",
+            "app_id",
+            "federation_id",
+        ),
     )
 
     federation_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)

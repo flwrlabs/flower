@@ -43,6 +43,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAppAssociationsRequest,
+    ListAppAssociationsResponse,
     ListAppsRequest,
     ListAppsResponse,
     ListAutomationsRequest,
@@ -340,6 +342,17 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/ListApps",
             request=request,
             response_type=ListAppsResponse,
+        )
+
+    def ListAppAssociations(
+        self, request: ListAppAssociationsRequest
+    ) -> ListAppAssociationsResponse:
+        """List federations associated with an app."""
+        return self._unary_unary(
+            path="/v1/control/list-app-associations",
+            rpc_method="/flwr.proto.Control/ListAppAssociations",
+            request=request,
+            response_type=ListAppAssociationsResponse,
         )
 
     def AddApp(self, request: AddAppRequest) -> AddAppResponse:

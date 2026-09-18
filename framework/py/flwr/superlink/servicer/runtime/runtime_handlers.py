@@ -67,11 +67,6 @@ from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.inflatable.inflatable_object import (
-    get_all_nested_objects,
-    get_object_tree,
-    no_object_id_recompute,
-)
 from flwr.supercore.object_store import NoObjectInStoreError
 from flwr.superlink.servicer.control.control_handlers import process_due_automations
 from flwr.superlink.servicer.control.control_handlers import (
@@ -184,19 +179,12 @@ def pull_messages(  # pylint: disable=R0914
     messages: list[Message] = state.get_message_res(
         message_ids=message_ids, run_id=run_id
     )
+    # Allow pulling instruction message for `flwr-agentapp`
     messages += state.get_message_ins(
         node_id=SUPERLINK_NODE_ID, limit=None, run_id=run_id
     )
 
     store = state.object_store
-    for msg_res in messages:
-        if msg_res.metadata.src_node_id == SUPERLINK_NODE_ID:
-            with no_object_id_recompute():
-                all_objects = get_all_nested_objects(msg_res)
-                store.preregister(run_id, get_object_tree(msg_res))
-                for obj_id, obj in all_objects.items():
-                    store.put(obj_id, obj.deflate())
-
     # Gather all the instruction message IDs to delete
     message_ins_ids_to_delete = {
         msg.metadata.reply_to_message_id or msg.metadata.message_id for msg in messages
@@ -207,12 +195,11 @@ def pull_messages(  # pylint: disable=R0914
     trees = []
     while messages:
         msg = messages.pop(0)
-        if msg.metadata.src_node_id != SUPERLINK_NODE_ID:
-            _raise_if(
-                validation_error=run_id != msg.metadata.run_id,
-                request_name="PullMessages",
-                detail="`message.metadata` has mismatched `run_id`",
-            )
+        _raise_if(
+            validation_error=run_id != msg.metadata.run_id,
+            request_name="PullMessages",
+            detail="`message.metadata` has mismatched `run_id`",
+        )
 
         try:
             msg_object_id = msg.metadata.message_id

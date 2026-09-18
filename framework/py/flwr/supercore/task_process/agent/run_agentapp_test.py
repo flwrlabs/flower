@@ -80,10 +80,10 @@ def test_set_runtime_environment(
 @pytest.mark.parametrize(
     ("msg_src_node_id", "expected"),
     [
-        (789, '{"message_id":"message-1","payload":"hello world!"}'),
+        (789, "hello world!"),
         (
             99,
-            '{"message_id":"message-1","payload":"hello world!","src_node_id":"99"}',
+            '{"message_id":"message-1","src_node_id":"99","payload":"hello world!"}',
         ),
     ],
 )
@@ -107,7 +107,7 @@ def test_pull_prompt_serializes_instruction() -> None:
     grid = Mock()
     grid.pull_messages.return_value = [_payload_message(789)]
 
-    assert pull_prompt(grid) == '{"message_id":"message-1","payload":"hello world!"}'
+    assert pull_prompt(grid) == "hello world!"
 
 
 def test_pull_prompt_rejects_multiple_instructions() -> None:

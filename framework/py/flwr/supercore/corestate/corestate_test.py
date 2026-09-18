@@ -40,6 +40,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskUsage,
 )
 from flwr.supercore.constant import (
+    FLOWER_AGENT_APP_ID,
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
     TaskType,
@@ -133,6 +134,23 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [app.app_id for app in state.list_apps("@me/fed-a", limit=1)],
             ["@me/z-agent"],
         )
+        self.assertCountEqual(
+            state.list_app_associations("@me/server", ["@me/fed-a", "@me/fed-b"]),
+            ["@me/fed-a", "@me/fed-b"],
+        )
+        self.assertEqual(
+            state.list_app_associations("@me/server", ["@me/fed-a"]),
+            ["@me/fed-a"],
+        )
+        self.assertEqual(state.list_app_associations("@me/missing", ["@me/fed-a"]), [])
+        self.assertEqual(state.list_app_associations("", ["@me/fed-a"]), [])
+        self.assertEqual(state.list_app_associations("@me/server", []), [])
+        self.assertEqual(
+            state.list_app_associations(
+                FLOWER_AGENT_APP_ID, ["@me/fed-b", "@me/fed-a"]
+            ),
+            ["@me/fed-b", "@me/fed-a"],
+        )
         self.assertEqual(state.list_apps("@me/fed-a", limit=0), [])
         with self.assertRaises(AssertionError):
             state.list_apps("@me/fed-a", limit=-1)
@@ -186,6 +204,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [app.app_id for app in state.list_apps("@me/fed-b")],
             ["@me/server"],
+        )
+        self.assertEqual(
+            state.list_app_associations("@me/server", ["@me/fed-a", "@me/fed-b"]),
+            ["@me/fed-b"],
         )
         self.assertIsNotNone(state.get_fab(updated_hash))
 
