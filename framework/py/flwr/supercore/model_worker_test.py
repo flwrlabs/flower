@@ -220,6 +220,8 @@ def test_worker_relays_redacted_output(
         on_started()
         assert sys.stdout.fileno() == 42
         sys.stdout.buffer.write(f"binary {invocation_token}\n".encode())
+        sys.stdout.buffer.writelines([f"binary lines {invocation_token}\n".encode()])
+        sys.stdout.writelines(["text lines ", invocation_token, "\n"])
         midpoint = len(invocation_token) // 2
         sys.stdout.write(f"before {invocation_token[:midpoint]}")
         sys.stdout.write(f"{invocation_token[midpoint:]} after\n")
@@ -243,6 +245,7 @@ def test_worker_relays_redacted_output(
     assert frames[0] == {"event": "accepted"}
     assert frames[-1] == {"event": "finished", "returncode": 0}
     assert "binary [REDACTED]\n" in output
+    assert "binary lines [REDACTED]\ntext lines [REDACTED]\n" in output
     assert "before [REDACTED] after\n" in output
     assert "model error\n" in output
     assert token not in output
