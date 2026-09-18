@@ -79,7 +79,6 @@ from .session import (
     RuntimeAgentSession,
 )
 
-_AGENT_INPUT_KEY = "agent.input"
 _RUNTIME_API_KEY_ENV = "FLWR_RUNTIME_API_KEY"
 _RUNTIME_BASE_URL_ENV = "FLWR_RUNTIME_BASE_URL"
 _SSL_CERT_FILE_ENV = "SSL_CERT_FILE"
@@ -250,10 +249,6 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         context.run_config = get_fused_config_from_dir(
             Path(app_path), run.override_config
         )
-
-        agent_input = context.run_config.get(_AGENT_INPUT_KEY)
-        if agent_input is not None and not isinstance(agent_input, str):
-            raise ValueError("context.run_config['agent.input'] must be a string.")
 
         log(
             DEBUG,

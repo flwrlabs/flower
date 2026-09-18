@@ -288,9 +288,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         max_runs=3,
         start_run_request=StartRunRequest(
             app_spec="example/app",
-            override_config=user_config_to_proto(
-                {"existing": "value", "agent.input": "Do work"}
-            ),
+            override_config=user_config_to_proto({"existing": "value"}),
             federation="@account/federation",
             series_id=2,
             user_prompt="Do work",

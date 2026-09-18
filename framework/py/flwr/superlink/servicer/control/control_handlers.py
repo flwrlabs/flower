@@ -675,7 +675,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             resolved_federation_config.MergeFrom(request.override_federation_config)
 
         # Validate that a user prompt is provided for AgentApp runs
-        if primary_task_type == TaskType.AGENT_APP and not request.user_prompt:
+        user_prompt = request.user_prompt.strip()
+        if primary_task_type == TaskType.AGENT_APP and not user_prompt:
             raise FlowerError(
                 ApiErrorCode.AGENTAPP_USER_PROMPT_REQUIRED,
                 "AgentApp run requested without a user prompt.",
@@ -716,16 +717,14 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         series_id = request.series_id if request.HasField("series_id") else None
         series_description: str | None = None
         if primary_task_type == TaskType.AGENT_APP and series_id is None:
-            series_description = (
-                _derive_run_series_description(request.user_prompt) or None
-            )
+            series_description = _derive_run_series_description(user_prompt) or None
 
         initial_task_event = None
         if primary_task_type == TaskType.AGENT_APP:
             input_item: JSONObject = {
                 "type": "message",
                 "role": "user",
-                "content": request.user_prompt,
+                "content": user_prompt,
             }
             initial_task_event = TaskEvent(
                 event="message",

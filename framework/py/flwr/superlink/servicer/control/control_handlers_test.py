@@ -477,26 +477,29 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
     def test_start_run_requires_user_prompt_for_agentapp(self) -> None:
         """Reject an AgentApp run without a user prompt."""
-        request = StartRunRequest(federation=NOOP_FEDERATION_ID)
-        request.fab.content = b"AgentApp FAB"
+        for user_prompt in ("", " \n\t "):
+            request = StartRunRequest(
+                federation=NOOP_FEDERATION_ID, user_prompt=user_prompt
+            )
+            request.fab.content = b"AgentApp FAB"
 
-        with (
-            patch(
-                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
-                return_value={"tool": {"flwr": {"app": {"config": {}}}}},
-            ),
-            patch(
-                "flwr.superlink.servicer.control.control_handlers._get_app_type",
-                return_value=TaskType.AGENT_APP,
-            ),
-            self.assertRaises(FlowerError) as error,
-        ):
-            start_run(request, self.account, self.state, None)
+            with (
+                patch(
+                    "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                    return_value={"tool": {"flwr": {"app": {"config": {}}}}},
+                ),
+                patch(
+                    "flwr.superlink.servicer.control.control_handlers._get_app_type",
+                    return_value=TaskType.AGENT_APP,
+                ),
+                self.assertRaises(FlowerError) as error,
+            ):
+                start_run(request, self.account, self.state, None)
 
-        self.assertEqual(
-            error.exception.code,
-            ApiErrorCode.AGENTAPP_USER_PROMPT_REQUIRED,
-        )
+            self.assertEqual(
+                error.exception.code,
+                ApiErrorCode.AGENTAPP_USER_PROMPT_REQUIRED,
+            )
         self.assertEqual(self.state.get_run_info(), [])
 
     def test_start_run_notifies_extension_after_persisting_run(self) -> None:

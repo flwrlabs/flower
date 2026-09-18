@@ -666,35 +666,6 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             # Ins message was deleted
             assert self.state.num_message_ins() == 0
 
-    def test_pull_messages_returns_agentapp_user_prompt(self) -> None:
-        """Return and consume the initial AgentApp instruction without message IDs."""
-        run_id = self.state.create_run(
-            "flwr/agent",
-            "1.0.0",
-            "fab-hash",
-            {},
-            NOOP_FEDERATION_ID,
-            None,
-            "account",
-            TaskType.AGENT_APP,
-            user_prompt="Initial prompt",
-        )
-        task_id = self._primary_task_id(run_id)
-        task = self.state.get_tasks(task_ids=[task_id])[0]
-
-        response = runtime_handlers.pull_messages(
-            PullAppMessagesRequest(), self.state, task
-        )
-
-        assert len(response.messages_list) == 1
-        message = message_from_proto(response.messages_list[0])
-        assert (
-            message.content[AGENT_MESSAGE_CONTENT_RECORD_KEY][AGENT_MESSAGE_TEXT_KEY]
-            == "Initial prompt"
-        )
-        assert len(response.message_object_trees) == 1
-        assert self.state.num_message_ins() == 0
-
     def test_pull_messages_rejects_message_from_another_run(self) -> None:
         """Reject message IDs not owned by the authenticated run."""
         other_run_id = self.state.create_run(

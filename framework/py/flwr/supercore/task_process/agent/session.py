@@ -356,9 +356,6 @@ class AgentRuntime:
                     start_run_request=self._start_run_request,
                 ),
             )
-            request.start_run_request.override_config["agent.input"].string = (
-                input_value.strip()
-            )
             request.start_run_request.user_prompt = input_value.strip()
             response = self._stub.StartAutomation(request)
             output: JSONObject = {
