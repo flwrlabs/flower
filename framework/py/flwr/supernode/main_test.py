@@ -14,8 +14,11 @@
 # ==============================================================================
 """Tests for SuperNode FastAPI application construction."""
 
-
 from fastapi.routing import iter_route_contexts
+from fastapi.testclient import TestClient
+
+from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supernode.nodestate import NodeStateFactory
 
 from .main import create_app
 
@@ -31,3 +34,16 @@ def test_create_app_mounts_health_without_readiness() -> None:
 
     assert "/health" in paths
     assert "/ready" not in paths
+
+
+def test_create_app_mounts_responses_router() -> None:
+    """Expose the shared Responses endpoint through the SuperNode API."""
+    app = create_app(NodeStateFactory(ObjectStoreFactory()))
+
+    response = TestClient(app).post(
+        "/v1/runtime/responses",
+        json={"model": "model", "input": "hello"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "invalid_api_key"
