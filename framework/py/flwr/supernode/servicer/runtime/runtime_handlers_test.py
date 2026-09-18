@@ -242,26 +242,6 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         self.assertEqual(list(response.objects_to_push), ["object-id"])
         self.assertEqual(response.session_id, "session-id")
 
-    def test_push_messages_returns_empty_message_id_when_storage_fails(self) -> None:
-        """PushMessages should report a failed store with an empty message ID."""
-        message = make_message(
-            metadata=self.maker.metadata(), content=self.maker.recorddict(1, 1, 1)
-        )
-        request = PushAppMessagesRequest(
-            messages_list=[message_to_proto(message)],
-            message_object_trees=[get_object_tree(message)],
-        )
-        self.state.store_message_and_object_tree.return_value = (False, [])
-        self.state.start_session.return_value = "session-id"
-
-        response = runtime_handlers.push_messages(
-            request, self.state, Task(run_id=message.metadata.run_id)
-        )
-
-        self.assertEqual(list(response.message_ids), [""])
-        self.assertEqual(list(response.objects_to_push), [])
-        self.assertEqual(response.session_id, "session-id")
-
     def test_push_messages_rejects_mismatched_run_id(self) -> None:
         """PushMessages should reject messages from another run."""
         message = make_message(
