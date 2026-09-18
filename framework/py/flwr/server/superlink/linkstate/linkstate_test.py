@@ -1701,9 +1701,11 @@ class StateTest(CoreStateTest):
         reply_1 = msgs[message_id_1]  # Offline due to heartbeat timeout
         assert reply_1.has_error()
         assert reply_1.error.code == ErrorCode.NODE_UNAVAILABLE
+        assert reply_1.metadata.message_id in state.object_store
         reply_2 = msgs[message_id_2]  # Deleted node
         assert reply_2.has_error()
         assert reply_2.error.code == ErrorCode.NODE_UNAVAILABLE
+        assert reply_2.metadata.message_id in state.object_store
 
     def test_store_message_res_message_ins_expired(self) -> None:
         """Test behavior of store_message_res when the Message it replies to is
@@ -1905,6 +1907,10 @@ class StateTest(CoreStateTest):
             res_msg = state.get_message_res({ins_msg1_id}, run_id)[0]
             assert res_msg.has_error()
             assert res_msg.error.code == ErrorCode.MESSAGE_UNAVAILABLE
+            assert res_msg.metadata.run_id == run_id
+            assert (
+                state.object_store.get(res_msg.metadata.message_id) == res_msg.deflate()
+            )
 
     def test_get_message_res_reply_not_ready(self) -> None:
         """Test get_message_res to return nothing since reply Message isn't present."""
@@ -1947,6 +1953,7 @@ class StateTest(CoreStateTest):
         assert len(message_res_list) == 1
         assert message_res_list[0].has_error()
         assert message_res_list[0].error.code == ErrorCode.MESSAGE_UNAVAILABLE
+        assert message_res_list[0].metadata.message_id in state.object_store
 
     def test_get_message_res_rejects_mismatched_run_id(self) -> None:
         """Reject Message IDs belonging to another run before claiming replies."""
@@ -2034,6 +2041,7 @@ class StateTest(CoreStateTest):
         assert len(message_res_list) == 1
         assert message_res_list[0].has_error()
         assert message_res_list[0].error.code == ErrorCode.MESSAGE_UNAVAILABLE
+        assert message_res_list[0].metadata.message_id in state.object_store
         # Both message_ins and message_res should be deleted
         assert state.num_message_ins() == 0
         assert state.num_message_res() == 0

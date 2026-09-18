@@ -371,6 +371,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             ret = verify_message_ids(
                 inquired_message_ids=message_ids,
                 found_message_ins_dict=found_message_ins_dict,
+                run_id=run_id,
                 current_time=current,
             )
 
@@ -402,6 +403,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     message_res = self.message_res_store[message_res_id]
                     if message_res.metadata.delivered_at == "":
                         message_res_found.append(message_res)
+            found_message_res_ids = {
+                message.metadata.message_id for message in message_res_found
+            }
             tmp_ret_dict = verify_found_message_replies(
                 inquired_message_ids=message_ids,
                 found_message_ins_dict=found_message_ins_dict,
@@ -414,6 +418,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             delivered_at = now().isoformat()
             for message_res in message_res_found:
                 message_res.metadata.delivered_at = delivered_at
+
+            for message in ret.values():
+                if message.metadata.message_id not in found_message_res_ids:
+                    self._store_generated_message(message)
 
         return list(ret.values())
 

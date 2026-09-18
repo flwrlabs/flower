@@ -532,6 +532,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             ret = verify_message_ids(
                 inquired_message_ids=message_ids,
                 found_message_ins_dict=found_message_ins_dict,
+                run_id=run_id,
                 current_time=current,
             )
 
@@ -565,6 +566,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
             # Return accumulated replies if no IDs remain to avoid generating `IN ()`
             if not message_ids:
+                for message in ret.values():
+                    self._store_generated_message(message)
                 return list(ret.values())
 
             # Atomically claim all eligible reply Messages
@@ -585,13 +588,21 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 convert_sint64_values_in_dict_to_uint64(
                     row, ["run_id", "src_node_id", "dst_node_id"]
                 )
+            found_message_res_list = [dict_to_message(row) for row in rows]
+            found_message_res_ids = {
+                message.metadata.message_id for message in found_message_res_list
+            }
             tmp_ret_dict = verify_found_message_replies(
                 inquired_message_ids=message_ids,
                 found_message_ins_dict=found_message_ins_dict,
-                found_message_res_list=[dict_to_message(row) for row in rows],
+                found_message_res_list=found_message_res_list,
                 current_time=current,
             )
             ret.update(tmp_ret_dict)
+
+            for message in ret.values():
+                if message.metadata.message_id not in found_message_res_ids:
+                    self._store_generated_message(message)
 
         return list(ret.values())
 
