@@ -41,6 +41,7 @@ from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID, 
 from flwr.supercore.date import now
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.superlink.federation import NoOpFederationManager
 
 from .inmemory_grid import InMemoryGrid
@@ -56,11 +57,17 @@ def push_messages(grid: InMemoryGrid, num_nodes: int) -> tuple[Iterable[str], in
             heartbeat_interval=0,  # This field has no effect
         )
         grid.state.acknowledge_node_heartbeat(node_id, HEARTBEAT_INTERVAL_INF)
-    num_messages = 3
-    msgs = [Message(RecordDict(), node_id, "query") for _ in range(num_messages)]
+    with patch.multiple(
+        TaskIdentity,
+        _task_id=123,
+        _run_id=grid.run.run_id,
+        _node_id=SUPERLINK_NODE_ID,
+    ):
+        num_messages = 3
+        msgs = [Message(RecordDict(), node_id, "query") for _ in range(num_messages)]
 
-    # Execute: push messages
-    return grid.push_messages(msgs), node_id
+        # Execute: push messages
+        return grid.push_messages(msgs), node_id
 
 
 def get_replies(grid: InMemoryGrid, msg_ids: Iterable[str], node_id: int) -> list[str]:
@@ -115,6 +122,14 @@ class TestInMemoryGrid(unittest.TestCase):
         self.grid = InMemoryGrid(state_factory=state_factory)
         self.grid.set_run(self.mock_run)
         self.grid.state = self.state
+        identity_patcher = patch.multiple(
+            TaskIdentity,
+            _task_id=123,
+            _run_id=self.mock_run.run_id,
+            _node_id=SUPERLINK_NODE_ID,
+        )
+        identity_patcher.start()
+        self.addCleanup(identity_patcher.stop)
 
     def test_get_run(self) -> None:
         """Test the InMemoryGrid starting with a `Run` object."""

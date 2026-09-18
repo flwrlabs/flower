@@ -37,6 +37,7 @@ from flwr.supercore.interceptors import (
 )
 from flwr.supercore.retry import RetryInvoker, make_simple_http_retry_invoker
 from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
 
 from .task import handle_task
@@ -104,14 +105,13 @@ def run_model(  # pylint: disable=too-many-locals
         # Pull task input from SuperLink
         log(DEBUG, "[flwr-model] Pull task input")
         task_input: PullTaskInputResponse = client.PullTaskInput(PullTaskInputRequest())
+        TaskIdentity.task_id = task_input.task_id
+        TaskIdentity.run_id = task_input.run.run_id
+        TaskIdentity.node_id = task_input.context.node_id
 
         event(EventType.FLWR_MODEL_RUN_ENTER)
 
-        handle_task(
-            client=client,
-            task_id=task_input.task_id,
-            run_id=task_input.run.run_id,
-        )
+        handle_task(client=client)
 
         # Update sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED

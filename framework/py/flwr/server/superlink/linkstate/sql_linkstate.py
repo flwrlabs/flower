@@ -184,14 +184,16 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 federation_id: str = run_row["federation_id"]
 
                 # Validate destination node ID
+                dst_node_id = message.metadata.dst_node_id
                 node_id = session.scalar(
                     select(NodeModel.node_id).where(
                         NodeModel.node_id == data[0]["dst_node_id"],
                         NodeModel.status.in_([NodeStatus.ONLINE, NodeStatus.OFFLINE]),
                     )
                 )
-                if node_id is None or not self.federation_manager.has_node(
-                    message.metadata.dst_node_id, federation_id
+                if dst_node_id != SUPERLINK_NODE_ID and (
+                    node_id is None
+                    or not self.federation_manager.has_node(dst_node_id, federation_id)
                 ):
                     log(
                         ERROR,
@@ -299,27 +301,30 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 src_node_id = int64_to_uint64(cast(int, message_model.src_node_id))
                 dst_node_id = int64_to_uint64(cast(int, message_model.dst_node_id))
 
-                # Filter nodes to check if they're in the federation
-                filtered = self.federation_manager.filter_nodes(
-                    {src_node_id, dst_node_id}, federation_id
-                )
-                if len(filtered) != 2:  # Not both nodes are in the federation
-                    invalid_msg_ids.add(msg_id)
+                if src_node_id != dst_node_id:
+                    # Filter nodes to check if they're in the federation
+                    filtered = self.federation_manager.filter_nodes(
+                        {src_node_id, dst_node_id}, federation_id
+                    )
+                    if len(filtered) != 2:  # Not both nodes are in the federation
+                        invalid_msg_ids.add(msg_id)
 
             # Delete all invalid messages
             self.delete_messages(invalid_msg_ids)
 
-    def get_message_ins(self, node_id: int, limit: int | None) -> list[Message]:
+    def get_message_ins(
+        self,
+        node_id: int,
+        limit: int | None,
+        *,
+        run_id: int | None = None,
+    ) -> list[Message]:
         """Get all Messages that have not been delivered yet."""
         if limit is not None and limit < 1:
             raise AssertionError("`limit` must be >= 1")
 
-        if node_id == SUPERLINK_NODE_ID:
-            msg = f"`node_id` must be != {SUPERLINK_NODE_ID}"
-            raise AssertionError(msg)
-
         with self.session():
-            rows = self._claim_message_ins_rows(node_id, limit)
+            rows = self._claim_message_ins_rows(node_id, limit, run_id)
             message_ids: set[str] = {row["message_id"] for row in rows}
             self._check_stored_messages(message_ids)
 
@@ -339,15 +344,20 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         return result
 
     def _claim_message_ins_rows(
-        self, node_id: int, limit: int | None
+        self,
+        node_id: int,
+        limit: int | None,
+        run_id: int | None = None,
     ) -> list[dict[str, Any]]:
         """Atomically claim eligible instruction Messages for a node."""
         current_time = now()
-        common_conditions = (
+        common_conditions = [
             MessageInsModel.dst_node_id == uint64_to_int64(node_id),
             MessageInsModel.delivered_at == "",
             MessageInsModel.created_at + MessageInsModel.ttl > current_time.timestamp(),
-        )
+        ]
+        if run_id is not None:
+            common_conditions.append(MessageInsModel.run_id == uint64_to_int64(run_id))
         stmt = update(MessageInsModel).where(*common_conditions)
         if limit is not None:
             # Materialize limited candidates before updating. Some backends can

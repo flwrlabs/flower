@@ -29,7 +29,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import ExecutorType, TaskType
+from flwr.supercore.constant import ExecutorType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import (
@@ -45,7 +45,6 @@ from flwr.supercore.tls import validate_and_resolve_root_certificates
 from .executor import LaunchResult, LaunchResultStatus, get_executor
 from .executor.config import ExecutorConfig
 from .plugin import ExecPlugin
-from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 
 _TASK_POLL_INTERVAL_ENV = "FLWR_SUPEREXEC_TASK_POLL_INTERVAL"
 _MIN_TASK_POLL_INTERVAL_SECONDS = 0.01
@@ -88,13 +87,8 @@ def _get_task_poll_interval() -> float:
     return interval
 
 
-def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
+def _handle_launch_result(result: LaunchResult, task: Task) -> None:
     """Handle the immediate outcome of a TaskExecutor launch attempt."""
-    # Temporary: ephemeral plugins may not return a LaunchResult.
-    # Remove this once ephemeral plugins are removed.
-    if result is None:
-        return
-
     if result.status == LaunchResultStatus.ACCEPTED:
         return
 
@@ -178,7 +172,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     runtime_dependency_install : bool (default: False)
         Whether runtime dependency installation is allowed.
     executor_type : ExecutorType (default: ExecutorType.SUBPROCESS)
-        The executor to use for non-ephemeral app processes.
+        The executor to use for task processes.
     executor_config : Optional[ExecutorConfig] (default: None)
         Parsed executor configuration.
     """
@@ -197,13 +191,13 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     interceptors: list[ProtobufClientInterceptor] = [
         RuntimeVersionHttpInterceptor(component_name="SuperExec")
     ]
-    auth_interceptor: SuperExecAuthHttpInterceptor | None = None
     if superexec_auth_secret:
-        auth_interceptor = SuperExecAuthHttpInterceptor(
-            master_secret=superexec_auth_secret,
-            protected_methods=_SUPEREXEC_AUTH_METHODS,
+        interceptors.append(
+            SuperExecAuthHttpInterceptor(
+                master_secret=superexec_auth_secret,
+                protected_methods=_SUPEREXEC_AUTH_METHODS,
+            )
         )
-        interceptors.append(auth_interceptor)
 
     # Start monitoring the parent process if a PID is provided
     if parent_pid is not None:
@@ -277,24 +271,10 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                 time.sleep(task_poll_interval)
                 continue
 
-            ready_to_claim = True
-            if isinstance(plugin, BaseEphemeralExecPlugin):
-                try:
-                    task_type = TaskType(task.type)
-                except ValueError:
-                    task_type = None
-                executor.wait_for_capacity(
-                    task_type=task_type,
-                    insecure=insecure,
-                    root_certificates_path=root_certificates_path,
-                )
-            else:
-                # Snapshot executor resources before the atomic task claim.
-                # If the claim succeeds, the executor can safely retire only
-                # resources from an older claim without blocking this poll loop.
-                ready_to_claim = executor.prepare_launch(task.task_id)
-
-            if not ready_to_claim:
+            # Snapshot executor resources before the atomic task claim. If the
+            # claim succeeds, the executor can safely retire only resources from
+            # an older claim without blocking this poll loop.
+            if not executor.prepare_launch(task.task_id):
                 time.sleep(task_poll_interval)
                 continue
 
@@ -303,19 +283,6 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             if not claim_res.token:
                 time.sleep(task_poll_interval)
                 continue
-
-            # Destroy the auth secret before launching the app for ephemeral plugins
-            if isinstance(plugin, BaseEphemeralExecPlugin):
-
-                def cleanup_auth_secret() -> None:
-                    nonlocal superexec_auth_secret
-                    if superexec_auth_secret is not None:
-                        superexec_auth_secret = None
-                    if auth_interceptor is not None:
-                        # pylint: disable-next=protected-access
-                        auth_interceptor._auth_secret = b"\x00" * 32
-
-                plugin.cleanup_before_launch = cleanup_auth_secret
 
             launch_result = plugin.launch_task(token=claim_res.token, task=task)
             _handle_launch_result(launch_result, task)
