@@ -73,7 +73,11 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskUsage,
 )
 from flwr.supercore import log
-from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
+from flwr.supercore.constant import (
+    FLOWER_AGENT_APP_ID,
+    OBJECT_PUSH_SESSION_TTL_SECONDS,
+    AutomationStatus,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
@@ -597,6 +601,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
                 for app in apps
             ]
+
+    def list_app_associations(
+        self, app_id: str, federation_ids: Sequence[str]
+    ) -> Sequence[str]:
+        """List the provided federation IDs associated with an app."""
+        if not app_id or not federation_ids:
+            return []
+        if app_id == FLOWER_AGENT_APP_ID:
+            return list(federation_ids)
+        query = select(FederationAppModel.federation_id).where(
+            FederationAppModel.app_id == app_id,
+            FederationAppModel.federation_id.in_(federation_ids),
+        )
+        with self.session() as session:
+            return session.scalars(query).all()
 
     def delete_app(self, federation_id: str, app_id: str) -> bool:
         """Delete one federation-app association; its FAB remains in state."""

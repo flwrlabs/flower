@@ -45,6 +45,7 @@ _UNARY_UNARY_ENDPOINTS = (
     "list-nodes",
     "list-federations",
     "list-apps",
+    "list-app-associations",
     "add-app",
     "remove-app",
     "show-federation",
