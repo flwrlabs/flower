@@ -33,7 +33,7 @@ from . import run_superexec as run_superexec_module
 
 def _run_superexec_one_launch(
     monkeypatch: pytest.MonkeyPatch,
-    launch_result: LaunchResult | None,
+    launch_result: LaunchResult,
     task_poll_interval: str | None = None,
 ) -> tuple[Mock, Mock, Mock, Mock]:
     """Run one SuperExec launch loop and stop at the loop sleep."""
@@ -230,17 +230,6 @@ def test_run_superexec_logs_non_accepted_launch_result(
     assert log.call_args.args[0] == expected_level
     assert expected_message in log.call_args.args[1]
     assert log.call_args.args[2] == 123
-
-
-def test_run_superexec_continues_when_plugin_returns_no_launch_result(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """SuperExec should not crash if a plugin returns no launch result."""
-    log, plugin, stub, _ = _run_superexec_one_launch(monkeypatch, None)
-
-    stub.ClaimTask.assert_called_once()
-    plugin.launch_task.assert_called_once()
-    log.assert_not_called()
 
 
 def test_run_superexec_uses_configured_task_poll_interval(

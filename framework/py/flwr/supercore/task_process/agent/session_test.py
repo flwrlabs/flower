@@ -40,11 +40,20 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject
 
 from .session import AgentRuntime, RuntimeAgentConnectors, RuntimeAgentEvents
+
+
+@pytest.fixture(autouse=True)
+def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the task identity used by Agent task messages."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 789)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 123)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 456)
 
 
 def test_emit_event_pushes_task_event() -> None:

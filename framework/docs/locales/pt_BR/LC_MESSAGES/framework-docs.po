@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-16 00:09+0000\n"
+"POT-Creation-Date: 2026-09-17 00:09+0000\n"
 "PO-Revision-Date: 2026-05-23 06:54+0000\n"
 "Last-Translator: Gustavo Bertoli <gubertoli@gmail.com>\n"
 "Language: pt_BR\n"
@@ -12697,14 +12697,15 @@ msgstr "Argumento de compilação"
 #: ../../source/ref-exit-codes/202.rst:7 ../../source/ref-exit-codes/203.rst:7
 #: ../../source/ref-exit-codes/250.rst:7 ../../source/ref-exit-codes/3.rst:7
 #: ../../source/ref-exit-codes/302.rst:7 ../../source/ref-exit-codes/303.rst:7
-#: ../../source/ref-exit-codes/304.rst:7 ../../source/ref-exit-codes/400.rst:7
-#: ../../source/ref-exit-codes/401.rst:7 ../../source/ref-exit-codes/402.rst:7
-#: ../../source/ref-exit-codes/500.rst:7 ../../source/ref-exit-codes/600.rst:7
-#: ../../source/ref-exit-codes/602.rst:7 ../../source/ref-exit-codes/603.rst:7
-#: ../../source/ref-exit-codes/604.rst:7 ../../source/ref-exit-codes/605.rst:7
-#: ../../source/ref-exit-codes/606.rst:7 ../../source/ref-exit-codes/607.rst:7
-#: ../../source/ref-exit-codes/608.rst:7 ../../source/ref-exit-codes/700.rst:7
-#: ../../source/ref-exit-codes/701.rst:7 ../../source/ref-exit-codes/800.rst:7
+#: ../../source/ref-exit-codes/304.rst:7 ../../source/ref-exit-codes/305.rst:7
+#: ../../source/ref-exit-codes/400.rst:7 ../../source/ref-exit-codes/401.rst:7
+#: ../../source/ref-exit-codes/402.rst:7 ../../source/ref-exit-codes/500.rst:7
+#: ../../source/ref-exit-codes/600.rst:7 ../../source/ref-exit-codes/602.rst:7
+#: ../../source/ref-exit-codes/603.rst:7 ../../source/ref-exit-codes/604.rst:7
+#: ../../source/ref-exit-codes/605.rst:7 ../../source/ref-exit-codes/606.rst:7
+#: ../../source/ref-exit-codes/607.rst:7 ../../source/ref-exit-codes/608.rst:7
+#: ../../source/ref-exit-codes/700.rst:7 ../../source/ref-exit-codes/701.rst:7
+#: ../../source/ref-exit-codes/800.rst:7
 msgid "Description"
 msgstr "Descrição"
 
@@ -14741,8 +14742,8 @@ msgstr ""
 #: ../../source/docker/enable-tls.rst:240
 #: ../../source/docker/tutorial-quickstart-docker.rst:84
 #: ../../source/docker/tutorial-quickstart-docker.rst:129
-#: ../../source/docker/tutorial-quickstart-docker.rst:246
-#: ../../source/docker/tutorial-quickstart-docker.rst:284
+#: ../../source/docker/tutorial-quickstart-docker.rst:244
+#: ../../source/docker/tutorial-quickstart-docker.rst:278
 msgid "``docker run``: This tells Docker to run a container from an image."
 msgstr ""
 
@@ -14753,8 +14754,8 @@ msgstr ""
 #: ../../source/docker/enable-tls.rst:241
 #: ../../source/docker/tutorial-quickstart-docker.rst:85
 #: ../../source/docker/tutorial-quickstart-docker.rst:130
-#: ../../source/docker/tutorial-quickstart-docker.rst:247
-#: ../../source/docker/tutorial-quickstart-docker.rst:285
+#: ../../source/docker/tutorial-quickstart-docker.rst:245
+#: ../../source/docker/tutorial-quickstart-docker.rst:279
 msgid "``--rm``: Remove the container once it is stopped or the command exits."
 msgstr ""
 
@@ -15067,12 +15068,12 @@ msgstr ""
 #: ../../source/docker/tutorial-deploy-on-multiple-machines.rst:167
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:110
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:250
-#: ../../source/docker/tutorial-quickstart-docker.rst:331
+#: ../../source/docker/tutorial-quickstart-docker.rst:322
 #: ../../source/how-to-authenticate-accounts.rst:71
 #: ../../source/how-to-authenticate-supernodes.rst:122
-#: ../../source/how-to-enable-tls-connections.rst:219
+#: ../../source/how-to-enable-tls-connections.rst:217
 #: ../../source/how-to-run-flower-on-azure.rst:230
-#: ../../source/how-to-run-flower-on-gcp.rst:625
+#: ../../source/how-to-run-flower-on-gcp.rst:619
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:684
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:214
 #: ../../source/how-to-upgrade-to-flower-1.28.rst:80
@@ -15887,8 +15888,8 @@ msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:90
 #: ../../source/docker/tutorial-quickstart-docker.rst:134
-#: ../../source/docker/tutorial-quickstart-docker.rst:248
-#: ../../source/docker/tutorial-quickstart-docker.rst:286
+#: ../../source/docker/tutorial-quickstart-docker.rst:246
+#: ../../source/docker/tutorial-quickstart-docker.rst:280
 msgid ""
 "``--network flwr-network``: Make the container join the network named "
 "``flwr-network``."
@@ -15900,8 +15901,8 @@ msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:92
 #: ../../source/docker/tutorial-quickstart-docker.rst:136
-#: ../../source/docker/tutorial-quickstart-docker.rst:250
-#: ../../source/docker/tutorial-quickstart-docker.rst:288
+#: ../../source/docker/tutorial-quickstart-docker.rst:248
+#: ../../source/docker/tutorial-quickstart-docker.rst:282
 msgid ""
 "``--detach``: Run the container in the background, freeing up the "
 "terminal."
@@ -16010,25 +16011,23 @@ msgstr ""
 #: ../../source/docker/tutorial-quickstart-docker.rst:174
 msgid ""
 "The **SuperExec** Docker image comes with a pre-installed version of "
-"Flower and serves as a base for building your own image. Use a **single**"
-" image and select the desired behavior (ServerApps vs ClientApps) at "
-"runtime via the ``--plugin-type`` flag. SuperExec spawns the "
-"corresponding processes on demand."
+"Flower and serves as a base for building your own image. SuperExec spawns"
+" the appropriate processes on demand based on the tasks it receives."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:179
+#: ../../source/docker/tutorial-quickstart-docker.rst:178
 msgid ""
-"When using SuperExec with the *serverapp* plugin, pass ``--runtime-api-"
-"address`` pointing to the SuperLink's **Runtime API** endpoint."
+"To execute ServerApps, pass ``--runtime-api-address`` pointing to the "
+"SuperLink's **Runtime API** endpoint."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:182
+#: ../../source/docker/tutorial-quickstart-docker.rst:181
 msgid ""
 "Create a Dockerfile called ``superexec.Dockerfile`` and paste the "
 "following:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:184
+#: ../../source/docker/tutorial-quickstart-docker.rst:183
 #: ../../source/how-to-run-flower-on-gcp.rst
 #, fuzzy
 msgid "superexec.Dockerfile"
@@ -16038,7 +16037,7 @@ msgstr "Construindo a imagem do servidor"
 msgid "Understand the Dockerfile"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:200
+#: ../../source/docker/tutorial-quickstart-docker.rst:199
 msgid ""
 ":substitution-code:`FROM flwr/superexec:|stable_flwr_version|`: This line"
 " specifies that the Docker image to be built from is the "
@@ -16046,46 +16045,46 @@ msgid ""
 "code:`|stable_flwr_version|`."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:202
+#: ../../source/docker/tutorial-quickstart-docker.rst:201
 msgid ""
 "``WORKDIR /app``: Set the working directory for the container to "
 "``/app``. Any subsequent commands that reference a directory will be "
 "relative to this directory."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:204
+#: ../../source/docker/tutorial-quickstart-docker.rst:203
 msgid ""
 "``COPY pyproject.toml .``: Copy the ``pyproject.toml`` file. from the "
 "current working directory into the container's ``/app`` directory."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:206
+#: ../../source/docker/tutorial-quickstart-docker.rst:205
 msgid ""
 "``RUN sed -i 's/.*flwr\\[simulation\\].*//' pyproject.toml``: Remove the "
 "``flwr`` dependency from the ``pyproject.toml``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:208
+#: ../../source/docker/tutorial-quickstart-docker.rst:207
 msgid ""
 "``python -m pip install -U --no-cache-dir .``: Run the ``pip`` install "
 "command to install the dependencies defined in the ``pyproject.toml`` "
 "file."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:211
+#: ../../source/docker/tutorial-quickstart-docker.rst:210
 msgid ""
 "The ``-U`` flag indicates that any existing packages should be upgraded, "
 "and ``--no-cache-dir`` prevents pip from using the cache to speed up the "
 "installation."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:213
+#: ../../source/docker/tutorial-quickstart-docker.rst:212
 msgid ""
 "``ENTRYPOINT [\"flower-superexec\"]``: Set the command ``flower-"
 "superexec`` to be the default command run when the container is started."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:218
+#: ../../source/docker/tutorial-quickstart-docker.rst:217
 msgid ""
 "Note that `flwr <https://pypi.org/project/flwr/>`__ is already installed "
 "in the ``flwr/superexec`` base image, so only other package dependencies "
@@ -16094,92 +16093,79 @@ msgid ""
 "after it has been copied into the Docker image (see line 5)."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:224
+#: ../../source/docker/tutorial-quickstart-docker.rst:223
 msgid ""
 "Afterward, in the directory that holds the Dockerfile, execute this "
 "Docker command to build the SuperExec image:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:231
+#: ../../source/docker/tutorial-quickstart-docker.rst:230
 msgid "Start the **SuperExec for ServerApps** container:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:249
+#: ../../source/docker/tutorial-quickstart-docker.rst:247
 msgid "``--name superexec-serverapp``: Give the container a descriptive name."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:251
-#: ../../source/docker/tutorial-quickstart-docker.rst:289
+#: ../../source/docker/tutorial-quickstart-docker.rst:249
+#: ../../source/docker/tutorial-quickstart-docker.rst:283
 msgid ""
 "``flwr_superexec:0.0.1``: This is the name of the image to be run and the"
 " specific tag of the image."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:253
-#: ../../source/docker/tutorial-quickstart-docker.rst:291
+#: ../../source/docker/tutorial-quickstart-docker.rst:251
+#: ../../source/docker/tutorial-quickstart-docker.rst:285
 msgid ""
 "``--insecure``: This flag tells the container to operate in an insecure "
 "mode, allowing unencrypted communication. Secure connections will be "
 "added in future releases."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:255
-msgid ""
-"``--plugin-type serverapp``: Load the *serverapp* plugin. SuperExec will "
-"spawn ServerApp processes as needed."
-msgstr ""
-
-#: ../../source/docker/tutorial-quickstart-docker.rst:257
+#: ../../source/docker/tutorial-quickstart-docker.rst:253
 msgid ""
 "``--runtime-api-address superlink:8000``: Connect to the SuperLink's "
 "Runtime API at the address ``superlink:8000``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:262
+#: ../../source/docker/tutorial-quickstart-docker.rst:258
 msgid "Step 5: Start the SuperExec to execute ClientApps"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:264
+#: ../../source/docker/tutorial-quickstart-docker.rst:260
 msgid ""
-"For ClientApps, reuse the **same** image and change the plugin and API "
-"address. When using the *clientapp* plugin, pass ``--runtime-api-"
+"For ClientApps, reuse the **same** image and pass ``--runtime-api-"
 "address`` pointing to the SuperNode's **Runtime API** endpoint."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:268
+#: ../../source/docker/tutorial-quickstart-docker.rst:263
 msgid "(No new Dockerfile is needed; reuse ``flwr_superexec:0.0.1``.)"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:269
+#: ../../source/docker/tutorial-quickstart-docker.rst:264
 msgid "Start the first **SuperExec for ClientApps** container:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:287
+#: ../../source/docker/tutorial-quickstart-docker.rst:281
 msgid "``--name superexec-clientapp-1``: Give the container a descriptive name."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:293
-msgid ""
-"``--plugin-type clientapp``: Load the *clientapp* plugin. SuperExec will "
-"spawn ClientApp processes as needed."
-msgstr ""
-
-#: ../../source/docker/tutorial-quickstart-docker.rst:295
+#: ../../source/docker/tutorial-quickstart-docker.rst:287
 msgid ""
 "``--runtime-api-address supernode-1:9094``: Connect to the SuperNode's "
 "Runtime API at the address ``supernode-1:9094``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:298
+#: ../../source/docker/tutorial-quickstart-docker.rst:290
 msgid "Start the second **SuperExec for ClientApps** container:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:313
+#: ../../source/docker/tutorial-quickstart-docker.rst:304
 msgid "Step 6: Run the Quickstart Project"
 msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:94
-#: ../../source/docker/tutorial-quickstart-docker.rst:315
+#: ../../source/docker/tutorial-quickstart-docker.rst:306
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:198
 msgid ""
 "Find the Flower Configuration TOML file in your machine. This file is "
@@ -16188,84 +16174,84 @@ msgid ""
 "as the path to the configuration file."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:329
+#: ../../source/docker/tutorial-quickstart-docker.rst:320
 msgid ""
 "Add the following lines to the ``config.toml`` to add a new SuperLink "
 "connection:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:338
+#: ../../source/docker/tutorial-quickstart-docker.rst:329
 msgid ""
 "Run the ``quickstart-pytorch`` project and follow the ServerApp logs to "
 "track the execution of the run:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:347
+#: ../../source/docker/tutorial-quickstart-docker.rst:338
 msgid "Step 7: Update the Application"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:349
+#: ../../source/docker/tutorial-quickstart-docker.rst:340
 msgid ""
 "Change the application code. For example, change the ``seed`` in "
 "``pytorchexample/task.py`` to ``43`` and save it:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:352
+#: ../../source/docker/tutorial-quickstart-docker.rst:343
 msgid "pytorchexample/task.py"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:359
+#: ../../source/docker/tutorial-quickstart-docker.rst:350
 msgid "Stop the running containers:"
 msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:148
-#: ../../source/docker/tutorial-quickstart-docker.rst:363
+#: ../../source/docker/tutorial-quickstart-docker.rst:354
 msgid ""
 "If you have modified the dependencies listed in your ``pyproject.toml`` "
 "file, it is essential to rebuild images."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:366
+#: ../../source/docker/tutorial-quickstart-docker.rst:357
 msgid "If you haven't made any changes, you can skip steps 2 through 4."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:372
+#: ../../source/docker/tutorial-quickstart-docker.rst:363
 #, fuzzy
 msgid "Rebuild the SuperExec image:"
 msgstr "Construindo a imagem base"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:378
+#: ../../source/docker/tutorial-quickstart-docker.rst:369
 msgid ""
 "Launch **one SuperExec container** for the new ServerApp and **two "
 "SuperExec containers** for the new ClientApps:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:408
+#: ../../source/docker/tutorial-quickstart-docker.rst:396
 msgid "Run the updated project:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:416
+#: ../../source/docker/tutorial-quickstart-docker.rst:404
 msgid "Step 8: Clean Up"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:418
+#: ../../source/docker/tutorial-quickstart-docker.rst:406
 msgid "Remove the containers and the bridge network:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:444
-#: ../../source/docker/tutorial-quickstart-docker.rst:430
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:442
+#: ../../source/docker/tutorial-quickstart-docker.rst:418
 msgid "Where to Go Next"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:432
+#: ../../source/docker/tutorial-quickstart-docker.rst:420
 msgid ":doc:`enable-tls`"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:433
+#: ../../source/docker/tutorial-quickstart-docker.rst:421
 msgid ":doc:`persist-superlink-state`"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:434
+#: ../../source/docker/tutorial-quickstart-docker.rst:422
 msgid ":doc:`tutorial-quickstart-docker-compose`"
 msgstr ""
 
@@ -16470,7 +16456,7 @@ msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:208
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:263
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:410
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:408
 msgid "Rerun the ``quickstart-pytorch`` project:"
 msgstr ""
 
@@ -16524,68 +16510,68 @@ msgstr ""
 msgid "compose.yml"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:332
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:330
 msgid ""
 "If you also want to enable TLS for the new SuperNode, uncomment the "
 "definition in the ``with-tls.yml`` file:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:335
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:333
 msgid "with-tls.yml"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:358
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:356
 msgid "Restart the services with:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:368
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:366
 msgid "Step 8: Persisting the SuperLink State and Enabling TLS"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:370
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:368
 msgid ""
 "To run Flower with persisted SuperLink state and enabled TLS, a slight "
 "change in the ``with-state.yml`` file is required:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:373
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:371
 msgid "Comment out the first ``command`` block and uncomment the second one:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:375
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:373
 msgid "with-state.yml"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:404
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:402
 msgid "Restart the services:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:418
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:416
 msgid "Step 9: Merge Multiple Compose Files"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:420
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:418
 msgid ""
 "You can merge multiple Compose files into a single file. For instance, if"
 " you wish to combine the basic configuration with the TLS configuration, "
 "execute the following command:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:429
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:427
 msgid ""
 "This will merge the contents of ``compose.yml`` and ``with-tls.yml`` into"
 " a new file called ``my_compose.yml``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:434
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:432
 msgid "Step 10: Clean Up"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:436
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:434
 msgid "Remove all services and volumes:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:446
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:444
 msgid ":doc:`run-quickstart-examples-docker-compose`"
 msgstr ""
 
@@ -22035,7 +22021,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-authenticate-supernodes.rst:145
-#: ../../source/how-to-enable-tls-connections.rst:236
+#: ../../source/how-to-enable-tls-connections.rst:234
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:242
 msgid ""
 "You can setup your ``local-deployment`` profile as the default so you "
@@ -22158,7 +22144,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-authenticate-supernodes.rst:307
-#: ../../source/how-to-enable-tls-connections.rst:243
+#: ../../source/how-to-enable-tls-connections.rst:241
 #: ../../source/how-to-use-built-in-mods.rst:175
 #: ../../source/tutorial-series-what-is-federated-learning.rst:291
 msgid "Conclusion"
@@ -22172,7 +22158,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-authenticate-supernodes.rst:315
-#: ../../source/how-to-enable-tls-connections.rst:253
+#: ../../source/how-to-enable-tls-connections.rst:251
 msgid ""
 "Refer to the :doc:`docker/index` documentation to learn how to setup a "
 "federation where each component runs in its own Docker container. You can"
@@ -23572,17 +23558,17 @@ msgstr ""
 msgid "Create ``superexec-clientapp.sbatch``:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:156
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:155
 msgid "Submit the SuperNode job first, then submit the SuperExec job:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:163
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:162
 msgid ""
 "The SuperExec waits for ClientApp tasks from the SuperNode. The ClientApp"
 " processes inherit the CPU and memory allocation of the SuperExec job."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:168
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:167
 msgid ""
 "``--insecure`` applies only to the local Runtime API connection between "
 "SuperExec and SuperNode. The connection from SuperNode to SuperGrid still"
@@ -23591,11 +23577,11 @@ msgid ""
 "enable-tls-connections>`."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:175
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:174
 msgid "Use process isolation with a GPU ClientApp"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:177
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:176
 msgid ""
 "To run a ClientApp on a GPU, use the ``supernode-process.sbatch`` script "
 "from the previous section without adding a GPU request. The SuperNode "
@@ -23603,7 +23589,7 @@ msgid ""
 "need access to the GPU."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:181
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:180
 msgid ""
 "Request the GPU only in the SuperExec job. The ClientApp process then "
 "inherits the SuperExec environment, including ``CUDA_VISIBLE_DEVICES``. "
@@ -23612,17 +23598,17 @@ msgid ""
 "node."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:186
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:185
 msgid "Create ``superexec-clientapp-gpu.sbatch``:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:225
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:223
 msgid ""
 "Submit the unchanged process-isolated SuperNode job first, then submit "
 "the GPU SuperExec job:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:233
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:231
 msgid ""
 "The ClientApp environment must include a GPU-enabled version of its "
 "machine learning framework and the required GPU libraries. For example, a"
@@ -23630,11 +23616,11 @@ msgid ""
 "``CUDA_VISIBLE_DEVICES``."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:239
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:237
 msgid "Discover the SuperNode address from its job ID"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:241
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:239
 msgid ""
 "The preceding process-isolation examples use ``--nodelist`` to place both"
 " jobs on the same node. You can remove this constraint when the compute "
@@ -23643,32 +23629,32 @@ msgid ""
 "starts, SuperExec uses that ID to discover the assigned node's address."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:247
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:245
 msgid "Create ``supernode-process-dynamic.sbatch``:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:272
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:270
 msgid ""
 "The SuperNode listens on all network interfaces because Slurm can place "
 "SuperExec on a different node. Create ``superexec-clientapp-"
 "dynamic.sbatch`` without a ``--nodelist`` directive:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:334
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:331
 msgid ""
 "This example requests one GPU for SuperExec. Remove ``#SBATCH "
 "--gres=gpu:1`` when the ClientApp does not need a GPU."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:337
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:334
 msgid "Create ``submit-process-pair.sh`` to submit both jobs:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:357
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:354
 msgid "Run the submission script:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:363
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:360
 msgid ""
 "The first ``sbatch`` command returns the SuperNode job ID. The second job"
 " uses an ``after:<job-id>`` dependency, so Slurm holds it until the "
@@ -23678,7 +23664,7 @@ msgid ""
 "becoming available."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:371
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:368
 msgid ""
 "This minimal example exposes an unauthenticated and unencrypted Runtime "
 "API on the compute-node network. Use it only in a trusted, isolated test "
@@ -23687,7 +23673,7 @@ msgid ""
 "guide."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:376
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:373
 msgid ""
 "For more information about the two isolation modes and the Runtime API, "
 "see :doc:`Flower Network Communication <ref-flower-network-"
@@ -24120,7 +24106,7 @@ msgid ""
 "establish TLS connections to the Runtime API hosted by the SuperLink:"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:194
+#: ../../source/how-to-enable-tls-connections.rst:193
 msgid ""
 "``--root-certificates``: Specify the location of the CA certificate file."
 " The ``ca.crt`` file is used by SuperExec to verify the Runtime API "
@@ -24134,20 +24120,13 @@ msgid ""
 "SuperLink's Runtime API."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst
-msgid ""
-"``--plugin-type``: Specify the type of app process SuperExec should "
-"launch. Use ``serverapp`` for a ``ServerApp`` SuperExec."
-msgstr ""
-
-#: ../../source/how-to-enable-tls-connections.rst:198
+#: ../../source/how-to-enable-tls-connections.rst:196
 msgid ""
 "Next, use the same procedure for a ``ClientApp`` SuperExec, but pass the "
-"SuperNode's Runtime API address, e.g. ``127.0.0.1:9094``, and set "
-"``--plugin-type clientapp``."
+"SuperNode's Runtime API address, e.g. ``127.0.0.1:9094``."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:201
+#: ../../source/how-to-enable-tls-connections.rst:199
 msgid ""
 "Now your SuperLink-side SuperExec and SuperNode-side SuperExec can "
 "establish TLS connections to their respective Runtime APIs. When using "
@@ -24158,11 +24137,11 @@ msgid ""
 "in the commands or configuration used by your orchestration system."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:210
+#: ../../source/how-to-enable-tls-connections.rst:208
 msgid "TLS-enabled Flower CLI"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:212
+#: ../../source/how-to-enable-tls-connections.rst:210
 msgid ""
 "The `Flower CLI <ref-api-cli.html>`_ (e.g. ``flwr run`` command) is the "
 "way a user (e.g. a data scientist) can interact with a deployed "
@@ -24174,13 +24153,13 @@ msgid ""
 "certificate:"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:227
+#: ../../source/how-to-enable-tls-connections.rst:225
 msgid ""
 "Note that the path to the ``root-certificates`` is relative to the root "
 "of the project. Now, you can run the example by executing ``flwr run``:"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:245
+#: ../../source/how-to-enable-tls-connections.rst:243
 msgid ""
 "You should now have learned how to generate self-signed certificates "
 "using the given script, start a TLS-enabled server and have two clients "
@@ -24190,21 +24169,21 @@ msgid ""
 "`Flower CLI <ref-api-cli.html>`_ will also be TLS-enabled."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:260
+#: ../../source/how-to-enable-tls-connections.rst:258
 msgid "Additional resources"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:262
+#: ../../source/how-to-enable-tls-connections.rst:260
 msgid ""
 "These additional sources might be relevant if you would like to dive "
 "deeper into the topic of certificates:"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:265
+#: ../../source/how-to-enable-tls-connections.rst:263
 msgid "`Let's Encrypt <https://letsencrypt.org/docs/>`_"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:266
+#: ../../source/how-to-enable-tls-connections.rst:264
 msgid "`certbot <https://certbot.eff.org/>`_"
 msgstr ""
 
@@ -24407,43 +24386,43 @@ msgid ""
 "``flower-superexec`` instead:"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:103
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:102
 msgid "How installation works"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:105
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:104
 msgid "When runtime dependency installation is enabled, Flower:"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:107
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:106
 msgid "reads ``[project].dependencies`` from the installed Flower App,"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:108
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:107
 msgid "creates an isolated runtime environment under ``$FLWR_HOME/runtime-envs``,"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:109
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:108
 msgid ""
 "invokes ``uv sync`` in the app project directory using the current Python"
 " executable,"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:110
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:109
 msgid ""
 "installs the declared app dependencies into the isolated runtime "
 "environment,"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:111
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:110
 msgid "activates that environment for the current app process, and"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:112
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:111
 msgid "deletes the environment after app execution is complete."
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:114
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:113
 msgid ""
 "Each run gets its own environment, so concurrently running apps do not "
 "modify each other's Python packages. The app code itself comes from the "
@@ -25636,7 +25615,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:199
-#: ../../source/how-to-run-flower-on-gcp.rst:592
+#: ../../source/how-to-run-flower-on-gcp.rst:586
 #, fuzzy
 msgid "Run Flower App"
 msgstr "O nome do repositório da imagem base."
@@ -25655,7 +25634,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:214
-#: ../../source/how-to-run-flower-on-gcp.rst:609
+#: ../../source/how-to-run-flower-on-gcp.rst:603
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:668
 msgid ""
 "Run ``flwr config list`` to locate the Flower configuration file on your "
@@ -25663,7 +25642,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:227
-#: ../../source/how-to-run-flower-on-gcp.rst:622
+#: ../../source/how-to-run-flower-on-gcp.rst:616
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:681
 msgid ""
 "Open the Flower Configuration file (``config.toml``) and add a new "
@@ -26034,13 +26013,13 @@ msgstr ""
 msgid "superexec-clientapp-2-deployment.yaml"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:545
+#: ../../source/how-to-run-flower-on-gcp.rst:539
 msgid ""
 "Once you have created the required files, you can use the following "
 "``k8s-deploy.sh`` helper script to deploy all the ``Pods``."
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:550
+#: ../../source/how-to-run-flower-on-gcp.rst:544
 msgid ""
 "Make sure the Flower version you use to deploy the ``Pods`` matches the "
 "version of your Flower app."
@@ -26050,7 +26029,7 @@ msgstr ""
 msgid "k8s-deploy.sh"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:580
+#: ../../source/how-to-run-flower-on-gcp.rst:574
 msgid ""
 "To see that your ``Pods`` are deployed, please go to the ``Navigation "
 "Menu`` on the Google Console, select ``Kubernetes Engine`` and then the "
@@ -26058,38 +26037,38 @@ msgid ""
 "the ``Pods`` under deployment."
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:586
+#: ../../source/how-to-run-flower-on-gcp.rst:580
 msgid ""
 "Please wait for a couple of minutes (3' to 5' minutes should be enough) "
 "before the ``Pods`` are up and running. While ``Pods`` resources are "
 "being provisioned, some warnings are expected."
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:594
+#: ../../source/how-to-run-flower-on-gcp.rst:588
 msgid ""
 "Once all ``Pods`` are up and running, we need to get the ``EXTERNAL_IP`` "
 "of the ``superlink-service`` and point our Flower app to use the "
 "Kubernetes cluster to submit and execute the job."
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:598
+#: ../../source/how-to-run-flower-on-gcp.rst:592
 msgid ""
 "To get the ``EXTERNAL-IP`` of the ``superlink-service`` we run the "
 "following command, which will show the ``NAME``, ``TYPE``, ``CLUSTER-"
 "IP``, ``EXTERNAL-IP`` and ``PORTS`` of the service:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:606
+#: ../../source/how-to-run-flower-on-gcp.rst:600
 msgid ""
 "After we get the ``EXTERNAL-IP`` we need to create a new SuperLink "
 "connection in the Flower Configuration file:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:632
+#: ../../source/how-to-run-flower-on-gcp.rst:626
 msgid "Then we can execute the example on the GCP cluster by running:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:640
+#: ../../source/how-to-run-flower-on-gcp.rst:634
 msgid ""
 "Please note that in the current deployment, communication is not "
 "encrypted. To enable TLS for secure connections, check the following "
@@ -26097,7 +26076,7 @@ msgid ""
 "the current guide soon with more details on how to configure TLS."
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:645
+#: ../../source/how-to-run-flower-on-gcp.rst:639
 msgid ""
 "If the job is successfully submitted, and executed, then in your console "
 "you should see the logs from the run. The output should look like the one"
@@ -26108,18 +26087,18 @@ msgstr ""
 msgid "Expected Output"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:721
+#: ../../source/how-to-run-flower-on-gcp.rst:715
 msgid ""
 "Please note that if you terminate or shut down the cluster, and create a "
 "new one, the value of the ``EXTERNAL_IP`` changes. In that case, you will"
 " have to update the Flower Configuration file."
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:727
+#: ../../source/how-to-run-flower-on-gcp.rst:721
 msgid "Shutdown Flower Infrastructure"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:729
+#: ../../source/how-to-run-flower-on-gcp.rst:723
 msgid ""
 "If you would like to shutdown all the running pods deployed during this "
 "guide, you can use the ``kubectl delete`` command and pass the the "
@@ -30794,53 +30773,63 @@ msgstr "O nome do repositório da imagem base."
 msgid "Classes"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 msgid ":py:obj:`AgentApp <flwr.agentapp.AgentApp>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.agent_app.AgentApp:1 of
 #, fuzzy
 msgid "Flower AgentApp."
 msgstr "O nome do repositório da imagem base."
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 msgid ":py:obj:`AgentConnectors <flwr.agentapp.AgentConnectors>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.base.AgentConnectors:1 of
 msgid "Abstract base class for AgentApp connector execution."
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 msgid ":py:obj:`AgentEvents <flwr.agentapp.AgentEvents>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.base.AgentEvents:1 of
 msgid "Abstract base class for AgentApp run events."
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
+msgid ":py:obj:`AgentGrid <flwr.agentapp.AgentGrid>`\\ \\(\\)"
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
+#: flwr.agentapp.base.AgentGrid:1 of
+#, fuzzy
+msgid "Model-facing access to the federation Grid."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 msgid ":py:obj:`AgentSession <flwr.agentapp.AgentSession>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.base.AgentSession:1 of
 msgid "Abstract base class for AgentApp runtime capabilities."
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:32
+#: ../../source/ref-api/flwr.agentapp.rst:33
 #, fuzzy
 msgid "Exceptions"
 msgstr "Descrição"
 
-#: ../../source/ref-api/flwr.agentapp.rst:36:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:37:<autosummary>:1
 msgid ":py:obj:`LoadAgentAppError <flwr.agentapp.LoadAgentAppError>`\\"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:36:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:37:<autosummary>:1
 #: flwr.agentapp.agent_app.LoadAgentAppError:1 of
 msgid "Error when trying to load `AgentApp`."
 msgstr ""
@@ -30919,6 +30908,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.AgentApp.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentConnectors.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentEvents.rst:15
+#: ../../source/ref-api/flwr.agentapp.AgentGrid.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentSession.rst:15
 #: ../../source/ref-api/flwr.app.Array.rst:15
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:15
@@ -31051,7 +31041,8 @@ msgid "AgentConnectors"
 msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors:1 flwr.agentapp.base.AgentEvents:1
-#: flwr.agentapp.base.AgentSession:1 flwr.compat.client.client.Client:1
+#: flwr.agentapp.base.AgentGrid:1 flwr.agentapp.base.AgentSession:1
+#: flwr.compat.client.client.Client:1
 #: flwr.compat.client.numpy_client.NumPyClient:1
 #: flwr.server.client_manager.ClientManager:1
 #: flwr.server.strategy.strategy.Strategy:1 flwr.serverapp.grid.grid.Grid:1
@@ -31098,6 +31089,28 @@ msgstr ""
 #: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1
 #: flwr.agentapp.base.AgentEvents.get_trace:1 of
 msgid "Get events from all runs in the current run series."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.AgentGrid.rst:2
+msgid "AgentGrid"
+msgstr ""
+
+#: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1 of
+msgid ":py:obj:`call <flwr.agentapp.AgentGrid.call>`\\ \\(tool\\_call\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentGrid.call:1
+#: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1 of
+msgid "Execute one Grid function_call and return a function_call_output item."
+msgstr ""
+
+#: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1 of
+msgid ":py:obj:`tools <flwr.agentapp.AgentGrid.tools>`\\ \\(\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1
+#: flwr.agentapp.base.AgentGrid.tools:1 of
+msgid "Return model-facing Grid tool schemas."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentSession.rst:2
@@ -31180,6 +31193,15 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
 #: flwr.agentapp.AgentSession.events:1 of
 msgid "Frontend-visible structured run event API."
+msgstr ""
+
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
+msgid ":py:obj:`grid <flwr.agentapp.AgentSession.grid>`\\"
+msgstr ""
+
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
+#: flwr.agentapp.AgentSession.grid:1 of
+msgid "Model-facing federation Grid API."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.LoadAgentAppError.rst:2
@@ -43700,6 +43722,7 @@ msgstr ""
 #: ../../source/ref-exit-codes/302.rst:15
 #: ../../source/ref-exit-codes/303.rst:14
 #: ../../source/ref-exit-codes/304.rst:15
+#: ../../source/ref-exit-codes/305.rst:15
 #: ../../source/ref-exit-codes/400.rst:14
 #: ../../source/ref-exit-codes/401.rst:13
 #: ../../source/ref-exit-codes/402.rst:14
@@ -44082,6 +44105,47 @@ msgid ""
 "**Disable entity verification** by removing the ``--trusted-entities`` "
 "option when starting the SuperNode. This allows the SuperNode to run "
 "without entity verification."
+msgstr ""
+
+#: ../../source/ref-exit-codes/305.rst:3
+msgid "[305] SUPERNODE_CONNECTION_ERROR"
+msgstr ""
+
+#: ../../source/ref-exit-codes/305.rst:9
+msgid ""
+"This error occurs when the SuperNode cannot initialize its connection to "
+"the SuperLink. The error shown before this message contains additional "
+"details returned by the SuperLink or the local connection layer."
+msgstr ""
+
+#: ../../source/ref-exit-codes/305.rst:17
+msgid "Check the reported error and verify the following:"
+msgstr ""
+
+#: ../../source/ref-exit-codes/305.rst:19
+msgid ""
+"The SuperLink address is correct and reachable from the SuperNode. Check "
+"network, DNS, proxy, and firewall settings as applicable."
+msgstr ""
+
+#: ../../source/ref-exit-codes/305.rst:21
+msgid ""
+"The TLS configuration matches the SuperLink, including any root "
+"certificates passed to the SuperNode."
+msgstr ""
+
+#: ../../source/ref-exit-codes/305.rst:23
+msgid ""
+"If ``--auth-supernode-private-key`` is set, the corresponding public key "
+"is still registered with the SuperLink. Register it again if it was de-"
+"registered."
+msgstr ""
+
+#: ../../source/ref-exit-codes/305.rst:25
+msgid ""
+"Another SuperNode is not already active with the same credentials. Stop "
+"the other process or wait until the SuperLink marks it offline before "
+"retrying."
 msgstr ""
 
 #: ../../source/ref-exit-codes/400.rst:3
@@ -92428,3 +92492,57 @@ msgstr ""
 #~ msgid "Model response creation API."
 #~ msgstr ""
 
+#~ msgid ""
+#~ "The **SuperExec** Docker image comes "
+#~ "with a pre-installed version of "
+#~ "Flower and serves as a base for"
+#~ " building your own image. Use a "
+#~ "**single** image and select the desired"
+#~ " behavior (ServerApps vs ClientApps) at "
+#~ "runtime via the ``--plugin-type`` flag."
+#~ " SuperExec spawns the corresponding "
+#~ "processes on demand."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "When using SuperExec with the "
+#~ "*serverapp* plugin, pass ``--runtime-api-"
+#~ "address`` pointing to the SuperLink's "
+#~ "**Runtime API** endpoint."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``--plugin-type serverapp``: Load the "
+#~ "*serverapp* plugin. SuperExec will spawn "
+#~ "ServerApp processes as needed."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "For ClientApps, reuse the **same** image"
+#~ " and change the plugin and API "
+#~ "address. When using the *clientapp* "
+#~ "plugin, pass ``--runtime-api-address`` "
+#~ "pointing to the SuperNode's **Runtime "
+#~ "API** endpoint."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``--plugin-type clientapp``: Load the "
+#~ "*clientapp* plugin. SuperExec will spawn "
+#~ "ClientApp processes as needed."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``--plugin-type``: Specify the type of"
+#~ " app process SuperExec should launch. "
+#~ "Use ``serverapp`` for a ``ServerApp`` "
+#~ "SuperExec."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Next, use the same procedure for a"
+#~ " ``ClientApp`` SuperExec, but pass the "
+#~ "SuperNode's Runtime API address, e.g. "
+#~ "``127.0.0.1:9094``, and set ``--plugin-type"
+#~ " clientapp``."
+#~ msgstr ""

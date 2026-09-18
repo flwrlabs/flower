@@ -17,13 +17,24 @@
 
 from unittest.mock import Mock
 
-from flwr.agentapp.constants import (
-    AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY,
-    AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY,
-)
+import pytest
+
 from flwr.app import ConfigRecord, Message, RecordDict
+from flwr.supercore.constant import (
+    AGENT_MESSAGE_CONTENT_RECORD_KEY,
+    AGENT_MESSAGE_TEXT_KEY,
+)
+from flwr.supercore.task_identity import TaskIdentity
 
 from .grid import RuntimeAgentGrid
+
+
+@pytest.fixture(autouse=True)
+def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the task identity used by Agent Grid messages."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 123)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 456)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 789)
 
 
 def test_runtime_agent_grid_tools() -> None:
@@ -34,8 +45,8 @@ def test_runtime_agent_grid_tools() -> None:
     reply = Message(
         RecordDict(
             {
-                AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY: ConfigRecord(
-                    {AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY: "done"}
+                AGENT_MESSAGE_CONTENT_RECORD_KEY: ConfigRecord(
+                    {AGENT_MESSAGE_TEXT_KEY: "done"}
                 )
             }
         ),
@@ -81,7 +92,11 @@ def test_runtime_agent_grid_tools() -> None:
                         "dst_node_id": "11",
                         "payload": "hi",
                     },
-                    {"dst_node_id": "22", "payload": "hello"},
+                    {
+                        "dst_node_id": "22",
+                        "payload": "hello",
+                        "reply_to_message_id": "message-0",
+                    },
                 ]
             },
         }
@@ -96,11 +111,10 @@ def test_runtime_agent_grid_tools() -> None:
     assert second.metadata.dst_node_id == 22
     assert sent.metadata.message_type == "query"
     assert sent.metadata.group_id == ""
+    assert sent.metadata.reply_to_message_id == ""
+    assert second.metadata.reply_to_message_id == "message-0"
     assert (
-        sent.content[AGENT_GRID_MESSAGE_PAYLOAD_RECORD_KEY][
-            AGENT_GRID_MESSAGE_PAYLOAD_JSON_KEY
-        ]
-        == "hi"
+        sent.content[AGENT_MESSAGE_CONTENT_RECORD_KEY][AGENT_MESSAGE_TEXT_KEY] == "hi"
     )
 
     pulled = agent_grid.call(
