@@ -23,10 +23,10 @@ import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from logging import ERROR
-from typing import Annotated, cast
+from typing import cast
 
 from anyio import CancelScope
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -36,21 +36,19 @@ from flwr.app.metadata import Metadata
 from flwr.common.constant import Status, SubStatus
 from flwr.proto.runtime_pb2 import CreateTaskRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
-from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.constant import TaskType
+from flwr.supercore.corestate import CoreState
 from flwr.supercore.date import now
+from flwr.supercore.dependencies.runtime import RuntimeStateDependency
 from flwr.supercore.error import FlowerError
 from flwr.supercore.json_message.base import make_json_message
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.servicer.runtime import runtime_handlers
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
-from flwr.superlink.dependencies.linkstate import get_linkstate
 
 router = APIRouter(prefix="/v1/runtime", tags=["Runtime"])
-
-LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 
 _SUPPORTED_FIELDS = frozenset(
     {
@@ -97,7 +95,7 @@ class _ResponsesError(Exception):
 @router.post("/responses")
 async def create_runtime_response(
     request: Request,
-    state: LinkStateDependency,
+    state: RuntimeStateDependency,
 ) -> Response:
     """Create a model response through a child model task."""
     try:
@@ -122,7 +120,7 @@ async def create_runtime_response(
     return JSONResponse(content=response)
 
 
-def _authenticate(request: Request, state: LinkState) -> Task:
+def _authenticate(request: Request, state: CoreState) -> Task:
     """Authenticate exactly one AgentApp Bearer token."""
     authorization = request.headers.getlist("authorization")
     if len(authorization) != 1:
@@ -180,7 +178,7 @@ def _normalize_model_request_payload(payload: JSONObject) -> JSONObject:
 
 
 def _start_exchange(
-    state: LinkState,
+    state: CoreState,
     task: Task,
     payload: JSONObject,
 ) -> _Exchange:
@@ -231,7 +229,7 @@ def _start_exchange(
 
 
 async def _wait_for_response(
-    request: Request, state: LinkState, exchange: _Exchange
+    request: Request, state: CoreState, exchange: _Exchange
 ) -> JSONObject:
     """Wait for and return one correlated model response."""
     started_at = time.monotonic()
@@ -266,7 +264,7 @@ async def _wait_for_response(
 
 
 async def _stream_response(
-    state: LinkState, task: Task, model_payload: JSONObject
+    state: CoreState, task: Task, model_payload: JSONObject
 ) -> AsyncIterator[str]:
     """Create an exchange and relay its events as Server-Sent Events."""
     cursor: int | None = None
@@ -336,7 +334,7 @@ async def _stream_response(
 
 
 async def _wait_for_terminal_reply(
-    state: LinkState,
+    state: CoreState,
     exchange: _Exchange,
     launch_deadline: float,
     response_deadline: float,
@@ -355,7 +353,7 @@ async def _wait_for_terminal_reply(
         await asyncio.sleep(_POLL_INTERVAL)
 
 
-def _claim_response(state: LinkState, exchange: _Exchange) -> JSONObject | None:
+def _claim_response(state: CoreState, exchange: _Exchange) -> JSONObject | None:
     """Atomically claim the reply belonging to this exchange."""
     messages = state.get_task_message(
         dst_task_ids=[exchange.agent_task_id],
@@ -374,7 +372,7 @@ def _claim_response(state: LinkState, exchange: _Exchange) -> JSONObject | None:
 
 
 def _claim_response_or_raise_for_model_task_state(
-    state: LinkState,
+    state: CoreState,
     exchange: _Exchange,
     launch_deadline: float | None = None,
     response_deadline: float | None = None,
@@ -445,7 +443,7 @@ def _response_error_message(response: JSONObject) -> str:
     return "Model request failed."
 
 
-def _stop_model_task(state: LinkState, exchange: _Exchange, details: str) -> None:
+def _stop_model_task(state: CoreState, exchange: _Exchange, details: str) -> None:
     """Stop an unfinished model task and drain an already-arrived reply."""
     state.finish_task(exchange.model_task_id, SubStatus.STOPPED, details)
     try:

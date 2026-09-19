@@ -29,13 +29,13 @@ from flwr.app.message_type import MessageType
 from flwr.app.metadata import Metadata
 from flwr.common.constant import Status, SubStatus
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
-from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.constant import TaskType
+from flwr.supercore.corestate import CoreState
 from flwr.supercore.date import now
+from flwr.supercore.dependencies.runtime import get_runtime_state
 from flwr.supercore.json_message.base import make_json_message
 from flwr.supercore.json_message.model_message import ModelResponse
 from flwr.supercore.typing import JSONObject
-from flwr.superlink.dependencies.linkstate import get_linkstate
 
 from .responses import (
     _Exchange,
@@ -50,12 +50,12 @@ from .responses import (
 def _client(state: Mock) -> TestClient:
     app = FastAPI()
     app.include_router(router)
-    app.dependency_overrides[get_linkstate] = lambda: state
+    app.dependency_overrides[get_runtime_state] = lambda: state
     return TestClient(app)
 
 
 def _state() -> Mock:
-    state = Mock(spec=LinkState)
+    state = Mock(spec=CoreState)
     state.get_node_id.return_value = 789
     state.get_task_by_token.return_value = Task(
         task_id=123, run_id=789, type=TaskType.AGENT_APP
@@ -275,7 +275,7 @@ def test_responses_reports_missing_terminal_event() -> None:
 def test_responses_maps_unexpected_errors() -> None:
     """Return an OpenAI-style error envelope for unexpected failures."""
     with patch(
-        "flwr.superlink.routers.runtime.responses._authenticate",
+        "flwr.supercore.routers.runtime.responses._authenticate",
         side_effect=RuntimeError("unexpected"),
     ):
         response = _client(_state()).post(
@@ -310,7 +310,7 @@ def test_responses_stops_and_drains_when_response_wait_is_cancelled() -> None:
             agent_task_id=123,
             model_task_id=456,
         )
-        with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=10):
+        with patch("flwr.supercore.routers.runtime.responses._POLL_INTERVAL", new=10):
             response_wait = asyncio.create_task(
                 _wait_for_response(request, state, exchange)
             )
@@ -375,7 +375,7 @@ def test_responses_times_out_if_model_task_is_not_launched() -> None:
             model_task_id=456,
         )
         with patch(
-            "flwr.superlink.routers.runtime.responses._model_task_launch_timeout",
+            "flwr.supercore.routers.runtime.responses._model_task_launch_timeout",
             return_value=0.0,
         ):
             with pytest.raises(_ResponsesError) as exc_info:
@@ -409,7 +409,7 @@ def test_responses_times_out_if_running_model_task_does_not_respond() -> None:
             model_task_id=456,
         )
         with patch(
-            "flwr.superlink.routers.runtime.responses._DEFAULT_MODEL_RESPONSE_TIMEOUT",
+            "flwr.supercore.routers.runtime.responses._DEFAULT_MODEL_RESPONSE_TIMEOUT",
             new=0.0,
         ):
             with pytest.raises(_ResponsesError) as exc_info:
@@ -447,7 +447,7 @@ def test_responses_stops_and_drains_when_stream_task_group_is_cancelled() -> Non
         async def consume_stream() -> None:
             await anext(stream)
 
-        with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=10):
+        with patch("flwr.supercore.routers.runtime.responses._POLL_INTERVAL", new=10):
             async with anyio.create_task_group() as task_group:
                 task_group.start_soon(consume_stream)
                 await asyncio.wait_for(wait_until_polled(), timeout=1)
