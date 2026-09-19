@@ -33,7 +33,8 @@ _MAX_FILE_BYTES = 1024 * 1024
 _O_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 _O_DIRECTORY = getattr(os, "O_DIRECTORY", 0)
 _O_NONBLOCK = getattr(os, "O_NONBLOCK", 0)
-_O_SEARCH = getattr(os, "O_SEARCH", 0) or os.O_RDONLY
+_O_SEARCH = getattr(os, "O_SEARCH", 0) or getattr(os, "O_PATH", 0) or os.O_RDONLY
+_PLATFORM_SUPPORTED = os.name != "nt" and _O_NOFOLLOW != 0
 
 
 class FilesystemApiError(ConnectorApiError):
@@ -82,7 +83,7 @@ def invoke_filesystem_provider(
 ) -> JSONObject:
     """Execute one filesystem action."""
     del usage_recorder
-    if os.name == "nt":
+    if not _PLATFORM_SUPPORTED:
         raise FilesystemApiError("unsupported_platform")
     allowed = _allowed_dirs()
     if action == "list_directory":
@@ -241,7 +242,7 @@ def _safe_resolve(path: str, allowed: list[str]) -> str:
 
 def filesystem_is_configured() -> bool:
     """Return whether filesystem access is available and configured."""
-    if os.name == "nt":
+    if not _PLATFORM_SUPPORTED:
         return False
     raw = os.getenv(FILESYSTEM_ALLOWED_DIRS_ENV, "")
     return any(d.strip() for d in raw.split(os.pathsep))

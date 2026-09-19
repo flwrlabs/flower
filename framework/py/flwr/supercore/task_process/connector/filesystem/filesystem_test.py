@@ -73,8 +73,8 @@ def test_read_file_reads_content(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.skipif(
-    not getattr(os, "O_SEARCH", 0) or os.geteuid() == 0,
-    reason="requires O_SEARCH and non-root permission checks",
+    not (getattr(os, "O_SEARCH", 0) or getattr(os, "O_PATH", 0)) or os.geteuid() == 0,
+    reason="requires O_SEARCH/O_PATH and non-root permission checks",
 )
 def test_read_file_traverses_search_only_directory(
     monkeypatch: pytest.MonkeyPatch,
@@ -183,8 +183,8 @@ def test_list_directory_rejects_too_many_entries(
 
 
 def test_windows_rejected_as_unsupported(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Windows should be rejected because O_NOFOLLOW is unavailable."""
-    monkeypatch.setattr(os, "name", "nt")
+    """Unsupported platforms should be rejected."""
+    monkeypatch.setattr(filesystem_module, "_PLATFORM_SUPPORTED", False)
     monkeypatch.setenv(FILESYSTEM_ALLOWED_DIRS_ENV, "/tmp/example")
     assert filesystem_is_configured() is False
     with pytest.raises(FilesystemApiError, match="unsupported_platform"):
