@@ -33,7 +33,10 @@ from .filesystem import (
 
 
 def _allow(monkeypatch: pytest.MonkeyPatch, *dirs: str) -> None:
-    monkeypatch.setenv(FILESYSTEM_ALLOWED_DIRS_ENV, os.pathsep.join(dirs))
+    monkeypatch.setenv(
+        FILESYSTEM_ALLOWED_DIRS_ENV,
+        os.pathsep.join(os.path.realpath(path) for path in dirs),
+    )
 
 
 def _call(action: str, path: str) -> JSONObject:
@@ -68,7 +71,7 @@ def test_read_file_reads_content(monkeypatch: pytest.MonkeyPatch) -> None:
         _allow(monkeypatch, root)
         result = _call("read_file", filepath)
         assert result["content"] == "hello, world"
-        assert result["path"] == os.path.normpath(filepath)
+        assert result["path"] == os.path.realpath(filepath)
 
 
 @pytest.mark.skipif(
@@ -120,6 +123,74 @@ def test_replaced_allowed_root_denied(monkeypatch: pytest.MonkeyPatch) -> None:
 
             with pytest.raises(FilesystemApiError, match="access_denied"):
                 _call("read_file", os.path.join(root, "secret.txt"))
+
+
+def test_replaced_allowed_root_ancestor_denied(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Replacing a root ancestor during resolution must not move the sandbox."""
+    with tempfile.TemporaryDirectory() as parent:
+        with tempfile.TemporaryDirectory() as outside:
+            ancestor = os.path.join(parent, "ancestor")
+            parked = os.path.join(parent, "parked")
+            root = os.path.join(ancestor, "allowed")
+            os.makedirs(root)
+            os.mkdir(os.path.join(outside, "allowed"))
+            secret = os.path.join(outside, "allowed", "secret.txt")
+            with open(secret, "w", encoding="utf-8") as handle:
+                handle.write("secret")
+            _allow(monkeypatch, root)
+            real_realpath = os.path.realpath
+            replaced = False
+
+            def resolve_then_replace(path: str) -> str:
+                nonlocal replaced
+                resolved = real_realpath(path)
+                if not replaced:
+                    os.rename(ancestor, parked)
+                    os.symlink(outside, ancestor)
+                    replaced = True
+                return resolved
+
+            monkeypatch.setattr(os.path, "realpath", resolve_then_replace)
+
+            with pytest.raises(FilesystemApiError, match="access_denied"):
+                _call("read_file", os.path.join(root, "secret.txt"))
+
+
+def test_directory_moved_outside_root_during_open_denied(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A directory moved outside the root during traversal must be rejected."""
+    with tempfile.TemporaryDirectory() as parent:
+        root = os.path.join(parent, "allowed")
+        child = os.path.join(root, "child")
+        moved = os.path.join(parent, "moved")
+        os.makedirs(child)
+        path = os.path.join(child, "note.txt")
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write("secret")
+        _allow(monkeypatch, root)
+        real_open = os.open
+        moved_child = False
+
+        def open_and_move_child(
+            path: str,
+            flags: int,
+            mode: int = 0o777,
+            *,
+            dir_fd: int | None = None,
+        ) -> int:
+            nonlocal moved_child
+            fd = real_open(path, flags, mode, dir_fd=dir_fd)
+            if path == "child" and dir_fd is not None and not moved_child:
+                os.rename(child, moved)
+                moved_child = True
+            return fd
+
+        monkeypatch.setattr(os, "open", open_and_move_child)
+        with pytest.raises(FilesystemApiError, match="access_denied"):
+            _call("read_file", path)
 
 
 def test_allowed_root_preserves_whitespace(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -270,6 +341,6 @@ def test_make_filesystem_tool_schema() -> None:
 
 def test_allowed_dirs_rejects_relative_root(monkeypatch: pytest.MonkeyPatch) -> None:
     """Allowed directory configuration must contain absolute paths."""
-    _allow(monkeypatch, "relative")
+    monkeypatch.setenv(FILESYSTEM_ALLOWED_DIRS_ENV, "relative")
     with pytest.raises(FilesystemApiError, match="invalid_config"):
         _call("list_directory", "/tmp/x")

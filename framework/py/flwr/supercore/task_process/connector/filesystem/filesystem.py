@@ -188,7 +188,7 @@ def _open_sandboxed(path: str, allowed: list[str], flags: int) -> tuple[int, str
     """Open an absolute path relative to a pinned allowed-directory fd."""
     if not os.path.isabs(path):
         raise FilesystemApiError("access_denied")
-    normalized = os.path.normpath(path)
+    normalized = os.path.realpath(path)
     for root in allowed:
         normalized_root = os.path.normpath(root)
         try:
@@ -198,7 +198,7 @@ def _open_sandboxed(path: str, allowed: list[str], flags: int) -> tuple[int, str
             continue
         root_fd = None
         try:
-            root_fd = os.open(normalized_root, _O_SEARCH | _O_NOFOLLOW | _O_DIRECTORY)
+            root_fd = _open_root(normalized_root)
             return (
                 _open_relative(
                     root_fd,
@@ -215,6 +215,21 @@ def _open_sandboxed(path: str, allowed: list[str], flags: int) -> tuple[int, str
     raise FilesystemApiError("access_denied")
 
 
+def _open_root(root: str) -> int:
+    """Open every component of a configured root without following symlinks."""
+    parts = [part for part in root.split(os.sep) if part]
+    fd = os.open(os.sep, _O_SEARCH | _O_DIRECTORY)
+    try:
+        for part in parts:
+            new_fd = os.open(part, _O_SEARCH | _O_NOFOLLOW | _O_DIRECTORY, dir_fd=fd)
+            os.close(fd)
+            fd = new_fd
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
 def _open_relative(root_fd: int, relative: str, flags: int) -> int:
     """Open a relative path without following any of its components."""
     parts = [] if relative == "." else relative.split(os.sep)
@@ -226,11 +241,47 @@ def _open_relative(root_fd: int, relative: str, flags: int) -> int:
             fd = new_fd
         name = parts[-1] if parts else "."
         new_fd = os.open(name, flags | _O_NOFOLLOW, dir_fd=fd)
+        try:
+            beneath = _is_beneath(fd, root_fd)
+        except BaseException:
+            os.close(new_fd)
+            raise
+        if not beneath:
+            os.close(new_fd)
+            raise FilesystemApiError("access_denied")
         os.close(fd)
         return new_fd
     except BaseException:
         os.close(fd)
         raise
+
+
+def _is_beneath(directory_fd: int, root_fd: int) -> bool:
+    """Return whether an open directory still descends from the pinned root."""
+    root_stat = os.fstat(root_fd)
+    current_fd = os.dup(directory_fd)
+    try:
+        while True:
+            current_stat = os.fstat(current_fd)
+            if (current_stat.st_dev, current_stat.st_ino) == (
+                root_stat.st_dev,
+                root_stat.st_ino,
+            ):
+                return True
+            parent_fd = os.open(
+                "..", _O_SEARCH | _O_NOFOLLOW | _O_DIRECTORY, dir_fd=current_fd
+            )
+            parent_stat = os.fstat(parent_fd)
+            if (parent_stat.st_dev, parent_stat.st_ino) == (
+                current_stat.st_dev,
+                current_stat.st_ino,
+            ):
+                os.close(parent_fd)
+                return False
+            os.close(current_fd)
+            current_fd = parent_fd
+    finally:
+        os.close(current_fd)
 
 
 def _allowed_dirs() -> list[str]:

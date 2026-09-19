@@ -142,14 +142,17 @@ class TestHandleTask(unittest.TestCase):
                 {"action": "read_file", "path": path},
             )
 
-            with patch.dict(os.environ, {FILESYSTEM_ALLOWED_DIRS_ENV: root}):
+            with patch.dict(
+                os.environ,
+                {FILESYSTEM_ALLOWED_DIRS_ENV: os.path.realpath(root)},
+            ):
                 handle_task(client=self.stub)
 
         self.stub.GetConnector.assert_not_called()
         assert _pushed_response(self.stub).payload == {
             "name": FILESYSTEM_CONNECTOR_NAME,
             "call_id": "call-1",
-            "output": {"content": "hello", "path": os.path.normpath(path)},
+            "output": {"content": "hello", "path": os.path.realpath(path)},
             "error": None,
         }
 
