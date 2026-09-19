@@ -81,6 +81,8 @@ def invoke_filesystem_provider(
 ) -> JSONObject:
     """Execute one filesystem action."""
     del usage_recorder
+    if os.name == "nt":
+        raise FilesystemApiError("unsupported_platform")
     allowed = _allowed_dirs()
     if action == "list_directory":
         return _list_directory(path, allowed)
@@ -92,34 +94,24 @@ def invoke_filesystem_provider(
 def _list_directory(path: str, allowed: list[str]) -> JSONObject:
     """List entries in an allowed directory.
 
-    On POSIX the directory is opened via a per-component O_NOFOLLOW walk
+    The directory is opened via a per-component O_NOFOLLOW walk
     (_open_sandboxed) and the descriptor is kept open through the entry
     metadata loop so stat lookups are fd-relative and cannot escape the
-    sandbox. On Windows, where O_NOFOLLOW is unavailable, listdir and
-    stat fall back to path-based forms and _safe_resolve remains the
-    sandbox control.
+    sandbox. Entries are collected through a bounded scan so directories
+    with more than _MAX_DIRECTORY_ENTRIES entries fail fast instead of
+    being materialized in memory.
     """
     resolved = _safe_resolve(path, allowed)
-    fd = None
     try:
-        if _O_NOFOLLOW:
-            fd = _open_sandboxed(resolved, os.O_RDONLY | _O_DIRECTORY | _O_NONBLOCK)
-            entries = os.listdir(fd)
-        else:
-            entries = os.listdir(resolved)
+        fd = _open_sandboxed(resolved, os.O_RDONLY | _O_DIRECTORY | _O_NONBLOCK)
     except OSError:
         raise FilesystemApiError("access_denied") from None
     try:
-        if len(entries) > _MAX_DIRECTORY_ENTRIES:
-            raise FilesystemApiError("too_many_entries")
+        entries = _bounded_listdir(fd)
         items: list[JSONObject] = []
         for name in sorted(entries):
             try:
-                entry_st = (
-                    os.stat(name, follow_symlinks=False, dir_fd=fd)
-                    if fd is not None
-                    else os.stat(os.path.join(resolved, name), follow_symlinks=False)
-                )
+                entry_st = os.stat(name, follow_symlinks=False, dir_fd=fd)
             except OSError:
                 continue
             items.append(
@@ -134,20 +126,28 @@ def _list_directory(path: str, allowed: list[str]) -> JSONObject:
             )
         return {"entries": items}
     finally:
-        if fd is not None:
-            os.close(fd)
+        os.close(fd)
+
+
+def _bounded_listdir(fd: int) -> list[str]:
+    """List entry names of an open directory fd, capped at the entry limit."""
+    names: list[str] = []
+    with os.scandir(fd) as iterator:
+        for entry in iterator:
+            names.append(entry.name)
+            if len(names) > _MAX_DIRECTORY_ENTRIES:
+                raise FilesystemApiError("too_many_entries")
+    return names
 
 
 def _read_file(path: str, allowed: list[str]) -> JSONObject:
     """Read one UTF-8 text file inside an allowed directory.
 
-    On POSIX the file is opened via a per-component O_NOFOLLOW walk so
-    no intermediate directory can be swapped for a symlink between
+    The file is opened via a per-component O_NOFOLLOW walk so no
+    intermediate directory can be swapped for a symlink between
     _safe_resolve and the open syscall; O_NONBLOCK avoids hanging on
     named pipes. fstat on the returned fd validates the file is a
-    regular file (S_ISREG). On Windows, where O_NOFOLLOW is unavailable,
-    open falls back to plain os.open and _safe_resolve remains the
-    sandbox control.
+    regular file (S_ISREG).
     """
     resolved = _safe_resolve(path, allowed)
     fd = None
@@ -196,12 +196,8 @@ def _open_sandboxed(resolved: str, flags: int) -> int:
 
     Each component is opened relative to the previous directory fd, so a
     concurrent swap of any intermediate directory for a symlink is
-    rejected by the kernel instead of followed. Without O_NOFOLLOW
-    (Windows), falls back to a plain open; _safe_resolve remains the
-    sandbox control there.
+    rejected by the kernel instead of followed.
     """
-    if not _O_NOFOLLOW:
-        return os.open(resolved, flags)
     parts = [c for c in resolved.split(os.sep) if c]
     if not parts:
         return os.open(os.sep, flags | _O_NOFOLLOW | _O_DIRECTORY)
@@ -223,10 +219,9 @@ def _safe_resolve(path: str, allowed: list[str]) -> str:
     """Resolve and sandbox an absolute path.
 
     realpath canonicalization catches symlinks and '..' components before
-    the path is used. On POSIX, _open_sandboxed then re-opens the result
-    component by component with O_NOFOLLOW, closing the race window for
-    every path level. On Windows, where O_NOFOLLOW is unavailable, this
-    realpath check remains the sole sandbox control.
+    the path is used. _open_sandboxed then re-opens the result component
+    by component with O_NOFOLLOW, closing the race window for every path
+    level.
     """
     if not os.path.isabs(path):
         raise FilesystemApiError("access_denied")
@@ -241,7 +236,9 @@ def _safe_resolve(path: str, allowed: list[str]) -> str:
 
 
 def filesystem_is_configured() -> bool:
-    """Return whether filesystem access directories are configured."""
+    """Return whether filesystem access is available and configured."""
+    if os.name == "nt":
+        return False
     raw = os.getenv(FILESYSTEM_ALLOWED_DIRS_ENV, "")
     return any(d.strip() for d in raw.split(os.pathsep))
 

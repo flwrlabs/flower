@@ -23,6 +23,7 @@ import pytest
 
 from flwr.supercore.typing import JSONObject
 
+from . import filesystem as filesystem_module
 from .filesystem import (
     FILESYSTEM_ALLOWED_DIRS_ENV,
     FilesystemApiError,
@@ -114,25 +115,57 @@ def test_list_directory_rejects_file(monkeypatch: pytest.MonkeyPatch) -> None:
             _call("list_directory", filepath)
 
 
-def test_list_directory_reports_special_entries_as_other(
+def test_list_directory_reports_symlink_as_other(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Symlinks and FIFOs should be reported as type 'other'."""
+    """Symlinks should be reported as type 'other'."""
     with tempfile.TemporaryDirectory() as root:
         target = os.path.join(root, "target.txt")
         with open(target, "w", encoding="utf-8") as handle:
             handle.write("x")
         os.symlink(target, os.path.join(root, "link"))
-        os.mkfifo(os.path.join(root, "fifo"))
         _allow(monkeypatch, root)
         result = _call("list_directory", root)
         assert result == {
             "entries": [
-                {"name": "fifo", "type": "other"},
                 {"name": "link", "type": "other"},
                 {"name": "target.txt", "type": "file"},
             ]
         }
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="mkfifo is POSIX-only")
+def test_list_directory_reports_fifo_as_other(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """FIFOs should be reported as type 'other'."""
+    with tempfile.TemporaryDirectory() as root:
+        os.mkfifo(os.path.join(root, "fifo"))
+        _allow(monkeypatch, root)
+        result = _call("list_directory", root)
+        assert result == {"entries": [{"name": "fifo", "type": "other"}]}
+
+
+def test_list_directory_rejects_too_many_entries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Directories above the entry cap should raise before materializing."""
+    with tempfile.TemporaryDirectory() as root:
+        for index in range(2):
+            os.makedirs(os.path.join(root, f"entry-{index}"))
+        _allow(monkeypatch, root)
+        monkeypatch.setattr(filesystem_module, "_MAX_DIRECTORY_ENTRIES", 1)
+        with pytest.raises(FilesystemApiError, match="too_many_entries"):
+            _call("list_directory", root)
+
+
+def test_windows_rejected_as_unsupported(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Windows should be rejected because O_NOFOLLOW is unavailable."""
+    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setenv(FILESYSTEM_ALLOWED_DIRS_ENV, "/tmp/example")
+    assert filesystem_is_configured() is False
+    with pytest.raises(FilesystemApiError, match="unsupported_platform"):
+        _call("list_directory", "/tmp/example")
 
 
 def test_invalid_action_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
