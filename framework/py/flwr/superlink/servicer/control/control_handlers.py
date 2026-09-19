@@ -733,7 +733,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             resolved_federation_config,
             flwr_aid,
             primary_task_type,
-            user_prompt=request.user_prompt or None,
+            user_prompt=user_prompt or None,
             series_id=series_id,
             series_description=series_description,
             connector_refs=connector_refs,
@@ -752,7 +752,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         run = state.get_run_info(run_ids=[run_id])[0]
         series_id = run.series_id
         if series_description and series_id:
-            start_title_generation(state, series_id, request.user_prompt)
+            start_title_generation(state, series_id, user_prompt)
 
     except ValueError as e:
         log(ERROR, "Could not start run: %s", str(e))
