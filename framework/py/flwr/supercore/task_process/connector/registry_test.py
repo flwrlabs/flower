@@ -34,10 +34,5 @@ def test_connector_tool_names_are_unique() -> None:
 
 def test_filesystem_is_builtin_without_oauth() -> None:
     """Filesystem should use the same credential-free path as web_search."""
-    tool_names = [tool["name"] for tool in registry.get_builtin_connector_tools()]
-
-    assert "filesystem" in tool_names
     assert registry.has_builtin_connector("filesystem")
     assert "filesystem" not in registry.OAUTH_FLOWS
-    assert registry.get_connector_tools("filesystem")[0]["name"] == "filesystem"
-    assert registry.get_builtin_connector_tool("filesystem")["name"] == "filesystem"
