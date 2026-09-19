@@ -31,6 +31,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddAppRequest,
     AddAppResponse,
     AppInfo,
+    ListAppAssociationsRequest,
     ListAppsRequest,
     ListAppsResponse,
     ListAutomationsRequest,
@@ -62,6 +63,7 @@ from flwr.superlink.federation import NoOpFederationManager
 
 from .control_handlers import (
     add_app,
+    list_app_associations,
     list_apps,
     list_automations,
     list_run_series_events,
@@ -558,6 +560,65 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 (FLOWER_AGENT_APP_ID, "", TaskType.AGENT_APP),
             ],
         )
+
+    def test_list_app_associations_only_returns_accessible_federations(self) -> None:
+        """Exclude non-member and archived federations from app associations."""
+        for federation_id in (
+            NOOP_FEDERATION_ID,
+            "@me/archived",
+            "@other/private",
+        ):
+            self.state.store_app(
+                fab=Fab("", federation_id.encode(), {}),
+                federation_id=federation_id,
+                app_id="@flwr/demo",
+                app_type=TaskType.SERVER_APP,
+                added_by=self.account.flwr_aid,
+            )
+
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "get_federations",
+                return_value=[
+                    Mock(id=NOOP_FEDERATION_ID, archived=False),
+                    Mock(id="@me/archived", archived=True),
+                ],
+            ),
+            patch.object(
+                self.state,
+                "list_app_associations",
+                wraps=self.state.list_app_associations,
+            ) as state_list_app_associations,
+        ):
+            response = list_app_associations(
+                ListAppAssociationsRequest(app_id="@flwr/demo"),
+                self.account,
+                self.state,
+            )
+
+        self.assertEqual(list(response.federation_ids), [NOOP_FEDERATION_ID])
+        state_list_app_associations.assert_called_once_with(
+            "@flwr/demo", [NOOP_FEDERATION_ID]
+        )
+
+    def test_list_app_associations_includes_default_flower_agent(self) -> None:
+        """List active member federations for the default Flower Agent."""
+        with patch.object(
+            self.state.federation_manager,
+            "get_federations",
+            return_value=[
+                Mock(id=NOOP_FEDERATION_ID, archived=False),
+                Mock(id="@me/archived", archived=True),
+            ],
+        ):
+            response = list_app_associations(
+                ListAppAssociationsRequest(app_id=FLOWER_AGENT_APP_ID),
+                self.account,
+                self.state,
+            )
+
+        self.assertEqual(list(response.federation_ids), [NOOP_FEDERATION_ID])
 
     def test_list_apps_does_not_duplicate_stored_flower_agent(self) -> None:
         """List apps uses the stored Flower Agent entry when available."""
