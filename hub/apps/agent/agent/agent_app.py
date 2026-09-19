@@ -14,10 +14,6 @@ app = AgentApp()
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
     """Send the configured input to the model."""
-    prompt = context.run_config.get("agent.input")
-    if not isinstance(prompt, str) or not prompt.strip():
-        raise ValueError("agent.input must be a non-empty string")
-
     client = OpenAI(
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
         api_key=os.environ["FLWR_RUNTIME_API_KEY"],
@@ -25,7 +21,7 @@ def main(agent: AgentSession, context: Context) -> None:
     )
     stream = client.responses.create(
         model=MODEL,
-        input=prompt.strip(),
+        input=agent.prompt,
         stream=True,
     )
 
