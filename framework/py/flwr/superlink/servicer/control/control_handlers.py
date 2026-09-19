@@ -657,7 +657,6 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         # Validate user config overrides matches keys in run config in FAB
         fab_config = get_fab_config(fab_file)
         run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
-        fuse_dicts(run_config, override_config)
 
         # Derive primary task type from the submitted FAB. AgentApp-only FABs can
         # be bundled locally and submitted through the regular `flwr run` path.
