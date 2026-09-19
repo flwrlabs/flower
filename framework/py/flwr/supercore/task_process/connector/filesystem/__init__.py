@@ -12,10 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""File system connector."""
+"""Built-in filesystem connector."""
 
-from .definition import CONNECTOR
+from .filesystem import (
+    FILESYSTEM_ALLOWED_DIRS_ENV,
+    FILESYSTEM_CONNECTOR_NAME,
+    FilesystemApiError,
+    filesystem_is_configured,
+    invoke_filesystem_provider,
+    make_filesystem_tool,
+)
 
 __all__ = [
-    "CONNECTOR",
+    "FILESYSTEM_ALLOWED_DIRS_ENV",
+    "FILESYSTEM_CONNECTOR_NAME",
+    "FilesystemApiError",
+    "filesystem_is_configured",
+    "invoke_filesystem_provider",
+    "make_filesystem_tool",
 ]

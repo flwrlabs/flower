@@ -16,19 +16,31 @@
 
 import os
 import tempfile
+from typing import cast
 from unittest.mock import Mock
 
 import pytest
 
-from .executors import FilesystemApiError, list_directory, read_file
+from flwr.supercore.typing import JSONObject
+
+from .filesystem import (
+    FILESYSTEM_ALLOWED_DIRS_ENV,
+    FilesystemApiError,
+    filesystem_is_configured,
+    invoke_filesystem_provider,
+    make_filesystem_tool,
+)
 
 
-def _context(**kwargs: object) -> Mock:
-    config: dict[str, object] = {"allowed_dirs": []} | kwargs
-    return Mock(config=config)
+def _allow(monkeypatch: pytest.MonkeyPatch, *dirs: str) -> None:
+    monkeypatch.setenv(FILESYSTEM_ALLOWED_DIRS_ENV, os.pathsep.join(dirs))
 
 
-def test_list_directory_in_temp_dir() -> None:
+def _call(action: str, path: str) -> JSONObject:
+    return invoke_filesystem_provider(action, path, usage_recorder=Mock())
+
+
+def test_list_directory_in_temp_dir(monkeypatch: pytest.MonkeyPatch) -> None:
     """Listing should return sorted file and directory entries."""
     with tempfile.TemporaryDirectory() as root:
         os.makedirs(os.path.join(root, "subdir"))
@@ -36,7 +48,8 @@ def test_list_directory_in_temp_dir() -> None:
             handle.write("hello")
         with open(os.path.join(root, "b.txt"), "w", encoding="utf-8") as handle:
             handle.write("world")
-        result = list_directory({"path": root}, _context(allowed_dirs=[root]))
+        _allow(monkeypatch, root)
+        result = _call("list_directory", root)
         assert result == {
             "entries": [
                 {"name": "a.txt", "type": "file"},
@@ -46,28 +59,30 @@ def test_list_directory_in_temp_dir() -> None:
         }
 
 
-def test_read_file_reads_content() -> None:
+def test_read_file_reads_content(monkeypatch: pytest.MonkeyPatch) -> None:
     """File reading should return UTF-8 content and resolved path."""
     with tempfile.TemporaryDirectory() as root:
         filepath = os.path.join(root, "note.txt")
         with open(filepath, "w", encoding="utf-8") as handle:
             handle.write("hello, world")
-        result = read_file({"path": filepath}, _context(allowed_dirs=[root]))
+        _allow(monkeypatch, root)
+        result = _call("read_file", filepath)
         assert result["content"] == "hello, world"
         assert result["path"] == os.path.realpath(filepath)
 
 
-def test_read_file_symlink_outside_denied() -> None:
+def test_read_file_symlink_outside_denied(monkeypatch: pytest.MonkeyPatch) -> None:
     """Symlinks that resolve outside allowed dirs should be denied."""
     with tempfile.TemporaryDirectory() as good:
         with tempfile.TemporaryDirectory() as outside:
             sym = os.path.join(good, "link")
             os.symlink(os.path.join(outside, "secret"), sym)
+            _allow(monkeypatch, good)
             with pytest.raises(FilesystemApiError, match="access_denied"):
-                read_file({"path": sym}, _context(allowed_dirs=[good]))
+                _call("read_file", sym)
 
 
-def test_read_file_path_traversal_denied() -> None:
+def test_read_file_path_traversal_denied(monkeypatch: pytest.MonkeyPatch) -> None:
     """A path that resolves outside allowed dirs should be denied."""
     with tempfile.TemporaryDirectory() as root:
         with tempfile.TemporaryDirectory() as outside:
@@ -75,28 +90,33 @@ def test_read_file_path_traversal_denied() -> None:
             with open(outside_file, "w", encoding="utf-8") as handle:
                 handle.write("secret")
             path = os.path.join(root, "..", os.path.basename(outside), "secret.txt")
+            _allow(monkeypatch, root)
             with pytest.raises(FilesystemApiError, match="access_denied"):
-                read_file({"path": path}, _context(allowed_dirs=[root]))
+                _call("read_file", path)
 
 
-def test_read_file_rejects_directory() -> None:
+def test_read_file_rejects_directory(monkeypatch: pytest.MonkeyPatch) -> None:
     """Calling read_file on a directory should raise."""
     with tempfile.TemporaryDirectory() as root:
+        _allow(monkeypatch, root)
         with pytest.raises(FilesystemApiError, match="not_a_file"):
-            read_file({"path": root}, _context(allowed_dirs=[root]))
+            _call("read_file", root)
 
 
-def test_list_directory_rejects_file() -> None:
+def test_list_directory_rejects_file(monkeypatch: pytest.MonkeyPatch) -> None:
     """Calling list_directory on a file should raise."""
     with tempfile.TemporaryDirectory() as root:
         filepath = os.path.join(root, "f.txt")
         with open(filepath, "w", encoding="utf-8") as handle:
             handle.write("x")
+        _allow(monkeypatch, root)
         with pytest.raises(FilesystemApiError, match="access_denied"):
-            list_directory({"path": filepath}, _context(allowed_dirs=[root]))
+            _call("list_directory", filepath)
 
 
-def test_list_directory_reports_special_entries_as_other() -> None:
+def test_list_directory_reports_special_entries_as_other(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Symlinks and FIFOs should be reported as type 'other'."""
     with tempfile.TemporaryDirectory() as root:
         target = os.path.join(root, "target.txt")
@@ -104,7 +124,8 @@ def test_list_directory_reports_special_entries_as_other() -> None:
             handle.write("x")
         os.symlink(target, os.path.join(root, "link"))
         os.mkfifo(os.path.join(root, "fifo"))
-        result = list_directory({"path": root}, _context(allowed_dirs=[root]))
+        _allow(monkeypatch, root)
+        result = _call("list_directory", root)
         assert result == {
             "entries": [
                 {"name": "fifo", "type": "other"},
@@ -114,36 +135,68 @@ def test_list_directory_reports_special_entries_as_other() -> None:
         }
 
 
-def test_list_directory_requires_path() -> None:
-    """Missing path argument should raise a ValueError."""
-    with pytest.raises(ValueError, match="must be a non-empty string"):
-        list_directory({}, _context(allowed_dirs=["/tmp"]))
+def test_invalid_action_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An unknown action should raise."""
+    with tempfile.TemporaryDirectory() as root:
+        _allow(monkeypatch, root)
+        with pytest.raises(FilesystemApiError, match="invalid_action"):
+            _call("delete_file", root)
 
 
-def test_read_file_requires_path() -> None:
-    """Missing path argument should raise a ValueError."""
-    with pytest.raises(ValueError, match="must be a non-empty string"):
-        read_file({}, _context(allowed_dirs=["/tmp"]))
-
-
-def test_relative_path_rejected() -> None:
+def test_relative_path_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     """A relative path should be rejected before realpath resolution."""
     with tempfile.TemporaryDirectory() as root:
+        _allow(monkeypatch, root)
         with pytest.raises(FilesystemApiError, match="access_denied"):
-            read_file({"path": "some/relative/path"}, _context(allowed_dirs=[root]))
+            _call("read_file", "some/relative/path")
 
 
-def test_allowed_dirs_rejects_empty_string() -> None:
-    """Empty-string allowed_dirs entries should trigger invalid_config."""
+def test_allowed_dirs_rejects_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unset allowed_dirs should trigger invalid_config."""
+    monkeypatch.delenv(FILESYSTEM_ALLOWED_DIRS_ENV, raising=False)
     with pytest.raises(FilesystemApiError, match="invalid_config"):
-        list_directory({"path": "/tmp/x"}, _context(allowed_dirs=[""]))
+        _call("list_directory", "/tmp/x")
 
 
-def test_read_file_enforces_max_size() -> None:
+def test_read_file_enforces_max_size(monkeypatch: pytest.MonkeyPatch) -> None:
     """Files larger than 1 MB should be rejected."""
     with tempfile.TemporaryDirectory() as root:
         big = os.path.join(root, "big.bin")
         with open(big, "wb") as handle:
             handle.write(b"\x00" * (1024 * 1024 + 1))
+        _allow(monkeypatch, root)
         with pytest.raises(FilesystemApiError, match="file_too_large"):
-            read_file({"path": big}, _context(allowed_dirs=[root]))
+            _call("read_file", big)
+
+
+def test_make_filesystem_tool_schema() -> None:
+    """Tool schema should expose the filesystem connector contract."""
+    tool = make_filesystem_tool()
+    assert tool["name"] == "filesystem"
+    assert tool["type"] == "function"
+    params = cast(JSONObject, tool["parameters"])
+    assert params["additionalProperties"] is False
+    assert set(cast(list[str], params["required"])) == {"action", "path"}
+    properties = cast(JSONObject, params["properties"])
+    assert cast(JSONObject, properties["action"])["enum"] == [
+        "list_directory",
+        "read_file",
+    ]
+
+
+def test_filesystem_is_configured_when_dirs_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Setting allowed dirs should report the connector as configured."""
+    _allow(monkeypatch, "/tmp/example")
+    assert filesystem_is_configured() is True
+
+
+def test_filesystem_is_configured_rejects_blank(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An unset or blank allowed dirs value should report not configured."""
+    monkeypatch.delenv(FILESYSTEM_ALLOWED_DIRS_ENV, raising=False)
+    assert filesystem_is_configured() is False
+    monkeypatch.setenv(FILESYSTEM_ALLOWED_DIRS_ENV, f" {os.pathsep} ")
+    assert filesystem_is_configured() is False

@@ -15,6 +15,10 @@
 """Tests for the connector registry."""
 
 
+import pytest
+
+from . import registry
+from .filesystem.filesystem import FILESYSTEM_ALLOWED_DIRS_ENV
 from .registry import CONNECTORS
 
 
@@ -30,3 +34,33 @@ def test_connector_tool_names_are_unique() -> None:
     tool_names = [name for connector in CONNECTORS for name in connector.handlers]
 
     assert len(tool_names) == len(set(tool_names))
+
+
+def test_filesystem_tool_hidden_without_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Filesystem tools should be unavailable when allowed dirs are unset."""
+    monkeypatch.delenv(FILESYSTEM_ALLOWED_DIRS_ENV, raising=False)
+
+    tool_names = [tool["name"] for tool in registry.get_builtin_connector_tools()]
+
+    assert "filesystem" not in tool_names
+    assert not registry.has_builtin_connector("filesystem")
+    with pytest.raises(ValueError, match="not configured"):
+        registry.get_connector_tools("filesystem")
+    with pytest.raises(ValueError, match="Unsupported connector"):
+        registry.get_builtin_connector_tool("filesystem")
+
+
+def test_filesystem_tool_visible_with_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Filesystem tools should be available when allowed dirs are configured."""
+    monkeypatch.setenv(FILESYSTEM_ALLOWED_DIRS_ENV, "/tmp/example")
+
+    tool_names = [tool["name"] for tool in registry.get_builtin_connector_tools()]
+
+    assert "filesystem" in tool_names
+    assert registry.has_builtin_connector("filesystem")
+    assert registry.get_connector_tools("filesystem")[0]["name"] == "filesystem"
+    assert registry.get_builtin_connector_tool("filesystem")["name"] == "filesystem"
