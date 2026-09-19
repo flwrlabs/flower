@@ -45,7 +45,10 @@ def test_filesystem_tool_hidden_without_configuration(
     tool_names = [tool["name"] for tool in registry.get_builtin_connector_tools()]
 
     assert "filesystem" not in tool_names
-    assert not registry.has_builtin_connector("filesystem")
+    # The connector stays registered so SuperLink-side CreateTask validation
+    # succeeds even when FLWR_FILESYSTEM_ALLOWED_DIRS is only set on the
+    # TaskExecutor; execution fails with invalid_config instead.
+    assert registry.has_builtin_connector("filesystem")
     with pytest.raises(ValueError, match="not configured"):
         registry.get_connector_tools("filesystem")
     with pytest.raises(ValueError, match="Unsupported connector"):

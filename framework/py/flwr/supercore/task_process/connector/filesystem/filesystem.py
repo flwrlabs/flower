@@ -33,6 +33,7 @@ _MAX_FILE_BYTES = 1024 * 1024
 _O_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 _O_DIRECTORY = getattr(os, "O_DIRECTORY", 0)
 _O_NONBLOCK = getattr(os, "O_NONBLOCK", 0)
+_O_SEARCH = getattr(os, "O_SEARCH", 0) or os.O_RDONLY
 
 
 class FilesystemApiError(ConnectorApiError):
@@ -196,15 +197,18 @@ def _open_sandboxed(resolved: str, flags: int) -> int:
 
     Each component is opened relative to the previous directory fd, so a
     concurrent swap of any intermediate directory for a symlink is
-    rejected by the kernel instead of followed.
+    rejected by the kernel instead of followed. Intermediate directories
+    are opened search-only (O_SEARCH where available) so traversal
+    through execute-only ancestors succeeds, matching normal POSIX
+    pathname semantics.
     """
     parts = [c for c in resolved.split(os.sep) if c]
     if not parts:
         return os.open(os.sep, flags | _O_NOFOLLOW | _O_DIRECTORY)
-    fd = os.open(os.sep, os.O_RDONLY)
+    fd = os.open(os.sep, _O_SEARCH)
     try:
         for part in parts[:-1]:
-            new_fd = os.open(part, os.O_RDONLY | _O_NOFOLLOW | _O_DIRECTORY, dir_fd=fd)
+            new_fd = os.open(part, _O_SEARCH | _O_NOFOLLOW | _O_DIRECTORY, dir_fd=fd)
             os.close(fd)
             fd = new_fd
         new_fd = os.open(parts[-1], flags | _O_NOFOLLOW, dir_fd=fd)

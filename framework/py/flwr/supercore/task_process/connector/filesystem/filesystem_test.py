@@ -72,6 +72,29 @@ def test_read_file_reads_content(monkeypatch: pytest.MonkeyPatch) -> None:
         assert result["path"] == os.path.realpath(filepath)
 
 
+@pytest.mark.skipif(
+    not getattr(os, "O_SEARCH", 0) or os.geteuid() == 0,
+    reason="requires O_SEARCH and non-root permission checks",
+)
+def test_read_file_traverses_search_only_directory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Files beneath execute-only ancestors should stay readable."""
+    with tempfile.TemporaryDirectory() as root:
+        middle = os.path.join(root, "search_only")
+        os.makedirs(middle)
+        filepath = os.path.join(middle, "note.txt")
+        with open(filepath, "w", encoding="utf-8") as handle:
+            handle.write("hidden but readable")
+        os.chmod(middle, 0o111)
+        try:
+            _allow(monkeypatch, root)
+            result = _call("read_file", filepath)
+        finally:
+            os.chmod(middle, 0o700)
+        assert result["content"] == "hidden but readable"
+
+
 def test_read_file_symlink_outside_denied(monkeypatch: pytest.MonkeyPatch) -> None:
     """Symlinks that resolve outside allowed dirs should be denied."""
     with tempfile.TemporaryDirectory() as good:

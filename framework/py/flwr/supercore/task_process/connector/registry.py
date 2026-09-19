@@ -149,5 +149,12 @@ def get_oauth_flow(connector_ref: str) -> OAuthFlow:
 
 
 def has_builtin_connector(name: str) -> bool:
-    """Return whether a built-in connector is registered and available."""
-    return name in _CONNECTOR_HANDLERS and _is_builtin_connector_available(name)
+    """Return whether a built-in connector is registered.
+
+    Availability is not consulted here; callers must validate the
+    connector is configured before invoking it at runtime. This
+    allows the SuperLink's CreateTask validation to accept
+    connectors that are configured only in the executor environment
+    (e.g. FLWR_FILESYSTEM_ALLOWED_DIRS).
+    """
+    return name in _CONNECTOR_HANDLERS
