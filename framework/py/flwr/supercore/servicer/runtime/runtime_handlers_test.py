@@ -15,7 +15,6 @@
 """Runtime API handler tests."""
 
 
-import os
 import unittest
 from logging import ERROR
 from unittest.mock import Mock, patch
@@ -249,18 +248,11 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.state.get_run_connector_refs.assert_not_called()
         self.assertEqual(response.task_id, 456)
 
-    def test_create_task_allows_unconfigured_filesystem_connector(
-        self,
-    ) -> None:
-        """CreateTask validation must not depend on executor-only env config."""
+    def test_create_task_allows_filesystem_connector(self) -> None:
+        """CreateTask should allow filesystem without OAuth or run binding."""
         self.state.create_task.return_value = 456
-        env = {
-            key: value
-            for key, value in os.environ.items()
-            if key != "FLWR_FILESYSTEM_ALLOWED_DIRS"
-        }
-        with patch.dict(os.environ, env, clear=True):
-            response = self._create_connector_task("filesystem")
+
+        response = self._create_connector_task("filesystem")
 
         self.state.get_run_connector_refs.assert_not_called()
         self.assertEqual(response.task_id, 456)

@@ -14,6 +14,8 @@
 # ==============================================================================
 """Connector task credential-resolution tests."""
 
+import os
+import tempfile
 import traceback
 import unittest
 from unittest.mock import ANY, Mock, patch
@@ -28,9 +30,11 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorResponse,
 )
 from flwr.supercore.task_identity import TaskIdentity
+from flwr.supercore.typing import JSONObject
 
 from . import registry
 from .definition import ConnectorExecutionContext
+from .filesystem import FILESYSTEM_ALLOWED_DIRS_ENV, FILESYSTEM_CONNECTOR_NAME
 from .http import ConnectorApiError
 from .task import handle_task
 
@@ -41,13 +45,15 @@ class NotionTestApiError(ConnectorApiError):
     provider = "Notion"
 
 
-def _connector_request(name: str) -> ConnectorRequest:
+def _connector_request(
+    name: str, arguments: JSONObject | None = None
+) -> ConnectorRequest:
     """Build a connector request with routed task metadata."""
     request = ConnectorRequest(
         dst_task_id=22,
         name=name,
         call_id="call-1",
-        arguments={"query": "release notes"},
+        arguments=arguments or {"query": "release notes"},
     )
     request.metadata.__dict__["_run_id"] = 7
     request.metadata.__dict__["_message_id"] = "request-message-id"
@@ -122,6 +128,28 @@ class TestHandleTask(unittest.TestCase):
             "name": tool_name,
             "call_id": "call-1",
             "output": {"pages": 3},
+            "error": None,
+        }
+
+    def test_executes_filesystem_without_credentials(self) -> None:
+        """Filesystem should execute locally without loading OAuth credentials."""
+        with tempfile.TemporaryDirectory() as root:
+            path = os.path.join(root, "note.txt")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write("hello")
+            self.pull_connector_request.return_value = _connector_request(
+                FILESYSTEM_CONNECTOR_NAME,
+                {"action": "read_file", "path": path},
+            )
+
+            with patch.dict(os.environ, {FILESYSTEM_ALLOWED_DIRS_ENV: root}):
+                handle_task(client=self.stub)
+
+        self.stub.GetConnector.assert_not_called()
+        assert _pushed_response(self.stub).payload == {
+            "name": FILESYSTEM_CONNECTOR_NAME,
+            "call_id": "call-1",
+            "output": {"content": "hello", "path": os.path.normpath(path)},
             "error": None,
         }
 

@@ -18,7 +18,6 @@ from .filesystem import (
     FILESYSTEM_ALLOWED_DIRS_ENV,
     FILESYSTEM_CONNECTOR_NAME,
     FilesystemApiError,
-    filesystem_is_configured,
     invoke_filesystem_provider,
     make_filesystem_tool,
 )
@@ -27,7 +26,6 @@ __all__ = [
     "FILESYSTEM_ALLOWED_DIRS_ENV",
     "FILESYSTEM_CONNECTOR_NAME",
     "FilesystemApiError",
-    "filesystem_is_configured",
     "invoke_filesystem_provider",
     "make_filesystem_tool",
 ]

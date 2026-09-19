@@ -14,11 +14,7 @@
 # ==============================================================================
 """Tests for the connector registry."""
 
-
-import pytest
-
 from . import registry
-from .filesystem.filesystem import FILESYSTEM_ALLOWED_DIRS_ENV
 from .registry import CONNECTORS
 
 
@@ -36,34 +32,12 @@ def test_connector_tool_names_are_unique() -> None:
     assert len(tool_names) == len(set(tool_names))
 
 
-def test_filesystem_tool_hidden_without_configuration(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Filesystem tools should be unavailable when allowed dirs are unset."""
-    monkeypatch.delenv(FILESYSTEM_ALLOWED_DIRS_ENV, raising=False)
-
-    tool_names = [tool["name"] for tool in registry.get_builtin_connector_tools()]
-
-    assert "filesystem" not in tool_names
-    # The connector stays registered so SuperLink-side CreateTask validation
-    # succeeds even when FLWR_FILESYSTEM_ALLOWED_DIRS is only set on the
-    # TaskExecutor; execution fails with invalid_config instead.
-    assert registry.has_builtin_connector("filesystem")
-    with pytest.raises(ValueError, match="not configured"):
-        registry.get_connector_tools("filesystem")
-    with pytest.raises(ValueError, match="Unsupported connector"):
-        registry.get_builtin_connector_tool("filesystem")
-
-
-def test_filesystem_tool_visible_with_configuration(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Filesystem tools should be available when allowed dirs are configured."""
-    monkeypatch.setenv(FILESYSTEM_ALLOWED_DIRS_ENV, "/tmp/example")
-
+def test_filesystem_is_builtin_without_oauth() -> None:
+    """Filesystem should use the same credential-free path as web_search."""
     tool_names = [tool["name"] for tool in registry.get_builtin_connector_tools()]
 
     assert "filesystem" in tool_names
     assert registry.has_builtin_connector("filesystem")
+    assert "filesystem" not in registry.OAUTH_FLOWS
     assert registry.get_connector_tools("filesystem")[0]["name"] == "filesystem"
     assert registry.get_builtin_connector_tool("filesystem")["name"] == "filesystem"

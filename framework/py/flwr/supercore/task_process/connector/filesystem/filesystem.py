@@ -96,18 +96,12 @@ def invoke_filesystem_provider(
 def _list_directory(path: str, allowed: list[str]) -> JSONObject:
     """List entries in an allowed directory.
 
-    The directory is opened via a per-component O_NOFOLLOW walk
-    (_open_sandboxed) and the descriptor is kept open through the entry
-    metadata loop so stat lookups are fd-relative and cannot escape the
-    sandbox. Entries are collected through a bounded scan so directories
-    with more than _MAX_DIRECTORY_ENTRIES entries fail fast instead of
-    being materialized in memory.
+    The configured root is pinned by descriptor before the requested path is
+    opened component by component with O_NOFOLLOW. The target descriptor stays
+    open through metadata lookup so concurrent path replacement cannot escape
+    the sandbox.
     """
-    resolved = _safe_resolve(path, allowed)
-    try:
-        fd = _open_sandboxed(resolved, os.O_RDONLY | _O_DIRECTORY | _O_NONBLOCK)
-    except OSError:
-        raise FilesystemApiError("access_denied") from None
+    fd, _ = _open_sandboxed(path, allowed, os.O_RDONLY | _O_DIRECTORY | _O_NONBLOCK)
     try:
         entries = _bounded_listdir(fd)
         items: list[JSONObject] = []
@@ -145,16 +139,13 @@ def _bounded_listdir(fd: int) -> list[str]:
 def _read_file(path: str, allowed: list[str]) -> JSONObject:
     """Read one UTF-8 text file inside an allowed directory.
 
-    The file is opened via a per-component O_NOFOLLOW walk so no
-    intermediate directory can be swapped for a symlink between
-    _safe_resolve and the open syscall; O_NONBLOCK avoids hanging on
-    named pipes. fstat on the returned fd validates the file is a
-    regular file (S_ISREG).
+    The configured root is pinned by descriptor before the requested path is
+    opened component by component with O_NOFOLLOW. O_NONBLOCK avoids hanging
+    on named pipes, and fstat validates the target is a regular file.
     """
-    resolved = _safe_resolve(path, allowed)
     fd = None
     try:
-        fd = _open_sandboxed(resolved, os.O_RDONLY | _O_NONBLOCK)
+        fd, resolved = _open_sandboxed(path, allowed, os.O_RDONLY | _O_NONBLOCK)
         st = os.fstat(fd)
         if not stat.S_ISREG(st.st_mode):
             raise FilesystemApiError("not_a_file")
@@ -193,26 +184,48 @@ def _read_all(fd: int) -> bytes:
     return b"".join(chunks)
 
 
-def _open_sandboxed(resolved: str, flags: int) -> int:
-    """Open resolved by walking every component with O_NOFOLLOW.
+def _open_sandboxed(path: str, allowed: list[str], flags: int) -> tuple[int, str]:
+    """Open an absolute path relative to a pinned allowed-directory fd."""
+    if not os.path.isabs(path):
+        raise FilesystemApiError("access_denied")
+    normalized = os.path.normpath(path)
+    for root in allowed:
+        normalized_root = os.path.normpath(root)
+        try:
+            if os.path.commonpath((normalized, normalized_root)) != normalized_root:
+                continue
+        except ValueError:
+            continue
+        root_fd = None
+        try:
+            root_fd = os.open(normalized_root, _O_SEARCH | _O_NOFOLLOW | _O_DIRECTORY)
+            return (
+                _open_relative(
+                    root_fd,
+                    os.path.relpath(normalized, normalized_root),
+                    flags,
+                ),
+                normalized,
+            )
+        except OSError:
+            continue
+        finally:
+            if root_fd is not None:
+                os.close(root_fd)
+    raise FilesystemApiError("access_denied")
 
-    Each component is opened relative to the previous directory fd, so a
-    concurrent swap of any intermediate directory for a symlink is
-    rejected by the kernel instead of followed. Intermediate directories
-    are opened search-only (O_SEARCH where available) so traversal
-    through execute-only ancestors succeeds, matching normal POSIX
-    pathname semantics.
-    """
-    parts = [c for c in resolved.split(os.sep) if c]
-    if not parts:
-        return os.open(os.sep, flags | _O_NOFOLLOW | _O_DIRECTORY)
-    fd = os.open(os.sep, _O_SEARCH)
+
+def _open_relative(root_fd: int, relative: str, flags: int) -> int:
+    """Open a relative path without following any of its components."""
+    parts = [] if relative == "." else relative.split(os.sep)
+    fd = os.dup(root_fd)
     try:
         for part in parts[:-1]:
             new_fd = os.open(part, _O_SEARCH | _O_NOFOLLOW | _O_DIRECTORY, dir_fd=fd)
             os.close(fd)
             fd = new_fd
-        new_fd = os.open(parts[-1], flags | _O_NOFOLLOW, dir_fd=fd)
+        name = parts[-1] if parts else "."
+        new_fd = os.open(name, flags | _O_NOFOLLOW, dir_fd=fd)
         os.close(fd)
         return new_fd
     except BaseException:
@@ -220,38 +233,10 @@ def _open_sandboxed(resolved: str, flags: int) -> int:
         raise
 
 
-def _safe_resolve(path: str, allowed: list[str]) -> str:
-    """Resolve and sandbox an absolute path.
-
-    realpath canonicalization catches symlinks and '..' components before
-    the path is used. _open_sandboxed then re-opens the result component
-    by component with O_NOFOLLOW, closing the race window for every path
-    level.
-    """
-    if not os.path.isabs(path):
-        raise FilesystemApiError("access_denied")
-    real = os.path.realpath(path)
-    for root in allowed:
-        resolved_root = os.path.realpath(root)
-        if not resolved_root.endswith(os.sep):
-            resolved_root += os.sep
-        if real.startswith(resolved_root) or real == resolved_root.rstrip(os.sep):
-            return real
-    raise FilesystemApiError("access_denied")
-
-
-def filesystem_is_configured() -> bool:
-    """Return whether filesystem access is available and configured."""
-    if not _PLATFORM_SUPPORTED:
-        return False
-    raw = os.getenv(FILESYSTEM_ALLOWED_DIRS_ENV, "")
-    return any(d.strip() for d in raw.split(os.pathsep))
-
-
 def _allowed_dirs() -> list[str]:
     """Parse allowed directories from the environment variable."""
     raw = os.getenv(FILESYSTEM_ALLOWED_DIRS_ENV, "")
-    dirs = [d.strip() for d in raw.split(os.pathsep) if d.strip()]
-    if not dirs:
+    dirs = raw.split(os.pathsep)
+    if not dirs or not all(path.strip() and os.path.isabs(path) for path in dirs):
         raise FilesystemApiError("invalid_config")
     return dirs

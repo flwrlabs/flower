@@ -27,7 +27,6 @@ from . import filesystem as filesystem_module
 from .filesystem import (
     FILESYSTEM_ALLOWED_DIRS_ENV,
     FilesystemApiError,
-    filesystem_is_configured,
     invoke_filesystem_provider,
     make_filesystem_tool,
 )
@@ -69,7 +68,7 @@ def test_read_file_reads_content(monkeypatch: pytest.MonkeyPatch) -> None:
         _allow(monkeypatch, root)
         result = _call("read_file", filepath)
         assert result["content"] == "hello, world"
-        assert result["path"] == os.path.realpath(filepath)
+        assert result["path"] == os.path.normpath(filepath)
 
 
 @pytest.mark.skipif(
@@ -104,6 +103,36 @@ def test_read_file_symlink_outside_denied(monkeypatch: pytest.MonkeyPatch) -> No
             _allow(monkeypatch, good)
             with pytest.raises(FilesystemApiError, match="access_denied"):
                 _call("read_file", sym)
+
+
+def test_replaced_allowed_root_denied(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Replacing an allowed root with a symlink must not move the sandbox."""
+    with tempfile.TemporaryDirectory() as parent:
+        with tempfile.TemporaryDirectory() as outside:
+            root = os.path.join(parent, "allowed")
+            os.mkdir(root)
+            secret = os.path.join(outside, "secret.txt")
+            with open(secret, "w", encoding="utf-8") as handle:
+                handle.write("secret")
+            _allow(monkeypatch, root)
+            os.rmdir(root)
+            os.symlink(outside, root)
+
+            with pytest.raises(FilesystemApiError, match="access_denied"):
+                _call("read_file", os.path.join(root, "secret.txt"))
+
+
+def test_allowed_root_preserves_whitespace(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Whitespace in an allowed directory name must remain significant."""
+    with tempfile.TemporaryDirectory() as parent:
+        root = os.path.join(parent, "allowed ")
+        os.mkdir(root)
+        path = os.path.join(root, "note.txt")
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write("hello")
+        _allow(monkeypatch, root)
+
+        assert _call("read_file", path)["content"] == "hello"
 
 
 def test_read_file_path_traversal_denied(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -186,7 +215,6 @@ def test_windows_rejected_as_unsupported(monkeypatch: pytest.MonkeyPatch) -> Non
     """Unsupported platforms should be rejected."""
     monkeypatch.setattr(filesystem_module, "_PLATFORM_SUPPORTED", False)
     monkeypatch.setenv(FILESYSTEM_ALLOWED_DIRS_ENV, "/tmp/example")
-    assert filesystem_is_configured() is False
     with pytest.raises(FilesystemApiError, match="unsupported_platform"):
         _call("list_directory", "/tmp/example")
 
@@ -240,19 +268,8 @@ def test_make_filesystem_tool_schema() -> None:
     ]
 
 
-def test_filesystem_is_configured_when_dirs_set(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Setting allowed dirs should report the connector as configured."""
-    _allow(monkeypatch, "/tmp/example")
-    assert filesystem_is_configured() is True
-
-
-def test_filesystem_is_configured_rejects_blank(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """An unset or blank allowed dirs value should report not configured."""
-    monkeypatch.delenv(FILESYSTEM_ALLOWED_DIRS_ENV, raising=False)
-    assert filesystem_is_configured() is False
-    monkeypatch.setenv(FILESYSTEM_ALLOWED_DIRS_ENV, f" {os.pathsep} ")
-    assert filesystem_is_configured() is False
+def test_allowed_dirs_rejects_relative_root(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Allowed directory configuration must contain absolute paths."""
+    _allow(monkeypatch, "relative")
+    with pytest.raises(FilesystemApiError, match="invalid_config"):
+        _call("list_directory", "/tmp/x")

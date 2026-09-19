@@ -62,9 +62,6 @@ _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.make_browser_use_tool,
     filesystem.FILESYSTEM_CONNECTOR_NAME: filesystem.make_filesystem_tool,
 }
-_BUILTIN_CONNECTOR_AVAILABILITY: dict[str, Callable[[], bool]] = {
-    filesystem.FILESYSTEM_CONNECTOR_NAME: filesystem.filesystem_is_configured,
-}
 
 
 def invoke_connector(
@@ -104,18 +101,10 @@ def get_connector_ref(name: str) -> str:
     return _CREDENTIAL_CONNECTOR_REFS.get(name, name)
 
 
-def _is_builtin_connector_available(name: str) -> bool:
-    """Return whether a built-in connector is currently available."""
-    is_available = _BUILTIN_CONNECTOR_AVAILABILITY.get(name)
-    return is_available() if is_available is not None else True
-
-
 def get_connector_tools(connector_ref: str) -> list[JSONObject]:
     """Return model-facing tools for one built-in or OAuth connector."""
     make_builtin_tool = _BUILTIN_CONNECTOR_TOOL_FACTORIES.get(connector_ref)
     if make_builtin_tool is not None:
-        if not _is_builtin_connector_available(connector_ref):
-            raise ValueError(f"Connector '{connector_ref}' is not configured.")
         return [make_builtin_tool()]
     connector = _CONNECTORS_BY_REF.get(connector_ref)
     if connector is None:
@@ -124,18 +113,14 @@ def get_connector_tools(connector_ref: str) -> list[JSONObject]:
 
 
 def get_builtin_connector_tools() -> list[JSONObject]:
-    """Return function tools for configured built-in connectors."""
-    return [
-        make_tool()
-        for name, make_tool in _BUILTIN_CONNECTOR_TOOL_FACTORIES.items()
-        if _is_builtin_connector_available(name)
-    ]
+    """Return function tools for built-in connectors."""
+    return [make_tool() for make_tool in _BUILTIN_CONNECTOR_TOOL_FACTORIES.values()]
 
 
 def get_builtin_connector_tool(name: str) -> JSONObject:
     """Return the function tool for one built-in connector."""
     make_tool = _BUILTIN_CONNECTOR_TOOL_FACTORIES.get(name)
-    if make_tool is None or not _is_builtin_connector_available(name):
+    if make_tool is None:
         raise ValueError(f"Unsupported connector '{name}'.")
     return make_tool()
 
@@ -149,12 +134,5 @@ def get_oauth_flow(connector_ref: str) -> OAuthFlow:
 
 
 def has_builtin_connector(name: str) -> bool:
-    """Return whether a built-in connector is registered.
-
-    Availability is not consulted here; callers must validate the
-    connector is configured before invoking it at runtime. This
-    allows the SuperLink's CreateTask validation to accept
-    connectors that are configured only in the executor environment
-    (e.g. FLWR_FILESYSTEM_ALLOWED_DIRS).
-    """
+    """Return whether a built-in connector is registered."""
     return name in _CONNECTOR_HANDLERS
