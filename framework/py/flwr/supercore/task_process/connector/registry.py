@@ -20,7 +20,7 @@ from copy import deepcopy
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
-from . import automation, browser_use, web_fetch, web_search
+from . import automation, browser_use, filesystem, web_fetch, web_search
 from .definition import (
     ConnectorDefinition,
     ConnectorExecutionContext,
@@ -45,6 +45,7 @@ _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
+    filesystem.FILESYSTEM_CONNECTOR_NAME: filesystem.invoke_filesystem_provider,
 }
 _CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorExecutor] = {
     name: handler
@@ -59,6 +60,7 @@ _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.make_web_search_tool,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.make_web_fetch_tool,
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.make_browser_use_tool,
+    filesystem.FILESYSTEM_CONNECTOR_NAME: filesystem.make_filesystem_tool,
 }
 
 

@@ -14,7 +14,7 @@
 # ==============================================================================
 """Tests for the connector registry."""
 
-
+from . import registry
 from .registry import CONNECTORS
 
 
@@ -30,3 +30,9 @@ def test_connector_tool_names_are_unique() -> None:
     tool_names = [name for connector in CONNECTORS for name in connector.handlers]
 
     assert len(tool_names) == len(set(tool_names))
+
+
+def test_filesystem_is_builtin_without_oauth() -> None:
+    """Filesystem should use the same credential-free path as web_search."""
+    assert registry.has_builtin_connector("filesystem")
+    assert "filesystem" not in registry.OAUTH_FLOWS
