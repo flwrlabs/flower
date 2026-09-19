@@ -242,13 +242,18 @@ def _open_relative(root_fd: int, relative: str, flags: int) -> int:
         name = parts[-1] if parts else "."
         new_fd = os.open(name, flags | _O_NOFOLLOW, dir_fd=fd)
         try:
-            beneath = _is_beneath(fd, root_fd)
+            if not _is_beneath(fd, root_fd):
+                raise FilesystemApiError("access_denied")
+            opened_stat = os.fstat(new_fd)
+            entry_stat = os.stat(name, dir_fd=fd, follow_symlinks=False)
+            if (opened_stat.st_dev, opened_stat.st_ino) != (
+                entry_stat.st_dev,
+                entry_stat.st_ino,
+            ):
+                raise FilesystemApiError("access_denied")
         except BaseException:
             os.close(new_fd)
             raise
-        if not beneath:
-            os.close(new_fd)
-            raise FilesystemApiError("access_denied")
         os.close(fd)
         return new_fd
     except BaseException:
@@ -290,4 +295,7 @@ def _allowed_dirs() -> list[str]:
     dirs = raw.split(os.pathsep)
     if not dirs or not all(path.strip() and os.path.isabs(path) for path in dirs):
         raise FilesystemApiError("invalid_config")
-    return dirs
+    normalized = [os.path.normpath(path) for path in dirs]
+    if any(os.path.realpath(path) != path for path in normalized):
+        raise FilesystemApiError("invalid_config")
+    return normalized

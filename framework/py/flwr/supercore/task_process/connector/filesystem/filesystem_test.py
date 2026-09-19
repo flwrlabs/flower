@@ -121,7 +121,7 @@ def test_replaced_allowed_root_denied(monkeypatch: pytest.MonkeyPatch) -> None:
             os.rmdir(root)
             os.symlink(outside, root)
 
-            with pytest.raises(FilesystemApiError, match="access_denied"):
+            with pytest.raises(FilesystemApiError, match="invalid_config"):
                 _call("read_file", os.path.join(root, "secret.txt"))
 
 
@@ -166,6 +166,7 @@ def test_directory_moved_outside_root_during_open_denied(
         root = os.path.join(parent, "allowed")
         child = os.path.join(root, "child")
         moved = os.path.join(parent, "moved")
+        stolen = os.path.join(parent, "stolen.txt")
         os.makedirs(child)
         path = os.path.join(child, "note.txt")
         with open(path, "w", encoding="utf-8") as handle:
@@ -186,6 +187,9 @@ def test_directory_moved_outside_root_during_open_denied(
             if path == "child" and dir_fd is not None and not moved_child:
                 os.rename(child, moved)
                 moved_child = True
+            elif path == "note.txt" and moved_child:
+                os.rename(os.path.join(moved, "note.txt"), stolen)
+                os.rename(moved, child)
             return fd
 
         monkeypatch.setattr(os, "open", open_and_move_child)
@@ -344,3 +348,18 @@ def test_allowed_dirs_rejects_relative_root(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setenv(FILESYSTEM_ALLOWED_DIRS_ENV, "relative")
     with pytest.raises(FilesystemApiError, match="invalid_config"):
         _call("list_directory", "/tmp/x")
+
+
+def test_allowed_dirs_rejects_noncanonical_root(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Configured roots containing symlinks must report invalid_config."""
+    with tempfile.TemporaryDirectory() as parent:
+        root = os.path.join(parent, "root")
+        link = os.path.join(parent, "link")
+        os.mkdir(root)
+        os.symlink(root, link)
+        monkeypatch.setenv(FILESYSTEM_ALLOWED_DIRS_ENV, link)
+
+        with pytest.raises(FilesystemApiError, match="invalid_config"):
+            _call("list_directory", link)
