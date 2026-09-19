@@ -33,12 +33,14 @@ from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
 from flwr.supercore import log
 from flwr.supercore import model_worker_protocol as protocol
+from flwr.supercore.typing import JSONObject
 from flwr.supercore.warm_executor_constants import (
     WARM_EXECUTOR_BUSY_FILE,
     WARM_EXECUTOR_READY_FILE,
     WARM_MODEL_EXECUTOR_SOCKET,
 )
 
+# Bound each socket write so a lost reader cannot stall accepted-task cleanup.
 _OUTPUT_SEND_TIMEOUT_SECONDS = 0.1
 
 
@@ -240,6 +242,14 @@ def _serve_connection(connection: socket.socket, run_once: _RunModelOnce) -> int
             pass
 
 
+def _send_rejection(channel: protocol.MessageChannel, reason: str) -> None:
+    """Send a rejection when the dispatcher is still reachable."""
+    try:
+        protocol.send_message(channel, {"event": "rejected", "reason": reason})
+    except (OSError, ValueError):
+        pass
+
+
 def _serve_channel(
     channel: protocol.MessageChannel,
     run_once: _RunModelOnce,
@@ -249,10 +259,7 @@ def _serve_channel(
     try:
         invocation = ModelInvocation.from_payload(protocol.read_message(channel))
     except ValueError as err:
-        try:
-            protocol.send_message(channel, {"event": "rejected", "reason": str(err)})
-        except (OSError, ValueError):
-            pass
+        _send_rejection(channel, str(err))
         return 1
 
     sender: protocol.ProtocolOutputSender | None = None
@@ -287,37 +294,28 @@ def _serve_channel(
 
     returncode = 1
     try:
-        try:
-            certificates = (
-                Path(invocation.root_certificates_path).read_bytes()
-                if invocation.root_certificates_path is not None
-                else None
-            )
-            returncode = run_once(
-                invocation.runtime_api_address,
-                invocation.token,
-                invocation.insecure,
-                certificates,
-                accept_invocation,
-            )
-            if not accepted:
-                raise RuntimeError("Model invocation was not accepted.")
-        except Exception as err:  # pylint: disable=broad-exception-caught
-            log(ERROR, "Prestarted Model worker failed", exc_info=err)
-            if not accepted:
-                try:
-                    protocol.send_message(
-                        channel,
-                        {
-                            "event": "rejected",
-                            "reason": "Prestarted Model worker could not start task.",
-                        },
-                    )
-                except (OSError, ValueError):
-                    pass
-        except SystemExit as err:
-            returncode = _system_exit_returncode(err)
-            raise
+        certificates = (
+            Path(invocation.root_certificates_path).read_bytes()
+            if invocation.root_certificates_path is not None
+            else None
+        )
+        returncode = run_once(
+            invocation.runtime_api_address,
+            invocation.token,
+            invocation.insecure,
+            certificates,
+            accept_invocation,
+        )
+        if not accepted:
+            returncode = 1
+            raise RuntimeError("Model invocation was not accepted.")
+    except SystemExit as err:
+        returncode = _system_exit_returncode(err)
+        raise
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        log(ERROR, "Prestarted Model worker failed", exc_info=err)
+        if not accepted:
+            _send_rejection(channel, "Prestarted Model worker could not start task.")
     finally:
         output_context.close()
         if sender is not None:
@@ -358,7 +356,7 @@ def _register_idle_signal_handlers() -> None:
         default_handlers[sig] = signal.signal(sig, graceful_exit_handler)
 
 
-def _required_string(payload: dict[str, Any], name: str) -> str:
+def _required_string(payload: JSONObject, name: str) -> str:
     value = payload.get(name)
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"Model invocation field '{name}' must be a non-empty string.")
