@@ -76,7 +76,18 @@ def _exchange(
 
 
 def test_protocol_rejects_invalid_messages() -> None:
-    """Protocol input should be typed and bounded."""
+    """Protocol messages should be typed, bounded, and fully written."""
+
+    class ShortWriteChannel(BytesIO):
+        """Accept only a few bytes from each write."""
+
+        def write(self, data: Any, /) -> int:
+            return super().write(data[:3])
+
+    channel = ShortWriteChannel()
+    model_worker_protocol.send_message(channel, {"value": "\ud800"})
+    assert channel.getvalue() == b'{"value":"\\ud800"}\n'
+
     with pytest.raises(ValueError, match="valid JSON"):
         model_worker_protocol.read_message(BytesIO(b"{\n"))
     with pytest.raises(ValueError, match="non-empty string"):
@@ -142,6 +153,7 @@ def test_dispatch_relays_accepted_output(
     connection = MagicMock()
     connection.__enter__.return_value = connection
     channel = MagicMock()
+    channel.write.side_effect = len
     connection.makefile.return_value.__enter__.return_value = channel
     monkeypatch.setattr(socket, "socket", Mock(return_value=connection))
     monkeypatch.setattr(
@@ -177,7 +189,9 @@ def test_dispatch_rejects_output_before_acceptance(
     """Output without accepted task authority should not be relayed."""
     connection = MagicMock()
     connection.__enter__.return_value = connection
-    connection.makefile.return_value.__enter__.return_value = MagicMock()
+    channel = MagicMock()
+    channel.write.side_effect = len
+    connection.makefile.return_value.__enter__.return_value = channel
     monkeypatch.setattr(socket, "socket", Mock(return_value=connection))
     monkeypatch.setattr(
         model_worker_protocol,
@@ -257,8 +271,8 @@ def test_worker_relays_redacted_output(
 
 
 def test_worker_rejects_failure_before_acceptance() -> None:
-    """Runtime setup failure should reject rather than transfer authority."""
-    result, frames = _exchange(Mock(side_effect=RuntimeError("setup failed")))
+    """Returning without acceptance should reject and fail the worker."""
+    result, frames = _exchange(Mock(return_value=0))
 
     assert result == [1]
     assert frames == [
@@ -335,7 +349,7 @@ def test_disconnect_does_not_abort_accepted_task() -> None:
 
 
 def test_saturated_output_channel_does_not_abort_task() -> None:
-    """A slow protocol writer should drop logs and preserve completion."""
+    """A slow or failed output write should preserve task completion."""
 
     class SlowChannel(BytesIO):
         """Delay every write after the synchronous acceptance frame."""
@@ -348,6 +362,8 @@ def test_saturated_output_channel_does_not_abort_task() -> None:
             self.writes += 1
             if self.writes > 1:
                 time.sleep(0.02)
+            if self.writes == 3:
+                raise OSError("output write failed")
             return super().write(data)
 
         def flush(self) -> None:

@@ -26,11 +26,14 @@ from queue import Empty, Full, Queue
 from typing import Any, BinaryIO, Protocol, TextIO, cast
 
 from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
+from flwr.supercore.typing import JSONObject
 
 MAX_PROTOCOL_MESSAGE_BYTES = 16_384
 _MAX_OUTPUT_FRAME_CHARS = 1_024
 _MAX_QUEUED_OUTPUT_FRAMES = 64
+# Stop draining best-effort logs promptly after task completion.
 _OUTPUT_DRAIN_BUDGET_SECONDS = 0.25
+# Leave time for the drain budget and one final bounded socket write.
 _OUTPUT_CLOSE_TIMEOUT_SECONDS = 0.5
 
 
@@ -52,7 +55,7 @@ class ProtocolOutputSender:
 
     def __init__(self, channel: MessageChannel) -> None:
         self._channel = channel
-        self._queue: Queue[dict[str, Any]] = Queue(maxsize=_MAX_QUEUED_OUTPUT_FRAMES)
+        self._queue: Queue[JSONObject] = Queue(maxsize=_MAX_QUEUED_OUTPUT_FRAMES)
         self._done = threading.Event()
         self._failed = threading.Event()
         self._returncode: int | None = None
@@ -91,25 +94,33 @@ class ProtocolOutputSender:
 
     def _send(self) -> None:
         try:
-            while not self._done.is_set() or not self._queue.empty():
-                if (
-                    self._done.is_set()
-                    and self._drain_deadline is not None
-                    and time.monotonic() >= self._drain_deadline
-                ):
-                    break
-                try:
-                    payload = self._queue.get(timeout=0.01)
-                except Empty:
-                    continue
-                send_message(self._channel, payload)
-            if self._returncode is not None:
+            self._drain_output()
+        except Exception:  # pylint: disable=broad-exception-caught
+            self._failed.set()
+            self._done.wait()
+        if self._returncode is not None:
+            try:
                 send_message(
                     self._channel,
                     {"event": "finished", "returncode": self._returncode},
                 )
-        except Exception:  # pylint: disable=broad-exception-caught
-            self._failed.set()
+            except Exception:  # pylint: disable=broad-exception-caught
+                self._failed.set()
+
+    def _drain_output(self) -> None:
+        """Send queued output until completion or the drain budget expires."""
+        while not self._done.is_set() or not self._queue.empty():
+            if (
+                self._done.is_set()
+                and self._drain_deadline is not None
+                and time.monotonic() >= self._drain_deadline
+            ):
+                break
+            try:
+                payload = self._queue.get(timeout=0.01)
+            except Empty:
+                continue
+            send_message(self._channel, payload)
 
 
 class _RelayedBinaryOutput:
@@ -252,23 +263,28 @@ def relay_task_output(sender: ProtocolOutputSender, token: str) -> Iterator[None
         stderr.finish()
 
 
-def send_message(channel: MessageChannel, payload: dict[str, Any]) -> None:
+def send_message(channel: MessageChannel, payload: JSONObject) -> None:
     """Send one bounded newline-delimited JSON protocol message."""
     encoded = encode_message(payload)
     if len(encoded) > MAX_PROTOCOL_MESSAGE_BYTES:
         raise ValueError("Model worker protocol message is too large.")
-    channel.write(encoded)
+    offset = 0
+    while offset < len(encoded):
+        written = channel.write(encoded[offset:])
+        if written <= 0:
+            raise OSError("Model worker protocol write made no progress.")
+        offset += written
     channel.flush()
 
 
-def encode_message(payload: dict[str, Any]) -> bytes:
+def encode_message(payload: JSONObject) -> bytes:
     """Encode one JSON-lines protocol message."""
     return (
-        json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode() + b"\n"
+        json.dumps(payload, ensure_ascii=True, separators=(",", ":")).encode() + b"\n"
     )
 
 
-def read_message(channel: MessageChannel) -> dict[str, Any]:
+def read_message(channel: MessageChannel) -> JSONObject:
     """Read one bounded newline-delimited JSON protocol message."""
     encoded = channel.readline(MAX_PROTOCOL_MESSAGE_BYTES + 1)
     if not encoded:
