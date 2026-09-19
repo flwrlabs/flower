@@ -21,7 +21,7 @@ def main(agent: AgentSession, context: Context) -> None:
     )
     stream = client.responses.create(
         model=MODEL,
-        input=agent.prompt.strip(),
+        input=agent.prompt,
         stream=True,
     )
 
