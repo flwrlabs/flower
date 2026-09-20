@@ -1410,6 +1410,8 @@ def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
     client.reset_mock()
     pending_pod = _ready_warm_pod(pool_key, config, name="pending")
     pending_pod["status"] = {"phase": "Pending", "conditions": []}
+    keep_pod = _ready_warm_pod(pool_key, config, name="keep")
+    keep_pod["spec"]["containers"].insert(0, {"name": "sidecar"})
     legacy_pod = _ready_warm_pod(pool_key, config, name="legacy")
     legacy_pod["spec"]["containers"][0]["command"] = [
         "python",
@@ -1419,7 +1421,7 @@ def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
     client.list_namespaced_pod.return_value = {
         "items": [
             pending_pod,
-            _ready_warm_pod(pool_key, config, name="keep"),
+            keep_pod,
             obsolete_pod,
             legacy_pod,
         ]

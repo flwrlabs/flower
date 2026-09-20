@@ -1268,8 +1268,11 @@ def _has_warm_executor_configuration(
         == _warm_executor_configuration_hash(config)
         and isinstance(containers, Sequence)
         and not isinstance(containers, (str, bytes))
-        and bool(containers)
-        and _object_field(containers[0], "command") == _warm_executor_command(pool_key)
+        and any(
+            _object_field(container, "name") == "taskexecutor"
+            and _object_field(container, "command") == _warm_executor_command(pool_key)
+            for container in containers
+        )
     )
 
 
