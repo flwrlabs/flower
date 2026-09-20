@@ -304,6 +304,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         series_description: str | None = None,
         connector_refs: Sequence[str] = (),
         initial_task_event: TaskEvent | None = None,
+        user_prompt: str | None = None,
     ) -> int:
         """Create a new run.
 
@@ -337,6 +338,9 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Connector references the run is allowed to invoke.
         initial_task_event : TaskEvent | None (default: None)
             Event to store atomically before the pending primary task is visible.
+        user_prompt : str | None (default: None)
+            User prompt to store as an instruction Message for an AgentApp run.
+            Ignored for other primary task types and when `None`.
 
         Returns
         -------

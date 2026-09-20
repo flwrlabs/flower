@@ -29,7 +29,6 @@ from typing import Any, cast
 
 import requests
 
-from flwr.app.user_config import UserConfig
 from flwr.cli.utils import validate_federation_name
 from flwr.common.config import (
     flatten_dict,
@@ -658,7 +657,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         # Validate user config overrides matches keys in run config in FAB
         fab_config = get_fab_config(fab_file)
         run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
-        fused_run_config = fuse_dicts(run_config, override_config)
+        fuse_dicts(run_config, override_config, check_keys=True)
 
         # Derive primary task type from the submitted FAB. AgentApp-only FABs can
         # be bundled locally and submitted through the regular `flwr run` path.
@@ -674,6 +673,14 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             resolved_federation_config = SimulationConfig()
             resolved_federation_config.CopyFrom(sim_cfg)
             resolved_federation_config.MergeFrom(request.override_federation_config)
+
+        # Validate that a user prompt is provided for AgentApp runs
+        user_prompt = request.user_prompt.strip()
+        if primary_task_type == TaskType.AGENT_APP and not user_prompt:
+            raise FlowerError(
+                ApiErrorCode.AGENTAPP_USER_PROMPT_REQUIRED,
+                "AgentApp run requested without a user prompt.",
+            )
 
         state.federation_manager.can_execute(
             flwr_aid,
@@ -710,23 +717,19 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         series_id = request.series_id if request.HasField("series_id") else None
         series_description: str | None = None
         if primary_task_type == TaskType.AGENT_APP and series_id is None:
-            series_description = (
-                _derive_run_series_description(fused_run_config) or None
-            )
+            series_description = _derive_run_series_description(user_prompt) or None
 
         initial_task_event = None
-        agent_input = fused_run_config.get("agent.input")
         if primary_task_type == TaskType.AGENT_APP:
-            if isinstance(agent_input, str) and agent_input:
-                input_item: JSONObject = {
-                    "type": "message",
-                    "role": "user",
-                    "content": agent_input,
-                }
-                initial_task_event = TaskEvent(
-                    event="message",
-                    data=strict_json_dumps(input_item, compact=True),
-                )
+            input_item: JSONObject = {
+                "type": "message",
+                "role": "user",
+                "content": user_prompt,
+            }
+            initial_task_event = TaskEvent(
+                event="message",
+                data=strict_json_dumps(input_item, compact=True),
+            )
 
         run_id = state.create_run(
             fab_id,
@@ -737,6 +740,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             resolved_federation_config,
             flwr_aid,
             primary_task_type,
+            user_prompt=user_prompt or None,
             series_id=series_id,
             series_description=series_description,
             connector_refs=connector_refs,
@@ -754,8 +758,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
         run = state.get_run_info(run_ids=[run_id])[0]
         series_id = run.series_id
-        if series_description and isinstance(agent_input, str) and series_id:
-            start_title_generation(state, series_id, agent_input)
+        if series_description and series_id:
+            start_title_generation(state, series_id, user_prompt)
 
     except ValueError as e:
         log(ERROR, "Could not start run: %s", str(e))
@@ -2061,13 +2065,9 @@ def _resolve_federation_id(
     return federation_id
 
 
-def _derive_run_series_description(run_config: UserConfig) -> str:
-    """Derive a concise RunSeries description from the agent input."""
-    agent_input = run_config.get("agent.input")
-    if not isinstance(agent_input, str):
-        return ""
-
-    description = " ".join(agent_input.split())
+def _derive_run_series_description(user_prompt: str) -> str:
+    """Derive a concise RunSeries description from the user prompt."""
+    description = " ".join(user_prompt.split())
     if len(description) <= RUN_SERIES_DESCRIPTION_MAX_LENGTH:
         return description
     return f"{description[: RUN_SERIES_DESCRIPTION_MAX_LENGTH - 1]}…"

@@ -65,6 +65,11 @@ class AgentSession(ABC):
 
     @property
     @abstractmethod
+    def prompt(self) -> str:
+        """Return the initial prompt for this AgentApp run."""
+
+    @property
+    @abstractmethod
     def connectors(self) -> AgentConnectors:
         """Connector tool schema and execution API."""
 

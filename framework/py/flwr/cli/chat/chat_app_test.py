@@ -158,6 +158,8 @@ def test_start_chat_run_uploads_local_fab() -> None:
     request = stub.StartRun.call_args.args[0]
     assert request.app_spec == ""
     assert request.fab.content == b"fab-content"
+    assert request.user_prompt == "Hello"
+    assert not request.override_config
 
 
 def test_chat_selects_connector_from_dropdown() -> None:

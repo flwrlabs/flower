@@ -60,7 +60,10 @@ from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
 from flwr.supercore.constant import (
+    AGENT_MESSAGE_CONTENT_RECORD_KEY,
+    AGENT_MESSAGE_TEXT_KEY,
     NOOP_FEDERATION_ID,
+    SYSTEM_MESSAGE_TYPE,
     AutomationStatus,
     NodeStatus,
     TaskType,
@@ -185,6 +188,57 @@ class StateTest(CoreStateTest):
         assert stored_event.event == initial_event.event
         assert stored_event.data == initial_event.data
         assert stored_event.task_id == run.primary_task_id
+
+    @parameterized.expand(  # type: ignore[untyped-decorator]
+        [
+            (TaskType.AGENT_APP, "Hello AgentApp", 1),
+            (TaskType.AGENT_APP, None, 0),
+            (TaskType.SERVER_APP, "Hello ServerApp", 0),
+        ]
+    )
+    def test_create_run_stores_user_prompt_for_agentapp(
+        self,
+        primary_task_type: str,
+        user_prompt: str | None,
+        expected_messages: int,
+    ) -> None:
+        """Store a user prompt as a SuperLink instruction only for AgentApp runs."""
+        state: LinkState = self.state_factory()
+        run_id = state.create_run(
+            fab_id="flwr/test",
+            fab_version="1.0.0",
+            fab_hash="hash",
+            override_config={},
+            federation_id=NOOP_FEDERATION_ID,
+            federation_config=None,
+            flwr_aid="account",
+            primary_task_type=primary_task_type,
+            user_prompt=user_prompt,
+        )
+
+        messages = state.get_message_ins(SUPERLINK_NODE_ID, limit=None, run_id=run_id)
+
+        assert len(messages) == expected_messages
+        if messages:
+            message = messages[0]
+            assert user_prompt is not None
+            assert message.metadata.run_id == run_id
+            assert message.metadata.src_node_id == SUPERLINK_NODE_ID
+            assert message.metadata.dst_node_id == SUPERLINK_NODE_ID
+            assert message.metadata.message_type == SYSTEM_MESSAGE_TYPE
+            assert (
+                message.content[AGENT_MESSAGE_CONTENT_RECORD_KEY][
+                    AGENT_MESSAGE_TEXT_KEY
+                ]
+                == user_prompt
+            )
+            assert (
+                state.object_store.get(message.metadata.message_id) == message.deflate()
+            )
+            assert (
+                state.object_store.get(message.content.object_id)
+                == message.content.deflate()
+            )
 
     def test_create_run_uses_existing_series_id(self) -> None:
         """Test create_run links the run to an existing run series."""

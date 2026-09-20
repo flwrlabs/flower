@@ -82,6 +82,7 @@ from .utils import (
     check_node_availability_for_in_message,
     convert_sint64_values_in_dict_to_uint64,
     convert_uint64_values_in_dict_to_sint64,
+    create_user_prompt_message,
     dict_to_message,
     generate_rand_int_from_bytes,
     message_to_dict,
@@ -945,6 +946,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         series_description: str | None = None,
         connector_refs: Sequence[str] = (),
         initial_task_event: TaskEvent | None = None,
+        user_prompt: str | None = None,
     ) -> int:
         """Create a new run."""
         if isinstance(connector_refs, str) or any(
@@ -1023,6 +1025,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         details="",
                     )
                 )
+                if primary_task_type == TaskType.AGENT_APP and user_prompt is not None:
+                    message = create_user_prompt_message(run_id, user_prompt)
+                    self.store_message_ins(message)
+                    self._store_generated_message(message)
                 if initial_task_event is not None:
                     initial_task_event.run_id = run_id
                     initial_task_event.task_id = task_id
