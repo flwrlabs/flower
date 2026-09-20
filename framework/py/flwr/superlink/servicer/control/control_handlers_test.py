@@ -49,6 +49,8 @@ from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
+    AGENT_MESSAGE_CONTENT_RECORD_KEY,
+    AGENT_MESSAGE_TEXT_KEY,
     FLOWER_AGENT_APP_ID,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
@@ -421,11 +423,11 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         self.assertEqual(run.fab_hash, fab_hash)
 
-    def test_start_run_persists_agent_input_event(self) -> None:
-        """Persist agent input as a primary-task message item."""
+    def test_start_run_persists_user_prompt_event(self) -> None:
+        """Persist the user prompt as a primary-task message item."""
         request = StartRunRequest(federation=NOOP_FEDERATION_ID)
         request.fab.content = b"AgentApp FAB"
-        request.override_config["agent.input"].string = "Hello"
+        request.user_prompt = "Hello"
 
         with (
             patch(
@@ -465,6 +467,40 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             run.series_id,
             "Hello",
         )
+        messages = self.state.get_message_ins(
+            self.state.get_node_id(), limit=None, run_id=response.run_id
+        )
+        agent_record = messages[0].content[AGENT_MESSAGE_CONTENT_RECORD_KEY]
+        prompt = agent_record[AGENT_MESSAGE_TEXT_KEY]
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(prompt, "Hello")
+
+    def test_start_run_requires_user_prompt_for_agentapp(self) -> None:
+        """Reject an AgentApp run without a user prompt."""
+        for user_prompt in ("", " \n\t "):
+            request = StartRunRequest(
+                federation=NOOP_FEDERATION_ID, user_prompt=user_prompt
+            )
+            request.fab.content = b"AgentApp FAB"
+
+            with (
+                patch(
+                    "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                    return_value={"tool": {"flwr": {"app": {"config": {}}}}},
+                ),
+                patch(
+                    "flwr.superlink.servicer.control.control_handlers._get_app_type",
+                    return_value=TaskType.AGENT_APP,
+                ),
+                self.assertRaises(FlowerError) as error,
+            ):
+                start_run(request, self.account, self.state, None)
+
+            self.assertEqual(
+                error.exception.code,
+                ApiErrorCode.AGENTAPP_USER_PROMPT_REQUIRED,
+            )
+        self.assertEqual(self.state.get_run_info(), [])
 
     def test_start_run_notifies_extension_after_persisting_run(self) -> None:
         """Notify the optional extension with the persisted run snapshot."""

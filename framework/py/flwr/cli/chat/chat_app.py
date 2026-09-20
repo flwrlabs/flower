@@ -60,7 +60,6 @@ from prompt_toolkit.utils import get_cwidth
 from prompt_toolkit.widgets import Frame
 
 from flwr.cli.constant import (
-    CHAT_AGENT_INPUT_KEY,
     CHAT_AGENT_NAME,
     CHAT_AGENTS_API_PATH,
     CHAT_APP_STYLE,
@@ -87,7 +86,6 @@ from flwr.cli.constant import (
     CHAT_WEB_SEARCH_CONNECTOR_REF,
     CHAT_WELCOME_MESSAGE,
 )
-from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Connector,
     StartRunRequest,
@@ -1200,7 +1198,7 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
     req = StartRunRequest(
         # SuperLink derives the app ID from submitted local FAB content.
         app_spec="" if fab_content is not None else app_spec,
-        override_config=user_config_to_proto({CHAT_AGENT_INPUT_KEY: prompt}),
+        user_prompt=prompt,
         federation=federation or "",
         fab=Fab(hash_str=fab_hash or "", content=fab_content or b""),
         connector_refs=connector_refs,

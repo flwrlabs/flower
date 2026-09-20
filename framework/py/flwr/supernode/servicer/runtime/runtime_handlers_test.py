@@ -33,6 +33,8 @@ from flwr.proto.message_pb2 import (  # pylint:disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint:disable=E0611
     GetConnectorRequest,
     GetNodesRequest,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
     PullAppMessagesRequest,
     PullTaskInputRequest,
     PullTaskInputResponse,
@@ -40,7 +42,8 @@ from flwr.proto.runtime_pb2 import (  # pylint:disable=E0611
     PushTaskOutputRequest,
     PushTaskOutputResponse,
 )
-from flwr.proto.task_pb2 import Task  # pylint:disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint:disable=E0611
+from flwr.supercore.constant import TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import get_object_tree
@@ -235,6 +238,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         )
         self.assertEqual(stored_tree, object_tree)
         self.assertEqual(session_id, "session-id")
+        self.assertEqual(list(response.message_ids), [message.metadata.message_id])
         self.assertEqual(list(response.objects_to_push), ["object-id"])
         self.assertEqual(response.session_id, "session-id")
 
@@ -257,6 +261,55 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
             error.exception.code, ApiErrorCode.RUNTIME_MESSAGE_RUN_ID_MISMATCH
         )
         self.state.store_message_and_object_tree.assert_not_called()
+
+    def test_get_run_series_events_returns_local_agent_events(self) -> None:
+        """GetRunSeriesEvents should return AgentApp events from the same series."""
+        current_run = Run.create_empty(run_id=10)
+        current_run.series_id = 7
+        same_series_run = Run.create_empty(run_id=11)
+        same_series_run.series_id = 7
+        other_series_run = Run.create_empty(run_id=12)
+        other_series_run.series_id = 8
+        tasks = [
+            Task(task_id=100, run_id=10, type=TaskType.AGENT_APP),
+            Task(task_id=101, run_id=11, type=TaskType.AGENT_APP),
+            Task(task_id=102, run_id=10, type=TaskType.MODEL),
+            Task(task_id=103, run_id=12, type=TaskType.AGENT_APP),
+        ]
+        expected_events = [
+            TaskEvent(
+                id=1,
+                run_id=10,
+                task_id=100,
+                event="response.completed",
+                data='{"type":"response.completed"}',
+            )
+        ]
+        runs = {10: current_run, 11: same_series_run, 12: other_series_run}
+        self.state.get_run.side_effect = runs.get
+        self.state.get_tasks.return_value = tasks
+        self.state.get_task_events.return_value = expected_events
+
+        response = runtime_handlers.get_run_series_events(
+            GetRunSeriesEventsRequest(), self.state, tasks[0]
+        )
+
+        self.assertIsInstance(response, GetRunSeriesEventsResponse)
+        self.assertEqual(list(response.events), expected_events)
+        self.state.get_task_events.assert_called_once_with(task_ids=[100, 101])
+
+    def test_get_run_series_events_rejects_unknown_run(self) -> None:
+        """GetRunSeriesEvents should reject an unknown authenticated run."""
+        self.state.get_run.return_value = None
+
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.get_run_series_events(
+                GetRunSeriesEventsRequest(), self.state, Task(run_id=10)
+            )
+
+        self.assertEqual(error.exception.code, ApiErrorCode.RUN_ID_NOT_FOUND)
+        self.state.get_tasks.assert_not_called()
+        self.state.get_task_events.assert_not_called()
 
     def test_push_object_uses_state(self) -> None:
         """PushObject should delegate session validation and storage to state."""

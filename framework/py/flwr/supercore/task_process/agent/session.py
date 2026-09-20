@@ -172,13 +172,20 @@ class RuntimeAgentSession(AgentSession):
 
     def __init__(
         self,
+        prompt: str,
         connectors: AgentConnectors,
         events: AgentEvents,
         grid: AgentGrid,
     ) -> None:
+        self._prompt = prompt
         self._connectors = connectors
         self._events = events
         self._grid = grid
+
+    @property
+    def prompt(self) -> str:
+        """Return the initial prompt for this AgentApp run."""
+        return self._prompt
 
     @property
     def connectors(self) -> AgentConnectors:
@@ -349,9 +356,7 @@ class AgentRuntime:
                     start_run_request=self._start_run_request,
                 ),
             )
-            request.start_run_request.override_config["agent.input"].string = (
-                input_value.strip()
-            )
+            request.start_run_request.user_prompt = input_value.strip()
             response = self._stub.StartAutomation(request)
             output: JSONObject = {
                 "automation_id": response.automation_id,

@@ -54,6 +54,7 @@ from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
+    SYSTEM_MESSAGE_TYPE,
 )
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
@@ -79,7 +80,6 @@ from .session import (
     RuntimeAgentSession,
 )
 
-_AGENT_INPUT_KEY = "agent.input"
 _RUNTIME_API_KEY_ENV = "FLWR_RUNTIME_API_KEY"
 _RUNTIME_BASE_URL_ENV = "FLWR_RUNTIME_BASE_URL"
 _SSL_CERT_FILE_ENV = "SSL_CERT_FILE"
@@ -89,14 +89,25 @@ def message_to_prompt(message: Message) -> str:
     """Serialize a Grid message into a JSON prompt string."""
     prompt: JSONObject = {
         "message_id": message.metadata.message_id,
+        "src_node_id": str(message.metadata.src_node_id),
         "payload": cast(
             str,
             message.content[AGENT_MESSAGE_CONTENT_RECORD_KEY][AGENT_MESSAGE_TEXT_KEY],
         ),
     }
-    if message.metadata.src_node_id != TaskIdentity.node_id:
-        prompt["src_node_id"] = str(message.metadata.src_node_id)
+    # Return the payload string directly if the message is a system message
+    if message.metadata.message_type == SYSTEM_MESSAGE_TYPE:
+        return cast(str, prompt["payload"])
+    # Otherwise, return the full prompt as a compact JSON string
     return strict_json_dumps(prompt, compact=True)
+
+
+def pull_prompt(grid: HttpGrid) -> str:
+    """Pull and serialize the initial AgentApp instruction."""
+    instructions = list(grid.pull_messages([]))
+    if len(instructions) != 1:
+        raise RuntimeError("Expected exactly one initial AgentApp instruction.")
+    return message_to_prompt(instructions[0])
 
 
 def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
@@ -195,6 +206,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         hash_run_id = get_sha256_hash(run.run_id)
 
         grid.set_run(run)
+        prompt = pull_prompt(grid)
 
         log_uploader = start_log_uploader(
             log_queue=log_queue,
@@ -239,10 +251,6 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             Path(app_path), run.override_config
         )
 
-        agent_input = context.run_config.get(_AGENT_INPUT_KEY)
-        if agent_input is not None and not isinstance(agent_input, str):
-            raise ValueError("context.run_config['agent.input'] must be a string.")
-
         log(
             DEBUG,
             "[flwr-agentapp] Will load AgentApp `%s` in %s",
@@ -280,6 +288,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             events=agent_events,
         )
         agent = RuntimeAgentSession(
+            prompt=prompt,
             connectors=RuntimeAgentConnectors(agent_runtime),
             events=agent_events,
             grid=RuntimeAgentGrid(grid, agent_events),

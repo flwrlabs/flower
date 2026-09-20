@@ -58,6 +58,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
+from flwr.supercore.constant import TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.supernode.nodestate import NodeState
@@ -213,12 +214,14 @@ def push_messages(
 
     # Save the message to the state and preregister its objects
     session_id = state.start_session(run_id)
-    _, objects_to_push = state.store_message_and_object_tree(
+    stored, objects_to_push = state.store_message_and_object_tree(
         message, request.message_object_trees[0], session_id
     )
 
     return PushAppMessagesResponse(
-        objects_to_push=objects_to_push, session_id=session_id
+        message_ids=[message.metadata.message_id if stored else ""],
+        objects_to_push=objects_to_push,
+        session_id=session_id,
     )
 
 
@@ -238,12 +241,26 @@ def get_run_series_events(
     state: NodeState,
     task: Task,
 ) -> GetRunSeriesEventsResponse:
-    """Reject run-series event requests in the Simulation Runtime."""
+    """Get locally available AgentApp events from the authenticated run series."""
     log(DEBUG, "Runtime.GetRunSeriesEvents")
-    raise FlowerError(
-        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-        "This endpoint is only available for Deployment Runtime runs.",
-    )
+
+    run = state.get_run(task.run_id)
+    if run is None:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND,
+            f"Run {task.run_id} not found in NodeState.",
+        )
+
+    agent_task_ids = []
+    for candidate in state.get_tasks():
+        if candidate.type != TaskType.AGENT_APP:
+            continue
+        candidate_run = state.get_run(candidate.run_id)
+        if candidate_run is not None and candidate_run.series_id == run.series_id:
+            agent_task_ids.append(candidate.task_id)
+
+    events = state.get_task_events(task_ids=agent_task_ids)
+    return GetRunSeriesEventsResponse(events=events)
 
 
 def start_automation(
