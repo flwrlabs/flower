@@ -68,7 +68,7 @@ def search_code(
 def get_file_contents(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
-    """Read one repository file as base64 and decoded text."""
+    """Return GitHub's unchanged Contents API response, including Base64 content."""
     owner, repo = _repository_ref(arguments.get("owner"), arguments.get("repo"))
     path = _repository_path(arguments.get("path"))
     ref = optional_string(arguments.get("ref"), "GitHub", "ref")
