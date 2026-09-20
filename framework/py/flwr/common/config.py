@@ -240,6 +240,23 @@ def get_metadata_from_config(config: dict[str, Any]) -> tuple[str, str]:
     )
 
 
+def get_app_presentation_metadata(
+    config: dict[str, Any],
+) -> dict[str, str | None]:
+    """Extract app presentation metadata from a project config."""
+    app_config = config["tool"]["flwr"]["app"]
+    project_config = config.get("project", {})
+
+    def optional_string(value: Any) -> str | None:
+        return value if isinstance(value, str) and value else None
+
+    return {
+        "display_name": optional_string(app_config.get("display-name")),
+        "description": optional_string(project_config.get("description")),
+        "color": optional_string(app_config.get("color")),
+    }
+
+
 def get_fab_config(fab_file: Path | bytes) -> dict[str, Any]:
     """Extract the config from a FAB file or path.
 

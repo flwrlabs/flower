@@ -59,8 +59,9 @@ erDiagram
     VARCHAR color "nullable"
     VARCHAR description "nullable"
     VARCHAR display_name "nullable"
-    VARCHAR fab_hash "nullable"
+    VARCHAR fab_hash
     BOOLEAN is_hub_app "nullable"
+    TIMESTAMP updated_at
   }
 
   message_ins {

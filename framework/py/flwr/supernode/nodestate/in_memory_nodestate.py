@@ -28,11 +28,6 @@ from flwr.supercore import log
 from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS, TaskType
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.date import now
-from flwr.supercore.inflatable.inflatable_object import (
-    get_all_nested_objects,
-    get_object_tree,
-    no_object_id_recompute,
-)
 from flwr.supercore.object_store import ObjectStore
 from flwr.supercore.run import Run
 
@@ -200,13 +195,8 @@ class InMemoryNodeState(
                 error_reply = Message(CLIENT_APP_CRASHED_ERROR, reply_to=msg)
 
                 # Insert objects of the error reply into the object store
-                with no_object_id_recompute():
-                    # pylint: disable-next=W0212
-                    error_reply.metadata._message_id = error_reply.object_id  # type: ignore
-                    object_tree = get_object_tree(error_reply)
-                    self.object_store.preregister(msg.metadata.run_id, object_tree)
-                    for obj_id, obj in get_all_nested_objects(error_reply).items():
-                        self.object_store.put(obj_id, obj.deflate())
+                error_reply.metadata.__dict__["_message_id"] = error_reply.object_id
+                self._store_generated_message(error_reply)
 
                 # Store the error reply message
                 self.record_message_processing_end(msg.metadata.message_id)

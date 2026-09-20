@@ -61,6 +61,7 @@ FLWR_IN_MEMORY_SQLITE_DB_URL = "sqlite:///:memory:"
 APP_ID_PATTERN = r"^@[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
 APP_VERSION_PATTERN = r"^\d+\.\d+\.\d+$"
 FLWR_SUPERGRID_API_URL = os.getenv("FLWR_SUPERGRID_API_URL", "https://api.flower.ai/v1")
+HUB_APP_REFRESH_INTERVAL = timedelta(minutes=5)
 
 # Constants for Flower CLI update check
 FLWR_DISABLE_UPDATE_CHECK = "FLWR_DISABLE_UPDATE_CHECK"
@@ -214,6 +215,9 @@ class InvitationStatus(StrEnum):
 AUTOMATION_BATCH_LIMIT = 1
 
 FLOWER_AGENT_APP_ID = "@flwrlabs/flwr-agent"
+
+AGENT_MESSAGE_CONTENT_RECORD_KEY = "agent"
+AGENT_MESSAGE_TEXT_KEY = "text"
 
 
 class AutomationStatus(StrEnum):

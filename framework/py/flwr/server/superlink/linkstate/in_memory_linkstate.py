@@ -162,14 +162,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             federation_id = self.run_ids[message.metadata.run_id].run.federation_id
 
             # Validate destination node ID
-            dst_node = self.nodes.get(message.metadata.dst_node_id)
-            if (
+            dst_node_id = message.metadata.dst_node_id
+            dst_node = self.nodes.get(dst_node_id)
+            if dst_node_id != SUPERLINK_NODE_ID and (
                 # Node must exist
                 dst_node is None
                 # Node must be online or offline
                 or dst_node.status not in (NodeStatus.ONLINE, NodeStatus.OFFLINE)
                 # Node must belong to the same federation
-                or not self.federation_manager.has_node(dst_node.node_id, federation_id)
+                or not self.federation_manager.has_node(dst_node_id, federation_id)
             ):
                 log(
                     ERROR,
@@ -198,7 +199,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             missing_objects = self.preregister_object_tree(object_tree, session_id)
             return True, missing_objects
 
-    def _check_stored_messages(self, message_ids: set[str]) -> None:
+    def _check_stored_messages(
+        self, message_ids: set[str], run_id: int | None = None
+    ) -> None:
         """Check and delete the message if it's invalid."""
         with self.lock:
             invalid_msg_ids: set[str] = set()
@@ -206,6 +209,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             for msg_id in message_ids:
                 if not (message := self.message_ins_store.get(msg_id)):
                     continue
+                if run_id is not None and message.metadata.run_id != run_id:
+                    raise ValueError("`message_ids` contains invalid IDs")
 
                 # Check if the message has expired
                 available_until = message.metadata.created_at + message.metadata.ttl
@@ -218,17 +223,24 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 src_node_id = message.metadata.src_node_id
                 dst_node_id = message.metadata.dst_node_id
                 federation_id = self.run_ids[message.metadata.run_id].run.federation_id
-                filtered = self.federation_manager.filter_nodes(
-                    {src_node_id, dst_node_id},
-                    federation_id,
-                )
-                if len(filtered) != 2:  # Not both nodes are in the federation
-                    invalid_msg_ids.add(msg_id)
+                if src_node_id != dst_node_id:
+                    filtered = self.federation_manager.filter_nodes(
+                        {src_node_id, dst_node_id},
+                        federation_id,
+                    )
+                    if len(filtered) != 2:  # Not both nodes are in the federation
+                        invalid_msg_ids.add(msg_id)
 
             # Delete all invalid messages
             self.delete_messages(invalid_msg_ids)
 
-    def get_message_ins(self, node_id: int, limit: int | None) -> list[Message]:
+    def get_message_ins(
+        self,
+        node_id: int,
+        limit: int | None,
+        *,
+        run_id: int | None = None,
+    ) -> list[Message]:
         """Get all Messages that have not been delivered yet."""
         if limit is not None and limit < 1:
             raise AssertionError("`limit` must be >= 1")
@@ -242,6 +254,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 if (
                     (msg_ins := self.message_ins_store.get(msg_id))
                     and msg_ins.metadata.dst_node_id == node_id
+                    and (run_id is None or msg_ins.metadata.run_id == run_id)
                     and msg_ins.metadata.delivered_at == ""
                 ):
                     message_ins_list.append(msg_ins)
@@ -270,6 +283,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             message_id = res_metadata.message_id
             # Check if the Message it is replying to exists and is valid
             msg_ins_id = res_metadata.reply_to_message_id
+            msg_ins = self.message_ins_store.get(msg_ins_id)
+            if msg_ins and msg_ins.metadata.run_id != res_metadata.run_id:
+                log(ERROR, "`metadata.run_id` is invalid")
+                return None
             self._check_stored_messages({msg_ins_id})
             msg_ins = self.message_ins_store.get(msg_ins_id)
 
@@ -338,18 +355,23 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         # Return the new message_id
         return message_id
 
-    def get_message_res(self, message_ids: set[str]) -> list[Message]:
+    def get_message_res(self, message_ids: set[str], run_id: int) -> list[Message]:
         """Get reply Messages for the given Message IDs."""
         ret: dict[str, Message] = {}
 
         with self.lock:
-            self._check_stored_messages(message_ids)
+            self._check_stored_messages(message_ids, run_id)
             current = now().timestamp()
-
+            found_message_ins_dict = {
+                message_id: self.message_ins_store[message_id]
+                for message_id in message_ids
+                if message_id in self.message_ins_store
+            }
             # Verify Message IDs
             ret = verify_message_ids(
                 inquired_message_ids=message_ids,
-                found_message_ins_dict=self.message_ins_store,
+                found_message_ins_dict=found_message_ins_dict,
+                run_id=run_id,
                 current_time=current,
             )
 
@@ -360,7 +382,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             }
             tmp_ret_dict = check_node_availability_for_in_message(
                 inquired_in_message_ids=message_ids,
-                found_in_message_dict=self.message_ins_store,
+                found_in_message_dict=found_message_ins_dict,
                 node_id_to_online_until={
                     node_id: self.nodes[node_id].online_until
                     for node_id in dst_node_ids
@@ -381,9 +403,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     message_res = self.message_res_store[message_res_id]
                     if message_res.metadata.delivered_at == "":
                         message_res_found.append(message_res)
+            found_message_res_ids = {
+                message.metadata.message_id for message in message_res_found
+            }
             tmp_ret_dict = verify_found_message_replies(
                 inquired_message_ids=message_ids,
-                found_message_ins_dict=self.message_ins_store,
+                found_message_ins_dict=found_message_ins_dict,
                 found_message_res_list=message_res_found,
                 current_time=current,
             )
@@ -393,6 +418,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             delivered_at = now().isoformat()
             for message_res in message_res_found:
                 message_res.metadata.delivered_at = delivered_at
+
+            for message in ret.values():
+                if message.metadata.message_id not in found_message_res_ids:
+                    self._store_generated_message(message)
 
         return list(ret.values())
 

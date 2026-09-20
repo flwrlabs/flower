@@ -87,6 +87,12 @@ class ControlStub:
     ]
     """Get run series"""
 
+    UpdateRunSeriesDescription: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionRequest,
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse,
+    ]
+    """Update run series description"""
+
     ListRunSeriesEvents: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ListRunSeriesEventsRequest,
         flwr.proto.control_pb2.ListRunSeriesEventsResponse,
@@ -164,6 +170,12 @@ class ControlStub:
         flwr.proto.control_pb2.ListAppsResponse,
     ]
     """List Apps in a Federation"""
+
+    ListAppAssociations: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppAssociationsRequest,
+        flwr.proto.control_pb2.ListAppAssociationsResponse,
+    ]
+    """List Federations associated with an App"""
 
     AddApp: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.AddAppRequest,
@@ -315,6 +327,12 @@ class ControlAsyncStub:
     ]
     """Get run series"""
 
+    UpdateRunSeriesDescription: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionRequest,
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse,
+    ]
+    """Update run series description"""
+
     ListRunSeriesEvents: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ListRunSeriesEventsRequest,
         flwr.proto.control_pb2.ListRunSeriesEventsResponse,
@@ -392,6 +410,12 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.ListAppsResponse,
     ]
     """List Apps in a Federation"""
+
+    ListAppAssociations: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppAssociationsRequest,
+        flwr.proto.control_pb2.ListAppAssociationsResponse,
+    ]
+    """List Federations associated with an App"""
 
     AddApp: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.AddAppRequest,
@@ -562,6 +586,14 @@ class ControlServicer(metaclass=abc.ABCMeta):
         """Get run series"""
 
     @abc.abstractmethod
+    def UpdateRunSeriesDescription(
+        self,
+        request: flwr.proto.control_pb2.UpdateRunSeriesDescriptionRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse, collections.abc.Awaitable[flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse]]:
+        """Update run series description"""
+
+    @abc.abstractmethod
     def ListRunSeriesEvents(
         self,
         request: flwr.proto.control_pb2.ListRunSeriesEventsRequest,
@@ -664,6 +696,14 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.ListAppsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAppsResponse]]:
         """List Apps in a Federation"""
+
+    @abc.abstractmethod
+    def ListAppAssociations(
+        self,
+        request: flwr.proto.control_pb2.ListAppAssociationsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListAppAssociationsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAppAssociationsResponse]]:
+        """List Federations associated with an App"""
 
     @abc.abstractmethod
     def AddApp(

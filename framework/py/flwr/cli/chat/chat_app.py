@@ -19,7 +19,7 @@
 import asyncio
 import json
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
@@ -65,6 +65,7 @@ from flwr.cli.constant import (
     CHAT_AGENTS_API_PATH,
     CHAT_APP_STYLE,
     CHAT_COMMANDS,
+    CHAT_CONNECTOR_COMMAND,
     CHAT_DEFAULT_FEDERATION_NAME,
     CHAT_EXIT_COMMAND,
     CHAT_EXIT_HINT,
@@ -88,6 +89,7 @@ from flwr.cli.constant import (
 )
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Connector,
     StartRunRequest,
     StopRunRequest,
     StreamRunEventsRequest,
@@ -105,6 +107,12 @@ from flwr.supercore.typing import JSONObject
 
 from ..auth_plugin import CliAuthPlugin, OidcCliPlugin
 from ..utils import flwr_cli_exc_handler
+from .chat_connector import (
+    CHAT_CONNECTOR_CLEAR,
+    complete_connectors,
+    fetch_chat_connectors,
+    select_connector,
+)
 from .chat_federation import complete_federations, select_federation
 from .chat_history import HistoryBlock, load_conversation, load_history, render_history
 from .chat_local_agent import (
@@ -149,33 +157,49 @@ class _ChatCompleter(Completer):
 
     def __init__(
         self,
+        stub: ControlHttpClient,
         auth_plugin: CliAuthPlugin,
         federation: str,
         federations: list[Federation],
     ) -> None:
+        self.stub = stub
         self.auth_plugin = auth_plugin
         self.federation = federation
         self.federations = federations
         self.agents: list[_Agent] | None = None
-        self._agents_lock = Lock()
+        self.connectors: list[Connector] | None = None
+        self._completion_lock = Lock()
 
     def load_agents(self) -> list[_Agent]:
         """Load and cache the available agents."""
-        with self._agents_lock:
+        with self._completion_lock:
             if self.agents is None:
                 self.agents = fetch_chat_agents(self.auth_plugin, self.federation)
             return self.agents
 
+    def load_connectors(self) -> list[Connector]:
+        """Load and cache the connected connectors."""
+        with self._completion_lock:
+            if self.connectors is None:
+                self.connectors = fetch_chat_connectors(self.stub, self.federation)
+            return self.connectors
+
     def set_federation(self, federation: str) -> None:
         """Select a federation and clear cached agent completions."""
-        with self._agents_lock:
+        with self._completion_lock:
             self.federation = federation
             self.agents = None
+            self.connectors = None
 
     def invalidate_agents(self) -> None:
         """Clear cached agent completions."""
-        with self._agents_lock:
+        with self._completion_lock:
             self.agents = None
+
+    def invalidate_connectors(self) -> None:
+        """Clear cached connector completions."""
+        with self._completion_lock:
+            self.connectors = None
 
     def get_completions(  # pylint: disable=too-many-return-statements,too-many-branches
         self, document: Document, _complete_event: CompleteEvent
@@ -191,6 +215,18 @@ class _ChatCompleter(Completer):
             if any(char.isspace() for char in query):
                 return
             yield from complete_federations(query, self.federations)
+            return
+
+        connector_prefix = f"{CHAT_CONNECTOR_COMMAND} "
+        if text.lower().startswith(connector_prefix):
+            query = text[len(connector_prefix) :]
+            if any(char.isspace() for char in query):
+                return
+            try:
+                connectors = self.load_connectors()
+            except click.ClickException:
+                return
+            yield from complete_connectors(query, connectors)
             return
 
         if any(char.isspace() for char in text):
@@ -273,7 +309,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_fab_hash: str | None = None
         self.agent_name = CHAT_AGENT_NAME
         self.local_agent: LocalAgent | None = None
-        self.completer = _ChatCompleter(auth_plugin, self.federation, federations)
+        self.connector_refs: list[str] = []
+        self.completer = _ChatCompleter(stub, auth_plugin, self.federation, federations)
         self.input_buffer = Buffer(
             completer=ThreadedCompleter(self.completer),
             complete_while_typing=True,
@@ -501,7 +538,61 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             f"{CHAT_FEDERATION_COMMAND} "
         ):
             return self._handle_federation_command(event, prompt)
+        if command == CHAT_CONNECTOR_COMMAND or command.startswith(
+            f"{CHAT_CONNECTOR_COMMAND} "
+        ):
+            return self._handle_connector_command(event, prompt)
         return False
+
+    # pylint: disable-next=too-many-return-statements
+    def _handle_connector_command(self, event: KeyPressEvent, prompt: str) -> bool:
+        """Show the connector selector or apply its selection."""
+        if prompt.lower() == f"{CHAT_CONNECTOR_COMMAND} {CHAT_CONNECTOR_CLEAR}":
+            self.connector_refs.clear()
+            event.app.invalidate()
+            return True
+
+        if not self.federation.endswith(f"/{CHAT_DEFAULT_FEDERATION_NAME}"):
+            self._append_transcript(
+                "class:notice",
+                "Connectors are only available in the personal federation.\n\n",
+            )
+            return True
+
+        if prompt.lower() == CHAT_CONNECTOR_COMMAND:
+            self.completer.invalidate_connectors()
+
+        try:
+            connectors = self.completer.load_connectors()
+        except click.ClickException as exc:
+            self._append_transcript("class:error", f"Error: {exc.format_message()}\n\n")
+            return True
+
+        if not connectors:
+            self._append_transcript(
+                "class:notice",
+                "No connected connectors found. Please configure connectors using "
+                "WebUI.\n\n",
+            )
+            return True
+
+        if prompt.lower() == CHAT_CONNECTOR_COMMAND:
+            self.input_buffer.text = f"{CHAT_CONNECTOR_COMMAND} "
+            self.input_buffer.cursor_position = len(self.input_buffer.text)
+            self.input_buffer.start_completion(select_first=False)
+            event.app.invalidate()
+            return True
+
+        try:
+            connector = select_connector(prompt, connectors)
+        except click.ClickException as exc:
+            self._append_transcript("class:error", f"{exc.format_message()}\n\n")
+            return True
+
+        if connector.connector_ref not in self.connector_refs:
+            self.connector_refs.append(connector.connector_ref)
+            event.app.invalidate()
+        return True
 
     def _handle_load_command(self, event: KeyPressEvent, prompt: str) -> bool:
         """Validate a load command and start building its local AgentApp."""
@@ -580,6 +671,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_fab_hash = None
         self.agent_name = CHAT_AGENT_NAME
         self.local_agent = None
+        self.connector_refs.clear()
         self.series_id = None
         self._clear_transcript()
         return True
@@ -739,6 +831,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             app_spec,
             fab_hash,
             fab_content,
+            self.connector_refs,
         )
         if fab_content is not None:
             self.completer.invalidate_agents()
@@ -912,7 +1005,17 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
     def _render_agent_name(self) -> StyleAndTextTuples:
         """Return the selected agent label with the active federation."""
-        return [("class:agent.name", f" ✿ {self.agent_name} · {self.federation} ")]
+        connectors = (
+            f" · connectors: {', '.join(self.connector_refs)}"
+            if self.connector_refs
+            else ""
+        )
+        return [
+            (
+                "class:agent.name",
+                f" ✿ {self.agent_name} · {self.federation}{connectors} ",
+            )
+        ]
 
     def _render_transcript(self) -> StyleAndTextTuples:
         """Return transcript text wrapped to the current terminal width."""
@@ -1091,6 +1194,7 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
     app_spec: str = FLOWER_AGENT_APP_ID,
     fab_hash: str | None = None,
     fab_content: bytes | None = None,
+    connector_refs: Sequence[str] = (),
 ) -> tuple[int, int | None]:
     """Start one Flower AgentApp run."""
     req = StartRunRequest(
@@ -1099,6 +1203,7 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
         override_config=user_config_to_proto({CHAT_AGENT_INPUT_KEY: prompt}),
         federation=federation or "",
         fab=Fab(hash_str=fab_hash or "", content=fab_content or b""),
+        connector_refs=connector_refs,
     )
     if series_id is not None:
         req.series_id = series_id

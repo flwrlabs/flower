@@ -79,6 +79,11 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesResponse.FromString,
                 _registered_method=True)
+        self.UpdateRunSeriesDescription = channel.unary_unary(
+                '/flwr.proto.Control/UpdateRunSeriesDescription',
+                request_serializer=flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionResponse.FromString,
+                _registered_method=True)
         self.ListRunSeriesEvents = channel.unary_unary(
                 '/flwr.proto.Control/ListRunSeriesEvents',
                 request_serializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsRequest.SerializeToString,
@@ -143,6 +148,11 @@ class ControlStub(object):
                 '/flwr.proto.Control/ListApps',
                 request_serializer=flwr_dot_proto_dot_control__pb2.ListAppsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.ListAppsResponse.FromString,
+                _registered_method=True)
+        self.ListAppAssociations = channel.unary_unary(
+                '/flwr.proto.Control/ListAppAssociations',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListAppAssociationsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListAppAssociationsResponse.FromString,
                 _registered_method=True)
         self.AddApp = channel.unary_unary(
                 '/flwr.proto.Control/AddApp',
@@ -287,6 +297,13 @@ class ControlServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def UpdateRunSeriesDescription(self, request, context):
+        """Update run series description
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def ListRunSeriesEvents(self, request, context):
         """List events for all runs in a run series
         """
@@ -373,6 +390,13 @@ class ControlServicer(object):
 
     def ListApps(self, request, context):
         """List Apps in a Federation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListAppAssociations(self, request, context):
+        """List Federations associated with an App
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -535,6 +559,11 @@ def add_ControlServicer_to_server(servicer, server):
                     request_deserializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesResponse.SerializeToString,
             ),
+            'UpdateRunSeriesDescription': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateRunSeriesDescription,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionResponse.SerializeToString,
+            ),
             'ListRunSeriesEvents': grpc.unary_unary_rpc_method_handler(
                     servicer.ListRunSeriesEvents,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsRequest.FromString,
@@ -599,6 +628,11 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.ListApps,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.ListAppsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.ListAppsResponse.SerializeToString,
+            ),
+            'ListAppAssociations': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListAppAssociations,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListAppAssociationsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListAppAssociationsResponse.SerializeToString,
             ),
             'AddApp': grpc.unary_unary_rpc_method_handler(
                     servicer.AddApp,
@@ -919,6 +953,33 @@ class Control(object):
             '/flwr.proto.Control/GetRunSeries',
             flwr_dot_proto_dot_control__pb2.GetRunSeriesRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.GetRunSeriesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateRunSeriesDescription(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/UpdateRunSeriesDescription',
+            flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.UpdateRunSeriesDescriptionResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1270,6 +1331,33 @@ class Control(object):
             '/flwr.proto.Control/ListApps',
             flwr_dot_proto_dot_control__pb2.ListAppsRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.ListAppsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListAppAssociations(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListAppAssociations',
+            flwr_dot_proto_dot_control__pb2.ListAppAssociationsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListAppAssociationsResponse.FromString,
             options,
             channel_credentials,
             insecure,

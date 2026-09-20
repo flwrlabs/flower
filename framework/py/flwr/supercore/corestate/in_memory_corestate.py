@@ -50,7 +50,11 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskUsage,
 )
 from flwr.supercore import log
-from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
+from flwr.supercore.constant import (
+    FLOWER_AGENT_APP_ID,
+    OBJECT_PUSH_SESSION_TTL_SECONDS,
+    AutomationStatus,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
@@ -98,7 +102,7 @@ class FederationAppRecord:  # pylint: disable=too-many-instance-attributes
 
     federation_id: str
     app_id: str
-    fab_hash: str | None
+    fab_hash: str
     app_type: str
     is_hub_app: bool
     display_name: str | None
@@ -106,6 +110,7 @@ class FederationAppRecord:  # pylint: disable=too-many-instance-attributes
     color: str | None
     added_by: str
     added_at: datetime
+    updated_at: datetime
 
 
 @dataclass
@@ -334,7 +339,7 @@ class InMemoryCoreState(
 
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab | None,
+        fab: Fab,
         federation_id: str,
         app_id: str,
         app_type: str,
@@ -344,44 +349,41 @@ class InMemoryCoreState(
         description: str | None = None,
         color: str | None = None,
     ) -> str:
-        """Store an optional FAB and associate its app with a federation."""
+        """Store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
             raise ValueError(
                 "Federation ID, app ID, app type, and added by are required"
             )
-        if fab is None and not is_hub_app:
-            raise ValueError("A FAB is required for custom apps")
-        fab_hash = None
-        if fab is not None:
-            fab_hash = hashlib.sha256(fab.content).hexdigest()
-            if fab.hash_str and fab.hash_str != fab_hash:
-                raise ValueError(
-                    f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
-                )
+        fab_hash = hashlib.sha256(fab.content).hexdigest()
+        if fab.hash_str and fab.hash_str != fab_hash:
+            raise ValueError(
+                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+            )
         key = (federation_id, app_id)
+        current_time = now()
         with self.lock_fab_store, self.lock_federation_app_store:
-            if fab is not None and fab_hash is not None:
-                # Keep launch behavior: last write wins for metadata under the same
-                # content hash.
-                self.fab_store[fab_hash] = Fab(
-                    hash_str=fab_hash,
-                    content=fab.content,
-                    verifications=dict(fab.verifications),
-                )
+            # Keep launch behavior: last write wins for metadata under the same
+            # content hash.
+            self.fab_store[fab_hash] = Fab(
+                hash_str=fab_hash,
+                content=fab.content,
+                verifications=dict(fab.verifications),
+            )
             existing = self.federation_app_store.get(key)
             self.federation_app_store[key] = FederationAppRecord(
                 federation_id=federation_id,
                 app_id=app_id,
-                fab_hash=None if is_hub_app else fab_hash,
+                fab_hash=fab_hash,
                 app_type=app_type,
                 is_hub_app=is_hub_app,
                 display_name=display_name,
                 description=description,
                 color=color,
                 added_by=existing.added_by if existing else added_by,
-                added_at=existing.added_at if existing else now(),
+                added_at=existing.added_at if existing else current_time,
+                updated_at=current_time,
             )
-        return fab_hash or ""
+        return fab_hash
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
@@ -411,6 +413,44 @@ class InMemoryCoreState(
                 verifications=dict(fab.verifications),
             )
 
+    def get_hub_app(
+        self, federation_id: str, app_id: str
+    ) -> tuple[Fab, datetime] | None:
+        """Return the cached Hub FAB and its last update time, if present."""
+        with self.lock_fab_store, self.lock_federation_app_store:
+            app = self.federation_app_store.get((federation_id, app_id))
+            fab = self.fab_store.get(app.fab_hash) if app else None
+            if app is None or not app.is_hub_app or fab is None:
+                return None
+            return (
+                Fab(fab.hash_str, fab.content, dict(fab.verifications)),
+                app.updated_at,
+            )
+
+    def update_hub_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        federation_id: str,
+        app_id: str,
+        previous_fab_hash: str,
+        fab_hash: str,
+        app_type: str,
+    ) -> bool:
+        """Update a Hub app if it still points to the previous FAB."""
+        key = (federation_id, app_id)
+        with self.lock_fab_store, self.lock_federation_app_store:
+            app = self.federation_app_store.get(key)
+            if (
+                app is None
+                or not app.is_hub_app
+                or app.fab_hash != previous_fab_hash
+                or fab_hash not in self.fab_store
+            ):
+                return False
+            self.federation_app_store[key] = replace(
+                app, fab_hash=fab_hash, app_type=app_type, updated_at=now()
+            )
+            return True
+
     def list_apps(
         self, federation_id: str, limit: int | None = None
     ) -> Sequence[AppInfo]:
@@ -433,14 +473,30 @@ class InMemoryCoreState(
             return [
                 AppInfo(
                     app_id=record.app_id,
-                    fab_hash=record.fab_hash or "",
+                    fab_hash=record.fab_hash,
                     app_type=record.app_type,
                     is_hub_app=record.is_hub_app,
-                    display_name=record.display_name,
-                    description=record.description,
-                    color=record.color,
+                    display_name=record.display_name or "",
+                    description=record.description or "",
+                    color=record.color or "",
                 )
                 for record in records
+            ]
+
+    def list_app_associations(
+        self, app_id: str, federation_ids: Sequence[str]
+    ) -> Sequence[str]:
+        """List the provided federation IDs associated with an app."""
+        if not app_id or not federation_ids:
+            return []
+        if app_id == FLOWER_AGENT_APP_ID:
+            return list(federation_ids)
+        federation_id_set = set(federation_ids)
+        with self.lock_federation_app_store:
+            return [
+                record.federation_id
+                for record in self.federation_app_store.values()
+                if record.app_id == app_id and record.federation_id in federation_id_set
             ]
 
     def delete_app(self, federation_id: str, app_id: str) -> bool:
@@ -616,6 +672,17 @@ class InMemoryCoreState(
             if limit is not None:
                 run_series = run_series[:limit]
             return list(run_series)
+
+    def set_run_series_description(self, series_id: int, description: str) -> None:
+        """Set the description of an existing RunSeries."""
+        normalized = description.strip()
+        if not normalized:
+            return
+        with self.lock_run_series_store:
+            run_series = self.run_series_store.get(series_id)
+            if run_series is None:
+                return
+            run_series.description = normalized
 
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
@@ -1172,7 +1239,7 @@ class InMemoryCoreState(
     ) -> bool:
         """Store one task-addressed Message."""
         message_id = message.metadata.message_id
-        if validate_task_message(message):
+        if validate_task_message(message, self.get_node_id()):
             return False
         src_task_id = cast(int, message.metadata.src_task_id)
         dst_task_id = cast(int, message.metadata.dst_task_id)

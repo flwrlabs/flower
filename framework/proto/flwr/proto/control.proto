@@ -57,6 +57,10 @@ service Control {
   // Get run series
   rpc GetRunSeries(GetRunSeriesRequest) returns (GetRunSeriesResponse) {}
 
+  // Update run series description
+  rpc UpdateRunSeriesDescription(UpdateRunSeriesDescriptionRequest)
+      returns (UpdateRunSeriesDescriptionResponse) {}
+
   // List events for all runs in a run series
   rpc ListRunSeriesEvents(ListRunSeriesEventsRequest)
       returns (ListRunSeriesEventsResponse) {}
@@ -101,6 +105,10 @@ service Control {
 
   // List Apps in a Federation
   rpc ListApps(ListAppsRequest) returns (ListAppsResponse) {}
+
+  // List Federations associated with an App
+  rpc ListAppAssociations(ListAppAssociationsRequest)
+      returns (ListAppAssociationsResponse) {}
 
   // Add App to a Federation
   rpc AddApp(AddAppRequest) returns (AddAppResponse) {}
@@ -172,6 +180,7 @@ message StartRunRequest {
   string federation = 5;
   optional uint64 series_id = 6;
   repeated string connector_refs = 7;
+  string user_prompt = 8;
 }
 message StartRunResponse {
   optional uint64 run_id = 1;
@@ -323,15 +332,18 @@ message AppInfo {
   // True for Hub apps, false for local/custom apps, and absent for legacy apps
   // whose provenance is unknown.
   optional bool is_hub_app = 4;
-  optional string display_name = 5;
-  optional string description = 6;
-  optional string color = 7;
+  string display_name = 5;
+  string description = 6;
+  string color = 7;
 }
 message ListAppsRequest {
   string federation_id = 1;
   optional uint64 limit = 2;
 }
 message ListAppsResponse { repeated AppInfo apps = 1; }
+
+message ListAppAssociationsRequest { string app_id = 1; }
+message ListAppAssociationsResponse { repeated string federation_ids = 1; }
 
 message AddAppRequest {
   string federation_id = 1;
@@ -414,3 +426,9 @@ message StreamRunEventsRequest {
   optional uint64 after_task_event_id = 2;
 }
 message StreamRunEventsResponse { TaskEvent task_event = 1; }
+
+message UpdateRunSeriesDescriptionRequest {
+  uint64 series_id = 1;
+  string description = 2;
+}
+message UpdateRunSeriesDescriptionResponse { RunSeries series = 1; }

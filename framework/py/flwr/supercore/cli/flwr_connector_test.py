@@ -14,17 +14,23 @@
 # ==============================================================================
 """Tests for connector process CLI parsing and wiring."""
 
-
 import importlib
+import io
+import sys
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
 
+from flwr.common.constant import (
+    FLWR_TASK_TOKEN_LENGTH,
+    FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
+)
 from flwr.supercore.cli.flwr_connector import _parse_args_run_flwr_connector
 from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 
 flwr_connector_module = importlib.import_module("flwr.supercore.cli.flwr_connector")
+_VALID_TASK_TOKEN = "a" * (FLWR_TASK_TOKEN_LENGTH * 2)
 
 
 def test_parse_flwr_connector_requires_token() -> None:
@@ -49,6 +55,36 @@ def test_parse_flwr_connector_parses_tokenized_invocation() -> None:
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
+
+
+def test_parse_flwr_connector_accepts_only_one_token_source() -> None:
+    """The private stdin mode should be mutually exclusive with other sources."""
+    parser = _parse_args_run_flwr_connector()
+
+    assert parser.parse_args(["--token-stdin"]).token_stdin is True
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--token", "test-token", "--token-stdin"])
+
+
+def test_flwr_connector_reads_stdin_token_and_acknowledges_start(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The private handoff should consume one token before acknowledging it."""
+    token_stdin = io.TextIOWrapper(io.BytesIO(f"{_VALID_TASK_TOKEN}\n".encode()))
+    monkeypatch.setattr(sys, "stdin", token_stdin)
+    monkeypatch.setattr(sys, "argv", ["flwr-connector", "--token-stdin", "--insecure"])
+
+    with (
+        patch.object(flwr_connector_module, "restore_output"),
+        patch.object(flwr_connector_module, "run_connector") as run_connector,
+    ):
+        flwr_connector_module.flwr_connector()
+
+    assert token_stdin.closed
+    assert FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT in capsys.readouterr().out
+    assert run_connector.call_args.kwargs["token"] == _VALID_TASK_TOKEN
 
 
 def test_flwr_connector_parses_args_before_runtime_side_effects() -> None:

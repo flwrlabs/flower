@@ -17,9 +17,10 @@
 
 from unittest.mock import patch
 
+import pytest
 from parameterized import parameterized
 
-from .exit import _get_code_url
+from .exit import _get_code_url, flwr_exit
 
 
 @parameterized.expand(  # type: ignore
@@ -39,3 +40,17 @@ def test_get_code_url(version: str, subdir: str) -> None:
             expected_url = "https://flower.ai/docs/framework/"
             expected_url += f"{subdir}ref-exit-codes/{code}.html"
             assert actual_url == expected_url
+
+
+def test_flwr_exit_can_skip_previously_emitted_telemetry() -> None:
+    """A caller-owned leave event should not be emitted again during exit."""
+    with (
+        patch("flwr.supercore.exit.exit.event") as event,
+        patch("flwr.supercore.exit.exit.log"),
+        patch("flwr.supercore.exit.exit.trigger_exit_handlers"),
+        patch("flwr.supercore.exit.exit.threading.Thread"),
+        pytest.raises(SystemExit),
+    ):
+        flwr_exit(0, emit_telemetry=False)
+
+    event.assert_not_called()

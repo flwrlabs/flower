@@ -21,10 +21,11 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 
-from flwr.app import ArrayRecord, ConfigRecord, Context, Message, RecordDict
-from flwr.app.message import remove_content_from_message
+from flwr.app import ArrayRecord, ConfigRecord, Context, Message, Metadata, RecordDict
+from flwr.app.message import make_message, remove_content_from_message
 from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE, SubStatus
 from flwr.supercore.constant import TaskType
+from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -89,13 +90,20 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
     def _prepare_for_pull_and_store_message(self) -> None:
         """Prepare mocks for pull_and_store_message."""
         # Prepare
-        message = Message(
+        message = make_message(
             content=RecordDict({"mock_cfg": ConfigRecord({"key": "value"})}),
-            dst_node_id=self.node_id,
-            message_type="query",
-            group_id="test_group",
+            metadata=Metadata(
+                run_id=self.run_id,
+                message_id="",
+                src_node_id=0,
+                dst_node_id=self.node_id,
+                reply_to_message_id="",
+                group_id="test_group",
+                created_at=now().timestamp(),
+                ttl=10.0,
+                message_type="query",
+            ),
         )
-        message.metadata.__dict__["_run_id"] = self.run_id
         message.metadata.__dict__["_message_id"] = message.object_id
         message_without_content = remove_content_from_message(message)
         self.mock_receive.return_value = (
@@ -134,7 +142,9 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         # Prepare
         self._prepare_for_pull_and_store_message()
         fab_hash = "abc123"
-        self.mock_state.get_run.return_value = Mock(fab_hash=fab_hash)
+        self.mock_state.get_run.return_value = Mock(
+            fab_hash=fab_hash, primary_task_type=TaskType.SERVER_APP
+        )
         self.mock_state.create_task.return_value = 123
 
         # Execute
@@ -253,6 +263,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             fab_hash=fab.hash_str,
             override_config={},
             series_id=self.series_id,
+            primary_task_type=TaskType.AGENT_APP,
         )
         self.mock_get_run.return_value = mock_run
         self.mock_get_fab.return_value = fab
@@ -294,6 +305,11 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state.store_fab.assert_called_once_with(fab)
         self.mock_state.store_run.assert_called_once_with(mock_run)
         self.mock_state.get_run_series_context.assert_called_once_with(self.series_id)
+        self.mock_state.create_task.assert_called_once_with(
+            task_type=TaskType.AGENT_APP,
+            run_id=self.run_id,
+            fab_hash=fab.hash_str,
+        )
 
         # Assert: the Context should be created and stored if run_id is unknown
         self.mock_state.set_run_series_context.assert_called_once()
@@ -492,7 +508,20 @@ def test_start_client_internal_launches_superexec_with_runtime_http_address() ->
 
 def test_push_messages_pushes_each_requested_object_once() -> None:
     """Shared objects in different branches should only be pushed once."""
-    instruction = Message(content=RecordDict(), dst_node_id=1, message_type="query")
+    instruction = make_message(
+        content=RecordDict(),
+        metadata=Metadata(
+            run_id=1,
+            message_id="instruction-id",
+            src_node_id=0,
+            dst_node_id=1,
+            reply_to_message_id="",
+            group_id="",
+            created_at=now().timestamp(),
+            ttl=10.0,
+            message_type="query",
+        ),
+    )
     reply = Message(
         content=RecordDict(
             {

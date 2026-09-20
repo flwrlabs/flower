@@ -14,9 +14,7 @@
 # ==============================================================================
 """Tests for AgentApp process CLI parsing and wiring."""
 
-
 import importlib
-import io
 import os
 import sys
 from pathlib import Path
@@ -25,11 +23,11 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from flwr.common.constant import FLWR_TASK_TOKEN_LENGTH
-from flwr.supercore.cli.flwr_agentapp import (
-    _parse_args_run_flwr_agentapp,
-    _try_obtain_agentapp_token,
+from flwr.common.constant import (
+    FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
+    FLWR_TASK_TOKEN_LENGTH,
 )
+from flwr.supercore.cli.flwr_agentapp import _parse_args_run_flwr_agentapp
 from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 
 flwr_agentapp_module = importlib.import_module("flwr.supercore.cli.flwr_agentapp")
@@ -173,50 +171,9 @@ def test_flwr_agentapp_reads_stdin_token_and_acknowledges_start(
         token_writer.close()
 
     assert token_stdin.closed
-    assert capsys.readouterr().out == "FLWR_AGENTAPP_TOKEN_ACCEPTED\n"
+    assert capsys.readouterr().out == f"{FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT}\n"
     run_agentapp.assert_called_once()
     assert run_agentapp.call_args.kwargs["token"] == _VALID_TASK_TOKEN
-
-
-def test_flwr_agentapp_accumulates_split_stdin_token(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A valid token can arrive across multiple stdin reads."""
-    token_stdin = Mock()
-    token_stdin.buffer.read1.side_effect = [
-        _VALID_TASK_TOKEN[:128].encode("ascii"),
-        f"{_VALID_TASK_TOKEN[128:]}\n".encode("ascii"),
-    ]
-    monkeypatch.setattr(sys, "stdin", token_stdin)
-    args = _parse_args_run_flwr_agentapp().parse_args(["--token-stdin"])
-
-    assert _try_obtain_agentapp_token(args) == _VALID_TASK_TOKEN
-    assert token_stdin.buffer.read1.call_count == 2
-    token_stdin.close.assert_called_once()
-
-
-@pytest.mark.parametrize(
-    "token_input",
-    [
-        "",
-        "not-a-task-token",
-        f"{_VALID_TASK_TOKEN}\n{_VALID_TASK_TOKEN}\n",
-    ],
-)
-def test_flwr_agentapp_rejects_invalid_stdin_without_disclosure(
-    token_input: str,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Invalid private handoffs should fail closed without echoing their input."""
-    token_stdin = io.TextIOWrapper(io.BytesIO(token_input.encode("ascii")))
-    monkeypatch.setattr(sys, "stdin", token_stdin)
-    args = _parse_args_run_flwr_agentapp().parse_args(["--token-stdin"])
-
-    with pytest.raises(SystemExit) as exc_info:
-        _try_obtain_agentapp_token(args)
-
-    assert token_stdin.closed
-    assert not token_input or token_input not in str(exc_info.value)
 
 
 def test_flwr_agentapp_forwards_explicit_root_certificates_path(

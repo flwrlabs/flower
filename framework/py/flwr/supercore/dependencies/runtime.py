@@ -35,6 +35,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -124,6 +126,14 @@ class RuntimeHandlers(Protocol[StateT_contra]):
         self, request: GetNodesRequest, state: StateT_contra, task: Task
     ) -> GetNodesResponse:
         """Get available nodes."""
+
+    def get_run_series_events(
+        self,
+        request: GetRunSeriesEventsRequest,
+        state: StateT_contra,
+        task: Task,
+    ) -> GetRunSeriesEventsResponse:
+        """Get events from the authenticated task's run series."""
 
 
 def get_runtime_state(request: Request) -> CoreState:

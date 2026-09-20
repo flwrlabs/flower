@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-09 00:10+0000\n"
+"POT-Creation-Date: 2026-09-17 00:09+0000\n"
 "PO-Revision-Date: 2026-05-23 06:54+0000\n"
 "Last-Translator: Gustavo Bertoli <gubertoli@gmail.com>\n"
 "Language: pt_BR\n"
@@ -48,8 +48,8 @@ msgstr ""
 msgid "Changelog"
 msgstr ""
 
-#: ../../source/changelog/v1.36.0.md:2
-msgid "v1.36.0 (2026-09-01)"
+#: ../../source/changelog/v1.37.0.md:2
+msgid "v1.37.0 (2026-09-15)"
 msgstr ""
 
 #: ../../source/changelog/v1.0.0.md:11 ../../source/changelog/v1.1.0.md:4
@@ -70,10 +70,10 @@ msgstr ""
 #: ../../source/changelog/v1.31.0.md:4 ../../source/changelog/v1.32.0.md:4
 #: ../../source/changelog/v1.32.1.md:4 ../../source/changelog/v1.33.0.md:4
 #: ../../source/changelog/v1.34.0.md:4 ../../source/changelog/v1.35.0.md:4
-#: ../../source/changelog/v1.36.0.md:4 ../../source/changelog/v1.4.0.md:4
-#: ../../source/changelog/v1.5.0.md:4 ../../source/changelog/v1.6.0.md:4
-#: ../../source/changelog/v1.7.0.md:4 ../../source/changelog/v1.8.0.md:4
-#: ../../source/changelog/v1.9.0.md:4
+#: ../../source/changelog/v1.36.0.md:4 ../../source/changelog/v1.37.0.md:4
+#: ../../source/changelog/v1.4.0.md:4 ../../source/changelog/v1.5.0.md:4
+#: ../../source/changelog/v1.6.0.md:4 ../../source/changelog/v1.7.0.md:4
+#: ../../source/changelog/v1.8.0.md:4 ../../source/changelog/v1.9.0.md:4
 msgid "Thanks to our contributors"
 msgstr ""
 
@@ -94,19 +94,20 @@ msgstr ""
 #: ../../source/changelog/v1.31.0.md:6 ../../source/changelog/v1.32.0.md:6
 #: ../../source/changelog/v1.32.1.md:6 ../../source/changelog/v1.33.0.md:6
 #: ../../source/changelog/v1.34.0.md:6 ../../source/changelog/v1.35.0.md:6
-#: ../../source/changelog/v1.36.0.md:6 ../../source/changelog/v1.4.0.md:6
-#: ../../source/changelog/v1.5.0.md:6 ../../source/changelog/v1.6.0.md:6
-#: ../../source/changelog/v1.7.0.md:6 ../../source/changelog/v1.8.0.md:6
-#: ../../source/changelog/v1.9.0.md:6
+#: ../../source/changelog/v1.36.0.md:6 ../../source/changelog/v1.37.0.md:6
+#: ../../source/changelog/v1.4.0.md:6 ../../source/changelog/v1.5.0.md:6
+#: ../../source/changelog/v1.6.0.md:6 ../../source/changelog/v1.7.0.md:6
+#: ../../source/changelog/v1.8.0.md:6 ../../source/changelog/v1.9.0.md:6
 msgid ""
 "We would like to give our special thanks to all the contributors who made"
 " the new version of Flower possible (in `git shortlog` order):"
 msgstr ""
 
-#: ../../source/changelog/v1.36.0.md:8
+#: ../../source/changelog/v1.37.0.md:8
 msgid ""
-"`Charles Beauville`, `Daniel J. Beutel`, `Dimitris Stripelis`, `Heng "
-"Pan`, `Javier`, `Lorenzo Sani`, `Taner Topal`, `Yan Gao`, `jafermarq`"
+"`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata "
+"Nugraha`, `Dimitris Stripelis`, `Heng Pan`, `Javier`, `Julian Rußmeyer`, "
+"`Paul Thomas`, `Silvio Cretti`, `Taner Topal`, `Zhewen Tan`"
 msgstr ""
 
 #: ../../source/changelog/v0.13.0.md:4 ../../source/changelog/v0.14.0.md:4
@@ -130,11 +131,268 @@ msgstr ""
 #: ../../source/changelog/v1.31.0.md:10 ../../source/changelog/v1.32.0.md:10
 #: ../../source/changelog/v1.32.1.md:10 ../../source/changelog/v1.33.0.md:10
 #: ../../source/changelog/v1.34.0.md:10 ../../source/changelog/v1.35.0.md:10
-#: ../../source/changelog/v1.36.0.md:10 ../../source/changelog/v1.4.0.md:10
-#: ../../source/changelog/v1.5.0.md:10 ../../source/changelog/v1.6.0.md:10
-#: ../../source/changelog/v1.7.0.md:10 ../../source/changelog/v1.8.0.md:10
-#: ../../source/changelog/v1.9.0.md:10
+#: ../../source/changelog/v1.36.0.md:10 ../../source/changelog/v1.37.0.md:10
+#: ../../source/changelog/v1.4.0.md:10 ../../source/changelog/v1.5.0.md:10
+#: ../../source/changelog/v1.6.0.md:10 ../../source/changelog/v1.7.0.md:10
+#: ../../source/changelog/v1.8.0.md:10 ../../source/changelog/v1.9.0.md:10
 msgid "What's new?"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:12
+msgid ""
+"With this release, both RuntimeAPI and ControlAPI now use HTTP, making "
+"traffic easier to inspect, debug, and integrate with standard HTTP "
+"tooling. Logging is also richer, and the default log output has changed "
+"slightly to improve readability. To see all logs, enable [verbose "
+"logging](https://flower.ai/docs/framework/1.37/en/how-to-configure-"
+"logging.html) for SuperLink, SuperNode, or SuperExec. SuperLink no longer"
+" periodically logs which SuperNodes are connected; you can query this "
+"information at any time by running `flwr supernode ls`."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:14
+msgid ""
+"**Flower CLI switches to HTTP** "
+"([#8028](https://github.com/flwrlabs/flower/pull/8028), "
+"[#8045](https://github.com/flwrlabs/flower/pull/8045), "
+"[#8046](https://github.com/flwrlabs/flower/pull/8046), "
+"[#8047](https://github.com/flwrlabs/flower/pull/8047), "
+"[#8055](https://github.com/flwrlabs/flower/pull/8055), "
+"[#8057](https://github.com/flwrlabs/flower/pull/8057), "
+"[#8070](https://github.com/flwrlabs/flower/pull/8070), "
+"[#8072](https://github.com/flwrlabs/flower/pull/8072), "
+"[#8073](https://github.com/flwrlabs/flower/pull/8073), "
+"[#8076](https://github.com/flwrlabs/flower/pull/8076), "
+"[#8077](https://github.com/flwrlabs/flower/pull/8077), "
+"[#8084](https://github.com/flwrlabs/flower/pull/8084), "
+"[#8085](https://github.com/flwrlabs/flower/pull/8085), "
+"[#8087](https://github.com/flwrlabs/flower/pull/8087), "
+"[#8089](https://github.com/flwrlabs/flower/pull/8089), "
+"[#8093](https://github.com/flwrlabs/flower/pull/8093), "
+"[#8099](https://github.com/flwrlabs/flower/pull/8099))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:16
+msgid ""
+"The Flower CLI now sends Control API requests over HTTP. The gRPC Control"
+" API is disabled by default, and `--control-api-address` is deprecated in"
+" favor of `--host` and `--port`. SuperGrid configuration and deployment "
+"guides now use `api.flower.ai`. If your [Flower "
+"Configuration](https://flower.ai/docs/framework/1.37/en/ref-flower-"
+"configuration.html) file defines a custom `SuperLink` connection, you "
+"must update it for the switch from gRPC to HTTP; in most cases, only the "
+"port needs to change."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:18
+msgid ""
+"**Improve AgentApp conversations with history, connectors, titles, and "
+"local app loading** "
+"([#8048](https://github.com/flwrlabs/flower/pull/8048), "
+"[#8058](https://github.com/flwrlabs/flower/pull/8058), "
+"[#8060](https://github.com/flwrlabs/flower/pull/8060), "
+"[#8101](https://github.com/flwrlabs/flower/pull/8101), "
+"[#8102](https://github.com/flwrlabs/flower/pull/8102), "
+"[#8104](https://github.com/flwrlabs/flower/pull/8104), "
+"[#8105](https://github.com/flwrlabs/flower/pull/8105), "
+"[#8110](https://github.com/flwrlabs/flower/pull/8110), "
+"[#8123](https://github.com/flwrlabs/flower/pull/8123), "
+"[#8127](https://github.com/flwrlabs/flower/pull/8127), "
+"[#8128](https://github.com/flwrlabs/flower/pull/8128), "
+"[#8131](https://github.com/flwrlabs/flower/pull/8131), "
+"[#8133](https://github.com/flwrlabs/flower/pull/8133), "
+"[#8148](https://github.com/flwrlabs/flower/pull/8148))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:20
+msgid ""
+"`flwr chat` can now load and interactively test local AgentApps with the "
+"`/load <path>` command. Users can name or rename conversation titles, and"
+" titles can also be generated automatically. Within an `AgentApp`, "
+"persisted conversation history is now accessible through "
+"`agent.events.get_trace()`, with user inputs and tool calls recorded as "
+"standard events. `flwr chat` can also use connected connectors: select "
+"them with `/connector`, view the current selection in the context bar, "
+"and clear it with `/connector clear`. Connector setup remains available "
+"through the Web UI."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:22
+msgid ""
+"**Configure Runtime API TLS with consistent options** "
+"([#8109](https://github.com/flwrlabs/flower/pull/8109), "
+"[#8113](https://github.com/flwrlabs/flower/pull/8113))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:24
+msgid ""
+"SuperNode now uses `--ssl-certfile`, `--ssl-keyfile`, and `--ssl-ca-"
+"certfile` for Runtime API TLS while retaining the former `--appio-ssl-*` "
+"options as deprecated aliases. SuperLink help now clarifies that the same"
+" `--ssl-*` options secure its Fleet, Control, and Runtime APIs."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:26
+msgid ""
+"**Deploy SuperNodes using Slurm** "
+"([#8074](https://github.com/flwrlabs/flower/pull/8074))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:28
+msgid ""
+"A new guide covers running SuperNodes as Slurm jobs with subprocess or "
+"process isolation, including separate SuperExec jobs, GPU allocation, and"
+" scheduler-selected nodes."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:30
+msgid ""
+"**Reject invalid `FedTrimmedAvg` trimming fractions** "
+"([#7946](https://github.com/flwrlabs/flower/pull/7946))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:32
+msgid ""
+"ServerApp and legacy `FedTrimmedAvg` strategies now require `beta` to be "
+"in `[0, 0.5)`, preventing invalid trimming from producing `NaN` model "
+"parameters."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:34
+msgid ""
+"**Run adaptive federated DDoS attack detection with FLAD** "
+"([#8083](https://github.com/flwrlabs/flower/pull/8083))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:36
+msgid ""
+"The new FLAD baseline implements the strategy and a subset of the "
+"convergence experiments from its paper on a highly non-IID dataset of "
+"heterogeneous DDoS attacks. FLAD dynamically assigns more computation to "
+"clients whose attack profiles are harder to learn without sharing test "
+"data."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:38
+msgid ""
+"**General improvements** "
+"([#8049](https://github.com/flwrlabs/flower/pull/8049), "
+"[#8056](https://github.com/flwrlabs/flower/pull/8056), "
+"[#8064](https://github.com/flwrlabs/flower/pull/8064), "
+"[#8066](https://github.com/flwrlabs/flower/pull/8066), "
+"[#8067](https://github.com/flwrlabs/flower/pull/8067), "
+"[#8068](https://github.com/flwrlabs/flower/pull/8068), "
+"[#8071](https://github.com/flwrlabs/flower/pull/8071), "
+"[#8075](https://github.com/flwrlabs/flower/pull/8075), "
+"[#8078](https://github.com/flwrlabs/flower/pull/8078), "
+"[#8080](https://github.com/flwrlabs/flower/pull/8080), "
+"[#8082](https://github.com/flwrlabs/flower/pull/8082), "
+"[#8088](https://github.com/flwrlabs/flower/pull/8088), "
+"[#8095](https://github.com/flwrlabs/flower/pull/8095), "
+"[#8096](https://github.com/flwrlabs/flower/pull/8096), "
+"[#8098](https://github.com/flwrlabs/flower/pull/8098), "
+"[#8103](https://github.com/flwrlabs/flower/pull/8103), "
+"[#8108](https://github.com/flwrlabs/flower/pull/8108), "
+"[#8112](https://github.com/flwrlabs/flower/pull/8112), "
+"[#8114](https://github.com/flwrlabs/flower/pull/8114), "
+"[#8115](https://github.com/flwrlabs/flower/pull/8115), "
+"[#8116](https://github.com/flwrlabs/flower/pull/8116), "
+"[#8118](https://github.com/flwrlabs/flower/pull/8118), "
+"[#8119](https://github.com/flwrlabs/flower/pull/8119), "
+"[#8120](https://github.com/flwrlabs/flower/pull/8120), "
+"[#8124](https://github.com/flwrlabs/flower/pull/8124), "
+"[#8125](https://github.com/flwrlabs/flower/pull/8125), "
+"[#8126](https://github.com/flwrlabs/flower/pull/8126), "
+"[#8129](https://github.com/flwrlabs/flower/pull/8129), "
+"[#8134](https://github.com/flwrlabs/flower/pull/8134), "
+"[#8135](https://github.com/flwrlabs/flower/pull/8135), "
+"[#8136](https://github.com/flwrlabs/flower/pull/8136), "
+"[#8137](https://github.com/flwrlabs/flower/pull/8137), "
+"[#8139](https://github.com/flwrlabs/flower/pull/8139), "
+"[#8140](https://github.com/flwrlabs/flower/pull/8140), "
+"[#8142](https://github.com/flwrlabs/flower/pull/8142), "
+"[#8144](https://github.com/flwrlabs/flower/pull/8144), "
+"[#8149](https://github.com/flwrlabs/flower/pull/8149))"
+msgstr ""
+
+#: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
+#: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
+#: ../../source/changelog/v1.13.1.md:32 ../../source/changelog/v1.14.0.md:63
+#: ../../source/changelog/v1.15.0.md:80 ../../source/changelog/v1.16.0.md:54
+#: ../../source/changelog/v1.17.0.md:85 ../../source/changelog/v1.18.0.md:50
+#: ../../source/changelog/v1.19.0.md:68 ../../source/changelog/v1.20.0.md:66
+#: ../../source/changelog/v1.21.0.md:56 ../../source/changelog/v1.22.0.md:40
+#: ../../source/changelog/v1.23.0.md:48 ../../source/changelog/v1.24.0.md:42
+#: ../../source/changelog/v1.25.0.md:36 ../../source/changelog/v1.26.0.md:44
+#: ../../source/changelog/v1.27.0.md:50 ../../source/changelog/v1.28.0.md:50
+#: ../../source/changelog/v1.29.0.md:46 ../../source/changelog/v1.30.0.md:34
+#: ../../source/changelog/v1.31.0.md:50 ../../source/changelog/v1.32.0.md:44
+#: ../../source/changelog/v1.33.0.md:50 ../../source/changelog/v1.34.0.md:54
+#: ../../source/changelog/v1.35.0.md:50 ../../source/changelog/v1.36.0.md:30
+#: ../../source/changelog/v1.37.0.md:40
+msgid ""
+"As always, many parts of the Flower framework and quality infrastructure "
+"were improved and updated."
+msgstr ""
+
+#: ../../source/changelog/v0.16.0.md:21 ../../source/changelog/v0.17.0.md:33
+#: ../../source/changelog/v0.18.0.md:62 ../../source/changelog/v0.19.0.md:58
+#: ../../source/changelog/v1.0.0.md:17 ../../source/changelog/v1.1.0.md:60
+#: ../../source/changelog/v1.10.0.md:90 ../../source/changelog/v1.11.0.md:78
+#: ../../source/changelog/v1.11.1.md:30 ../../source/changelog/v1.12.0.md:66
+#: ../../source/changelog/v1.13.0.md:77 ../../source/changelog/v1.14.0.md:65
+#: ../../source/changelog/v1.15.0.md:82 ../../source/changelog/v1.16.0.md:56
+#: ../../source/changelog/v1.18.0.md:52 ../../source/changelog/v1.2.0.md:67
+#: ../../source/changelog/v1.20.0.md:68 ../../source/changelog/v1.21.0.md:58
+#: ../../source/changelog/v1.23.0.md:50 ../../source/changelog/v1.24.0.md:44
+#: ../../source/changelog/v1.25.0.md:38 ../../source/changelog/v1.26.0.md:46
+#: ../../source/changelog/v1.27.0.md:52 ../../source/changelog/v1.28.0.md:52
+#: ../../source/changelog/v1.29.0.md:48 ../../source/changelog/v1.3.0.md:56
+#: ../../source/changelog/v1.30.0.md:36 ../../source/changelog/v1.31.0.md:52
+#: ../../source/changelog/v1.32.0.md:46 ../../source/changelog/v1.33.0.md:52
+#: ../../source/changelog/v1.34.0.md:56 ../../source/changelog/v1.35.0.md:52
+#: ../../source/changelog/v1.37.0.md:42 ../../source/changelog/v1.4.0.md:62
+#: ../../source/changelog/v1.5.0.md:82 ../../source/changelog/v1.6.0.md:90
+#: ../../source/changelog/v1.7.0.md:73 ../../source/changelog/v1.8.0.md:62
+#: ../../source/changelog/v1.9.0.md:88
+msgid "Incompatible changes"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:44
+msgid ""
+"**Remove deprecated SuperLink Exec API options** "
+"([#8100](https://github.com/flwrlabs/flower/pull/8100))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:46
+msgid ""
+"SuperLink no longer accepts `--exec-api-address`, `--executor`, "
+"`--executor-dir`, or `--executor-config`. Remove these long-deprecated "
+"options from SuperLink launch configurations."
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:48
+msgid ""
+"**Update SuperLink TLS configuration** "
+"([#8106](https://github.com/flwrlabs/flower/pull/8106))"
+msgstr ""
+
+#: ../../source/changelog/v1.37.0.md:50
+msgid ""
+"SuperLink now uses `--ssl-certfile`, `--ssl-keyfile`, and `--ssl-ca-"
+"certfile` to secure its Fleet, Control, and Runtime APIs with one "
+"certificate set. Replace any `--appio-ssl-*` options with these shared "
+"options; the removed flags now terminate startup."
+msgstr ""
+
+#: ../../source/changelog/v1.36.0.md:2
+msgid "v1.36.0 (2026-09-01)"
+msgstr ""
+
+#: ../../source/changelog/v1.36.0.md:8
+msgid ""
+"`Charles Beauville`, `Daniel J. Beutel`, `Dimitris Stripelis`, `Heng "
+"Pan`, `Javier`, `Lorenzo Sani`, `Taner Topal`, `Yan Gao`, `jafermarq`"
 msgstr ""
 
 #: ../../source/changelog/v1.36.0.md:12
@@ -233,25 +491,6 @@ msgid ""
 "[#8042](https://github.com/flwrlabs/flower/pull/8042), "
 "[#8043](https://github.com/flwrlabs/flower/pull/8043), "
 "[#8044](https://github.com/flwrlabs/flower/pull/8044))"
-msgstr ""
-
-#: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
-#: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
-#: ../../source/changelog/v1.13.1.md:32 ../../source/changelog/v1.14.0.md:63
-#: ../../source/changelog/v1.15.0.md:80 ../../source/changelog/v1.16.0.md:54
-#: ../../source/changelog/v1.17.0.md:85 ../../source/changelog/v1.18.0.md:50
-#: ../../source/changelog/v1.19.0.md:68 ../../source/changelog/v1.20.0.md:66
-#: ../../source/changelog/v1.21.0.md:56 ../../source/changelog/v1.22.0.md:40
-#: ../../source/changelog/v1.23.0.md:48 ../../source/changelog/v1.24.0.md:42
-#: ../../source/changelog/v1.25.0.md:36 ../../source/changelog/v1.26.0.md:44
-#: ../../source/changelog/v1.27.0.md:50 ../../source/changelog/v1.28.0.md:50
-#: ../../source/changelog/v1.29.0.md:46 ../../source/changelog/v1.30.0.md:34
-#: ../../source/changelog/v1.31.0.md:50 ../../source/changelog/v1.32.0.md:44
-#: ../../source/changelog/v1.33.0.md:50 ../../source/changelog/v1.34.0.md:54
-#: ../../source/changelog/v1.35.0.md:50 ../../source/changelog/v1.36.0.md:30
-msgid ""
-"As always, many parts of the Flower framework and quality infrastructure "
-"were improved and updated."
 msgstr ""
 
 #: ../../source/changelog/v1.35.0.md:2
@@ -436,28 +675,6 @@ msgid ""
 "[#7982](https://github.com/flwrlabs/flower/pull/7982), "
 "[#7989](https://github.com/flwrlabs/flower/pull/7989), "
 "[#7995](https://github.com/flwrlabs/flower/pull/7995))"
-msgstr ""
-
-#: ../../source/changelog/v0.16.0.md:21 ../../source/changelog/v0.17.0.md:33
-#: ../../source/changelog/v0.18.0.md:62 ../../source/changelog/v0.19.0.md:58
-#: ../../source/changelog/v1.0.0.md:17 ../../source/changelog/v1.1.0.md:60
-#: ../../source/changelog/v1.10.0.md:90 ../../source/changelog/v1.11.0.md:78
-#: ../../source/changelog/v1.11.1.md:30 ../../source/changelog/v1.12.0.md:66
-#: ../../source/changelog/v1.13.0.md:77 ../../source/changelog/v1.14.0.md:65
-#: ../../source/changelog/v1.15.0.md:82 ../../source/changelog/v1.16.0.md:56
-#: ../../source/changelog/v1.18.0.md:52 ../../source/changelog/v1.2.0.md:67
-#: ../../source/changelog/v1.20.0.md:68 ../../source/changelog/v1.21.0.md:58
-#: ../../source/changelog/v1.23.0.md:50 ../../source/changelog/v1.24.0.md:44
-#: ../../source/changelog/v1.25.0.md:38 ../../source/changelog/v1.26.0.md:46
-#: ../../source/changelog/v1.27.0.md:52 ../../source/changelog/v1.28.0.md:52
-#: ../../source/changelog/v1.29.0.md:48 ../../source/changelog/v1.3.0.md:56
-#: ../../source/changelog/v1.30.0.md:36 ../../source/changelog/v1.31.0.md:52
-#: ../../source/changelog/v1.32.0.md:46 ../../source/changelog/v1.33.0.md:52
-#: ../../source/changelog/v1.34.0.md:56 ../../source/changelog/v1.35.0.md:52
-#: ../../source/changelog/v1.4.0.md:62 ../../source/changelog/v1.5.0.md:82
-#: ../../source/changelog/v1.6.0.md:90 ../../source/changelog/v1.7.0.md:73
-#: ../../source/changelog/v1.8.0.md:62 ../../source/changelog/v1.9.0.md:88
-msgid "Incompatible changes"
 msgstr ""
 
 #: ../../source/changelog/v1.35.0.md:54
@@ -12480,14 +12697,15 @@ msgstr "Argumento de compilação"
 #: ../../source/ref-exit-codes/202.rst:7 ../../source/ref-exit-codes/203.rst:7
 #: ../../source/ref-exit-codes/250.rst:7 ../../source/ref-exit-codes/3.rst:7
 #: ../../source/ref-exit-codes/302.rst:7 ../../source/ref-exit-codes/303.rst:7
-#: ../../source/ref-exit-codes/304.rst:7 ../../source/ref-exit-codes/400.rst:7
-#: ../../source/ref-exit-codes/401.rst:7 ../../source/ref-exit-codes/402.rst:7
-#: ../../source/ref-exit-codes/500.rst:7 ../../source/ref-exit-codes/600.rst:7
-#: ../../source/ref-exit-codes/602.rst:7 ../../source/ref-exit-codes/603.rst:7
-#: ../../source/ref-exit-codes/604.rst:7 ../../source/ref-exit-codes/605.rst:7
-#: ../../source/ref-exit-codes/606.rst:7 ../../source/ref-exit-codes/607.rst:7
-#: ../../source/ref-exit-codes/608.rst:7 ../../source/ref-exit-codes/700.rst:7
-#: ../../source/ref-exit-codes/701.rst:7 ../../source/ref-exit-codes/800.rst:7
+#: ../../source/ref-exit-codes/304.rst:7 ../../source/ref-exit-codes/305.rst:7
+#: ../../source/ref-exit-codes/400.rst:7 ../../source/ref-exit-codes/401.rst:7
+#: ../../source/ref-exit-codes/402.rst:7 ../../source/ref-exit-codes/500.rst:7
+#: ../../source/ref-exit-codes/600.rst:7 ../../source/ref-exit-codes/602.rst:7
+#: ../../source/ref-exit-codes/603.rst:7 ../../source/ref-exit-codes/604.rst:7
+#: ../../source/ref-exit-codes/605.rst:7 ../../source/ref-exit-codes/606.rst:7
+#: ../../source/ref-exit-codes/607.rst:7 ../../source/ref-exit-codes/608.rst:7
+#: ../../source/ref-exit-codes/700.rst:7 ../../source/ref-exit-codes/701.rst:7
+#: ../../source/ref-exit-codes/800.rst:7
 msgid "Description"
 msgstr "Descrição"
 
@@ -13857,7 +14075,7 @@ msgstr ""
 msgid ""
 "The title should be changed to adhere to the :ref:`pr_title_format` "
 "guidelines, otherwise it won't be possible to merge the PR. So in this "
-"case, a correct title might be ``docs(framework:skip) Fix typos``."
+"case, a correct title might be ``docs(framework:skip): Fix typos``."
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:218
@@ -14085,7 +14303,7 @@ msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:348
 msgid ""
-"Open a PR (as shown above) with title ``docs(framework) Update how-to "
+"Open a PR (as shown above) with title ``docs(framework): Update how-to "
 "guide title``"
 msgstr ""
 
@@ -14135,7 +14353,7 @@ msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:377
 msgid ""
-"(or ``<type>(<project>:skip) <subject>`` to ignore the PR in the "
+"(or ``<type>(<project>:skip): <subject>`` to ignore the PR in the "
 "changelog)"
 msgstr ""
 
@@ -14143,57 +14361,58 @@ msgstr ""
 #, python-brace-format
 msgid ""
 "Where ``<type>`` needs to be in ``{ci, fix, feat, docs, refactor, "
-"break}``, ``<project>`` should be in ``{framework, baselines, datasets, "
-"examples, or '*' when modifying multiple projects which requires the "
-"':skip' flag to be used}``, and ``<subject>`` starts with a capitalised "
-"verb in the imperative mood."
+"break}``, ``<project>`` should be in ``{devtool, framework, agent, "
+"baselines, datasets, examples, benchmarks, glossary, intelligence, hub, "
+"model, or '*' when modifying multiple projects which requires the ':skip'"
+" flag to be used}``, and ``<subject>`` starts with a capitalised verb in "
+"the imperative mood."
 msgstr ""
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:384
+#: ../../source/contributor-tutorial-contribute-on-github.rst:385
 #, fuzzy
 msgid "Valid examples:"
 msgstr "Exemplo"
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:386
-msgid "``feat(framework) Add flwr build CLI command``"
-msgstr ""
-
 #: ../../source/contributor-tutorial-contribute-on-github.rst:387
-msgid "``refactor(examples:skip) Improve quickstart-pytorch logging``"
+msgid "``feat(framework): Add flwr build CLI command``"
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:388
-msgid "``ci(*:skip) Enforce PR title format``"
+msgid "``refactor(examples:skip): Improve quickstart-pytorch logging``"
 msgstr ""
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:390
+#: ../../source/contributor-tutorial-contribute-on-github.rst:389
+msgid "``ci(*:skip): Enforce PR title format``"
+msgstr ""
+
+#: ../../source/contributor-tutorial-contribute-on-github.rst:391
 msgid "Invalid examples:"
 msgstr ""
 
-#: ../../source/contributor-tutorial-contribute-on-github.rst:392
-msgid "``feat(framework): Add flwr build CLI command`` (extra ``:``)"
-msgstr ""
-
 #: ../../source/contributor-tutorial-contribute-on-github.rst:393
-msgid ""
-"``feat(*) Add flwr build CLI command`` (missing ``skip`` flag along with "
-"``*``)"
+msgid "``feat(framework) Add flwr build CLI command`` (missing ``:``)"
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:394
-msgid "``feat(skip) Add flwr build CLI command`` (missing ``<project>``)"
+msgid ""
+"``feat(*): Add flwr build CLI command`` (missing ``skip`` flag along with"
+" ``*``)"
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:395
-msgid "``feat(framework) add flwr build CLI command`` (non capitalised verb)"
+msgid "``feat(skip): Add flwr build CLI command`` (missing ``<project>``)"
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:396
-msgid "``feat(framework) Add flwr build CLI command.`` (dot at the end)"
+msgid "``feat(framework): add flwr build CLI command`` (non capitalised verb)"
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:397
-msgid "``Add flwr build CLI command.`` (missing ``<type>(<project>)``)"
+msgid "``feat(framework): Add flwr build CLI command.`` (dot at the end)"
+msgstr ""
+
+#: ../../source/contributor-tutorial-contribute-on-github.rst:398
+msgid "``Add flwr build CLI command.`` (missing ``<type>(<project>):``)"
 msgstr ""
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:3
@@ -14523,8 +14742,8 @@ msgstr ""
 #: ../../source/docker/enable-tls.rst:240
 #: ../../source/docker/tutorial-quickstart-docker.rst:84
 #: ../../source/docker/tutorial-quickstart-docker.rst:129
-#: ../../source/docker/tutorial-quickstart-docker.rst:246
-#: ../../source/docker/tutorial-quickstart-docker.rst:284
+#: ../../source/docker/tutorial-quickstart-docker.rst:244
+#: ../../source/docker/tutorial-quickstart-docker.rst:278
 msgid "``docker run``: This tells Docker to run a container from an image."
 msgstr ""
 
@@ -14535,8 +14754,8 @@ msgstr ""
 #: ../../source/docker/enable-tls.rst:241
 #: ../../source/docker/tutorial-quickstart-docker.rst:85
 #: ../../source/docker/tutorial-quickstart-docker.rst:130
-#: ../../source/docker/tutorial-quickstart-docker.rst:247
-#: ../../source/docker/tutorial-quickstart-docker.rst:285
+#: ../../source/docker/tutorial-quickstart-docker.rst:245
+#: ../../source/docker/tutorial-quickstart-docker.rst:279
 msgid "``--rm``: Remove the container once it is stopped or the command exits."
 msgstr ""
 
@@ -14849,12 +15068,12 @@ msgstr ""
 #: ../../source/docker/tutorial-deploy-on-multiple-machines.rst:167
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:110
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:250
-#: ../../source/docker/tutorial-quickstart-docker.rst:331
+#: ../../source/docker/tutorial-quickstart-docker.rst:322
 #: ../../source/how-to-authenticate-accounts.rst:71
 #: ../../source/how-to-authenticate-supernodes.rst:122
-#: ../../source/how-to-enable-tls-connections.rst:219
+#: ../../source/how-to-enable-tls-connections.rst:217
 #: ../../source/how-to-run-flower-on-azure.rst:230
-#: ../../source/how-to-run-flower-on-gcp.rst:625
+#: ../../source/how-to-run-flower-on-gcp.rst:619
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:684
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:214
 #: ../../source/how-to-upgrade-to-flower-1.28.rst:80
@@ -15669,8 +15888,8 @@ msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:90
 #: ../../source/docker/tutorial-quickstart-docker.rst:134
-#: ../../source/docker/tutorial-quickstart-docker.rst:248
-#: ../../source/docker/tutorial-quickstart-docker.rst:286
+#: ../../source/docker/tutorial-quickstart-docker.rst:246
+#: ../../source/docker/tutorial-quickstart-docker.rst:280
 msgid ""
 "``--network flwr-network``: Make the container join the network named "
 "``flwr-network``."
@@ -15682,8 +15901,8 @@ msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:92
 #: ../../source/docker/tutorial-quickstart-docker.rst:136
-#: ../../source/docker/tutorial-quickstart-docker.rst:250
-#: ../../source/docker/tutorial-quickstart-docker.rst:288
+#: ../../source/docker/tutorial-quickstart-docker.rst:248
+#: ../../source/docker/tutorial-quickstart-docker.rst:282
 msgid ""
 "``--detach``: Run the container in the background, freeing up the "
 "terminal."
@@ -15792,25 +16011,23 @@ msgstr ""
 #: ../../source/docker/tutorial-quickstart-docker.rst:174
 msgid ""
 "The **SuperExec** Docker image comes with a pre-installed version of "
-"Flower and serves as a base for building your own image. Use a **single**"
-" image and select the desired behavior (ServerApps vs ClientApps) at "
-"runtime via the ``--plugin-type`` flag. SuperExec spawns the "
-"corresponding processes on demand."
+"Flower and serves as a base for building your own image. SuperExec spawns"
+" the appropriate processes on demand based on the tasks it receives."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:179
+#: ../../source/docker/tutorial-quickstart-docker.rst:178
 msgid ""
-"When using SuperExec with the *serverapp* plugin, pass ``--runtime-api-"
-"address`` pointing to the SuperLink's **Runtime API** endpoint."
+"To execute ServerApps, pass ``--runtime-api-address`` pointing to the "
+"SuperLink's **Runtime API** endpoint."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:182
+#: ../../source/docker/tutorial-quickstart-docker.rst:181
 msgid ""
 "Create a Dockerfile called ``superexec.Dockerfile`` and paste the "
 "following:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:184
+#: ../../source/docker/tutorial-quickstart-docker.rst:183
 #: ../../source/how-to-run-flower-on-gcp.rst
 #, fuzzy
 msgid "superexec.Dockerfile"
@@ -15820,7 +16037,7 @@ msgstr "Construindo a imagem do servidor"
 msgid "Understand the Dockerfile"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:200
+#: ../../source/docker/tutorial-quickstart-docker.rst:199
 msgid ""
 ":substitution-code:`FROM flwr/superexec:|stable_flwr_version|`: This line"
 " specifies that the Docker image to be built from is the "
@@ -15828,46 +16045,46 @@ msgid ""
 "code:`|stable_flwr_version|`."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:202
+#: ../../source/docker/tutorial-quickstart-docker.rst:201
 msgid ""
 "``WORKDIR /app``: Set the working directory for the container to "
 "``/app``. Any subsequent commands that reference a directory will be "
 "relative to this directory."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:204
+#: ../../source/docker/tutorial-quickstart-docker.rst:203
 msgid ""
 "``COPY pyproject.toml .``: Copy the ``pyproject.toml`` file. from the "
 "current working directory into the container's ``/app`` directory."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:206
+#: ../../source/docker/tutorial-quickstart-docker.rst:205
 msgid ""
 "``RUN sed -i 's/.*flwr\\[simulation\\].*//' pyproject.toml``: Remove the "
 "``flwr`` dependency from the ``pyproject.toml``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:208
+#: ../../source/docker/tutorial-quickstart-docker.rst:207
 msgid ""
 "``python -m pip install -U --no-cache-dir .``: Run the ``pip`` install "
 "command to install the dependencies defined in the ``pyproject.toml`` "
 "file."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:211
+#: ../../source/docker/tutorial-quickstart-docker.rst:210
 msgid ""
 "The ``-U`` flag indicates that any existing packages should be upgraded, "
 "and ``--no-cache-dir`` prevents pip from using the cache to speed up the "
 "installation."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:213
+#: ../../source/docker/tutorial-quickstart-docker.rst:212
 msgid ""
 "``ENTRYPOINT [\"flower-superexec\"]``: Set the command ``flower-"
 "superexec`` to be the default command run when the container is started."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:218
+#: ../../source/docker/tutorial-quickstart-docker.rst:217
 msgid ""
 "Note that `flwr <https://pypi.org/project/flwr/>`__ is already installed "
 "in the ``flwr/superexec`` base image, so only other package dependencies "
@@ -15876,92 +16093,79 @@ msgid ""
 "after it has been copied into the Docker image (see line 5)."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:224
+#: ../../source/docker/tutorial-quickstart-docker.rst:223
 msgid ""
 "Afterward, in the directory that holds the Dockerfile, execute this "
 "Docker command to build the SuperExec image:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:231
+#: ../../source/docker/tutorial-quickstart-docker.rst:230
 msgid "Start the **SuperExec for ServerApps** container:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:249
+#: ../../source/docker/tutorial-quickstart-docker.rst:247
 msgid "``--name superexec-serverapp``: Give the container a descriptive name."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:251
-#: ../../source/docker/tutorial-quickstart-docker.rst:289
+#: ../../source/docker/tutorial-quickstart-docker.rst:249
+#: ../../source/docker/tutorial-quickstart-docker.rst:283
 msgid ""
 "``flwr_superexec:0.0.1``: This is the name of the image to be run and the"
 " specific tag of the image."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:253
-#: ../../source/docker/tutorial-quickstart-docker.rst:291
+#: ../../source/docker/tutorial-quickstart-docker.rst:251
+#: ../../source/docker/tutorial-quickstart-docker.rst:285
 msgid ""
 "``--insecure``: This flag tells the container to operate in an insecure "
 "mode, allowing unencrypted communication. Secure connections will be "
 "added in future releases."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:255
-msgid ""
-"``--plugin-type serverapp``: Load the *serverapp* plugin. SuperExec will "
-"spawn ServerApp processes as needed."
-msgstr ""
-
-#: ../../source/docker/tutorial-quickstart-docker.rst:257
+#: ../../source/docker/tutorial-quickstart-docker.rst:253
 msgid ""
 "``--runtime-api-address superlink:8000``: Connect to the SuperLink's "
 "Runtime API at the address ``superlink:8000``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:262
+#: ../../source/docker/tutorial-quickstart-docker.rst:258
 msgid "Step 5: Start the SuperExec to execute ClientApps"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:264
+#: ../../source/docker/tutorial-quickstart-docker.rst:260
 msgid ""
-"For ClientApps, reuse the **same** image and change the plugin and API "
-"address. When using the *clientapp* plugin, pass ``--runtime-api-"
+"For ClientApps, reuse the **same** image and pass ``--runtime-api-"
 "address`` pointing to the SuperNode's **Runtime API** endpoint."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:268
+#: ../../source/docker/tutorial-quickstart-docker.rst:263
 msgid "(No new Dockerfile is needed; reuse ``flwr_superexec:0.0.1``.)"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:269
+#: ../../source/docker/tutorial-quickstart-docker.rst:264
 msgid "Start the first **SuperExec for ClientApps** container:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:287
+#: ../../source/docker/tutorial-quickstart-docker.rst:281
 msgid "``--name superexec-clientapp-1``: Give the container a descriptive name."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:293
-msgid ""
-"``--plugin-type clientapp``: Load the *clientapp* plugin. SuperExec will "
-"spawn ClientApp processes as needed."
-msgstr ""
-
-#: ../../source/docker/tutorial-quickstart-docker.rst:295
+#: ../../source/docker/tutorial-quickstart-docker.rst:287
 msgid ""
 "``--runtime-api-address supernode-1:9094``: Connect to the SuperNode's "
 "Runtime API at the address ``supernode-1:9094``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:298
+#: ../../source/docker/tutorial-quickstart-docker.rst:290
 msgid "Start the second **SuperExec for ClientApps** container:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:313
+#: ../../source/docker/tutorial-quickstart-docker.rst:304
 msgid "Step 6: Run the Quickstart Project"
 msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:94
-#: ../../source/docker/tutorial-quickstart-docker.rst:315
+#: ../../source/docker/tutorial-quickstart-docker.rst:306
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:198
 msgid ""
 "Find the Flower Configuration TOML file in your machine. This file is "
@@ -15970,84 +16174,84 @@ msgid ""
 "as the path to the configuration file."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:329
+#: ../../source/docker/tutorial-quickstart-docker.rst:320
 msgid ""
 "Add the following lines to the ``config.toml`` to add a new SuperLink "
 "connection:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:338
+#: ../../source/docker/tutorial-quickstart-docker.rst:329
 msgid ""
 "Run the ``quickstart-pytorch`` project and follow the ServerApp logs to "
 "track the execution of the run:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:347
+#: ../../source/docker/tutorial-quickstart-docker.rst:338
 msgid "Step 7: Update the Application"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:349
+#: ../../source/docker/tutorial-quickstart-docker.rst:340
 msgid ""
 "Change the application code. For example, change the ``seed`` in "
 "``pytorchexample/task.py`` to ``43`` and save it:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:352
+#: ../../source/docker/tutorial-quickstart-docker.rst:343
 msgid "pytorchexample/task.py"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:359
+#: ../../source/docker/tutorial-quickstart-docker.rst:350
 msgid "Stop the running containers:"
 msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:148
-#: ../../source/docker/tutorial-quickstart-docker.rst:363
+#: ../../source/docker/tutorial-quickstart-docker.rst:354
 msgid ""
 "If you have modified the dependencies listed in your ``pyproject.toml`` "
 "file, it is essential to rebuild images."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:366
+#: ../../source/docker/tutorial-quickstart-docker.rst:357
 msgid "If you haven't made any changes, you can skip steps 2 through 4."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:372
+#: ../../source/docker/tutorial-quickstart-docker.rst:363
 #, fuzzy
 msgid "Rebuild the SuperExec image:"
 msgstr "Construindo a imagem base"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:378
+#: ../../source/docker/tutorial-quickstart-docker.rst:369
 msgid ""
 "Launch **one SuperExec container** for the new ServerApp and **two "
 "SuperExec containers** for the new ClientApps:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:408
+#: ../../source/docker/tutorial-quickstart-docker.rst:396
 msgid "Run the updated project:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:416
+#: ../../source/docker/tutorial-quickstart-docker.rst:404
 msgid "Step 8: Clean Up"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:418
+#: ../../source/docker/tutorial-quickstart-docker.rst:406
 msgid "Remove the containers and the bridge network:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:444
-#: ../../source/docker/tutorial-quickstart-docker.rst:430
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:442
+#: ../../source/docker/tutorial-quickstart-docker.rst:418
 msgid "Where to Go Next"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:432
+#: ../../source/docker/tutorial-quickstart-docker.rst:420
 msgid ":doc:`enable-tls`"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:433
+#: ../../source/docker/tutorial-quickstart-docker.rst:421
 msgid ":doc:`persist-superlink-state`"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:434
+#: ../../source/docker/tutorial-quickstart-docker.rst:422
 msgid ":doc:`tutorial-quickstart-docker-compose`"
 msgstr ""
 
@@ -16252,7 +16456,7 @@ msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:208
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:263
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:410
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:408
 msgid "Rerun the ``quickstart-pytorch`` project:"
 msgstr ""
 
@@ -16306,68 +16510,68 @@ msgstr ""
 msgid "compose.yml"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:332
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:330
 msgid ""
 "If you also want to enable TLS for the new SuperNode, uncomment the "
 "definition in the ``with-tls.yml`` file:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:335
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:333
 msgid "with-tls.yml"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:358
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:356
 msgid "Restart the services with:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:368
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:366
 msgid "Step 8: Persisting the SuperLink State and Enabling TLS"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:370
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:368
 msgid ""
 "To run Flower with persisted SuperLink state and enabled TLS, a slight "
 "change in the ``with-state.yml`` file is required:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:373
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:371
 msgid "Comment out the first ``command`` block and uncomment the second one:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:375
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:373
 msgid "with-state.yml"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:404
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:402
 msgid "Restart the services:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:418
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:416
 msgid "Step 9: Merge Multiple Compose Files"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:420
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:418
 msgid ""
 "You can merge multiple Compose files into a single file. For instance, if"
 " you wish to combine the basic configuration with the TLS configuration, "
 "execute the following command:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:429
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:427
 msgid ""
 "This will merge the contents of ``compose.yml`` and ``with-tls.yml`` into"
 " a new file called ``my_compose.yml``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:434
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:432
 msgid "Step 10: Clean Up"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:436
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:434
 msgid "Remove all services and volumes:"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:446
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:444
 msgid ":doc:`run-quickstart-examples-docker-compose`"
 msgstr ""
 
@@ -18238,7 +18442,6 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:579
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:236
-#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst
 #: ../../source/ref-api/flwr.app.Array.rst
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst
@@ -21818,7 +22021,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-authenticate-supernodes.rst:145
-#: ../../source/how-to-enable-tls-connections.rst:236
+#: ../../source/how-to-enable-tls-connections.rst:234
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:242
 msgid ""
 "You can setup your ``local-deployment`` profile as the default so you "
@@ -21941,7 +22144,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-authenticate-supernodes.rst:307
-#: ../../source/how-to-enable-tls-connections.rst:243
+#: ../../source/how-to-enable-tls-connections.rst:241
 #: ../../source/how-to-use-built-in-mods.rst:175
 #: ../../source/tutorial-series-what-is-federated-learning.rst:291
 msgid "Conclusion"
@@ -21955,7 +22158,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-authenticate-supernodes.rst:315
-#: ../../source/how-to-enable-tls-connections.rst:253
+#: ../../source/how-to-enable-tls-connections.rst:251
 msgid ""
 "Refer to the :doc:`docker/index` documentation to learn how to setup a "
 "federation where each component runs in its own Docker container. You can"
@@ -23355,17 +23558,17 @@ msgstr ""
 msgid "Create ``superexec-clientapp.sbatch``:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:156
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:155
 msgid "Submit the SuperNode job first, then submit the SuperExec job:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:163
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:162
 msgid ""
 "The SuperExec waits for ClientApp tasks from the SuperNode. The ClientApp"
 " processes inherit the CPU and memory allocation of the SuperExec job."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:168
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:167
 msgid ""
 "``--insecure`` applies only to the local Runtime API connection between "
 "SuperExec and SuperNode. The connection from SuperNode to SuperGrid still"
@@ -23374,11 +23577,11 @@ msgid ""
 "enable-tls-connections>`."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:175
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:174
 msgid "Use process isolation with a GPU ClientApp"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:177
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:176
 msgid ""
 "To run a ClientApp on a GPU, use the ``supernode-process.sbatch`` script "
 "from the previous section without adding a GPU request. The SuperNode "
@@ -23386,7 +23589,7 @@ msgid ""
 "need access to the GPU."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:181
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:180
 msgid ""
 "Request the GPU only in the SuperExec job. The ClientApp process then "
 "inherits the SuperExec environment, including ``CUDA_VISIBLE_DEVICES``. "
@@ -23395,17 +23598,17 @@ msgid ""
 "node."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:186
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:185
 msgid "Create ``superexec-clientapp-gpu.sbatch``:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:225
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:223
 msgid ""
 "Submit the unchanged process-isolated SuperNode job first, then submit "
 "the GPU SuperExec job:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:233
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:231
 msgid ""
 "The ClientApp environment must include a GPU-enabled version of its "
 "machine learning framework and the required GPU libraries. For example, a"
@@ -23413,11 +23616,11 @@ msgid ""
 "``CUDA_VISIBLE_DEVICES``."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:239
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:237
 msgid "Discover the SuperNode address from its job ID"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:241
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:239
 msgid ""
 "The preceding process-isolation examples use ``--nodelist`` to place both"
 " jobs on the same node. You can remove this constraint when the compute "
@@ -23426,32 +23629,32 @@ msgid ""
 "starts, SuperExec uses that ID to discover the assigned node's address."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:247
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:245
 msgid "Create ``supernode-process-dynamic.sbatch``:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:272
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:270
 msgid ""
 "The SuperNode listens on all network interfaces because Slurm can place "
 "SuperExec on a different node. Create ``superexec-clientapp-"
 "dynamic.sbatch`` without a ``--nodelist`` directive:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:334
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:331
 msgid ""
 "This example requests one GPU for SuperExec. Remove ``#SBATCH "
 "--gres=gpu:1`` when the ClientApp does not need a GPU."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:337
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:334
 msgid "Create ``submit-process-pair.sh`` to submit both jobs:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:357
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:354
 msgid "Run the submission script:"
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:363
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:360
 msgid ""
 "The first ``sbatch`` command returns the SuperNode job ID. The second job"
 " uses an ``after:<job-id>`` dependency, so Slurm holds it until the "
@@ -23461,7 +23664,7 @@ msgid ""
 "becoming available."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:371
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:368
 msgid ""
 "This minimal example exposes an unauthenticated and unencrypted Runtime "
 "API on the compute-node network. Use it only in a trusted, isolated test "
@@ -23470,7 +23673,7 @@ msgid ""
 "guide."
 msgstr ""
 
-#: ../../source/how-to-deploy-supernode-using-slurm.rst:376
+#: ../../source/how-to-deploy-supernode-using-slurm.rst:373
 msgid ""
 "For more information about the two isolation modes and the Runtime API, "
 "see :doc:`Flower Network Communication <ref-flower-network-"
@@ -23903,7 +24106,7 @@ msgid ""
 "establish TLS connections to the Runtime API hosted by the SuperLink:"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:194
+#: ../../source/how-to-enable-tls-connections.rst:193
 msgid ""
 "``--root-certificates``: Specify the location of the CA certificate file."
 " The ``ca.crt`` file is used by SuperExec to verify the Runtime API "
@@ -23917,20 +24120,13 @@ msgid ""
 "SuperLink's Runtime API."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst
-msgid ""
-"``--plugin-type``: Specify the type of app process SuperExec should "
-"launch. Use ``serverapp`` for a ``ServerApp`` SuperExec."
-msgstr ""
-
-#: ../../source/how-to-enable-tls-connections.rst:198
+#: ../../source/how-to-enable-tls-connections.rst:196
 msgid ""
 "Next, use the same procedure for a ``ClientApp`` SuperExec, but pass the "
-"SuperNode's Runtime API address, e.g. ``127.0.0.1:9094``, and set "
-"``--plugin-type clientapp``."
+"SuperNode's Runtime API address, e.g. ``127.0.0.1:9094``."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:201
+#: ../../source/how-to-enable-tls-connections.rst:199
 msgid ""
 "Now your SuperLink-side SuperExec and SuperNode-side SuperExec can "
 "establish TLS connections to their respective Runtime APIs. When using "
@@ -23941,11 +24137,11 @@ msgid ""
 "in the commands or configuration used by your orchestration system."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:210
+#: ../../source/how-to-enable-tls-connections.rst:208
 msgid "TLS-enabled Flower CLI"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:212
+#: ../../source/how-to-enable-tls-connections.rst:210
 msgid ""
 "The `Flower CLI <ref-api-cli.html>`_ (e.g. ``flwr run`` command) is the "
 "way a user (e.g. a data scientist) can interact with a deployed "
@@ -23957,13 +24153,13 @@ msgid ""
 "certificate:"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:227
+#: ../../source/how-to-enable-tls-connections.rst:225
 msgid ""
 "Note that the path to the ``root-certificates`` is relative to the root "
 "of the project. Now, you can run the example by executing ``flwr run``:"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:245
+#: ../../source/how-to-enable-tls-connections.rst:243
 msgid ""
 "You should now have learned how to generate self-signed certificates "
 "using the given script, start a TLS-enabled server and have two clients "
@@ -23973,21 +24169,21 @@ msgid ""
 "`Flower CLI <ref-api-cli.html>`_ will also be TLS-enabled."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:260
+#: ../../source/how-to-enable-tls-connections.rst:258
 msgid "Additional resources"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:262
+#: ../../source/how-to-enable-tls-connections.rst:260
 msgid ""
 "These additional sources might be relevant if you would like to dive "
 "deeper into the topic of certificates:"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:265
+#: ../../source/how-to-enable-tls-connections.rst:263
 msgid "`Let's Encrypt <https://letsencrypt.org/docs/>`_"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:266
+#: ../../source/how-to-enable-tls-connections.rst:264
 msgid "`certbot <https://certbot.eff.org/>`_"
 msgstr ""
 
@@ -24190,43 +24386,43 @@ msgid ""
 "``flower-superexec`` instead:"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:103
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:102
 msgid "How installation works"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:105
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:104
 msgid "When runtime dependency installation is enabled, Flower:"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:107
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:106
 msgid "reads ``[project].dependencies`` from the installed Flower App,"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:108
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:107
 msgid "creates an isolated runtime environment under ``$FLWR_HOME/runtime-envs``,"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:109
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:108
 msgid ""
 "invokes ``uv sync`` in the app project directory using the current Python"
 " executable,"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:110
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:109
 msgid ""
 "installs the declared app dependencies into the isolated runtime "
 "environment,"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:111
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:110
 msgid "activates that environment for the current app process, and"
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:112
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:111
 msgid "deletes the environment after app execution is complete."
 msgstr ""
 
-#: ../../source/how-to-install-app-dependencies-at-runtime.rst:114
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:113
 msgid ""
 "Each run gets its own environment, so concurrently running apps do not "
 "modify each other's Python packages. The app code itself comes from the "
@@ -25419,7 +25615,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:199
-#: ../../source/how-to-run-flower-on-gcp.rst:592
+#: ../../source/how-to-run-flower-on-gcp.rst:586
 #, fuzzy
 msgid "Run Flower App"
 msgstr "O nome do repositório da imagem base."
@@ -25438,7 +25634,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:214
-#: ../../source/how-to-run-flower-on-gcp.rst:609
+#: ../../source/how-to-run-flower-on-gcp.rst:603
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:668
 msgid ""
 "Run ``flwr config list`` to locate the Flower configuration file on your "
@@ -25446,7 +25642,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:227
-#: ../../source/how-to-run-flower-on-gcp.rst:622
+#: ../../source/how-to-run-flower-on-gcp.rst:616
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:681
 msgid ""
 "Open the Flower Configuration file (``config.toml``) and add a new "
@@ -25817,13 +26013,13 @@ msgstr ""
 msgid "superexec-clientapp-2-deployment.yaml"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:545
+#: ../../source/how-to-run-flower-on-gcp.rst:539
 msgid ""
 "Once you have created the required files, you can use the following "
 "``k8s-deploy.sh`` helper script to deploy all the ``Pods``."
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:550
+#: ../../source/how-to-run-flower-on-gcp.rst:544
 msgid ""
 "Make sure the Flower version you use to deploy the ``Pods`` matches the "
 "version of your Flower app."
@@ -25833,7 +26029,7 @@ msgstr ""
 msgid "k8s-deploy.sh"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:580
+#: ../../source/how-to-run-flower-on-gcp.rst:574
 msgid ""
 "To see that your ``Pods`` are deployed, please go to the ``Navigation "
 "Menu`` on the Google Console, select ``Kubernetes Engine`` and then the "
@@ -25841,38 +26037,38 @@ msgid ""
 "the ``Pods`` under deployment."
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:586
+#: ../../source/how-to-run-flower-on-gcp.rst:580
 msgid ""
 "Please wait for a couple of minutes (3' to 5' minutes should be enough) "
 "before the ``Pods`` are up and running. While ``Pods`` resources are "
 "being provisioned, some warnings are expected."
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:594
+#: ../../source/how-to-run-flower-on-gcp.rst:588
 msgid ""
 "Once all ``Pods`` are up and running, we need to get the ``EXTERNAL_IP`` "
 "of the ``superlink-service`` and point our Flower app to use the "
 "Kubernetes cluster to submit and execute the job."
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:598
+#: ../../source/how-to-run-flower-on-gcp.rst:592
 msgid ""
 "To get the ``EXTERNAL-IP`` of the ``superlink-service`` we run the "
 "following command, which will show the ``NAME``, ``TYPE``, ``CLUSTER-"
 "IP``, ``EXTERNAL-IP`` and ``PORTS`` of the service:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:606
+#: ../../source/how-to-run-flower-on-gcp.rst:600
 msgid ""
 "After we get the ``EXTERNAL-IP`` we need to create a new SuperLink "
 "connection in the Flower Configuration file:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:632
+#: ../../source/how-to-run-flower-on-gcp.rst:626
 msgid "Then we can execute the example on the GCP cluster by running:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:640
+#: ../../source/how-to-run-flower-on-gcp.rst:634
 msgid ""
 "Please note that in the current deployment, communication is not "
 "encrypted. To enable TLS for secure connections, check the following "
@@ -25880,7 +26076,7 @@ msgid ""
 "the current guide soon with more details on how to configure TLS."
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:645
+#: ../../source/how-to-run-flower-on-gcp.rst:639
 msgid ""
 "If the job is successfully submitted, and executed, then in your console "
 "you should see the logs from the run. The output should look like the one"
@@ -25891,18 +26087,18 @@ msgstr ""
 msgid "Expected Output"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:721
+#: ../../source/how-to-run-flower-on-gcp.rst:715
 msgid ""
 "Please note that if you terminate or shut down the cluster, and create a "
 "new one, the value of the ``EXTERNAL_IP`` changes. In that case, you will"
 " have to update the Flower Configuration file."
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:727
+#: ../../source/how-to-run-flower-on-gcp.rst:721
 msgid "Shutdown Flower Infrastructure"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:729
+#: ../../source/how-to-run-flower-on-gcp.rst:723
 msgid ""
 "If you would like to shutdown all the running pods deployed during this "
 "guide, you can use the ``kubectl delete`` command and pass the the "
@@ -30606,12 +30802,13 @@ msgid "Abstract base class for AgentApp run events."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
-msgid ":py:obj:`AgentResponses <flwr.agentapp.AgentResponses>`\\ \\(\\)"
+msgid ":py:obj:`AgentGrid <flwr.agentapp.AgentGrid>`\\ \\(\\)"
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
-#: flwr.agentapp.base.AgentResponses:1 of
-msgid "Abstract base class for AgentApp model response creation."
+#: flwr.agentapp.base.AgentGrid:1 of
+#, fuzzy
+msgid "Model-facing access to the federation Grid."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
@@ -30711,7 +30908,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.AgentApp.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentConnectors.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentEvents.rst:15
-#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:15
+#: ../../source/ref-api/flwr.agentapp.AgentGrid.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentSession.rst:15
 #: ../../source/ref-api/flwr.app.Array.rst:15
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:15
@@ -30844,7 +31041,7 @@ msgid "AgentConnectors"
 msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors:1 flwr.agentapp.base.AgentEvents:1
-#: flwr.agentapp.base.AgentResponses:1 flwr.agentapp.base.AgentSession:1
+#: flwr.agentapp.base.AgentGrid:1 flwr.agentapp.base.AgentSession:1
 #: flwr.compat.client.client.Client:1
 #: flwr.compat.client.numpy_client.NumPyClient:1
 #: flwr.server.client_manager.ClientManager:1
@@ -30885,135 +31082,35 @@ msgstr ""
 msgid "Emit one structured run event."
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:2
-msgid "AgentResponses"
+#: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
+msgid ":py:obj:`get_trace <flwr.agentapp.AgentEvents.get_trace>`\\ \\(\\)"
 msgstr ""
 
-#: flwr.agentapp.base.AgentResponses.create:1:<autosummary>:1 of
-msgid ":py:obj:`create <flwr.agentapp.AgentResponses.create>`\\ \\(request\\)"
+#: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1
+#: flwr.agentapp.base.AgentEvents.get_trace:1 of
+msgid "Get events from all runs in the current run series."
 msgstr ""
 
-#: flwr.agentapp.base.AgentResponses.create:1
-#: flwr.agentapp.base.AgentResponses.create:1:<autosummary>:1 of
-#, fuzzy
-msgid "Create a model response."
-msgstr "``FLWR_VERSION``"
-
-#: flwr.agentapp.base.AgentResponses.create:3 of
-msgid "Open Responses-compatible create request."
+#: ../../source/ref-api/flwr.agentapp.AgentGrid.rst:2
+msgid "AgentGrid"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst
-#: ../../source/ref-api/flwr.app.Array.rst
-#: ../../source/ref-api/flwr.app.ArrayRecord.rst
-#: ../../source/ref-api/flwr.app.ConfigRecord.rst
-#: ../../source/ref-api/flwr.app.Message.rst
-#: ../../source/ref-api/flwr.app.MetricRecord.rst
-#: ../../source/ref-api/flwr.app.RecordDict.rst
-#: ../../source/ref-api/flwr.client.Client.rst
-#: ../../source/ref-api/flwr.client.NumPyClient.rst
-#: ../../source/ref-api/flwr.common.Array.rst
-#: ../../source/ref-api/flwr.common.ArrayRecord.rst
-#: ../../source/ref-api/flwr.common.ConfigRecord.rst
-#: ../../source/ref-api/flwr.common.ConfigsRecord.rst
-#: ../../source/ref-api/flwr.common.Message.rst
-#: ../../source/ref-api/flwr.common.MetricRecord.rst
-#: ../../source/ref-api/flwr.common.MetricsRecord.rst
-#: ../../source/ref-api/flwr.common.ParametersRecord.rst
-#: ../../source/ref-api/flwr.common.RecordDict.rst
-#: ../../source/ref-api/flwr.common.RecordSet.rst
-#: ../../source/ref-api/flwr.server.ClientManager.rst
-#: ../../source/ref-api/flwr.server.Driver.rst
-#: ../../source/ref-api/flwr.server.Grid.rst
-#: ../../source/ref-api/flwr.server.SimpleClientManager.rst
-#: ../../source/ref-api/flwr.server.strategy.DPFedAvgAdaptive.rst
-#: ../../source/ref-api/flwr.server.strategy.DPFedAvgFixed.rst
-#: ../../source/ref-api/flwr.server.strategy.Strategy.rst
-#: ../../source/ref-api/flwr.serverapp.Grid.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.Bulyan.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideAdaptiveClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideFixedClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideAdaptiveClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideFixedClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAdagrad.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAdam.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAvg.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAvgM.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedMedian.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedProx.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedTrimmedAvg.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbCyclic.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedYogi.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.Krum.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.MultiKrum.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.QFedAvg.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.Strategy.rst
-#: flwr.clientapp.client_app.ClientApp.evaluate
-#: flwr.clientapp.client_app.ClientApp.query
-#: flwr.clientapp.client_app.ClientApp.train
-#: flwr.compat.server.app.start_server
-#: flwr.serverapp.grid.grid.Grid.send_and_receive of
-#, fuzzy
-msgid "Returns"
+#: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1 of
+msgid ":py:obj:`call <flwr.agentapp.AgentGrid.call>`\\ \\(tool\\_call\\)"
 msgstr ""
 
-#: flwr.agentapp.base.AgentResponses.create:6 of
-msgid "**response** -- Open Responses-compatible response."
+#: flwr.agentapp.base.AgentGrid.call:1
+#: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1 of
+msgid "Execute one Grid function_call and return a function_call_output item."
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst
-#: ../../source/ref-api/flwr.app.Array.rst
-#: ../../source/ref-api/flwr.app.ArrayRecord.rst
-#: ../../source/ref-api/flwr.app.ConfigRecord.rst
-#: ../../source/ref-api/flwr.app.Message.rst
-#: ../../source/ref-api/flwr.app.MetricRecord.rst
-#: ../../source/ref-api/flwr.app.RecordDict.rst
-#: ../../source/ref-api/flwr.client.Client.rst
-#: ../../source/ref-api/flwr.client.NumPyClient.rst
-#: ../../source/ref-api/flwr.common.Array.rst
-#: ../../source/ref-api/flwr.common.ArrayRecord.rst
-#: ../../source/ref-api/flwr.common.ConfigRecord.rst
-#: ../../source/ref-api/flwr.common.ConfigsRecord.rst
-#: ../../source/ref-api/flwr.common.Message.rst
-#: ../../source/ref-api/flwr.common.MetricRecord.rst
-#: ../../source/ref-api/flwr.common.MetricsRecord.rst
-#: ../../source/ref-api/flwr.common.ParametersRecord.rst
-#: ../../source/ref-api/flwr.common.RecordDict.rst
-#: ../../source/ref-api/flwr.common.RecordSet.rst
-#: ../../source/ref-api/flwr.server.ClientManager.rst
-#: ../../source/ref-api/flwr.server.Driver.rst
-#: ../../source/ref-api/flwr.server.Grid.rst
-#: ../../source/ref-api/flwr.server.SimpleClientManager.rst
-#: ../../source/ref-api/flwr.server.strategy.DPFedAvgAdaptive.rst
-#: ../../source/ref-api/flwr.server.strategy.DPFedAvgFixed.rst
-#: ../../source/ref-api/flwr.server.strategy.Strategy.rst
-#: ../../source/ref-api/flwr.serverapp.Grid.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.Bulyan.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideAdaptiveClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideFixedClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideAdaptiveClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideFixedClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAdagrad.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAdam.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAvg.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAvgM.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedMedian.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedProx.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedTrimmedAvg.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbCyclic.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedYogi.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.Krum.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.MultiKrum.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.QFedAvg.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.Strategy.rst
-#: flwr.clientapp.client_app.ClientApp.evaluate
-#: flwr.clientapp.client_app.ClientApp.query
-#: flwr.clientapp.client_app.ClientApp.train
-#: flwr.compat.server.app.start_server
-#: flwr.serverapp.grid.grid.Grid.send_and_receive of
-msgid "Return type"
+#: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1 of
+msgid ":py:obj:`tools <flwr.agentapp.AgentGrid.tools>`\\ \\(\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentGrid.call:1:<autosummary>:1
+#: flwr.agentapp.base.AgentGrid.tools:1 of
+msgid "Return model-facing Grid tool schemas."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentSession.rst:2
@@ -31099,12 +31196,12 @@ msgid "Frontend-visible structured run event API."
 msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
-msgid ":py:obj:`responses <flwr.agentapp.AgentSession.responses>`\\"
+msgid ":py:obj:`grid <flwr.agentapp.AgentSession.grid>`\\"
 msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
-#: flwr.agentapp.AgentSession.responses:1 of
-msgid "Model response creation API."
+#: flwr.agentapp.AgentSession.grid:1 of
+msgid "Model-facing federation Grid API."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.LoadAgentAppError.rst:2
@@ -31467,8 +31564,115 @@ msgid ""
 "children will raise a ``ValueError``."
 msgstr ""
 
+#: ../../source/ref-api/flwr.app.Array.rst
+#: ../../source/ref-api/flwr.app.ArrayRecord.rst
+#: ../../source/ref-api/flwr.app.ConfigRecord.rst
+#: ../../source/ref-api/flwr.app.Message.rst
+#: ../../source/ref-api/flwr.app.MetricRecord.rst
+#: ../../source/ref-api/flwr.app.RecordDict.rst
+#: ../../source/ref-api/flwr.client.Client.rst
+#: ../../source/ref-api/flwr.client.NumPyClient.rst
+#: ../../source/ref-api/flwr.common.Array.rst
+#: ../../source/ref-api/flwr.common.ArrayRecord.rst
+#: ../../source/ref-api/flwr.common.ConfigRecord.rst
+#: ../../source/ref-api/flwr.common.ConfigsRecord.rst
+#: ../../source/ref-api/flwr.common.Message.rst
+#: ../../source/ref-api/flwr.common.MetricRecord.rst
+#: ../../source/ref-api/flwr.common.MetricsRecord.rst
+#: ../../source/ref-api/flwr.common.ParametersRecord.rst
+#: ../../source/ref-api/flwr.common.RecordDict.rst
+#: ../../source/ref-api/flwr.common.RecordSet.rst
+#: ../../source/ref-api/flwr.server.ClientManager.rst
+#: ../../source/ref-api/flwr.server.Driver.rst
+#: ../../source/ref-api/flwr.server.Grid.rst
+#: ../../source/ref-api/flwr.server.SimpleClientManager.rst
+#: ../../source/ref-api/flwr.server.strategy.DPFedAvgAdaptive.rst
+#: ../../source/ref-api/flwr.server.strategy.DPFedAvgFixed.rst
+#: ../../source/ref-api/flwr.server.strategy.Strategy.rst
+#: ../../source/ref-api/flwr.serverapp.Grid.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.Bulyan.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideAdaptiveClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideFixedClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideAdaptiveClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideFixedClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAdagrad.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAdam.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAvg.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAvgM.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedMedian.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedProx.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedTrimmedAvg.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbCyclic.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedYogi.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.Krum.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.MultiKrum.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.QFedAvg.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.Strategy.rst
+#: flwr.clientapp.client_app.ClientApp.evaluate
+#: flwr.clientapp.client_app.ClientApp.query
+#: flwr.clientapp.client_app.ClientApp.train
+#: flwr.compat.server.app.start_server
+#: flwr.serverapp.grid.grid.Grid.send_and_receive of
+#, fuzzy
+msgid "Returns"
+msgstr ""
+
 #: flwr.app.message.array.Array.inflate:9 of
 msgid "The inflated Array."
+msgstr ""
+
+#: ../../source/ref-api/flwr.app.Array.rst
+#: ../../source/ref-api/flwr.app.ArrayRecord.rst
+#: ../../source/ref-api/flwr.app.ConfigRecord.rst
+#: ../../source/ref-api/flwr.app.Message.rst
+#: ../../source/ref-api/flwr.app.MetricRecord.rst
+#: ../../source/ref-api/flwr.app.RecordDict.rst
+#: ../../source/ref-api/flwr.client.Client.rst
+#: ../../source/ref-api/flwr.client.NumPyClient.rst
+#: ../../source/ref-api/flwr.common.Array.rst
+#: ../../source/ref-api/flwr.common.ArrayRecord.rst
+#: ../../source/ref-api/flwr.common.ConfigRecord.rst
+#: ../../source/ref-api/flwr.common.ConfigsRecord.rst
+#: ../../source/ref-api/flwr.common.Message.rst
+#: ../../source/ref-api/flwr.common.MetricRecord.rst
+#: ../../source/ref-api/flwr.common.MetricsRecord.rst
+#: ../../source/ref-api/flwr.common.ParametersRecord.rst
+#: ../../source/ref-api/flwr.common.RecordDict.rst
+#: ../../source/ref-api/flwr.common.RecordSet.rst
+#: ../../source/ref-api/flwr.server.ClientManager.rst
+#: ../../source/ref-api/flwr.server.Driver.rst
+#: ../../source/ref-api/flwr.server.Grid.rst
+#: ../../source/ref-api/flwr.server.SimpleClientManager.rst
+#: ../../source/ref-api/flwr.server.strategy.DPFedAvgAdaptive.rst
+#: ../../source/ref-api/flwr.server.strategy.DPFedAvgFixed.rst
+#: ../../source/ref-api/flwr.server.strategy.Strategy.rst
+#: ../../source/ref-api/flwr.serverapp.Grid.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.Bulyan.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideAdaptiveClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideFixedClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideAdaptiveClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideFixedClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAdagrad.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAdam.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAvg.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAvgM.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedMedian.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedProx.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedTrimmedAvg.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbCyclic.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedYogi.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.Krum.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.MultiKrum.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.QFedAvg.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.Strategy.rst
+#: flwr.clientapp.client_app.ClientApp.evaluate
+#: flwr.clientapp.client_app.ClientApp.query
+#: flwr.clientapp.client_app.ClientApp.train
+#: flwr.compat.server.app.start_server
+#: flwr.serverapp.grid.grid.Grid.send_and_receive of
+msgid "Return type"
 msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:2
@@ -43518,6 +43722,7 @@ msgstr ""
 #: ../../source/ref-exit-codes/302.rst:15
 #: ../../source/ref-exit-codes/303.rst:14
 #: ../../source/ref-exit-codes/304.rst:15
+#: ../../source/ref-exit-codes/305.rst:15
 #: ../../source/ref-exit-codes/400.rst:14
 #: ../../source/ref-exit-codes/401.rst:13
 #: ../../source/ref-exit-codes/402.rst:14
@@ -43900,6 +44105,47 @@ msgid ""
 "**Disable entity verification** by removing the ``--trusted-entities`` "
 "option when starting the SuperNode. This allows the SuperNode to run "
 "without entity verification."
+msgstr ""
+
+#: ../../source/ref-exit-codes/305.rst:3
+msgid "[305] SUPERNODE_CONNECTION_ERROR"
+msgstr ""
+
+#: ../../source/ref-exit-codes/305.rst:9
+msgid ""
+"This error occurs when the SuperNode cannot initialize its connection to "
+"the SuperLink. The error shown before this message contains additional "
+"details returned by the SuperLink or the local connection layer."
+msgstr ""
+
+#: ../../source/ref-exit-codes/305.rst:17
+msgid "Check the reported error and verify the following:"
+msgstr ""
+
+#: ../../source/ref-exit-codes/305.rst:19
+msgid ""
+"The SuperLink address is correct and reachable from the SuperNode. Check "
+"network, DNS, proxy, and firewall settings as applicable."
+msgstr ""
+
+#: ../../source/ref-exit-codes/305.rst:21
+msgid ""
+"The TLS configuration matches the SuperLink, including any root "
+"certificates passed to the SuperNode."
+msgstr ""
+
+#: ../../source/ref-exit-codes/305.rst:23
+msgid ""
+"If ``--auth-supernode-private-key`` is set, the corresponding public key "
+"is still registered with the SuperLink. Register it again if it was de-"
+"registered."
+msgstr ""
+
+#: ../../source/ref-exit-codes/305.rst:25
+msgid ""
+"Another SuperNode is not already active with the same credentials. Stop "
+"the other process or wait until the SuperLink marks it offline before "
+"retrying."
 msgstr ""
 
 #: ../../source/ref-exit-codes/400.rst:3
@@ -92158,4 +92404,145 @@ msgstr ""
 #~ "processes they launch. This is not "
 #~ "mTLS. See :doc:`how-to-enable-tls-"
 #~ "connections` for concrete commands."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The title should be changed to "
+#~ "adhere to the :ref:`pr_title_format` "
+#~ "guidelines, otherwise it won't be "
+#~ "possible to merge the PR. So in"
+#~ " this case, a correct title might "
+#~ "be ``docs(framework:skip) Fix typos``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Open a PR (as shown above) with"
+#~ " title ``docs(framework) Update how-to "
+#~ "guide title``"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "(or ``<type>(<project>:skip) <subject>`` to "
+#~ "ignore the PR in the changelog)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Where ``<type>`` needs to be in "
+#~ "``{ci, fix, feat, docs, refactor, "
+#~ "break}``, ``<project>`` should be in "
+#~ "``{framework, baselines, datasets, examples, "
+#~ "or '*' when modifying multiple projects"
+#~ " which requires the ':skip' flag to"
+#~ " be used}``, and ``<subject>`` starts "
+#~ "with a capitalised verb in the "
+#~ "imperative mood."
+#~ msgstr ""
+
+#~ msgid "``feat(framework) Add flwr build CLI command``"
+#~ msgstr ""
+
+#~ msgid "``refactor(examples:skip) Improve quickstart-pytorch logging``"
+#~ msgstr ""
+
+#~ msgid "``ci(*:skip) Enforce PR title format``"
+#~ msgstr ""
+
+#~ msgid "``feat(framework): Add flwr build CLI command`` (extra ``:``)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``feat(*) Add flwr build CLI command``"
+#~ " (missing ``skip`` flag along with "
+#~ "``*``)"
+#~ msgstr ""
+
+#~ msgid "``feat(skip) Add flwr build CLI command`` (missing ``<project>``)"
+#~ msgstr ""
+
+#~ msgid "``feat(framework) add flwr build CLI command`` (non capitalised verb)"
+#~ msgstr ""
+
+#~ msgid "``feat(framework) Add flwr build CLI command.`` (dot at the end)"
+#~ msgstr ""
+
+#~ msgid "``Add flwr build CLI command.`` (missing ``<type>(<project>)``)"
+#~ msgstr ""
+
+#~ msgid ":py:obj:`AgentResponses <flwr.agentapp.AgentResponses>`\\ \\(\\)"
+#~ msgstr ""
+
+#~ msgid "Abstract base class for AgentApp model response creation."
+#~ msgstr ""
+
+#~ msgid "AgentResponses"
+#~ msgstr ""
+
+#~ msgid ":py:obj:`create <flwr.agentapp.AgentResponses.create>`\\ \\(request\\)"
+#~ msgstr ""
+
+#~ msgid "Create a model response."
+#~ msgstr "``FLWR_VERSION``"
+
+#~ msgid "**response** -- Open Responses-compatible response."
+#~ msgstr ""
+
+#~ msgid ":py:obj:`responses <flwr.agentapp.AgentSession.responses>`\\"
+#~ msgstr ""
+
+#~ msgid "Model response creation API."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The **SuperExec** Docker image comes "
+#~ "with a pre-installed version of "
+#~ "Flower and serves as a base for"
+#~ " building your own image. Use a "
+#~ "**single** image and select the desired"
+#~ " behavior (ServerApps vs ClientApps) at "
+#~ "runtime via the ``--plugin-type`` flag."
+#~ " SuperExec spawns the corresponding "
+#~ "processes on demand."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "When using SuperExec with the "
+#~ "*serverapp* plugin, pass ``--runtime-api-"
+#~ "address`` pointing to the SuperLink's "
+#~ "**Runtime API** endpoint."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``--plugin-type serverapp``: Load the "
+#~ "*serverapp* plugin. SuperExec will spawn "
+#~ "ServerApp processes as needed."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "For ClientApps, reuse the **same** image"
+#~ " and change the plugin and API "
+#~ "address. When using the *clientapp* "
+#~ "plugin, pass ``--runtime-api-address`` "
+#~ "pointing to the SuperNode's **Runtime "
+#~ "API** endpoint."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``--plugin-type clientapp``: Load the "
+#~ "*clientapp* plugin. SuperExec will spawn "
+#~ "ClientApp processes as needed."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``--plugin-type``: Specify the type of"
+#~ " app process SuperExec should launch. "
+#~ "Use ``serverapp`` for a ``ServerApp`` "
+#~ "SuperExec."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Next, use the same procedure for a"
+#~ " ``ClientApp`` SuperExec, but pass the "
+#~ "SuperNode's Runtime API address, e.g. "
+#~ "``127.0.0.1:9094``, and set ``--plugin-type"
+#~ " clientapp``."
 #~ msgstr ""

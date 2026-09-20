@@ -164,6 +164,7 @@ dependencies = [
     { name = "furo" },
     { name = "myst-parser" },
     { name = "sphinx" },
+    { name = "sphinx-substitution-extensions" },
 ]
 
 [package.dev-dependencies]
@@ -180,6 +181,7 @@ requires-dist = [
     { name = "furo", specifier = "==2024.8.6" },
     { name = "myst-parser", specifier = "==3.0.1" },
     { name = "sphinx", specifier = "==7.4.7" },
+    { name = "sphinx-substitution-extensions", specifier = "==2022.2.16" },
 ]
 
 [package.metadata.requires-dev]
@@ -566,6 +568,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/98/0b/a866924ded68efec7a1759587a4e478aec7559d8165fac8b2ad1c0e774d6/sphinx_basic_ng-1.0.0b2.tar.gz", hash = "sha256:9ec55a47c90c8c002b5960c57492ec3021f5193cb26cebc2dc4ea226848651c9", size = 20736, upload-time = "2023-07-08T18:40:54.166Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3c/dd/018ce05c532a22007ac58d4f45232514cd9d6dd0ee1dc374e309db830983/sphinx_basic_ng-1.0.0b2-py3-none-any.whl", hash = "sha256:eb09aedbabfb650607e9b4b68c9d240b90b1e1be221d6ad71d61c52e29f7932b", size = 22496, upload-time = "2023-07-08T18:40:52.659Z" },
+]
+
+[[package]]
+name = "sphinx-substitution-extensions"
+version = "2022.2.16"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "docutils" },
+    { name = "sphinx" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/45/ed/f684f94a7ace29ab3032e1be95803147120522207c1f0519b7012e278bed/Sphinx_Substitution_Extensions-2022.2.16-py3-none-any.whl", hash = "sha256:5a8ca34dac3984486344e95c36e3ed4766d402a71bdee7390d600f153db9795b", size = 9778, upload-time = "2022-02-16T12:16:07.583Z" },
 ]
 
 [[package]]

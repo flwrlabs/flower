@@ -19,7 +19,10 @@ from unittest.mock import Mock, patch
 
 from flwr.supercore.constant import TaskType
 from flwr.supercore.superexec.executor import ExecutionSpec
-from flwr.supercore.superexec.plugin.base_exec_plugin import BaseExecPlugin
+from flwr.supercore.superexec.plugin.base_exec_plugin import (
+    AutoExecPlugin,
+    BaseExecPlugin,
+)
 from flwr.supercore.superexec.plugin.clientapp_exec_plugin import ClientAppExecPlugin
 
 from .serverapp_exec_plugin import ServerAppExecPlugin
@@ -89,6 +92,21 @@ def test_serverapp_launch_delegates_suppressed_stdio_spec() -> None:
     spec = _execution_spec_from_executor(executor)
     assert spec.task_type == TaskType.SERVER_APP
     assert spec.suppress_output is True
+
+
+def test_default_plugin_uses_task_type() -> None:
+    """Default plugin should pass the pulled task type to the executor."""
+    executor = Mock()
+    plugin = AutoExecPlugin(
+        runtime_api_address="127.0.0.1:9091",
+        insecure=True,
+        root_certificates_path=None,
+        executor=executor,
+    )
+
+    plugin.launch_task(token="token", task=_get_task(task_type=TaskType.AGENT_APP))
+
+    assert _execution_spec_from_executor(executor).task_type == TaskType.AGENT_APP
 
 
 def test_serverapp_launch_configures_task_output_visibility() -> None:

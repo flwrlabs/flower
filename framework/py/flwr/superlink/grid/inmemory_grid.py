@@ -110,9 +110,7 @@ class InMemoryGrid(Grid):
         """
         msg_ids: list[str] = []
         for msg in messages:
-            # Populate metadata
-            msg.metadata.__dict__["_run_id"] = cast(Run, self._run).run_id
-            msg.metadata.__dict__["_src_node_id"] = self.node.node_id
+            # Populate message ID
             msg.metadata.__dict__["_message_id"] = str(uuid4())
             # Check message
             self._check_message(msg)
@@ -131,7 +129,9 @@ class InMemoryGrid(Grid):
         """
         msg_ids = set(message_ids)
         # Pull Messages
-        message_res_list = self.state.get_message_res(message_ids=msg_ids)
+        message_res_list = self.state.get_message_res(
+            message_ids=msg_ids, run_id=cast(Run, self._run).run_id
+        )
         # Get IDs of Messages these replies are for
         message_ins_ids_to_delete = {
             msg_res.metadata.reply_to_message_id for msg_res in message_res_list

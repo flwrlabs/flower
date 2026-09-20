@@ -20,9 +20,10 @@ import unittest
 from collections.abc import Callable, Sequence
 from concurrent import futures
 from typing import Any
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import grpc
+import pytest
 from google.protobuf.message import Message as GrpcMessage
 from parameterized import parameterized
 
@@ -53,6 +54,7 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
+from flwr.supercore.exit import ExitCode
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.inflatable.inflatable_object import get_object_tree
 from flwr.supercore.primitives.asymmetric import (
@@ -70,6 +72,7 @@ class _MockServicer:
         self._lock = threading.Lock()
         self._received_client_metadata: Sequence[tuple[str, str | bytes]] | None = None
         self._received_message_bytes: bytes = b""
+        self.activation_error_details: str | None = None
 
     def unary_unary(  # pylint: disable=too-many-return-statements
         self, request: GrpcMessage, context: grpc.ServicerContext
@@ -82,6 +85,11 @@ class _MockServicer:
             if isinstance(request, RegisterNodeFleetRequest):
                 return RegisterNodeFleetResponse()
             if isinstance(request, ActivateNodeRequest):
+                if self.activation_error_details is not None:
+                    context.abort(
+                        grpc.StatusCode.FAILED_PRECONDITION,
+                        self.activation_error_details,
+                    )
                 return ActivateNodeResponse(node_id=123)
             if isinstance(request, DeactivateNodeRequest):
                 return DeactivateNodeResponse()
@@ -226,3 +234,35 @@ class TestAuthenticateClientInterceptor(unittest.TestCase):
             assert verify_signature(
                 self._client_public_key, timestamp.encode("ascii"), signature
             )
+
+    def test_connection_exits_on_activation_error_without_raw_logging(self) -> None:
+        """An activation error should produce a concise Flower exit."""
+        self._servicer.activation_error_details = (
+            '{"code": 2004, "public_message": "Failed to activate SuperNode.", '
+            '"public_details": null}'
+        )
+
+        with (
+            patch("flwr.client.grpc_rere_client.connection.log") as mock_log,
+            patch(
+                "flwr.client.grpc_rere_client.connection.flwr_exit",
+                side_effect=SystemExit,
+            ) as mock_exit,
+            pytest.raises(SystemExit),
+        ):
+            with self._connection(
+                self._address,
+                True,
+                Mock(invoke=lambda fn, *args, **kwargs: fn(*args, **kwargs)),
+                GRPC_MAX_MESSAGE_LENGTH,
+                None,
+                (self._client_private_key, self._client_public_key),
+            ):
+                pass
+
+        mock_log.assert_not_called()
+        mock_exit.assert_called_once_with(
+            ExitCode.SUPERNODE_CONNECTION_ERROR,
+            "Failed to initialize the connection to the SuperLink.\n"
+            "[code: 2004] Failed to activate SuperNode.",
+        )

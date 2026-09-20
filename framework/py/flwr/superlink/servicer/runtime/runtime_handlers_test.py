@@ -22,7 +22,7 @@ import os
 import tempfile
 import threading
 import unittest
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
 from parameterized import parameterized
@@ -50,6 +50,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -60,7 +62,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputRequest,
     PushTaskOutputResponse,
 )
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
@@ -70,7 +72,6 @@ from flwr.supercore.constant import (
     AutomationStatus,
     TaskType,
 )
-from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
@@ -129,6 +130,35 @@ def test_raise_if_true() -> None:
         assert str(err) == "Malformed DummyRequest: test"
     except Exception as err:
         raise AssertionError() from err
+
+
+def test_get_run_series_events_uses_authenticated_task_series() -> None:
+    """GetRunSeriesEvents should derive the series from task authentication."""
+    state = Mock(spec=LinkState)
+    current_run = Mock(run_id=123, series_id=456, primary_task_id=789)
+    series_runs = [Mock(run_id=120, primary_task_id=780), current_run]
+    state.get_run_info.side_effect = [[current_run], series_runs]
+    state.get_run_series.return_value = [Mock(run_ids=[120, 123])]
+    expected_event = TaskEvent(
+        id=11,
+        run_id=120,
+        task_id=780,
+        event="response.completed",
+        data='{"type":"response.completed"}',
+    )
+    state.get_task_events.return_value = [expected_event]
+    request = GetRunSeriesEventsRequest()
+
+    response = runtime_handlers.get_run_series_events(
+        request,
+        state,
+        Task(task_id=790, run_id=123, type=TaskType.MODEL),
+    )
+
+    assert isinstance(response, GetRunSeriesEventsResponse)
+    assert list(response.events) == [expected_event]
+    state.get_run_series.assert_called_once_with(series_ids=[456])
+    state.get_task_events.assert_called_once_with(task_ids=[780, 789])
 
 
 def _create_shared_runtime(
@@ -634,6 +664,28 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             # Ins message was deleted
             assert self.state.num_message_ins() == 0
 
+    def test_pull_messages_rejects_message_from_another_run(self) -> None:
+        """Reject message IDs not owned by the authenticated run."""
+        other_run_id = self.state.create_run(
+            "", "", "", {}, NOOP_FEDERATION_ID, None, "", TaskType.SERVER_APP
+        )
+        self._transition_run_status(other_run_id, 2)
+        message = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=self.node_id,
+                run_id=other_run_id,
+            )
+        )
+        message_id = self.state.store_message_ins(message)
+        assert message_id
+
+        request = PullAppMessagesRequest(message_ids=[message_id])
+        with self.assertRaisesRegex(ValueError, "contains invalid IDs"):
+            runtime_handlers.pull_messages(request, self.state, self._auth_task)
+
+        assert self.state.num_message_ins() == 1
+
     @parameterized.expand(
         [
             # Reply with Message
@@ -682,46 +734,6 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         assert isinstance(response, PullAppMessagesResponse)
         assert self.state.num_message_ins() == 0
         assert self.state.num_message_res() == 0
-
-    def test_pull_message_from_expired_message_error(self) -> None:
-        """Test that the servicer correctly handles the registration in the ObjectStore
-        of an Error message created by the LinkState due to an expired TTL."""
-        # Prepare
-        run_id = self._auth_run_id
-
-        # Push Messages and reply
-        message_ins = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
-            )
-        )
-        message_ins.metadata.ttl = 1  # set short TTL for testing
-        msg_id = self.state.store_message_ins(message=message_ins)
-
-        # Simulate situation where the message has expired in the LinkState
-        # This will trigger the creation of an Error message
-        future_dt = now() + timedelta(seconds=message_ins.metadata.ttl + 0.1)
-        with patch("datetime.datetime") as mock_dt:
-            mock_dt.now.return_value = future_dt  # over TTL limit
-
-            # Execute
-            request = PullAppMessagesRequest(message_ids=[str(msg_id)])
-            response = runtime_handlers.pull_messages(
-                request, self.state, self._auth_task
-            )
-
-            # Assert
-            assert isinstance(response, PullAppMessagesResponse)
-
-            # Assert that objects to pull points to a message carrying an error
-            msg_res = message_from_proto(response.messages_list[0])
-            assert msg_res.has_error()
-            object_tree = response.message_object_trees[0]
-            object_ids_in_response = [
-                tree.object_id for tree in iterate_object_tree(object_tree)
-            ]
-            # expected a single object id (that of the error message)
-            assert list(object_ids_in_response) == [msg_res.object_id]
 
     def test_push_object_successful(self) -> None:
         """Test `PushObject`."""

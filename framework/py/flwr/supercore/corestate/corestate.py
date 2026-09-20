@@ -14,6 +14,7 @@
 # ==============================================================================
 """Abstract base class CoreState."""
 
+# pylint: disable=too-many-lines
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -30,6 +31,11 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
+from flwr.supercore.inflatable.inflatable_object import (
+    get_all_nested_objects,
+    get_object_tree,
+    no_object_id_recompute,
+)
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..constant import AutomationStatus
@@ -39,10 +45,23 @@ from ..object_store import ObjectStore
 class CoreState(ABC):  # pylint: disable=R0904
     """Abstract base class for core state."""
 
+    @abstractmethod
+    def get_node_id(self) -> int:
+        """Return the ID of the node owning this CoreState."""
+
     @property
     @abstractmethod
     def object_store(self) -> ObjectStore:
         """Return the ObjectStore instance used by this CoreState."""
+
+    def _store_generated_message(self, message: Message) -> None:
+        """Store a generated Message in the object store."""
+        with no_object_id_recompute():
+            self.object_store.preregister(
+                message.metadata.run_id, get_object_tree(message)
+            )
+            for object_id, obj in get_all_nested_objects(message).items():
+                self.object_store.put(object_id, obj.deflate())
 
     @abstractmethod
     def start_session(self, run_id: int) -> str:
@@ -120,7 +139,7 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab | None,
+        fab: Fab,
         federation_id: str,
         app_id: str,
         app_type: str,
@@ -130,17 +149,16 @@ class CoreState(ABC):  # pylint: disable=R0904
         description: str | None = None,
         color: str | None = None,
     ) -> str:
-        """Store an optional FAB and associate its app with a federation.
+        """Store a FAB and associate its app with a federation.
 
         A federation has at most one association for each app ID. Storing the app
-        again updates its FAB hash, when applicable, and type while preserving when
-        and by whom it was first added.
+        again updates its FAB hash and type while preserving when and by whom it was
+        first added.
 
         Parameters
         ----------
-        fab : Fab | None
-            FAB content and verification metadata to store. Required for custom
-            apps and optional for Hub apps.
+        fab : Fab
+            FAB content and verification metadata to store.
         federation_id : str
             ID of the federation to associate with the app.
         app_id : str
@@ -162,8 +180,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         Returns
         -------
         str
-            Canonical SHA-256 hash of the stored FAB, or an empty string when no
-            FAB was provided.
+            Canonical SHA-256 hash of the stored FAB.
         """
 
     @abstractmethod
@@ -175,10 +192,36 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Return a FAB only when it matches the federation-app association."""
 
     @abstractmethod
+    def get_hub_app(
+        self, federation_id: str, app_id: str
+    ) -> tuple[Fab, datetime] | None:
+        """Return the cached Hub FAB and its last update time, if present."""
+
+    @abstractmethod
+    def update_hub_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        federation_id: str,
+        app_id: str,
+        previous_fab_hash: str,
+        fab_hash: str,
+        app_type: str,
+    ) -> bool:
+        """Update a Hub app if it still points to the previous FAB."""
+
+    @abstractmethod
     def list_apps(
         self, federation_id: str, limit: int | None = None
     ) -> Sequence[AppInfo]:
         """List apps associated with a federation, newest first."""
+
+    @abstractmethod
+    def list_app_associations(
+        self, app_id: str, federation_ids: Sequence[str]
+    ) -> Sequence[str]:
+        """List candidate federation IDs associated with an app.
+
+        The built-in Flower Agent is associated with every candidate federation.
+        """
 
     @abstractmethod
     def delete_app(self, federation_id: str, app_id: str) -> bool:
@@ -390,6 +433,20 @@ class CoreState(ABC):  # pylint: disable=R0904
         -------
         Sequence[RunSeries]
             RunSeries records ordered by `updated_at` descending.
+        """
+
+    @abstractmethod
+    def set_run_series_description(self, series_id: int, description: str) -> None:
+        """Set the description of an existing RunSeries.
+
+        Empty descriptions are ignored and do not update the RunSeries.
+
+        Parameters
+        ----------
+        series_id : int
+            The ID of the RunSeries to update.
+        description : str
+            The non-empty description to store.
         """
 
     @abstractmethod

@@ -808,6 +808,27 @@ class StateTest(CoreStateTest):
         assert datetime.fromisoformat(actual_message_ins.metadata.delivered_at) > dt
         assert actual_message_ins.metadata.ttl > 0
 
+    def test_store_message_ins_to_superlink(self) -> None:
+        """Test storing and retrieving an instruction Message for the SuperLink."""
+        # Prepare: create an instruction Message for the SuperLink
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        message = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=SUPERLINK_NODE_ID,
+                run_id=run_id,
+            )
+        )
+
+        # Execute: store and retrieve the Message
+        message_id = state.store_message_ins(message)
+        retrieved = state.get_message_ins(node_id=SUPERLINK_NODE_ID, limit=1)
+
+        # Assert: the Message is stored and retrieved
+        assert message_id == message.metadata.message_id
+        assert [msg.metadata.message_id for msg in retrieved] == [message_id]
+
     def test_store_message_and_object_tree_ins(self) -> None:
         """Test store_message_and_object_tree with instruction Messages."""
         # Prepare
@@ -833,21 +854,6 @@ class StateTest(CoreStateTest):
         message_ins_list = state.get_message_ins(node_id=node_id, limit=1)
         assert len(message_ins_list) == 1
         assert message_ins_list[0].metadata.message_id == msg.metadata.message_id
-
-        # Invalid messages should not preregister objects.
-        invalid_msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=SUPERLINK_NODE_ID,
-                run_id=run_id,
-            )
-        )
-        stored, missing_objects = state.store_message_and_object_tree(
-            invalid_msg, get_object_tree(invalid_msg), session_id
-        )
-        assert not stored
-        assert missing_objects == []
-        assert invalid_msg.metadata.message_id not in state.object_store
 
     def test_store_message_and_object_tree_res(self) -> None:
         """Test store_message_and_object_tree with reply Messages."""
@@ -877,7 +883,7 @@ class StateTest(CoreStateTest):
         assert stored
         assert res_msg.metadata.message_id in missing_objects
         assert res_msg.metadata.message_id in state.object_store
-        replies = state.get_message_res({ins_msg_id})
+        replies = state.get_message_res({ins_msg_id}, run_id)
         assert len(replies) == 1
         assert replies[0].metadata.message_id == res_msg.metadata.message_id
 
@@ -911,6 +917,34 @@ class StateTest(CoreStateTest):
         assert first_message_id == msg.metadata.message_id
         assert second_message_id == msg.metadata.message_id
         assert state.num_message_ins() == 1
+
+    def test_get_message_ins_filters_run_id(self) -> None:
+        """Test get_message_ins filters by run ID."""
+        # Prepare: store Messages for two runs
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        other_run_id = create_dummy_run(state)
+        messages = [
+            message_from_proto(
+                create_ins_message(
+                    src_node_id=SUPERLINK_NODE_ID,
+                    dst_node_id=node_id,
+                    run_id=current_run_id,
+                )
+            )
+            for current_run_id in [run_id, other_run_id]
+        ]
+        for message in messages:
+            assert state.store_message_ins(message)
+
+        # Execute: retrieve Messages for the first run
+        retrieved = state.get_message_ins(node_id=node_id, limit=None, run_id=run_id)
+
+        # Assert: only the Message for the first run is retrieved
+        assert [message.metadata.message_id for message in retrieved] == [
+            messages[0].metadata.message_id
+        ]
 
     def test_store_message_ins_invalid_node_id(self) -> None:
         """Test store_message_ins with invalid node_id."""
@@ -1011,7 +1045,7 @@ class StateTest(CoreStateTest):
 
         _ = state.store_message_res(message=msg_res_0)
         retrieved_msg_res_0 = state.get_message_res(
-            message_ids={msg_res_0.metadata.reply_to_message_id}
+            message_ids={msg_res_0.metadata.reply_to_message_id}, run_id=run_id
         )[0]
         assert retrieved_msg_res_0.error.code == 0
 
@@ -1658,7 +1692,7 @@ class StateTest(CoreStateTest):
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = future_dt
             res_message_list = state.get_message_res(
-                {message_id_0, message_id_1, message_id_2}
+                {message_id_0, message_id_1, message_id_2}, run_id
             )
             msgs = {msg.metadata.reply_to_message_id: msg for msg in res_message_list}
 
@@ -1667,9 +1701,11 @@ class StateTest(CoreStateTest):
         reply_1 = msgs[message_id_1]  # Offline due to heartbeat timeout
         assert reply_1.has_error()
         assert reply_1.error.code == ErrorCode.NODE_UNAVAILABLE
+        assert reply_1.metadata.message_id in state.object_store
         reply_2 = msgs[message_id_2]  # Deleted node
         assert reply_2.has_error()
         assert reply_2.error.code == ErrorCode.NODE_UNAVAILABLE
+        assert reply_2.metadata.message_id in state.object_store
 
     def test_store_message_res_message_ins_expired(self) -> None:
         """Test behavior of store_message_res when the Message it replies to is
@@ -1868,9 +1904,13 @@ class StateTest(CoreStateTest):
         future_dt = now() + timedelta(seconds=msg1.metadata.ttl + 0.1)
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = future_dt  # over TTL limit
-            res_msg = state.get_message_res({ins_msg1_id})[0]
+            res_msg = state.get_message_res({ins_msg1_id}, run_id)[0]
             assert res_msg.has_error()
             assert res_msg.error.code == ErrorCode.MESSAGE_UNAVAILABLE
+            assert res_msg.metadata.run_id == run_id
+            assert (
+                state.object_store.get(res_msg.metadata.message_id) == res_msg.deflate()
+            )
 
     def test_get_message_res_reply_not_ready(self) -> None:
         """Test get_message_res to return nothing since reply Message isn't present."""
@@ -1887,7 +1927,7 @@ class StateTest(CoreStateTest):
         ins_msg_id = state.store_message_ins(msg)
         assert ins_msg_id
 
-        reply = state.get_message_res({ins_msg_id})
+        reply = state.get_message_res({ins_msg_id}, run_id)
         assert len(reply) == 0
         # Check message contains error informing reply message hasn't arrived
         assert state.num_message_ins() == 1
@@ -1897,7 +1937,7 @@ class StateTest(CoreStateTest):
         """Test that get_message_res returns empty for empty input."""
         state = self.state_factory()
 
-        self.assertEqual(state.get_message_res(set()), [])
+        self.assertEqual(state.get_message_res(set(), 0), [])
 
     def test_get_message_res_returns_empty_for_missing_message_ins(self) -> None:
         """Test that get_message_res returns an empty result when the corresponding
@@ -1906,13 +1946,65 @@ class StateTest(CoreStateTest):
         state = self.state_factory()
         message_ins_id = "5b0a3fc2-edba-4525-a89a-04b83420b7c8"
         # Execute
-        message_res_list = state.get_message_res(message_ids={message_ins_id})
+        message_res_list = state.get_message_res(message_ids={message_ins_id}, run_id=0)
         print(message_res_list)
 
         # Assert
         assert len(message_res_list) == 1
         assert message_res_list[0].has_error()
         assert message_res_list[0].error.code == ErrorCode.MESSAGE_UNAVAILABLE
+        assert message_res_list[0].metadata.message_id in state.object_store
+
+    def test_get_message_res_rejects_mismatched_run_id(self) -> None:
+        """Reject Message IDs belonging to another run before claiming replies."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        other_run_id = create_dummy_run(state)
+        message = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=node_id,
+                run_id=run_id,
+            )
+        )
+        message_id = state.store_message_ins(message)
+        assert message_id
+        instruction = state.get_message_ins(node_id=node_id, limit=1)[0]
+        reply = Message(RecordDict(), reply_to=instruction)
+        reply.metadata.__dict__["_message_id"] = reply.object_id
+        assert state.store_message_res(reply)
+
+        with self.assertRaisesRegex(ValueError, "contains invalid IDs"):
+            state.get_message_res({message_id}, other_run_id)
+
+        assert len(state.get_message_res({message_id}, run_id)) == 1
+
+    def test_get_message_res_does_not_delete_expired_message_from_another_run(
+        self,
+    ) -> None:
+        """Reject a foreign expired Message without deleting it."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        other_run_id = create_dummy_run(state)
+        message = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=node_id,
+                run_id=run_id,
+            )
+        )
+        message_id = state.store_message_ins(message)
+        assert message_id
+
+        future_dt = now() + timedelta(seconds=message.metadata.ttl + 0.1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = future_dt
+            with self.assertRaisesRegex(ValueError, "contains invalid IDs"):
+                state.get_message_res({message_id}, other_run_id)
+
+        assert state.num_message_ins() == 1
 
     def test_get_message_res_node_removed_from_federation(self) -> None:
         """Test that when node is removed from federation after storing message_ins and
@@ -1940,13 +2032,16 @@ class StateTest(CoreStateTest):
         state.federation_manager.filter_nodes = Mock(return_value=set())  # type: ignore
 
         # Execute
-        message_res_list = state.get_message_res(message_ids={msg.object_id})
+        message_res_list = state.get_message_res(
+            message_ids={msg.object_id}, run_id=run_id
+        )
 
         # Assert
         # Should return error message since node is no longer in federation
         assert len(message_res_list) == 1
         assert message_res_list[0].has_error()
         assert message_res_list[0].error.code == ErrorCode.MESSAGE_UNAVAILABLE
+        assert message_res_list[0].metadata.message_id in state.object_store
         # Both message_ins and message_res should be deleted
         assert state.num_message_ins() == 0
         assert state.num_message_res() == 0
@@ -1975,7 +2070,7 @@ class StateTest(CoreStateTest):
         assert state.num_message_res() == 1
 
         # Fetch reply
-        reply_msg = state.get_message_res({ins_msg_id})
+        reply_msg = state.get_message_res({ins_msg_id}, run_id)
 
         # Assert
         assert reply_msg[0].metadata.dst_node_id == msg.metadata.src_node_id
@@ -2043,7 +2138,7 @@ class StateTest(CoreStateTest):
         assert second_res_msg_id is None
         assert state.num_message_res() == 1
 
-        reply_msg = state.get_message_res({ins_msg_id})
+        reply_msg = state.get_message_res({ins_msg_id}, run_id)
         assert len(reply_msg) == 1
         assert reply_msg[0].metadata.message_id == first_res_msg_id
 
@@ -2075,6 +2170,29 @@ class StateTest(CoreStateTest):
 
         # Assert
         assert msg_res_id is None
+        assert state.num_message_ins() == 1
+        assert state.num_message_res() == 0
+
+    def test_store_message_res_fail_if_run_id_mismatch(self) -> None:
+        """Reject a reply belonging to a different run than its instruction."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        other_run_id = create_dummy_run(state)
+        message = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=node_id,
+                run_id=run_id,
+            )
+        )
+        assert state.store_message_ins(message)
+        instruction = state.get_message_ins(node_id=node_id, limit=1)[0]
+        reply = Message(RecordDict(), reply_to=instruction)
+        reply.metadata.__dict__["_run_id"] = other_run_id
+        reply.metadata.__dict__["_message_id"] = str(uuid4())
+
+        assert state.store_message_res(reply) is None
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 0
 
@@ -2863,11 +2981,12 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             state = self._create_shared_sql_states(db_path)[0]
 
             node_id = create_dummy_node(state)
+            run_id = create_dummy_run(state)
             assert state.store_message_ins(
                 create_ins_message_obj(
                     src_node_id=SUPERLINK_NODE_ID,
                     dst_node_id=node_id,
-                    run_id=create_dummy_run(state),
+                    run_id=run_id,
                 )
             )
             pulled_ins = state.get_message_ins(node_id=node_id, limit=1)[0]
@@ -2879,7 +2998,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             # Execute
             msg_id = pulled_ins.metadata.message_id
             results = self._query_states_in_parallel(
-                lambda state: state.get_message_res({msg_id}),
+                lambda state: state.get_message_res({msg_id}, run_id),
             )
 
             # Assert

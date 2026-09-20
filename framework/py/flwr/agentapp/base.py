@@ -24,25 +24,6 @@ from flwr.app import Context
 from flwr.supercore.typing import JSONObject
 
 
-class AgentResponses(ABC):
-    """Abstract base class for AgentApp model response creation."""
-
-    @abstractmethod
-    def create(self, request: JSONObject) -> JSONObject:
-        """Create a model response.
-
-        Parameters
-        ----------
-        request : JSONObject
-            Open Responses-compatible create request.
-
-        Returns
-        -------
-        response : JSONObject
-            Open Responses-compatible response.
-        """
-
-
 class AgentConnectors(ABC):
     """Abstract base class for AgentApp connector execution."""
 
@@ -59,17 +40,28 @@ class AgentEvents(ABC):
     """Abstract base class for AgentApp run events."""
 
     @abstractmethod
+    def get_trace(self) -> list[JSONObject]:
+        """Get events from all runs in the current run series."""
+
+    @abstractmethod
     def emit(self, event: JSONObject) -> None:
         """Emit one structured run event."""
 
 
+class AgentGrid(ABC):
+    """Model-facing access to the federation Grid."""
+
+    @abstractmethod
+    def tools(self) -> list[JSONObject]:
+        """Return model-facing Grid tool schemas."""
+
+    @abstractmethod
+    def call(self, tool_call: JSONObject) -> JSONObject:
+        """Execute one Grid function_call and return a function_call_output item."""
+
+
 class AgentSession(ABC):
     """Abstract base class for AgentApp runtime capabilities."""
-
-    @property
-    @abstractmethod
-    def responses(self) -> AgentResponses:
-        """Model response creation API."""
 
     @property
     @abstractmethod
@@ -80,6 +72,11 @@ class AgentSession(ABC):
     @abstractmethod
     def events(self) -> AgentEvents:
         """Frontend-visible structured run event API."""
+
+    @property
+    @abstractmethod
+    def grid(self) -> AgentGrid:
+        """Model-facing federation Grid API."""
 
 
 AgentAppCallable = Callable[[AgentSession, Context], None]

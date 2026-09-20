@@ -46,6 +46,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAppAssociationsRequest,
+    ListAppAssociationsResponse,
     ListAppsRequest,
     ListAppsResponse,
     ListAutomationsRequest,
@@ -96,6 +98,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
@@ -173,6 +177,18 @@ def get_run_series(
 ) -> GetRunSeriesResponse:
     """Get a run series."""
     return control_handlers.get_run_series(request, account, linkstate)
+
+
+@router.post("/update-run-series-description")
+def update_run_series_description(
+    request: Annotated[
+        UpdateRunSeriesDescriptionRequest, Depends(get_protobuf_request)
+    ],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> UpdateRunSeriesDescriptionResponse:
+    """Update a run series description."""
+    return control_handlers.update_run_series_description(request, account, linkstate)
 
 
 @router.post("/list-run-series-events")
@@ -388,6 +404,16 @@ def list_apps(
 ) -> ListAppsResponse:
     """List apps associated with a federation."""
     return control_handlers.list_apps(request, account, linkstate)
+
+
+@router.post("/list-app-associations")
+def list_app_associations(
+    request: Annotated[ListAppAssociationsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListAppAssociationsResponse:
+    """List federations associated with an app."""
+    return control_handlers.list_app_associations(request, account, linkstate)
 
 
 @router.post("/add-app")

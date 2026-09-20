@@ -5,7 +5,7 @@ stop the run when necessary.
 
 Start with [Write your first
 AgentApp](../tutorials/write-your-first-agentapp.md) if you do not have a valid
-AgentApp project. This guide targets Flower 1.35.0.
+AgentApp project. This guide targets Flower {{ stable_flwr_version }}.
 
 To run the same app without SuperGrid, see [Run an AgentApp with a local
 SuperLink](run-with-local-superlink.md).
@@ -14,12 +14,15 @@ SuperLink](run-with-local-superlink.md).
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and log in:
 
-```console
-$ uvx --from flwr==1.35.0 flwr login supergrid
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr login supergrid
 ```
 
-Use `uvx --from flwr==1.35.0` for standalone commands. Use `uv run flwr` for
-commands that must load the local project environment.
+Use {substitution-code}`uvx --from flwr==|stable_flwr_version|` for standalone
+commands. Use `uv run flwr` for commands that must load the local project
+environment.
 
 ## Validate before submission
 
@@ -70,8 +73,10 @@ Do not combine a TOML run-config file and inline run-config values.
 After you [find or publish an AgentApp on Flower Hub](use-flower-hub.md), use
 its app spec instead of a local directory:
 
-```console
-$ uvx --from flwr==1.35.0 flwr run @publisher/agent supergrid \
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr run @publisher/agent supergrid \
     --run-config 'agent.input="Explain your task."'
 ```
 
@@ -82,8 +87,10 @@ can depend on the target federation.
 
 List the federations visible to your account:
 
-```console
-$ uvx --from flwr==1.35.0 flwr federation list supergrid
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr federation list supergrid
 ```
 
 Without `--federation`, SuperGrid uses the account default. To choose another
@@ -107,9 +114,11 @@ use the account-connector selection flow.
 
 Use the printed run ID:
 
-```console
-$ uvx --from flwr==1.35.0 flwr list --run-id <run-id> supergrid
-$ uvx --from flwr==1.35.0 flwr log <run-id> supergrid --show
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr list --run-id <run-id> supergrid
+$ uvx --from flwr==|stable_flwr_version| flwr log <run-id> supergrid --show
 ```
 
 `flwr log` streams by default. Use `--show` to print the available logs once.
@@ -122,8 +131,10 @@ is active.
 
 ## Stop a run
 
-```console
-$ uvx --from flwr==1.35.0 flwr stop <run-id> supergrid
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr stop <run-id> supergrid
 ```
 
 Wait for the run to reach a stopped terminal state before submitting a
@@ -139,10 +150,12 @@ agent catalog, connector, heartbeat, interruption, and stuck-run recovery.
 
 For a custom app, start with:
 
-```console
+```{code-block} console
+:substitutions:
+
 $ uv run flwr build
-$ uvx --from flwr==1.35.0 flwr list --run-id <run-id> supergrid
-$ uvx --from flwr==1.35.0 flwr log <run-id> supergrid --show
+$ uvx --from flwr==|stable_flwr_version| flwr list --run-id <run-id> supergrid
+$ uvx --from flwr==|stable_flwr_version| flwr log <run-id> supergrid --show
 ```
 
 Keep the run ID, series ID when visible, federation ID, app spec, Flower

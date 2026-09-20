@@ -136,11 +136,16 @@ class FederationApp(FlwrBase):
             "federation_id",
             "added_at",
         ),
+        Index(
+            "idx_federation_app_app_id_federation_id",
+            "app_id",
+            "federation_id",
+        ),
     )
 
     federation_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
     app_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
-    fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    fab_hash: Mapped[str] = mapped_column(String, nullable=False)
     app_type: Mapped[str] = mapped_column(String, nullable=False)
     is_hub_app: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     display_name: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -148,6 +153,7 @@ class FederationApp(FlwrBase):
     color: Mapped[str | None] = mapped_column(String, nullable=True)
     added_by: Mapped[str] = mapped_column(String, nullable=False)
     added_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
 class Connector(FlwrBase):

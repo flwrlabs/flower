@@ -43,6 +43,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAppAssociationsRequest,
+    ListAppAssociationsResponse,
     ListAppsRequest,
     ListAppsResponse,
     ListAutomationsRequest,
@@ -93,6 +95,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
 )
 from flwr.supercore.protobuf.client import ProtobufClient
 
@@ -187,6 +191,17 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/GetRunSeries",
             request=request,
             response_type=GetRunSeriesResponse,
+        )
+
+    def UpdateRunSeriesDescription(
+        self, request: UpdateRunSeriesDescriptionRequest
+    ) -> UpdateRunSeriesDescriptionResponse:
+        """Update a run series description."""
+        return self._unary_unary(
+            path="/v1/control/update-run-series-description",
+            rpc_method="/flwr.proto.Control/UpdateRunSeriesDescription",
+            request=request,
+            response_type=UpdateRunSeriesDescriptionResponse,
         )
 
     def ListRunSeriesEvents(
@@ -327,6 +342,17 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/ListApps",
             request=request,
             response_type=ListAppsResponse,
+        )
+
+    def ListAppAssociations(
+        self, request: ListAppAssociationsRequest
+    ) -> ListAppAssociationsResponse:
+        """List federations associated with an app."""
+        return self._unary_unary(
+            path="/v1/control/list-app-associations",
+            rpc_method="/flwr.proto.Control/ListAppAssociations",
+            request=request,
+            response_type=ListAppAssociationsResponse,
         )
 
     def AddApp(self, request: AddAppRequest) -> AddAppResponse:
