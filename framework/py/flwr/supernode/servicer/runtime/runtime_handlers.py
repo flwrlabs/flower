@@ -213,12 +213,14 @@ def push_messages(
 
     # Save the message to the state and preregister its objects
     session_id = state.start_session(run_id)
-    _, objects_to_push = state.store_message_and_object_tree(
+    stored, objects_to_push = state.store_message_and_object_tree(
         message, request.message_object_trees[0], session_id
     )
 
     return PushAppMessagesResponse(
-        objects_to_push=objects_to_push, session_id=session_id
+        message_ids=[message.metadata.message_id if stored else ""],
+        objects_to_push=objects_to_push,
+        session_id=session_id,
     )
 
 

@@ -235,6 +235,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         )
         self.assertEqual(stored_tree, object_tree)
         self.assertEqual(session_id, "session-id")
+        self.assertEqual(list(response.message_ids), [message.metadata.message_id])
         self.assertEqual(list(response.objects_to_push), ["object-id"])
         self.assertEqual(response.session_id, "session-id")
 
