@@ -654,9 +654,9 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             )
 
     try:
+        # Validate user config overrides matches keys in run config in FAB
         fab_config = get_fab_config(fab_file)
         run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
-        # Check for invalid override keys before creating the run.
         fuse_dicts(run_config, override_config, check_keys=True)
 
         # Derive primary task type from the submitted FAB. AgentApp-only FABs can
