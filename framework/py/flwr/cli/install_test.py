@@ -15,6 +15,7 @@
 """Tests for Flower command line interface `install` command."""
 
 
+import hashlib
 import io
 import zipfile
 from pathlib import Path
@@ -23,7 +24,7 @@ import click
 import pytest
 
 from .archive_utils import safe_extract_zip
-from .install import install_from_fab
+from .install import _verify_hashes, install_from_fab
 
 
 def _zip_bytes(entries: list[tuple[str, bytes]]) -> bytes:
@@ -63,6 +64,17 @@ def test_safe_extract_zip_rejects_absolute_paths(tmp_path: Path) -> None:
     with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
         with pytest.raises(click.ClickException, match="Unsafe path in FAB archive"):
             safe_extract_zip(zf, tmp_path)
+
+
+def test_verify_hashes_accepts_comma_in_file_name(tmp_path: Path) -> None:
+    """Hash verification should preserve commas in manifest file paths."""
+    file_name = "metrics,round=1.json"
+    file_content = b"{}"
+    (tmp_path / file_name).write_bytes(file_content)
+    file_hash = hashlib.sha256(file_content).hexdigest()
+    content_manifest = f"{file_name},{file_hash},{len(file_content) * 8}"
+
+    assert _verify_hashes(content_manifest, tmp_path)
 
 
 def test_install_from_fab_rejects_zip_slip(tmp_path: Path) -> None:
