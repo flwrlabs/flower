@@ -45,7 +45,12 @@ from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TO
 from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject
 
-from .session import AgentRuntime, RuntimeAgentConnectors, RuntimeAgentEvents
+from .session import (
+    AgentRuntime,
+    RuntimeAgentConnectors,
+    RuntimeAgentEvents,
+    RuntimeAgentSession,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -78,6 +83,18 @@ def test_emit_event_pushes_task_event() -> None:
     stub.PushTaskEvents.assert_called_once_with(
         PushTaskEventsRequest(events=[expected_event])
     )
+
+
+def test_runtime_agent_session_exposes_prompt() -> None:
+    """Expose the initial prompt without additional runtime calls."""
+    session = RuntimeAgentSession(
+        prompt="Initial prompt",
+        connectors=Mock(),
+        events=Mock(),
+        grid=Mock(),
+    )
+
+    assert session.prompt == "Initial prompt"
 
 
 def test_close_drains_events_before_worker_stops() -> None:
@@ -271,11 +288,10 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         max_runs=3,
         start_run_request=StartRunRequest(
             app_spec="example/app",
-            override_config=user_config_to_proto(
-                {"existing": "value", "agent.input": "Do work"}
-            ),
+            override_config=user_config_to_proto({"existing": "value"}),
             federation="@account/federation",
             series_id=2,
+            user_prompt="Do work",
         ),
     )
     items = [item.args[0][0] for item in push_run_events.call_args_list]
