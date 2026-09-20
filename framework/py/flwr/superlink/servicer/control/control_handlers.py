@@ -30,7 +30,12 @@ from typing import Any, cast
 import requests
 
 from flwr.cli.utils import validate_federation_name
-from flwr.common.config import get_fab_config, get_metadata_from_config
+from flwr.common.config import (
+    flatten_dict,
+    fuse_dicts,
+    get_fab_config,
+    get_metadata_from_config,
+)
 from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
     FAB_MAX_SIZE,
@@ -649,8 +654,10 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             )
 
     try:
-        # Validate user config overrides matches keys in run config in FAB
         fab_config = get_fab_config(fab_file)
+        run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
+        # Check for invalid override keys before creating the run.
+        fuse_dicts(run_config, override_config, check_keys=True)
 
         # Derive primary task type from the submitted FAB. AgentApp-only FABs can
         # be bundled locally and submitted through the regular `flwr run` path.
