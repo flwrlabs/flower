@@ -15,7 +15,7 @@
 """Store federation app presentation metadata.
 
 Revision ID: 4d638b3f5d59
-Revises: 94018fa20b10
+Revises: 6ea9c44bb683
 Create Date: 2026-09-09 17:01:02.088794
 """
 from collections.abc import Sequence
@@ -27,7 +27,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "4d638b3f5d59"
-down_revision: str | Sequence[str] | None = "94018fa20b10"
+down_revision: str | Sequence[str] | None = "6ea9c44bb683"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
