@@ -19,6 +19,9 @@ from flwr.supercore.typing import JSONObject
 from ..definition import ActionAccess, ActionDefinition
 from ..tool_schema import string_property
 
+GITHUB_PAGINATION_MINIMUM = 1
+GITHUB_PER_PAGE_MAXIMUM = 100
+
 _REPOSITORY: JSONObject = {
     "owner": string_property("GitHub organization or repository owner."),
     "repo": string_property("Public GitHub repository name."),
@@ -45,13 +48,13 @@ ACTIONS = (
                 },
                 "per_page": {
                     "type": "integer",
-                    "minimum": 1,
-                    "maximum": 100,
+                    "minimum": GITHUB_PAGINATION_MINIMUM,
+                    "maximum": GITHUB_PER_PAGE_MAXIMUM,
                     "description": "Number of results to return per page.",
                 },
                 "page": {
                     "type": "integer",
-                    "minimum": 1,
+                    "minimum": GITHUB_PAGINATION_MINIMUM,
                     "description": "Page number to return.",
                 },
             },

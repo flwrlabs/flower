@@ -23,6 +23,7 @@ from flwr.supercore.typing import JSONObject
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
 from ..http import ConnectorApiError, request_json_object
 from ..json_utils import optional_string, require_string
+from .actions import GITHUB_PAGINATION_MINIMUM, GITHUB_PER_PAGE_MAXIMUM
 
 _API_BASE_URL = "https://api.github.com"
 _API_VERSION = "2026-03-10"
@@ -51,10 +52,15 @@ def search_code(
             if (
                 isinstance(integer_value, bool)
                 or not isinstance(integer_value, int)
-                or integer_value < 1
-                or (name == "per_page" and integer_value > 100)
+                or integer_value < GITHUB_PAGINATION_MINIMUM
+                or (name == "per_page" and integer_value > GITHUB_PER_PAGE_MAXIMUM)
             ):
-                constraint = "between 1 and 100" if name == "per_page" else "positive"
+                constraint = (
+                    f"between {GITHUB_PAGINATION_MINIMUM} and "
+                    f"{GITHUB_PER_PAGE_MAXIMUM}"
+                    if name == "per_page"
+                    else f"at least {GITHUB_PAGINATION_MINIMUM}"
+                )
                 raise ValueError(f"GitHub {name} must be {constraint}.")
             params[name] = str(integer_value)
     return _call_api(
