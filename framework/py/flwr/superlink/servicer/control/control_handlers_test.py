@@ -657,9 +657,6 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             [(app.app_id, app.fab_hash, app.app_type) for app in response.apps],
             [(FLOWER_AGENT_APP_ID, fab_hash, TaskType.AGENT_APP)],
         )
-        self.assertEqual(response.apps[0].display_name, "Flower Agent")
-        self.assertEqual(response.apps[0].description, "Chat with Flower Agent")
-        self.assertEqual(response.apps[0].color, "yellow")
 
     def test_list_apps_preserves_hub_flag_over_wire(self) -> None:
         """ListApps preserves Hub provenance through protobuf serialization."""

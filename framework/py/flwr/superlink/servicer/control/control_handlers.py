@@ -1653,11 +1653,6 @@ def list_apps(
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
     limit = request.limit if request.HasField("limit") else None
     apps = list(state.list_apps(federation_id, limit))
-    for app in apps:
-        if app.app_id == FLOWER_AGENT_APP_ID:
-            app.display_name = app.display_name or "Flower Agent"
-            app.description = app.description or "Chat with Flower Agent"
-            app.color = app.color or "yellow"
     if (limit is None or limit > 0) and not any(
         app.app_id == FLOWER_AGENT_APP_ID for app in apps
     ):
