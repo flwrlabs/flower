@@ -50,7 +50,11 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskUsage,
 )
 from flwr.supercore import log
-from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
+from flwr.supercore.constant import (
+    FLOWER_AGENT_APP_ID,
+    OBJECT_PUSH_SESSION_TTL_SECONDS,
+    AutomationStatus,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
@@ -465,6 +469,22 @@ class InMemoryCoreState(
                     is_hub_app=record.is_hub_app,
                 )
                 for record in records
+            ]
+
+    def list_app_associations(
+        self, app_id: str, federation_ids: Sequence[str]
+    ) -> Sequence[str]:
+        """List the provided federation IDs associated with an app."""
+        if not app_id or not federation_ids:
+            return []
+        if app_id == FLOWER_AGENT_APP_ID:
+            return list(federation_ids)
+        federation_id_set = set(federation_ids)
+        with self.lock_federation_app_store:
+            return [
+                record.federation_id
+                for record in self.federation_app_store.values()
+                if record.app_id == app_id and record.federation_id in federation_id_set
             ]
 
     def delete_app(self, federation_id: str, app_id: str) -> bool:

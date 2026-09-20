@@ -27,6 +27,14 @@ Download :download:`flower-models.json <_static/flower-models.json>` to your
 ``Downloads`` folder, keeping that filename. This catalog makes **Endeavor**
 available in the model selector and defines its capabilities.
 
+.. note::
+
+    The supplied catalog configures a 128,000-token context window and a
+    96,000-token automatic compaction threshold for this client. These are
+    client configuration values, not a universal limit on Endeavor API
+    requests. See :ref:`Context window and limits <endeavor-context-limits>`
+    for details.
+
 In your terminal, copy the file to the Codex configuration directory:
 
 .. code-block:: zsh

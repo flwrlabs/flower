@@ -21,10 +21,11 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 
-from flwr.app import ArrayRecord, ConfigRecord, Context, Message, RecordDict
-from flwr.app.message import remove_content_from_message
+from flwr.app import ArrayRecord, ConfigRecord, Context, Message, Metadata, RecordDict
+from flwr.app.message import make_message, remove_content_from_message
 from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE, SubStatus
 from flwr.supercore.constant import TaskType
+from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -89,13 +90,20 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
     def _prepare_for_pull_and_store_message(self) -> None:
         """Prepare mocks for pull_and_store_message."""
         # Prepare
-        message = Message(
+        message = make_message(
             content=RecordDict({"mock_cfg": ConfigRecord({"key": "value"})}),
-            dst_node_id=self.node_id,
-            message_type="query",
-            group_id="test_group",
+            metadata=Metadata(
+                run_id=self.run_id,
+                message_id="",
+                src_node_id=0,
+                dst_node_id=self.node_id,
+                reply_to_message_id="",
+                group_id="test_group",
+                created_at=now().timestamp(),
+                ttl=10.0,
+                message_type="query",
+            ),
         )
-        message.metadata.__dict__["_run_id"] = self.run_id
         message.metadata.__dict__["_message_id"] = message.object_id
         message_without_content = remove_content_from_message(message)
         self.mock_receive.return_value = (
@@ -500,7 +508,20 @@ def test_start_client_internal_launches_superexec_with_runtime_http_address() ->
 
 def test_push_messages_pushes_each_requested_object_once() -> None:
     """Shared objects in different branches should only be pushed once."""
-    instruction = Message(content=RecordDict(), dst_node_id=1, message_type="query")
+    instruction = make_message(
+        content=RecordDict(),
+        metadata=Metadata(
+            run_id=1,
+            message_id="instruction-id",
+            src_node_id=0,
+            dst_node_id=1,
+            reply_to_message_id="",
+            group_id="",
+            created_at=now().timestamp(),
+            ttl=10.0,
+            message_type="query",
+        ),
+    )
     reply = Message(
         content=RecordDict(
             {

@@ -24,11 +24,17 @@ from fastapi.testclient import TestClient
 from starlette.responses import StreamingResponse
 from starlette.types import Message, Scope
 
+from flwr.app.constants import DEFAULT_TTL
+from flwr.app.message_type import MessageType
+from flwr.app.metadata import Metadata
 from flwr.common.constant import Status, SubStatus
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.constant import TaskType
-from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
+from flwr.supercore.date import now
+from flwr.supercore.json_message.base import make_json_message
+from flwr.supercore.json_message.model_message import ModelResponse
+from flwr.supercore.typing import JSONObject
 from flwr.superlink.dependencies.linkstate import get_linkstate
 
 from .responses import (
@@ -60,15 +66,28 @@ def _state() -> Mock:
 
 
 def _reply(request_message_id: str) -> ModelResponse:
-    return ModelResponse(
+    metadata = Metadata(
+        run_id=789,
+        message_id="response-message-id",
+        src_node_id=789,
+        dst_node_id=789,
+        reply_to_message_id=request_message_id,
+        group_id="",
+        created_at=now().timestamp(),
+        ttl=DEFAULT_TTL,
+        message_type=MessageType.QUERY,
+        src_task_id=456,
         dst_task_id=123,
-        response={
+    )
+    return make_json_message(
+        ModelResponse,
+        metadata=metadata,
+        payload={
             "object": "response",
             "id": "resp_1",
             "status": "completed",
             "output": [],
         },
-        reply_to_message_id=request_message_id,
     )
 
 
@@ -83,12 +102,9 @@ def _event(event_id: int, event: str, data: str | None = None) -> TaskEvent:
     )
 
 
-def _stream_request() -> ModelRequest:
-    """Create one streaming model request."""
-    return ModelRequest.from_payload(
-        dst_task_id=0,
-        payload={"model": "model", "input": "hello", "stream": True},
-    )
+def _stream_request() -> JSONObject:
+    """Create one normalized streaming model request payload."""
+    return {"model": "model", "input": "hello", "stream": True}
 
 
 @pytest.mark.parametrize("authorization", [None, "Basic task-token"])
