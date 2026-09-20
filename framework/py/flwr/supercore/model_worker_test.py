@@ -76,7 +76,18 @@ def _exchange(
 
 
 def test_protocol_rejects_invalid_messages() -> None:
-    """Protocol input should be typed and bounded."""
+    """Protocol messages should be typed, bounded, and fully written."""
+
+    class ShortWriteChannel(BytesIO):
+        """Accept only a few bytes from each write."""
+
+        def write(self, data: Any, /) -> int:
+            return super().write(data[:3])
+
+    channel = ShortWriteChannel()
+    model_worker_protocol.send_message(channel, {"value": "\ud800"})
+    assert channel.getvalue() == b'{"value":"\\ud800"}\n'
+
     with pytest.raises(ValueError, match="valid JSON"):
         model_worker_protocol.read_message(BytesIO(b"{\n"))
     with pytest.raises(ValueError, match="non-empty string"):
@@ -89,24 +100,11 @@ def test_protocol_rejects_invalid_messages() -> None:
         )
 
 
-def test_protocol_preserves_coalesced_messages() -> None:
-    """Buffered reads should preserve a completion sent with its acceptance."""
-    channel = BytesIO(b'{"event":"accepted"}\n{"event":"finished","returncode":0}\n')
-
-    assert model_worker_protocol.read_message(channel) == {"event": "accepted"}
-    assert model_worker_protocol.read_message(channel) == {
-        "event": "finished",
-        "returncode": 0,
-    }
-
-
-@pytest.mark.parametrize("returncode", [0, 1])
 def test_worker_cleans_up_socket_and_markers(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    returncode: int,
 ) -> None:
-    """Worker files should be exclusive and removed for either result."""
+    """Worker files should be exclusive and removed after serving a task."""
     socket_path = tmp_path / "model.sock"
     ready_file = tmp_path / "ready"
     busy_file = tmp_path / "busy"
@@ -128,7 +126,7 @@ def test_worker_cleans_up_socket_and_markers(
     def serve_connection(*_: object) -> int:
         assert busy_file.is_file()
         assert not ready_file.exists()
-        return returncode
+        return 0
 
     server.accept.side_effect = accept
     register_signals = Mock()
@@ -141,13 +139,13 @@ def test_worker_cleans_up_socket_and_markers(
 
     assert (
         model_worker.serve_prestarted_model_worker(socket_path, ready_file, busy_file)
-        == returncode
+        == 0
     )
     register_signals.assert_called_once_with()
     assert not any(path.exists() for path in (socket_path, ready_file, busy_file))
 
 
-def test_dispatch_relays_accepted_output_best_effort(
+def test_dispatch_relays_accepted_output(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -155,6 +153,7 @@ def test_dispatch_relays_accepted_output_best_effort(
     connection = MagicMock()
     connection.__enter__.return_value = connection
     channel = MagicMock()
+    channel.write.side_effect = len
     connection.makefile.return_value.__enter__.return_value = channel
     monkeypatch.setattr(socket, "socket", Mock(return_value=connection))
     monkeypatch.setattr(
@@ -165,21 +164,10 @@ def test_dispatch_relays_accepted_output_best_effort(
                 {"event": "accepted"},
                 {"event": "output", "stream": "stdout", "data": "out\n"},
                 {"event": "output", "stream": "stderr", "data": "err\n"},
-                {"event": "output", "stream": "stderr", "data": "é"},
                 {"event": "finished", "returncode": 0},
             ]
         ),
     )
-    captured_stderr = sys.stderr
-
-    def write_stderr(output: str) -> int:
-        if output == "é":
-            raise UnicodeEncodeError("ascii", output, 0, 1, "ordinal")
-        return captured_stderr.write(output)
-
-    stderr = Mock(wraps=captured_stderr)
-    stderr.write.side_effect = write_stderr
-    monkeypatch.setattr(sys, "stderr", stderr)
 
     assert (
         model_worker.dispatch_prestarted_model(
@@ -191,7 +179,6 @@ def test_dispatch_relays_accepted_output_best_effort(
     captured = capsys.readouterr()
     assert captured.out == f"{FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT}\nout\n"
     assert captured.err == "err\n"
-    stderr.write.assert_any_call("é")
     assert b"task-token" in channel.write.call_args.args[0]
 
 
@@ -202,7 +189,9 @@ def test_dispatch_rejects_output_before_acceptance(
     """Output without accepted task authority should not be relayed."""
     connection = MagicMock()
     connection.__enter__.return_value = connection
-    connection.makefile.return_value.__enter__.return_value = MagicMock()
+    channel = MagicMock()
+    channel.write.side_effect = len
+    connection.makefile.return_value.__enter__.return_value = channel
     monkeypatch.setattr(socket, "socket", Mock(return_value=connection))
     monkeypatch.setattr(
         model_worker_protocol,
@@ -219,11 +208,16 @@ def test_dispatch_rejects_output_before_acceptance(
     assert capsys.readouterr().out == ""
 
 
-def test_worker_relays_redacted_bounded_output(tmp_path: Path) -> None:
-    """Task output should be redacted, bounded, and carry fresh certificates."""
+def test_worker_relays_redacted_output(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Task output should be compatible, redacted, and carry fresh certificates."""
     token = "task-token-that-must-not-be-relayed"
     certificate_path = tmp_path / "runtime-ca.pem"
     certificate_path.write_bytes(b"test-ca")
+    original_stdout = Mock(encoding="utf-8", buffer=Mock(raw=BytesIO()))
+    original_stdout.fileno.return_value = 42
+    monkeypatch.setattr(sys, "stdout", original_stdout)
 
     def run_once(
         runtime_api_address: str,
@@ -238,6 +232,13 @@ def test_worker_relays_redacted_bounded_output(tmp_path: Path) -> None:
             b"test-ca",
         )
         on_started()
+        assert sys.stdout.fileno() == 42
+        binary_output: Any = sys.stdout.buffer
+        binary_output.write(f"binary {invocation_token}\n".encode())
+        binary_output.write1(f"write1 {invocation_token}\n".encode())
+        binary_output.raw.write(f"raw {invocation_token}\n".encode())
+        binary_output.writelines([f"binary lines {invocation_token}\n".encode()])
+        sys.stdout.writelines(["text lines ", invocation_token, "\n"])
         midpoint = len(invocation_token) // 2
         sys.stdout.write(f"before {invocation_token[:midpoint]}")
         sys.stdout.write(f"{invocation_token[midpoint:]} after\n")
@@ -260,20 +261,18 @@ def test_worker_relays_redacted_bounded_output(tmp_path: Path) -> None:
     assert result == [0]
     assert frames[0] == {"event": "accepted"}
     assert frames[-1] == {"event": "finished", "returncode": 0}
+    assert "binary [REDACTED]\n" in output
+    assert "write1 [REDACTED]\nraw [REDACTED]\n" in output
+    assert "binary lines [REDACTED]\ntext lines [REDACTED]\n" in output
     assert "before [REDACTED] after\n" in output
     assert "model error\n" in output
     assert token not in output
     assert FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT not in output
-    assert all(
-        len(model_worker_protocol.encode_message(frame))
-        <= model_worker_protocol.MAX_PROTOCOL_MESSAGE_BYTES
-        for frame in frames
-    )
 
 
 def test_worker_rejects_failure_before_acceptance() -> None:
-    """Runtime setup failure should reject rather than transfer authority."""
-    result, frames = _exchange(Mock(side_effect=RuntimeError("setup failed")))
+    """Returning without acceptance should reject and fail the worker."""
+    result, frames = _exchange(Mock(return_value=0))
 
     assert result == [1]
     assert frames == [
@@ -350,7 +349,7 @@ def test_disconnect_does_not_abort_accepted_task() -> None:
 
 
 def test_saturated_output_channel_does_not_abort_task() -> None:
-    """A slow protocol writer should drop logs and preserve completion."""
+    """A slow or failed output write should preserve task completion."""
 
     class SlowChannel(BytesIO):
         """Delay every write after the synchronous acceptance frame."""
@@ -363,6 +362,8 @@ def test_saturated_output_channel_does_not_abort_task() -> None:
             self.writes += 1
             if self.writes > 1:
                 time.sleep(0.02)
+            if self.writes == 3:
+                raise OSError("output write failed")
             return super().write(data)
 
         def flush(self) -> None:

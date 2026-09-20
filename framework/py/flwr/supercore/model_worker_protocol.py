@@ -20,18 +20,20 @@ import json
 import sys
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
-from io import TextIOBase
 from queue import Empty, Full, Queue
-from typing import Any, Protocol
+from typing import Any, BinaryIO, Protocol, TextIO, cast
 
 from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
+from flwr.supercore.typing import JSONObject
 
 MAX_PROTOCOL_MESSAGE_BYTES = 16_384
 _MAX_OUTPUT_FRAME_CHARS = 1_024
 _MAX_QUEUED_OUTPUT_FRAMES = 64
+# Stop draining best-effort logs promptly after task completion.
 _OUTPUT_DRAIN_BUDGET_SECONDS = 0.25
+# Leave time for the drain budget and one final bounded socket write.
 _OUTPUT_CLOSE_TIMEOUT_SECONDS = 0.5
 
 
@@ -53,7 +55,7 @@ class ProtocolOutputSender:
 
     def __init__(self, channel: MessageChannel) -> None:
         self._channel = channel
-        self._queue: Queue[dict[str, Any]] = Queue(maxsize=_MAX_QUEUED_OUTPUT_FRAMES)
+        self._queue: Queue[JSONObject] = Queue(maxsize=_MAX_QUEUED_OUTPUT_FRAMES)
         self._done = threading.Event()
         self._failed = threading.Event()
         self._returncode: int | None = None
@@ -92,44 +94,106 @@ class ProtocolOutputSender:
 
     def _send(self) -> None:
         try:
-            while not self._done.is_set() or not self._queue.empty():
-                if (
-                    self._done.is_set()
-                    and self._drain_deadline is not None
-                    and time.monotonic() >= self._drain_deadline
-                ):
-                    break
-                try:
-                    payload = self._queue.get(timeout=0.01)
-                except Empty:
-                    continue
-                send_message(self._channel, payload)
-            if self._returncode is not None:
+            self._drain_output()
+        except Exception:  # pylint: disable=broad-exception-caught
+            self._failed.set()
+            self._done.wait()
+        if self._returncode is not None:
+            try:
                 send_message(
                     self._channel,
                     {"event": "finished", "returncode": self._returncode},
                 )
-        except Exception:  # pylint: disable=broad-exception-caught
-            self._failed.set()
+            except Exception:  # pylint: disable=broad-exception-caught
+                self._failed.set()
+
+    def _drain_output(self) -> None:
+        """Send queued output until completion or the drain budget expires."""
+        while not self._done.is_set() or not self._queue.empty():
+            if (
+                self._done.is_set()
+                and self._drain_deadline is not None
+                and time.monotonic() >= self._drain_deadline
+            ):
+                break
+            try:
+                payload = self._queue.get(timeout=0.01)
+            except Empty:
+                continue
+            send_message(self._channel, payload)
 
 
-class _RelayedTextOutput(TextIOBase):
+class _RelayedBinaryOutput:
+    """Relay binary writes while preserving the original stream interface."""
+
+    def __init__(self, relay: _RelayedTextOutput, original: BinaryIO) -> None:
+        self._relay = relay
+        self._original = original
+
+    def write(self, output: bytes | bytearray | memoryview) -> int:
+        """Decode and relay one binary write without exposing task authority."""
+        raw = bytes(output)
+        self._relay.write(raw.decode(self._relay.encoding, errors="replace"))
+        return len(raw)
+
+    def write1(self, output: bytes | bytearray | memoryview) -> int:
+        """Relay one buffered binary write."""
+        return self.write(output)
+
+    def writelines(self, lines: Iterable[bytes]) -> None:
+        """Relay binary lines through the redacting text stream."""
+        for line in lines:
+            self.write(line)
+
+    @property
+    def raw(self) -> _RelayedBinaryOutput:
+        """Return a redacting proxy for the underlying raw stream."""
+        return _RelayedBinaryOutput(
+            self._relay, cast(BinaryIO, cast(Any, self._original).raw)
+        )
+
+    def flush(self) -> None:
+        """Keep the relay's redaction suffix buffered."""
+        self._relay.flush()
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate the remaining binary stream interface."""
+        return getattr(self._original, name)
+
+
+class _RelayedTextOutput:
     """Redact authority markers and enqueue one ordered text stream."""
-
-    encoding = "utf-8"
 
     def __init__(
         self,
         sender: ProtocolOutputSender,
         stream: str,
         secrets: tuple[str, ...],
+        original: TextIO,
     ) -> None:
         self._sender = sender
         self._stream = stream
         self._secrets = tuple(secret for secret in secrets if secret)
+        self._original = original
         self._pending = ""
         self._lock = threading.Lock()
         self._retained_chars = max(map(len, self._secrets), default=1) - 1
+
+    @property
+    def buffer(self) -> _RelayedBinaryOutput:
+        """Return a binary view that preserves redaction and output relay."""
+        return _RelayedBinaryOutput(
+            self, cast(BinaryIO, cast(Any, self._original).buffer)
+        )
+
+    @property
+    def encoding(self) -> str:
+        """Return the original stream encoding."""
+        return self._original.encoding or "utf-8"
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate the remaining text stream interface."""
+        return getattr(self._original, name)
 
     def writable(self) -> bool:
         """Return whether the relay accepts text writes."""
@@ -150,6 +214,11 @@ class _RelayedTextOutput(TextIOBase):
             else:
                 self._pending = redacted
         return len(output)
+
+    def writelines(self, lines: Iterable[str]) -> None:
+        """Relay lines instead of delegating writes to the original stream."""
+        for line in lines:
+            self.write(line)
 
     def flush(self) -> None:
         """Keep a bounded suffix so secrets split across writes stay redacted."""
@@ -176,14 +245,14 @@ def relay_task_output(sender: ProtocolOutputSender, token: str) -> Iterator[None
     )
 
     secrets = (token, FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT)
-    stdout = _RelayedTextOutput(sender, "stdout", secrets)
-    stderr = _RelayedTextOutput(sender, "stderr", secrets)
     original_stdout = sys.stdout
     original_stderr = sys.stderr
+    stdout = _RelayedTextOutput(sender, "stdout", secrets, original_stdout)
+    stderr = _RelayedTextOutput(sender, "stderr", secrets, original_stderr)
     original_log_stream = console_handler.stream
-    sys.stdout = stdout
-    sys.stderr = stderr
-    console_handler.stream = stderr
+    sys.stdout = cast(TextIO, stdout)
+    sys.stderr = cast(TextIO, stderr)
+    console_handler.stream = cast(TextIO, stderr)
     try:
         yield
     finally:
@@ -194,23 +263,28 @@ def relay_task_output(sender: ProtocolOutputSender, token: str) -> Iterator[None
         stderr.finish()
 
 
-def send_message(channel: MessageChannel, payload: dict[str, Any]) -> None:
+def send_message(channel: MessageChannel, payload: JSONObject) -> None:
     """Send one bounded newline-delimited JSON protocol message."""
     encoded = encode_message(payload)
     if len(encoded) > MAX_PROTOCOL_MESSAGE_BYTES:
         raise ValueError("Model worker protocol message is too large.")
-    channel.write(encoded)
+    offset = 0
+    while offset < len(encoded):
+        written = channel.write(encoded[offset:])
+        if written <= 0:
+            raise OSError("Model worker protocol write made no progress.")
+        offset += written
     channel.flush()
 
 
-def encode_message(payload: dict[str, Any]) -> bytes:
+def encode_message(payload: JSONObject) -> bytes:
     """Encode one JSON-lines protocol message."""
     return (
-        json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode() + b"\n"
+        json.dumps(payload, ensure_ascii=True, separators=(",", ":")).encode() + b"\n"
     )
 
 
-def read_message(channel: MessageChannel) -> dict[str, Any]:
+def read_message(channel: MessageChannel) -> JSONObject:
     """Read one bounded newline-delimited JSON protocol message."""
     encoded = channel.readline(MAX_PROTOCOL_MESSAGE_BYTES + 1)
     if not encoded:
