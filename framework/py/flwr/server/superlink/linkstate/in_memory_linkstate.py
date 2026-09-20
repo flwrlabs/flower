@@ -52,6 +52,7 @@ from flwr.superlink.federation import FederationManager
 
 from .utils import (
     check_node_availability_for_in_message,
+    create_user_prompt_message,
     generate_rand_int_from_bytes,
     verify_found_message_replies,
     verify_message_ids,
@@ -672,6 +673,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         series_description: str | None = None,
         connector_refs: Sequence[str] = (),
         initial_task_event: TaskEvent | None = None,
+        user_prompt: str | None = None,
     ) -> int:
         """Create a new run."""
         if isinstance(connector_refs, str) or any(
@@ -753,6 +755,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 model_ref=None,
                 connector_ref=None,
             )
+            if primary_task_type == TaskType.AGENT_APP and user_prompt is not None:
+                message = create_user_prompt_message(run_id, user_prompt)
+                self.store_message_ins(message)
+                self._store_generated_message(message)
             if initial_task_event is not None:
                 initial_task_event.id = self._next_task_event_id
                 initial_task_event.timestamp = current

@@ -29,9 +29,13 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     GetNodesRequest,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
+    PushTaskEventsRequest,
 )
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.auth import create_superexec_auth_metadata, derive_auth_secret
 from flwr.supercore.constant import TASK_TOKEN_HEADER, TaskType
 from flwr.supercore.dependencies.runtime import get_runtime_state
@@ -40,6 +44,7 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers.runtime import router
+from flwr.supercore.run import Run
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 from flwr.supernode.servicer.runtime import runtime_handlers
 
@@ -189,6 +194,43 @@ def test_get_nodes_allows_auth_then_returns_permission_denied(
 
     assert response.status_code == 403
     assert response.json()["code"] == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+
+
+def test_agent_events_round_trip(client: TestClient, state: NodeState) -> None:
+    """AgentApp events should be readable through the SuperNode Runtime API."""
+    run = Run.create_empty(run_id=99)
+    run.series_id = 7
+    state.store_run(run)
+    task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run.run_id)
+    assert task_id is not None
+    token = state.claim_task(task_id)
+    assert token is not None
+    task_event = TaskEvent(
+        event="response.completed",
+        data='{"type":"response.completed"}',
+    )
+
+    push_response = _post(
+        client,
+        "push-task-events",
+        PushTaskEventsRequest(events=[task_event]),
+        token=token,
+    )
+    get_response = _post(
+        client,
+        "get-run-series-events",
+        GetRunSeriesEventsRequest(),
+        token=token,
+    )
+
+    assert push_response.status_code == 200
+    assert get_response.status_code == 200
+    events = GetRunSeriesEventsResponse.FromString(get_response.content).events
+    assert len(events) == 1
+    assert events[0].run_id == run.run_id
+    assert events[0].task_id == task_id
+    assert events[0].event == task_event.event
+    assert events[0].data == task_event.data
 
 
 def test_pull_pending_tasks_allows_without_superexec_metadata(state: NodeState) -> None:
