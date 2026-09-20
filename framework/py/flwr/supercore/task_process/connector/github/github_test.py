@@ -65,6 +65,16 @@ def test_get_file_contents_returns_raw_response() -> None:
         )
     request.assert_not_called()
 
+    with patch(_HTTP_REQUEST) as request, pytest.raises(ValueError):
+        registry.invoke_connector(
+            "github_get_file_contents",
+            {"owner": "acme", "repo": "..", "path": "foo"},
+            Mock(),
+            {"access_token": "secret"},
+            {},
+        )
+    request.assert_not_called()
+
 
 def test_github_search_forwards_page() -> None:
     """Code search should forward GitHub's numeric page parameter."""

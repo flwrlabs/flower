@@ -131,6 +131,8 @@ def _repository_ref(owner: object, repo: object) -> tuple[str, str]:
     """Validate a public repository reference."""
     owner = require_string(owner, "GitHub", "owner")
     repo = require_string(repo, "GitHub", "repo")
+    if owner in {".", ".."} or repo in {".", ".."}:
+        raise ValueError("GitHub repository is invalid.")
     return owner, repo
 
 
