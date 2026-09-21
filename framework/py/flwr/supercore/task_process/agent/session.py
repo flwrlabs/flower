@@ -85,8 +85,12 @@ class RuntimeAgentEvents(AgentEvents):
     def get_trace(self) -> list[JSONObject]:
         """Get events from all runs in the current run series."""
         response = self._stub.GetRunSeriesEvents(GetRunSeriesEventsRequest())
-        return [
-            {
+        run_initiators = {
+            initiator.run_id: initiator for initiator in response.run_initiators
+        }
+        trace: list[JSONObject] = []
+        for event in response.events:
+            trace_event: JSONObject = {
                 "id": event.id,
                 "timestamp": event.timestamp,
                 "run_id": event.run_id,
@@ -94,8 +98,14 @@ class RuntimeAgentEvents(AgentEvents):
                 "event": event.event,
                 "data": strict_json_loads(event.data),
             }
-            for event in response.events
-        ]
+            initiator = run_initiators.get(event.run_id)
+            if initiator is not None:
+                trace_event["run_initiator"] = {
+                    "flwr_aid": initiator.flwr_aid,
+                    "account_name": initiator.account_name,
+                }
+            trace.append(trace_event)
+        return trace
 
     def emit(self, event: JSONObject) -> None:
         """Queue one event for publication to run-event subscribers."""

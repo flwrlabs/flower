@@ -33,6 +33,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskMessageRequest,
     PullTaskMessageResponse,
     PushTaskEventsRequest,
+    RunInitiator,
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
@@ -167,6 +168,51 @@ def test_get_trace_gets_current_run_series_events() -> None:
             "data": {"type": "response.completed", "response": {"id": "resp_1"}},
         }
     ]
+
+
+def test_get_trace_includes_matching_run_initiator() -> None:
+    """Get trace should attach only the initiator matching each event's run."""
+    stub = Mock()
+    stub.GetRunSeriesEvents.return_value = GetRunSeriesEventsResponse(
+        events=[
+            TaskEvent(
+                id=12,
+                run_id=34,
+                event="response.completed",
+                data='{"type":"response.completed"}',
+            ),
+            TaskEvent(
+                id=13,
+                run_id=35,
+                event="response.completed",
+                data='{"type":"response.completed"}',
+            ),
+            TaskEvent(
+                id=14,
+                run_id=36,
+                event="response.completed",
+                data='{"type":"response.completed"}',
+            ),
+        ],
+        run_initiators=[
+            RunInitiator(run_id=34, flwr_aid="account-a", account_name="Alice"),
+            RunInitiator(run_id=35, flwr_aid="account-b", account_name="Bob"),
+        ],
+    )
+    events = RuntimeAgentEvents(stub)
+
+    trace = events.get_trace()
+    events.close()
+
+    assert trace[0]["run_initiator"] == {
+        "flwr_aid": "account-a",
+        "account_name": "Alice",
+    }
+    assert trace[1]["run_initiator"] == {
+        "flwr_aid": "account-b",
+        "account_name": "Bob",
+    }
+    assert "run_initiator" not in trace[2]
 
 
 def test_agent_events_and_connector_items_use_same_publisher() -> None:

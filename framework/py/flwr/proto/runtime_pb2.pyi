@@ -307,18 +307,45 @@ class GetRunSeriesEventsRequest(google.protobuf.message.Message):
 global___GetRunSeriesEventsRequest = GetRunSeriesEventsRequest
 
 @typing.final
+class RunInitiator(google.protobuf.message.Message):
+    """The authenticated account that started one run in the series."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    RUN_ID_FIELD_NUMBER: builtins.int
+    FLWR_AID_FIELD_NUMBER: builtins.int
+    ACCOUNT_NAME_FIELD_NUMBER: builtins.int
+    run_id: builtins.int
+    flwr_aid: builtins.str
+    account_name: builtins.str
+    def __init__(
+        self,
+        *,
+        run_id: builtins.int = ...,
+        flwr_aid: builtins.str = ...,
+        account_name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["account_name", b"account_name", "flwr_aid", b"flwr_aid", "run_id", b"run_id"]) -> None: ...
+
+global___RunInitiator = RunInitiator
+
+@typing.final
 class GetRunSeriesEventsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     EVENTS_FIELD_NUMBER: builtins.int
+    RUN_INITIATORS_FIELD_NUMBER: builtins.int
     @property
     def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.TaskEvent]: ...
+    @property
+    def run_initiators(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RunInitiator]: ...
     def __init__(
         self,
         *,
         events: collections.abc.Iterable[flwr.proto.task_pb2.TaskEvent] | None = ...,
+        run_initiators: collections.abc.Iterable[global___RunInitiator] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events", "run_initiators", b"run_initiators"]) -> None: ...
 
 global___GetRunSeriesEventsResponse = GetRunSeriesEventsResponse
 
