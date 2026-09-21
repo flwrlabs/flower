@@ -57,6 +57,7 @@ class Node(LinkStateBase):
         LargeBinary, unique=True, nullable=True
     )
     location: Mapped[str | None] = mapped_column(String, nullable=True)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
 
     __mapper_args__ = {"primary_key": [node_id]}
 

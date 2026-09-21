@@ -30,8 +30,10 @@ from flwr.app.error import Error
 from flwr.app.message import Message
 from flwr.common.constant import SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.serde import message_to_proto
+from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
+    GetNodesResponse,
     PullAppMessagesRequest,
     PushAppMessagesRequest,
 )
@@ -86,19 +88,25 @@ class TestHttpGrid(unittest.TestCase):
     def test_get_nodes(self) -> None:
         """Test retrieval of nodes."""
         # Prepare
-        mock_response = Mock()
-        mock_response.nodes = [Mock(node_id=404), Mock(node_id=200)]
+        mock_response = GetNodesResponse(
+            nodes=[
+                NodeInfo(node_id=404, name="London", location="51.5072,-0.1276"),
+                NodeInfo(node_id=200),
+            ]
+        )
         self.mock_client.GetNodes.return_value = mock_response
 
         # Execute
-        node_ids = self.grid.get_node_ids()
+        nodes = list(self.grid.get_nodes())
         args, kwargs = self.mock_client.GetNodes.call_args
 
         # Assert
         self.assertEqual(len(args), 1)
         self.assertEqual(len(kwargs), 0)
         self.assertIsInstance(args[0], GetNodesRequest)
-        self.assertEqual(node_ids, [404, 200])
+        self.assertEqual([node.node_id for node in nodes], [404, 200])
+        self.assertEqual(nodes[0].name, "London")
+        self.assertEqual(nodes[0].location, "51.5072,-0.1276")
 
     def _prep_message(self, message: Message) -> Message:
         # We need to be able to specify the actual object IDs

@@ -17,12 +17,13 @@
 
 import time
 from collections.abc import Iterable
+from copy import deepcopy
 from typing import cast
 from uuid import uuid4
 
 from flwr.app import Message, RecordDict
 from flwr.common.constant import SUPERLINK_NODE_ID
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.node_pb2 import Node, NodeInfo  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.serverapp.grid import Grid
 from flwr.supercore.logger import warn_deprecated_feature
@@ -101,6 +102,10 @@ class InMemoryGrid(Grid):
     def get_node_ids(self) -> Iterable[int]:
         """Get node IDs."""
         return self.state.get_nodes(cast(Run, self._run).run_id)
+
+    def get_nodes(self) -> Iterable[NodeInfo]:
+        """Get nodes."""
+        return deepcopy(self.state.get_node_info(node_ids=list(self.get_node_ids())))
 
     def push_messages(self, messages: Iterable[Message]) -> Iterable[str]:
         """Push messages to specified node IDs.

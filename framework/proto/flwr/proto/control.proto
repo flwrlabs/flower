@@ -313,6 +313,7 @@ message PullArtifactsResponse { optional string url = 1; }
 message RegisterNodeRequest {
   bytes public_key = 1;
   optional string location = 2;
+  optional string name = 3;
 }
 message RegisterNodeResponse { optional uint64 node_id = 1; }
 

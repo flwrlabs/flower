@@ -1571,6 +1571,7 @@ def register_node(
             public_key=request.public_key,
             heartbeat_interval=HEARTBEAT_DEFAULT_INTERVAL,
             location=location,
+            name=request.name if request.HasField("name") else None,
         )
 
     except ValueError as err:
