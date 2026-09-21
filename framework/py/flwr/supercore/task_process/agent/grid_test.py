@@ -15,18 +15,21 @@
 """Runtime AgentGrid tests."""
 
 
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 
 from flwr.app import ConfigRecord, Message, RecordDict
+from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
 )
 from flwr.supercore.task_identity import TaskIdentity
+from flwr.supercore.typing import JSONObject
 
 from .grid import RuntimeAgentGrid
+from .session import AgentRuntime
 
 
 @pytest.fixture(autouse=True)
@@ -35,6 +38,18 @@ def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(TaskIdentity, "_task_id", 123)
     monkeypatch.setattr(TaskIdentity, "_run_id", 456)
     monkeypatch.setattr(TaskIdentity, "_node_id", 789)
+
+
+def _agent_runtime(grid: Mock, events: Mock) -> AgentRuntime:
+    """Create an AgentRuntime backed by the given event publisher."""
+    return AgentRuntime(
+        stub=Mock(),
+        run_id=456,
+        task_id=123,
+        start_run_request=StartRunRequest(),
+        events=events,
+        grid=grid,
+    )
 
 
 def test_runtime_agent_grid_tools() -> None:
@@ -58,7 +73,7 @@ def test_runtime_agent_grid_tools() -> None:
     reply.metadata.__dict__["_reply_to_message_id"] = "message-1"
     grid.pull_messages.return_value = [reply]
     events = Mock()
-    agent_grid = RuntimeAgentGrid(grid, events)
+    agent_grid = RuntimeAgentGrid(_agent_runtime(grid, events))
 
     assert [tool["name"] for tool in agent_grid.tools()] == [
         "get_nodes",
@@ -130,3 +145,68 @@ def test_runtime_agent_grid_tools() -> None:
         '"payload":"done","error":null}],"pending_message_ids":[]}'
     )
     assert events.emit.call_count == 8
+
+
+def test_grid_call_emits_standard_items() -> None:
+    """Emit standard function call and output items for a SuperNode tool."""
+    grid = Mock()
+    grid.get_node_ids.return_value = [11, 22]
+    events = Mock()
+    agent_grid = RuntimeAgentGrid(_agent_runtime(grid, events))
+    tool_call: JSONObject = {
+        "name": "get_nodes",
+        "call_id": "call-1",
+        "arguments": {"sample_size": 1},
+    }
+
+    output = agent_grid.call(tool_call)
+
+    assert output["type"] == "function_call_output"
+    assert output["call_id"] == "call-1"
+    assert output["output"] in (
+        '{"node_ids":["11"],"num_available":2}',
+        '{"node_ids":["22"],"num_available":2}',
+    )
+    assert events.emit.call_args_list == [
+        call(
+            {
+                "type": "function_call",
+                "call_id": "call-1",
+                "name": "get_nodes",
+                "arguments": '{"sample_size":1}',
+            }
+        ),
+        call(output),
+    ]
+
+
+def test_failed_grid_call_emits_terminal_output() -> None:
+    """Emit a secret-safe terminal output when a SuperNode tool fails."""
+    grid = Mock()
+    grid.get_node_ids.side_effect = RuntimeError("sensitive failure details")
+    events = Mock()
+    agent_grid = RuntimeAgentGrid(_agent_runtime(grid, events))
+
+    with pytest.raises(RuntimeError, match="sensitive failure details"):
+        agent_grid.call({"name": "get_nodes", "call_id": "call-1", "arguments": {}})
+
+    assert events.emit.call_args_list == [
+        call(
+            {
+                "type": "function_call",
+                "call_id": "call-1",
+                "name": "get_nodes",
+                "arguments": "{}",
+            }
+        ),
+        call(
+            {
+                "type": "function_call_output",
+                "call_id": "call-1",
+                "output": (
+                    '{"error":{"code":"grid_error",'
+                    '"message":"Grid tool execution failed."}}'
+                ),
+            }
+        ),
+    ]

@@ -286,12 +286,13 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
                 series_id=run.series_id,
             ),
             events=agent_events,
+            grid=grid,
         )
         agent = RuntimeAgentSession(
             prompt=prompt,
             connectors=RuntimeAgentConnectors(agent_runtime),
             events=agent_events,
-            grid=RuntimeAgentGrid(grid, agent_events),
+            grid=RuntimeAgentGrid(agent_runtime),
         )
         agent_app(agent=agent, context=context)
         agent_events.close()

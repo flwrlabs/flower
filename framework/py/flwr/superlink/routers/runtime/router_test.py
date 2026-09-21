@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for the Runtime API router."""
 
+from collections.abc import Callable
 from typing import cast
 from unittest.mock import Mock
 
@@ -24,6 +25,10 @@ from google.protobuf.message import Message
 from httpx import Response
 from pytest import MonkeyPatch
 
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
+)
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
@@ -199,6 +204,42 @@ def test_get_run_series_events_delegates_with_authenticated_task(
     assert response.status_code == 200
     assert GetRunSeriesEventsResponse.FromString(response.content) == expected
     handler.assert_called_once_with(request, state, task)
+
+
+def test_start_automation_uses_shared_event_handler(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Automation requests should be observed by the shared Runtime handler."""
+    state = Mock(spec=LinkState)
+    task = Task(task_id=123)
+    expected = StartAutomationResponse(automation_id=456)
+    component_handler = Mock(return_value=expected)
+    monkeypatch.setattr(runtime_handlers, "start_automation", component_handler)
+
+    def call_with_events(
+        request: StartAutomationRequest,
+        request_state: LinkState,
+        request_task: Task,
+        execute: Callable[[], StartAutomationResponse],
+    ) -> StartAutomationResponse:
+        assert request.tool_call_id == "call-1"
+        assert request_state is state
+        assert request_task is task
+        return execute()
+
+    event_handler = Mock(side_effect=call_with_events)
+    monkeypatch.setattr(
+        core_runtime_handlers, "call_automation_with_events", event_handler
+    )
+    client = TestClient(_create_app(state, task=task))
+    request = StartAutomationRequest(tool_call_id="call-1")
+
+    response = _post(client, "/v1/runtime/start-automation", request)
+
+    assert response.status_code == 200
+    assert StartAutomationResponse.FromString(response.content) == expected
+    assert event_handler.call_args.args[:3] == (request, state, task)
+    component_handler.assert_called_once_with(request, state, task)
 
 
 def test_superexec_route_rejects_unsigned_request_when_auth_is_enabled() -> None:

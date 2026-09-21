@@ -16,10 +16,17 @@
 
 # pylint: disable=unused-argument
 
+from collections.abc import Callable
 from logging import DEBUG, ERROR
+from typing import cast
 
+from flwr.app import Message
 from flwr.common.constant import Status
 from flwr.common.serde import message_from_proto, message_to_proto
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
+)
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
@@ -42,7 +49,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import (
     TASK_TYPES_ALLOWED_TO_CREATE_TASKS,
@@ -53,7 +60,13 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.json_message.connector_message import (
+    ConnectorRequest,
+    ConnectorResponse,
+)
 from flwr.supercore.task_process.connector import registry as connector_registry
+from flwr.supercore.typing import JSONObject, JSONValue
+from flwr.supercore.utils import strict_json_dumps
 
 
 def pull_pending_tasks(
@@ -133,14 +146,73 @@ def push_task_message(
 
     message = message_from_proto(request.message)
 
+    tool_event = _connector_tool_event(message, state, task)
     stored = state.store_task_message(message)
     if not stored:
         raise FlowerError(
             ApiErrorCode.RUNTIME_INVALID_TASK_MESSAGE,
             "Task message could not be stored.",
         )
+    if tool_event is not None:
+        event_task, item = tool_event
+        _store_tool_event(state, event_task, item)
 
     return PushTaskMessageResponse(message_id=message.metadata.message_id)
+
+
+def call_automation_with_events(
+    request: StartAutomationRequest,
+    state: CoreState,
+    task: Task,
+    execute: Callable[[], StartAutomationResponse],
+) -> StartAutomationResponse:
+    """Execute an automation tool call and store its activity events."""
+    if (
+        task.type != TaskType.AGENT_APP
+        or not request.HasField("tool_call_id")
+        or not request.tool_call_id
+    ):
+        return execute()
+
+    call_id = request.tool_call_id
+    arguments: JSONObject = {
+        "input": request.start_run_request.user_prompt,
+    }
+    if request.HasField("start_at"):
+        arguments["start_at"] = request.start_at
+    if request.HasField("fixed_interval"):
+        arguments["fixed_interval"] = request.fixed_interval
+    if request.HasField("max_runs"):
+        arguments["max_runs"] = request.max_runs
+
+    _store_tool_call_event(state, task, call_id, "start_automation", arguments)
+    try:
+        response = execute()
+    except Exception:  # pylint: disable=broad-exception-caught
+        _store_tool_output_event(
+            state,
+            task,
+            call_id,
+            {
+                "error": {
+                    "code": "automation_error",
+                    "message": "Automation execution failed.",
+                }
+            },
+        )
+        raise
+
+    _store_tool_output_event(
+        state,
+        task,
+        call_id,
+        {
+            "automation_id": response.automation_id,
+            "series_id": response.series_id,
+            "next_run_at": response.next_run_at,
+        },
+    )
+    return response
 
 
 def push_task_events(
@@ -167,6 +239,111 @@ def push_task_events(
         )
 
     return PushTaskEventsResponse()
+
+
+def _connector_tool_event(
+    message: Message, state: CoreState, task: Task
+) -> tuple[Task, JSONObject] | None:
+    """Build a connector event from an authenticated task message."""
+    if task.type not in (TaskType.AGENT_APP, TaskType.CONNECTOR):
+        return None
+    dst_task_id = message.metadata.dst_task_id
+    if dst_task_id is None:
+        return None
+    destination_tasks = state.get_tasks(task_ids=[dst_task_id])
+    if not destination_tasks:
+        return None
+    destination_task = destination_tasks[0]
+
+    if task.type == TaskType.AGENT_APP and destination_task.type == TaskType.CONNECTOR:
+        connector_request = ConnectorRequest.from_message(message)
+        payload = connector_request.payload
+        arguments = cast(JSONObject, payload["arguments"])
+        return task, {
+            "type": "function_call",
+            "call_id": cast(str, payload["call_id"]),
+            "name": cast(str, payload["name"]),
+            "arguments": strict_json_dumps(arguments, compact=True),
+        }
+
+    if task.type == TaskType.CONNECTOR and destination_task.type == TaskType.AGENT_APP:
+        connector_response = ConnectorResponse.from_message(message)
+        payload = connector_response.payload
+        output: JSONValue = payload["output"]
+        if payload["error"] is not None:
+            output = {
+                "error": {
+                    "code": "connector_error",
+                    "message": "Connector execution failed.",
+                }
+            }
+        return destination_task, {
+            "type": "function_call_output",
+            "call_id": cast(str, payload["call_id"]),
+            "output": strict_json_dumps(output, compact=True),
+        }
+
+    return None
+
+
+def _store_tool_call_event(
+    state: CoreState,
+    task: Task,
+    call_id: str,
+    name: str,
+    arguments: JSONObject,
+) -> None:
+    """Store one runtime-observed function call item."""
+    _store_tool_event(
+        state,
+        task,
+        {
+            "type": "function_call",
+            "call_id": call_id,
+            "name": name,
+            "arguments": strict_json_dumps(arguments, compact=True),
+        },
+    )
+
+
+def _store_tool_output_event(
+    state: CoreState,
+    task: Task,
+    call_id: str,
+    output: JSONValue,
+) -> None:
+    """Store one runtime-observed function call output item."""
+    _store_tool_event(
+        state,
+        task,
+        {
+            "type": "function_call_output",
+            "call_id": call_id,
+            "output": strict_json_dumps(output, compact=True),
+        },
+    )
+
+
+def _store_tool_event(state: CoreState, task: Task, item: JSONObject) -> None:
+    """Store one tool event under its authenticated AgentApp task."""
+    event_type = cast(str, item["type"])
+    stored = state.store_task_events(
+        [
+            TaskEvent(
+                run_id=task.run_id,
+                task_id=task.task_id,
+                event=event_type,
+                data=strict_json_dumps(item, compact=True),
+            )
+        ]
+    )
+    if not stored:
+        log(
+            ERROR,
+            "Tool event could not be stored for task %d of run %d.",
+            task.task_id,
+            task.run_id,
+        )
 
 
 def record_task_usage(

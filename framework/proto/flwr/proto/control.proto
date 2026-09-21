@@ -194,6 +194,7 @@ message StartAutomationRequest {
   optional string start_at = 2;
   optional uint64 fixed_interval = 3;
   optional uint32 max_runs = 4;
+  optional string tool_call_id = 5;
 }
 message StartAutomationResponse {
   uint64 automation_id = 1;
