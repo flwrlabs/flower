@@ -24,6 +24,7 @@ from typing import cast
 
 from flwr.agentapp import AgentEvents, AgentGrid
 from flwr.app import ConfigRecord, Message, RecordDict
+from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.serverapp import Grid
 from flwr.supercore import log
 from flwr.supercore.constant import (
@@ -38,6 +39,7 @@ from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
 _GRID_TOOL_NAMES = {"get_nodes", "push_messages", "pull_messages"}
+_SUPERNODE_GRID_TOOL_NAMES = {"push_messages"}
 
 
 def _grid_tools() -> list[JSONObject]:
@@ -65,7 +67,7 @@ def _grid_tools() -> list[JSONObject]:
                         "items": string_property(
                             "Selected SuperNode uint64 ID as a decimal string."
                         ),
-                        "description": "All or a random sample of available nodes.",
+                        "description": "All or a random sample of SuperNodes.",
                     },
                     "num_available": {
                         "type": "integer",
@@ -80,9 +82,9 @@ def _grid_tools() -> list[JSONObject]:
         function_tool(
             "push_messages",
             (
-                "Send messages to SuperNodes and return one result per message in "
-                "the same order. Pass accepted message IDs to pull_messages if "
-                "replies are required."
+                "Send messages to nodes in the federation (SuperLink or SuperNodes) "
+                "and return one result per message in the same order. Pass accepted "
+                "message IDs to pull_messages if replies are required."
             ),
             properties={
                 "messages": {
@@ -92,8 +94,9 @@ def _grid_tools() -> list[JSONObject]:
                         "type": "object",
                         "properties": {
                             "dst_node_id": string_property(
-                                "Destination SuperNode uint64 ID as a decimal string "
-                                "to preserve precision."
+                                "Destination node ID (SuperNode or SuperLink) as a "
+                                "decimal uint64 string. For a reply, use the received "
+                                "message's src_node_id."
                             ),
                             "payload": string_property("String payload to send."),
                             "reply_to_message_id": string_property(
@@ -145,7 +148,9 @@ def _grid_tools() -> list[JSONObject]:
             properties={
                 "message_ids": {
                     "type": "array",
-                    "items": string_property("Message ID returned by push_messages."),
+                    "items": string_property(
+                        "Accepted message ID returned by push_messages."
+                    ),
                     "minItems": 1,
                     "description": "Message IDs whose replies are awaited.",
                 },
@@ -170,7 +175,8 @@ def _grid_tools() -> list[JSONObject]:
                                     "ID of the message this replies to."
                                 ),
                                 "src_node_id": string_property(
-                                    "Source SuperNode uint64 ID as a decimal string."
+                                    "Source node ID (SuperNode or SuperLink) as a "
+                                    "decimal uint64 string."
                                 ),
                                 "payload": {
                                     "type": ["string", "null"],
@@ -213,13 +219,17 @@ def _grid_tools() -> list[JSONObject]:
 class RuntimeAgentGrid(AgentGrid):
     """Expose selected Grid operations as model tools."""
 
-    def __init__(self, grid: Grid, events: AgentEvents) -> None:
+    def __init__(self, grid: Grid, events: AgentEvents, node_id: int) -> None:
         self._grid = grid
         self._events = events
+        self._is_superlink = node_id == SUPERLINK_NODE_ID
+        self._tool_names = (
+            _GRID_TOOL_NAMES if self._is_superlink else _SUPERNODE_GRID_TOOL_NAMES
+        )
 
     def tools(self) -> list[JSONObject]:
         """Return model-facing Grid tool schemas."""
-        return _grid_tools()
+        return [tool for tool in _grid_tools() if tool["name"] in self._tool_names]
 
     def call(self, tool_call: JSONObject) -> JSONObject:
         """Execute one Grid function_call and return a function_call_output item."""
@@ -228,7 +238,7 @@ class RuntimeAgentGrid(AgentGrid):
             arguments = strict_json_loads(arguments)
         name = cast(str, tool_call["name"])
         call_id = cast(str, tool_call["call_id"])
-        if name not in _GRID_TOOL_NAMES:
+        if name not in self._tool_names:
             raise ValueError(f"Unsupported Grid tool '{name}'.")
 
         arguments_obj = cast(JSONObject, arguments)
