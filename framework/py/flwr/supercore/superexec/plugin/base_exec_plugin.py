@@ -126,6 +126,6 @@ class AutoExecPlugin(BaseExecPlugin):
 
     suppress_output = True
     visible_output_task_types = frozenset(
-        {TaskType.CLIENT_APP, TaskType.CONNECTOR, TaskType.MODEL}
+        {TaskType.AGENT_APP, TaskType.CLIENT_APP, TaskType.CONNECTOR, TaskType.MODEL}
     )
     supported_task_types = frozenset(TaskType)
