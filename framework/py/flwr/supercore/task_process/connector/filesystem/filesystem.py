@@ -45,6 +45,8 @@ class FilesystemApiError(ConnectorApiError):
 
 def make_filesystem_tools() -> list[JSONObject]:
     """Return the filesystem function tool schemas."""
+    if not os.getenv(FILESYSTEM_ALLOWED_DIRS_ENV):
+        return []
     allowed_dirs = ", ".join(_allowed_dirs())
     return [
         {

@@ -69,6 +69,15 @@ def test_tool_schema_lists_allowed_directories(
     assert str(tmp_path.resolve()) in repr(tools)
 
 
+def test_tool_schema_is_empty_without_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An unconfigured optional connector should advertise no tools."""
+    monkeypatch.delenv(FILESYSTEM_ALLOWED_DIRS_ENV, raising=False)
+
+    assert make_filesystem_tools() == []
+
+
 def test_reads_file_and_lists_directory(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
