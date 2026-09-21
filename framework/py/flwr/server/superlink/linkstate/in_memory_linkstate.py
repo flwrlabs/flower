@@ -493,12 +493,13 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """
         return len(self.message_res_store)
 
-    def create_node(
+    def create_node(  # pylint: disable=too-many-arguments
         self,
         owner_aid: str,
         owner_name: str,
         public_key: bytes,
         heartbeat_interval: float,
+        *,
         name: str | None = None,
     ) -> int:
         """Create, store in the link state, and return `node_id`."""
