@@ -1194,6 +1194,18 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             RegisterSupernodeContext(),
         )
 
+    def test_register_node_rejects_invalid_location(self) -> None:
+        """Test RegisterNode rejects an invalid location."""
+        req = RegisterNodeRequest(
+            public_key=public_key_to_bytes(generate_key_pairs()[1]),
+            location="nan,inf",
+        )
+
+        with self.assertRaises(FlowerError) as cm:
+            self.servicer.RegisterNode(req, Mock())
+
+        self.assertEqual(cm.exception.code, ApiErrorCode.INVALID_SUPERNODE_LOCATION)
+
     @parameterized.expand(
         [
             (True,),  # PASSES, uses registered node ID

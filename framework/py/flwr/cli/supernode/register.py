@@ -15,7 +15,6 @@
 """Flower command line interface `supernode register` command."""
 
 
-import math
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -35,6 +34,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.primitives.asymmetric import public_key_to_bytes, uses_nist_ec_curve
+from flwr.supercore.utils import validate_node_location
 
 from ..utils import (
     cli_output_handler,
@@ -137,26 +137,9 @@ def _validate_location(location: str | None) -> str | None:
         return None
 
     try:
-        latitude_str, longitude_str = location.split(",")
-        latitude = float(latitude_str)
-        longitude = float(longitude_str)
+        validate_node_location(location)
     except ValueError as err:
-        raise click.BadParameter(
-            'must contain two comma-separated numbers: "<lat>,<lon>"',
-            param_hint="--location",
-        ) from err
-
-    if (
-        not math.isfinite(latitude)
-        or not math.isfinite(longitude)
-        or not -90 <= latitude <= 90
-        or not -180 <= longitude <= 180
-    ):
-        raise click.BadParameter(
-            "latitude must be between -90 and 90 and longitude must be between "
-            "-180 and 180",
-            param_hint="--location",
-        )
+        raise click.BadParameter(str(err), param_hint="--location") from err
 
     return location
 

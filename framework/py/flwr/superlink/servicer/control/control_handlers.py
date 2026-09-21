@@ -177,6 +177,7 @@ from flwr.supercore.utils import (
     request_download_link,
     resolve_account_ids,
     strict_json_dumps,
+    validate_node_location,
 )
 from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
@@ -1536,6 +1537,17 @@ def register_node(
             f"Invalid public key in RegisterNode request: {err}",
         ) from err
 
+    location = request.location if request.HasField("location") else None
+    if location is not None:
+        try:
+            validate_node_location(location)
+        except ValueError as err:
+            raise FlowerError(
+                ApiErrorCode.INVALID_SUPERNODE_LOCATION,
+                f"Invalid location in RegisterNode request: {err}",
+                public_details=str(err),
+            ) from err
+
     node_id = 0
 
     flwr_aid = account.flwr_aid
@@ -1553,7 +1565,7 @@ def register_node(
             owner_name=account_name,
             public_key=request.public_key,
             heartbeat_interval=HEARTBEAT_DEFAULT_INTERVAL,
-            location=request.location if request.HasField("location") else None,
+            location=location,
         )
 
     except ValueError as err:
