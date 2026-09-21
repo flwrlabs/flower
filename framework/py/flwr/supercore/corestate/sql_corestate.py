@@ -610,9 +610,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     fab_hash=app.fab_hash,
                     app_type=app.app_type,
                     is_hub_app=app.is_hub_app,
-                    display_name=app.display_name or "",
-                    description=app.description or "",
-                    color=app.color or "",
+                    display_name=app.display_name,
+                    description=app.description,
+                    color=app.color,
                 )
                 for app in apps
             ]
@@ -1992,7 +1992,7 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     return RunSeries(
         series_id=int64_to_uint64(row["series_id"]),
         federation=row["federation_id"],
-        description=row["description"] or "",
+        description=row["description"],
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
     )
@@ -2003,7 +2003,7 @@ def _run_series_from_model(model: RunSeriesModel) -> RunSeries:
     return RunSeries(
         series_id=int64_to_uint64(model.series_id),
         federation=model.federation_id,
-        description=model.description or "",
+        description=model.description,
         created_at=timestamp_to_iso(model.created_at),
         updated_at=timestamp_to_iso(model.updated_at),
     )
@@ -2078,7 +2078,7 @@ def _task_message_from_snapshot(row: dict[str, Any], node_id: int) -> Message:
         message_id=row["message_id"],
         src_node_id=node_id,
         dst_node_id=node_id,
-        reply_to_message_id=row["reply_to_message_id"] or "",
+        reply_to_message_id=row["reply_to_message_id"],
         group_id="",  # Task messages don't have this field for now
         created_at=row["created_at"],
         ttl=row["ttl"],
