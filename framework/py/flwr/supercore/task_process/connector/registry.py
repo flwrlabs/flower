@@ -56,9 +56,9 @@ _CREDENTIAL_CONNECTOR_REFS: dict[str, str] = {
 }
 _BUILTIN_CONNECTOR_REFS = {
     filesystem.FILESYSTEM_LIST_DIRECTORY_TOOL_NAME: (
-        filesystem.FILESYSTEM_CONNECTOR_NAME
+        filesystem.FILESYSTEM_CONNECTOR_REF
     ),
-    filesystem.FILESYSTEM_READ_FILE_TOOL_NAME: filesystem.FILESYSTEM_CONNECTOR_NAME,
+    filesystem.FILESYSTEM_READ_FILE_TOOL_NAME: filesystem.FILESYSTEM_CONNECTOR_REF,
 }
 _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
     automation.START_AUTOMATION_TOOL_NAME: automation.make_start_automation_tool,
@@ -107,7 +107,7 @@ def get_connector_ref(name: str) -> str:
 
 def get_connector_tools(connector_ref: str) -> list[JSONObject]:
     """Return model-facing tools for one built-in or OAuth connector."""
-    if connector_ref == filesystem.FILESYSTEM_CONNECTOR_NAME:
+    if connector_ref == filesystem.FILESYSTEM_CONNECTOR_REF:
         return filesystem.make_filesystem_tools()
     make_builtin_tool = _BUILTIN_CONNECTOR_TOOL_FACTORIES.get(connector_ref)
     if make_builtin_tool is not None:

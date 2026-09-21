@@ -50,7 +50,7 @@ from flwr.supercore.json_message.connector_message import (
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.filesystem import (
-    FILESYSTEM_CONNECTOR_NAME,
+    FILESYSTEM_CONNECTOR_REF,
     invoke_filesystem,
 )
 from flwr.supercore.task_process.connector.registry import (
@@ -264,7 +264,7 @@ class AgentRuntime:
         """Create one connector response."""
         name = name.strip().lower()
         connector_ref = get_connector_ref(name)
-        if connector_ref == FILESYSTEM_CONNECTOR_NAME:
+        if connector_ref == FILESYSTEM_CONNECTOR_REF:
             return invoke_filesystem(
                 name,
                 arguments,

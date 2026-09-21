@@ -24,7 +24,7 @@ from flwr.supercore.typing import JSONObject
 
 from ..http import ConnectorApiError
 
-FILESYSTEM_CONNECTOR_NAME = "filesystem"
+FILESYSTEM_CONNECTOR_REF = "filesystem"
 FILESYSTEM_LIST_DIRECTORY_TOOL_NAME = "filesystem_list_directory"
 FILESYSTEM_READ_FILE_TOOL_NAME = "filesystem_read_file"
 FILESYSTEM_ALLOWED_DIRS_ENV = "FLWR_FILESYSTEM_ALLOWED_DIRS"
