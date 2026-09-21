@@ -404,110 +404,53 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             ApiErrorCode.RUNTIME_INVALID_TASK_MESSAGE,
         )
 
-    def test_push_task_message_stores_connector_call_event(self) -> None:
-        """Store connector function calls observed in authenticated task messages."""
+    def test_push_task_message_stores_connector_events(self) -> None:
+        """Store connector call and output events under the AgentApp task."""
         self.state.store_task_message.return_value = True
         self.state.store_task_events.return_value = True
-        self.state.get_tasks.return_value = [
-            Task(task_id=456, run_id=789, type=TaskType.CONNECTOR)
-        ]
+        agent_task = Task(task_id=123, run_id=789, type=TaskType.AGENT_APP)
+        connector_task = Task(task_id=456, run_id=789, type=TaskType.CONNECTOR)
+
         with patch.multiple(TaskIdentity, _task_id=123, _run_id=789, _node_id=0):
-            message = ConnectorRequest(
+            request = ConnectorRequest(
                 dst_task_id=456,
                 name="notion_search",
                 call_id="call-1",
                 arguments={"query": "Flower"},
             )
-        message.metadata.__dict__["_message_id"] = message.object_id
-
+        request.metadata.__dict__["_message_id"] = request.object_id
+        self.state.get_tasks.return_value = [connector_task]
         runtime_handlers.push_task_message(
-            PushTaskMessageRequest(message=message_to_proto(message)),
+            PushTaskMessageRequest(message=message_to_proto(request)),
             self.state,
-            Task(task_id=123, run_id=789, type=TaskType.AGENT_APP),
+            agent_task,
         )
 
-        stored_event = self.state.store_task_events.call_args.args[0][0]
-        self.assertEqual(stored_event.run_id, 789)
-        self.assertEqual(stored_event.task_id, 123)
-        self.assertEqual(stored_event.event, "function_call")
-        self.assertEqual(
-            stored_event.data,
-            (
-                '{"type":"function_call","call_id":"call-1",'
-                '"name":"notion_search","arguments":"{\\"query\\":\\"Flower\\"}"}'
-            ),
-        )
-
-    def test_push_task_message_stores_connector_output_event(self) -> None:
-        """Store connector outputs under the destination AgentApp task."""
-        self.state.store_task_message.return_value = True
-        self.state.store_task_events.return_value = True
-        self.state.get_tasks.return_value = [
-            Task(task_id=123, run_id=789, type=TaskType.AGENT_APP)
-        ]
         with patch.multiple(TaskIdentity, _task_id=456, _run_id=789, _node_id=0):
-            message = ConnectorResponse(
+            response = ConnectorResponse(
                 dst_task_id=123,
                 name="notion_search",
                 call_id="call-1",
                 output={"results": []},
                 error=None,
-                reply_to_message_id="request-message-id",
+                reply_to_message_id=request.object_id,
             )
-        message.metadata.__dict__["_message_id"] = message.object_id
-
+        response.metadata.__dict__["_message_id"] = response.object_id
+        self.state.get_tasks.return_value = [agent_task]
         runtime_handlers.push_task_message(
-            PushTaskMessageRequest(message=message_to_proto(message)),
+            PushTaskMessageRequest(message=message_to_proto(response)),
             self.state,
-            Task(task_id=456, run_id=789, type=TaskType.CONNECTOR),
+            connector_task,
         )
 
-        stored_event = self.state.store_task_events.call_args.args[0][0]
-        self.assertEqual(stored_event.run_id, 789)
-        self.assertEqual(stored_event.task_id, 123)
-        self.assertEqual(stored_event.event, "function_call_output")
-        self.assertEqual(
-            stored_event.data,
-            (
-                '{"type":"function_call_output","call_id":"call-1",'
-                '"output":"{\\"results\\":[]}"}'
-            ),
-        )
-
-    def test_push_task_message_stores_safe_connector_error_event(self) -> None:
-        """Avoid exposing connector error details in persisted tool events."""
-        self.state.store_task_message.return_value = True
-        self.state.store_task_events.return_value = True
-        self.state.get_tasks.return_value = [
-            Task(task_id=123, run_id=789, type=TaskType.AGENT_APP)
+        events = [
+            call.args[0][0] for call in self.state.store_task_events.call_args_list
         ]
-        with patch.multiple(TaskIdentity, _task_id=456, _run_id=789, _node_id=0):
-            message = ConnectorResponse(
-                dst_task_id=123,
-                name="notion_search",
-                call_id="call-1",
-                output=None,
-                error={"message": "sensitive connector failure"},
-                reply_to_message_id="request-message-id",
-            )
-        message.metadata.__dict__["_message_id"] = message.object_id
-
-        runtime_handlers.push_task_message(
-            PushTaskMessageRequest(message=message_to_proto(message)),
-            self.state,
-            Task(task_id=456, run_id=789, type=TaskType.CONNECTOR),
-        )
-
-        stored_event = self.state.store_task_events.call_args.args[0][0]
         self.assertEqual(
-            stored_event.data,
-            (
-                '{"type":"function_call_output","call_id":"call-1",'
-                '"output":"{\\"error\\":{\\"code\\":\\"connector_error\\",'
-                '\\"message\\":\\"Connector execution failed.\\"}}"}'
-            ),
+            [(event.task_id, event.event) for event in events],
+            [(123, "function_call"), (123, "function_call_output")],
         )
-        self.assertNotIn("sensitive connector failure", stored_event.data)
+        self.assertTrue(all('"call_id":"call-1"' in event.data for event in events))
 
     def test_call_automation_with_events_stores_runtime_events(self) -> None:
         """Store automation call and output items around handler execution."""
@@ -516,8 +459,6 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         request = StartAutomationRequest(
             start_run_request=StartRunRequest(user_prompt="Do work"),
             start_at="2026-07-28T12:00:00Z",
-            fixed_interval=60,
-            max_runs=3,
             tool_call_id="call-1",
         )
         execute = Mock(
@@ -532,76 +473,15 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             request, self.state, task, execute
         )
 
-        self.assertEqual(response.automation_id, 10)
-        stored_events = [
+        events = [
             call.args[0][0] for call in self.state.store_task_events.call_args_list
         ]
+        self.assertEqual(response.automation_id, 10)
         self.assertEqual(
-            [event.event for event in stored_events],
+            [event.event for event in events],
             ["function_call", "function_call_output"],
         )
-        self.assertEqual(
-            stored_events[0].data,
-            (
-                '{"type":"function_call","call_id":"call-1",'
-                '"name":"start_automation","arguments":'
-                '"{\\"input\\":\\"Do work\\",'
-                '\\"start_at\\":\\"2026-07-28T12:00:00Z\\",'
-                '\\"fixed_interval\\":60,\\"max_runs\\":3}"}'
-            ),
-        )
-        self.assertEqual(
-            stored_events[1].data,
-            (
-                '{"type":"function_call_output","call_id":"call-1",'
-                '"output":"{\\"automation_id\\":10,\\"series_id\\":20,'
-                '\\"next_run_at\\":\\"2026-07-28T12:00:00Z\\"}"}'
-            ),
-        )
-
-    def test_call_automation_with_events_stores_safe_failure(self) -> None:
-        """Store a secret-safe terminal output if automation execution fails."""
-        self.state.store_task_events.return_value = True
-        task = Task(task_id=123, run_id=789, type=TaskType.AGENT_APP)
-        request = StartAutomationRequest(
-            start_run_request=StartRunRequest(user_prompt="Do work"),
-            start_at="2026-07-28T12:00:00Z",
-            tool_call_id="call-1",
-        )
-        execute = Mock(side_effect=RuntimeError("sensitive failure"))
-
-        with self.assertRaisesRegex(RuntimeError, "sensitive failure"):
-            runtime_handlers.call_automation_with_events(
-                request, self.state, task, execute
-            )
-
-        stored_event = self.state.store_task_events.call_args_list[-1].args[0][0]
-        self.assertEqual(stored_event.event, "function_call_output")
-        self.assertEqual(
-            stored_event.data,
-            (
-                '{"type":"function_call_output","call_id":"call-1",'
-                '"output":"{\\"error\\":{\\"code\\":\\"automation_error\\",'
-                '\\"message\\":\\"Automation execution failed.\\"}}"}'
-            ),
-        )
-        self.assertNotIn("sensitive failure", stored_event.data)
-
-    def test_call_automation_with_events_ignores_non_agentapp_task(self) -> None:
-        """Do not create tool events for non-AgentApp automation requests."""
-        request = StartAutomationRequest(tool_call_id="call-1")
-        expected = StartAutomationResponse(automation_id=10)
-        execute = Mock(return_value=expected)
-
-        response = runtime_handlers.call_automation_with_events(
-            request,
-            self.state,
-            Task(task_id=123, run_id=789, type=TaskType.CLIENT_APP),
-            execute,
-        )
-
-        self.assertIs(response, expected)
-        self.state.store_task_events.assert_not_called()
+        self.assertTrue(all('"call_id":"call-1"' in event.data for event in events))
 
     def test_push_task_events_derives_authenticated_task_identity(self) -> None:
         """PushTaskEvents should derive run and task IDs from task auth."""

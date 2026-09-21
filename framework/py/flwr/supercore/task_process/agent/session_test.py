@@ -219,7 +219,7 @@ def test_runtime_connectors_expand_one_connector_into_multiple_tools() -> None:
     get_connector_tools.assert_called_once_with("example")
 
 
-def test_call_automation_embeds_input_in_control_request() -> None:
+def test_call_tool_embeds_automation_input_in_control_request() -> None:
     """Embed model input in the Control request sent to the Runtime API."""
     # Prepare
     stub = Mock()
@@ -244,8 +244,10 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     }
 
     # Execute
-    output = agent_runtime.call_automation_with_events(
-        call_id="call-1", arguments=arguments
+    output = agent_runtime.call_tool(
+        name=START_AUTOMATION_TOOL_NAME,
+        call_id="call-1",
+        arguments=arguments,
     )
 
     # Assert
@@ -270,7 +272,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     }
 
 
-def test_connector_call_returns_standard_output_item() -> None:
+def test_call_tool_returns_connector_output_item() -> None:
     """Return the standard output item while Runtime persists the events."""
     agent_runtime = AgentRuntime(
         stub=Mock(),
@@ -283,7 +285,7 @@ def test_connector_call_returns_standard_output_item() -> None:
     with patch.object(
         agent_runtime, "create_connector_response", return_value={"results": []}
     ):
-        output = agent_runtime.call_connector_with_events(
+        output = agent_runtime.call_tool(
             name="notion_search", call_id="call-1", arguments=arguments
         )
 

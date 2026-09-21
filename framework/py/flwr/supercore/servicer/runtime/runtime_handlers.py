@@ -175,43 +175,44 @@ def call_automation_with_events(
         return execute()
 
     call_id = request.tool_call_id
-    arguments: JSONObject = {
-        "input": request.start_run_request.user_prompt,
-    }
-    if request.HasField("start_at"):
-        arguments["start_at"] = request.start_at
-    if request.HasField("fixed_interval"):
-        arguments["fixed_interval"] = request.fixed_interval
-    if request.HasField("max_runs"):
-        arguments["max_runs"] = request.max_runs
+    arguments: JSONObject = {"input": request.start_run_request.user_prompt}
+    for field in ("start_at", "fixed_interval", "max_runs"):
+        if request.HasField(field):
+            arguments[field] = getattr(request, field)
 
-    _store_tool_call_event(state, task, call_id, "start_automation", arguments)
-    try:
-        response = execute()
-    except Exception:  # pylint: disable=broad-exception-caught
-        _store_tool_output_event(
-            state,
-            task,
-            call_id,
-            {
-                "error": {
-                    "code": "automation_error",
-                    "message": "Automation execution failed.",
-                }
-            },
-        )
-        raise
-
-    _store_tool_output_event(
+    _store_tool_event(
         state,
         task,
-        call_id,
         {
+            "type": "function_call",
+            "call_id": call_id,
+            "name": "start_automation",
+            "arguments": strict_json_dumps(arguments, compact=True),
+        },
+    )
+    output: JSONValue = {
+        "error": {
+            "code": "automation_error",
+            "message": "Automation execution failed.",
+        }
+    }
+    try:
+        response = execute()
+        output = {
             "automation_id": response.automation_id,
             "series_id": response.series_id,
             "next_run_at": response.next_run_at,
-        },
-    )
+        }
+    finally:
+        _store_tool_event(
+            state,
+            task,
+            {
+                "type": "function_call_output",
+                "call_id": call_id,
+                "output": strict_json_dumps(output, compact=True),
+            },
+        )
     return response
 
 
@@ -256,8 +257,7 @@ def _connector_tool_event(
     destination_task = destination_tasks[0]
 
     if task.type == TaskType.AGENT_APP and destination_task.type == TaskType.CONNECTOR:
-        connector_request = ConnectorRequest.from_message(message)
-        payload = connector_request.payload
+        payload = ConnectorRequest.from_message(message).payload
         arguments = cast(JSONObject, payload["arguments"])
         return task, {
             "type": "function_call",
@@ -267,8 +267,7 @@ def _connector_tool_event(
         }
 
     if task.type == TaskType.CONNECTOR and destination_task.type == TaskType.AGENT_APP:
-        connector_response = ConnectorResponse.from_message(message)
-        payload = connector_response.payload
+        payload = ConnectorResponse.from_message(message).payload
         output: JSONValue = payload["output"]
         if payload["error"] is not None:
             output = {
@@ -286,64 +285,20 @@ def _connector_tool_event(
     return None
 
 
-def _store_tool_call_event(
-    state: CoreState,
-    task: Task,
-    call_id: str,
-    name: str,
-    arguments: JSONObject,
-) -> None:
-    """Store one runtime-observed function call item."""
-    _store_tool_event(
-        state,
-        task,
-        {
-            "type": "function_call",
-            "call_id": call_id,
-            "name": name,
-            "arguments": strict_json_dumps(arguments, compact=True),
-        },
-    )
-
-
-def _store_tool_output_event(
-    state: CoreState,
-    task: Task,
-    call_id: str,
-    output: JSONValue,
-) -> None:
-    """Store one runtime-observed function call output item."""
-    _store_tool_event(
-        state,
-        task,
-        {
-            "type": "function_call_output",
-            "call_id": call_id,
-            "output": strict_json_dumps(output, compact=True),
-        },
-    )
-
-
 def _store_tool_event(state: CoreState, task: Task, item: JSONObject) -> None:
     """Store one tool event under its authenticated AgentApp task."""
-    event_type = cast(str, item["type"])
-    stored = state.store_task_events(
-        [
-            TaskEvent(
-                run_id=task.run_id,
-                task_id=task.task_id,
-                event=event_type,
-                data=strict_json_dumps(item, compact=True),
-            )
-        ]
+    push_task_events(
+        PushTaskEventsRequest(
+            events=[
+                TaskEvent(
+                    event=cast(str, item["type"]),
+                    data=strict_json_dumps(item, compact=True),
+                )
+            ]
+        ),
+        state,
+        task,
     )
-    if not stored:
-        log(
-            ERROR,
-            "Tool event could not be stored for task %d of run %d.",
-            task.task_id,
-            task.run_id,
-        )
 
 
 def record_task_usage(

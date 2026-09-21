@@ -223,12 +223,7 @@ class RuntimeAgentConnectors(AgentConnectors):
         call_id = cast(str, tool_call["call_id"])
         arguments_obj = cast(JSONObject, arguments)
 
-        if name == START_AUTOMATION_TOOL_NAME:
-            return self._agent_runtime.call_automation_with_events(
-                call_id=call_id,
-                arguments=arguments_obj,
-            )
-        return self._agent_runtime.call_connector_with_events(
+        return self._agent_runtime.call_tool(
             name=name,
             call_id=call_id,
             arguments=arguments_obj,
@@ -283,49 +278,34 @@ class AgentRuntime:
 
         return response_payload["output"]
 
-    def call_connector_with_events(
+    def call_tool(
         self, *, name: str, call_id: str, arguments: JSONObject
     ) -> JSONObject:
-        """Call a connector whose events are persisted by Runtime handlers."""
+        """Execute a tool whose events are persisted by Runtime handlers."""
         name = name.strip().lower()
-        output = self.create_connector_response(
-            name=name,
-            call_id=call_id,
-            arguments=arguments,
-        )
-
-        return {
-            "type": "function_call_output",
-            "call_id": call_id,
-            "output": strict_json_dumps(output, compact=True),
-        }
-
-    def call_automation_with_events(
-        self, *, call_id: str, arguments: JSONObject
-    ) -> JSONObject:
-        """Create an automation whose events are persisted by Runtime handlers."""
-        input_value = arguments.get("input")
-        if not isinstance(input_value, str) or not input_value.strip():
-            raise ValueError("Automation input must be a non-empty string.")
-        start_at = arguments.get("start_at")
-        if not isinstance(start_at, str) or not start_at.strip():
-            raise ValueError("Automation start_at must be a non-empty string.")
-        request_data = dict(arguments)
-        del request_data["input"]
-        request = ParseDict(
-            request_data,
-            StartAutomationRequest(
-                start_run_request=self._start_run_request,
-                tool_call_id=call_id,
-            ),
-        )
-        request.start_run_request.user_prompt = input_value.strip()
-        response = self._stub.StartAutomation(request)
-        output: JSONObject = {
-            "automation_id": response.automation_id,
-            "series_id": response.series_id,
-            "next_run_at": response.next_run_at,
-        }
+        if name == START_AUTOMATION_TOOL_NAME:
+            request_data = dict(arguments)
+            input_value = cast(str, request_data.pop("input"))
+            request = ParseDict(
+                request_data,
+                StartAutomationRequest(
+                    start_run_request=self._start_run_request,
+                    tool_call_id=call_id,
+                ),
+            )
+            request.start_run_request.user_prompt = input_value
+            response = self._stub.StartAutomation(request)
+            output: JSONValue = {
+                "automation_id": response.automation_id,
+                "series_id": response.series_id,
+                "next_run_at": response.next_run_at,
+            }
+        else:
+            output = self.create_connector_response(
+                name=name,
+                call_id=call_id,
+                arguments=arguments,
+            )
 
         return {
             "type": "function_call_output",
