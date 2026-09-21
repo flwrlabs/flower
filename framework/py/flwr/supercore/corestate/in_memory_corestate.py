@@ -476,9 +476,9 @@ class InMemoryCoreState(
                     fab_hash=record.fab_hash,
                     app_type=record.app_type,
                     is_hub_app=record.is_hub_app,
-                    display_name=record.display_name,
-                    description=record.description,
-                    color=record.color,
+                    display_name=record.display_name or "",
+                    description=record.description or "",
+                    color=record.color or "",
                 )
                 for record in records
             ]

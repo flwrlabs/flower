@@ -2003,7 +2003,7 @@ def _run_series_from_model(model: RunSeriesModel) -> RunSeries:
     return RunSeries(
         series_id=int64_to_uint64(model.series_id),
         federation=model.federation_id,
-        description=model.description,
+        description=model.description or "",
         created_at=timestamp_to_iso(model.created_at),
         updated_at=timestamp_to_iso(model.updated_at),
     )
