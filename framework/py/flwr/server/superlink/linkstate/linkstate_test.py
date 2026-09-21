@@ -1323,7 +1323,7 @@ class StateTest(CoreStateTest):
         # Prepare
         state: LinkState = self.state_factory()
         public_key = b"mock"
-        location = "London, UK"
+        location = "37.4056,-122.0775"
 
         # Execute
         expected_registered_at = now().timestamp()

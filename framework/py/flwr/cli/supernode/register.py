@@ -15,6 +15,7 @@
 """Flower command line interface `supernode register` command."""
 
 
+import math
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -59,7 +60,10 @@ def register(  # pylint: disable=R0914
         str | None,
         typer.Option(
             "--location",
-            help='Location of the SuperNode, for example "London, UK".',
+            help=(
+                'Location of the SuperNode as "<latitude>,<longitude>", '
+                'for example "37.4056,-122.0775".'
+            ),
         ),
     ] = None,
     output_format: Annotated[
@@ -72,6 +76,8 @@ def register(  # pylint: disable=R0914
     ] = CliOutputFormat.DEFAULT,
 ) -> None:
     """Add a SuperNode to the federation."""
+    location = _validate_location(location)
+
     # Load public key
     public_key_bytes = try_load_public_key(public_key.expanduser())
 
@@ -123,6 +129,36 @@ def _register_node(
             )
     else:
         raise click.ClickException("SuperNode couldn't be registered.")
+
+
+def _validate_location(location: str | None) -> str | None:
+    """Validate the optional SuperNode location."""
+    if location is None:
+        return None
+
+    try:
+        latitude_str, longitude_str = location.split(",")
+        latitude = float(latitude_str)
+        longitude = float(longitude_str)
+    except ValueError as err:
+        raise click.BadParameter(
+            'must contain two comma-separated numbers: "<lat>,<lon>"',
+            param_hint="--location",
+        ) from err
+
+    if (
+        not math.isfinite(latitude)
+        or not math.isfinite(longitude)
+        or not -90 <= latitude <= 90
+        or not -180 <= longitude <= 180
+    ):
+        raise click.BadParameter(
+            "latitude must be between -90 and 90 and longitude must be between "
+            "-180 and 180",
+            param_hint="--location",
+        )
+
+    return location
 
 
 def try_load_public_key(public_key_path: Path) -> bytes:
