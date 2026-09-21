@@ -26,10 +26,16 @@ erDiagram
   }
 
   connector {
-    VARCHAR connector_ref PK
-    VARCHAR flwr_aid PK
+    INTEGER connector_id PK
     VARCHAR config_json
+    VARCHAR connector_ref
+    TIMESTAMP created_at "nullable"
+    VARCHAR created_by "nullable"
     VARCHAR credentials_json
+    TIMESTAMP deleted_at "nullable"
+    VARCHAR deleted_by "nullable"
+    VARCHAR federation_id "nullable"
+    VARCHAR flwr_aid
   }
 
   connector_oauth_session {

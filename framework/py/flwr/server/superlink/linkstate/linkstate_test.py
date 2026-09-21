@@ -34,7 +34,7 @@ from uuid import uuid4
 
 from google.protobuf.message import DecodeError
 from parameterized import parameterized
-from sqlalchemy import event, insert
+from sqlalchemy import event, insert, select
 from sqlalchemy.sql.dml import Update
 
 from flwr.app import DEFAULT_TTL, Error, Message, RecordDict
@@ -2609,7 +2609,12 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
                 credentials_json='{"token":"old"}',
                 config_json='{"calendar":"primary"}',
             )
-            cached_row = session.get(ConnectorModel, ("account-a", "calendar"))
+            cached_row = session.scalar(
+                select(ConnectorModel).where(
+                    ConnectorModel.flwr_aid == "account-a",
+                    ConnectorModel.connector_ref == "calendar",
+                )
+            )
             assert cached_row is not None
             self.assertEqual(cached_row.credentials_json, '{"token":"old"}')
             state.upsert_connector(

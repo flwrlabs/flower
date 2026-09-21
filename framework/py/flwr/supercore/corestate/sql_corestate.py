@@ -666,10 +666,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if not flwr_aid or not connector_ref:
             return None
         with self.session() as session:
-            row = session.get(
-                ConnectorModel,
-                (flwr_aid, connector_ref),
-                populate_existing=True,
+            row = session.scalar(
+                select(ConnectorModel)
+                .where(
+                    ConnectorModel.flwr_aid == flwr_aid,
+                    ConnectorModel.connector_ref == connector_ref,
+                )
+                .execution_options(populate_existing=True)
             )
             if row is None:
                 return None

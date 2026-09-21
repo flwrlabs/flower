@@ -14,7 +14,14 @@
 # ==============================================================================
 """Tests for CoreState declarative models."""
 
-from flwr.supercore.state.schema.corestate_models import FlwrBase, Task, TaskLogsTable
+from sqlalchemy import UniqueConstraint
+
+from flwr.supercore.state.schema.corestate_models import (
+    Connector,
+    FlwrBase,
+    Task,
+    TaskLogsTable,
+)
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 
 CORESTATE_TABLE_NAMES = {
@@ -51,6 +58,19 @@ def test_declarative_metadata_covers_all_mappable_core_tables() -> None:
 def test_task_mapper_uses_task_id_as_identity_key() -> None:
     """Ensure the mapper-only primary key uses the existing unique task_id column."""
     assert [column.name for column in Task.__mapper__.primary_key] == ["task_id"]
+
+
+def test_connector_uses_incrementing_id_and_unique_account_reference() -> None:
+    """Ensure connectors have a surrogate ID and retain their natural uniqueness."""
+    table = Connector.__table__
+
+    assert [column.name for column in table.primary_key.columns] == ["connector_id"]
+    assert table.c.connector_id.autoincrement is True
+    assert any(
+        {column.name for column in constraint.columns} == {"flwr_aid", "connector_ref"}
+        for constraint in table.constraints
+        if isinstance(constraint, UniqueConstraint)
+    )
 
 
 def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:
