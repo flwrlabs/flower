@@ -36,3 +36,5 @@ def test_filesystem_is_builtin_without_oauth() -> None:
     """Filesystem should use the same credential-free path as web_search."""
     assert registry.has_builtin_connector("filesystem")
     assert "filesystem" not in registry.OAUTH_FLOWS
+    assert registry.get_connector_ref("filesystem_list_directory") == "filesystem"
+    assert registry.get_connector_ref("filesystem_read_file") == "filesystem"

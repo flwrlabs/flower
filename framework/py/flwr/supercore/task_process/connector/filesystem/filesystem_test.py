@@ -24,9 +24,12 @@ from flwr.supercore.typing import JSONObject
 
 from .filesystem import (
     FILESYSTEM_ALLOWED_DIRS_ENV,
+    FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
+    FILESYSTEM_READ_FILE_TOOL_NAME,
     FilesystemApiError,
-    invoke_filesystem_provider,
-    make_filesystem_tool,
+    list_directory,
+    make_filesystem_tools,
+    read_file,
 )
 
 
@@ -37,8 +40,12 @@ def _allow(monkeypatch: pytest.MonkeyPatch, *dirs: Path) -> None:
     )
 
 
-def _call(action: str, path: Path | str) -> JSONObject:
-    return invoke_filesystem_provider(action, str(path), usage_recorder=Mock())
+def _list(path: Path | str) -> JSONObject:
+    return list_directory(str(path), usage_recorder=Mock())
+
+
+def _read(path: Path | str) -> JSONObject:
+    return read_file(str(path), usage_recorder=Mock())
 
 
 def test_tool_schema_lists_allowed_directories(
@@ -47,7 +54,12 @@ def test_tool_schema_lists_allowed_directories(
     """The model should know which absolute paths it can request."""
     _allow(monkeypatch, tmp_path)
 
-    assert str(tmp_path.resolve()) in repr(make_filesystem_tool())
+    tools = make_filesystem_tools()
+    assert [tool["name"] for tool in tools] == [
+        FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
+        FILESYSTEM_READ_FILE_TOOL_NAME,
+    ]
+    assert str(tmp_path.resolve()) in repr(tools)
 
 
 def test_reads_file_and_lists_directory(
@@ -59,11 +71,11 @@ def test_reads_file_and_lists_directory(
     file.write_text("hello", encoding="utf-8")
     _allow(monkeypatch, tmp_path)
 
-    assert _call("read_file", file) == {
+    assert _read(file) == {
         "content": "hello",
         "path": str(file.resolve()),
     }
-    assert _call("list_directory", tmp_path) == {
+    assert _list(tmp_path) == {
         "entries": [
             {"name": "note.txt", "type": "file"},
             {"name": "subdir", "type": "directory"},
@@ -86,7 +98,7 @@ def test_denies_symlink_outside_allowed_directory(
     _allow(monkeypatch, allowed)
 
     with pytest.raises(FilesystemApiError, match="access_denied"):
-        _call("read_file", link)
+        _read(link)
 
 
 def test_denies_path_traversal(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -98,7 +110,7 @@ def test_denies_path_traversal(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     _allow(monkeypatch, allowed)
 
     with pytest.raises(FilesystemApiError, match="access_denied"):
-        _call("read_file", allowed / ".." / secret.name)
+        _read(allowed / ".." / secret.name)
 
 
 def test_rejects_wrong_target_types(
@@ -110,9 +122,9 @@ def test_rejects_wrong_target_types(
     _allow(monkeypatch, tmp_path)
 
     with pytest.raises(FilesystemApiError, match="not_a_file"):
-        _call("read_file", tmp_path)
+        _read(tmp_path)
     with pytest.raises(FilesystemApiError, match="access_denied"):
-        _call("list_directory", file)
+        _list(file)
 
 
 def test_requires_absolute_configured_directory(
@@ -122,7 +134,7 @@ def test_requires_absolute_configured_directory(
     monkeypatch.setenv(FILESYSTEM_ALLOWED_DIRS_ENV, "relative")
 
     with pytest.raises(FilesystemApiError, match="invalid_config"):
-        _call("list_directory", tmp_path)
+        _list(tmp_path)
 
 
 def test_enforces_file_size_limit(
@@ -134,4 +146,4 @@ def test_enforces_file_size_limit(
     _allow(monkeypatch, tmp_path)
 
     with pytest.raises(FilesystemApiError, match="file_too_large"):
-        _call("read_file", file)
+        _read(file)

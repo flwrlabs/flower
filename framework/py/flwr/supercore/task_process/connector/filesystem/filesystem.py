@@ -25,6 +25,8 @@ from flwr.supercore.typing import JSONObject
 from ..http import ConnectorApiError
 
 FILESYSTEM_CONNECTOR_NAME = "filesystem"
+FILESYSTEM_LIST_DIRECTORY_TOOL_NAME = "filesystem_list_directory"
+FILESYSTEM_READ_FILE_TOOL_NAME = "filesystem_read_file"
 FILESYSTEM_ALLOWED_DIRS_ENV = "FLWR_FILESYSTEM_ALLOWED_DIRS"
 
 _MAX_DIRECTORY_ENTRIES = 1000
@@ -41,57 +43,58 @@ class FilesystemApiError(ConnectorApiError):
     provider = "Filesystem"
 
 
-def make_filesystem_tool() -> JSONObject:
-    """Return the filesystem function tool schema."""
+def make_filesystem_tools() -> list[JSONObject]:
+    """Return the filesystem function tool schemas."""
     allowed_dirs = ", ".join(_allowed_dirs())
-    return {
-        "type": "function",
-        "name": FILESYSTEM_CONNECTOR_NAME,
-        "description": (
-            "Browse local directories and read files within configured filesystem "
-            "roots. List a directory to inspect its entries, or read a specific file "
-            "when its contents are needed."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string",
-                    "enum": ["list_directory", "read_file"],
-                    "description": (
-                        "Filesystem operation. 'list_directory' returns the immediate "
-                        "entries of a directory sorted by name. 'read_file' returns "
-                        "the contents of one UTF-8 text file up to 1 MiB."
-                    ),
-                },
-                "path": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": (
-                        "Absolute path to a file or directory within one of these "
-                        f"configured roots: {allowed_dirs}."
-                    ),
-                },
-            },
-            "required": ["action", "path"],
-            "additionalProperties": False,
-        },
+    path: JSONObject = {
+        "type": "string",
+        "minLength": 1,
+        "description": f"Absolute path within configured roots: {allowed_dirs}.",
     }
+    return [
+        {
+            "type": "function",
+            "name": FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
+            "description": (
+                "List the immediate entries of a local directory, sorted by name."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {"path": path},
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "type": "function",
+            "name": FILESYSTEM_READ_FILE_TOOL_NAME,
+            "description": (
+                "Read the contents of one local UTF-8 text file up to 1 MiB."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {"path": path},
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+        },
+    ]
 
 
-def invoke_filesystem_provider(
-    action: str, path: str, *, usage_recorder: TaskUsageRecorder
-) -> JSONObject:
-    """Execute one filesystem action."""
+def list_directory(path: str, *, usage_recorder: TaskUsageRecorder) -> JSONObject:
+    """List entries in an allowed directory."""
     del usage_recorder
     if not _PLATFORM_SUPPORTED:
         raise FilesystemApiError("unsupported_platform")
-    allowed = _allowed_dirs()
-    if action == "list_directory":
-        return _list_directory(path, allowed)
-    if action == "read_file":
-        return _read_file(path, allowed)
-    raise FilesystemApiError("invalid_action")
+    return _list_directory(path, _allowed_dirs())
+
+
+def read_file(path: str, *, usage_recorder: TaskUsageRecorder) -> JSONObject:
+    """Read one UTF-8 text file inside an allowed directory."""
+    del usage_recorder
+    if not _PLATFORM_SUPPORTED:
+        raise FilesystemApiError("unsupported_platform")
+    return _read_file(path, _allowed_dirs())
 
 
 def _list_directory(path: str, allowed: list[str]) -> JSONObject:

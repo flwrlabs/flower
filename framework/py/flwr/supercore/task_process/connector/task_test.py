@@ -34,7 +34,7 @@ from flwr.supercore.typing import JSONObject
 
 from . import registry
 from .definition import ConnectorExecutionContext
-from .filesystem import FILESYSTEM_ALLOWED_DIRS_ENV, FILESYSTEM_CONNECTOR_NAME
+from .filesystem import FILESYSTEM_ALLOWED_DIRS_ENV, FILESYSTEM_READ_FILE_TOOL_NAME
 from .http import ConnectorApiError
 from .task import handle_task
 
@@ -138,8 +138,8 @@ class TestHandleTask(unittest.TestCase):
             with open(path, "w", encoding="utf-8") as handle:
                 handle.write("hello")
             self.pull_connector_request.return_value = _connector_request(
-                FILESYSTEM_CONNECTOR_NAME,
-                {"action": "read_file", "path": path},
+                FILESYSTEM_READ_FILE_TOOL_NAME,
+                {"path": path},
             )
 
             with patch.dict(
@@ -150,7 +150,7 @@ class TestHandleTask(unittest.TestCase):
 
         self.stub.GetConnector.assert_not_called()
         assert _pushed_response(self.stub).payload == {
-            "name": FILESYSTEM_CONNECTOR_NAME,
+            "name": FILESYSTEM_READ_FILE_TOOL_NAME,
             "call_id": "call-1",
             "output": {"content": "hello", "path": os.path.realpath(path)},
             "error": None,
