@@ -427,6 +427,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
+        display_name: str | None = None,
+        description: str | None = None,
+        color: str | None = None,
     ) -> str:
         """Store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
@@ -456,6 +459,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             fab_hash=fab_hash,
             app_type=app_type,
             is_hub_app=is_hub_app,
+            display_name=display_name,
+            description=description,
+            color=color,
             added_by=added_by,
             added_at=now(),
             updated_at=now(),
@@ -469,6 +475,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 "fab_hash": app_stmt.excluded.fab_hash,
                 "app_type": app_stmt.excluded.app_type,
                 "is_hub_app": app_stmt.excluded.is_hub_app,
+                "display_name": app_stmt.excluded.display_name,
+                "description": app_stmt.excluded.description,
+                "color": app_stmt.excluded.color,
                 "updated_at": app_stmt.excluded.updated_at,
             },
         )
@@ -581,6 +590,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 FederationAppModel.fab_hash,
                 FederationAppModel.app_type,
                 FederationAppModel.is_hub_app,
+                FederationAppModel.display_name,
+                FederationAppModel.description,
+                FederationAppModel.color,
             )
             .where(FederationAppModel.federation_id == federation_id)
             .order_by(
@@ -598,6 +610,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     fab_hash=app.fab_hash,
                     app_type=app.app_type,
                     is_hub_app=app.is_hub_app,
+                    display_name=app.display_name,
+                    description=app.description,
+                    color=app.color,
                 )
                 for app in apps
             ]
@@ -1977,7 +1992,7 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     return RunSeries(
         series_id=int64_to_uint64(row["series_id"]),
         federation=row["federation_id"],
-        description=row["description"] or "",
+        description=row["description"],
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
     )
@@ -2063,7 +2078,7 @@ def _task_message_from_snapshot(row: dict[str, Any], node_id: int) -> Message:
         message_id=row["message_id"],
         src_node_id=node_id,
         dst_node_id=node_id,
-        reply_to_message_id=row["reply_to_message_id"] or "",
+        reply_to_message_id=row["reply_to_message_id"],
         group_id="",  # Task messages don't have this field for now
         created_at=row["created_at"],
         ttl=row["ttl"],
