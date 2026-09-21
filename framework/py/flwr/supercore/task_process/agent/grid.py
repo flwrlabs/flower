@@ -62,26 +62,11 @@ def _grid_tools() -> list[JSONObject]:
             output_schema={
                 "type": "object",
                 "properties": {
-                    "nodes": {
+                    "node_ids": {
                         "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "id": string_property(
-                                    "Selected SuperNode uint64 ID as a decimal string."
-                                ),
-                                "name": {
-                                    "type": ["string", "null"],
-                                    "description": "SuperNode name, if configured.",
-                                },
-                                "location": {
-                                    "type": ["string", "null"],
-                                    "description": "SuperNode location, if configured.",
-                                },
-                            },
-                            "required": ["id", "name", "location"],
-                            "additionalProperties": False,
-                        },
+                        "items": string_property(
+                            "Selected SuperNode uint64 ID as a decimal string."
+                        ),
                         "description": "All or a random sample of SuperNodes.",
                     },
                     "num_available": {
@@ -90,7 +75,7 @@ def _grid_tools() -> list[JSONObject]:
                         "description": "Total number of available SuperNodes.",
                     },
                 },
-                "required": ["nodes", "num_available"],
+                "required": ["node_ids", "num_available"],
                 "additionalProperties": False,
             },
         ),
@@ -279,24 +264,17 @@ class RuntimeAgentGrid(AgentGrid):
         return output_item
 
     def _get_nodes(self, sample_size: int | None = None) -> JSONObject:
-        nodes = list(self._grid.get_nodes())
+        node_ids = list(self._grid.get_node_ids())
         if sample_size is not None and sample_size < 1:
             raise ValueError("Grid sample size must be positive.")
         selected = (
-            nodes
+            node_ids
             if sample_size is None
-            else random.sample(nodes, min(sample_size, len(nodes)))
+            else random.sample(node_ids, min(sample_size, len(node_ids)))
         )
         return {
-            "nodes": [
-                {
-                    "id": str(node.node_id),
-                    "name": node.name if node.HasField("name") else None,
-                    "location": node.location if node.HasField("location") else None,
-                }
-                for node in selected
-            ],
-            "num_available": len(nodes),
+            "node_ids": [str(node_id) for node_id in selected],
+            "num_available": len(node_ids),
         }
 
     def _push_messages(self, messages: list[JSONObject]) -> JSONObject:
