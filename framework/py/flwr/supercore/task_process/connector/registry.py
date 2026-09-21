@@ -30,7 +30,7 @@ from .definition import (
 from .loader import load_connectors
 from .oauth import OAuthFlow
 
-ConnectorToolFactory = Callable[[], list[JSONObject]]
+ConnectorToolFactory = Callable[[], JSONObject]
 
 
 CONNECTORS: tuple[ConnectorDefinition, ...] = load_connectors()
@@ -45,8 +45,6 @@ _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
-    filesystem.FILESYSTEM_LIST_DIRECTORY_TOOL_NAME: filesystem.list_directory,
-    filesystem.FILESYSTEM_READ_FILE_TOOL_NAME: filesystem.read_file,
 }
 _CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorExecutor] = {
     name: handler
@@ -63,15 +61,10 @@ _BUILTIN_CONNECTOR_REFS = {
     filesystem.FILESYSTEM_READ_FILE_TOOL_NAME: filesystem.FILESYSTEM_CONNECTOR_NAME,
 }
 _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
-    automation.START_AUTOMATION_TOOL_NAME: lambda: [
-        automation.make_start_automation_tool()
-    ],
-    web_search.WEB_SEARCH_CONNECTOR_NAME: lambda: [web_search.make_web_search_tool()],
-    web_fetch.WEB_FETCH_CONNECTOR_NAME: lambda: [web_fetch.make_web_fetch_tool()],
-    browser_use.BROWSER_USE_CONNECTOR_NAME: lambda: [
-        browser_use.make_browser_use_tool()
-    ],
-    filesystem.FILESYSTEM_CONNECTOR_NAME: filesystem.make_filesystem_tools,
+    automation.START_AUTOMATION_TOOL_NAME: automation.make_start_automation_tool,
+    web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.make_web_search_tool,
+    web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.make_web_fetch_tool,
+    browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.make_browser_use_tool,
 }
 
 
@@ -114,9 +107,11 @@ def get_connector_ref(name: str) -> str:
 
 def get_connector_tools(connector_ref: str) -> list[JSONObject]:
     """Return model-facing tools for one built-in or OAuth connector."""
-    make_builtin_tools = _BUILTIN_CONNECTOR_TOOL_FACTORIES.get(connector_ref)
-    if make_builtin_tools is not None:
-        return make_builtin_tools()
+    if connector_ref == filesystem.FILESYSTEM_CONNECTOR_NAME:
+        return filesystem.make_filesystem_tools()
+    make_builtin_tool = _BUILTIN_CONNECTOR_TOOL_FACTORIES.get(connector_ref)
+    if make_builtin_tool is not None:
+        return [make_builtin_tool()]
     connector = _CONNECTORS_BY_REF.get(connector_ref)
     if connector is None:
         raise ValueError(f"Unsupported connector '{connector_ref}'.")
@@ -125,22 +120,15 @@ def get_connector_tools(connector_ref: str) -> list[JSONObject]:
 
 def get_builtin_connector_tools() -> list[JSONObject]:
     """Return function tools for built-in connectors."""
-    return [
-        tool
-        for make_tools in _BUILTIN_CONNECTOR_TOOL_FACTORIES.values()
-        for tool in make_tools()
-    ]
+    return [make_tool() for make_tool in _BUILTIN_CONNECTOR_TOOL_FACTORIES.values()]
 
 
 def get_builtin_connector_tool(name: str) -> JSONObject:
     """Return the function tool for one built-in connector."""
-    make_tools = _BUILTIN_CONNECTOR_TOOL_FACTORIES.get(name)
-    if make_tools is None:
+    make_tool = _BUILTIN_CONNECTOR_TOOL_FACTORIES.get(name)
+    if make_tool is None:
         raise ValueError(f"Unsupported connector '{name}'.")
-    tools = make_tools()
-    if len(tools) != 1:
-        raise ValueError(f"Connector '{name}' has multiple tools.")
-    return tools[0]
+    return make_tool()
 
 
 def get_oauth_flow(connector_ref: str) -> OAuthFlow:
@@ -153,4 +141,4 @@ def get_oauth_flow(connector_ref: str) -> OAuthFlow:
 
 def has_builtin_connector(name: str) -> bool:
     """Return whether a built-in connector is registered."""
-    return name in _BUILTIN_CONNECTOR_TOOL_FACTORIES
+    return name in _CONNECTOR_HANDLERS

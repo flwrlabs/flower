@@ -96,20 +96,21 @@ def make_filesystem_tools() -> list[JSONObject]:
     ]
 
 
-def list_directory(path: str, *, usage_recorder: TaskUsageRecorder) -> JSONObject:
-    """List entries in an allowed directory."""
+def invoke_filesystem(
+    name: str, arguments: JSONObject, *, usage_recorder: TaskUsageRecorder
+) -> JSONObject:
+    """Invoke one filesystem tool."""
     del usage_recorder
     if not _PLATFORM_SUPPORTED:
         raise FilesystemApiError("unsupported_platform")
-    return _list_directory(path, _allowed_dirs())
-
-
-def read_file(path: str, *, usage_recorder: TaskUsageRecorder) -> JSONObject:
-    """Read one UTF-8 text file inside an allowed directory."""
-    del usage_recorder
-    if not _PLATFORM_SUPPORTED:
-        raise FilesystemApiError("unsupported_platform")
-    return _read_file(path, _allowed_dirs())
+    path = arguments.get("path")
+    if not isinstance(path, str):
+        raise FilesystemApiError("invalid_request")
+    if name == FILESYSTEM_LIST_DIRECTORY_TOOL_NAME:
+        return _list_directory(path, _allowed_dirs())
+    if name == FILESYSTEM_READ_FILE_TOOL_NAME:
+        return _read_file(path, _allowed_dirs())
+    raise FilesystemApiError("invalid_request")
 
 
 def _list_directory(path: str, allowed: list[str]) -> JSONObject:

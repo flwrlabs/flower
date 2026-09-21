@@ -32,9 +32,11 @@ def test_connector_tool_names_are_unique() -> None:
     assert len(tool_names) == len(set(tool_names))
 
 
-def test_filesystem_is_builtin_without_oauth() -> None:
-    """Filesystem should use the same credential-free path as web_search."""
-    assert registry.has_builtin_connector("filesystem")
+def test_filesystem_registry() -> None:
+    """Filesystem should be local and require no OAuth credentials."""
     assert "filesystem" not in registry.OAUTH_FLOWS
     assert registry.get_connector_ref("filesystem_list_directory") == "filesystem"
     assert registry.get_connector_ref("filesystem_read_file") == "filesystem"
+    assert not registry.has_builtin_connector("filesystem")
+    assert not registry.has_builtin_connector("filesystem_read_file")
+    assert not registry.has_builtin_connector("start_automation")

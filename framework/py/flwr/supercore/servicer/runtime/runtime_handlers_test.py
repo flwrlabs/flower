@@ -248,15 +248,6 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.state.get_run_connector_refs.assert_not_called()
         self.assertEqual(response.task_id, 456)
 
-    def test_create_task_allows_filesystem_connector(self) -> None:
-        """CreateTask should allow filesystem without OAuth or run binding."""
-        self.state.create_task.return_value = 456
-
-        response = self._create_connector_task("filesystem")
-
-        self.state.get_run_connector_refs.assert_not_called()
-        self.assertEqual(response.task_id, 456)
-
     def test_create_task_propagates_state_error(self) -> None:
         """CreateTask should let state-layer run validation errors propagate."""
         # Prepare

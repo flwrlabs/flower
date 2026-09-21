@@ -27,9 +27,8 @@ from .filesystem import (
     FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
     FILESYSTEM_READ_FILE_TOOL_NAME,
     FilesystemApiError,
-    list_directory,
+    invoke_filesystem,
     make_filesystem_tools,
-    read_file,
 )
 
 
@@ -41,11 +40,19 @@ def _allow(monkeypatch: pytest.MonkeyPatch, *dirs: Path) -> None:
 
 
 def _list(path: Path | str) -> JSONObject:
-    return list_directory(str(path), usage_recorder=Mock())
+    return invoke_filesystem(
+        FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
+        {"path": str(path)},
+        usage_recorder=Mock(),
+    )
 
 
 def _read(path: Path | str) -> JSONObject:
-    return read_file(str(path), usage_recorder=Mock())
+    return invoke_filesystem(
+        FILESYSTEM_READ_FILE_TOOL_NAME,
+        {"path": str(path)},
+        usage_recorder=Mock(),
+    )
 
 
 def test_tool_schema_lists_allowed_directories(
