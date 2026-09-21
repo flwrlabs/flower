@@ -21,6 +21,7 @@ import pytest
 
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
@@ -41,7 +42,10 @@ def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_runtime_agent_grid_tools() -> None:
     """Grid tools should sample nodes, send content, and return serialized replies."""
     grid = Mock()
-    grid.get_node_ids.return_value = [11, 22]
+    grid.get_nodes.return_value = [
+        NodeInfo(node_id=11, name="London", location="51.5072,-0.1276"),
+        NodeInfo(node_id=22),
+    ]
     grid.push_messages.return_value = ["message-1", ""]
     reply = Message(
         RecordDict(
@@ -69,7 +73,10 @@ def test_runtime_agent_grid_tools() -> None:
     all_nodes = agent_grid.call(
         {"name": "get_nodes", "call_id": "call-0", "arguments": {}}
     )
-    assert all_nodes["output"] == '{"node_ids":["11","22"],"num_available":2}'
+    assert all_nodes["output"] == (
+        '{"nodes":[{"id":"11","name":"London","location":"51.5072,-0.1276"},'
+        '{"id":"22","name":null,"location":null}],"num_available":2}'
+    )
 
     get_nodes = agent_grid.call(
         {
@@ -79,8 +86,9 @@ def test_runtime_agent_grid_tools() -> None:
         }
     )
     assert get_nodes["output"] in (
-        '{"node_ids":["11"],"num_available":2}',
-        '{"node_ids":["22"],"num_available":2}',
+        '{"nodes":[{"id":"11","name":"London",'
+        '"location":"51.5072,-0.1276"}],"num_available":2}',
+        '{"nodes":[{"id":"22","name":null,"location":null}],"num_available":2}',
     )
 
     pushed = agent_grid.call(
