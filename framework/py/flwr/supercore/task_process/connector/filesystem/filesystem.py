@@ -46,21 +46,26 @@ class FilesystemApiError(ConnectorApiError):
 def make_filesystem_tools() -> list[JSONObject]:
     """Return the filesystem function tool schemas."""
     allowed_dirs = ", ".join(_allowed_dirs())
-    path: JSONObject = {
-        "type": "string",
-        "minLength": 1,
-        "description": f"Absolute path within configured roots: {allowed_dirs}.",
-    }
     return [
         {
             "type": "function",
             "name": FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
             "description": (
-                "List the immediate entries of a local directory, sorted by name."
+                "List a local directory's immediate entries, sorted by name. Returns "
+                "each entry's name and type: file, directory, or other."
             ),
             "parameters": {
                 "type": "object",
-                "properties": {"path": path},
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": (
+                            "Absolute directory path within configured roots: "
+                            f"{allowed_dirs}."
+                        ),
+                    }
+                },
                 "required": ["path"],
                 "additionalProperties": False,
             },
@@ -69,11 +74,21 @@ def make_filesystem_tools() -> list[JSONObject]:
             "type": "function",
             "name": FILESYSTEM_READ_FILE_TOOL_NAME,
             "description": (
-                "Read the contents of one local UTF-8 text file up to 1 MiB."
+                "Read a local UTF-8 text file up to 1 MiB. Returns its content and "
+                "resolved absolute path."
             ),
             "parameters": {
                 "type": "object",
-                "properties": {"path": path},
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": (
+                            "Absolute file path within configured roots: "
+                            f"{allowed_dirs}."
+                        ),
+                    }
+                },
                 "required": ["path"],
                 "additionalProperties": False,
             },
