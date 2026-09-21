@@ -185,6 +185,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         owner_name: str,
         public_key: bytes,
         heartbeat_interval: float,
+        name: str | None = None,
     ) -> int:
         """Create, store in the link state, and return `node_id`."""
 

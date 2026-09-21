@@ -1135,7 +1135,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             )
 
         # Execute
-        req = RegisterNodeRequest(public_key=pub_key)
+        name = "Kings Cross"
+        req = RegisterNodeRequest(public_key=pub_key, name=name)
         ctx = Mock()
         if expected_code is not None:
             with self.assertRaises(FlowerError) as cm:
@@ -1144,6 +1145,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         else:
             response = self.servicer.RegisterNode(req, ctx)
             assert response.node_id
+            node = self.state.get_node_info(node_ids=[response.node_id])[0]
+            self.assertEqual(node.name, name)
 
     def test_register_node_denied_when_not_entitled(self) -> None:
         """Test RegisterNode raises when federation manager denies execution."""

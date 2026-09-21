@@ -1323,16 +1323,18 @@ class StateTest(CoreStateTest):
         # Prepare
         state: LinkState = self.state_factory()
         public_key = b"mock"
+        name = "Kings Cross"
 
         # Execute
         expected_registered_at = now().timestamp()
-        node_id = state.create_node("fake_aid", "fake_name", public_key, 10)
+        node_id = state.create_node("fake_aid", "fake_name", public_key, 10, name=name)
         node = state.get_node_info(node_ids=[node_id])[0]
         actual_registered_at = datetime.fromisoformat(node.registered_at).timestamp()
 
         # Assert
         assert node.node_id == node_id
         assert node.public_key == public_key
+        assert node.name == name
         self.assertAlmostEqual(actual_registered_at, expected_registered_at, 2)
 
     def test_create_node_public_key_twice(self) -> None:
