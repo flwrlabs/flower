@@ -84,9 +84,9 @@ class Grid(ABC):
     def get_node_ids(self) -> Iterable[int]:
         """Get node IDs."""
 
-    @abstractmethod
     def get_nodes(self) -> Iterable[NodeInfo]:
         """Get nodes."""
+        return (NodeInfo(node_id=node_id) for node_id in self.get_node_ids())
 
     @abstractmethod
     def push_messages(self, messages: Iterable[Message]) -> Iterable[str]:
