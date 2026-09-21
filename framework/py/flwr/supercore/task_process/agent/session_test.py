@@ -15,7 +15,7 @@
 """Runtime AgentApp session tests."""
 
 
-from unittest.mock import ANY, Mock, call, patch
+from unittest.mock import Mock, call, patch
 
 import pytest
 
@@ -414,5 +414,4 @@ def test_create_connector_response_executes_filesystem_locally() -> None:
     invoke_filesystem.assert_called_once_with(
         "filesystem_list_directory",
         {"path": "/allowed"},
-        usage_recorder=ANY,
     )

@@ -57,7 +57,6 @@ from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
     get_connector_tools,
 )
-from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
@@ -265,11 +264,7 @@ class AgentRuntime:
         name = name.strip().lower()
         connector_ref = get_connector_ref(name)
         if connector_ref == FILESYSTEM_CONNECTOR_REF:
-            return invoke_filesystem(
-                name,
-                arguments,
-                usage_recorder=TaskUsageRecorder(self._stub),
-            )
+            return invoke_filesystem(name, arguments)
 
         create_res = self._stub.CreateTask(
             CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=connector_ref)

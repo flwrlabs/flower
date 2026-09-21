@@ -19,7 +19,6 @@ from __future__ import annotations
 import os
 import stat
 
-from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 
 from ..http import ConnectorApiError
@@ -98,11 +97,8 @@ def make_filesystem_tools() -> list[JSONObject]:
     ]
 
 
-def invoke_filesystem(
-    name: str, arguments: JSONObject, *, usage_recorder: TaskUsageRecorder
-) -> JSONObject:
+def invoke_filesystem(name: str, arguments: JSONObject) -> JSONObject:
     """Invoke one filesystem tool."""
-    del usage_recorder
     if not _PLATFORM_SUPPORTED:
         raise FilesystemApiError("unsupported_platform")
     path = arguments.get("path")

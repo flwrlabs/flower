@@ -16,7 +16,6 @@
 
 import os
 from pathlib import Path
-from unittest.mock import Mock
 
 import pytest
 
@@ -43,7 +42,6 @@ def _list(path: Path | str) -> JSONObject:
     return invoke_filesystem(
         FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
         {"path": str(path)},
-        usage_recorder=Mock(),
     )
 
 
@@ -51,7 +49,6 @@ def _read(path: Path | str) -> JSONObject:
     return invoke_filesystem(
         FILESYSTEM_READ_FILE_TOOL_NAME,
         {"path": str(path)},
-        usage_recorder=Mock(),
     )
 
 
