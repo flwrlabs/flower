@@ -33,6 +33,7 @@ from flwr.cli.utils import validate_federation_name
 from flwr.common.config import (
     flatten_dict,
     fuse_dicts,
+    get_app_presentation_metadata,
     get_fab_config,
     get_metadata_from_config,
 )
@@ -705,6 +706,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             )
 
         if not is_stored_app and not is_cached_hub_app:
+            metadata = get_app_presentation_metadata(fab_config)
             state.store_app(
                 fab=fab,
                 federation_id=federation_id,
@@ -712,6 +714,9 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 app_type=app_type,
                 added_by=flwr_aid,
                 is_hub_app=is_hub_app,
+                display_name=metadata.display_name,
+                description=metadata.description,
+                color=metadata.color,
             )
 
         series_id = request.series_id if request.HasField("series_id") else None
@@ -1662,6 +1667,9 @@ def list_apps(
             app_id=FLOWER_AGENT_APP_ID,
             app_type=TaskType.AGENT_APP,
             is_hub_app=True,
+            display_name="Flower Agent",
+            description="Chat with Flower Agent",
+            color="yellow",
         )
         if limit is not None:
             apps = apps[: limit - 1]
@@ -1697,13 +1705,15 @@ def add_app(
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
     fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, request.app_id)
     try:
-        app_type = _get_app_type(get_fab_config(fab_file))
+        fab_config = get_fab_config(fab_file)
+        app_type = _get_app_type(fab_config)
     except ValueError as e:
         raise FlowerError(
             ApiErrorCode.INVALID_APP_SPEC,
             f"Failed to read app metadata: {e}",
         ) from e
 
+    metadata = get_app_presentation_metadata(fab_config)
     state.store_app(
         fab=Fab(hashlib.sha256(fab_file).hexdigest(), fab_file, verification_dict),
         federation_id=federation_id,
@@ -1711,6 +1721,9 @@ def add_app(
         app_type=app_type,
         added_by=account.flwr_aid,
         is_hub_app=True,
+        display_name=metadata.display_name,
+        description=metadata.description,
+        color=metadata.color,
     )
 
     return AddAppResponse()

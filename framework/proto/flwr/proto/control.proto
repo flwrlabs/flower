@@ -332,6 +332,9 @@ message AppInfo {
   // True for Hub apps, false for local/custom apps, and absent for legacy apps
   // whose provenance is unknown.
   optional bool is_hub_app = 4;
+  string display_name = 5;
+  string description = 6;
+  string color = 7;
 }
 message ListAppsRequest {
   string federation_id = 1;

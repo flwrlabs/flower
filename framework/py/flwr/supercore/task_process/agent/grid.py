@@ -19,11 +19,13 @@ from __future__ import annotations
 
 import random
 import time
+from logging import DEBUG
 from typing import cast
 
 from flwr.agentapp import AgentEvents, AgentGrid
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.serverapp import Grid
+from flwr.supercore import log
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
@@ -230,19 +232,23 @@ class RuntimeAgentGrid(AgentGrid):
             raise ValueError(f"Unsupported Grid tool '{name}'.")
 
         arguments_obj = cast(JSONObject, arguments)
+        arguments_json = strict_json_dumps(arguments_obj, compact=True)
+        log(DEBUG, "[AgentGrid] %s input: %s", name, arguments_json)
         self._events.emit(
             {
                 "type": "function_call",
                 "call_id": call_id,
                 "name": name,
-                "arguments": strict_json_dumps(arguments_obj, compact=True),
+                "arguments": arguments_json,
             }
         )
         output = cast(JSONObject, getattr(self, f"_{name}")(**arguments_obj))
+        output_json = strict_json_dumps(output, compact=True)
+        log(DEBUG, "[AgentGrid] %s output: %s", name, output_json)
         output_item: JSONObject = {
             "type": "function_call_output",
             "call_id": call_id,
-            "output": strict_json_dumps(output, compact=True),
+            "output": output_json,
         }
         self._events.emit(output_item)
         return output_item
