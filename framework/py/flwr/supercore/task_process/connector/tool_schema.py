@@ -20,7 +20,7 @@ from collections.abc import Sequence
 from flwr.supercore.typing import JSONObject
 
 
-def function_tool(
+def function_tool(  # pylint: disable=too-many-arguments
     name: str,
     description: str,
     *,
