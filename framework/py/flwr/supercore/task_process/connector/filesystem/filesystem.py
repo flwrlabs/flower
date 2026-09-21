@@ -48,8 +48,9 @@ def make_filesystem_tool() -> JSONObject:
         "type": "function",
         "name": FILESYSTEM_CONNECTOR_NAME,
         "description": (
-            "Read files and directories from the local file system within "
-            "configured allowed directories."
+            "Browse local directories and read files within configured filesystem "
+            "roots. Start by listing a configured root, then use returned paths to "
+            "navigate and read files."
         ),
         "parameters": {
             "type": "object",
@@ -58,17 +59,18 @@ def make_filesystem_tool() -> JSONObject:
                     "type": "string",
                     "enum": ["list_directory", "read_file"],
                     "description": (
-                        "The filesystem action to perform. 'list_directory' lists "
-                        "entries of a directory sorted by name. 'read_file' reads "
-                        "one UTF-8 text file and returns its content."
+                        "Filesystem operation. 'list_directory' returns the immediate "
+                        "entries of a directory sorted by name. 'read_file' returns "
+                        "the contents of one UTF-8 text file up to 1 MiB."
                     ),
                 },
                 "path": {
                     "type": "string",
                     "minLength": 1,
                     "description": (
-                        "Absolute path inside one of the allowed directories. "
-                        f"Configured allowed directories: {allowed_dirs}."
+                        "Absolute path to a file or directory. Start at a configured "
+                        "root and use paths returned by 'list_directory'. Configured "
+                        f"roots: {allowed_dirs}."
                     ),
                 },
             },
