@@ -61,13 +61,19 @@ def test_runtime_agent_grid_tools() -> None:
     events = Mock()
     agent_grid = RuntimeAgentGrid(grid, events, SUPERLINK_NODE_ID)
 
-    assert [tool["name"] for tool in agent_grid.tools()] == [
+    tools = agent_grid.tools()
+    assert [tool["name"] for tool in tools] == [
         "get_nodes",
         "push_messages",
         "pull_messages",
     ]
+    assert all(tool["strict"] is True for tool in tools)
     all_nodes = agent_grid.call(
-        {"name": "get_nodes", "call_id": "call-0", "arguments": {}}
+        {
+            "name": "get_nodes",
+            "call_id": "call-0",
+            "arguments": {"sample_size": None},
+        }
     )
     assert all_nodes["output"] == '{"node_ids":["11","22"],"num_available":2}'
 
@@ -92,6 +98,7 @@ def test_runtime_agent_grid_tools() -> None:
                     {
                         "dst_node_id": "11",
                         "payload": "hi",
+                        "reply_to_message_id": None,
                     },
                     {
                         "dst_node_id": "22",
