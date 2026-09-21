@@ -113,6 +113,7 @@ def test_runtime_agent_grid_tools() -> None:
     assert sent.metadata.group_id == ""
     assert sent.metadata.reply_to_message_id == ""
     assert second.metadata.reply_to_message_id == "message-0"
+    assert second.metadata.ttl == 21600
     assert (
         sent.content[AGENT_MESSAGE_CONTENT_RECORD_KEY][AGENT_MESSAGE_TEXT_KEY] == "hi"
     )

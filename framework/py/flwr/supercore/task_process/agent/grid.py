@@ -19,11 +19,13 @@ from __future__ import annotations
 
 import random
 import time
+from logging import DEBUG
 from typing import cast
 
 from flwr.agentapp import AgentEvents, AgentGrid
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.serverapp import Grid
+from flwr.supercore import log
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
@@ -99,11 +101,6 @@ def _grid_tools() -> list[JSONObject]:
                                 "replying to another message; otherwise, this field "
                                 "must not be set."
                             ),
-                            "ttl": {
-                                "type": "number",
-                                "exclusiveMinimum": 0,
-                                "description": "Optional round-trip TTL in seconds.",
-                            },
                         },
                         "required": ["dst_node_id", "payload"],
                         "additionalProperties": False,
@@ -235,19 +232,23 @@ class RuntimeAgentGrid(AgentGrid):
             raise ValueError(f"Unsupported Grid tool '{name}'.")
 
         arguments_obj = cast(JSONObject, arguments)
+        arguments_json = strict_json_dumps(arguments_obj, compact=True)
+        log(DEBUG, "[AgentGrid] %s input: %s", name, arguments_json)
         self._events.emit(
             {
                 "type": "function_call",
                 "call_id": call_id,
                 "name": name,
-                "arguments": strict_json_dumps(arguments_obj, compact=True),
+                "arguments": arguments_json,
             }
         )
         output = cast(JSONObject, getattr(self, f"_{name}")(**arguments_obj))
+        output_json = strict_json_dumps(output, compact=True)
+        log(DEBUG, "[AgentGrid] %s output: %s", name, output_json)
         output_item: JSONObject = {
             "type": "function_call_output",
             "call_id": call_id,
-            "output": strict_json_dumps(output, compact=True),
+            "output": output_json,
         }
         self._events.emit(output_item)
         return output_item
@@ -272,9 +273,6 @@ class RuntimeAgentGrid(AgentGrid):
 
         outgoing = []
         for item in messages:
-            ttl = cast(float | None, item.get("ttl"))
-            if ttl is not None and ttl <= 0:
-                raise ValueError("Grid message TTL must be positive.")
             config_record = ConfigRecord(
                 {AGENT_MESSAGE_TEXT_KEY: cast(str, item["payload"])}
             )
@@ -285,10 +283,13 @@ class RuntimeAgentGrid(AgentGrid):
                 dst_node_id=int(cast(str, item["dst_node_id"])),
                 message_type="query",  # Replace with an AgentGrid message type.
                 group_id="",
-                ttl=ttl,
             )
             reply_to_message_id = cast(str | None, item.get("reply_to_message_id"))
             if reply_to_message_id is not None:
+                # Temporary: use a 6-hour TTL for replies instead of the default
+                # 12 hours to avoid replies expiring after the original message,
+                # which SuperLink rejects.
+                message.metadata.ttl = 21600
                 message.metadata.__dict__["_reply_to_message_id"] = reply_to_message_id
             outgoing.append(message)
 
