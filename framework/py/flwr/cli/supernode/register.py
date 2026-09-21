@@ -55,6 +55,13 @@ def register(  # pylint: disable=R0914
         str | None,
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
+    location: Annotated[
+        str | None,
+        typer.Option(
+            "--location",
+            help='Location of the SuperNode, for example "London, UK".',
+        ),
+    ] = None,
     output_format: Annotated[
         Literal["default", "json"],
         typer.Option(
@@ -83,6 +90,7 @@ def register(  # pylint: disable=R0914
                 stub=control_client,
                 public_key=public_key_bytes,
                 is_json=is_json,
+                location=location,
             )
 
         finally:
@@ -90,11 +98,16 @@ def register(  # pylint: disable=R0914
                 control_client.close()
 
 
-def _register_node(stub: ControlHttpClient, public_key: bytes, is_json: bool) -> None:
+def _register_node(
+    stub: ControlHttpClient,
+    public_key: bytes,
+    is_json: bool,
+    location: str | None = None,
+) -> None:
     """Register a node."""
     with flwr_cli_exc_handler():
         response: RegisterNodeResponse = stub.RegisterNode(
-            request=RegisterNodeRequest(public_key=public_key)
+            request=RegisterNodeRequest(public_key=public_key, location=location)
         )
     if response.node_id:
         typer.secho(

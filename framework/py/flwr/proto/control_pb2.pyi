@@ -832,13 +832,18 @@ class RegisterNodeRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     PUBLIC_KEY_FIELD_NUMBER: builtins.int
+    LOCATION_FIELD_NUMBER: builtins.int
     public_key: builtins.bytes
+    location: builtins.str
     def __init__(
         self,
         *,
         public_key: builtins.bytes = ...,
+        location: builtins.str | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["public_key", b"public_key"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_location", b"_location", "location", b"location"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_location", b"_location", "location", b"location", "public_key", b"public_key"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_location", b"_location"]) -> typing.Literal["location"] | None: ...
 
 global___RegisterNodeRequest = RegisterNodeRequest
 

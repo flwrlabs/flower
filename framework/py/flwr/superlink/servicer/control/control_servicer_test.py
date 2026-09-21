@@ -1191,6 +1191,18 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             RegisterSupernodeContext(),
         )
 
+    def test_register_node_stores_location(self) -> None:
+        """Test RegisterNode stores the optional location."""
+        req = RegisterNodeRequest(
+            public_key=public_key_to_bytes(generate_key_pairs()[1]),
+            location="London, UK",
+        )
+
+        response = self.servicer.RegisterNode(req, Mock())
+
+        node = self.state.get_node_info(node_ids=[response.node_id])[0]
+        self.assertEqual(node.location, "London, UK")
+
     @parameterized.expand(
         [
             (True,),  # PASSES, uses registered node ID

@@ -310,7 +310,10 @@ message StopRunResponse { bool success = 1; }
 message PullArtifactsRequest { uint64 run_id = 1; }
 message PullArtifactsResponse { optional string url = 1; }
 
-message RegisterNodeRequest { bytes public_key = 1; }
+message RegisterNodeRequest {
+  bytes public_key = 1;
+  optional string location = 2;
+}
 message RegisterNodeResponse { optional uint64 node_id = 1; }
 
 message UnregisterNodeRequest { uint64 node_id = 1; }

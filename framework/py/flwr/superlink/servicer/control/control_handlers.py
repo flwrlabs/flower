@@ -1553,6 +1553,7 @@ def register_node(
             owner_name=account_name,
             public_key=request.public_key,
             heartbeat_interval=HEARTBEAT_DEFAULT_INTERVAL,
+            location=request.location if request.HasField("location") else None,
         )
 
     except ValueError as err:
