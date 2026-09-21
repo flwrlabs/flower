@@ -18,7 +18,6 @@
 from __future__ import annotations
 
 import json
-import random
 import time
 from collections.abc import Sequence
 from queue import Empty, Queue
@@ -28,7 +27,7 @@ from typing import cast
 from google.protobuf.json_format import ParseDict
 
 from flwr.agentapp import AgentConnectors, AgentEvents, AgentGrid, AgentSession
-from flwr.app import ConfigRecord, Message, RecordDict
+from flwr.app import Message
 from flwr.common.serde import message_from_proto, message_to_proto
 
 # pylint: disable=E0611
@@ -43,12 +42,7 @@ from flwr.proto.runtime_pb2 import (
 from flwr.proto.task_pb2 import TaskEvent
 
 # pylint: enable=E0611
-from flwr.serverapp import Grid
-from flwr.supercore.constant import (
-    AGENT_MESSAGE_CONTENT_RECORD_KEY,
-    AGENT_MESSAGE_TEXT_KEY,
-    TaskType,
-)
+from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
@@ -244,22 +238,18 @@ class RuntimeAgentConnectors(AgentConnectors):
 class AgentRuntime:
     """Coordinate AgentApp operations with Runtime services."""
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         *,
         stub: RuntimeHttpClient,
         run_id: int,
         task_id: int,
         start_run_request: StartRunRequest,
-        events: AgentEvents,
-        grid: Grid,
     ) -> None:
         self._stub = stub
         self._run_id = run_id
         self._task_id = task_id
         self._start_run_request = start_run_request
-        self._events = events
-        self._grid = grid
 
     def create_connector_response(
         self, *, name: str, call_id: str, arguments: JSONObject
@@ -310,154 +300,6 @@ class AgentRuntime:
             "output": strict_json_dumps(output, compact=True),
         }
 
-    def call_grid_with_events(
-        self,
-        *,
-        name: str,
-        call_id: str,
-        arguments: JSONObject,
-    ) -> JSONObject:
-        """Call a SuperNode tool and emit/persist its activity events."""
-        if name not in {"get_nodes", "push_messages", "pull_messages"}:
-            raise ValueError(f"Unsupported Grid tool '{name}'.")
-
-        function_call: JSONObject = {
-            "type": "function_call",
-            "call_id": call_id,
-            "name": name,
-            "arguments": strict_json_dumps(arguments, compact=True),
-        }
-        self.push_run_events([function_call])
-
-        try:
-            output = cast(JSONObject, getattr(self, f"_{name}")(**arguments))
-        except Exception:  # pylint: disable=broad-exception-caught
-            error_output: JSONObject = {
-                "error": {
-                    "code": "grid_error",
-                    "message": "Grid tool execution failed.",
-                }
-            }
-            self.push_run_events(
-                [
-                    {
-                        "type": "function_call_output",
-                        "call_id": call_id,
-                        "output": strict_json_dumps(error_output, compact=True),
-                    }
-                ]
-            )
-            raise
-
-        output_item: JSONObject = {
-            "type": "function_call_output",
-            "call_id": call_id,
-            "output": strict_json_dumps(output, compact=True),
-        }
-        self.push_run_events([output_item])
-        return output_item
-
-    def _get_nodes(self, sample_size: int | None = None) -> JSONObject:
-        """Return all or a sample of available SuperNode IDs."""
-        node_ids = list(self._grid.get_node_ids())
-        if sample_size is not None and sample_size < 1:
-            raise ValueError("Grid sample size must be positive.")
-        selected = (
-            node_ids
-            if sample_size is None
-            else random.sample(node_ids, min(sample_size, len(node_ids)))
-        )
-        return {
-            "node_ids": [str(node_id) for node_id in selected],
-            "num_available": len(node_ids),
-        }
-
-    def _push_messages(self, messages: list[JSONObject]) -> JSONObject:
-        """Push messages to SuperNodes."""
-        if not messages:
-            raise ValueError("At least one message is required.")
-
-        outgoing = []
-        for item in messages:
-            ttl = cast(float | None, item.get("ttl"))
-            if ttl is not None and ttl <= 0:
-                raise ValueError("Grid message TTL must be positive.")
-            config_record = ConfigRecord(
-                {AGENT_MESSAGE_TEXT_KEY: cast(str, item["payload"])}
-            )
-            content = RecordDict({AGENT_MESSAGE_CONTENT_RECORD_KEY: config_record})
-
-            message = Message(
-                content,
-                dst_node_id=int(cast(str, item["dst_node_id"])),
-                message_type="query",  # Replace with an AgentGrid message type.
-                group_id="",
-                ttl=ttl,
-            )
-            reply_to_message_id = cast(str | None, item.get("reply_to_message_id"))
-            if reply_to_message_id is not None:
-                message.metadata.__dict__["_reply_to_message_id"] = reply_to_message_id
-            outgoing.append(message)
-
-        message_ids = list(self._grid.push_messages(outgoing))
-        if len(message_ids) != len(outgoing):
-            raise RuntimeError("Grid returned an unexpected number of message IDs.")
-        return {
-            "results": [
-                {
-                    "message_id": message_id or None,
-                    "error": None if message_id else "Message was not accepted.",
-                }
-                for message_id in message_ids
-            ]
-        }
-
-    def _pull_messages(self, message_ids: list[str], timeout: float) -> JSONObject:
-        """Pull replies from SuperNodes until completion or timeout."""
-        if not 0 <= timeout <= 300:
-            raise ValueError("Grid pull timeout must be between 0 and 300 seconds.")
-        pending = set(message_ids)
-        replies: list[Message] = []
-        deadline = time.monotonic() + timeout
-        while pending:
-            pulled = list(self._grid.pull_messages(pending))
-            replies.extend(pulled)
-            pending.difference_update(
-                message.metadata.reply_to_message_id for message in pulled
-            )
-            remaining = deadline - time.monotonic()
-            if not pending or remaining <= 0:
-                break
-            time.sleep(min(0.25, remaining))
-
-        messages: list[JSONObject] = []
-        for message in replies:
-            payload = None
-            error = None
-            if message.has_error():
-                error = message.error.reason
-            else:
-                payload = cast(
-                    str,
-                    message.content[AGENT_MESSAGE_CONTENT_RECORD_KEY][
-                        AGENT_MESSAGE_TEXT_KEY
-                    ],
-                )
-            messages.append(
-                {
-                    "message_id": message.metadata.message_id,
-                    "reply_to_message_id": message.metadata.reply_to_message_id,
-                    "src_node_id": str(message.metadata.src_node_id),
-                    "payload": payload,
-                    "error": error,
-                }
-            )
-
-        return {
-            "messages": messages,
-            "pending_message_ids": sorted(pending),
-        }
-
     def call_automation_with_events(
         self, *, call_id: str, arguments: JSONObject
     ) -> JSONObject:
@@ -490,11 +332,6 @@ class AgentRuntime:
             "call_id": call_id,
             "output": strict_json_dumps(output, compact=True),
         }
-
-    def push_run_events(self, events: Sequence[JSONObject]) -> None:
-        """Queue structured run events for `StreamRunEvents` clients."""
-        for event in events:
-            self._events.emit(event)
 
     def _push_task_message(self, message: Message) -> None:
         """Push one task message and return its message ID."""

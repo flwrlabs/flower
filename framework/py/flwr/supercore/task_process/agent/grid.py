@@ -17,18 +17,25 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+import random
+import time
+from typing import cast
 
-from flwr.agentapp import AgentGrid
+from flwr.agentapp import AgentEvents, AgentGrid
+from flwr.app import ConfigRecord, Message, RecordDict
+from flwr.serverapp import Grid
+from flwr.supercore.constant import (
+    AGENT_MESSAGE_CONTENT_RECORD_KEY,
+    AGENT_MESSAGE_TEXT_KEY,
+)
 from flwr.supercore.task_process.connector.tool_schema import (
     function_tool,
     string_property,
 )
 from flwr.supercore.typing import JSONObject
-from flwr.supercore.utils import strict_json_loads
+from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
-if TYPE_CHECKING:
-    from .session import AgentRuntime
+_GRID_TOOL_NAMES = {"get_nodes", "push_messages", "pull_messages"}
 
 
 def _grid_tools() -> list[JSONObject]:
@@ -209,8 +216,9 @@ def _grid_tools() -> list[JSONObject]:
 class RuntimeAgentGrid(AgentGrid):
     """Expose selected Grid operations as model tools."""
 
-    def __init__(self, agent_runtime: AgentRuntime) -> None:
-        self._agent_runtime = agent_runtime
+    def __init__(self, grid: Grid, events: AgentEvents) -> None:
+        self._grid = grid
+        self._events = events
 
     def tools(self) -> list[JSONObject]:
         """Return model-facing Grid tool schemas."""
@@ -223,9 +231,121 @@ class RuntimeAgentGrid(AgentGrid):
             arguments = strict_json_loads(arguments)
         name = cast(str, tool_call["name"])
         call_id = cast(str, tool_call["call_id"])
+        if name not in _GRID_TOOL_NAMES:
+            raise ValueError(f"Unsupported Grid tool '{name}'.")
+
         arguments_obj = cast(JSONObject, arguments)
-        return self._agent_runtime.call_grid_with_events(
-            name=name,
-            call_id=call_id,
-            arguments=arguments_obj,
+        self._events.emit(
+            {
+                "type": "function_call",
+                "call_id": call_id,
+                "name": name,
+                "arguments": strict_json_dumps(arguments_obj, compact=True),
+            }
         )
+        output = cast(JSONObject, getattr(self, f"_{name}")(**arguments_obj))
+        output_item: JSONObject = {
+            "type": "function_call_output",
+            "call_id": call_id,
+            "output": strict_json_dumps(output, compact=True),
+        }
+        self._events.emit(output_item)
+        return output_item
+
+    def _get_nodes(self, sample_size: int | None = None) -> JSONObject:
+        node_ids = list(self._grid.get_node_ids())
+        if sample_size is not None and sample_size < 1:
+            raise ValueError("Grid sample size must be positive.")
+        selected = (
+            node_ids
+            if sample_size is None
+            else random.sample(node_ids, min(sample_size, len(node_ids)))
+        )
+        return {
+            "node_ids": [str(node_id) for node_id in selected],
+            "num_available": len(node_ids),
+        }
+
+    def _push_messages(self, messages: list[JSONObject]) -> JSONObject:
+        if not messages:
+            raise ValueError("At least one message is required.")
+
+        outgoing = []
+        for item in messages:
+            ttl = cast(float | None, item.get("ttl"))
+            if ttl is not None and ttl <= 0:
+                raise ValueError("Grid message TTL must be positive.")
+            config_record = ConfigRecord(
+                {AGENT_MESSAGE_TEXT_KEY: cast(str, item["payload"])}
+            )
+            content = RecordDict({AGENT_MESSAGE_CONTENT_RECORD_KEY: config_record})
+
+            message = Message(
+                content,
+                dst_node_id=int(cast(str, item["dst_node_id"])),
+                message_type="query",  # Replace with an AgentGrid message type.
+                group_id="",
+                ttl=ttl,
+            )
+            reply_to_message_id = cast(str | None, item.get("reply_to_message_id"))
+            if reply_to_message_id is not None:
+                message.metadata.__dict__["_reply_to_message_id"] = reply_to_message_id
+            outgoing.append(message)
+
+        message_ids = list(self._grid.push_messages(outgoing))
+        if len(message_ids) != len(outgoing):
+            raise RuntimeError("Grid returned an unexpected number of message IDs.")
+        return {
+            "results": [
+                {
+                    "message_id": message_id or None,
+                    "error": None if message_id else "Message was not accepted.",
+                }
+                for message_id in message_ids
+            ]
+        }
+
+    def _pull_messages(self, message_ids: list[str], timeout: float) -> JSONObject:
+        if not 0 <= timeout <= 300:
+            raise ValueError("Grid pull timeout must be between 0 and 300 seconds.")
+        pending = set(message_ids)
+        replies: list[Message] = []
+        deadline = time.monotonic() + timeout
+        while pending:
+            pulled = list(self._grid.pull_messages(pending))
+            replies.extend(pulled)
+            pending.difference_update(
+                message.metadata.reply_to_message_id for message in pulled
+            )
+            remaining = deadline - time.monotonic()
+            if not pending or remaining <= 0:
+                break
+            time.sleep(min(0.25, remaining))
+
+        messages: list[JSONObject] = []
+        for message in replies:
+            payload = None
+            error = None
+            if message.has_error():
+                error = message.error.reason
+            else:
+                payload = cast(
+                    str,
+                    message.content[AGENT_MESSAGE_CONTENT_RECORD_KEY][
+                        AGENT_MESSAGE_TEXT_KEY
+                    ],
+                )
+            messages.append(
+                {
+                    "message_id": message.metadata.message_id,
+                    "reply_to_message_id": message.metadata.reply_to_message_id,
+                    "src_node_id": str(message.metadata.src_node_id),
+                    "payload": payload,
+                    "error": error,
+                }
+            )
+
+        return {
+            "messages": messages,
+            "pending_message_ids": sorted(pending),
+        }

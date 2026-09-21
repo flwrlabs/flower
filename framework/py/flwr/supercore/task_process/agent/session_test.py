@@ -15,7 +15,7 @@
 """Runtime AgentApp session tests."""
 
 
-from unittest.mock import Mock, call, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -169,38 +169,6 @@ def test_get_trace_gets_current_run_series_events() -> None:
     ]
 
 
-def test_agent_events_and_grid_items_use_same_publisher() -> None:
-    """Publish explicit AgentApp events and Grid items through one publisher."""
-    stub = Mock()
-    events = Mock()
-    agent_runtime = AgentRuntime(
-        stub=stub,
-        run_id=123,
-        task_id=789,
-        start_run_request=StartRunRequest(),
-        events=events,
-        grid=Mock(),
-    )
-    model_event: JSONObject = {
-        "type": "response.output_text.delta",
-        "delta": "Hello",
-    }
-    grid_event: JSONObject = {
-        "type": "function_call",
-        "call_id": "call-1",
-        "name": "get_nodes",
-        "arguments": "{}",
-    }
-
-    events.emit(model_event)
-    agent_runtime.push_run_events([grid_event])
-
-    assert events.emit.call_args_list == [
-        call(model_event),
-        call(grid_event),
-    ]
-
-
 def test_pull_task_messages_filters_by_child_task() -> None:
     """Claim only messages sent by the expected child task."""
     stub = Mock()
@@ -210,8 +178,6 @@ def test_pull_task_messages_filters_by_child_task() -> None:
         run_id=123,
         task_id=789,
         start_run_request=StartRunRequest(),
-        events=Mock(),
-        grid=Mock(),
     )
 
     assert agent_runtime._pull_task_messages(456) == []  # pylint: disable=W0212
@@ -269,8 +235,6 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         run_id=123,
         task_id=789,
         start_run_request=start_run_request,
-        events=Mock(),
-        grid=Mock(),
     )
     arguments: JSONObject = {
         "input": "Do work",
@@ -313,8 +277,6 @@ def test_connector_call_returns_standard_output_item() -> None:
         run_id=123,
         task_id=789,
         start_run_request=StartRunRequest(),
-        events=Mock(),
-        grid=Mock(),
     )
     arguments: JSONObject = {"query": "Flower"}
 
@@ -341,8 +303,6 @@ def test_create_connector_response_resolves_canonical_name() -> None:
         run_id=123,
         task_id=789,
         start_run_request=StartRunRequest(),
-        events=Mock(),
-        grid=Mock(),
     )
     reply = ConnectorResponse(
         dst_task_id=789,
