@@ -16,10 +16,14 @@
 
 from unittest.mock import Mock, patch
 
+import click
+import pytest
 from typer.testing import CliRunner
 
 from flwr.cli.app import app
 from flwr.proto.control_pb2 import RegisterNodeResponse  # pylint: disable=E0611
+
+from .register import _register_node, _validate_location
 
 
 def test_register_command_sends_name() -> None:
@@ -55,3 +59,19 @@ def test_register_command_sends_name() -> None:
     assert result.exit_code == 0
     request = client.RegisterNode.call_args.kwargs["request"]
     assert request.name == "London SuperNode"
+
+
+def test_register_node_location() -> None:
+    """Validate and send the optional location."""
+    location = _validate_location("37.4056,-122.0775")
+    client = Mock()
+    client.RegisterNode.return_value = RegisterNodeResponse(node_id=1)
+
+    _register_node(client, b"public-key", False, location=location)
+
+    request = client.RegisterNode.call_args.kwargs["request"]
+    assert request.location == "37.4056,-122.0775"
+
+    for invalid_location in ("37.4056", "latitude,longitude", "91,-181", "nan,inf"):
+        with pytest.raises(click.BadParameter):
+            _validate_location(invalid_location)

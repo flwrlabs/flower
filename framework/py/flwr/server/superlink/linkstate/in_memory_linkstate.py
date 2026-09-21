@@ -500,6 +500,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         public_key: bytes,
         heartbeat_interval: float,
         *,
+        location: str | None = None,
         name: str | None = None,
     ) -> int:
         """Create, store in the link state, and return `node_id`."""
@@ -528,6 +529,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 online_until=None,
                 heartbeat_interval=heartbeat_interval,
                 public_key=public_key,
+                location=location,
                 name=name,
             )
             self.node_public_key_to_node_id[public_key] = node_id

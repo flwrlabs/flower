@@ -265,6 +265,11 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_400_BAD_REQUEST,
         public_message="A user prompt is required to start an AgentApp run.",
     ),
+    ApiErrorCode.INVALID_SUPERNODE_LOCATION: ApiErrorSpec(
+        status_code=StatusCode.INVALID_ARGUMENT,
+        http_status_code=status.HTTP_400_BAD_REQUEST,
+        public_message="Invalid SuperNode location.",
+    ),
     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
