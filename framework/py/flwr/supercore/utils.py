@@ -102,12 +102,10 @@ def validate_node_location(location: str) -> None:
             '"<latitude>,<longitude>".'
         ) from err
 
-    if (
-        not math.isfinite(latitude)
-        or not math.isfinite(longitude)
-        or not -90 <= latitude <= 90
-        or not -180 <= longitude <= 180
-    ):
+    if not math.isfinite(latitude) or not math.isfinite(longitude):
+        raise ValueError("Latitude and longitude must be finite numbers.")
+
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
         raise ValueError(
             "Latitude must be between -90 and 90 and longitude must be between "
             "-180 and 180."
