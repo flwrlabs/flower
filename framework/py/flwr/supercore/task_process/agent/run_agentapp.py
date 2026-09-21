@@ -285,7 +285,6 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
                 federation=run.federation_id,
                 series_id=run.series_id,
             ),
-            events=agent_events,
         )
         agent = RuntimeAgentSession(
             prompt=prompt,

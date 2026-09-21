@@ -15,7 +15,7 @@
 """Runtime AgentApp session tests."""
 
 
-from unittest.mock import Mock, call, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -169,37 +169,6 @@ def test_get_trace_gets_current_run_series_events() -> None:
     ]
 
 
-def test_agent_events_and_connector_items_use_same_publisher() -> None:
-    """Publish explicit AgentApp events and connector items through one publisher."""
-    stub = Mock()
-    events = Mock()
-    agent_runtime = AgentRuntime(
-        stub=stub,
-        run_id=123,
-        task_id=789,
-        start_run_request=StartRunRequest(),
-        events=events,
-    )
-    model_event: JSONObject = {
-        "type": "response.output_text.delta",
-        "delta": "Hello",
-    }
-    connector_event: JSONObject = {
-        "type": "function_call",
-        "call_id": "call-1",
-        "name": "web_search",
-        "arguments": '{"query":"Flower"}',
-    }
-
-    events.emit(model_event)
-    agent_runtime.push_run_events([connector_event])
-
-    assert events.emit.call_args_list == [
-        call(model_event),
-        call(connector_event),
-    ]
-
-
 def test_pull_task_messages_filters_by_child_task() -> None:
     """Claim only messages sent by the expected child task."""
     stub = Mock()
@@ -209,7 +178,6 @@ def test_pull_task_messages_filters_by_child_task() -> None:
         run_id=123,
         task_id=789,
         start_run_request=StartRunRequest(),
-        events=Mock(),
     )
 
     assert agent_runtime._pull_task_messages(456) == []  # pylint: disable=W0212
@@ -251,7 +219,7 @@ def test_runtime_connectors_expand_one_connector_into_multiple_tools() -> None:
     get_connector_tools.assert_called_once_with("example")
 
 
-def test_call_automation_embeds_input_in_control_request() -> None:
+def test_call_tool_embeds_automation_input_in_control_request() -> None:
     """Embed model input in the Control request sent to the Runtime API."""
     # Prepare
     stub = Mock()
@@ -267,7 +235,6 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         run_id=123,
         task_id=789,
         start_run_request=start_run_request,
-        events=Mock(),
     )
     arguments: JSONObject = {
         "input": "Do work",
@@ -277,8 +244,11 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     }
 
     # Execute
-    with patch.object(agent_runtime, "push_run_events") as push_run_events:
-        agent_runtime.call_automation_with_events(call_id="call-1", arguments=arguments)
+    output = agent_runtime.call_tool(
+        name=START_AUTOMATION_TOOL_NAME,
+        call_id="call-1",
+        arguments=arguments,
+    )
 
     # Assert
     request = stub.StartAutomation.call_args.args[0]
@@ -286,6 +256,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         start_at="2026-07-28T12:00:00Z",
         fixed_interval=60,
         max_runs=3,
+        tool_call_id="call-1",
         start_run_request=StartRunRequest(
             app_spec="example/app",
             override_config=user_config_to_proto({"existing": "value"}),
@@ -294,32 +265,27 @@ def test_call_automation_embeds_input_in_control_request() -> None:
             user_prompt="Do work",
         ),
     )
-    items = [item.args[0][0] for item in push_run_events.call_args_list]
-    assert [item["type"] for item in items] == [
-        "function_call",
-        "function_call_output",
-    ]
-    assert items[0]["name"] == START_AUTOMATION_TOOL_NAME
+    assert output == {
+        "type": "function_call_output",
+        "call_id": "call-1",
+        "output": '{"automation_id":0,"series_id":0,"next_run_at":""}',
+    }
 
 
-def test_connector_call_emits_standard_items() -> None:
-    """Emit standard function call and output items."""
+def test_call_tool_returns_connector_output_item() -> None:
+    """Return the standard output item while Runtime persists the events."""
     agent_runtime = AgentRuntime(
         stub=Mock(),
         run_id=123,
         task_id=789,
         start_run_request=StartRunRequest(),
-        events=Mock(),
     )
     arguments: JSONObject = {"query": "Flower"}
 
-    with (
-        patch.object(
-            agent_runtime, "create_connector_response", return_value={"results": []}
-        ),
-        patch.object(agent_runtime, "push_run_events") as push_run_events,
+    with patch.object(
+        agent_runtime, "create_connector_response", return_value={"results": []}
     ):
-        output = agent_runtime.call_connector_with_events(
+        output = agent_runtime.call_tool(
             name="notion_search", call_id="call-1", arguments=arguments
         )
 
@@ -328,19 +294,6 @@ def test_connector_call_emits_standard_items() -> None:
         "call_id": "call-1",
         "output": '{"results":[]}',
     }
-    assert push_run_events.call_args_list == [
-        call(
-            [
-                {
-                    "type": "function_call",
-                    "call_id": "call-1",
-                    "name": "notion_search",
-                    "arguments": '{"query":"Flower"}',
-                }
-            ]
-        ),
-        call([output]),
-    ]
 
 
 def test_create_connector_response_resolves_canonical_name() -> None:
@@ -352,7 +305,6 @@ def test_create_connector_response_resolves_canonical_name() -> None:
         run_id=123,
         task_id=789,
         start_run_request=StartRunRequest(),
-        events=Mock(),
     )
     reply = ConnectorResponse(
         dst_task_id=789,

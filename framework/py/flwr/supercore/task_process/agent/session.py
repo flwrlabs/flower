@@ -223,12 +223,7 @@ class RuntimeAgentConnectors(AgentConnectors):
         call_id = cast(str, tool_call["call_id"])
         arguments_obj = cast(JSONObject, arguments)
 
-        if name == START_AUTOMATION_TOOL_NAME:
-            return self._agent_runtime.call_automation_with_events(
-                call_id=call_id,
-                arguments=arguments_obj,
-            )
-        return self._agent_runtime.call_connector_with_events(
+        return self._agent_runtime.call_tool(
             name=name,
             call_id=call_id,
             arguments=arguments_obj,
@@ -238,20 +233,18 @@ class RuntimeAgentConnectors(AgentConnectors):
 class AgentRuntime:
     """Coordinate AgentApp operations with Runtime services."""
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         *,
         stub: RuntimeHttpClient,
         run_id: int,
         task_id: int,
         start_run_request: StartRunRequest,
-        events: AgentEvents,
     ) -> None:
         self._stub = stub
         self._run_id = run_id
         self._task_id = task_id
         self._start_run_request = start_run_request
-        self._events = events
 
     def create_connector_response(
         self, *, name: str, call_id: str, arguments: JSONObject
@@ -285,114 +278,40 @@ class AgentRuntime:
 
         return response_payload["output"]
 
-    def call_connector_with_events(
+    def call_tool(
         self, *, name: str, call_id: str, arguments: JSONObject
     ) -> JSONObject:
-        """Call a connector and emit/persist its activity events."""
+        """Execute a tool whose events are persisted by Runtime handlers."""
         name = name.strip().lower()
-        function_call: JSONObject = {
-            "type": "function_call",
-            "call_id": call_id,
-            "name": name,
-            "arguments": strict_json_dumps(arguments, compact=True),
-        }
-        self.push_run_events([function_call])
-
-        try:
+        if name == START_AUTOMATION_TOOL_NAME:
+            request_data = dict(arguments)
+            input_value = cast(str, request_data.pop("input"))
+            request = ParseDict(
+                request_data,
+                StartAutomationRequest(
+                    start_run_request=self._start_run_request,
+                    tool_call_id=call_id,
+                ),
+            )
+            request.start_run_request.user_prompt = input_value
+            response = self._stub.StartAutomation(request)
+            output: JSONValue = {
+                "automation_id": response.automation_id,
+                "series_id": response.series_id,
+                "next_run_at": response.next_run_at,
+            }
+        else:
             output = self.create_connector_response(
                 name=name,
                 call_id=call_id,
                 arguments=arguments,
             )
-        except Exception:  # pylint: disable=broad-exception-caught
-            error_output: JSONObject = {
-                "error": {
-                    "code": "connector_error",
-                    "message": "Connector execution failed.",
-                }
-            }
-            self.push_run_events(
-                [
-                    {
-                        "type": "function_call_output",
-                        "call_id": call_id,
-                        "output": strict_json_dumps(error_output, compact=True),
-                    }
-                ]
-            )
-            raise
 
-        output_item: JSONObject = {
+        return {
             "type": "function_call_output",
             "call_id": call_id,
             "output": strict_json_dumps(output, compact=True),
         }
-        self.push_run_events([output_item])
-        return output_item
-
-    def call_automation_with_events(
-        self, *, call_id: str, arguments: JSONObject
-    ) -> JSONObject:
-        """Create an automation and emit/persist its activity events."""
-        function_call: JSONObject = {
-            "type": "function_call",
-            "call_id": call_id,
-            "name": START_AUTOMATION_TOOL_NAME,
-            "arguments": strict_json_dumps(arguments, compact=True),
-        }
-        self.push_run_events([function_call])
-        try:
-            input_value = arguments.get("input")
-            if not isinstance(input_value, str) or not input_value.strip():
-                raise ValueError("Automation input must be a non-empty string.")
-            start_at = arguments.get("start_at")
-            if not isinstance(start_at, str) or not start_at.strip():
-                raise ValueError("Automation start_at must be a non-empty string.")
-            request_data = dict(arguments)
-            del request_data["input"]
-            request = ParseDict(
-                request_data,
-                StartAutomationRequest(
-                    start_run_request=self._start_run_request,
-                ),
-            )
-            request.start_run_request.user_prompt = input_value.strip()
-            response = self._stub.StartAutomation(request)
-            output: JSONObject = {
-                "automation_id": response.automation_id,
-                "series_id": response.series_id,
-                "next_run_at": response.next_run_at,
-            }
-        except Exception:  # pylint: disable=broad-exception-caught
-            error_output: JSONObject = {
-                "error": {
-                    "code": "automation_error",
-                    "message": "Automation execution failed.",
-                }
-            }
-            self.push_run_events(
-                [
-                    {
-                        "type": "function_call_output",
-                        "call_id": call_id,
-                        "output": strict_json_dumps(error_output, compact=True),
-                    }
-                ]
-            )
-            raise
-
-        output_item: JSONObject = {
-            "type": "function_call_output",
-            "call_id": call_id,
-            "output": strict_json_dumps(output, compact=True),
-        }
-        self.push_run_events([output_item])
-        return output_item
-
-    def push_run_events(self, events: Sequence[JSONObject]) -> None:
-        """Queue structured run events for `StreamRunEvents` clients."""
-        for event in events:
-            self._events.emit(event)
 
     def _push_task_message(self, message: Message) -> None:
         """Push one task message and return its message ID."""

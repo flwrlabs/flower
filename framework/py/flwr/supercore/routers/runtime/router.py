@@ -196,7 +196,12 @@ def runtime_start_automation(
     task: TaskDependency,
 ) -> StartAutomationResponse:
     """Start an automation from a Runtime task."""
-    return handlers.start_automation(request, state, task)
+    return core_runtime_handlers.call_automation_with_events(
+        request,
+        state,
+        task,
+        lambda: handlers.start_automation(request, state, task),
+    )
 
 
 @router.post("/push-task-message")
