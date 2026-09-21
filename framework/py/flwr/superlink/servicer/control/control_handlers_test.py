@@ -21,6 +21,7 @@ from datetime import timedelta
 from typing import Any, cast
 from unittest.mock import Mock, call, patch
 
+from flwr.common.capability import capability_binding
 from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
     NOOP_ACCOUNT_NAME,
@@ -384,6 +385,56 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
             [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
         )
+
+    def test_start_run_logs_sanitized_capability_acceptance(self) -> None:
+        """Log the accepted trust binding without opaque package contents."""
+        fab_content = b"stored FAB"
+        fab_hash = hashlib.sha256(fab_content).hexdigest()
+        participant_id = "flwr-p384-spki-pem-sha256:" + "b" * 64
+        binding = capability_binding(NOOP_FEDERATION_ID, fab_hash)
+        self.state.store_app(
+            fab=Fab(fab_hash, fab_content, {}),
+            federation_id=NOOP_FEDERATION_ID,
+            app_id="@flwr/demo",
+            app_type=TaskType.SERVER_APP,
+            added_by=self.account.flwr_aid,
+        )
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/demo", "v0.0.1"),
+            ),
+            patch("flwr.superlink.servicer.control.control_handlers.log") as mock_log,
+        ):
+            request = StartRunRequest(federation=NOOP_FEDERATION_ID)
+            request.app_spec = "@flwr/demo==0.0.1"
+            request.fab.hash_str = fab_hash
+            request.capability_packages[participant_id] = b"raw-secret-package"
+            response = start_run(request, self.account, self.state, None)
+
+        capability_calls = [
+            item.args
+            for item in mock_log.call_args_list
+            if "[CAPABILITY]" in str(item.args)
+        ]
+        self.assertEqual(len(capability_calls), 1)
+        rendered = str(capability_calls[0])
+        self.assertIn("StartRun accepted", rendered)
+        self.assertIn(str(response.run_id), rendered)
+        self.assertIn(NOOP_FEDERATION_ID, rendered)
+        self.assertIn(fab_hash[:12], rendered)
+        self.assertIn(binding[-64:-52], rendered)
+        self.assertIn("participants=%s", rendered)
+        self.assertNotIn(fab_hash, rendered)
+        self.assertNotIn(binding, rendered)
+        self.assertNotIn(participant_id, rendered)
+        self.assertNotIn("raw-secret-package", rendered)
 
     def test_start_run_uses_and_refreshes_stale_hub_fab(self) -> None:
         """Start from the cached FAB and refresh it in the background."""

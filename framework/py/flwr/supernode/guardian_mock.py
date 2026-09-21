@@ -25,6 +25,8 @@ import json
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from flwr.common.capability import CAPABILITY_LOG_PREFIX, safe_digest_prefix
+
 from .guardian import GUARDIAN_PROTOCOL_VERSION
 
 
@@ -48,9 +50,18 @@ class GuardianMockHandler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.BAD_REQUEST)
             return
 
+        denied = capability.startswith("deny:")
+        presented_binding = capability.removeprefix("deny:")
+        print(
+            f"{CAPABILITY_LOG_PREFIX} GuardianMock verify "
+            f"protocol={GUARDIAN_PROTOCOL_VERSION} "
+            f"decision={'deny' if denied else 'allow'} "
+            f"returned_binding={safe_digest_prefix(presented_binding)}",
+            flush=True,
+        )
         response = {
             "version": GUARDIAN_PROTOCOL_VERSION,
-            "allowed": not capability.startswith("deny:"),
+            "allowed": not denied,
             "binding": capability,
         }
         body = json.dumps(response).encode("utf-8")

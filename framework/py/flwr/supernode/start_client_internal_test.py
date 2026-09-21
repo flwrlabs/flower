@@ -424,6 +424,8 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
                 "os.environ", {"FLWR_GUARDIAN_URL": "http://guardian"}, clear=True
             ),
             patch("urllib.request.urlopen", return_value=response),
+            patch("flwr.supernode.guardian.log") as guardian_log,
+            patch("flwr.supernode.start_client_internal.log") as mock_log,
         ):
             res = _pull_and_store_message(
                 state=self.mock_state,
@@ -443,6 +445,67 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state.store_run.assert_not_called()
         stored_message = self.mock_state.store_message.call_args.args[0]
         assert stored_message.error == CAPABILITY_VERIFICATION_ERROR
+        rendered = " ".join(str(call.args) for call in mock_log.call_args_list)
+        assert "verification=required" in rendered
+        assert "blocking_fab_retrieval=true" in rendered
+        assert "verification=denied" in rendered
+        assert "fab_retrieval=skipped" in rendered
+        assert "task_creation=skipped" in rendered
+        assert "fail_closed=true" in rendered
+        assert "opaque" not in rendered
+        guardian_rendered = " ".join(
+            str(call.args) for call in guardian_log.call_args_list
+        )
+        assert "Guardian response" in guardian_rendered
+        assert "binding_check" not in guardian_rendered
+
+    def test_guardian_binding_mismatch_prevents_fab_and_task(self) -> None:
+        """Log match=false before failing closed at the SuperNode boundary."""
+        self._prepare_for_pull_and_store_message()
+        self.mock_state.get_run.return_value = None
+        run = Run.create_empty(self.run_id)
+        run.capability_required = True
+        run.capability_package = b"opaque"
+        run.capability_binding = "flwr-capability-binding-v1-sha256:" + "a" * 64
+        self.mock_get_run.return_value = run
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = (
+            b'{"version":"v1","allowed":true,'
+            b'"binding":"flwr-capability-binding-v1-sha256:' + b"b" * 64 + b'"}'
+        )
+
+        with (
+            patch.dict(
+                "os.environ", {"FLWR_GUARDIAN_URL": "http://guardian"}, clear=True
+            ),
+            patch("urllib.request.urlopen", return_value=response),
+            patch("flwr.supernode.guardian.log") as guardian_log,
+        ):
+            result = _pull_and_store_message(
+                state=self.mock_state,
+                object_store=self.mock_object_store,
+                node_config={},
+                receive=self.mock_receive,
+                get_run=self.mock_get_run,
+                get_fab=self.mock_get_fab,
+                pull_object=self.mock_pull_object,
+                confirm_message_received=self.mock_confirm_message_received,
+                trusted_entities={},
+            )
+
+        assert result == self.run_id
+        self.mock_get_fab.assert_not_called()
+        self.mock_state.create_task.assert_not_called()
+        self.mock_state.store_run.assert_not_called()
+        stored_message = self.mock_state.store_message.call_args.args[0]
+        assert stored_message.error == CAPABILITY_VERIFICATION_ERROR
+        match_calls = [
+            call.args
+            for call in guardian_log.call_args_list
+            if "binding_check" in str(call.args)
+        ]
+        assert len(match_calls) == 1
+        assert match_calls[0][-1] == "false"
 
     def test_pull_and_store_message_rejects_unverified_fab(self) -> None:
         """Test that trusted-entity verification rejects invalid FAB signatures."""

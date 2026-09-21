@@ -14,10 +14,14 @@
 # ==============================================================================
 """Integration test for the executable MLCommons capability POC harness."""
 
+import pytest
+
 from dev.run_mlcommons_capability_poc import run_smoke
 
 
-def test_capability_poc_allowed_and_denied_paths() -> None:
+def test_capability_poc_allowed_and_denied_paths(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Exercise CLI submission, routing, Guardian allow, and fail-closed denial."""
     result = run_smoke()
     scenarios = result["scenarios"]
@@ -27,3 +31,10 @@ def test_capability_poc_allowed_and_denied_paths() -> None:
     assert scenarios["allowed"]["fab_retrieved"]
     assert not scenarios["denied"]["task_created"]
     assert not scenarios["denied"]["fab_retrieved"]
+    output = capsys.readouterr().out
+    assert "[CAPABILITY] GuardianMock verify" in output
+    assert "decision=allow" in output
+    assert "decision=deny" in output
+    assert result["binding"][-64:-52] in output
+    assert result["binding"] not in output
+    assert "PRIVATE KEY" not in output

@@ -14,7 +14,7 @@
 # ==============================================================================
 """Tests for the temporary capability contracts."""
 
-from .capability import capability_binding
+from .capability import capability_binding, safe_digest_prefix
 
 
 def test_capability_binding_v1_golden_vector() -> None:
@@ -28,3 +28,11 @@ def test_capability_binding_v1_golden_vector() -> None:
         "flwr-capability-binding-v1-sha256:"
         "903193ce7786ff344fdb2cd1263b6769634c5186e5310615f29ce1392e13518a"
     )
+
+
+def test_safe_digest_prefix_uses_exactly_twelve_hex_characters() -> None:
+    """Keep canonical values intact while shortening human-readable logs."""
+    digest = "0123456789abcdef" * 4
+
+    assert safe_digest_prefix(digest) == "0123456789ab"
+    assert safe_digest_prefix(f"kind:{digest}") == "0123456789ab"

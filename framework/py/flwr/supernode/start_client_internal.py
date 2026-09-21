@@ -34,6 +34,7 @@ from flwr.app import Context, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.client.grpc_adapter_client.connection import grpc_adapter
 from flwr.client.grpc_rere_client.connection import grpc_request_response
+from flwr.common.capability import CAPABILITY_LOG_PREFIX
 from flwr.common.config import get_fused_config_from_fab
 from flwr.common.constant import (
     ISOLATION_MODE_SUBPROCESS,
@@ -354,13 +355,38 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             # Pull run info from SuperLink
             run_info = get_run(run_id)
 
+            if run_info.capability_required:
+                log(
+                    INFO,
+                    "%s SuperNode run_id=%s verification=required "
+                    "blocking_fab_retrieval=true",
+                    CAPABILITY_LOG_PREFIX,
+                    run_id,
+                )
             try:
                 verify_capability(run_info)
             except GuardianVerificationError as err:
-                log(ERROR, "Capability verification failed: %s", err)
+                log(
+                    ERROR,
+                    "%s SuperNode run_id=%s verification=denied "
+                    "fab_retrieval=skipped task_creation=skipped fail_closed=true "
+                    "reason=%s",
+                    CAPABILITY_LOG_PREFIX,
+                    run_id,
+                    err,
+                )
                 reply = Message(CAPABILITY_VERIFICATION_ERROR, reply_to=message)
                 _insert_message(reply, state, object_store)
                 return run_id
+
+            if run_info.capability_required:
+                log(
+                    INFO,
+                    "%s SuperNode run_id=%s verification=accepted "
+                    "fab_retrieval=unblocked",
+                    CAPABILITY_LOG_PREFIX,
+                    run_id,
+                )
 
             # Pull and store the FAB
             fab = get_fab(run_info.fab_hash, run_id)

@@ -15,10 +15,15 @@
 """Fleet API message handlers."""
 
 from dataclasses import replace
-from logging import ERROR
+from logging import ERROR, INFO
 
 from flwr.app import Message
-from flwr.common.capability import capability_binding, participant_id_from_public_key
+from flwr.common.capability import (
+    CAPABILITY_LOG_PREFIX,
+    capability_binding,
+    participant_id_from_public_key,
+    safe_digest_prefix,
+)
 from flwr.common.constant import (
     HEARTBEAT_MAX_INTERVAL,
     HEARTBEAT_MIN_INTERVAL,
@@ -246,11 +251,22 @@ def get_run(request: GetRunRequest, state: LinkState) -> GetRunResponse:
         nodes = state.get_node_info(node_ids=[request.node.node_id])
         public_key = nodes[0].public_key if nodes else b""
         participant_id = participant_id_from_public_key(public_key)
+        package = run.capability_packages.get(participant_id, b"")
         run = replace(
             run,
-            capability_package=run.capability_packages.get(participant_id, b""),
+            capability_package=package,
             capability_required=True,
             capability_binding=capability_binding(run.federation_id, run.fab_hash),
+        )
+        log(
+            INFO,
+            "%s GetRun route run_id=%s node_id=%s participant=%s match=%s%s",
+            CAPABILITY_LOG_PREFIX,
+            request.run_id,
+            request.node.node_id,
+            safe_digest_prefix(participant_id),
+            "found" if package else "missing",
+            " fail_closed=true" if not package else "",
         )
 
     return GetRunResponse(run=run_to_proto(run))

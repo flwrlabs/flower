@@ -50,7 +50,7 @@ def test_run_without_capability_keeps_existing_behavior() -> None:
     verify_capability(Run.create_empty(1))
 
 
-def test_guardian_mock_round_trip() -> None:
+def test_guardian_mock_round_trip(capsys: pytest.CaptureFixture[str]) -> None:
     """Verify a capability through the real local HTTP mock contract."""
     server = ThreadingHTTPServer(("127.0.0.1", 0), GuardianMockHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -66,6 +66,14 @@ def test_guardian_mock_round_trip() -> None:
         server.shutdown()
         server.server_close()
         thread.join()
+    output = capsys.readouterr().out
+    assert "[CAPABILITY] GuardianMock verify" in output
+    assert "protocol=v1" in output
+    assert "decision=allow" in output
+    assert "returned_binding=" + "a" * 12 in output
+    assert "match=" not in output
+    assert BINDING not in output
+    assert "PRIVATE KEY" not in output
 
 
 @patch.dict("os.environ", {"FLWR_GUARDIAN_URL": "http://guardian"}, clear=True)
@@ -76,7 +84,114 @@ def test_guardian_allows_matching_binding(urlopen: MagicMock) -> None:
         {"version": "v1", "allowed": True, "binding": BINDING}
     )
 
-    verify_capability(_run())
+    with patch("flwr.supernode.guardian.log") as mock_log:
+        verify_capability(_run())
+
+    calls = [call.args for call in mock_log.call_args_list]
+    assert any("Guardian call" in str(call) for call in calls)
+    response_index = next(
+        index for index, call in enumerate(calls) if "Guardian response" in str(call)
+    )
+    match_index = next(
+        index for index, call in enumerate(calls) if "binding_check" in str(call)
+    )
+    assert response_index < match_index
+    rendered = " ".join(str(call) for call in calls)
+    assert "http://guardian/v1/verify" in rendered
+    assert "allowed=%s" in rendered
+    assert "binding_check expected=%s returned=%s match=%s" in rendered
+    assert calls[match_index][-1] == "true"
+    assert "a" * 12 in rendered
+    assert BINDING not in rendered
+    assert "b3BhcXVl" not in rendered
+
+
+@patch.dict("os.environ", {"FLWR_GUARDIAN_URL": "http://guardian"}, clear=True)
+@patch("urllib.request.urlopen")
+def test_guardian_mismatch_logs_supernode_match_false(urlopen: MagicMock) -> None:
+    """Attribute a mismatched returned binding to the SuperNode comparison."""
+    returned_binding = "flwr-capability-binding-v1-sha256:" + "b" * 64
+    urlopen.return_value = _response(
+        {"version": "v1", "allowed": True, "binding": returned_binding}
+    )
+
+    with (
+        patch("flwr.supernode.guardian.log") as mock_log,
+        pytest.raises(GuardianVerificationError, match="mismatched job binding"),
+    ):
+        verify_capability(_run())
+
+    rendered_calls = [str(call.args) for call in mock_log.call_args_list]
+    response_index = next(
+        index
+        for index, call in enumerate(rendered_calls)
+        if "Guardian response" in call
+    )
+    match_index = next(
+        index for index, call in enumerate(rendered_calls) if "binding_check" in call
+    )
+    assert response_index < match_index
+    assert mock_log.call_args_list[match_index].args[-1] == "false"
+    rendered = " ".join(rendered_calls)
+    assert "a" * 12 in rendered
+    assert "b" * 12 in rendered
+    assert BINDING not in rendered
+    assert returned_binding not in rendered
+
+
+@patch.dict("os.environ", {"FLWR_GUARDIAN_URL": "http://guardian"}, clear=True)
+@patch("urllib.request.urlopen")
+def test_guardian_denial_does_not_log_successful_binding_match(
+    urlopen: MagicMock,
+) -> None:
+    """Stop after the neutral Guardian denial response without comparing bindings."""
+    urlopen.return_value = _response(
+        {"version": "v1", "allowed": False, "binding": BINDING}
+    )
+
+    with (
+        patch("flwr.supernode.guardian.log") as mock_log,
+        pytest.raises(GuardianVerificationError, match="denied"),
+    ):
+        verify_capability(_run())
+
+    rendered = " ".join(str(call.args) for call in mock_log.call_args_list)
+    assert "Guardian response" in rendered
+    assert "binding_check" not in rendered
+    assert "match=true" not in rendered
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "FLWR_GUARDIAN_URL": (
+            "https://user:password@guardian.example:8443/base?token=secret#fragment"
+        )
+    },
+    clear=True,
+)
+@patch("urllib.request.urlopen")
+def test_guardian_log_sanitizes_configured_endpoint(urlopen: MagicMock) -> None:
+    """Keep endpoint credentials, query, fragment, and base path out of logs."""
+    urlopen.return_value = _response(
+        {"version": "v1", "allowed": True, "binding": BINDING}
+    )
+
+    with patch("flwr.supernode.guardian.log") as mock_log:
+        verify_capability(_run())
+
+    rendered = " ".join(str(call.args) for call in mock_log.call_args_list)
+    assert "https://guardian.example:8443/v1/verify" in rendered
+    assert "user" not in rendered
+    assert "password" not in rendered
+    assert "token" not in rendered
+    assert "secret" not in rendered
+    assert "fragment" not in rendered
+    assert "/base" not in rendered
+    assert urlopen.call_args.args[0].full_url == (
+        "https://user:password@guardian.example:8443/base?token=secret#fragment"
+        "/v1/verify"
+    )
 
 
 @pytest.mark.parametrize(

@@ -20,7 +20,10 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
+from logging import INFO
 
+from flwr.common.capability import CAPABILITY_LOG_PREFIX, safe_digest_prefix
+from flwr.supercore import log
 from flwr.supercore.run import Run
 
 GUARDIAN_PROTOCOL_VERSION = "v1"
@@ -31,6 +34,15 @@ DEFAULT_GUARDIAN_TIMEOUT = 5.0
 
 class GuardianVerificationError(Exception):
     """Raised when a capability cannot be verified by the Guardian."""
+
+
+def _safe_endpoint_for_log(parsed_url: urllib.parse.SplitResult) -> str:
+    """Return an endpoint label without userinfo, query, fragment, or base path."""
+    host = parsed_url.hostname or "unknown"
+    if ":" in host:
+        host = f"[{host}]"
+    port = f":{parsed_url.port}" if parsed_url.port is not None else ""
+    return f"{parsed_url.scheme}://{host}{port}/v1/verify"
 
 
 def verify_capability(run: Run) -> None:
@@ -60,6 +72,21 @@ def verify_capability(run: Run) -> None:
     if timeout <= 0:
         raise GuardianVerificationError(f"{GUARDIAN_TIMEOUT_ENV} must be positive")
 
+    endpoint = guardian_url.rstrip("/") + "/v1/verify"
+    try:
+        logged_endpoint = _safe_endpoint_for_log(parsed_url)
+    except ValueError as err:
+        raise GuardianVerificationError(
+            f"{GUARDIAN_URL_ENV} is not a valid URL"
+        ) from err
+    log(
+        INFO,
+        "%s Guardian call protocol=%s endpoint=%s expected_binding=%s",
+        CAPABILITY_LOG_PREFIX,
+        GUARDIAN_PROTOCOL_VERSION,
+        logged_endpoint,
+        safe_digest_prefix(run.capability_binding),
+    )
     try:
         body = json.dumps(
             {
@@ -68,7 +95,7 @@ def verify_capability(run: Run) -> None:
             }
         ).encode("utf-8")
         request = urllib.request.Request(
-            guardian_url.rstrip("/") + "/v1/verify",
+            endpoint,
             data=body,
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -89,7 +116,33 @@ def verify_capability(run: Run) -> None:
         or result.get("version") != GUARDIAN_PROTOCOL_VERSION
     ):
         raise GuardianVerificationError("Guardian returned an unsupported response")
-    if result.get("allowed") is not True:
+    allowed = result.get("allowed") is True
+    returned_binding = result.get("binding")
+    log(
+        INFO,
+        "%s Guardian response allowed=%s returned_binding=%s",
+        CAPABILITY_LOG_PREFIX,
+        str(allowed).lower(),
+        (
+            safe_digest_prefix(returned_binding)
+            if isinstance(returned_binding, str)
+            else "none"
+        ),
+    )
+    if not allowed:
         raise GuardianVerificationError("Guardian denied the capability")
-    if result.get("binding") != run.capability_binding:
+    binding_matches = returned_binding == run.capability_binding
+    log(
+        INFO,
+        "%s SuperNode binding_check expected=%s returned=%s match=%s",
+        CAPABILITY_LOG_PREFIX,
+        safe_digest_prefix(run.capability_binding),
+        (
+            safe_digest_prefix(returned_binding)
+            if isinstance(returned_binding, str)
+            else "none"
+        ),
+        str(binding_matches).lower(),
+    )
+    if not binding_matches:
         raise GuardianVerificationError("Guardian returned a mismatched job binding")

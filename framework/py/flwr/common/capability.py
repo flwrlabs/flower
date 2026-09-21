@@ -24,6 +24,13 @@ PARTICIPANT_ID_PREFIX = "flwr-p384-spki-pem-sha256:"
 PARTICIPANT_ID_PATTERN = re.compile(
     rf"{re.escape(PARTICIPANT_ID_PREFIX)}[0-9a-f]{{64}}\Z"
 )
+CAPABILITY_LOG_PREFIX = "[CAPABILITY]"
+LOG_DIGEST_PREFIX_LENGTH = 12
+
+
+def safe_digest_prefix(value: str) -> str:
+    """Return a presentation-only 12-character digest prefix."""
+    return value.rsplit(":", maxsplit=1)[-1][:LOG_DIGEST_PREFIX_LENGTH]
 
 
 def participant_id_from_public_key(public_key: bytes) -> str:

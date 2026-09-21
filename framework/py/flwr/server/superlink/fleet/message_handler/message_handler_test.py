@@ -15,7 +15,7 @@
 """Fleet API message handler tests."""
 
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from flwr.app import Metadata, RecordDict
 from flwr.app.message import make_message
@@ -52,13 +52,23 @@ def test_get_run_routes_capability_by_registered_public_key() -> None:
     state.federation_manager.has_node.return_value = True
     state.get_node_info.return_value = [NodeInfo(public_key=public_key)]
 
-    response = get_run(GetRunRequest(node=Node(node_id=7), run_id=123), state)
+    with patch(
+        "flwr.server.superlink.fleet.message_handler.message_handler.log"
+    ) as mock_log:
+        response = get_run(GetRunRequest(node=Node(node_id=7), run_id=123), state)
 
     assert response.run.capability_required
     assert response.run.capability_package == b"selected"
     assert response.run.capability_binding == capability_binding(
         run.federation_id, run.fab_hash
     )
+    rendered = " ".join(str(value) for value in mock_log.call_args.args)
+    assert "[CAPABILITY]" in rendered
+    assert "GetRun route" in rendered
+    assert "123" in rendered and "7" in rendered
+    assert participant_id[-64:-52] in rendered
+    assert "match=%s%s" in rendered
+    assert "selected" not in rendered
 
 
 def test_get_run_marks_missing_participant_capability_as_required() -> None:
@@ -71,10 +81,14 @@ def test_get_run_marks_missing_participant_capability_as_required() -> None:
     state.federation_manager.has_node.return_value = True
     state.get_node_info.return_value = [NodeInfo(public_key=b"unmatched-key")]
 
-    response = get_run(GetRunRequest(node=Node(node_id=7), run_id=123), state)
+    with patch(
+        "flwr.server.superlink.fleet.message_handler.message_handler.log"
+    ) as mock_log:
+        response = get_run(GetRunRequest(node=Node(node_id=7), run_id=123), state)
 
     assert response.run.capability_required
     assert response.run.capability_package == b""
+    assert mock_log.call_args.args[-2:] == ("missing", " fail_closed=true")
 
 
 def test_pull_messages() -> None:

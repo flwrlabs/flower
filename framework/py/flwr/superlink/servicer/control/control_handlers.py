@@ -30,7 +30,12 @@ from typing import Any, cast
 import requests
 
 from flwr.cli.utils import validate_federation_name
-from flwr.common.capability import PARTICIPANT_ID_PATTERN
+from flwr.common.capability import (
+    CAPABILITY_LOG_PREFIX,
+    PARTICIPANT_ID_PATTERN,
+    capability_binding,
+    safe_digest_prefix,
+)
 from flwr.common.config import (
     flatten_dict,
     fuse_dicts,
@@ -793,6 +798,19 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
     log_msg = f"Created run {run_id} in federation {run.federation_id}"
     log(INFO, log_msg)
+    if capability_packages:
+        binding = capability_binding(run.federation_id, run.fab_hash)
+        log(
+            INFO,
+            "%s StartRun accepted run_id=%s federation=%s fab_hash=%s "
+            "participants=%s binding=%s",
+            CAPABILITY_LOG_PREFIX,
+            run_id,
+            run.federation_id,
+            safe_digest_prefix(run.fab_hash),
+            len(capability_packages),
+            safe_digest_prefix(binding),
+        )
     response = StartRunResponse(
         run_id=run_id, note=note, series_id=series_id, federation=run.federation_id
     )
