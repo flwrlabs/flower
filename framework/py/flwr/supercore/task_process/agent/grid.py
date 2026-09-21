@@ -99,11 +99,6 @@ def _grid_tools() -> list[JSONObject]:
                                 "replying to another message; otherwise, this field "
                                 "must not be set."
                             ),
-                            "ttl": {
-                                "type": "number",
-                                "exclusiveMinimum": 0,
-                                "description": "Optional round-trip TTL in seconds.",
-                            },
                         },
                         "required": ["dst_node_id", "payload"],
                         "additionalProperties": False,
@@ -272,9 +267,6 @@ class RuntimeAgentGrid(AgentGrid):
 
         outgoing = []
         for item in messages:
-            ttl = cast(float | None, item.get("ttl"))
-            if ttl is not None and ttl <= 0:
-                raise ValueError("Grid message TTL must be positive.")
             config_record = ConfigRecord(
                 {AGENT_MESSAGE_TEXT_KEY: cast(str, item["payload"])}
             )
@@ -285,10 +277,13 @@ class RuntimeAgentGrid(AgentGrid):
                 dst_node_id=int(cast(str, item["dst_node_id"])),
                 message_type="query",  # Replace with an AgentGrid message type.
                 group_id="",
-                ttl=ttl,
             )
             reply_to_message_id = cast(str | None, item.get("reply_to_message_id"))
             if reply_to_message_id is not None:
+                # Temporary: use a 6-hour TTL for replies instead of the default
+                # 12 hours to avoid replies expiring after the original message,
+                # which SuperLink rejects.
+                message.metadata.ttl = 21600
                 message.metadata.__dict__["_reply_to_message_id"] = reply_to_message_id
             outgoing.append(message)
 
