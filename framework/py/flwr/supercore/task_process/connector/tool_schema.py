@@ -27,8 +27,9 @@ def function_tool(
     properties: JSONObject,
     required: Sequence[str] = (),
     output_schema: JSONObject | None = None,
+    strict: bool | None = None,
 ) -> JSONObject:
-    """Build one strict function-tool schema."""
+    """Build one function-tool schema."""
     tool: JSONObject = {
         "type": "function",
         "name": name,
@@ -42,6 +43,8 @@ def function_tool(
     }
     if output_schema is not None:
         tool["output_schema"] = output_schema
+    if strict is not None:
+        tool["strict"] = strict
     return tool
 
 

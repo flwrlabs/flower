@@ -191,14 +191,17 @@ def _run_with_control_api(
             fab_id = fab_version = fab_hash = ""
             fab = Fab(fab_hash, b"", {})
 
+        run_config = parse_config_args(config_overrides)
+        user_prompt = run_config.pop("prompt", "")
         req = StartRunRequest(
             fab=fab_to_proto(fab),
-            override_config=user_config_to_proto(parse_config_args(config_overrides)),
+            override_config=user_config_to_proto(run_config),
             federation=federation_id,
             override_federation_config=_parse_federation_config_overrides(
                 federation_config_overrides, superlink_connection
             ),
             app_spec=app_spec or "",
+            user_prompt=user_prompt,
         )
         with flwr_cli_exc_handler():
             res = control_client.StartRun(req)

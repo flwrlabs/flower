@@ -25,14 +25,3 @@ class ServerAppExecPlugin(AutoExecPlugin):
 
     The plugin always selects the first candidate task.
     """
-
-    visible_output_task_types = frozenset({TaskType.CONNECTOR, TaskType.MODEL})
-    supported_task_types = frozenset(
-        {
-            TaskType.AGENT_APP,
-            TaskType.CONNECTOR,
-            TaskType.MODEL,
-            TaskType.SERVER_APP,
-            TaskType.SIMULATION,
-        }
-    )

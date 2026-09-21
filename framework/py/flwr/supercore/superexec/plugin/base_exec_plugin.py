@@ -125,7 +125,5 @@ class AutoExecPlugin(BaseExecPlugin):
     """Task-driven Flower SuperExec plugin."""
 
     suppress_output = True
-    visible_output_task_types = frozenset(
-        {TaskType.AGENT_APP, TaskType.CLIENT_APP, TaskType.CONNECTOR, TaskType.MODEL}
-    )
+    visible_output_task_types = frozenset(TaskType)
     supported_task_types = frozenset(TaskType)
