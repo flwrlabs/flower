@@ -26,6 +26,7 @@ from .filesystem import (
     FILESYSTEM_ALLOWED_DIRS_ENV,
     FilesystemApiError,
     invoke_filesystem_provider,
+    make_filesystem_tool,
 )
 
 
@@ -38,6 +39,15 @@ def _allow(monkeypatch: pytest.MonkeyPatch, *dirs: Path) -> None:
 
 def _call(action: str, path: Path | str) -> JSONObject:
     return invoke_filesystem_provider(action, str(path), usage_recorder=Mock())
+
+
+def test_tool_schema_lists_allowed_directories(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The model should know which absolute paths it can request."""
+    _allow(monkeypatch, tmp_path)
+
+    assert str(tmp_path.resolve()) in repr(make_filesystem_tool())
 
 
 def test_reads_file_and_lists_directory(

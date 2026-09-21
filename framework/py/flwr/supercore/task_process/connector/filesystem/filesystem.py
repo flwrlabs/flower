@@ -43,6 +43,9 @@ class FilesystemApiError(ConnectorApiError):
 
 def make_filesystem_tool() -> JSONObject:
     """Return the filesystem function tool schema."""
+    allowed_dirs = ", ".join(
+        os.getenv(FILESYSTEM_ALLOWED_DIRS_ENV, "").split(os.pathsep)
+    )
     return {
         "type": "function",
         "name": FILESYSTEM_CONNECTOR_NAME,
@@ -66,7 +69,8 @@ def make_filesystem_tool() -> JSONObject:
                     "type": "string",
                     "minLength": 1,
                     "description": (
-                        "Absolute path inside one of the allowed directories."
+                        "Absolute path inside one of the allowed directories. "
+                        f"Configured allowed directories: {allowed_dirs or 'none'}."
                     ),
                 },
             },
