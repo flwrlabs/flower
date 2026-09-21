@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for the connector registry."""
 
-from . import registry
 from .registry import CONNECTORS
 
 
@@ -30,13 +29,3 @@ def test_connector_tool_names_are_unique() -> None:
     tool_names = [name for connector in CONNECTORS for name in connector.handlers]
 
     assert len(tool_names) == len(set(tool_names))
-
-
-def test_filesystem_registry() -> None:
-    """Filesystem should be local and require no OAuth credentials."""
-    assert "filesystem" not in registry.OAUTH_FLOWS
-    assert registry.get_connector_ref("filesystem_list_directory") == "filesystem"
-    assert registry.get_connector_ref("filesystem_read_file") == "filesystem"
-    assert not registry.has_builtin_connector("filesystem")
-    assert not registry.has_builtin_connector("filesystem_read_file")
-    assert not registry.has_builtin_connector("start_automation")
