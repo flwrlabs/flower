@@ -75,7 +75,7 @@ def test_tool_schema_is_empty_without_config(
     """An unconfigured optional connector should advertise no tools."""
     monkeypatch.delenv(FILESYSTEM_ALLOWED_DIRS_ENV, raising=False)
 
-    assert make_filesystem_tools() == []
+    assert not make_filesystem_tools()
 
 
 def test_reads_file_and_lists_directory(
