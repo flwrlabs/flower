@@ -17,7 +17,6 @@
 from sqlalchemy import UniqueConstraint
 
 from flwr.supercore.state.schema.corestate_models import (
-    Connector,
     FlwrBase,
     Task,
     TaskLogsTable,
@@ -62,7 +61,7 @@ def test_task_mapper_uses_task_id_as_identity_key() -> None:
 
 def test_connector_uses_incrementing_id_and_unique_account_reference() -> None:
     """Ensure connectors have a surrogate ID and retain their natural uniqueness."""
-    table = Connector.__table__
+    table = FlwrBase.metadata.tables["connector"]
 
     assert [column.name for column in table.primary_key.columns] == ["connector_id"]
     assert table.c.connector_id.autoincrement is True
