@@ -27,6 +27,7 @@ import pytest
 from flwr.app.user_config import UserConfig
 
 from .config import (
+    AppMetadata,
     flatten_dict,
     fuse_dicts,
     get_app_presentation_metadata,
@@ -56,11 +57,11 @@ def test_get_app_presentation_metadata() -> None:
         },
     }
 
-    assert get_app_presentation_metadata(config) == {
-        "display_name": "Demo Agent",
-        "description": "Demo agent",
-        "color": "sky",
-    }
+    assert get_app_presentation_metadata(config) == AppMetadata(
+        display_name="Demo Agent",
+        description="Demo agent",
+        color="sky",
+    )
 
 
 def test_get_app_presentation_metadata_ignores_invalid_values() -> None:
@@ -70,11 +71,11 @@ def test_get_app_presentation_metadata_ignores_invalid_values() -> None:
         "tool": {"flwr": {"app": {"display-name": 1}}},
     }
 
-    assert get_app_presentation_metadata(config) == {
-        "display_name": None,
-        "description": None,
-        "color": None,
-    }
+    assert get_app_presentation_metadata(config) == AppMetadata(
+        display_name=None,
+        description=None,
+        color=None,
+    )
 
 
 def test_get_project_dir_invalid_fab_id() -> None:

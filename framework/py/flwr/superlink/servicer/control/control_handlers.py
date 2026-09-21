@@ -699,6 +699,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             )
 
         if not is_stored_app and not is_cached_hub_app:
+            metadata = get_app_presentation_metadata(fab_config)
             state.store_app(
                 fab=fab,
                 federation_id=federation_id,
@@ -706,7 +707,9 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 app_type=app_type,
                 added_by=flwr_aid,
                 is_hub_app=is_hub_app,
-                **get_app_presentation_metadata(fab_config),
+                display_name=metadata.display_name,
+                description=metadata.description,
+                color=metadata.color,
             )
 
         series_id = request.series_id if request.HasField("series_id") else None
@@ -1706,6 +1709,7 @@ def add_app(
             f"Failed to read app metadata: {e}",
         ) from e
 
+    metadata = get_app_presentation_metadata(fab_config)
     state.store_app(
         fab=Fab(hashlib.sha256(fab_file).hexdigest(), fab_file, verification_dict),
         federation_id=federation_id,
@@ -1713,7 +1717,9 @@ def add_app(
         app_type=app_type,
         added_by=account.flwr_aid,
         is_hub_app=True,
-        **get_app_presentation_metadata(fab_config),
+        display_name=metadata.display_name,
+        description=metadata.description,
+        color=metadata.color,
     )
 
     return AddAppResponse()
