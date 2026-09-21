@@ -31,4 +31,5 @@ message NodeInfo {
   optional double online_until = 9;
   double heartbeat_interval = 10;
   bytes public_key = 11;
+  optional string location = 12;
 }

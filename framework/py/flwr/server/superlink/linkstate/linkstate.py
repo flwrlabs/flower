@@ -179,12 +179,14 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
-    def create_node(
+    def create_node(  # pylint: disable=too-many-arguments
         self,
         owner_aid: str,
         owner_name: str,
         public_key: bytes,
         heartbeat_interval: float,
+        *,
+        location: str | None = None,
     ) -> int:
         """Create, store in the link state, and return `node_id`."""
 

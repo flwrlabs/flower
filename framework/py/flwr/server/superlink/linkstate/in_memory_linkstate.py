@@ -493,12 +493,14 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """
         return len(self.message_res_store)
 
-    def create_node(
+    def create_node(  # pylint: disable=too-many-arguments
         self,
         owner_aid: str,
         owner_name: str,
         public_key: bytes,
         heartbeat_interval: float,
+        *,
+        location: str | None = None,
     ) -> int:
         """Create, store in the link state, and return `node_id`."""
         # Sample a random int64 as node_id
@@ -526,6 +528,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 online_until=None,
                 heartbeat_interval=heartbeat_interval,
                 public_key=public_key,
+                location=location,
             )
             self.node_public_key_to_node_id[public_key] = node_id
             self.owner_to_node_ids.setdefault(owner_aid, set()).add(node_id)

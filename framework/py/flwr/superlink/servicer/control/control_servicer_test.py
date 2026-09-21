@@ -1135,7 +1135,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             )
 
         # Execute
-        req = RegisterNodeRequest(public_key=pub_key)
+        location = "37.4056,-122.0775"
+        req = RegisterNodeRequest(public_key=pub_key, location=location)
         ctx = Mock()
         if expected_code is not None:
             with self.assertRaises(FlowerError) as cm:
@@ -1144,6 +1145,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         else:
             response = self.servicer.RegisterNode(req, ctx)
             assert response.node_id
+            node = self.state.get_node_info(node_ids=[response.node_id])[0]
+            self.assertEqual(node.location, location)
 
     def test_register_node_denied_when_not_entitled(self) -> None:
         """Test RegisterNode raises when federation manager denies execution."""
@@ -1190,6 +1193,18 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ActionType.REGISTER_SUPERNODE,
             RegisterSupernodeContext(),
         )
+
+    def test_register_node_rejects_invalid_location(self) -> None:
+        """Test RegisterNode rejects an invalid location."""
+        req = RegisterNodeRequest(
+            public_key=public_key_to_bytes(generate_key_pairs()[1]),
+            location="nan,inf",
+        )
+
+        with self.assertRaises(FlowerError) as cm:
+            self.servicer.RegisterNode(req, Mock())
+
+        self.assertEqual(cm.exception.code, ApiErrorCode.INVALID_SUPERNODE_LOCATION)
 
     @parameterized.expand(
         [

@@ -34,6 +34,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.primitives.asymmetric import public_key_to_bytes, uses_nist_ec_curve
+from flwr.supercore.utils import validate_node_location
 
 from ..utils import (
     cli_output_handler,
@@ -55,6 +56,16 @@ def register(  # pylint: disable=R0914
         str | None,
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
+    location: Annotated[
+        str | None,
+        typer.Option(
+            "--location",
+            help=(
+                'Location of the SuperNode as "<latitude>,<longitude>", '
+                'for example "37.4056,-122.0775".'
+            ),
+        ),
+    ] = None,
     output_format: Annotated[
         Literal["default", "json"],
         typer.Option(
@@ -65,6 +76,8 @@ def register(  # pylint: disable=R0914
     ] = CliOutputFormat.DEFAULT,
 ) -> None:
     """Add a SuperNode to the federation."""
+    location = _validate_location(location)
+
     # Load public key
     public_key_bytes = try_load_public_key(public_key.expanduser())
 
@@ -83,6 +96,7 @@ def register(  # pylint: disable=R0914
                 stub=control_client,
                 public_key=public_key_bytes,
                 is_json=is_json,
+                location=location,
             )
 
         finally:
@@ -90,11 +104,16 @@ def register(  # pylint: disable=R0914
                 control_client.close()
 
 
-def _register_node(stub: ControlHttpClient, public_key: bytes, is_json: bool) -> None:
+def _register_node(
+    stub: ControlHttpClient,
+    public_key: bytes,
+    is_json: bool,
+    location: str | None = None,
+) -> None:
     """Register a node."""
     with flwr_cli_exc_handler():
         response: RegisterNodeResponse = stub.RegisterNode(
-            request=RegisterNodeRequest(public_key=public_key)
+            request=RegisterNodeRequest(public_key=public_key, location=location)
         )
     if response.node_id:
         typer.secho(
@@ -110,6 +129,19 @@ def _register_node(stub: ControlHttpClient, public_key: bytes, is_json: bool) ->
             )
     else:
         raise click.ClickException("SuperNode couldn't be registered.")
+
+
+def _validate_location(location: str | None) -> str | None:
+    """Validate the optional SuperNode location."""
+    if location is None:
+        return None
+
+    try:
+        validate_node_location(location)
+    except ValueError as err:
+        raise click.BadParameter(str(err), param_hint="--location") from err
+
+    return location
 
 
 def try_load_public_key(public_key_path: Path) -> bytes:

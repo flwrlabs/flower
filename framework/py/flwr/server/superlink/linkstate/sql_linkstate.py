@@ -684,12 +684,14 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         self.cleanup_run(run_id)
         return True
 
-    def create_node(
+    def create_node(  # pylint: disable=too-many-arguments
         self,
         owner_aid: str,
         owner_name: str,
         public_key: bytes,
         heartbeat_interval: float,
+        *,
+        location: str | None = None,
     ) -> int:
         """Create, store in the link state, and return `node_id`."""
         # Sample a random uint64 as node_id
@@ -716,6 +718,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         online_until=None,  # initialized with offline status
                         heartbeat_interval=heartbeat_interval,
                         public_key=public_key,
+                        location=location,
                     )
                 )
         except IntegrityError as e:
@@ -1405,6 +1408,7 @@ def _node_info_from_model(model: NodeModel) -> NodeInfo:
         online_until=model.online_until,
         heartbeat_interval=cast(float, model.heartbeat_interval),
         public_key=cast(bytes, model.public_key),
+        location=model.location,
     )
 
 
