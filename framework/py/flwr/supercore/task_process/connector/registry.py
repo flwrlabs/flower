@@ -54,11 +54,12 @@ _CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorExecutor] = {
 _CREDENTIAL_CONNECTOR_REFS: dict[str, str] = {
     name: connector.ref for connector in CONNECTORS for name in connector.handlers
 }
-_BUILTIN_CONNECTOR_REFS = {
+_CONNECTOR_REFS = {
     filesystem.FILESYSTEM_LIST_DIRECTORY_TOOL_NAME: (
-        filesystem.FILESYSTEM_CONNECTOR_REF
+        filesystem.FILESYSTEM_CONNECTOR_NAME
     ),
-    filesystem.FILESYSTEM_READ_FILE_TOOL_NAME: filesystem.FILESYSTEM_CONNECTOR_REF,
+    filesystem.FILESYSTEM_READ_FILE_TOOL_NAME: filesystem.FILESYSTEM_CONNECTOR_NAME,
+    **_CREDENTIAL_CONNECTOR_REFS,
 }
 _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
     automation.START_AUTOMATION_TOOL_NAME: automation.make_start_automation_tool,
@@ -102,7 +103,7 @@ def requires_connector_credentials(name: str) -> bool:
 
 def get_connector_ref(name: str) -> str:
     """Resolve a connector tool name to its connector reference."""
-    return _CREDENTIAL_CONNECTOR_REFS.get(name, _BUILTIN_CONNECTOR_REFS.get(name, name))
+    return _CONNECTOR_REFS.get(name, name)
 
 
 def get_connector_tools(connector_ref: str) -> list[JSONObject]:
