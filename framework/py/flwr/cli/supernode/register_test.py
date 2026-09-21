@@ -14,19 +14,44 @@
 # ==============================================================================
 """Tests for the Flower CLI SuperNode register command."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
+from typer.testing import CliRunner
+
+from flwr.cli.app import app
 from flwr.proto.control_pb2 import RegisterNodeResponse  # pylint: disable=E0611
 
-from .register import _register_node
 
-
-def test_register_node_sends_name() -> None:
-    """Send the optional name in the registration request."""
+def test_register_command_sends_name() -> None:
+    """Parse and send the optional name in the registration request."""
     client = Mock()
     client.RegisterNode.return_value = RegisterNodeResponse(node_id=1)
 
-    _register_node(client, b"public-key", False, "Kings Cross")
+    with (
+        patch("flwr.cli.app.warn_if_flwr_update_available"),
+        patch(
+            "flwr.cli.supernode.register.try_load_public_key",
+            return_value=b"public-key",
+        ),
+        patch("flwr.cli.supernode.register.migrate"),
+        patch("flwr.cli.supernode.register.read_superlink_connection"),
+        patch(
+            "flwr.cli.supernode.register.init_http_client_from_connection",
+            return_value=client,
+        ),
+    ):
+        result = CliRunner().invoke(
+            app,
+            [
+                "supernode",
+                "register",
+                "public-key.pub",
+                "test-superlink",
+                "--name",
+                "London SuperNode",
+            ],
+        )
 
+    assert result.exit_code == 0
     request = client.RegisterNode.call_args.kwargs["request"]
-    assert request.name == "Kings Cross"
+    assert request.name == "London SuperNode"

@@ -1323,7 +1323,7 @@ class StateTest(CoreStateTest):
         # Prepare
         state: LinkState = self.state_factory()
         public_key = b"mock"
-        name = "Kings Cross"
+        name = "London SuperNode"
 
         # Execute
         expected_registered_at = now().timestamp()

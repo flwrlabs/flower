@@ -1135,7 +1135,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             )
 
         # Execute
-        name = "Kings Cross"
+        name = "London SuperNode"
         req = RegisterNodeRequest(public_key=pub_key, name=name)
         ctx = Mock()
         if expected_code is not None:
