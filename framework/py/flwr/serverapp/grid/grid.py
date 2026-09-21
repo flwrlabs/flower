@@ -19,6 +19,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
 from flwr.app import Message, RecordDict
+from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.run import Run
 
 
@@ -82,6 +83,10 @@ class Grid(ABC):
     @abstractmethod
     def get_node_ids(self) -> Iterable[int]:
         """Get node IDs."""
+
+    @abstractmethod
+    def get_nodes(self) -> Iterable[NodeInfo]:
+        """Get nodes."""
 
     @abstractmethod
     def push_messages(self, messages: Iterable[Message]) -> Iterable[str]:
