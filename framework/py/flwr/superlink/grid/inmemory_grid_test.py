@@ -167,6 +167,8 @@ class TestInMemoryGrid(unittest.TestCase):
         self.assertEqual(len(nodes), self.num_nodes)
         self.assertEqual(nodes[0].name, "London")
         self.assertEqual(nodes[0].location, "51.5072,-0.1276")
+        nodes[0].name = "Changed"
+        self.assertEqual(node_infos[0].name, "London")
 
     def test_push_messages_valid(self) -> None:
         """Test pushing valid messages."""

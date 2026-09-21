@@ -17,6 +17,7 @@
 
 import time
 from collections.abc import Iterable
+from copy import deepcopy
 from typing import cast
 from uuid import uuid4
 
@@ -104,7 +105,7 @@ class InMemoryGrid(Grid):
 
     def get_nodes(self) -> Iterable[NodeInfo]:
         """Get nodes."""
-        return self.state.get_node_info(node_ids=list(self.get_node_ids()))
+        return deepcopy(self.state.get_node_info(node_ids=list(self.get_node_ids())))
 
     def push_messages(self, messages: Iterable[Message]) -> Iterable[str]:
         """Push messages to specified node IDs.
