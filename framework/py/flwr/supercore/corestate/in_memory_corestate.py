@@ -105,6 +105,9 @@ class FederationAppRecord:  # pylint: disable=too-many-instance-attributes
     fab_hash: str
     app_type: str
     is_hub_app: bool
+    display_name: str | None
+    description: str | None
+    color: str | None
     added_by: str
     added_at: datetime
     updated_at: datetime
@@ -342,6 +345,9 @@ class InMemoryCoreState(
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
+        display_name: str | None = None,
+        description: str | None = None,
+        color: str | None = None,
     ) -> str:
         """Store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
@@ -370,6 +376,9 @@ class InMemoryCoreState(
                 fab_hash=fab_hash,
                 app_type=app_type,
                 is_hub_app=is_hub_app,
+                display_name=display_name,
+                description=description,
+                color=color,
                 added_by=existing.added_by if existing else added_by,
                 added_at=existing.added_at if existing else current_time,
                 updated_at=current_time,
@@ -467,6 +476,9 @@ class InMemoryCoreState(
                     fab_hash=record.fab_hash,
                     app_type=record.app_type,
                     is_hub_app=record.is_hub_app,
+                    display_name=record.display_name or "",
+                    description=record.description or "",
+                    color=record.color or "",
                 )
                 for record in records
             ]
