@@ -15,7 +15,7 @@
 """Add SuperNode location.
 
 Revision ID: d8872d39e22f
-Revises: 6ea9c44bb683
+Revises: 4d638b3f5d59
 Create Date: 2026-09-21 14:02:16.331277
 """
 from collections.abc import Sequence
@@ -27,7 +27,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "d8872d39e22f"
-down_revision: str | Sequence[str] | None = "6ea9c44bb683"
+down_revision: str | Sequence[str] | None = "4d638b3f5d59"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
