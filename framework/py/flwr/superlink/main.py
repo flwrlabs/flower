@@ -25,7 +25,6 @@ from typing import TYPE_CHECKING
 
 from fastapi import Depends, FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
-from packaging.version import InvalidVersion, Version
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -117,14 +116,6 @@ def _get_middleware() -> list[Middleware]:
     ]
 
 
-def _get_openapi_version() -> str:
-    """Return the public package version for the OpenAPI schema."""
-    try:
-        return Version(package_version).base_version
-    except InvalidVersion:
-        return package_version
-
-
 def create_app(  # pylint: disable=too-many-statements
     config: SuperLinkLifespanConfig | None = None,
     superlink_lifespan_class: type[SuperLinkLifespan] | None = None,
@@ -194,7 +185,7 @@ def create_app(  # pylint: disable=too-many-statements
 
     fastapi_app = FastAPI(
         title="SuperLink API",
-        version=_get_openapi_version(),
+        version=package_version,
         docs_url="/docs",
         redoc_url=None,
         lifespan=lifespan,
