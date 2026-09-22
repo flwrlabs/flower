@@ -25,11 +25,13 @@ import dev.run_mlcommons_two_node_tls_auth_demo as demo_module
 from dev.run_mlcommons_two_node_tls_auth_demo import (
     _FAILURE_PREFIX,
     _allocate_ports,
+    _capabilities_for_scenario,
     _demo_env,
     _json_object_from_output,
     _orchestration_event,
     _ProcessManager,
     _run_command,
+    _sanitize_log_text,
     _superlink_command,
     _supernode_command,
     _wait_for_port,
@@ -38,6 +40,49 @@ from dev.run_mlcommons_two_node_tls_auth_demo import (
     _write_tls_material,
     run_demo,
 )
+
+
+def test_capability_scenarios_route_expected_packages() -> None:
+    """Build allow, denial, mismatch, and missing-participant fixtures."""
+    identities = [
+        {"participant_id": "flwr-p384-spki-pem-sha256:" + digit * 64}
+        for digit in ("a", "b")
+    ]
+    binding = "flwr-capability-binding-v1-sha256:" + "c" * 64
+    fab_hash = "d" * 64
+
+    allow, _ = _capabilities_for_scenario("allow", identities, binding, fab_hash)
+    denial, _ = _capabilities_for_scenario(
+        "guardian-deny", identities, binding, fab_hash
+    )
+    mismatch, _ = _capabilities_for_scenario(
+        "binding-mismatch", identities, binding, fab_hash
+    )
+    missing, _ = _capabilities_for_scenario(
+        "missing-capability", identities, binding, fab_hash
+    )
+
+    participant_ids = {identity["participant_id"] for identity in identities}
+    assert allow == dict.fromkeys(participant_ids, binding)
+    assert denial == dict.fromkeys(participant_ids, f"deny:{binding}")
+    assert set(mismatch) == participant_ids
+    assert len(set(mismatch.values())) == 1
+    assert next(iter(mismatch.values())) != binding
+    assert set(missing).isdisjoint(participant_ids)
+    assert list(missing.values()) == [binding]
+
+
+def test_human_log_sanitization_removes_packages_and_full_hashes() -> None:
+    """Retain causal log text without capability material or full digests."""
+    package = "deny:flwr-capability-binding-v1-sha256:" + "a" * 64
+    text = f"package={package} message_id={'b' * 64} match=false"
+
+    sanitized = _sanitize_log_text(text, [package])
+
+    assert package not in sanitized
+    assert "a" * 64 not in sanitized
+    assert "b" * 64 not in sanitized
+    assert "match=false" in sanitized
 
 
 def test_generated_identities_are_distinct_and_private(tmp_path: Path) -> None:

@@ -33,6 +33,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     iterate_object_tree,
 )
 from flwr.supercore.run import Run
+from flwr.supernode.guardian import GuardianVerificationError
 
 from .start_client_internal import (
     CAPABILITY_VERIFICATION_ERROR,
@@ -177,6 +178,213 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state.store_fab.assert_not_called()
         self.mock_state.store_run.assert_not_called()
         self.mock_state.set_run_series_context.assert_not_called()
+
+    def test_cached_capability_run_is_reverified_without_refetching_fab(self) -> None:
+        """Reverify cached runs while preserving their FAB/context cache."""
+        self._prepare_for_pull_and_store_message()
+        run = Run.create_empty(self.run_id)
+        run.fab_hash = "abc123"
+        run.capability_required = True
+        run.capability_package = b"opaque"
+        self.mock_state.get_run.return_value = run
+        self.mock_state.create_task.return_value = 123
+
+        with patch(
+            "flwr.supernode.start_client_internal.verify_capability"
+        ) as mock_verify:
+            result = _pull_and_store_message(
+                state=self.mock_state,
+                object_store=self.mock_object_store,
+                node_config={},
+                receive=self.mock_receive,
+                get_run=self.mock_get_run,
+                get_fab=self.mock_get_fab,
+                pull_object=self.mock_pull_object,
+                confirm_message_received=self.mock_confirm_message_received,
+                trusted_entities={},
+            )
+
+        assert result == self.run_id
+        mock_verify.assert_called_once_with(run)
+        self.mock_get_run.assert_not_called()
+        self.mock_get_fab.assert_not_called()
+        self.mock_state.store_run.assert_not_called()
+        self.mock_state.create_task.assert_called_once()
+
+    def test_cached_run_denial_stops_before_task_and_object_processing(self) -> None:
+        """Fail closed when re-verification rejects a cached run."""
+        self._prepare_for_pull_and_store_message()
+        run = Run.create_empty(self.run_id)
+        run.fab_hash = "abc123"
+        run.capability_required = True
+        run.capability_package = b"opaque"
+        self.mock_state.get_run.return_value = run
+
+        with patch(
+            "flwr.supernode.start_client_internal.verify_capability",
+            side_effect=GuardianVerificationError("cached binding mismatch"),
+        ) as mock_verify:
+            result = _pull_and_store_message(
+                state=self.mock_state,
+                object_store=self.mock_object_store,
+                node_config={},
+                receive=self.mock_receive,
+                get_run=self.mock_get_run,
+                get_fab=self.mock_get_fab,
+                pull_object=self.mock_pull_object,
+                confirm_message_received=self.mock_confirm_message_received,
+                trusted_entities={},
+            )
+
+        assert result == self.run_id
+        mock_verify.assert_called_once_with(run)
+        self.mock_get_fab.assert_not_called()
+        self.mock_state.create_task.assert_not_called()
+        self.mock_pull_object.assert_not_called()
+        self.mock_confirm_message_received.assert_not_called()
+        stored_message = self.mock_state.store_message.call_args.args[0]
+        assert stored_message.error == CAPABILITY_VERIFICATION_ERROR
+
+    def test_allowed_then_denied_cached_run_only_creates_first_task(self) -> None:
+        """A later denial must close a run that an earlier message cached."""
+        self._prepare_for_pull_and_store_message()
+        run = Run.create_empty(self.run_id)
+        run.fab_hash = "abc123"
+        run.override_config = {}
+        run.series_id = self.series_id
+        run.capability_required = True
+        run.capability_package = b"opaque"
+        fab = Fab(hash_str=run.fab_hash, content=b"fab", verifications={})
+        self.mock_state.get_run.side_effect = [None, run]
+        self.mock_get_run.return_value = run
+        self.mock_get_fab.return_value = fab
+        self.mock_state.create_task.return_value = 123
+
+        with (
+            patch(
+                "flwr.supernode.start_client_internal.verify_capability",
+                side_effect=[None, GuardianVerificationError("Guardian denied")],
+            ) as mock_verify,
+            patch(
+                "flwr.supernode.start_client_internal.get_fused_config_from_fab",
+                return_value={},
+            ),
+        ):
+            first = _pull_and_store_message(
+                self.mock_state,
+                self.mock_object_store,
+                {},
+                self.mock_receive,
+                self.mock_get_run,
+                self.mock_get_fab,
+                self.mock_pull_object,
+                self.mock_confirm_message_received,
+                {},
+            )
+            second = _pull_and_store_message(
+                self.mock_state,
+                self.mock_object_store,
+                {},
+                self.mock_receive,
+                self.mock_get_run,
+                self.mock_get_fab,
+                self.mock_pull_object,
+                self.mock_confirm_message_received,
+                {},
+            )
+
+        assert first == second == self.run_id
+        assert mock_verify.call_count == 2
+        self.mock_get_fab.assert_called_once_with(run.fab_hash, self.run_id)
+        self.mock_state.store_run.assert_called_once_with(run)
+        self.mock_state.create_task.assert_called_once()
+        self.mock_confirm_message_received.assert_called_once()
+
+    def test_reentry_refetches_run_after_verification_interruption(self) -> None:
+        """Never cache an unknown run before verification succeeds on re-entry."""
+        self._prepare_for_pull_and_store_message()
+        run = Run.create_empty(self.run_id)
+        run.fab_hash = "abc123"
+        run.override_config = {}
+        run.series_id = self.series_id
+        run.capability_required = True
+        run.capability_package = b"opaque"
+        fab = Fab(hash_str=run.fab_hash, content=b"fab", verifications={})
+        self.mock_state.get_run.side_effect = [None, None]
+        self.mock_get_run.return_value = run
+        self.mock_get_fab.return_value = fab
+        self.mock_state.create_task.return_value = 123
+
+        with (
+            patch(
+                "flwr.supernode.start_client_internal.verify_capability",
+                side_effect=[
+                    GuardianVerificationError("interrupted verification"),
+                    None,
+                ],
+            ),
+            patch(
+                "flwr.supernode.start_client_internal.get_fused_config_from_fab",
+                return_value={},
+            ),
+        ):
+            _pull_and_store_message(
+                self.mock_state,
+                self.mock_object_store,
+                {},
+                self.mock_receive,
+                self.mock_get_run,
+                self.mock_get_fab,
+                self.mock_pull_object,
+                self.mock_confirm_message_received,
+                {},
+            )
+            _pull_and_store_message(
+                self.mock_state,
+                self.mock_object_store,
+                {},
+                self.mock_receive,
+                self.mock_get_run,
+                self.mock_get_fab,
+                self.mock_pull_object,
+                self.mock_confirm_message_received,
+                {},
+            )
+
+        assert self.mock_get_run.call_count == 2
+        self.mock_state.store_run.assert_called_once_with(run)
+        self.mock_get_fab.assert_called_once_with(run.fab_hash, self.run_id)
+        self.mock_state.create_task.assert_called_once()
+
+    def test_non_capability_cached_run_keeps_existing_behavior(self) -> None:
+        """Ordinary cached runs remain local and create their task normally."""
+        self._prepare_for_pull_and_store_message()
+        run = Run.create_empty(self.run_id)
+        run.fab_hash = "abc123"
+        run.capability_required = False
+        self.mock_state.get_run.return_value = run
+        self.mock_state.create_task.return_value = 123
+
+        with patch(
+            "flwr.supernode.start_client_internal.verify_capability"
+        ) as mock_verify:
+            result = _pull_and_store_message(
+                self.mock_state,
+                self.mock_object_store,
+                {},
+                self.mock_receive,
+                self.mock_get_run,
+                self.mock_get_fab,
+                self.mock_pull_object,
+                self.mock_confirm_message_received,
+                {},
+            )
+
+        assert result == self.run_id
+        mock_verify.assert_called_once_with(run)
+        self.mock_get_run.assert_not_called()
+        self.mock_get_fab.assert_not_called()
+        self.mock_state.create_task.assert_called_once()
 
     def test_pull_and_store_message_returns_none_if_create_task_fails(self) -> None:
         """Test that message processing stops if task creation fails."""
@@ -445,7 +653,9 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state.store_run.assert_not_called()
         stored_message = self.mock_state.store_message.call_args.args[0]
         assert stored_message.error == CAPABILITY_VERIFICATION_ERROR
-        rendered = " ".join(str(call.args) for call in mock_log.call_args_list)
+        rendered = " ".join(
+            call.args[1] % call.args[2:] for call in mock_log.call_args_list
+        )
         assert "verification=required" in rendered
         assert "blocking_fab_retrieval=true" in rendered
         assert "verification=denied" in rendered

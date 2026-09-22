@@ -37,6 +37,7 @@ import hashlib
 import ipaddress
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -73,6 +74,7 @@ _STOP_TIMEOUT = 8.0
 _RESULT_PREFIX = "MLCOMMONS_TWO_NODE_RESULT="
 _FAILURE_PREFIX = "MLCOMMONS_TWO_NODE_FAILURE="
 _LOG_TAIL_LIMIT = 2000
+_SCENARIOS = ("allow", "guardian-deny", "binding-mismatch", "missing-capability")
 
 _PYPROJECT = """\
 [build-system]
@@ -99,7 +101,7 @@ serverapp = "two_node_demo.server_app:app"
 clientapp = "two_node_demo.client_app:app"
 """
 
-_SERVER_APP = f"""\
+_SERVER_APP_TEMPLATE = f"""\
 import json
 import time
 
@@ -107,6 +109,7 @@ from flwr.app import Message, MessageType, RecordDict
 from flwr.serverapp import Grid, ServerApp
 
 app = ServerApp()
+SCENARIO = "__SCENARIO__"
 
 
 @app.main()
@@ -134,17 +137,30 @@ def main(grid: Grid, context) -> None:
         for reply in replies
         if not reply.has_error()
     )
-    if partitions != [0, 1]:
+    rejection_reasons = sorted(
+        reply.error.reason or "unspecified"
+        for reply in replies
+        if reply.has_error()
+    )
+    result = {{
+        "node_count": len(node_ids),
+        "partitions": partitions,
+        "node_rejection_count": len(rejection_reasons),
+        "node_rejection_reasons": rejection_reasons,
+    }}
+    if SCENARIO == "allow" and partitions != [0, 1]:
         raise RuntimeError(
             f"expected replies from partitions 0 and 1, got {{partitions}}"
         )
+    if SCENARIO != "allow" and (
+        partitions or len(rejection_reasons) != 2
+    ):
+        raise RuntimeError(
+            f"expected two fail-closed replies for {{SCENARIO}}, got {{result}}"
+        )
     print(
         "{_RESULT_PREFIX}"
-        + json.dumps(
-            {{"node_count": len(node_ids), "partitions": partitions}},
-            sort_keys=True,
-            separators=(",", ":"),
-        ),
+        + json.dumps(result, sort_keys=True, separators=(",", ":")),
         flush=True,
     )
 """
@@ -248,10 +264,24 @@ class _ProcessManager:
             tail = owned.log_path.read_text(encoding="utf-8", errors="replace")[
                 -_LOG_TAIL_LIMIT:
             ]
-            for value in redactions:
-                tail = tail.replace(value, "<redacted-capability>")
-            tails[name] = tail
+            tails[name] = _sanitize_log_text(tail, redactions)
         return tails
+
+    def sanitize_logs(self, redactions: list[str]) -> None:
+        """Remove capability values and full hexadecimal hashes from saved logs."""
+        for owned in self.processes.values():
+            if owned.log_path.exists():
+                text = owned.log_path.read_text(encoding="utf-8", errors="replace")
+                owned.log_path.write_text(
+                    _sanitize_log_text(text, redactions), encoding="utf-8"
+                )
+
+
+def _sanitize_log_text(text: str, redactions: list[str]) -> str:
+    """Redact packages and full digest-shaped values from human-readable logs."""
+    for value in redactions:
+        text = text.replace(value, "<redacted-capability>")
+    return re.sub(r"\b[0-9a-fA-F]{64}\b", "<redacted-hash>", text)
 
 
 def _allocate_ports(count: int) -> list[int]:
@@ -376,7 +406,7 @@ def _write_supernode_identities(root: Path) -> list[dict[str, str]]:
     return identities
 
 
-def _write_app(root: Path) -> Path:
+def _write_app(root: Path, scenario: str) -> Path:
     """Write the deterministic dependency-free two-partition Flower App."""
     app_dir = root / "app"
     package_dir = app_dir / "two_node_demo"
@@ -384,9 +414,69 @@ def _write_app(root: Path) -> Path:
     (app_dir / "pyproject.toml").write_text(_PYPROJECT, encoding="utf-8")
     (app_dir / "LICENSE").write_text("Apache-2.0\n", encoding="utf-8")
     (package_dir / "__init__.py").write_text("", encoding="utf-8")
-    (package_dir / "server_app.py").write_text(_SERVER_APP, encoding="utf-8")
+    server_app = _SERVER_APP_TEMPLATE.replace("__SCENARIO__", scenario)
+    (package_dir / "server_app.py").write_text(server_app, encoding="utf-8")
     (package_dir / "client_app.py").write_text(_CLIENT_APP, encoding="utf-8")
     return app_dir
+
+
+def _capabilities_for_scenario(
+    scenario: str,
+    identities: list[dict[str, str]],
+    binding: str,
+    fab_hash: str,
+) -> tuple[dict[str, str], list[str]]:
+    """Return scenario packages and the raw values that logs must redact."""
+    if scenario == "allow":
+        package = binding
+        capabilities = {identity["participant_id"]: package for identity in identities}
+    elif scenario == "guardian-deny":
+        package = f"deny:{binding}"
+        capabilities = {identity["participant_id"]: package for identity in identities}
+    elif scenario == "binding-mismatch":
+        different_hash = "0" * 64 if fab_hash != "0" * 64 else "1" * 64
+        package = capability_binding(NOOP_FEDERATION_ID, different_hash)
+        capabilities = {identity["participant_id"]: package for identity in identities}
+    elif scenario == "missing-capability":
+        unrelated_participant = "flwr-p384-spki-pem-sha256:" + "0" * 64
+        if unrelated_participant in {
+            identity["participant_id"] for identity in identities
+        }:
+            unrelated_participant = "flwr-p384-spki-pem-sha256:" + "1" * 64
+        package = binding
+        capabilities = {unrelated_participant: package}
+    else:
+        raise ValueError(f"unsupported scenario: {scenario}")
+    return capabilities, [binding, package]
+
+
+def _read_process_log(manager: _ProcessManager, name: str) -> str:
+    """Read one complete child-process log after cleanup."""
+    owned = manager.processes.get(name)
+    if owned is None or not owned.log_path.exists():
+        return ""
+    return owned.log_path.read_text(encoding="utf-8", errors="replace")
+
+
+def _collect_observations(manager: _ProcessManager) -> dict[str, object]:
+    """Derive machine-readable lifecycle evidence from real process logs."""
+    node_logs = "\n".join(
+        _read_process_log(manager, f"supernode-{partition_id}")
+        for partition_id in range(2)
+    )
+    guardian_log = _read_process_log(manager, "guardian")
+    reasons = sorted(
+        match.strip()
+        for match in re.findall(r"verification=denied[^\n]*?reason=([^\n]+)", node_logs)
+    )
+    return {
+        "observed_node_rejection_count": node_logs.count("verification=denied"),
+        "observed_node_rejection_reasons": reasons,
+        "fab_request_count": node_logs.count("fab_retrieval=requested"),
+        "clientapp_task_start_count": node_logs.count("task_creation=started"),
+        "guardian_request_count": guardian_log.count("GuardianMock verify"),
+        "binding_mismatch_count": node_logs.count("match=false"),
+    }
 
 
 def _write_control_config(flwr_home: Path, control_port: int, ca_path: Path) -> None:
@@ -606,8 +696,12 @@ def _required_executable(name: str) -> str:
     return executable
 
 
-def run_demo(root: Path) -> dict[str, object]:  # pylint: disable=too-many-locals
+def run_demo(
+    root: Path, scenario: str = "allow"
+) -> dict[str, object]:  # pylint: disable=too-many-locals
     """Run the deployment and return secret-free machine-readable evidence."""
+    if scenario not in _SCENARIOS:
+        raise ValueError(f"unsupported scenario: {scenario}")
     root.mkdir(parents=True, exist_ok=True)
     logs_dir = root / "logs"
     logs_dir.mkdir()
@@ -617,20 +711,21 @@ def run_demo(root: Path) -> dict[str, object]:  # pylint: disable=too-many-local
     guardian_port, control_port, fleet_port, node0_port, node1_port = _allocate_ports(5)
     ca_path, leaves = _write_tls_material(root)
     identities = _write_supernode_identities(root)
-    app_dir = _write_app(root)
+    app_dir = _write_app(root, scenario)
     fab_bytes = build_fab_from_disk(app_dir)
     if fab_bytes != build_fab_from_disk(app_dir):
         raise RuntimeError("tiny FAB build is not deterministic")
     fab_hash = hashlib.sha256(fab_bytes).hexdigest()
     binding = capability_binding(NOOP_FEDERATION_ID, fab_hash)
+    capabilities, redactions = _capabilities_for_scenario(
+        scenario, identities, binding, fab_hash
+    )
     capabilities_path = root / "capabilities.json"
     capabilities_path.write_text(
         json.dumps(
             {
                 "version": CAPABILITY_FILE_VERSION,
-                "capabilities": {
-                    identity["participant_id"]: binding for identity in identities
-                },
+                "capabilities": capabilities,
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -641,8 +736,8 @@ def run_demo(root: Path) -> dict[str, object]:  # pylint: disable=too-many-local
     capabilities_hash = hashlib.sha256(capabilities_path.read_bytes()).hexdigest()
     _orchestration_event(
         orchestration_log,
-        f"capabilities_file={safe_digest_prefix(capabilities_hash)} "
-        f"participants={len(identities)}",
+        f"scenario={scenario} capabilities_file="
+        f"{safe_digest_prefix(capabilities_hash)} entries={len(capabilities)}",
     )
     _write_control_config(flwr_home, control_port, ca_path)
 
@@ -750,14 +845,29 @@ def run_demo(root: Path) -> dict[str, object]:  # pylint: disable=too-many-local
         if result_line is None:
             raise RuntimeError(f"run output lacked partition evidence:\n{run_output}")
         result = json.loads(result_line.split(_RESULT_PREFIX, maxsplit=1)[1])
-        if result != {"node_count": 2, "partitions": [0, 1]}:
-            raise RuntimeError(f"unexpected app result: {result}")
+        expected_result = {
+            "node_count": 2,
+            "partitions": [0, 1] if scenario == "allow" else [],
+            "node_rejection_count": 0 if scenario == "allow" else 2,
+            "node_rejection_reasons": (
+                []
+                if scenario == "allow"
+                else ["The run capability could not be verified."] * 2
+            ),
+        }
+        if result != expected_result:
+            raise RuntimeError(
+                f"unexpected app result for scenario {scenario}: {result}"
+            )
         _orchestration_event(
             orchestration_log,
-            f"completed partitions={result['partitions']}",
+            f"scenario={scenario} completed partitions={result['partitions']} "
+            f"rejections={result['node_rejection_count']}",
         )
         evidence = {
             "artifact_root": str(root),
+            "scenario": scenario,
+            "expected_outcome": "allow" if scenario == "allow" else "fail-closed",
             "fab_hash": fab_hash,
             "capabilities_file_sha256": capabilities_hash,
             "participant_ids": sorted(
@@ -782,14 +892,32 @@ def run_demo(root: Path) -> dict[str, object]:  # pylint: disable=too-many-local
     if failure is not None:
         diagnostics = {
             "cleanup": cleanup,
-            "log_tails": manager.log_tails([binding, f"deny:{binding}"]),
+            "log_tails": manager.log_tails(redactions),
         }
+        manager.sanitize_logs(redactions)
         diagnostic_text = json.dumps(diagnostics, sort_keys=True, separators=(",", ":"))
         raise RuntimeError(
             f"deployment failed: {failure}\n{_FAILURE_PREFIX}{diagnostic_text}"
         ) from failure
     if not all(cleanup.values()):
         raise RuntimeError(f"owned process cleanup failed: {cleanup}")
+    observations = _collect_observations(manager)
+    manager.sanitize_logs(redactions)
+    expected_count = 0 if scenario == "allow" else 2
+    expected_guardian_requests = 0 if scenario == "missing-capability" else 2
+    expected_fab_requests = 2 if scenario == "allow" else 0
+    expected_task_starts = 2 if scenario == "allow" else 0
+    if observations["observed_node_rejection_count"] != expected_count:
+        raise RuntimeError(f"unexpected rejection evidence: {observations}")
+    if observations["guardian_request_count"] != expected_guardian_requests:
+        raise RuntimeError(f"unexpected Guardian request evidence: {observations}")
+    if observations["fab_request_count"] != expected_fab_requests:
+        raise RuntimeError(f"unexpected FAB request evidence: {observations}")
+    if observations["clientapp_task_start_count"] != expected_task_starts:
+        raise RuntimeError(f"unexpected task-start evidence: {observations}")
+    if scenario == "binding-mismatch" and observations["binding_mismatch_count"] != 2:
+        raise RuntimeError(f"missing binding mismatch evidence: {observations}")
+    evidence.update(observations)
     evidence["cleanup"] = cleanup
     return evidence
 
@@ -802,13 +930,19 @@ def main() -> None:
         action="store_true",
         help="Retain generated state and logs instead of deleting them.",
     )
+    parser.add_argument(
+        "--scenario",
+        choices=_SCENARIOS,
+        default="allow",
+        help="Run the successful path or one expected fail-closed scenario.",
+    )
     args = parser.parse_args()
     if args.keep_artifacts:
         root = Path(tempfile.mkdtemp(prefix="flwr-mlcommons-two-node-"))
-        print(json.dumps(run_demo(root), indent=2, sort_keys=True))
+        print(json.dumps(run_demo(root, args.scenario), indent=2, sort_keys=True))
         return
     with tempfile.TemporaryDirectory(prefix="flwr-mlcommons-two-node-") as tmp:
-        print(json.dumps(run_demo(Path(tmp)), indent=2, sort_keys=True))
+        print(json.dumps(run_demo(Path(tmp), args.scenario), indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

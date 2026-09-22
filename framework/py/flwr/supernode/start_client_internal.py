@@ -350,40 +350,61 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
         # Ensure the run and FAB are available
         run_id = message.metadata.run_id
 
-        # Check if the message is from an unknown run
-        if (run_info := state.get_run(run_id)) is None:
+        # Resolve the run, but do not cache a newly fetched run until capability
+        # verification and FAB verification have both succeeded.
+        run_info = state.get_run(run_id)
+        run_cached = run_info is not None
+        if run_info is None:
             # Pull run info from SuperLink
             run_info = get_run(run_id)
 
-            if run_info.capability_required:
-                log(
-                    INFO,
-                    "%s SuperNode run_id=%s verification=required "
-                    "blocking_fab_retrieval=true",
-                    CAPABILITY_LOG_PREFIX,
-                    run_id,
-                )
-            try:
-                verify_capability(run_info)
-            except GuardianVerificationError as err:
-                log(
-                    ERROR,
-                    "%s SuperNode run_id=%s verification=denied "
-                    "fab_retrieval=skipped task_creation=skipped fail_closed=true "
-                    "reason=%s",
-                    CAPABILITY_LOG_PREFIX,
-                    run_id,
-                    err,
-                )
-                reply = Message(CAPABILITY_VERIFICATION_ERROR, reply_to=message)
-                _insert_message(reply, state, object_store)
-                return run_id
+        capability_required = run_info.capability_required is True
+        if capability_required:
+            log(
+                INFO,
+                "%s SuperNode run_id=%s verification=required "
+                "run_cached=%s blocking_task_creation=true "
+                "blocking_fab_retrieval=%s",
+                CAPABILITY_LOG_PREFIX,
+                run_id,
+                str(run_cached).lower(),
+                str(not run_cached).lower(),
+            )
+        try:
+            # Reverify on every message, including messages for cached runs.
+            verify_capability(run_info)
+        except GuardianVerificationError as err:
+            log(
+                ERROR,
+                "%s SuperNode run_id=%s verification=denied run_cached=%s "
+                "fab_retrieval=%s task_creation=skipped fail_closed=true reason=%s",
+                CAPABILITY_LOG_PREFIX,
+                run_id,
+                str(run_cached).lower(),
+                "cached_not_requested" if run_cached else "skipped",
+                err,
+            )
+            reply = Message(CAPABILITY_VERIFICATION_ERROR, reply_to=message)
+            _insert_message(reply, state, object_store)
+            return run_id
 
-            if run_info.capability_required:
+        if capability_required:
+            log(
+                INFO,
+                "%s SuperNode run_id=%s verification=accepted run_cached=%s "
+                "task_creation=unblocked fab_retrieval=%s",
+                CAPABILITY_LOG_PREFIX,
+                run_id,
+                str(run_cached).lower(),
+                "cached_not_requested" if run_cached else "unblocked",
+            )
+
+        # Fetch and cache the FAB/context only for a previously unknown run.
+        if not run_cached:
+            if capability_required:
                 log(
                     INFO,
-                    "%s SuperNode run_id=%s verification=accepted "
-                    "fab_retrieval=unblocked",
+                    "%s SuperNode run_id=%s fab_retrieval=requested",
                     CAPABILITY_LOG_PREFIX,
                     run_id,
                 )
@@ -455,6 +476,13 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                 run_id,
             )
             return None
+        if capability_required:
+            log(
+                INFO,
+                "%s SuperNode run_id=%s task_creation=started verification=accepted",
+                CAPABILITY_LOG_PREFIX,
+                run_id,
+            )
 
         # Preregister the object tree of the message
         obj_ids_to_pull = object_store.preregister(run_id, object_tree)
