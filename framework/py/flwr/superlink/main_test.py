@@ -19,7 +19,7 @@ from unittest.mock import Mock
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
-from pytest import MonkeyPatch
+from pytest import MonkeyPatch, mark
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -103,6 +103,25 @@ def test_create_app_mounts_core_health_router(monkeypatch: MonkeyPatch) -> None:
         route_context.path_format != "/ready"
         for route_context in iter_route_contexts(app.routes)
     )
+
+
+@mark.parametrize(
+    ("package_version", "expected"),
+    [
+        ("1.38.0", "1.38.0"),
+        ("1.38.0.dev123+build.abc1234", "1.38.0"),
+        ("unknown", "unknown"),
+    ],
+)
+def test_create_app_uses_public_version_in_openapi_schema(
+    monkeypatch: MonkeyPatch, package_version: str, expected: str
+) -> None:
+    """Remove development and build metadata from the OpenAPI version."""
+    monkeypatch.setattr(main, "package_version", package_version)
+
+    app = _create_app(monkeypatch)
+
+    assert app.openapi()["info"]["version"] == expected
 
 
 def test_get_ee_linkstate_db_uses_explicit_database(monkeypatch: MonkeyPatch) -> None:
