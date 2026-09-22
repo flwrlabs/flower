@@ -30,7 +30,7 @@ import pytest
 
 from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
 
-from . import model_worker, model_worker_protocol
+from . import model_worker, model_worker_protocol, task_worker, task_worker_protocol
 from .model_worker import ModelInvocation
 
 _RunOnce = Callable[[str, str, bool, bytes | None, Callable[[], None]], int]
@@ -55,15 +55,19 @@ def _exchange(
     server, client = socket.socketpair()
     result: list[int] = []
     thread = threading.Thread(
-        target=lambda: result.append(model_worker._serve_connection(server, run_once))
+        target=lambda: result.append(
+            task_worker._serve_connection(
+                server, run_once, ModelInvocation.from_payload, "Model"
+            )
+        )
     )
     thread.start()
     frames: list[dict[str, Any]] = []
     try:
         with client.makefile("rwb") as channel:
-            model_worker_protocol.send_message(channel, payload or _invocation())
+            task_worker_protocol.send_message(channel, payload or _invocation())
             while True:
-                frame = model_worker_protocol.read_message(channel)
+                frame = task_worker_protocol.read_message(channel)
                 frames.append(frame)
                 if frame.get("event") in {"finished", "rejected"}:
                     break
@@ -77,6 +81,7 @@ def _exchange(
 
 def test_protocol_rejects_invalid_messages() -> None:
     """Protocol messages should be typed, bounded, and fully written."""
+    assert model_worker_protocol.send_message is task_worker_protocol.send_message
 
     class ShortWriteChannel(BytesIO):
         """Accept only a few bytes from each write."""
@@ -85,18 +90,18 @@ def test_protocol_rejects_invalid_messages() -> None:
             return super().write(data[:3])
 
     channel = ShortWriteChannel()
-    model_worker_protocol.send_message(channel, {"value": "\ud800"})
+    task_worker_protocol.send_message(channel, {"value": "\ud800"})
     assert channel.getvalue() == b'{"value":"\\ud800"}\n'
 
     with pytest.raises(ValueError, match="valid JSON"):
-        model_worker_protocol.read_message(BytesIO(b"{\n"))
+        task_worker_protocol.read_message(BytesIO(b"{\n"))
     with pytest.raises(ValueError, match="non-empty string"):
         ModelInvocation.from_payload(_invocation(token=""))
     with pytest.raises(ValueError, match="unexpected fields"):
         ModelInvocation.from_payload(_invocation(extra=True))
     with pytest.raises(ValueError, match="too large"):
-        model_worker_protocol.read_message(
-            BytesIO(b"x" * (model_worker_protocol.MAX_PROTOCOL_MESSAGE_BYTES + 1))
+        task_worker_protocol.read_message(
+            BytesIO(b"x" * (task_worker_protocol.MAX_PROTOCOL_MESSAGE_BYTES + 1))
         )
 
 
@@ -131,10 +136,8 @@ def test_worker_cleans_up_socket_and_markers(
     server.accept.side_effect = accept
     register_signals = Mock()
     monkeypatch.setattr(socket, "socket", Mock(return_value=server))
-    monkeypatch.setattr(
-        model_worker, "_register_idle_signal_handlers", register_signals
-    )
-    monkeypatch.setattr(model_worker, "_serve_connection", serve_connection)
+    monkeypatch.setattr(task_worker, "_register_idle_signal_handlers", register_signals)
+    monkeypatch.setattr(task_worker, "_serve_connection", serve_connection)
     monkeypatch.setattr(Path, "unlink", unlink_after_busy)
 
     assert (
@@ -157,7 +160,7 @@ def test_dispatch_relays_accepted_output(
     connection.makefile.return_value.__enter__.return_value = channel
     monkeypatch.setattr(socket, "socket", Mock(return_value=connection))
     monkeypatch.setattr(
-        model_worker_protocol,
+        task_worker_protocol,
         "read_message",
         Mock(
             side_effect=[
@@ -194,7 +197,7 @@ def test_dispatch_rejects_output_before_acceptance(
     connection.makefile.return_value.__enter__.return_value = channel
     monkeypatch.setattr(socket, "socket", Mock(return_value=connection))
     monkeypatch.setattr(
-        model_worker_protocol,
+        task_worker_protocol,
         "read_message",
         Mock(return_value={"event": "output", "stream": "stdout", "data": "bad"}),
     )
@@ -285,7 +288,7 @@ def test_worker_rejects_failure_before_acceptance() -> None:
 
 def test_worker_reports_graceful_exit_after_acceptance() -> None:
     """A graceful resident exit should still send its terminal result."""
-    channel = BytesIO(model_worker_protocol.encode_message(_invocation()))
+    channel = BytesIO(task_worker_protocol.encode_message(_invocation()))
 
     def stop(
         _runtime_api_address: str,
@@ -298,11 +301,11 @@ def test_worker_reports_graceful_exit_after_acceptance() -> None:
         raise SystemExit(0)
 
     with pytest.raises(SystemExit):
-        model_worker._serve_channel(channel, stop)
+        task_worker._serve_channel(channel, stop, ModelInvocation.from_payload, "Model")
 
     responses = BytesIO(channel.getvalue().partition(b"\n")[2])
-    assert model_worker_protocol.read_message(responses) == {"event": "accepted"}
-    assert model_worker_protocol.read_message(responses) == {
+    assert task_worker_protocol.read_message(responses) == {"event": "accepted"}
+    assert task_worker_protocol.read_message(responses) == {
         "event": "finished",
         "returncode": 0,
     }
@@ -330,13 +333,15 @@ def test_disconnect_does_not_abort_accepted_task() -> None:
     result: list[int] = []
     thread = threading.Thread(
         target=lambda: result.append(
-            model_worker._serve_connection(server, run_once_mock)
+            task_worker._serve_connection(
+                server, run_once_mock, ModelInvocation.from_payload, "Model"
+            )
         )
     )
     thread.start()
     channel = client.makefile("rwb")
-    model_worker_protocol.send_message(channel, _invocation())
-    assert model_worker_protocol.read_message(channel) == {"event": "accepted"}
+    task_worker_protocol.send_message(channel, _invocation())
+    assert task_worker_protocol.read_message(channel) == {"event": "accepted"}
     assert started.wait(timeout=1.0)
     channel.close()
     client.close()
@@ -369,7 +374,7 @@ def test_saturated_output_channel_does_not_abort_task() -> None:
         def flush(self) -> None:
             return
 
-    channel = SlowChannel(model_worker_protocol.encode_message(_invocation()))
+    channel = SlowChannel(task_worker_protocol.encode_message(_invocation()))
 
     def run_once(
         _runtime_api_address: str,
@@ -383,7 +388,9 @@ def test_saturated_output_channel_does_not_abort_task() -> None:
         return 0
 
     started_at = time.monotonic()
-    result = model_worker._serve_channel(channel, run_once)
+    result = task_worker._serve_channel(
+        channel, run_once, ModelInvocation.from_payload, "Model"
+    )
     elapsed = time.monotonic() - started_at
 
     assert result == 0
