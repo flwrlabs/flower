@@ -235,7 +235,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             prompt=prompt,
             connectors=RuntimeAgentConnectors(agent_runtime),
             events=agent_events,
-            grid=RuntimeAgentGrid(grid, agent_events),
+            grid=RuntimeAgentGrid(grid, agent_events, context.node_id),
         )
 
         log(DEBUG, "[flwr-agentapp] Start FAB installation.")

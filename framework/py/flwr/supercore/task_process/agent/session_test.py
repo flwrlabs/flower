@@ -386,3 +386,32 @@ def test_create_connector_response_resolves_canonical_name() -> None:
     assert isinstance(request, ConnectorRequest)
     assert request.payload["name"] == "notion_search"
     assert output == "done"
+
+
+def test_create_connector_response_executes_filesystem_locally() -> None:
+    """Filesystem calls should stay on the requesting executor."""
+    stub = Mock()
+    agent_runtime = AgentRuntime(
+        stub=stub,
+        run_id=123,
+        task_id=789,
+        start_run_request=StartRunRequest(),
+        events=Mock(),
+    )
+
+    with patch(
+        "flwr.supercore.task_process.agent.session.invoke_filesystem",
+        return_value={"entries": []},
+    ) as invoke_filesystem:
+        output = agent_runtime.create_connector_response(
+            name="filesystem_list_directory",
+            call_id="call-1",
+            arguments={"path": "/allowed"},
+        )
+
+    assert output == {"entries": []}
+    stub.CreateTask.assert_not_called()
+    invoke_filesystem.assert_called_once_with(
+        "filesystem_list_directory",
+        {"path": "/allowed"},
+    )

@@ -49,6 +49,10 @@ from flwr.supercore.json_message.connector_message import (
 )
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
+from flwr.supercore.task_process.connector.filesystem import (
+    FILESYSTEM_CONNECTOR_REF,
+    invoke_filesystem,
+)
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
     get_connector_tools,
@@ -256,12 +260,14 @@ class AgentRuntime:
     def create_connector_response(
         self, *, name: str, call_id: str, arguments: JSONObject
     ) -> JSONValue:
-        """Create one connector response through a child connector task."""
+        """Create one connector response."""
         name = name.strip().lower()
+        connector_ref = get_connector_ref(name)
+        if connector_ref == FILESYSTEM_CONNECTOR_REF:
+            return invoke_filesystem(name, arguments)
+
         create_res = self._stub.CreateTask(
-            CreateTaskRequest(
-                type=TaskType.CONNECTOR, connector_ref=get_connector_ref(name)
-            )
+            CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=connector_ref)
         )
         if not create_res.HasField("task_id"):
             raise RuntimeError("Connector task could not be created.")

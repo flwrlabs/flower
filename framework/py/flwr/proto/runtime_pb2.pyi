@@ -222,11 +222,11 @@ class GetNodesResponse(google.protobuf.message.Message):
 
     NODES_FIELD_NUMBER: builtins.int
     @property
-    def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.node_pb2.Node]: ...
+    def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.node_pb2.NodeInfo]: ...
     def __init__(
         self,
         *,
-        nodes: collections.abc.Iterable[flwr.proto.node_pb2.Node] | None = ...,
+        nodes: collections.abc.Iterable[flwr.proto.node_pb2.NodeInfo] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["nodes", b"nodes"]) -> None: ...
 
