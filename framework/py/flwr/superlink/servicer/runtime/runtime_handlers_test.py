@@ -42,7 +42,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectRequest,
     PushObjectRequest,
 )
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.node_pb2 import Node, NodeInfo  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     CreateTaskRequest,
@@ -86,6 +86,25 @@ from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.runtime import runtime_handlers
 
 # pylint: disable=broad-except,too-many-lines
+
+
+def test_get_nodes_returns_metadata() -> None:
+    """Return names and locations for available nodes."""
+    state = Mock(spec=LinkState)
+    state.get_nodes.return_value = {11, 22}
+    state.get_node_info.return_value = [
+        NodeInfo(node_id=11, name="London", location="51.5072,-0.1276"),
+        NodeInfo(node_id=22),
+    ]
+
+    response = runtime_handlers.get_nodes(GetNodesRequest(), state, Task(run_id=123))
+
+    assert response == GetNodesResponse(
+        nodes=[
+            NodeInfo(node_id=11, name="London", location="51.5072,-0.1276"),
+            NodeInfo(node_id=22),
+        ]
+    )
 
 
 def test_raise_if_false() -> None:

@@ -17,6 +17,7 @@
 
 import ctypes
 import json
+import math
 import os
 import re
 import subprocess
@@ -87,6 +88,28 @@ def strict_json_dumps(value: JSONValue, *, compact: bool = False) -> str:
     if compact:
         return json.dumps(value, separators=(",", ":"), allow_nan=False)
     return json.dumps(value, allow_nan=False)
+
+
+def validate_node_location(location: str) -> None:
+    """Validate a SuperNode location in ``<latitude>,<longitude>`` format."""
+    try:
+        latitude_str, longitude_str = location.split(",")
+        latitude = float(latitude_str)
+        longitude = float(longitude_str)
+    except ValueError as err:
+        raise ValueError(
+            "Location must contain two comma-separated numbers: "
+            '"<latitude>,<longitude>".'
+        ) from err
+
+    if not math.isfinite(latitude) or not math.isfinite(longitude):
+        raise ValueError("Latitude and longitude must be finite numbers.")
+
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        raise ValueError(
+            "Latitude must be between -90 and 90 and longitude must be between "
+            "-180 and 180."
+        )
 
 
 def mask_string(value: str, head: int = 4, tail: int = 4) -> str:
