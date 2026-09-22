@@ -10,10 +10,10 @@ Use Endeavor with OpenCode
     You need a Flower API key with Endeavor access. Request access by filling out
     the `Endeavor 1.0 access form <https://flowerlabs.typeform.com/to/jlniHsuy>`_.
 
-This guide connects OpenCode CLI and OpenCode Desktop to ``flower-endeavor``
-at ``https://api.flower.ai/v1``. The commands below use macOS and its default
-shell, zsh. Install your preferred client using the `OpenCode setup guide
-<https://opencode.ai/download>`_ before continuing.
+This guide connects OpenCode CLI and OpenCode Desktop to
+``flwrlabs/endeavor-1.0`` at ``https://api.flower.ai/v1``. The commands below
+use macOS and its default shell, zsh. Install your preferred client using the
+`OpenCode setup guide <https://opencode.ai/download>`_ before continuing.
 
 For model details, see :doc:`endeavor`. To use ChatGPT/Codex instead, see
 :doc:`endeavor-chatgpt-codex`.
@@ -37,7 +37,7 @@ and ``provider.flower-labs`` settings, preserving unrelated configuration.
 
    {
      "$schema": "https://opencode.ai/config.json",
-     "model": "flower-labs/flower-endeavor",
+     "model": "flower-labs/flwrlabs/endeavor-1.0",
      "provider": {
        "flower-labs": {
          "npm": "@ai-sdk/openai",
@@ -47,7 +47,7 @@ and ``provider.flower-labs`` settings, preserving unrelated configuration.
            "apiKey": "{env:FLOWER_API_KEY}"
          },
          "models": {
-           "flower-endeavor": {
+           "flwrlabs/endeavor-1.0": {
              "name": "Endeavor"
            }
          }
@@ -86,7 +86,7 @@ In the same terminal, change to your project directory and start OpenCode:
 
 .. code-block:: zsh
 
-   opencode --model flower-labs/flower-endeavor
+   opencode --model flower-labs/flwrlabs/endeavor-1.0
 
 Send a prompt such as ``Explain the structure of this project.`` Repeat
 step 2 when starting from a new terminal session.

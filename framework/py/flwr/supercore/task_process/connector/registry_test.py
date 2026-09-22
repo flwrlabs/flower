@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for the connector registry."""
 
-
 from .registry import CONNECTORS
 
 

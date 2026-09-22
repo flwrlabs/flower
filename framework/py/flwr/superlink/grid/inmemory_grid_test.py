@@ -30,6 +30,7 @@ from flwr.common.constant import (
     Status,
 )
 from flwr.common.serde import message_from_proto
+from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import (
     InMemoryLinkState,
     LinkStateFactory,
@@ -153,11 +154,21 @@ class TestInMemoryGrid(unittest.TestCase):
 
     def test_get_nodes(self) -> None:
         """Test retrieval of nodes."""
+        node_infos = [
+            NodeInfo(node_id=node_id, name="London", location="51.5072,-0.1276")
+            for node_id in self.state.get_nodes.return_value
+        ]
+        self.state.get_node_info.return_value = node_infos
+
         # Execute
-        node_ids = list(self.grid.get_node_ids())
+        nodes = list(self.grid.get_nodes())
 
         # Assert
-        self.assertEqual(len(node_ids), self.num_nodes)
+        self.assertEqual(len(nodes), self.num_nodes)
+        self.assertEqual(nodes[0].name, "London")
+        self.assertEqual(nodes[0].location, "51.5072,-0.1276")
+        nodes[0].name = "Changed"
+        self.assertEqual(node_infos[0].name, "London")
 
     def test_push_messages_valid(self) -> None:
         """Test pushing valid messages."""

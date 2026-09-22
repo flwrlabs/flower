@@ -61,6 +61,9 @@ erDiagram
     TIMESTAMP added_at
     VARCHAR added_by
     VARCHAR app_type
+    VARCHAR color "nullable"
+    VARCHAR description "nullable"
+    VARCHAR display_name "nullable"
     VARCHAR fab_hash
     BOOLEAN is_hub_app "nullable"
     TIMESTAMP updated_at
@@ -100,6 +103,8 @@ erDiagram
     FLOAT heartbeat_interval "nullable"
     VARCHAR last_activated_at "nullable"
     VARCHAR last_deactivated_at "nullable"
+    VARCHAR location "nullable"
+    VARCHAR name "nullable"
     BIGINT node_id UK "nullable"
     FLOAT online_until "nullable"
     VARCHAR owner_aid "nullable"

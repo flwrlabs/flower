@@ -20,13 +20,16 @@
 ## Supported tags
 
 - `latest`
-  - points to `1.37.0` and `1.37.0-py3.13-ubuntu24.04`
+  - points to `1.38.0` and `1.38.0-py3.13-ubuntu24.04`
   - uses Python 3.13 and Ubuntu 24.04
 - `unstable`
   - points to the last successful build of the `main` branch
-- `nightly`, `<version>.dev<YYYYMMDD>` e.g. `1.38.0.dev20260915`
+- `nightly`, `<version>.dev<YYYYMMDD>` e.g. `1.39.0.dev20260922`
   - uses Python 3.13 and Ubuntu 24.04
-- `1.37.0`, `1.37.0-py3.13-ubuntu24.04`, `latest`
+- `1.38.0`, `1.38.0-py3.13-ubuntu24.04`, `latest`
+- `1.38.0-py3.12-ubuntu24.04`
+- `1.38.0-py3.11-ubuntu24.04`
+- `1.37.0`, `1.37.0-py3.13-ubuntu24.04`
 - `1.37.0-py3.12-ubuntu24.04`
 - `1.37.0-py3.11-ubuntu24.04`
 - `1.36.0`, `1.36.0-py3.13-ubuntu24.04`
