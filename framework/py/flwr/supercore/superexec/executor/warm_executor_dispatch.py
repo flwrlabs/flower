@@ -35,6 +35,7 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.warm_executor_constants import (
+    WARM_CONNECTOR_EXECUTOR_MODULE,
     WARM_EXECUTOR_BUSY_FILE,
     WARM_MODEL_EXECUTOR_MODULE,
 )
@@ -324,11 +325,15 @@ def warm_executor_command(
     spec: ExecutionSpec, runtime_root_certificates: str | None
 ) -> list[str]:
     """Build a one-task child command that receives authority on standard input."""
-    if spec.task_type == TaskType.MODEL:
+    worker_module = {
+        TaskType.CONNECTOR: WARM_CONNECTOR_EXECUTOR_MODULE,
+        TaskType.MODEL: WARM_MODEL_EXECUTOR_MODULE,
+    }.get(spec.task_type)
+    if worker_module is not None:
         command = [
             "python",
             "-m",
-            WARM_MODEL_EXECUTOR_MODULE,
+            worker_module,
             "dispatch",
             "--runtime-api-address",
             spec.runtime_api_address,
