@@ -34,7 +34,7 @@ from flwr.app import Context, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.client.grpc_adapter_client.connection import grpc_adapter
 from flwr.client.grpc_rere_client.connection import grpc_request_response
-from flwr.common.capability import CAPABILITY_LOG_PREFIX
+from flwr.common.capability import CAPABILITY_LOG_PREFIX, STORY_LOG_PREFIX
 from flwr.common.config import get_fused_config_from_fab
 from flwr.common.constant import (
     ISOLATION_MODE_SUBPROCESS,
@@ -370,6 +370,14 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                 str(run_cached).lower(),
                 str(not run_cached).lower(),
             )
+            log(
+                INFO,
+                "%s Execution gated: node_id=%s task_creation=blocked "
+                "fab_retrieval=%s",
+                STORY_LOG_PREFIX,
+                state.get_node_id(),
+                "cached" if run_cached else "blocked",
+            )
         try:
             # Reverify on every message, including messages for cached runs.
             verify_capability(run_info)
@@ -382,6 +390,13 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                 run_id,
                 str(run_cached).lower(),
                 "cached_not_requested" if run_cached else "skipped",
+                err,
+            )
+            log(
+                INFO,
+                "%s Execution blocked: FAB not requested; ClientApp task not "
+                "started; reason=%s",
+                STORY_LOG_PREFIX,
                 err,
             )
             reply = Message(CAPABILITY_VERIFICATION_ERROR, reply_to=message)
@@ -482,6 +497,12 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                 "%s SuperNode run_id=%s task_creation=started verification=accepted",
                 CAPABILITY_LOG_PREFIX,
                 run_id,
+            )
+            log(
+                INFO,
+                "%s Execution authorized: %s; ClientApp task started",
+                STORY_LOG_PREFIX,
+                "cached FAB reused" if run_cached else "FAB requested",
             )
 
         # Preregister the object tree of the message

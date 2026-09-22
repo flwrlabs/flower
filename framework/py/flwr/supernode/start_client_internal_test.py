@@ -189,9 +189,12 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state.get_run.return_value = run
         self.mock_state.create_task.return_value = 123
 
-        with patch(
-            "flwr.supernode.start_client_internal.verify_capability"
-        ) as mock_verify:
+        with (
+            patch(
+                "flwr.supernode.start_client_internal.verify_capability"
+            ) as mock_verify,
+            patch("flwr.supernode.start_client_internal.log") as mock_log,
+        ):
             result = _pull_and_store_message(
                 state=self.mock_state,
                 object_store=self.mock_object_store,
@@ -210,6 +213,14 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_get_fab.assert_not_called()
         self.mock_state.store_run.assert_not_called()
         self.mock_state.create_task.assert_called_once()
+        rendered = " ".join(str(call.args) for call in mock_log.call_args_list)
+        assert (
+            "Execution gated: node_id=%s task_creation=blocked fab_retrieval=%s"
+            in rendered
+        )
+        assert "cached" in rendered
+        assert "Execution authorized: %s; ClientApp task started" in rendered
+        assert "cached FAB reused" in rendered
 
     def test_cached_run_denial_stops_before_task_and_object_processing(self) -> None:
         """Fail closed when re-verification rejects a cached run."""
@@ -269,6 +280,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
                 "flwr.supernode.start_client_internal.get_fused_config_from_fab",
                 return_value={},
             ),
+            patch("flwr.supernode.start_client_internal.log") as mock_log,
         ):
             first = _pull_and_store_message(
                 self.mock_state,
@@ -299,6 +311,13 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state.store_run.assert_called_once_with(run)
         self.mock_state.create_task.assert_called_once()
         self.mock_confirm_message_received.assert_called_once()
+        rendered = " ".join(str(call.args) for call in mock_log.call_args_list)
+        assert "Execution authorized: %s; ClientApp task started" in rendered
+        assert "FAB requested" in rendered
+        assert (
+            "Execution blocked: FAB not requested; ClientApp task not started; "
+            "reason=%s" in rendered
+        )
 
     def test_reentry_refetches_run_after_verification_interruption(self) -> None:
         """Never cache an unknown run before verification succeeds on re-entry."""
@@ -662,6 +681,14 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         assert "fab_retrieval=skipped" in rendered
         assert "task_creation=skipped" in rendered
         assert "fail_closed=true" in rendered
+        assert (
+            "Execution gated: node_id=111 task_creation=blocked "
+            "fab_retrieval=blocked" in rendered
+        )
+        assert (
+            "Execution blocked: FAB not requested; ClientApp task not started; "
+            "reason=Guardian denied the capability" in rendered
+        )
         assert "opaque" not in rendered
         guardian_rendered = " ".join(
             str(call.args) for call in guardian_log.call_args_list

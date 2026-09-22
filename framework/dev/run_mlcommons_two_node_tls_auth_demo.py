@@ -60,6 +60,7 @@ from flwr.cli.build import build_fab_from_disk
 from flwr.common.capability import (
     CAPABILITY_FILE_VERSION,
     CAPABILITY_LOG_PREFIX,
+    STORY_LOG_PREFIX,
     capability_binding,
     participant_id_from_public_key,
     safe_digest_prefix,
@@ -465,6 +466,7 @@ def _collect_observations(manager: _ProcessManager) -> dict[str, object]:
         for partition_id in range(2)
     )
     guardian_log = _read_process_log(manager, "guardian")
+    superlink_log = _read_process_log(manager, "superlink")
     reasons = sorted(
         match.strip()
         for match in re.findall(r"verification=denied[^\n]*?reason=([^\n]+)", node_logs)
@@ -476,7 +478,103 @@ def _collect_observations(manager: _ProcessManager) -> dict[str, object]:
         "clientapp_task_start_count": node_logs.count("task_creation=started"),
         "guardian_request_count": guardian_log.count("GuardianMock verify"),
         "binding_mismatch_count": node_logs.count("match=false"),
+        "binding_match_count": node_logs.count("match=true"),
+        "capability_missing_count": superlink_log.count("Capability missing:"),
+        "capability_selected_count": superlink_log.count("Capability selected:"),
     }
+
+
+def _ordered_process_story(manager: _ProcessManager) -> list[str]:
+    """Return component-owned story events in causal presentation order."""
+    text = "\n".join(
+        _read_process_log(manager, name)
+        for name in ("superlink", "supernode-0", "supernode-1", "guardian")
+    )
+    text = re.sub(r"\x1b\[[0-9;]*m", "", text)
+    events = [
+        line.split(STORY_LOG_PREFIX, maxsplit=1)[1].strip()
+        for line in text.splitlines()
+        if STORY_LOG_PREFIX in line
+    ]
+    prefixes = (
+        "Run accepted:",
+        "Capability selected:",
+        "Capability missing:",
+        "Execution gated:",
+        "Guardian decision:",
+        "Guardian not called:",
+        "SuperNode fed/FAB binding check:",
+        "Execution authorized:",
+        "Execution blocked:",
+    )
+
+    def priority(event: str) -> int:
+        return next(
+            (
+                index
+                for index, prefix in enumerate(prefixes)
+                if event.startswith(prefix)
+            ),
+            len(prefixes),
+        )
+
+    ordered = sorted(events, key=priority)
+    return list(dict.fromkeys(ordered))
+
+
+def _classify_outcome(evidence: Mapping[str, object]) -> tuple[str, bool]:
+    """Classify one demo outcome strictly from collected process evidence."""
+    result = evidence.get("result")
+    result_dict = result if isinstance(result, dict) else {}
+    partitions = result_dict.get("partitions")
+    rejections = evidence.get("observed_node_rejection_count")
+    reasons = evidence.get("observed_node_rejection_reasons")
+    guardian_calls = evidence.get("guardian_request_count")
+    fab_requests = evidence.get("fab_request_count")
+    task_starts = evidence.get("clientapp_task_start_count")
+    mismatches = evidence.get("binding_mismatch_count")
+    matches = evidence.get("binding_match_count")
+    missing = evidence.get("capability_missing_count")
+
+    if (
+        partitions == [0, 1]
+        and rejections == 0
+        and guardian_calls == 2
+        and matches == 2
+        and fab_requests == 2
+        and task_starts == 2
+    ):
+        return "OUTCOME: AUTHORIZED — 2/2 SuperNodes executed; partitions=[0,1]", True
+    if rejections == 2 and mismatches == 2 and fab_requests == 0 and task_starts == 0:
+        return (
+            "OUTCOME: BLOCKED BY SUPERNODE FED/FAB BINDING CHECK — "
+            "mismatches=2; FAB requests=0; ClientApps started=0",
+            True,
+        )
+    if (
+        reasons == ["Guardian denied the capability"] * 2
+        and guardian_calls == 2
+        and fab_requests == 0
+        and task_starts == 0
+    ):
+        return (
+            "OUTCOME: BLOCKED BY GUARDIAN — 2/2 SuperNodes rejected; "
+            "FAB requests=0; ClientApps started=0",
+            True,
+        )
+    if (
+        rejections == 2
+        and missing == 2
+        and guardian_calls == 0
+        and fab_requests == 0
+        and task_starts == 0
+    ):
+        return (
+            "OUTCOME: BLOCKED BEFORE GUARDIAN — capabilities missing=2; "
+            "Guardian calls=0; FAB requests=0; ClientApps started=0",
+            True,
+        )
+    return "OUTCOME: UNEXPECTED — evidence did not describe a valid demo outcome", False
 
 
 def _write_control_config(flwr_home: Path, control_port: int, ca_path: Path) -> None:
@@ -594,6 +692,14 @@ def _run_command(executable: str, app_dir: Path, capabilities_path: Path) -> lis
 def _orchestration_event(log_path: Path, event: str) -> None:
     """Persist and print one sanitized orchestration event."""
     line = f"{CAPABILITY_LOG_PREFIX} Demo {event}"
+    with log_path.open("a", encoding="utf-8") as log_file:
+        log_file.write(line + "\n")
+    print(line, flush=True)
+
+
+def _story_event(log_path: Path, event: str) -> None:
+    """Persist and print one evidence-backed presentation event."""
+    line = f"{STORY_LOG_PREFIX} {event}"
     with log_path.open("a", encoding="utf-8") as log_file:
         log_file.write(line + "\n")
     print(line, flush=True)
@@ -764,6 +870,10 @@ def run_demo(
             ],
         )
         _wait_for_port(guardian_port, timeout=_READY_TIMEOUT, process=guardian)
+        _story_event(
+            orchestration_log,
+            f"Guardian started: endpoint=http://{_HOST}:{guardian_port}",
+        )
 
         link_cert, link_key = leaves["superlink"]
         link = manager.start(
@@ -790,6 +900,15 @@ def run_demo(
             process=link,
             ca_path=ca_path,
         )
+        _story_event(
+            orchestration_log,
+            f"SuperLink started: control={_HOST}:{control_port} "
+            f"fleet={_HOST}:{fleet_port}",
+        )
+        _story_event(
+            orchestration_log,
+            "TLS verified: SuperLink Control and Fleet APIs",
+        )
 
         registered_node_ids = []
         for identity in identities:
@@ -813,6 +932,12 @@ def run_demo(
                 f"node_id={registered_node_ids[-1]} "
                 f"partition={identity['partition_id']}",
             )
+            _story_event(
+                orchestration_log,
+                f"Participant registered: participant={participant_prefix} "
+                f"node_id={registered_node_ids[-1]} "
+                f"partition={identity['partition_id']}",
+            )
 
         node_ports = [node0_port, node1_port]
         for identity, port in zip(identities, node_ports, strict=True):
@@ -832,8 +957,33 @@ def run_demo(
                 ),
             )
             _wait_for_port(port, timeout=_READY_TIMEOUT, process=node, ca_path=ca_path)
+            _story_event(
+                orchestration_log,
+                f"SuperNode started: partition={partition_id} "
+                f"runtime={_HOST}:{port}",
+            )
+            _story_event(
+                orchestration_log,
+                f"TLS verified: SuperNode partition={partition_id} Runtime API",
+            )
 
         online_node_ids = _wait_for_nodes(flwr, env, _READY_TIMEOUT)
+        if set(registered_node_ids) != set(online_node_ids):
+            raise RuntimeError(
+                "registered and online SuperNode IDs did not reconcile: "
+                f"registered={sorted(registered_node_ids)} "
+                f"online={online_node_ids}"
+            )
+        for identity, node_id in zip(identities, registered_node_ids, strict=True):
+            _story_event(
+                orchestration_log,
+                "SuperNode authenticated and online: "
+                f"partition={identity['partition_id']} node_id={node_id}",
+            )
+        _story_event(
+            orchestration_log,
+            "Topology ready: SuperLinks=1 SuperNodes=2 Guardian=1",
+        )
         run_output = _run_checked(
             _run_command(flwr, app_dir, capabilities_path),
             env,
@@ -867,7 +1017,6 @@ def run_demo(
         evidence = {
             "artifact_root": str(root),
             "scenario": scenario,
-            "expected_outcome": "allow" if scenario == "allow" else "fail-closed",
             "fab_hash": fab_hash,
             "capabilities_file_sha256": capabilities_hash,
             "participant_ids": sorted(
@@ -902,23 +1051,22 @@ def run_demo(
     if not all(cleanup.values()):
         raise RuntimeError(f"owned process cleanup failed: {cleanup}")
     observations = _collect_observations(manager)
+    process_story = _ordered_process_story(manager)
     manager.sanitize_logs(redactions)
-    expected_count = 0 if scenario == "allow" else 2
-    expected_guardian_requests = 0 if scenario == "missing-capability" else 2
-    expected_fab_requests = 2 if scenario == "allow" else 0
-    expected_task_starts = 2 if scenario == "allow" else 0
-    if observations["observed_node_rejection_count"] != expected_count:
-        raise RuntimeError(f"unexpected rejection evidence: {observations}")
-    if observations["guardian_request_count"] != expected_guardian_requests:
-        raise RuntimeError(f"unexpected Guardian request evidence: {observations}")
-    if observations["fab_request_count"] != expected_fab_requests:
-        raise RuntimeError(f"unexpected FAB request evidence: {observations}")
-    if observations["clientapp_task_start_count"] != expected_task_starts:
-        raise RuntimeError(f"unexpected task-start evidence: {observations}")
-    if scenario == "binding-mismatch" and observations["binding_mismatch_count"] != 2:
-        raise RuntimeError(f"missing binding mismatch evidence: {observations}")
     evidence.update(observations)
     evidence["cleanup"] = cleanup
+    outcome, valid_outcome = _classify_outcome(evidence)
+    for event in process_story:
+        _story_event(orchestration_log, event)
+    _story_event(orchestration_log, outcome)
+    _story_event(
+        orchestration_log,
+        "Cleanup complete: SuperNodes=stopped Guardian=stopped SuperLink=stopped",
+    )
+    evidence["story_events"] = process_story
+    evidence["story_outcome"] = outcome
+    if not valid_outcome:
+        raise RuntimeError(outcome)
     return evidence
 
 

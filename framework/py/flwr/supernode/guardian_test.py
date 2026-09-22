@@ -70,7 +70,8 @@ def test_guardian_mock_round_trip(capsys: pytest.CaptureFixture[str]) -> None:
     assert "[CAPABILITY] GuardianMock verify" in output
     assert "protocol=v1" in output
     assert "decision=allow" in output
-    assert "returned_binding=" + "a" * 12 in output
+    assert "returned_fed_fab_binding=" + "a" * 12 in output
+    assert "[STORY] Guardian decision: ALLOW" in output
     assert "match=" not in output
     assert BINDING not in output
     assert "PRIVATE KEY" not in output
@@ -99,7 +100,10 @@ def test_guardian_allows_matching_binding(urlopen: MagicMock) -> None:
     rendered = " ".join(str(call) for call in calls)
     assert "http://guardian/v1/verify" in rendered
     assert "allowed=%s" in rendered
-    assert "binding_check expected=%s returned=%s match=%s" in rendered
+    assert "fed_fab_binding_check expected=%s returned=%s match=%s" in rendered
+    assert "Guardian decision:" not in rendered
+    assert "SuperNode fed/FAB binding check: %s expected=%s returned=%s" in rendered
+    assert "BINDING MATCHES" in rendered
     assert calls[match_index][-1] == "true"
     assert "a" * 12 in rendered
     assert BINDING not in rendered
@@ -117,7 +121,7 @@ def test_guardian_mismatch_logs_supernode_match_false(urlopen: MagicMock) -> Non
 
     with (
         patch("flwr.supernode.guardian.log") as mock_log,
-        pytest.raises(GuardianVerificationError, match="mismatched job binding"),
+        pytest.raises(GuardianVerificationError, match="mismatched fed/FAB binding"),
     ):
         verify_capability(_run())
 
@@ -133,6 +137,7 @@ def test_guardian_mismatch_logs_supernode_match_false(urlopen: MagicMock) -> Non
     assert response_index < match_index
     assert mock_log.call_args_list[match_index].args[-1] == "false"
     rendered = " ".join(rendered_calls)
+    assert "BINDING MISMATCH" in rendered
     assert "a" * 12 in rendered
     assert "b" * 12 in rendered
     assert BINDING not in rendered
@@ -159,6 +164,21 @@ def test_guardian_denial_does_not_log_successful_binding_match(
     assert "Guardian response" in rendered
     assert "binding_check" not in rendered
     assert "match=true" not in rendered
+    assert "Guardian decision:" not in rendered
+    assert "SuperNode fed/FAB binding check: NOT RUN guardian_decision=deny" in rendered
+
+
+def test_missing_capability_logs_guardian_not_called() -> None:
+    """Explain that the missing-package path stops before Guardian."""
+    with (
+        patch("flwr.supernode.guardian.log") as mock_log,
+        pytest.raises(GuardianVerificationError, match="no capability"),
+    ):
+        verify_capability(_run(b""))
+
+    rendered = " ".join(str(call.args) for call in mock_log.call_args_list)
+    assert "[STORY]" in rendered
+    assert "Guardian not called: no capability routed to this SuperNode" in rendered
 
 
 @patch.dict(

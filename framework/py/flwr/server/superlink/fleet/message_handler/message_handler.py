@@ -20,6 +20,7 @@ from logging import ERROR, INFO
 from flwr.app import Message
 from flwr.common.capability import (
     CAPABILITY_LOG_PREFIX,
+    STORY_LOG_PREFIX,
     capability_binding,
     participant_id_from_public_key,
     safe_digest_prefix,
@@ -267,6 +268,14 @@ def get_run(request: GetRunRequest, state: LinkState) -> GetRunResponse:
             safe_digest_prefix(participant_id),
             "found" if package else "missing",
             " fail_closed=true" if not package else "",
+        )
+        log(
+            INFO,
+            "%s Capability %s: node_id=%s participant=%s",
+            STORY_LOG_PREFIX,
+            "selected" if package else "missing",
+            request.node.node_id,
+            safe_digest_prefix(participant_id),
         )
 
     return GetRunResponse(run=run_to_proto(run))

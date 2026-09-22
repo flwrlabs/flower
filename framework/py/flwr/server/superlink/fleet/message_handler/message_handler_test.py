@@ -44,7 +44,7 @@ def test_get_run_routes_capability_by_registered_public_key() -> None:
     run.fab_hash = "a" * 64
     run.status.status = Status.RUNNING
     run.capability_packages = {
-        participant_id: b"selected",
+        participant_id: b"raw-secret-package",
         "flwr-p384-spki-pem-sha256:" + "b" * 64: b"other",
     }
     state = MagicMock()
@@ -58,17 +58,20 @@ def test_get_run_routes_capability_by_registered_public_key() -> None:
         response = get_run(GetRunRequest(node=Node(node_id=7), run_id=123), state)
 
     assert response.run.capability_required
-    assert response.run.capability_package == b"selected"
+    assert response.run.capability_package == b"raw-secret-package"
     assert response.run.capability_binding == capability_binding(
         run.federation_id, run.fab_hash
     )
-    rendered = " ".join(str(value) for value in mock_log.call_args.args)
+    rendered = " ".join(str(call.args) for call in mock_log.call_args_list)
     assert "[CAPABILITY]" in rendered
     assert "GetRun route" in rendered
     assert "123" in rendered and "7" in rendered
     assert participant_id[-64:-52] in rendered
     assert "match=%s%s" in rendered
-    assert "selected" not in rendered
+    assert "[STORY]" in rendered
+    assert "Capability %s: node_id=%s participant=%s" in rendered
+    assert "selected" in rendered
+    assert "raw-secret-package" not in rendered
 
 
 def test_get_run_marks_missing_participant_capability_as_required() -> None:
@@ -88,7 +91,11 @@ def test_get_run_marks_missing_participant_capability_as_required() -> None:
 
     assert response.run.capability_required
     assert response.run.capability_package == b""
-    assert mock_log.call_args.args[-2:] == ("missing", " fail_closed=true")
+    rendered = " ".join(str(call.args) for call in mock_log.call_args_list)
+    assert "missing" in rendered
+    assert "fail_closed=true" in rendered
+    assert "[STORY]" in rendered
+    assert "Capability %s: node_id=%s participant=%s" in rendered
 
 
 def test_pull_messages() -> None:

@@ -18,6 +18,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -26,12 +27,15 @@ from dev.run_mlcommons_two_node_tls_auth_demo import (
     _FAILURE_PREFIX,
     _allocate_ports,
     _capabilities_for_scenario,
+    _classify_outcome,
     _demo_env,
     _json_object_from_output,
     _orchestration_event,
+    _ordered_process_story,
     _ProcessManager,
     _run_command,
     _sanitize_log_text,
+    _story_event,
     _superlink_command,
     _supernode_command,
     _wait_for_port,
@@ -40,6 +44,149 @@ from dev.run_mlcommons_two_node_tls_auth_demo import (
     _write_tls_material,
     run_demo,
 )
+
+
+def _evidence(**overrides: object) -> dict[str, object]:
+    """Build minimal collected evidence for outcome classification tests."""
+    evidence: dict[str, object] = {
+        "scenario": "guardian-deny",
+        "result": {"partitions": []},
+        "observed_node_rejection_count": 2,
+        "observed_node_rejection_reasons": [],
+        "guardian_request_count": 0,
+        "fab_request_count": 0,
+        "clientapp_task_start_count": 0,
+        "binding_mismatch_count": 0,
+        "binding_match_count": 0,
+        "capability_missing_count": 0,
+    }
+    evidence.update(overrides)
+    return evidence
+
+
+@pytest.mark.parametrize(
+    ("evidence", "expected"),
+    [
+        (
+            _evidence(
+                result={"partitions": [0, 1]},
+                observed_node_rejection_count=0,
+                guardian_request_count=2,
+                binding_match_count=2,
+                fab_request_count=2,
+                clientapp_task_start_count=2,
+            ),
+            "OUTCOME: AUTHORIZED — 2/2 SuperNodes executed; partitions=[0,1]",
+        ),
+        (
+            _evidence(
+                observed_node_rejection_reasons=["Guardian denied the capability"] * 2,
+                guardian_request_count=2,
+            ),
+            "OUTCOME: BLOCKED BY GUARDIAN",
+        ),
+        (
+            _evidence(binding_mismatch_count=2, guardian_request_count=2),
+            "OUTCOME: BLOCKED BY SUPERNODE FED/FAB BINDING CHECK",
+        ),
+        (
+            _evidence(capability_missing_count=2),
+            "OUTCOME: BLOCKED BEFORE GUARDIAN",
+        ),
+    ],
+)
+def test_outcome_classification_uses_evidence_not_scenario(
+    evidence: dict[str, object], expected: str
+) -> None:
+    """Classify from observations even when the scenario label is misleading."""
+    outcome, valid = _classify_outcome(evidence)
+
+    assert valid
+    assert outcome.startswith(expected)
+
+
+def test_unexpected_evidence_is_reported_as_failure() -> None:
+    """Reject evidence that does not describe one internally consistent outcome."""
+    outcome, valid = _classify_outcome(
+        _evidence(observed_node_rejection_count=1, capability_missing_count=1)
+    )
+
+    assert not valid
+    assert outcome == (
+        "OUTCOME: UNEXPECTED — evidence did not describe a valid demo outcome"
+    )
+
+
+@pytest.mark.parametrize(
+    "missing_evidence",
+    ["guardian_request_count", "binding_match_count"],
+)
+def test_authorized_requires_guardian_and_binding_match_evidence(
+    missing_evidence: str,
+) -> None:
+    """Do not authorize from partitions/FAB/tasks without trust evidence."""
+    evidence = _evidence(
+        result={"partitions": [0, 1]},
+        observed_node_rejection_count=0,
+        guardian_request_count=2,
+        binding_match_count=2,
+        fab_request_count=2,
+        clientapp_task_start_count=2,
+    )
+    evidence[missing_evidence] = 0
+
+    outcome, valid = _classify_outcome(evidence)
+
+    assert not valid
+    assert outcome.startswith("OUTCOME: UNEXPECTED")
+
+
+def test_component_story_is_ordered_by_decision_causality(tmp_path: Path) -> None:
+    """Present component-owned events in stable causal order."""
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    contents = {
+        "superlink": "\n".join(
+            [
+                "[STORY] Capability selected: node_id=7 participant=abc",
+                (
+                    "[STORY] Run accepted: run_id=1 fab_hash=aaa "
+                    "fed_fab_binding=bbb participants=1"
+                ),
+            ]
+        ),
+        "supernode-0": "\n".join(
+            [
+                "[STORY] Execution authorized: FAB requested; ClientApp task started",
+                (
+                    "[STORY] Execution gated: node_id=7 "
+                    "task_creation=blocked fab_retrieval=blocked"
+                ),
+                (
+                    "[STORY] SuperNode fed/FAB binding check: "
+                    "BINDING MATCHES expected=bbb returned=bbb"
+                ),
+            ]
+        ),
+        "guardian": "[STORY] Guardian decision: ALLOW returned_fed_fab_binding=bbb",
+    }
+    manager = MagicMock()
+    manager.processes = {}
+    for name, content in contents.items():
+        path = logs / f"{name}.log"
+        path.write_text(content, encoding="utf-8")
+        manager.processes[name] = MagicMock(log_path=path)
+
+    events = _ordered_process_story(manager)
+
+    assert [event.split(":", maxsplit=1)[0] for event in events] == [
+        "Run accepted",
+        "Capability selected",
+        "Execution gated",
+        "Guardian decision",
+        "SuperNode fed/FAB binding check",
+        "Execution authorized",
+    ]
 
 
 def test_capability_scenarios_route_expected_packages() -> None:
@@ -132,6 +279,19 @@ def test_orchestration_event_is_prefixed_persisted_and_sanitized(
 
     expected = "[CAPABILITY] Demo completed partitions=[0, 1]"
     assert expected in capsys.readouterr().out
+    assert log_path.read_text(encoding="utf-8").strip() == expected
+
+
+def test_story_event_is_emitted_live_and_persisted(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Use the stable story prefix for terminal and orchestration output."""
+    log_path = tmp_path / "orchestration.log"
+
+    _story_event(log_path, "Guardian started: endpoint=http://127.0.0.1:1234")
+
+    expected = "[STORY] Guardian started: endpoint=http://127.0.0.1:1234"
+    assert capsys.readouterr().out.strip() == expected
     assert log_path.read_text(encoding="utf-8").strip() == expected
 
 
@@ -283,3 +443,10 @@ def test_partial_start_reports_logs_and_cleanup(
     assert "unknown option" in diagnostics["log_tails"]["superlink"].lower()
     assert "PRIVATE KEY" not in message
     assert "flwr-capability-binding-v1" not in message
+    orchestration = (tmp_path / "artifacts/logs/orchestration.log").read_text(
+        encoding="utf-8"
+    )
+    assert "[STORY] Guardian started:" in orchestration
+    assert "[STORY] SuperLink started:" not in orchestration
+    assert "[STORY] TLS verified: SuperLink" not in orchestration
+    assert "[STORY] Topology ready:" not in orchestration

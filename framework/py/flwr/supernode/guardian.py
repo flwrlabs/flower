@@ -22,7 +22,11 @@ import urllib.parse
 import urllib.request
 from logging import INFO
 
-from flwr.common.capability import CAPABILITY_LOG_PREFIX, safe_digest_prefix
+from flwr.common.capability import (
+    CAPABILITY_LOG_PREFIX,
+    STORY_LOG_PREFIX,
+    safe_digest_prefix,
+)
 from flwr.supercore import log
 from flwr.supercore.run import Run
 
@@ -46,10 +50,15 @@ def _safe_endpoint_for_log(parsed_url: urllib.parse.SplitResult) -> str:
 
 
 def verify_capability(run: Run) -> None:
-    """Fail closed unless the local Guardian authorizes the expected binding."""
+    """Fail closed unless Guardian authorizes the expected federation/FAB binding."""
     if run.capability_required is not True:
         return
     if not run.capability_package:
+        log(
+            INFO,
+            "%s Guardian not called: no capability routed to this SuperNode",
+            STORY_LOG_PREFIX,
+        )
         raise GuardianVerificationError("no capability was routed to this SuperNode")
 
     guardian_url = os.getenv(GUARDIAN_URL_ENV, "").strip()
@@ -81,7 +90,7 @@ def verify_capability(run: Run) -> None:
         ) from err
     log(
         INFO,
-        "%s Guardian call protocol=%s endpoint=%s expected_binding=%s",
+        "%s Guardian call protocol=%s endpoint=%s expected_fed_fab_binding=%s",
         CAPABILITY_LOG_PREFIX,
         GUARDIAN_PROTOCOL_VERSION,
         logged_endpoint,
@@ -120,7 +129,7 @@ def verify_capability(run: Run) -> None:
     returned_binding = result.get("binding")
     log(
         INFO,
-        "%s Guardian response allowed=%s returned_binding=%s",
+        "%s Guardian response allowed=%s returned_fed_fab_binding=%s",
         CAPABILITY_LOG_PREFIX,
         str(allowed).lower(),
         (
@@ -130,11 +139,16 @@ def verify_capability(run: Run) -> None:
         ),
     )
     if not allowed:
+        log(
+            INFO,
+            "%s SuperNode fed/FAB binding check: NOT RUN guardian_decision=deny",
+            STORY_LOG_PREFIX,
+        )
         raise GuardianVerificationError("Guardian denied the capability")
     binding_matches = returned_binding == run.capability_binding
     log(
         INFO,
-        "%s SuperNode binding_check expected=%s returned=%s match=%s",
+        "%s SuperNode fed_fab_binding_check expected=%s returned=%s match=%s",
         CAPABILITY_LOG_PREFIX,
         safe_digest_prefix(run.capability_binding),
         (
@@ -144,5 +158,19 @@ def verify_capability(run: Run) -> None:
         ),
         str(binding_matches).lower(),
     )
+    log(
+        INFO,
+        "%s SuperNode fed/FAB binding check: %s expected=%s returned=%s",
+        STORY_LOG_PREFIX,
+        "BINDING MATCHES" if binding_matches else "BINDING MISMATCH",
+        safe_digest_prefix(run.capability_binding),
+        (
+            safe_digest_prefix(returned_binding)
+            if isinstance(returned_binding, str)
+            else "none"
+        ),
+    )
     if not binding_matches:
-        raise GuardianVerificationError("Guardian returned a mismatched job binding")
+        raise GuardianVerificationError(
+            "Guardian returned a mismatched fed/FAB binding"
+        )

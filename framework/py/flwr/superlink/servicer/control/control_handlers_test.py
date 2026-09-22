@@ -431,10 +431,21 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertIn(fab_hash[:12], rendered)
         self.assertIn(binding[-64:-52], rendered)
         self.assertIn("participants=%s", rendered)
+        self.assertIn("fed_fab_binding=%s", rendered)
+        self.assertNotIn(" binding=%s", rendered)
         self.assertNotIn(fab_hash, rendered)
         self.assertNotIn(binding, rendered)
         self.assertNotIn(participant_id, rendered)
         self.assertNotIn("raw-secret-package", rendered)
+        story_calls = [
+            item.args for item in mock_log.call_args_list if "[STORY]" in str(item.args)
+        ]
+        self.assertEqual(len(story_calls), 1)
+        story_rendered = str(story_calls[0])
+        self.assertIn("Run accepted:", story_rendered)
+        self.assertIn("fed_fab_binding=%s", story_rendered)
+        self.assertIn(fab_hash[:12], story_rendered)
+        self.assertIn(binding[-64:-52], story_rendered)
 
     def test_start_run_uses_and_refreshes_stale_hub_fab(self) -> None:
         """Start from the cached FAB and refresh it in the background."""
