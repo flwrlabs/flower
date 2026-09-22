@@ -36,14 +36,16 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.typing import JSONObject
-
-from .types import ExecutionSpec, LaunchResult
-from .warm_executor import (
-    WARM_EXECUTOR_MODULE,
-    WARM_EXECUTOR_READINESS_COMMAND,
+from flwr.supercore.warm_executor_constants import (
+    WARM_EXECUTOR_BUSY_FILE,
     WARM_EXECUTOR_READY_DIRECTORY,
     WARM_EXECUTOR_READY_FILE,
+    WARM_MODEL_EXECUTOR_MODULE,
+    WARM_MODEL_EXECUTOR_SOCKET,
 )
+
+from .types import ExecutionSpec, LaunchResult
+from .warm_executor import WARM_EXECUTOR_MODULE, WARM_EXECUTOR_READINESS_COMMAND
 from .warm_executor_dispatch import (
     WARM_EXECUTOR_CONSUMED_ANNOTATION,
     WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH,
@@ -99,8 +101,10 @@ _RESERVED_TASKEXECUTOR_VOLUME_NAMES = frozenset(
 _RESERVED_TASKEXECUTOR_VOLUME_MOUNT_PATHS = frozenset(
     {
         APPIO_CREDENTIALS_MOUNT_PATH,
+        WARM_EXECUTOR_BUSY_FILE,
         WARM_EXECUTOR_READY_DIRECTORY,
         WARM_EXECUTOR_READY_FILE,
+        WARM_MODEL_EXECUTOR_SOCKET,
         WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH,
         WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH,
     }
@@ -814,6 +818,13 @@ def _build_taskexecutor_pod(
     }
 
 
+def _warm_executor_command(pool_key: WarmExecutorPoolKey) -> list[str]:
+    """Return the process command compatible with a warm executor pool."""
+    if pool_key.task_type == TaskType.MODEL:
+        return ["python", "-m", WARM_MODEL_EXECUTOR_MODULE, "serve"]
+    return ["python", "-m", WARM_EXECUTOR_MODULE]
+
+
 def _build_warm_executor_pod(
     pool_key: WarmExecutorPoolKey,
     config: KubernetesExecutorConfig,
@@ -851,7 +862,7 @@ def _build_warm_executor_pod(
     container: JSONObject = {
         "name": "taskexecutor",
         "image": pool_key.runtime_image,
-        "command": ["python", "-m", WARM_EXECUTOR_MODULE],
+        "command": _warm_executor_command(pool_key),
         "volumeMounts": [
             *volume_mounts,
             *(config.volume_mounts or []),
@@ -1243,14 +1254,26 @@ def _warm_executor_configuration_hash(config: KubernetesExecutorConfig) -> str:
 
 
 def _has_warm_executor_configuration(
-    pod: object, config: KubernetesExecutorConfig
+    pod: object,
+    pool_key: WarmExecutorPoolKey,
+    config: KubernetesExecutorConfig,
 ) -> bool:
     """Return true when a warm Pod was created with the current configuration."""
     metadata = _object_field(pod, "metadata")
     annotations = _object_field(metadata, "annotations")
-    return _object_field(
-        annotations, WARM_EXECUTOR_CONFIGURATION_ANNOTATION
-    ) == _warm_executor_configuration_hash(config)
+    spec = _object_field(pod, "spec")
+    containers = _object_field(spec, "containers")
+    return (
+        _object_field(annotations, WARM_EXECUTOR_CONFIGURATION_ANNOTATION)
+        == _warm_executor_configuration_hash(config)
+        and isinstance(containers, Sequence)
+        and not isinstance(containers, (str, bytes))
+        and any(
+            _object_field(container, "name") == "taskexecutor"
+            and _object_field(container, "command") == _warm_executor_command(pool_key)
+            for container in containers
+        )
+    )
 
 
 def _labels(
@@ -1362,7 +1385,7 @@ def _is_active_warm_executor(
     """Return true when a compatible warm Pod still occupies its pool slot."""
     if not is_compatible_warm_executor(
         pod, pool_key
-    ) or not _has_warm_executor_configuration(pod, config):
+    ) or not _has_warm_executor_configuration(pod, pool_key, config):
         return False
     metadata = _object_field(pod, "metadata")
     deletion_timestamp = _object_field(metadata, "deletion_timestamp")
