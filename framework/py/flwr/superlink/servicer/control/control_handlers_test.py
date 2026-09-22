@@ -423,8 +423,8 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         self.assertEqual(run.fab_hash, fab_hash)
 
-    def test_start_run_persists_user_prompt_event(self) -> None:
-        """Persist the user prompt as a primary-task message item."""
+    def test_start_run_persists_user_prompt_instruction(self) -> None:
+        """Persist the user prompt as an AgentApp instruction."""
         request = StartRunRequest(federation=NOOP_FEDERATION_ID)
         request.fab.content = b"AgentApp FAB"
         request.user_prompt = "Hello"
@@ -466,15 +466,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(app.display_name, "Local Agent")
         self.assertEqual(app.description, "Local agent")
         self.assertEqual(app.color, "rose")
-        event = self.state.get_task_events(run_ids=[response.run_id])[0]
-        self.assertEqual(
-            (event.task_id, event.event, event.data),
-            (
-                run.primary_task_id,
-                "message",
-                '{"type":"message","role":"user","content":"Hello"}',
-            ),
-        )
+        self.assertEqual(self.state.get_task_events(run_ids=[response.run_id]), [])
         start_title.assert_called_once_with(
             self.state,
             run.series_id,

@@ -206,13 +206,36 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         hash_run_id = get_sha256_hash(run.run_id)
 
         grid.set_run(run)
-        prompt = pull_prompt(grid)
 
         log_uploader = start_log_uploader(
             log_queue=log_queue,
             node_id=0,
             run_id=run.run_id,
             client=grid._runtime_client,
+        )
+
+        # Initialize the AgentApp session
+        prompt = pull_prompt(grid)
+        agent_events = RuntimeAgentEvents(grid._runtime_client)
+        agent_events.emit({"type": "message", "role": "user", "content": prompt})
+        agent_runtime = AgentRuntime(
+            stub=grid._runtime_client,
+            run_id=context.run_id,
+            task_id=task_id,
+            start_run_request=StartRunRequest(
+                fab=fab_to_proto(fab),
+                override_config=user_config_to_proto(run.override_config),
+                override_federation_config=res.federation_config,
+                federation=run.federation_id,
+                series_id=run.series_id,
+            ),
+            events=agent_events,
+        )
+        agent = RuntimeAgentSession(
+            prompt=prompt,
+            connectors=RuntimeAgentConnectors(agent_runtime),
+            events=agent_events,
+            grid=RuntimeAgentGrid(grid, agent_events, context.node_id),
         )
 
         log(DEBUG, "[flwr-agentapp] Start FAB installation.")
@@ -273,26 +296,6 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             raise LoadAgentAppError(
                 f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
             ) from None
-        agent_events = RuntimeAgentEvents(grid._runtime_client)
-        agent_runtime = AgentRuntime(
-            stub=grid._runtime_client,
-            run_id=context.run_id,
-            task_id=task_id,
-            start_run_request=StartRunRequest(
-                fab=fab_to_proto(fab),
-                override_config=user_config_to_proto(run.override_config),
-                override_federation_config=res.federation_config,
-                federation=run.federation_id,
-                series_id=run.series_id,
-            ),
-            events=agent_events,
-        )
-        agent = RuntimeAgentSession(
-            prompt=prompt,
-            connectors=RuntimeAgentConnectors(agent_runtime),
-            events=agent_events,
-            grid=RuntimeAgentGrid(grid, agent_events, context.node_id),
-        )
         agent_app(agent=agent, context=context)
         agent_events.close()
 
