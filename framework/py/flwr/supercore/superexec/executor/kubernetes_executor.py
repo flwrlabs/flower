@@ -37,6 +37,8 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.warm_executor_constants import (
+    WARM_CONNECTOR_EXECUTOR_MODULE,
+    WARM_CONNECTOR_EXECUTOR_SOCKET,
     WARM_EXECUTOR_BUSY_FILE,
     WARM_EXECUTOR_READY_DIRECTORY,
     WARM_EXECUTOR_READY_FILE,
@@ -104,6 +106,7 @@ _RESERVED_TASKEXECUTOR_VOLUME_MOUNT_PATHS = frozenset(
         WARM_EXECUTOR_BUSY_FILE,
         WARM_EXECUTOR_READY_DIRECTORY,
         WARM_EXECUTOR_READY_FILE,
+        WARM_CONNECTOR_EXECUTOR_SOCKET,
         WARM_MODEL_EXECUTOR_SOCKET,
         WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH,
         WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH,
@@ -820,6 +823,8 @@ def _build_taskexecutor_pod(
 
 def _warm_executor_command(pool_key: WarmExecutorPoolKey) -> list[str]:
     """Return the process command compatible with a warm executor pool."""
+    if pool_key.task_type == TaskType.CONNECTOR:
+        return ["python", "-m", WARM_CONNECTOR_EXECUTOR_MODULE, "serve"]
     if pool_key.task_type == TaskType.MODEL:
         return ["python", "-m", WARM_MODEL_EXECUTOR_MODULE, "serve"]
     return ["python", "-m", WARM_EXECUTOR_MODULE]
