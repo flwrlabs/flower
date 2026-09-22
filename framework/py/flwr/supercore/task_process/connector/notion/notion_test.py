@@ -34,7 +34,7 @@ _CREDENTIALS: JSONObject = {"access_token": "ntn-secret"}
 
 
 def test_notion_definition_is_registered() -> None:
-    """Notion schemas and handlers should form one account-scoped connector."""
+    """Notion schemas and handlers should form one federation-scoped connector."""
     assert len(ACTIONS) == 2
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     assert [

@@ -16,11 +16,7 @@
 
 from sqlalchemy import UniqueConstraint
 
-from flwr.supercore.state.schema.corestate_models import (
-    FlwrBase,
-    Task,
-    TaskLogsTable,
-)
+from flwr.supercore.state.schema.corestate_models import FlwrBase, Task, TaskLogsTable
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 
 CORESTATE_TABLE_NAMES = {
@@ -59,17 +55,22 @@ def test_task_mapper_uses_task_id_as_identity_key() -> None:
     assert [column.name for column in Task.__mapper__.primary_key] == ["task_id"]
 
 
-def test_connector_uses_incrementing_id_and_unique_account_reference() -> None:
+def test_connector_uses_incrementing_id_and_unique_federation_reference() -> None:
     """Ensure connectors have a surrogate ID and retain their natural uniqueness."""
     table = FlwrBase.metadata.tables["connector"]
 
     assert [column.name for column in table.primary_key.columns] == ["connector_id"]
     assert table.c.connector_id.autoincrement is True
     assert any(
-        {column.name for column in constraint.columns} == {"flwr_aid", "connector_ref"}
+        {column.name for column in constraint.columns}
+        == {"federation_id", "connector_ref"}
         for constraint in table.constraints
         if isinstance(constraint, UniqueConstraint)
     )
+    for column_name in ("federation_id", "created_at", "created_by"):
+        assert table.c[column_name].nullable is False
+    for column_name in ("deleted_at", "deleted_by"):
+        assert table.c[column_name].nullable is True
 
 
 def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:

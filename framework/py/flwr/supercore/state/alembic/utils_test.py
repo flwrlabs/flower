@@ -351,6 +351,55 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
+    def test_connector_federation_scope_migration_removes_existing_rows(self) -> None:
+        """Ensure account-scoped connectors are removed during migration."""
+        engine = self.create_engine("connector_federation_scope.db")
+        try:
+            self.upgrade_to_revision(engine, "6ea9c44bb683")
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO connector (
+                            flwr_aid, connector_ref, credentials_json, config_json
+                        ) VALUES (
+                            :flwr_aid, :connector_ref, :credentials_json, :config_json
+                        )
+                        """
+                    ),
+                    {
+                        "flwr_aid": "account-a",
+                        "connector_ref": "calendar",
+                        "credentials_json": '{"token":"secret"}',
+                        "config_json": '{"calendar":"work"}',
+                    },
+                )
+
+            self.upgrade_to_revision(engine, "f670d1ed8681")
+
+            with engine.connect() as connection:
+                connector_count = connection.execute(
+                    text("SELECT COUNT(*) FROM connector")
+                ).scalar_one()
+
+            self.assertEqual(connector_count, 0)
+            connector_columns = {
+                column["name"] for column in inspect(engine).get_columns("connector")
+            }
+            self.assertNotIn("flwr_aid", connector_columns)
+            self.assertIn("federation_id", connector_columns)
+
+            self.downgrade_to_revision(engine, "6ea9c44bb683")
+
+            with engine.connect() as connection:
+                connector_count = connection.execute(
+                    text("SELECT COUNT(*) FROM connector")
+                ).scalar_one()
+
+            self.assertEqual(connector_count, 0)
+        finally:
+            engine.dispose()
+
     def test_automation_timestamp_migration_normalizes_sqlite_text(self) -> None:
         """Ensure legacy SQLite automation timestamps use ORM-compatible text."""
         engine = self.create_engine("automation_timestamp_normalization.db")

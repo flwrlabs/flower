@@ -29,13 +29,12 @@ erDiagram
     INTEGER connector_id PK
     VARCHAR config_json
     VARCHAR connector_ref
-    TIMESTAMP created_at "nullable"
-    VARCHAR created_by "nullable"
+    TIMESTAMP created_at
+    VARCHAR created_by
     VARCHAR credentials_json
     TIMESTAMP deleted_at "nullable"
     VARCHAR deleted_by "nullable"
-    VARCHAR federation_id "nullable"
-    VARCHAR flwr_aid
+    VARCHAR federation_id
   }
 
   connector_oauth_session {

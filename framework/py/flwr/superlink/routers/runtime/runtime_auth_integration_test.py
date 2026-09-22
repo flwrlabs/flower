@@ -130,10 +130,11 @@ def test_get_connector_requires_and_uses_connector_task_token(
     assert token is not None
     assert state.activate_task(task_id)
     assert state.upsert_connector(
-        flwr_aid="account-a",
+        federation_id=NOOP_FEDERATION_ID,
         connector_ref="notion",
         credentials_json='{"token":"secret"}',
         config_json="{}",
+        created_by="account-a",
     )
 
     response = _post(client, "get-connector", GetConnectorRequest(), token=token)
