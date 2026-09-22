@@ -30644,7 +30644,7 @@ msgstr ""
 #: ../../flwr register:1 supernode
 #, fuzzy
 msgid "Name of the SuperNode."
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../flwr register:1 supernode
 msgid "Path to a P-384 (or any other NIST EC curve) public key file."

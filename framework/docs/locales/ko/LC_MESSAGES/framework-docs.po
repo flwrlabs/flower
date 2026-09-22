@@ -31586,7 +31586,7 @@ msgstr ""
 #: ../../flwr register:1 supernode
 #, fuzzy
 msgid "Name of the SuperNode."
-msgstr "서버(SuperLink)"
+msgstr ""
 
 #: ../../flwr register:1 supernode
 msgid "Path to a P-384 (or any other NIST EC curve) public key file."
@@ -32187,7 +32187,7 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`prompt <flwr.agentapp.AgentSession.prompt>`\\"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
 #: flwr.agentapp.AgentSession.prompt:1 of
@@ -38818,7 +38818,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`get_nodes <flwr.server.Driver.get_nodes>`\\ \\(\\)"
-msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
 #: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
@@ -39019,7 +39019,7 @@ msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
 #: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`get_nodes <flwr.server.Grid.get_nodes>`\\ \\(\\)"
-msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
 #, fuzzy
@@ -43063,7 +43063,7 @@ msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`get_nodes <flwr.serverapp.Grid.get_nodes>`\\ \\(\\)"
-msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #, fuzzy

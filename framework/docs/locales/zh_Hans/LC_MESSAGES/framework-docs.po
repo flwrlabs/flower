@@ -35163,7 +35163,7 @@ msgstr ""
 #: ../../flwr register:1 supernode
 #, fuzzy
 msgid "Name of the SuperNode."
-msgstr "然后，我们启动服务器："
+msgstr ""
 
 #: ../../flwr register:1 supernode
 msgid "Path to a P-384 (or any other NIST EC curve) public key file."
@@ -35774,7 +35774,7 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`prompt <flwr.agentapp.AgentSession.prompt>`\\"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
 #: flwr.agentapp.AgentSession.prompt:1 of
@@ -42426,7 +42426,7 @@ msgstr "获取节点 ID。"
 #: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`get_nodes <flwr.server.Driver.get_nodes>`\\ \\(\\)"
-msgstr ":py:obj:`get_node_ids <flwr.server.Driver.get_node_ids>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
 #: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
@@ -42434,7 +42434,7 @@ msgstr ":py:obj:`get_node_ids <flwr.server.Driver.get_node_ids>`\\ \\(\\)"
 #: flwr.serverapp.grid.grid.Grid.get_nodes:1 of
 #, fuzzy
 msgid "Get nodes."
-msgstr "获取节点 ID。"
+msgstr ""
 
 #: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
 #, fuzzy
@@ -42656,7 +42656,7 @@ msgstr ":py:obj:`get_node_ids <flwr.server.Driver.get_node_ids>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`get_nodes <flwr.server.Grid.get_nodes>`\\ \\(\\)"
-msgstr ":py:obj:`get_node_ids <flwr.server.Driver.get_node_ids>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
 #, fuzzy
@@ -47135,7 +47135,7 @@ msgstr ":py:obj:`get_node_ids <flwr.server.Driver.get_node_ids>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`get_nodes <flwr.serverapp.Grid.get_nodes>`\\ \\(\\)"
-msgstr ":py:obj:`get_node_ids <flwr.server.Driver.get_node_ids>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #, fuzzy
