@@ -12,20 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the connector registry."""
+"""Built-in filesystem connector."""
 
-from .registry import CONNECTORS
+from .filesystem import (
+    FILESYSTEM_ALLOWED_DIRS_ENV,
+    FILESYSTEM_CONNECTOR_REF,
+    FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
+    FILESYSTEM_READ_FILE_TOOL_NAME,
+    FilesystemApiError,
+    invoke_filesystem,
+    make_filesystem_tools,
+)
 
-
-def test_connector_references_are_unique() -> None:
-    """Connector references should be unique."""
-    connector_refs = [connector.ref for connector in CONNECTORS]
-
-    assert len(connector_refs) == len(set(connector_refs))
-
-
-def test_connector_tool_names_are_unique() -> None:
-    """Connector tool names should be unique."""
-    tool_names = [name for connector in CONNECTORS for name in connector.handlers]
-
-    assert len(tool_names) == len(set(tool_names))
+__all__ = [
+    "FILESYSTEM_ALLOWED_DIRS_ENV",
+    "FILESYSTEM_CONNECTOR_REF",
+    "FILESYSTEM_LIST_DIRECTORY_TOOL_NAME",
+    "FILESYSTEM_READ_FILE_TOOL_NAME",
+    "FilesystemApiError",
+    "invoke_filesystem",
+    "make_filesystem_tools",
+]

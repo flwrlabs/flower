@@ -32,4 +32,5 @@ message NodeInfo {
   double heartbeat_interval = 10;
   bytes public_key = 11;
   optional string location = 12;
+  optional string name = 13;
 }

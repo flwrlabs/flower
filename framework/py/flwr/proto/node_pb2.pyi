@@ -55,6 +55,7 @@ class NodeInfo(google.protobuf.message.Message):
     HEARTBEAT_INTERVAL_FIELD_NUMBER: builtins.int
     PUBLIC_KEY_FIELD_NUMBER: builtins.int
     LOCATION_FIELD_NUMBER: builtins.int
+    NAME_FIELD_NUMBER: builtins.int
     node_id: builtins.int
     owner_aid: builtins.str
     owner_name: builtins.str
@@ -67,6 +68,7 @@ class NodeInfo(google.protobuf.message.Message):
     heartbeat_interval: builtins.float
     public_key: builtins.bytes
     location: builtins.str
+    name: builtins.str
     def __init__(
         self,
         *,
@@ -82,15 +84,18 @@ class NodeInfo(google.protobuf.message.Message):
         heartbeat_interval: builtins.float = ...,
         public_key: builtins.bytes = ...,
         location: builtins.str | None = ...,
+        name: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_last_activated_at", b"_last_activated_at", "_last_deactivated_at", b"_last_deactivated_at", "_location", b"_location", "_online_until", b"_online_until", "_unregistered_at", b"_unregistered_at", "last_activated_at", b"last_activated_at", "last_deactivated_at", b"last_deactivated_at", "location", b"location", "online_until", b"online_until", "unregistered_at", b"unregistered_at"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_last_activated_at", b"_last_activated_at", "_last_deactivated_at", b"_last_deactivated_at", "_location", b"_location", "_online_until", b"_online_until", "_unregistered_at", b"_unregistered_at", "heartbeat_interval", b"heartbeat_interval", "last_activated_at", b"last_activated_at", "last_deactivated_at", b"last_deactivated_at", "location", b"location", "node_id", b"node_id", "online_until", b"online_until", "owner_aid", b"owner_aid", "owner_name", b"owner_name", "public_key", b"public_key", "registered_at", b"registered_at", "status", b"status", "unregistered_at", b"unregistered_at"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_last_activated_at", b"_last_activated_at", "_last_deactivated_at", b"_last_deactivated_at", "_location", b"_location", "_name", b"_name", "_online_until", b"_online_until", "_unregistered_at", b"_unregistered_at", "last_activated_at", b"last_activated_at", "last_deactivated_at", b"last_deactivated_at", "location", b"location", "name", b"name", "online_until", b"online_until", "unregistered_at", b"unregistered_at"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_last_activated_at", b"_last_activated_at", "_last_deactivated_at", b"_last_deactivated_at", "_location", b"_location", "_name", b"_name", "_online_until", b"_online_until", "_unregistered_at", b"_unregistered_at", "heartbeat_interval", b"heartbeat_interval", "last_activated_at", b"last_activated_at", "last_deactivated_at", b"last_deactivated_at", "location", b"location", "name", b"name", "node_id", b"node_id", "online_until", b"online_until", "owner_aid", b"owner_aid", "owner_name", b"owner_name", "public_key", b"public_key", "registered_at", b"registered_at", "status", b"status", "unregistered_at", b"unregistered_at"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_last_activated_at", b"_last_activated_at"]) -> typing.Literal["last_activated_at"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_last_deactivated_at", b"_last_deactivated_at"]) -> typing.Literal["last_deactivated_at"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_location", b"_location"]) -> typing.Literal["location"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_name", b"_name"]) -> typing.Literal["name"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_online_until", b"_online_until"]) -> typing.Literal["online_until"] | None: ...
     @typing.overload

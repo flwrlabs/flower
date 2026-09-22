@@ -41,7 +41,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectRequest,
     PushObjectResponse,
 )
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorRequest,
     GetConnectorResponse,
@@ -114,8 +113,7 @@ def get_nodes(
     log(DEBUG, "Runtime.GetNodes")
     run_id = task.run_id
     all_ids: set[int] = state.get_nodes(run_id)
-    nodes: list[Node] = [Node(node_id=node_id) for node_id in all_ids]
-    return GetNodesResponse(nodes=nodes)
+    return GetNodesResponse(nodes=state.get_node_info(node_ids=list(all_ids)))
 
 
 def push_messages(

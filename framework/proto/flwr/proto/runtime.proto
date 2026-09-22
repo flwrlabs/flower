@@ -56,7 +56,7 @@ message PullAppMessagesResponse {
 
 // GetNodes messages
 message GetNodesRequest {}
-message GetNodesResponse { repeated Node nodes = 1; }
+message GetNodesResponse { repeated NodeInfo nodes = 1; }
 
 // PushTaskMessage messages
 message PushTaskMessageRequest { Message message = 1; }

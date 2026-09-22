@@ -24,16 +24,18 @@ from flwr.proto.control_pb2 import RegisterNodeResponse  # pylint: disable=E0611
 from .register import _register_node, _validate_location
 
 
-def test_register_node_location() -> None:
-    """Validate and send the optional location."""
+def test_register_node_location_and_name() -> None:
+    """Validate and send the optional location and name."""
     location = _validate_location("37.4056,-122.0775")
+    name = "London SuperNode"
     client = Mock()
     client.RegisterNode.return_value = RegisterNodeResponse(node_id=1)
 
-    _register_node(client, b"public-key", False, location)
+    _register_node(client, b"public-key", False, location=location, name=name)
 
     request = client.RegisterNode.call_args.kwargs["request"]
     assert request.location == "37.4056,-122.0775"
+    assert request.name == name
 
     for invalid_location in ("37.4056", "latitude,longitude", "91,-181", "nan,inf"):
         with pytest.raises(click.BadParameter):

@@ -99,6 +99,7 @@ erDiagram
     VARCHAR last_activated_at "nullable"
     VARCHAR last_deactivated_at "nullable"
     VARCHAR location "nullable"
+    VARCHAR name "nullable"
     BIGINT node_id UK "nullable"
     FLOAT online_until "nullable"
     VARCHAR owner_aid "nullable"
