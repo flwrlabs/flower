@@ -41,7 +41,15 @@ class ConnectorInvocation:
     @classmethod
     def from_payload(cls, payload: object) -> ConnectorInvocation:
         """Validate and construct one invocation request."""
-        return cls(*task_worker.parse_invocation_payload(payload, "Connector"))
+        token, runtime_api_address, insecure, root_certificates_path = (
+            task_worker.parse_invocation_payload(payload, "Connector")
+        )
+        return cls(
+            token=token,
+            runtime_api_address=runtime_api_address,
+            insecure=insecure,
+            root_certificates_path=root_certificates_path,
+        )
 
 
 def serve_prestarted_connector_worker(
