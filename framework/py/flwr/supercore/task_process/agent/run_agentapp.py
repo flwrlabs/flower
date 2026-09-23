@@ -16,6 +16,7 @@
 
 
 import os
+import threading
 from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
@@ -110,7 +111,278 @@ def pull_prompt(grid: HttpGrid) -> str:
     return message_to_prompt(instructions[0])
 
 
-def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
+class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,protected-access
+    """Own task-scoped AgentApp state and exactly-once finalization."""
+
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        runtime_api_address: str,
+        log_queue: Queue[str | None],
+        token: str,
+        insecure: bool,
+        certificates: bytes | None,
+        certificates_path: str | None,
+        runtime_dependency_install: bool,
+    ) -> None:
+        self._runtime_api_address = runtime_api_address
+        self._log_queue = log_queue
+        self._token = token
+        self._insecure = insecure
+        self._certificates = certificates
+        self._certificates_path = certificates_path
+        self._runtime_dependency_install = runtime_dependency_install
+        self._grid: HttpGrid | None = None
+        self._log_uploader: threading.Thread | None = None
+        self._hash_run_id: str | None = None
+        self._sub_status = SubStatus.FAILED
+        self._details = "Task failed with unknown error."
+        self._heartbeat_sender: HeartbeatSender | None = None
+        self._context: Context | None = None
+        self._runtime_env_dir: Path | None = None
+        self._agent_events: RuntimeAgentEvents | None = None
+        self._finalized = False
+        self._lock = threading.RLock()
+
+    def initialize(self) -> None:
+        """Create fresh task-scoped Runtime state if it is not initialized."""
+        if self._grid is not None:
+            return
+        self._grid = HttpGrid(
+            runtime_api_address=self._runtime_api_address,
+            insecure=self._insecure,
+            root_certificates=self._certificates,
+            token=self._token,
+        )
+
+    def run(self) -> int:  # pylint: disable=too-many-locals,too-many-statements
+        """Execute the AgentApp task and return its Flower exit code."""
+        exit_code = ExitCode.SUCCESS
+        try:
+            if self._grid is None:
+                raise RuntimeError("AgentApp Runtime client initialization failed.")
+            grid = self._grid
+
+            self._heartbeat_sender = HeartbeatSender(
+                make_task_heartbeat_fn_http(grid._runtime_client)
+            )
+            self._heartbeat_sender.start()
+
+            log(DEBUG, "[flwr-agentapp] Pull task input")
+            res: PullTaskInputResponse = grid._runtime_client.PullTaskInput(
+                PullTaskInputRequest()
+            )
+
+            self._context = context_from_proto(res.context)
+            run = run_from_proto(res.run)
+            fab = fab_from_proto(res.fab)
+            task_id = res.task_id
+            TaskIdentity.task_id = task_id
+            TaskIdentity.run_id = run.run_id
+            TaskIdentity.node_id = self._context.node_id
+
+            self._hash_run_id = get_sha256_hash(run.run_id)
+
+            grid.set_run(run)
+
+            self._log_uploader = start_log_uploader(
+                log_queue=self._log_queue,
+                node_id=0,
+                run_id=run.run_id,
+                client=grid._runtime_client,
+            )
+
+            # Initialize the AgentApp session
+            prompt = pull_prompt(grid)
+            self._agent_events = RuntimeAgentEvents(grid._runtime_client)
+            self._agent_events.emit(
+                {"type": "message", "role": "user", "content": prompt}
+            )
+            agent_runtime = AgentRuntime(
+                stub=grid._runtime_client,
+                run_id=self._context.run_id,
+                task_id=task_id,
+                start_run_request=StartRunRequest(
+                    fab=fab_to_proto(fab),
+                    override_config=user_config_to_proto(run.override_config),
+                    override_federation_config=res.federation_config,
+                    federation=run.federation_id,
+                    series_id=run.series_id,
+                ),
+                events=self._agent_events,
+            )
+            agent = RuntimeAgentSession(
+                prompt=prompt,
+                connectors=RuntimeAgentConnectors(agent_runtime),
+                events=self._agent_events,
+                grid=RuntimeAgentGrid(grid, self._agent_events, self._context.node_id),
+            )
+
+            log(DEBUG, "[flwr-agentapp] Start FAB installation.")
+            install_from_fab(fab.content, skip_prompt=True)
+
+            fab_id, fab_version = get_fab_metadata(fab.content)
+
+            app_path = str(get_project_dir(fab_id, fab_version, fab.hash_str))
+
+            if self._runtime_dependency_install:
+                log(DEBUG, "[flwr-agentapp] Installing app dependencies.")
+                self._runtime_env_dir = install_app_dependencies(
+                    app_path,
+                    launch_id=self._token,
+                    run_id=run.run_id,
+                    index_context={
+                        "component": "agentapp",
+                        "project_dir": app_path,
+                        "run_id": run.run_id,
+                        "launch_id": self._token,
+                        "fab_id": run.fab_id,
+                        "fab_version": run.fab_version,
+                        "fab_hash": fab.hash_str,
+                    },
+                )
+            else:
+                log(
+                    DEBUG,
+                    "[flwr-agentapp] Runtime dependency installation is disabled.",
+                )
+
+            config = get_project_config(app_path)
+
+            agent_app_attr = config["tool"]["flwr"]["app"]["components"]["agentapp"]
+            self._context.run_config = get_fused_config_from_dir(
+                Path(app_path), run.override_config
+            )
+
+            log(
+                DEBUG,
+                "[flwr-agentapp] Will load AgentApp `%s` in %s",
+                agent_app_attr,
+                app_path,
+            )
+
+            event(
+                EventType.FLWR_AGENTAPP_RUN_ENTER,
+                event_details={"run-id-hash": self._hash_run_id},
+            )
+
+            _set_runtime_environment(
+                self._runtime_api_address,
+                self._token,
+                self._insecure,
+                self._certificates_path,
+            )
+
+            # Load and run the AgentApp
+            agent_app = load_app(agent_app_attr, LoadAgentAppError, app_path)
+            if not isinstance(agent_app, AgentApp):
+                raise LoadAgentAppError(
+                    f"Attribute '{agent_app_attr}' is not of type "
+                    f"'{AgentApp.__name__}'.",
+                ) from None
+            agent_app(agent=agent, context=self._context)
+            self._agent_events.close()
+
+            # Set sub_status and details for successful completion
+            with self._lock:
+                self._sub_status = SubStatus.COMPLETED
+                self._details = ""
+
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            log(ERROR, "AgentApp raised an exception", exc_info=ex)
+
+            with self._lock:
+                self._sub_status = SubStatus.FAILED
+                self._details = f"AgentApp failed with exception: {str(ex)}"
+
+            exit_code = ExitCode.TASK_PROC_EXCEPTION
+            if isinstance(ex, AppExitException):
+                exit_code = ex.exit_code
+            elif isinstance(ex, ImportError):
+                exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
+            elif isinstance(ex, RuntimeDependencyInstallationError):
+                exit_code = ExitCode.COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR
+
+        return exit_code
+
+    def finalize(self) -> None:  # pylint: disable=protected-access
+        """Push final status and release task state exactly once."""
+        with self._lock:
+            if self._finalized:
+                return
+            self._finalized = True
+
+            log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
+            if self._grid is None:
+                return
+
+            self._grid._retry_invoker.max_tries = 1
+
+            if self._agent_events is not None:
+                try:
+                    self._agent_events.close(1)
+                except Exception as err:  # pylint: disable=broad-exception-caught
+                    log(ERROR, "Failed to close AgentApp event publisher", exc_info=err)
+
+            if self._log_uploader:
+                flush_logs(self._log_queue)
+
+            pushoutput_req = PushTaskOutputRequest(
+                context=(context_to_proto(self._context) if self._context else None),
+                sub_status=self._sub_status,
+                details=self._details,
+            )
+            try:
+                self._grid._runtime_client.PushTaskOutput(pushoutput_req)
+            except httpx.HTTPError as err:
+                log(ERROR, "Failed to push task output: %s", str(err))
+
+            if self._log_uploader:
+                stop_log_uploader(self._log_queue, self._log_uploader)
+
+            if self._heartbeat_sender and self._heartbeat_sender.is_running:
+                self._heartbeat_sender.stop()
+
+            self._grid.close()
+
+            cleanup_app_runtime_environment(self._runtime_env_dir)
+
+    def event_details(self, exit_code: int) -> JSONObject:
+        """Return the AgentApp leave-event details."""
+        return {
+            "run-id-hash": self._hash_run_id,
+            "success": exit_code == ExitCode.SUCCESS,
+        }
+
+
+def _run_agentapp_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    runtime_api_address: str,
+    log_queue: Queue[str | None],
+    token: str,
+    insecure: bool,
+    certificates: bytes | None,
+    certificates_path: str | None,
+    runtime_dependency_install: bool,
+) -> tuple[_AgentAppTaskLifecycle, int]:
+    """Create and execute one task through the AgentApp lifecycle."""
+    lifecycle = _AgentAppTaskLifecycle(
+        runtime_api_address,
+        log_queue,
+        token,
+        insecure,
+        certificates,
+        certificates_path,
+        runtime_dependency_install,
+    )
+    lifecycle.initialize()
+    register_signal_handlers(
+        event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
+        exit_message="Task stopped by user.",
+        exit_handlers=[lifecycle.finalize],
+    )
+    return lifecycle, lifecycle.run()
+
+
+def run_agentapp(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     runtime_api_address: str,
     log_queue: Queue[str | None],
     token: str,
@@ -124,206 +396,20 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
 
-    # Initialize the Runtime API connection.
-    grid = HttpGrid(
-        runtime_api_address=runtime_api_address,
-        insecure=insecure,
-        root_certificates=validate_and_resolve_root_certificates(
-            certificates_path, insecure
-        ),
-        token=token,
+    lifecycle, exit_code = _run_agentapp_task(
+        runtime_api_address,
+        log_queue,
+        token,
+        insecure,
+        validate_and_resolve_root_certificates(certificates_path, insecure),
+        certificates_path,
+        runtime_dependency_install,
     )
-
-    log_uploader = None
-    hash_run_id = None
-    sub_status = SubStatus.FAILED
-    details = "Task failed with unknown error."
-    heartbeat_sender = None
-    context: Context | None = None
-    runtime_env_dir: Path | None = None
-    agent_events: RuntimeAgentEvents | None = None
-    exit_code = ExitCode.SUCCESS
-
-    def on_exit() -> None:
-        log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
-
-        grid._retry_invoker.max_tries = 1
-
-        if agent_events is not None:
-            try:
-                agent_events.close(1)
-            except Exception as err:  # pylint: disable=broad-exception-caught
-                log(ERROR, "Failed to close AgentApp event publisher", exc_info=err)
-
-        if log_uploader:
-            flush_logs(log_queue)
-
-        pushoutput_req = PushTaskOutputRequest(
-            context=context_to_proto(context) if context else None,
-            sub_status=sub_status,
-            details=details,
-        )
-        try:
-            grid._runtime_client.PushTaskOutput(pushoutput_req)
-        except httpx.HTTPError as err:
-            log(ERROR, "Failed to push task output: %s", str(err))
-
-        if log_uploader:
-            stop_log_uploader(log_queue, log_uploader)
-
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
-
-        grid.close()
-
-        cleanup_app_runtime_environment(runtime_env_dir)
-
-    register_signal_handlers(
-        event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
-        exit_message="Task stopped by user.",
-        exit_handlers=[on_exit],
-    )
-
-    try:
-        heartbeat_sender = HeartbeatSender(
-            make_task_heartbeat_fn_http(grid._runtime_client)
-        )
-        heartbeat_sender.start()
-
-        log(DEBUG, "[flwr-agentapp] Pull task input")
-        res: PullTaskInputResponse = grid._runtime_client.PullTaskInput(
-            PullTaskInputRequest()
-        )
-
-        context = context_from_proto(res.context)
-        run = run_from_proto(res.run)
-        fab = fab_from_proto(res.fab)
-        task_id = res.task_id
-        TaskIdentity.task_id = task_id
-        TaskIdentity.run_id = run.run_id
-        TaskIdentity.node_id = context.node_id
-
-        hash_run_id = get_sha256_hash(run.run_id)
-
-        grid.set_run(run)
-
-        log_uploader = start_log_uploader(
-            log_queue=log_queue,
-            node_id=0,
-            run_id=run.run_id,
-            client=grid._runtime_client,
-        )
-
-        # Initialize the AgentApp session
-        prompt = pull_prompt(grid)
-        agent_events = RuntimeAgentEvents(grid._runtime_client)
-        agent_events.emit({"type": "message", "role": "user", "content": prompt})
-        agent_runtime = AgentRuntime(
-            stub=grid._runtime_client,
-            run_id=context.run_id,
-            task_id=task_id,
-            start_run_request=StartRunRequest(
-                fab=fab_to_proto(fab),
-                override_config=user_config_to_proto(run.override_config),
-                override_federation_config=res.federation_config,
-                federation=run.federation_id,
-                series_id=run.series_id,
-            ),
-            events=agent_events,
-        )
-        agent = RuntimeAgentSession(
-            prompt=prompt,
-            connectors=RuntimeAgentConnectors(agent_runtime),
-            events=agent_events,
-            grid=RuntimeAgentGrid(grid, agent_events, context.node_id),
-        )
-
-        log(DEBUG, "[flwr-agentapp] Start FAB installation.")
-        install_from_fab(fab.content, skip_prompt=True)
-
-        fab_id, fab_version = get_fab_metadata(fab.content)
-
-        app_path = str(get_project_dir(fab_id, fab_version, fab.hash_str))
-
-        if runtime_dependency_install:
-            log(DEBUG, "[flwr-agentapp] Installing app dependencies.")
-            runtime_env_dir = install_app_dependencies(
-                app_path,
-                launch_id=token,
-                run_id=run.run_id,
-                index_context={
-                    "component": "agentapp",
-                    "project_dir": app_path,
-                    "run_id": run.run_id,
-                    "launch_id": token,
-                    "fab_id": run.fab_id,
-                    "fab_version": run.fab_version,
-                    "fab_hash": fab.hash_str,
-                },
-            )
-        else:
-            log(
-                DEBUG,
-                "[flwr-agentapp] Runtime dependency installation is disabled.",
-            )
-
-        config = get_project_config(app_path)
-
-        agent_app_attr = config["tool"]["flwr"]["app"]["components"]["agentapp"]
-        context.run_config = get_fused_config_from_dir(
-            Path(app_path), run.override_config
-        )
-
-        log(
-            DEBUG,
-            "[flwr-agentapp] Will load AgentApp `%s` in %s",
-            agent_app_attr,
-            app_path,
-        )
-
-        event(
-            EventType.FLWR_AGENTAPP_RUN_ENTER,
-            event_details={"run-id-hash": hash_run_id},
-        )
-
-        _set_runtime_environment(
-            runtime_api_address, token, insecure, certificates_path
-        )
-
-        # Load and run the AgentApp
-        agent_app = load_app(agent_app_attr, LoadAgentAppError, app_path)
-        if not isinstance(agent_app, AgentApp):
-            raise LoadAgentAppError(
-                f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
-            ) from None
-        agent_app(agent=agent, context=context)
-        agent_events.close()
-
-        # Set sub_status and details for successful completion
-        sub_status = SubStatus.COMPLETED
-        details = ""
-
-    except Exception as ex:  # pylint: disable=broad-exception-caught
-        log(ERROR, "AgentApp raised an exception", exc_info=ex)
-
-        sub_status = SubStatus.FAILED
-        details = f"AgentApp failed with exception: {str(ex)}"
-
-        exit_code = ExitCode.TASK_PROC_EXCEPTION
-        if isinstance(ex, AppExitException):
-            exit_code = ex.exit_code
-        elif isinstance(ex, ImportError):
-            exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
-        elif isinstance(ex, RuntimeDependencyInstallationError):
-            exit_code = ExitCode.COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR
 
     flwr_exit(
         code=exit_code,
         event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
-        event_details={
-            "run-id-hash": hash_run_id,
-            "success": exit_code == ExitCode.SUCCESS,
-        },
+        event_details=lifecycle.event_details(exit_code),
     )
 
 
