@@ -310,13 +310,17 @@ def test_preloaded_agentapp_requires_exact_task_identity(
         run_agentapp_module, "install_app_dependencies", install_dependencies
     )
 
-    assert lifecycle._load_task_app(fab, run) == (app, preloaded.app_path)
+    assert lifecycle._prepare_task_app(fab, run) == (
+        preloaded.app_path,
+        app,
+        None,
+    )
     if field == "fab_hash":
         fab.hash_str = value
     else:
         setattr(run, field, value)
     with pytest.raises(RuntimeError, match="does not match"):
-        lifecycle._load_task_app(fab, run)
+        lifecycle._prepare_task_app(fab, run)
     install.assert_not_called()
     load.assert_not_called()
     install_dependencies.assert_not_called()
@@ -383,6 +387,13 @@ def test_agentapp_lifecycle_runs_and_finalizes_once(  # pylint: disable=too-many
     app = AgentApp()
     app.main()(app_main)
     register_signal_handlers = Mock()
+    install_dependencies = Mock(return_value=runtime_env_dir)
+    runtime_environment = Mock()
+    load_agentapp = Mock(return_value=app)
+    import_order = Mock()
+    import_order.attach_mock(install_dependencies, "install_dependencies")
+    import_order.attach_mock(runtime_environment, "runtime_environment")
+    import_order.attach_mock(load_agentapp, "load_agentapp")
 
     monkeypatch.setattr(run_agentapp_module, "HttpGrid", Mock(return_value=grid))
     monkeypatch.setattr(
@@ -424,7 +435,7 @@ def test_agentapp_lifecycle_runs_and_finalizes_once(  # pylint: disable=too-many
     monkeypatch.setattr(
         run_agentapp_module,
         "install_app_dependencies",
-        Mock(return_value=runtime_env_dir),
+        install_dependencies,
     )
     monkeypatch.setattr(
         run_agentapp_module,
@@ -441,8 +452,10 @@ def test_agentapp_lifecycle_runs_and_finalizes_once(  # pylint: disable=too-many
         Mock(return_value={"setting": "value"}),
     )
     monkeypatch.setattr(run_agentapp_module, "event", Mock())
-    monkeypatch.setattr(run_agentapp_module, "_set_runtime_environment", Mock())
-    monkeypatch.setattr(run_agentapp_module, "load_app", Mock(return_value=app))
+    monkeypatch.setattr(
+        run_agentapp_module, "_set_runtime_environment", runtime_environment
+    )
+    monkeypatch.setattr(run_agentapp_module, "load_app", load_agentapp)
     monkeypatch.setattr(
         run_agentapp_module,
         "context_to_proto",
@@ -474,6 +487,17 @@ def test_agentapp_lifecycle_runs_and_finalizes_once(  # pylint: disable=too-many
         17,
         42,
         99,
+    )
+    assert [mock_call[0] for mock_call in import_order.mock_calls] == [
+        "install_dependencies",
+        "runtime_environment",
+        "load_agentapp",
+    ]
+    runtime_environment.assert_called_once_with(
+        "runtime.example:9092", "task-token", False, "/runtime-ca.pem"
+    )
+    load_agentapp.assert_called_once_with(
+        "pkg.app:app", LoadAgentAppError, str(app_path)
     )
     assert context.run_config == {"setting": "value"}
     output = client.PushTaskOutput.call_args.args[0]

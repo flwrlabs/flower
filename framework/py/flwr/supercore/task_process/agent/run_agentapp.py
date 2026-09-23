@@ -118,8 +118,23 @@ class PreloadedAgentApp:
     fab_hash: str
 
 
+def _load_agentapp_component(agent_app_attr: str, app_path: Path) -> AgentApp:
+    """Load and validate one AgentApp component."""
+    agent_app = load_app(agent_app_attr, LoadAgentAppError, str(app_path))
+    if not isinstance(agent_app, AgentApp):
+        raise LoadAgentAppError(
+            f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
+        ) from None
+    return agent_app
+
+
 def preload_agentapp(fab_path: Path, expected_fab_hash: str) -> PreloadedAgentApp:
-    """Verify, install, and import one deployment-configured AgentApp FAB."""
+    """Verify, install, and import one deployment-configured AgentApp FAB.
+
+    Dependencies must be deployment-provisioned, and app imports must not
+    require task-scoped Runtime values because authority is unavailable before
+    readiness.
+    """
     if not fab_path.is_absolute():
         raise ValueError("Preloaded AgentApp FAB path must be absolute.")
     if len(expected_fab_hash) != 64 or any(
@@ -145,11 +160,7 @@ def preload_agentapp(fab_path: Path, expected_fab_hash: str) -> PreloadedAgentAp
     config = get_project_config(app_path)
     fab_id, fab_version = get_metadata_from_config(config)
     agent_app_attr = config["tool"]["flwr"]["app"]["components"]["agentapp"]
-    agent_app = load_app(agent_app_attr, LoadAgentAppError, str(app_path))
-    if not isinstance(agent_app, AgentApp):
-        raise LoadAgentAppError(
-            f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
-        ) from None
+    agent_app = _load_agentapp_component(agent_app_attr, app_path)
     return PreloadedAgentApp(
         app=agent_app,
         app_path=app_path,
@@ -294,7 +305,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 grid=RuntimeAgentGrid(grid, self._agent_events, self._context.node_id),
             )
 
-            agent_app, app_path = self._load_task_app(fab, run)
+            app_path, agent_app, agent_app_attr = self._prepare_task_app(fab, run)
             self._context.run_config = get_fused_config_from_dir(
                 app_path, run.override_config
             )
@@ -311,6 +322,9 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 self._certificates_path,
             )
 
+            if agent_app is None:
+                assert agent_app_attr is not None
+                agent_app = _load_agentapp_component(agent_app_attr, app_path)
             agent_app(agent=agent, context=self._context)
             self._agent_events.close()
 
@@ -338,8 +352,10 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
 
         return exit_code
 
-    def _load_task_app(self, fab: Any, run: Any) -> tuple[AgentApp, Path]:
-        """Return the exact preloaded app or prepare the cold task app."""
+    def _prepare_task_app(
+        self, fab: Any, run: Any
+    ) -> tuple[Path, AgentApp | None, str | None]:
+        """Return a preloaded app or prepare a cold app for task-time import."""
         if self._preloaded is not None:
             if (
                 fab.hash_str != self._preloaded.fab_hash
@@ -347,7 +363,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 or run.fab_version != self._preloaded.fab_version
             ):
                 raise RuntimeError("Task FAB does not match the preloaded AgentApp.")
-            return self._preloaded.app, self._preloaded.app_path
+            return self._preloaded.app_path, self._preloaded.app, None
 
         log(DEBUG, "[flwr-agentapp] Start FAB installation.")
         install_from_fab(fab.content, skip_prompt=True)
@@ -380,13 +396,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             agent_app_attr,
             app_path,
         )
-        agent_app = load_app(agent_app_attr, LoadAgentAppError, str(app_path))
-        if not isinstance(agent_app, AgentApp):
-            raise LoadAgentAppError(
-                f"Attribute '{agent_app_attr}' is not of type "
-                f"'{AgentApp.__name__}'.",
-            ) from None
-        return agent_app, app_path
+        return app_path, None, agent_app_attr
 
     def mark_interrupted(self) -> None:
         """Record a graceful interruption before final task output is pushed."""
