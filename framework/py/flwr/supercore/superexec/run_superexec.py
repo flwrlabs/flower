@@ -29,7 +29,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import ExecutorType, TaskType
+from flwr.supercore.constant import ExecutorType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import (
@@ -267,25 +267,25 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             if tasks_res.tasks:
                 task = plugin.select_task(tasks_res.tasks)
 
-            # If a task was selected, claim it
-            if task is not None:
-                try:
-                    task_type = TaskType(task.type)
-                except ValueError:
-                    task_type = None
-                executor.wait_for_capacity(
-                    task_type=task_type,
-                    insecure=insecure,
-                    root_certificates_path=root_certificates_path,
-                )
+            if task is None:
+                time.sleep(task_poll_interval)
+                continue
 
-                claim_req = ClaimTaskRequest(task_id=task.task_id)
-                claim_res = client.ClaimTask(claim_req)
+            # Snapshot executor resources before the atomic task claim. If the
+            # claim succeeds, the executor can safely retire only resources from
+            # an older claim without blocking this poll loop.
+            if not executor.prepare_launch(task.task_id):
+                time.sleep(task_poll_interval)
+                continue
 
-                # Launch the app if a token was granted; do nothing if not
-                if claim_res.token:
-                    launch_result = plugin.launch_task(token=claim_res.token, task=task)
-                    _handle_launch_result(launch_result, task)
+            claim_req = ClaimTaskRequest(task_id=task.task_id)
+            claim_res = client.ClaimTask(claim_req)
+            if not claim_res.token:
+                time.sleep(task_poll_interval)
+                continue
+
+            launch_result = plugin.launch_task(token=claim_res.token, task=task)
+            _handle_launch_result(launch_result, task)
 
             # Sleep for a while before checking again
             time.sleep(task_poll_interval)

@@ -285,21 +285,28 @@ def _pod(
     *,
     name: str = _POD_NAME,
     labels: dict[str, str] | None = None,
+    uid: str | None = None,
 ) -> dict[str, Any]:
     metadata: dict[str, Any] = {"name": name}
     if deletion_timestamp is not None:
         metadata["deletionTimestamp"] = deletion_timestamp
     if labels is not None:
         metadata["labels"] = labels
+    if uid is not None:
+        metadata["uid"] = uid
 
     status: dict[str, Any] = {"phase": phase}
     return {"metadata": metadata, "status": status}
 
 
-def _secret(name: str, labels: dict[str, str] | None = None) -> dict[str, Any]:
+def _secret(
+    name: str, labels: dict[str, str] | None = None, uid: str | None = None
+) -> dict[str, Any]:
     metadata: dict[str, Any] = {"name": name}
     if labels is not None:
         metadata["labels"] = labels
+    if uid is not None:
+        metadata["uid"] = uid
     return {"metadata": metadata}
 
 
@@ -630,6 +637,53 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     )
     assert dispatch._log_output is suppress_output  # pylint: disable=protected-access
     assert started[0][1][-1] is (not suppress_output)
+
+
+def test_warm_launch_rechecks_claim_deadline_before_token_delivery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Slow warm setup must not deliver a token after the task claim expires."""
+    now = 0.0
+    client = Mock()
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+        monotonic=lambda: now,
+    )
+    client.list_namespaced_pod.return_value = {
+        "items": [_ready_warm_pod(pool_key, config)]
+    }
+    manager = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
+        client, config, lambda: 0
+    )
+    dispatch = Mock()
+
+    def _slow_open_dispatch(**_kwargs: object) -> Mock:
+        nonlocal now
+        now = 30.0
+        return dispatch
+
+    monkeypatch.setattr(manager, "_ensure_pool_capacity", Mock())
+    monkeypatch.setattr(manager, "_open_dispatch", _slow_open_dispatch)
+
+    result = manager.launch(
+        _execution_spec(task_type=TaskType.AGENT_APP, insecure=True),
+        None,
+        launch_deadline=30.0,
+    )
+
+    assert result is not None
+    assert result.status == LaunchResultStatus.CAPACITY_REJECTED
+    dispatch.send_token.assert_not_called()
+    dispatch.close.assert_called_once_with()
+    client.delete_namespaced_pod.assert_called_once_with(
+        name="flwr-taskexecutor-warm-ready",
+        namespace="flower-system",
+        grace_period_seconds=0,
+    )
 
 
 @pytest.mark.parametrize(
@@ -1457,10 +1511,10 @@ def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
     client.create_namespaced_pod.assert_not_called()
 
 
-def test_launch_retries_warm_dispatch_after_readiness_recovers_at_the_budget(
+def test_launch_rejects_without_waiting_if_warm_readiness_is_lost_at_budget(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Readiness recovery must unblock a task admitted before readiness was lost."""
+    """A lost warm reservation must not block the SuperExec task-poll loop."""
     client = Mock()
     sleep = Mock()
     pool_key = _warm_executor_pool_key(
@@ -1488,11 +1542,6 @@ def test_launch_retries_warm_dispatch_after_readiness_recovers_at_the_budget(
     sleep.assert_not_called()
     warm_pod["status"]["conditions"][0]["status"] = "False"
 
-    def _restore_readiness(_interval: float) -> None:
-        assert sleep.call_count == 1, "Launch kept waiting after readiness recovered"
-        warm_pod["status"]["conditions"][0]["status"] = "True"
-
-    sleep.side_effect = _restore_readiness
     response = _WarmExecResponse()
     stream = Mock(return_value=response)
     monkeypatch.setattr(
@@ -1504,10 +1553,10 @@ def test_launch_retries_warm_dispatch_after_readiness_recovers_at_the_budget(
         _execution_spec(task_type=TaskType.AGENT_APP, insecure=True)
     )
 
-    assert result.status == LaunchResultStatus.ACCEPTED
-    sleep.assert_called_once_with(1.0)
-    stream.assert_called_once()
-    assert response.written == ["task-token\n"]
+    assert result.status == LaunchResultStatus.CAPACITY_REJECTED
+    sleep.assert_not_called()
+    stream.assert_not_called()
+    assert not response.written
     client.create_namespaced_pod.assert_not_called()
     client.create_namespaced_secret.assert_not_called()
     client.delete_namespaced_pod.assert_not_called()
@@ -2407,6 +2456,29 @@ def test_wait_for_capacity_sweeps_terminal_pods_before_capacity_check() -> None:
     )
 
 
+def test_wait_for_capacity_sweeps_terminal_pods_without_a_budget() -> None:
+    """Unlimited cold pools must continue cleaning completed resources."""
+    client = Mock()
+    labels = _task_labels(123)
+    client.list_namespaced_pod.return_value = {
+        "items": [_pod("Succeeded", labels=labels)]
+    }
+    client.list_namespaced_secret.return_value = {
+        "items": [_secret(_SECRET_NAME, labels)]
+    }
+
+    KubernetesExecutor(client=client, config=_executor_config()).wait_for_capacity()
+
+    client.delete_namespaced_pod.assert_called_once_with(
+        name=_POD_NAME,
+        namespace="flower-system",
+        grace_period_seconds=0,
+    )
+    client.delete_namespaced_secret.assert_called_once_with(
+        name=_SECRET_NAME, namespace="flower-system"
+    )
+
+
 def test_wait_for_capacity_throttles_completed_pod_sweeps() -> None:
     """Test capacity wait does not sweep more often than the internal interval."""
     client = Mock()
@@ -2638,7 +2710,7 @@ def test_launch_submits_secret_before_pod_and_returns_accepted(
         )
     )
     assert result.status == LaunchResultStatus.ACCEPTED
-    assert client.mock_calls == [
+    assert client.mock_calls[-2:] == [
         call.create_namespaced_secret("flower-system", secret),
         call.create_namespaced_pod("flower-system", pod),
     ]
@@ -2685,6 +2757,469 @@ def test_launch_generates_distinct_object_names_for_same_task(
     assert [
         secret["metadata"]["labels"][LAUNCH_ATTEMPT_LABEL] for secret in secret_bodies
     ] == [_LAUNCH_ATTEMPT_ID, _NEXT_LAUNCH_ATTEMPT_ID]
+
+
+def test_delayed_dispatcher_does_not_delete_newer_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A delayed launcher must not delete attempts created after its snapshot."""
+    client = Mock()
+    labels = _task_labels(123)
+    labels[LAUNCH_ATTEMPT_LABEL] = _LAUNCH_ATTEMPT_ID
+    old_pod = _pod("Pending", labels=labels, uid="old-pod-uid")
+    old_secret = _secret(_SECRET_NAME, labels, uid="old-secret-uid")
+    client.list_namespaced_pod.return_value = {"items": [old_pod]}
+    client.list_namespaced_secret.return_value = {"items": [old_secret]}
+    now = 0.0
+    config = _executor_config(monotonic=lambda: now)
+    delayed_executor = KubernetesExecutor(client=client, config=config)
+    current_executor = KubernetesExecutor(client=client, config=config)
+    monkeypatch.setattr(
+        kube,
+        "_new_launch_attempt_id",
+        Mock(side_effect=[_NEXT_LAUNCH_ATTEMPT_ID, "fed789abc012"]),
+    )
+
+    # The delayed dispatcher snapshots and claims first, then stalls until its
+    # token expires and the task becomes pending again.
+    assert delayed_executor.prepare_launch(123)
+    now = 31.0
+    assert current_executor.prepare_launch(123)
+
+    # The current dispatcher wins the later claim and creates a replacement.
+    assert current_executor.launch(_execution_spec()).status == (
+        LaunchResultStatus.ACCEPTED
+    )
+    result = delayed_executor.launch(_execution_spec(token="expired-token"))
+
+    assert result.status == LaunchResultStatus.CAPACITY_REJECTED
+    client.delete_namespaced_pod.assert_called_once_with(
+        name=_POD_NAME,
+        namespace="flower-system",
+        body={
+            "gracePeriodSeconds": 0,
+            "preconditions": {"uid": "old-pod-uid"},
+        },
+    )
+    created_pod_names = [
+        call_args.args[1]["metadata"]["name"]
+        for call_args in client.create_namespaced_pod.call_args_list
+    ]
+    assert created_pod_names == [_NEXT_POD_NAME]
+    assert _NEXT_POD_NAME not in {
+        call_args.kwargs["name"]
+        for call_args in client.delete_namespaced_pod.call_args_list
+    }
+    client.delete_namespaced_secret.assert_called_once_with(
+        name=_SECRET_NAME,
+        namespace="flower-system",
+        body={"preconditions": {"uid": "old-secret-uid"}},
+    )
+
+
+def test_launch_rechecks_claim_deadline_after_slow_attempt_cleanup() -> None:
+    """Slow stale-attempt deletion must not launch with an expired claim."""
+    now = 0.0
+    client = Mock()
+    labels = {
+        **_task_labels(123),
+        LAUNCH_ATTEMPT_LABEL: _LAUNCH_ATTEMPT_ID,
+    }
+    client.list_namespaced_pod.return_value = {
+        "items": [_pod("Pending", labels=labels, uid="old-pod-uid")]
+    }
+    client.list_namespaced_secret.return_value = {
+        "items": [_secret(_SECRET_NAME, labels, uid="old-secret-uid")]
+    }
+
+    def _slow_delete(**_kwargs: object) -> None:
+        nonlocal now
+        now = 30.0
+
+    client.delete_namespaced_pod.side_effect = _slow_delete
+    executor = KubernetesExecutor(
+        client=client, config=_executor_config(monotonic=lambda: now)
+    )
+    assert executor.prepare_launch(123)
+
+    result = executor.launch(_execution_spec(token="fresh-token"))
+
+    assert result.status == LaunchResultStatus.CAPACITY_REJECTED
+    client.delete_namespaced_pod.assert_called_once()
+    client.delete_namespaced_secret.assert_called_once()
+    client.create_namespaced_secret.assert_not_called()
+    client.create_namespaced_pod.assert_not_called()
+
+
+def test_launch_rechecks_claim_deadline_after_slow_capacity_reconciliation() -> None:
+    """Slow capacity calls must not submit credentials for an expired claim."""
+    now = 0.0
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    client.list_namespaced_secret.return_value = {"items": []}
+    executor = KubernetesExecutor(
+        client=client, config=_executor_config(monotonic=lambda: now)
+    )
+    assert executor.prepare_launch(123)
+
+    def _slow_list(*_args: object, **_kwargs: object) -> dict[str, object]:
+        nonlocal now
+        now = 30.0
+        return {"items": []}
+
+    client.list_namespaced_pod.side_effect = _slow_list
+    result = executor.launch(_execution_spec(token="fresh-token"))
+
+    assert result.status == LaunchResultStatus.CAPACITY_REJECTED
+    client.create_namespaced_secret.assert_not_called()
+    client.create_namespaced_pod.assert_not_called()
+
+
+def test_launch_rechecks_claim_deadline_before_warm_dispatch() -> None:
+    """A warm Pod reservation must not receive an expired task token."""
+    now = 0.0
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    client.list_namespaced_secret.return_value = {"items": []}
+    executor = KubernetesExecutor(
+        client=client,
+        config=_executor_config(
+            warm_executor_owner="superexec-a", monotonic=lambda: now
+        ),
+    )
+    manager = Mock()
+
+    def _slow_ready_check(_task_type: TaskType) -> bool:
+        nonlocal now
+        now = 30.0
+        return True
+
+    manager.has_ready_pod.side_effect = _slow_ready_check
+    executor._warm_executor_pool_manager = manager  # pylint: disable=protected-access
+    assert executor.prepare_launch(123)
+
+    result = executor.launch(
+        _execution_spec(
+            task_type=TaskType.AGENT_APP, insecure=True, token="fresh-token"
+        )
+    )
+
+    assert result.status == LaunchResultStatus.CAPACITY_REJECTED
+    manager.launch.assert_not_called()
+    client.create_namespaced_secret.assert_not_called()
+    client.create_namespaced_pod.assert_not_called()
+
+
+def test_launch_cleans_secret_if_claim_expires_during_secret_create() -> None:
+    """Cold launch must remove credentials if the claim expires before Pod create."""
+    now = 0.0
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    client.list_namespaced_secret.return_value = {"items": []}
+
+    def _slow_create_secret(*_args: object, **_kwargs: object) -> None:
+        nonlocal now
+        now = 30.0
+
+    client.create_namespaced_secret.side_effect = _slow_create_secret
+    executor = KubernetesExecutor(
+        client=client, config=_executor_config(monotonic=lambda: now)
+    )
+    assert executor.prepare_launch(123)
+
+    result = executor.launch(_execution_spec(token="fresh-token"))
+
+    assert result.status == LaunchResultStatus.CAPACITY_REJECTED
+    client.create_namespaced_secret.assert_called_once()
+    client.delete_namespaced_secret.assert_called_once()
+    client.create_namespaced_pod.assert_not_called()
+
+
+def test_prepare_launch_skips_claim_admission_when_snapshot_fails() -> None:
+    """Snapshot failures must not permit another untracked launch attempt."""
+    client = Mock()
+    client.list_namespaced_secret.side_effect = _KubernetesApiError(
+        503, "service unavailable"
+    )
+    executor = KubernetesExecutor(client=client, config=_executor_config())
+
+    assert not executor.prepare_launch(123)
+
+    client.list_namespaced_pod.assert_not_called()
+
+
+def test_snapshot_race_defers_replacement_until_late_pod_is_visible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A launch crossing the snapshot boundary must not leave a duplicate Pod."""
+    now = 0.0
+    client = Mock()
+    labels = {
+        **_task_labels(123),
+        LAUNCH_ATTEMPT_LABEL: _LAUNCH_ATTEMPT_ID,
+    }
+    late_pod = _pod("Pending", labels=labels, uid="late-pod-uid")
+    observed_secret = _secret(_SECRET_NAME, labels, uid="old-secret-uid")
+    task_pod_snapshots = iter([[], [late_pod]])
+    task_secret_snapshots = iter([[observed_secret], []])
+    snapshot_calls: list[str] = []
+
+    def _list_pods(*_args: object, **kwargs: object) -> dict[str, object]:
+        selector = kwargs.get("label_selector")
+        if isinstance(selector, str) and LAUNCH_ATTEMPT_LABEL in selector:
+            snapshot_calls.append("pods")
+            return {"items": next(task_pod_snapshots)}
+        return {"items": []}
+
+    def _list_secrets(*_args: object, **kwargs: object) -> dict[str, object]:
+        selector = kwargs.get("label_selector")
+        if isinstance(selector, str) and LAUNCH_ATTEMPT_LABEL in selector:
+            snapshot_calls.append("secrets")
+            return {"items": next(task_secret_snapshots)}
+        return {"items": []}
+
+    client.list_namespaced_pod.side_effect = _list_pods
+    client.list_namespaced_secret.side_effect = _list_secrets
+    monkeypatch.setattr(
+        kube, "_new_launch_attempt_id", Mock(return_value=_NEXT_LAUNCH_ATTEMPT_ID)
+    )
+    executor = KubernetesExecutor(
+        client=client, config=_executor_config(monotonic=lambda: now)
+    )
+
+    assert executor.prepare_launch(123)
+    assert snapshot_calls == ["secrets", "pods"]
+    first_result = executor.launch(_execution_spec(token="first-token"))
+
+    assert first_result.status == LaunchResultStatus.CAPACITY_REJECTED
+    client.delete_namespaced_secret.assert_called_once_with(
+        name=_SECRET_NAME,
+        namespace="flower-system",
+        body={"preconditions": {"uid": "old-secret-uid"}},
+    )
+    client.delete_namespaced_pod.assert_not_called()
+    client.create_namespaced_pod.assert_not_called()
+
+    # The normal retry snapshots and retires the Pod that appeared after the
+    # first Pod list, then creates exactly one replacement attempt.
+    now = 31.0
+    assert executor.prepare_launch(123)
+    second_result = executor.launch(_execution_spec(token="second-token"))
+
+    assert second_result.status == LaunchResultStatus.ACCEPTED
+    client.delete_namespaced_pod.assert_called_once_with(
+        name=_POD_NAME,
+        namespace="flower-system",
+        body={
+            "gracePeriodSeconds": 0,
+            "preconditions": {"uid": "late-pod-uid"},
+        },
+    )
+    client.create_namespaced_pod.assert_called_once()
+    assert (
+        client.create_namespaced_pod.call_args.args[1]["metadata"]["name"]
+        == _NEXT_POD_NAME
+    )
+
+
+def test_reclaimed_task_retires_all_prior_attempts_before_replacement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Repeated unscheduled attempts collapse to one replacement launch."""
+    client = Mock()
+    attempt_ids = (_LAUNCH_ATTEMPT_ID, _NEXT_LAUNCH_ATTEMPT_ID, "fed789abc012")
+    pod_names = [f"flwr-taskexecutor-123-{attempt_id}" for attempt_id in attempt_ids]
+    labels = [
+        {
+            **_task_labels(123),
+            LAUNCH_ATTEMPT_LABEL: attempt_id,
+        }
+        for attempt_id in attempt_ids
+    ]
+    client.list_namespaced_pod.return_value = {
+        "items": [
+            _pod("Pending", name=name, labels=item_labels, uid=f"pod-uid-{index}")
+            for index, (name, item_labels) in enumerate(
+                zip(pod_names, labels, strict=True)
+            )
+        ]
+    }
+    client.list_namespaced_secret.return_value = {
+        "items": [
+            _secret(f"{name}-appio", item_labels, uid=f"secret-uid-{index}")
+            for index, (name, item_labels) in enumerate(
+                zip(pod_names, labels, strict=True)
+            )
+        ]
+    }
+    monkeypatch.setattr(
+        kube, "_new_launch_attempt_id", Mock(return_value="new123abc456")
+    )
+    executor = KubernetesExecutor(client=client, config=_executor_config())
+    assert executor.prepare_launch(123)
+
+    result = executor.launch(_execution_spec(token="fresh-token"))
+
+    assert result.status == LaunchResultStatus.ACCEPTED
+    assert {
+        call_args.kwargs["name"]
+        for call_args in client.delete_namespaced_pod.call_args_list
+    } == set(pod_names)
+    assert {
+        call_args.kwargs["name"]
+        for call_args in client.delete_namespaced_secret.call_args_list
+    } == {f"{name}-appio" for name in pod_names}
+    client.create_namespaced_pod.assert_called_once()
+    assert (
+        client.create_namespaced_pod.call_args.args[1]["metadata"]["name"]
+        == "flwr-taskexecutor-123-new123abc456"
+    )
+
+
+@pytest.mark.parametrize("old_resource_pool", ["gpu-pool", "previous-pool"])
+def test_restarted_executor_finds_attempt_after_metadata_changes(
+    monkeypatch: pytest.MonkeyPatch, old_resource_pool: str
+) -> None:
+    """Metadata changes must not hide old attempts from per-task cleanup."""
+    client = Mock()
+    old_labels = {
+        **_task_labels(123),
+        LAUNCH_ATTEMPT_LABEL: _LAUNCH_ATTEMPT_ID,
+        "flower.ai/resource-pool": old_resource_pool,
+        "flower.ai/team": "previous",
+    }
+    client.list_namespaced_pod.return_value = {
+        "items": [_pod("Pending", labels=old_labels, uid="old-pod-uid")]
+    }
+    client.list_namespaced_secret.return_value = {
+        "items": [_secret(_SECRET_NAME, old_labels, uid="old-secret-uid")]
+    }
+    monkeypatch.setattr(
+        kube, "_new_launch_attempt_id", Mock(return_value=_NEXT_LAUNCH_ATTEMPT_ID)
+    )
+    executor = KubernetesExecutor(
+        client=client,
+        config=_executor_config(
+            labels={"flower.ai/team": "current"},
+            resource_pool="gpu-pool",
+            active_pod_budget=2,
+        ),
+    )
+
+    assert executor.prepare_launch(123)
+    result = executor.launch(_execution_spec(token="fresh-token"))
+
+    assert result.status == LaunchResultStatus.ACCEPTED
+    client.delete_namespaced_pod.assert_called_once_with(
+        name=_POD_NAME,
+        namespace="flower-system",
+        body={
+            "gracePeriodSeconds": 0,
+            "preconditions": {"uid": "old-pod-uid"},
+        },
+    )
+    client.delete_namespaced_secret.assert_called_once_with(
+        name=_SECRET_NAME,
+        namespace="flower-system",
+        body={"preconditions": {"uid": "old-secret-uid"}},
+    )
+    pool_selector = (
+        "app.kubernetes.io/component=taskexecutor,"
+        "app.kubernetes.io/name=flower,"
+        "flower.ai/resource-pool=gpu-pool,"
+        "flower.ai/team=current"
+    )
+    attempt_selector = (
+        "app.kubernetes.io/component=taskexecutor,"
+        "app.kubernetes.io/name=flower,"
+        "flower.ai/superexec-task-id=123,"
+        f"{LAUNCH_ATTEMPT_LABEL}"
+    )
+    assert (
+        client.list_namespaced_secret.call_args_list[0].kwargs["label_selector"]
+        == attempt_selector
+    )
+    assert (
+        client.list_namespaced_pod.call_args_list[0].kwargs["label_selector"]
+        == attempt_selector
+    )
+    assert all(
+        call_args.kwargs["label_selector"] == pool_selector
+        for call_args in client.list_namespaced_pod.call_args_list[1:]
+    )
+    assert all(
+        call_args.kwargs["label_selector"] == pool_selector
+        for call_args in client.list_namespaced_secret.call_args_list[1:]
+    )
+
+
+def test_full_pool_retires_stale_attempts_without_adding_another() -> None:
+    """Terminating stale attempts stay counted and do not grow a full pool."""
+    client = Mock()
+    labels = {
+        **_task_labels(123),
+        LAUNCH_ATTEMPT_LABEL: _LAUNCH_ATTEMPT_ID,
+    }
+    stale_pod = _pod("Pending", labels=labels, uid="old-pod-uid")
+    stale_secret = _secret(_SECRET_NAME, labels, uid="old-secret-uid")
+    # Preparation, completed-Pod sweep, and the capacity check all observe the
+    # Pod. Kubernetes removes it asynchronously after the delete request.
+    client.list_namespaced_pod.return_value = {"items": [stale_pod]}
+    client.list_namespaced_secret.return_value = {"items": [stale_secret]}
+    executor = KubernetesExecutor(
+        client=client, config=_executor_config(active_pod_budget=1)
+    )
+    assert executor.prepare_launch(123)
+
+    result = executor.launch(_execution_spec(token="fresh-token"))
+
+    assert result.status == LaunchResultStatus.CAPACITY_REJECTED
+    client.delete_namespaced_pod.assert_called_once()
+    client.delete_namespaced_secret.assert_called_once()
+    client.create_namespaced_pod.assert_not_called()
+
+
+def test_launch_returns_capacity_rejected_without_waiting_at_budget() -> None:
+    """A full pool must return control so SuperExec can poll another task."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": [_pod("Pending")]}
+    client.list_namespaced_secret.return_value = {"items": []}
+    sleep = Mock()
+    executor = KubernetesExecutor(
+        client=client,
+        config=_executor_config(active_pod_budget=1, sleep=sleep),
+    )
+
+    result = executor.launch(_execution_spec())
+
+    assert result.status == LaunchResultStatus.CAPACITY_REJECTED
+    sleep.assert_not_called()
+    client.create_namespaced_secret.assert_not_called()
+    client.create_namespaced_pod.assert_not_called()
+
+
+def test_launch_keeps_secret_if_snapshotted_pod_identity_changed() -> None:
+    """A UID conflict protects a newer same-name Pod and credential Secret."""
+    client = Mock()
+    labels = _task_labels(123)
+    labels[LAUNCH_ATTEMPT_LABEL] = _LAUNCH_ATTEMPT_ID
+    client.list_namespaced_pod.return_value = {
+        "items": [_pod("Pending", labels=labels, uid="old-pod-uid")]
+    }
+    client.list_namespaced_secret.return_value = {
+        "items": [_secret(_SECRET_NAME, labels, uid="old-secret-uid")]
+    }
+    client.delete_namespaced_pod.side_effect = _KubernetesApiError(
+        409, "UID precondition failed"
+    )
+    executor = KubernetesExecutor(client=client, config=_executor_config())
+    assert executor.prepare_launch(123)
+
+    result = executor.launch(_execution_spec())
+
+    assert result.status == LaunchResultStatus.CAPACITY_REJECTED
+    client.delete_namespaced_secret.assert_not_called()
+    client.create_namespaced_pod.assert_not_called()
 
 
 def test_launch_returns_capacity_rejected_if_secret_create_hits_quota() -> None:
