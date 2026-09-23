@@ -388,9 +388,10 @@ def test_create_connector_response_resolves_canonical_name() -> None:
     assert output == "done"
 
 
-def test_create_connector_response_executes_filesystem_locally() -> None:
-    """Filesystem calls should stay on the requesting executor."""
+def test_create_connector_response_uses_connector_task_for_filesystem() -> None:
+    """Filesystem calls should execute through a Connector task."""
     stub = Mock()
+    stub.CreateTask.return_value = CreateTaskResponse(task_id=456)
     agent_runtime = AgentRuntime(
         stub=stub,
         run_id=123,
@@ -398,11 +399,16 @@ def test_create_connector_response_executes_filesystem_locally() -> None:
         start_run_request=StartRunRequest(),
         events=Mock(),
     )
+    reply = ConnectorResponse(
+        dst_task_id=789,
+        name="filesystem_list_directory",
+        call_id="call-1",
+        output={"entries": []},
+        error=None,
+        reply_to_message_id="request-message-id",
+    )
 
-    with patch(
-        "flwr.supercore.task_process.agent.session.invoke_filesystem",
-        return_value={"entries": []},
-    ) as invoke_filesystem:
+    with patch.object(agent_runtime, "_send_and_receive", return_value=reply):
         output = agent_runtime.create_connector_response(
             name="filesystem_list_directory",
             call_id="call-1",
@@ -410,8 +416,6 @@ def test_create_connector_response_executes_filesystem_locally() -> None:
         )
 
     assert output == {"entries": []}
-    stub.CreateTask.assert_not_called()
-    invoke_filesystem.assert_called_once_with(
-        "filesystem_list_directory",
-        {"path": "/allowed"},
+    stub.CreateTask.assert_called_once_with(
+        CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref="filesystem")
     )

@@ -42,6 +42,8 @@ OAUTH_FLOWS: dict[str, OAuthFlow] = {
     if connector.oauth_flow is not None
 }
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
+    filesystem.FILESYSTEM_LIST_DIRECTORY_TOOL_NAME: filesystem.list_directory,
+    filesystem.FILESYSTEM_READ_FILE_TOOL_NAME: filesystem.read_file,
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
@@ -142,4 +144,6 @@ def get_oauth_flow(connector_ref: str) -> OAuthFlow:
 
 def has_builtin_connector(name: str) -> bool:
     """Return whether a built-in connector is registered."""
-    return name in _CONNECTOR_HANDLERS
+    return name in _CONNECTOR_HANDLERS or any(
+        get_connector_ref(tool_name) == name for tool_name in _CONNECTOR_HANDLERS
+    )
