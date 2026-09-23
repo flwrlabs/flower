@@ -279,7 +279,7 @@ class TestGetConnector(unittest.TestCase):
     def test_returns_authenticated_task_credentials(self) -> None:
         """GetConnector should return the run owner's matching credentials."""
         task = Mock(type=TaskType.CONNECTOR, connector_ref="notion", run_id=123)
-        self.state.get_run_info.return_value = [Mock(federation_id="fed-a")]
+        self.state.get_run_info.return_value = [Mock(federation_id="@bob/fed-a")]
         self.state.get_connector.return_value = Mock(
             connector_ref="notion",
             credentials_json='{"token":"secret"}',
@@ -299,7 +299,7 @@ class TestGetConnector(unittest.TestCase):
             ),
         )
         self.state.get_connector.assert_called_once_with(
-            federation_id="fed-a",
+            federation_id="@bob/fed-a",
             connector_ref="notion",
         )
 
@@ -329,14 +329,14 @@ class TestGetConnector(unittest.TestCase):
     def test_hides_other_federation_credentials(self) -> None:
         """GetConnector should not fall back to another federation's credentials."""
         task = Mock(type=TaskType.CONNECTOR, connector_ref="notion", run_id=123)
-        self.state.get_run_info.return_value = [Mock(federation_id="fed-b")]
+        self.state.get_run_info.return_value = [Mock(federation_id="@bob/fed-b")]
         self.state.get_connector.return_value = None
 
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.get_connector(GetConnectorRequest(), self.state, task)
 
         self.state.get_connector.assert_called_once_with(
-            federation_id="fed-b",
+            federation_id="@bob/fed-b",
             connector_ref="notion",
         )
         self.assertEqual(error.exception.code, ApiErrorCode.CONNECTOR_NOT_FOUND)

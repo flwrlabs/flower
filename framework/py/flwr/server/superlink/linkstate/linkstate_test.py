@@ -2615,7 +2615,7 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
 
         with state.session() as session:
             state.upsert_connector(
-                federation_id="fed-a",
+                federation_id="@bob/fed-a",
                 connector_ref="calendar",
                 credentials_json='{"token":"old"}',
                 config_json='{"calendar":"primary"}',
@@ -2623,21 +2623,21 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
             )
             cached_row = session.scalar(
                 select(ConnectorModel).where(
-                    ConnectorModel.federation_id == "fed-a",
+                    ConnectorModel.federation_id == "@bob/fed-a",
                     ConnectorModel.connector_ref == "calendar",
                 )
             )
             assert cached_row is not None
             self.assertEqual(cached_row.credentials_json, '{"token":"old"}')
             state.upsert_connector(
-                federation_id="fed-a",
+                federation_id="@bob/fed-a",
                 connector_ref="calendar",
                 credentials_json='{"token":"new"}',
                 config_json='{"calendar":"work"}',
                 created_by="account-a",
             )
             second = state.get_connector(
-                federation_id="fed-a", connector_ref="calendar"
+                federation_id="@bob/fed-a", connector_ref="calendar"
             )
 
         assert second is not None

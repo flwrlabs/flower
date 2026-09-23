@@ -289,7 +289,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     def test_list_and_disconnect_connectors_are_federation_scoped(self) -> None:
         """List and disconnect only the requested federation's connector."""
         flow = _OAuthFlow()
-        for federation_id in (NOOP_FEDERATION_ID, "other-federation"):
+        for federation_id in (NOOP_FEDERATION_ID, "@bob/fed-a"):
             self.assertTrue(
                 self.state.upsert_connector(
                     federation_id=federation_id,
@@ -312,7 +312,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             )
 
         self.assertIsNone(self.state.get_connector(NOOP_FEDERATION_ID, "slack"))
-        self.assertIsNotNone(self.state.get_connector("other-federation", "slack"))
+        self.assertIsNotNone(self.state.get_connector("@bob/fed-a", "slack"))
 
     def test_list_connectors_without_federation_returns_empty(self) -> None:
         """ListConnectors should return no connectors without a federation."""
@@ -560,7 +560,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         flow = _OAuthFlow()
         if connector_ref == "slack":
             self.state.upsert_connector(
-                federation_id="other-federation",
+                federation_id="@bob/fed-a",
                 connector_ref="slack",
                 credentials_json="{}",
                 config_json="{}",

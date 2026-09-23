@@ -508,7 +508,7 @@ class InMemoryCoreState(
                 self.federation_app_store.pop((federation_id, app_id), None) is not None
             )
 
-    def upsert_connector(
+    def upsert_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         federation_id: str,
         connector_ref: str,

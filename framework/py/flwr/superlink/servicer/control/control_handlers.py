@@ -463,7 +463,7 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
     return CompleteConnectorOAuthResponse(connector_ref=connector_ref)
 
 
-def validate_run_connector_refs(
+def validate_run_connector_refs(  # pylint: disable=unused-argument
     connector_refs: Sequence[str],
     account: AccountInfo,
     state: LinkState,

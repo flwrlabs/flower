@@ -647,7 +647,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return deleted_app_id is not None
 
-    def upsert_connector(
+    def upsert_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         federation_id: str,
         connector_ref: str,

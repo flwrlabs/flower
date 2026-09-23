@@ -228,7 +228,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Delete one federation-app association; its FAB remains in state."""
 
     @abstractmethod
-    def upsert_connector(
+    def upsert_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         federation_id: str,
         connector_ref: str,
