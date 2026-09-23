@@ -16,13 +16,14 @@
 
 
 import os
+import signal
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
-from typing import cast
-
-import httpx
+from typing import Any, cast
 
 from flwr.agentapp import AgentApp, LoadAgentAppError
 from flwr.app import Context, Message
@@ -58,6 +59,7 @@ from flwr.supercore.constant import (
     SYSTEM_MESSAGE_TYPE,
 )
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.supercore.exit.signal_handler import SIGNAL_TO_EXIT_CODE
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
 from flwr.supercore.logger import flush_logs, start_log_uploader, stop_log_uploader
 from flwr.supercore.object_ref import load_app
@@ -131,11 +133,15 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
         self._certificates = certificates
         self._certificates_path = certificates_path
         self._runtime_dependency_install = runtime_dependency_install
-        self._grid: HttpGrid | None = None
+        self._grid = HttpGrid(
+            runtime_api_address=self._runtime_api_address,
+            insecure=self._insecure,
+            root_certificates=self._certificates,
+            token=self._token,
+        )
         self._log_uploader: threading.Thread | None = None
         self._hash_run_id: str | None = None
-        self._sub_status = SubStatus.FAILED
-        self._details = "Task failed with unknown error."
+        self._outcome = (SubStatus.FAILED, "Task failed with unknown error.")
         self._heartbeat_sender: HeartbeatSender | None = None
         self._context: Context | None = None
         self._runtime_env_dir: Path | None = None
@@ -143,23 +149,10 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
         self._finalized = False
         self._lock = threading.RLock()
 
-    def initialize(self) -> None:
-        """Create fresh task-scoped Runtime state if it is not initialized."""
-        if self._grid is not None:
-            return
-        self._grid = HttpGrid(
-            runtime_api_address=self._runtime_api_address,
-            insecure=self._insecure,
-            root_certificates=self._certificates,
-            token=self._token,
-        )
-
     def run(self) -> int:  # pylint: disable=too-many-locals,too-many-statements
         """Execute the AgentApp task and return its Flower exit code."""
         exit_code = ExitCode.SUCCESS
         try:
-            if self._grid is None:
-                raise RuntimeError("AgentApp Runtime client initialization failed.")
             grid = self._grid
 
             self._heartbeat_sender = HeartbeatSender(
@@ -284,15 +277,16 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
 
             # Set sub_status and details for successful completion
             with self._lock:
-                self._sub_status = SubStatus.COMPLETED
-                self._details = ""
+                self._outcome = (SubStatus.COMPLETED, "")
 
         except Exception as ex:  # pylint: disable=broad-exception-caught
             log(ERROR, "AgentApp raised an exception", exc_info=ex)
 
             with self._lock:
-                self._sub_status = SubStatus.FAILED
-                self._details = f"AgentApp failed with exception: {str(ex)}"
+                self._outcome = (
+                    SubStatus.FAILED,
+                    f"AgentApp failed with exception: {str(ex)}",
+                )
 
             exit_code = ExitCode.TASK_PROC_EXCEPTION
             if isinstance(ex, AppExitException):
@@ -306,15 +300,12 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
 
     def finalize(self) -> None:  # pylint: disable=protected-access
         """Push final status and release task state exactly once."""
-        with self._lock:
+        with _ignore_graceful_signals(), self._lock:
             if self._finalized:
                 return
             self._finalized = True
 
             log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
-            if self._grid is None:
-                return
-
             self._grid._retry_invoker.max_tries = 1
 
             if self._agent_events is not None:
@@ -323,28 +314,44 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 except Exception as err:  # pylint: disable=broad-exception-caught
                     log(ERROR, "Failed to close AgentApp event publisher", exc_info=err)
 
-            if self._log_uploader:
-                flush_logs(self._log_queue)
+            try:
+                if self._log_uploader:
+                    flush_logs(self._log_queue)
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to flush AgentApp task logs", exc_info=err)
 
+            sub_status, details = self._outcome
             pushoutput_req = PushTaskOutputRequest(
                 context=(context_to_proto(self._context) if self._context else None),
-                sub_status=self._sub_status,
-                details=self._details,
+                sub_status=sub_status,
+                details=details,
             )
             try:
                 self._grid._runtime_client.PushTaskOutput(pushoutput_req)
-            except httpx.HTTPError as err:
-                log(ERROR, "Failed to push task output: %s", str(err))
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to push AgentApp task output", exc_info=err)
 
-            if self._log_uploader:
-                stop_log_uploader(self._log_queue, self._log_uploader)
+            try:
+                if self._log_uploader:
+                    stop_log_uploader(self._log_queue, self._log_uploader)
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to stop AgentApp log uploader", exc_info=err)
 
-            if self._heartbeat_sender and self._heartbeat_sender.is_running:
-                self._heartbeat_sender.stop()
+            try:
+                if self._heartbeat_sender and self._heartbeat_sender.is_running:
+                    self._heartbeat_sender.stop()
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to stop AgentApp task heartbeat", exc_info=err)
 
-            self._grid.close()
+            try:
+                self._grid.close()
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to close AgentApp Runtime client", exc_info=err)
 
-            cleanup_app_runtime_environment(self._runtime_env_dir)
+            try:
+                cleanup_app_runtime_environment(self._runtime_env_dir)
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to clean up AgentApp runtime", exc_info=err)
 
     def event_details(self, exit_code: int) -> JSONObject:
         """Return the AgentApp leave-event details."""
@@ -352,6 +359,23 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             "run-id-hash": self._hash_run_id,
             "success": exit_code == ExitCode.SUCCESS,
         }
+
+
+@contextmanager
+def _ignore_graceful_signals() -> Iterator[None]:
+    """Ignore graceful signals process-wide while finalization is in progress."""
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+
+    previous_handlers: dict[int, Any] = {}
+    try:
+        for sig in SIGNAL_TO_EXIT_CODE:
+            previous_handlers[sig] = signal.signal(sig, signal.SIG_IGN)
+        yield
+    finally:
+        for sig, previous_handler in previous_handlers.items():
+            signal.signal(sig, previous_handler)
 
 
 def _run_agentapp_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -365,15 +389,14 @@ def _run_agentapp_task(  # pylint: disable=too-many-arguments,too-many-positiona
 ) -> tuple[_AgentAppTaskLifecycle, int]:
     """Create and execute one task through the AgentApp lifecycle."""
     lifecycle = _AgentAppTaskLifecycle(
-        runtime_api_address,
-        log_queue,
-        token,
-        insecure,
-        certificates,
-        certificates_path,
-        runtime_dependency_install,
+        runtime_api_address=runtime_api_address,
+        log_queue=log_queue,
+        token=token,
+        insecure=insecure,
+        certificates=certificates,
+        certificates_path=certificates_path,
+        runtime_dependency_install=runtime_dependency_install,
     )
-    lifecycle.initialize()
     register_signal_handlers(
         event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
         exit_message="Task stopped by user.",
