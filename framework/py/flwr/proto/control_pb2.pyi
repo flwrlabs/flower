@@ -63,7 +63,7 @@ class StartRunRequest(google.protobuf.message.Message):
     APP_SPEC_FIELD_NUMBER: builtins.int
     FEDERATION_FIELD_NUMBER: builtins.int
     SERIES_ID_FIELD_NUMBER: builtins.int
-    CONNECTOR_REFS_FIELD_NUMBER: builtins.int
+    CONNECTOR_IDS_FIELD_NUMBER: builtins.int
     USER_PROMPT_FIELD_NUMBER: builtins.int
     app_spec: builtins.str
     federation: builtins.str
@@ -76,7 +76,7 @@ class StartRunRequest(google.protobuf.message.Message):
     @property
     def override_federation_config(self) -> flwr.proto.federation_config_pb2.SimulationConfig: ...
     @property
-    def connector_refs(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def connector_ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
     def __init__(
         self,
         *,
@@ -86,11 +86,11 @@ class StartRunRequest(google.protobuf.message.Message):
         app_spec: builtins.str = ...,
         federation: builtins.str = ...,
         series_id: builtins.int | None = ...,
-        connector_refs: collections.abc.Iterable[builtins.str] | None = ...,
+        connector_ids: collections.abc.Iterable[builtins.int] | None = ...,
         user_prompt: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_series_id", b"_series_id", "fab", b"fab", "override_federation_config", b"override_federation_config", "series_id", b"series_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_series_id", b"_series_id", "app_spec", b"app_spec", "connector_refs", b"connector_refs", "fab", b"fab", "federation", b"federation", "override_config", b"override_config", "override_federation_config", b"override_federation_config", "series_id", b"series_id", "user_prompt", b"user_prompt"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_series_id", b"_series_id", "app_spec", b"app_spec", "connector_ids", b"connector_ids", "fab", b"fab", "federation", b"federation", "override_config", b"override_config", "override_federation_config", b"override_federation_config", "series_id", b"series_id", "user_prompt", b"user_prompt"]) -> None: ...
     def WhichOneof(self, oneof_group: typing.Literal["_series_id", b"_series_id"]) -> typing.Literal["series_id"] | None: ...
 
 global___StartRunRequest = StartRunRequest
@@ -630,10 +630,12 @@ class Connector(google.protobuf.message.Message):
     DISPLAY_NAME_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
     CONNECTED_FIELD_NUMBER: builtins.int
+    CONNECTOR_ID_FIELD_NUMBER: builtins.int
     connector_ref: builtins.str
     display_name: builtins.str
     description: builtins.str
     connected: builtins.bool
+    connector_id: builtins.int
     def __init__(
         self,
         *,
@@ -641,8 +643,11 @@ class Connector(google.protobuf.message.Message):
         display_name: builtins.str = ...,
         description: builtins.str = ...,
         connected: builtins.bool = ...,
+        connector_id: builtins.int | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["connected", b"connected", "connector_ref", b"connector_ref", "description", b"description", "display_name", b"display_name"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_connector_id", b"_connector_id", "connector_id", b"connector_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_connector_id", b"_connector_id", "connected", b"connected", "connector_id", b"connector_id", "connector_ref", b"connector_ref", "description", b"description", "display_name", b"display_name"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_connector_id", b"_connector_id"]) -> typing.Literal["connector_id"] | None: ...
 
 global___Connector = Connector
 
@@ -666,14 +671,17 @@ global___ListConnectorsResponse = ListConnectorsResponse
 class DisconnectConnectorRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    CONNECTOR_REF_FIELD_NUMBER: builtins.int
-    connector_ref: builtins.str
+    CONNECTOR_ID_FIELD_NUMBER: builtins.int
+    FEDERATION_FIELD_NUMBER: builtins.int
+    connector_id: builtins.int
+    federation: builtins.str
     def __init__(
         self,
         *,
-        connector_ref: builtins.str = ...,
+        connector_id: builtins.int = ...,
+        federation: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["connector_ref", b"connector_ref"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["connector_id", b"connector_id", "federation", b"federation"]) -> None: ...
 
 global___DisconnectConnectorRequest = DisconnectConnectorRequest
 
@@ -693,15 +701,18 @@ class BeginConnectorOAuthRequest(google.protobuf.message.Message):
 
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
     REDIRECT_URI_FIELD_NUMBER: builtins.int
+    FEDERATION_FIELD_NUMBER: builtins.int
     connector_ref: builtins.str
     redirect_uri: builtins.str
+    federation: builtins.str
     def __init__(
         self,
         *,
         connector_ref: builtins.str = ...,
         redirect_uri: builtins.str = ...,
+        federation: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["connector_ref", b"connector_ref", "redirect_uri", b"redirect_uri"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["connector_ref", b"connector_ref", "federation", b"federation", "redirect_uri", b"redirect_uri"]) -> None: ...
 
 global___BeginConnectorOAuthRequest = BeginConnectorOAuthRequest
 
@@ -755,13 +766,16 @@ class CompleteConnectorOAuthResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
+    CONNECTOR_ID_FIELD_NUMBER: builtins.int
     connector_ref: builtins.str
+    connector_id: builtins.int
     def __init__(
         self,
         *,
         connector_ref: builtins.str = ...,
+        connector_id: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["connector_ref", b"connector_ref"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["connector_id", b"connector_id", "connector_ref", b"connector_ref"]) -> None: ...
 
 global___CompleteConnectorOAuthResponse = CompleteConnectorOAuthResponse
 

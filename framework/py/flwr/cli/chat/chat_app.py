@@ -308,6 +308,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_name = CHAT_AGENT_NAME
         self.local_agent: LocalAgent | None = None
         self.connector_refs: list[str] = []
+        self.connector_ids: list[int] = []
         self.completer = _ChatCompleter(stub, auth_plugin, self.federation, federations)
         self.input_buffer = Buffer(
             completer=ThreadedCompleter(self.completer),
@@ -547,14 +548,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         """Show the connector selector or apply its selection."""
         if prompt.lower() == f"{CHAT_CONNECTOR_COMMAND} {CHAT_CONNECTOR_CLEAR}":
             self.connector_refs.clear()
+            self.connector_ids.clear()
             event.app.invalidate()
-            return True
-
-        if not self.federation.endswith(f"/{CHAT_DEFAULT_FEDERATION_NAME}"):
-            self._append_transcript(
-                "class:notice",
-                "Connectors are only available in the personal federation.\n\n",
-            )
             return True
 
         if prompt.lower() == CHAT_CONNECTOR_COMMAND:
@@ -587,8 +582,16 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             self._append_transcript("class:error", f"{exc.format_message()}\n\n")
             return True
 
-        if connector.connector_ref not in self.connector_refs:
-            self.connector_refs.append(connector.connector_ref)
+        if not connector.HasField("connector_id"):
+            self._append_transcript(
+                "class:error", "Error: Connected connector has no ID.\n\n"
+            )
+            return True
+        if connector.connector_id not in self.connector_ids:
+            self.connector_refs.append(
+                f"{connector.connector_ref}:{connector.connector_id}"
+            )
+            self.connector_ids.append(connector.connector_id)
             event.app.invalidate()
         return True
 
@@ -670,6 +673,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_name = CHAT_AGENT_NAME
         self.local_agent = None
         self.connector_refs.clear()
+        self.connector_ids.clear()
         self.series_id = None
         self._clear_transcript()
         return True
@@ -829,7 +833,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             app_spec,
             fab_hash,
             fab_content,
-            self.connector_refs,
+            self.connector_ids,
         )
         if fab_content is not None:
             self.completer.invalidate_agents()
@@ -1192,7 +1196,7 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
     app_spec: str = FLOWER_AGENT_APP_ID,
     fab_hash: str | None = None,
     fab_content: bytes | None = None,
-    connector_refs: Sequence[str] = (),
+    connector_ids: Sequence[int] = (),
 ) -> tuple[int, int | None]:
     """Start one Flower AgentApp run."""
     req = StartRunRequest(
@@ -1201,7 +1205,7 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
         user_prompt=prompt,
         federation=federation or "",
         fab=Fab(hash_str=fab_hash or "", content=fab_content or b""),
-        connector_refs=connector_refs,
+        connector_ids=connector_ids,
     )
     if series_id is not None:
         req.series_id = series_id

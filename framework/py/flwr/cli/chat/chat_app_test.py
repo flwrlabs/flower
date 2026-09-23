@@ -169,12 +169,14 @@ def test_chat_selects_connector_from_dropdown() -> None:
     stub.ListConnectors.return_value = ListConnectorsResponse(
         connectors=[
             Connector(
+                connector_id=11,
                 connector_ref="github",
                 display_name="GitHub",
                 description="Search GitHub",
                 connected=True,
             ),
             Connector(
+                connector_id=12,
                 connector_ref="attio",
                 display_name="Attio",
                 description="Search Attio",
@@ -202,23 +204,26 @@ def test_chat_selects_connector_from_dropdown() -> None:
     completions = list(
         chat.completer.get_completions(Document("/connector git"), CompleteEvent())
     )
-    assert [completion.text for completion in completions] == ["github"]
+    assert [completion.text for completion in completions] == ["github:11"]
 
     assert chat._handle_command(  # pylint: disable=protected-access
-        event, "/connector github"
+        event, "/connector github:11"
     )
-    assert chat.connector_refs == ["github"]
+    assert chat.connector_refs == ["github:11"]
+    assert chat.connector_ids == [11]
     assert chat._handle_command(  # pylint: disable=protected-access
-        event, "/connector attio"
+        event, "/connector attio:12"
     )
     assert chat._handle_command(  # pylint: disable=protected-access
-        event, "/connector github"
+        event, "/connector github:11"
     )
-    assert chat.connector_refs == ["github", "attio"]
+    assert chat.connector_refs == ["github:11", "attio:12"]
+    assert chat.connector_ids == [11, 12]
     assert chat._render_agent_name() == [  # pylint: disable=protected-access
         (
             "class:agent.name",
-            f" ✿ {CHAT_AGENT_NAME} · {_CHAT_FED_ID} · connectors: github, attio ",
+            f" ✿ {CHAT_AGENT_NAME} · {_CHAT_FED_ID} · connectors: "
+            "github:11, attio:12 ",
         )
     ]
     clear_completions = list(
@@ -226,13 +231,14 @@ def test_chat_selects_connector_from_dropdown() -> None:
     )
     assert [completion.text for completion in clear_completions] == ["clear"]
     assert clear_completions[0].display_text == (
-        "clear         Clear selected connectors"
+        "clear            Clear selected connectors"
     )
 
     assert chat._handle_command(  # pylint: disable=protected-access
         event, "/connector clear"
     )
     assert not chat.connector_refs
+    assert not chat.connector_ids
     assert chat._render_agent_name() == [  # pylint: disable=protected-access
         ("class:agent.name", f" ✿ {CHAT_AGENT_NAME} · {_CHAT_FED_ID} ")
     ]
@@ -248,6 +254,7 @@ def test_chat_connector_command_directs_to_webui_when_empty() -> None:
         ListConnectorsResponse(
             connectors=[
                 Connector(
+                    connector_id=11,
                     connector_ref="github",
                     display_name="GitHub",
                     connected=True,
@@ -272,29 +279,42 @@ def test_chat_connector_command_directs_to_webui_when_empty() -> None:
     chat.input_buffer.start_completion.assert_called_once_with(select_first=False)
 
 
-def test_chat_rejects_connector_selection_outside_personal_federation() -> None:
-    """Connectors should only be selectable in the personal federation."""
+def test_chat_allows_connector_selection_in_any_federation() -> None:
+    """Connectors should be selectable in any federation."""
     application = Mock()
+    stub = Mock()
+    stub.ListConnectors.return_value = ListConnectorsResponse(
+        connectors=[
+            Connector(
+                connector_id=11,
+                connector_ref="github",
+                display_name="GitHub",
+                connected=True,
+            )
+        ]
+    )
     federations = [
         Federation(name=_CHAT_FED_ID),
         Federation(name="@flower/other"),
     ]
     with patch.object(ChatApplication, "_create_application", return_value=application):
-        chat = ChatApplication(Mock(), federations, Mock())
+        chat = ChatApplication(stub, federations, Mock())
+    chat.input_buffer = Mock()
     chat.connector_refs = ["github"]
+    chat.connector_ids = [10]
 
     assert chat._handle_command(  # pylint: disable=protected-access
         Mock(app=application), "/federation @flower/other"
     )
     assert not chat.connector_refs
+    assert not chat.connector_ids
 
     assert chat._handle_command(  # pylint: disable=protected-access
         Mock(app=application), "/connector"
     )
-    assert chat.transcript[-1] == (
-        "class:notice",
-        "Connectors are only available in the personal federation.\n\n",
-    )
+    request = stub.ListConnectors.call_args.args[0]
+    assert request.federation == "@flower/other"
+    assert chat.input_buffer.text == "/connector "
 
 
 def test_start_chat_run_includes_selected_connectors() -> None:
@@ -307,8 +327,8 @@ def test_start_chat_run_includes_selected_connectors() -> None:
         "Hello",
         _CHAT_FED_ID,
         None,
-        connector_refs=["github", "attio"],
+        connector_ids=[11, 12],
     )
 
     request = stub.StartRun.call_args.args[0]
-    assert list(request.connector_refs) == ["github", "attio"]
+    assert list(request.connector_ids) == [11, 12]

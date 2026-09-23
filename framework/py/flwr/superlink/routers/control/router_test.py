@@ -161,7 +161,7 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
         ),
         (
             "/v1/control/disconnect-connector",
-            DisconnectConnectorRequest(connector_ref="google-drive"),
+            DisconnectConnectorRequest(connector_id=42, federation="@flower/fed-a"),
             DisconnectConnectorResponse.FromString,
             DisconnectConnectorResponse(),
             "disconnect_connector",
@@ -171,6 +171,7 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
             BeginConnectorOAuthRequest(
                 connector_ref="google-drive",
                 redirect_uri="https://example.test/oauth/callback",
+                federation="@flower/fed-a",
             ),
             BeginConnectorOAuthResponse.FromString,
             BeginConnectorOAuthResponse(
