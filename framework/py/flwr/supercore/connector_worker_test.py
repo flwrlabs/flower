@@ -49,6 +49,9 @@ def test_connector_worker_serve_and_dispatch_interfaces(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Connector serve and dispatch should delegate to the shared worker."""
+    assert ConnectorInvocation.from_payload(_payload()) == ConnectorInvocation(
+        "task-token", "runtime.example:9092", True, None
+    )
     socket_path = tmp_path / "connector.sock"
     ready_file = tmp_path / "ready"
     busy_file = tmp_path / "busy"
