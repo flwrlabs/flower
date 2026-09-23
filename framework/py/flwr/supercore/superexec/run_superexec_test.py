@@ -15,18 +15,26 @@
 """Tests for SuperExec runtime setup."""
 
 
+from collections.abc import Sequence
 from logging import ERROR, WARNING
 from typing import Any
 from unittest.mock import Mock
 
 import pytest
 
-from flwr.supercore.constant import ExecutorType
+from flwr.proto.runtime_pb2 import PullAndClaimTaskResponse  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore.constant import ExecutorType, TaskType
 from flwr.supercore.interceptors import (
     RuntimeVersionHttpInterceptor,
     SuperExecAuthHttpInterceptor,
 )
 from flwr.supercore.superexec.executor import LaunchResult, LaunchResultStatus
+from flwr.supercore.superexec.plugin import (
+    AutoExecPlugin,
+    ClientAppExecPlugin,
+    ServerAppExecPlugin,
+)
 
 from . import run_superexec as run_superexec_module
 
@@ -72,6 +80,172 @@ def _run_superexec_one_launch(
 
 
 @pytest.mark.parametrize(
+    ("plugin_class", "task_type"),
+    [
+        (AutoExecPlugin, TaskType.MODEL),
+        (ServerAppExecPlugin, TaskType.SERVER_APP),
+        (ClientAppExecPlugin, TaskType.CLIENT_APP),
+    ],
+)
+def test_builtin_subprocess_uses_one_acquisition_call(
+    monkeypatch: pytest.MonkeyPatch,
+    plugin_class: type[AutoExecPlugin | ServerAppExecPlugin | ClientAppExecPlugin],
+    task_type: TaskType,
+) -> None:
+    """Built-in subprocess execution gates capacity before one claim request."""
+    task = Task(task_id=123, type=task_type)
+    client = Mock()
+    client.PullAndClaimTask.return_value = PullAndClaimTaskResponse(
+        task=task, token="task-token"
+    )
+    client_class = Mock()
+    client_class.from_server_address.return_value = client
+    executor = Mock()
+    executor.launch.return_value = LaunchResult.accepted()
+    get_executor = Mock(return_value=executor)
+    order = Mock()
+    order.attach_mock(executor.wait_for_capacity, "capacity")
+    order.attach_mock(client.PullAndClaimTask, "acquire")
+    monkeypatch.setattr(run_superexec_module, "get_executor", get_executor)
+    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
+    monkeypatch.setattr(
+        "flwr.supercore.superexec.run_superexec.time.sleep",
+        Mock(side_effect=KeyboardInterrupt()),
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        run_superexec_module.run_superexec(
+            plugin_class=plugin_class,
+            client_class=client_class,
+            runtime_api_address="127.0.0.1:9091",
+            insecure=True,
+        )
+
+    assert [call[0] for call in order.mock_calls] == ["capacity", "acquire"]
+    assert set(client.PullAndClaimTask.call_args.args[0].supported_task_types) == set(
+        plugin_class.supported_task_types
+    )
+    client.PullPendingTasks.assert_not_called()
+    client.ClaimTask.assert_not_called()
+    assert executor.launch.call_args.args[0].task_id == task.task_id
+    assert executor.launch.call_args.args[0].token == "task-token"
+
+
+def test_builtin_subprocess_does_not_launch_for_empty_queue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An empty combined response leaves the executor idle."""
+    client = Mock()
+    client.PullAndClaimTask.return_value = PullAndClaimTaskResponse()
+    client_class = Mock()
+    client_class.from_server_address.return_value = client
+    executor = Mock()
+    monkeypatch.setattr(
+        run_superexec_module, "get_executor", Mock(return_value=executor)
+    )
+    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
+    monkeypatch.setattr(
+        "flwr.supercore.superexec.run_superexec.time.sleep",
+        Mock(side_effect=KeyboardInterrupt()),
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        run_superexec_module.run_superexec(
+            plugin_class=AutoExecPlugin,
+            client_class=client_class,
+            runtime_api_address="127.0.0.1:9091",
+            insecure=True,
+        )
+
+    client.PullAndClaimTask.assert_called_once()
+    executor.launch.assert_not_called()
+
+
+def test_kubernetes_keeps_task_specific_capacity_before_claim(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Kubernetes waits with the selected task type before claiming."""
+    task = Task(task_id=123, type=TaskType.MODEL)
+    client = Mock()
+    client.PullPendingTasks.return_value = Mock(tasks=[task])
+    client.ClaimTask.return_value = Mock(token="task-token")
+    client_class = Mock()
+    client_class.from_server_address.return_value = client
+    executor = Mock()
+    executor.launch.return_value = LaunchResult.accepted()
+    order = Mock()
+    order.attach_mock(client.PullPendingTasks, "pull")
+    order.attach_mock(executor.wait_for_capacity, "capacity")
+    order.attach_mock(client.ClaimTask, "claim")
+    monkeypatch.setattr(
+        run_superexec_module, "get_executor", Mock(return_value=executor)
+    )
+    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
+    monkeypatch.setattr(
+        "flwr.supercore.superexec.run_superexec.time.sleep",
+        Mock(side_effect=KeyboardInterrupt()),
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        run_superexec_module.run_superexec(
+            plugin_class=AutoExecPlugin,
+            client_class=client_class,
+            runtime_api_address="127.0.0.1:9091",
+            insecure=True,
+            executor_type=ExecutorType.KUBERNETES,
+        )
+
+    assert [call[0] for call in order.mock_calls] == ["pull", "capacity", "claim"]
+    assert executor.wait_for_capacity.call_args.kwargs["task_type"] == TaskType.MODEL
+    client.PullAndClaimTask.assert_not_called()
+
+
+def test_custom_plugin_keeps_its_selection_logic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A plugin override must still receive all pending candidates."""
+
+    class SelectLastPlugin(AutoExecPlugin):
+        """Choose the last pending task."""
+
+        def select_task(self, candidate_tasks: Sequence[Task]) -> Task | None:
+            """Select the last candidate."""
+            return candidate_tasks[-1] if candidate_tasks else None
+
+    client = Mock()
+    client.PullPendingTasks.return_value = Mock(
+        tasks=[
+            Task(task_id=1, type=TaskType.MODEL),
+            Task(task_id=2, type=TaskType.MODEL),
+        ]
+    )
+    client.ClaimTask.return_value = Mock(token="task-token")
+    client_class = Mock()
+    client_class.from_server_address.return_value = client
+    executor = Mock()
+    executor.launch.return_value = LaunchResult.accepted()
+    monkeypatch.setattr(
+        run_superexec_module, "get_executor", Mock(return_value=executor)
+    )
+    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
+    monkeypatch.setattr(
+        "flwr.supercore.superexec.run_superexec.time.sleep",
+        Mock(side_effect=KeyboardInterrupt()),
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        run_superexec_module.run_superexec(
+            plugin_class=SelectLastPlugin,
+            client_class=client_class,
+            runtime_api_address="127.0.0.1:9091",
+            insecure=True,
+        )
+
+    assert client.ClaimTask.call_args.args[0].task_id == 2
+    client.PullAndClaimTask.assert_not_called()
+
+
+@pytest.mark.parametrize(
     ("superexec_auth_secret", "expected_interceptor_types"),
     [
         (None, (RuntimeVersionHttpInterceptor,)),
@@ -111,6 +285,12 @@ def test_run_superexec_adds_runtime_version_interceptor(
     assert tuple(type(interceptor) for interceptor in captured["interceptors"]) == (
         expected_interceptor_types
     )
+    if superexec_auth_secret:
+        auth_interceptor = captured["interceptors"][1]
+        assert (
+            "/flwr.proto.Runtime/PullAndClaimTask"
+            in auth_interceptor._protected_methods  # pylint: disable=protected-access
+        )
 
 
 @pytest.mark.parametrize(

@@ -118,3 +118,10 @@ message CreateTaskRequest {
   optional string connector_ref = 4;
 }
 message CreateTaskResponse { optional uint64 task_id = 1; }
+
+// PullAndClaimTask messages
+message PullAndClaimTaskRequest { repeated string supported_task_types = 1; }
+message PullAndClaimTaskResponse {
+  Task task = 1;
+  string token = 2;
+}

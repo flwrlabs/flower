@@ -16,6 +16,7 @@
 
 
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from logging import ERROR
 from unittest.mock import Mock, patch
 
@@ -29,6 +30,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     CreateTaskRequest,
     CreateTaskResponse,
+    PullAndClaimTaskRequest,
     PullPendingTasksRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
@@ -46,7 +48,9 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
 from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.object_store.in_memory_object_store import InMemoryObjectStore
 from flwr.supercore.task_process.connector import registry as connector_registry
+from flwr.supernode.nodestate.in_memory_nodestate import InMemoryNodeState
 
 from . import runtime_handlers
 
@@ -91,6 +95,60 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(len(response.tasks), 1)
         self.assertEqual(response.tasks[0].task_id, 123)
+
+    def test_pull_and_claim_task_returns_empty_when_no_supported_task(self) -> None:
+        """An empty or unsupported queue must not claim a task."""
+        self.state.get_tasks.return_value = [Task(task_id=123, type=TaskType.MODEL)]
+
+        response = runtime_handlers.pull_and_claim_task(
+            PullAndClaimTaskRequest(supported_task_types=[TaskType.CLIENT_APP]),
+            self.state,
+        )
+
+        self.assertFalse(response.HasField("task"))
+        self.assertFalse(response.token)
+        self.state.claim_task.assert_not_called()
+
+    def test_pull_and_claim_task_retries_after_lost_claim_race(self) -> None:
+        """A contender should try the next eligible task after losing a claim."""
+        tasks = [
+            Task(task_id=1, type=TaskType.MODEL),
+            Task(task_id=2, type=TaskType.CLIENT_APP),
+            Task(task_id=3, type=TaskType.MODEL),
+        ]
+        self.state.get_tasks.return_value = tasks
+        self.state.claim_task.side_effect = [None, "task-token"]
+
+        response = runtime_handlers.pull_and_claim_task(
+            PullAndClaimTaskRequest(supported_task_types=[TaskType.MODEL]), self.state
+        )
+
+        self.assertEqual(response.task, tasks[2])
+        self.assertEqual(response.token, "task-token")
+        self.assertEqual(self.state.claim_task.call_count, 2)
+        self.assertEqual(
+            [call.args[0] for call in self.state.claim_task.call_args_list], [1, 3]
+        )
+
+    def test_pull_and_claim_task_has_one_winner_for_concurrent_contenders(self) -> None:
+        """Concurrent polls cannot both receive the same task token."""
+        state = InMemoryNodeState(InMemoryObjectStore())
+        task_id = state.create_task(task_type=TaskType.MODEL, run_id=42)
+        self.assertIsNotNone(task_id)
+        request = PullAndClaimTaskRequest(supported_task_types=[TaskType.MODEL])
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            responses = list(
+                pool.map(
+                    lambda _: runtime_handlers.pull_and_claim_task(request, state),
+                    range(2),
+                )
+            )
+
+        claimed = [response for response in responses if response.HasField("task")]
+        self.assertEqual(len(claimed), 1)
+        self.assertEqual(claimed[0].task.task_id, task_id)
+        self.assertTrue(claimed[0].token)
 
     def test_claim_task_returns_token_when_claim_succeeds(self) -> None:
         """ClaimTask should return the token from state."""

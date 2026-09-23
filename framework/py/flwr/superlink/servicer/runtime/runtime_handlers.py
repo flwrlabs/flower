@@ -48,6 +48,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    PullAndClaimTaskRequest,
+    PullAndClaimTaskResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -67,6 +69,7 @@ from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
+from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.superlink.servicer.control.control_handlers import process_due_automations
 from flwr.superlink.servicer.control.control_handlers import (
     start_automation as start_control_automation,
@@ -102,6 +105,14 @@ def pull_pending_tasks(
         statuses=[Status.PENDING], order_by="pending_at", ascending=True
     )
     return PullPendingTasksResponse(tasks=tasks)
+
+
+def pull_and_claim_task(
+    request: PullAndClaimTaskRequest, state: LinkState
+) -> PullAndClaimTaskResponse:
+    """Process due automations, then claim a supported pending task."""
+    process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
+    return core_runtime_handlers.pull_and_claim_task(request, state)
 
 
 def get_nodes(

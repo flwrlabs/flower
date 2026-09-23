@@ -29,6 +29,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
+    PullAndClaimTaskRequest,
+    PullAndClaimTaskResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
     PullTaskMessageRequest,
@@ -66,6 +68,24 @@ def pull_pending_tasks(
         statuses=[Status.PENDING], order_by="pending_at", ascending=True
     )
     return PullPendingTasksResponse(tasks=tasks)
+
+
+def pull_and_claim_task(
+    request: PullAndClaimTaskRequest, state: CoreState
+) -> PullAndClaimTaskResponse:
+    """Claim the oldest pending task with a supported type."""
+    log(DEBUG, "Runtime.PullAndClaimTask")
+    supported_types = set(request.supported_task_types)
+    if not supported_types:
+        return PullAndClaimTaskResponse()
+
+    tasks = state.get_tasks(
+        statuses=[Status.PENDING], order_by="pending_at", ascending=True
+    )
+    for task in tasks:
+        if task.type in supported_types and (token := state.claim_task(task.task_id)):
+            return PullAndClaimTaskResponse(task=task, token=token)
+    return PullAndClaimTaskResponse()
 
 
 def claim_task(request: ClaimTaskRequest, state: CoreState) -> ClaimTaskResponse:

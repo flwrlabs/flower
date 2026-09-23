@@ -20,7 +20,9 @@ from typing import Any
 
 from uvicorn.logging import AccessFormatter, DefaultFormatter
 
-ROUTINE_ACCESS_PATHS = frozenset({"/health", "/v1/runtime/pull-pending-tasks"})
+ROUTINE_ACCESS_PATHS = frozenset(
+    {"/health", "/v1/runtime/pull-pending-tasks", "/v1/runtime/pull-and-claim-task"}
+)
 LOG_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
 UVICORN_DEFAULT_LOG_FORMAT = "%(levelprefix)s %(message)s"

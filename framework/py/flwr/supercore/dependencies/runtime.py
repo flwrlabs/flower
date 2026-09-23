@@ -37,6 +37,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    PullAndClaimTaskRequest,
+    PullAndClaimTaskResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -68,6 +70,11 @@ StateT_contra = TypeVar("StateT_contra", bound=CoreState, contravariant=True)
 
 class RuntimeHandlers(Protocol[StateT_contra]):
     """Component-specific handlers used by the shared Runtime API router."""
+
+    def pull_and_claim_task(
+        self, request: PullAndClaimTaskRequest, state: StateT_contra
+    ) -> PullAndClaimTaskResponse:
+        """Claim the oldest supported pending task."""
 
     def pull_pending_tasks(
         self, request: PullPendingTasksRequest, state: StateT_contra

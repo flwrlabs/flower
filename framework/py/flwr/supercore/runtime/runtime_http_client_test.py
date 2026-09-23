@@ -22,6 +22,7 @@ from flwr.supercore.protobuf.client import ProtobufClient
 from flwr.supercore.runtime import RuntimeHttpClient
 
 _UNARY_UNARY_PATHS = (
+    "pull-and-claim-task",
     "pull-pending-tasks",
     "claim-task",
     "send-task-heartbeat",

@@ -559,3 +559,41 @@ class CreateTaskResponse(google.protobuf.message.Message):
     def WhichOneof(self, oneof_group: typing.Literal["_task_id", b"_task_id"]) -> typing.Literal["task_id"] | None: ...
 
 global___CreateTaskResponse = CreateTaskResponse
+
+@typing.final
+class PullAndClaimTaskRequest(google.protobuf.message.Message):
+    """PullAndClaimTask messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SUPPORTED_TASK_TYPES_FIELD_NUMBER: builtins.int
+    @property
+    def supported_task_types(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        supported_task_types: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["supported_task_types", b"supported_task_types"]) -> None: ...
+
+global___PullAndClaimTaskRequest = PullAndClaimTaskRequest
+
+@typing.final
+class PullAndClaimTaskResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_FIELD_NUMBER: builtins.int
+    TOKEN_FIELD_NUMBER: builtins.int
+    token: builtins.str
+    @property
+    def task(self) -> flwr.proto.task_pb2.Task: ...
+    def __init__(
+        self,
+        *,
+        task: flwr.proto.task_pb2.Task | None = ...,
+        token: builtins.str = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["task", b"task"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["task", b"task", "token", b"token"]) -> None: ...
+
+global___PullAndClaimTaskResponse = PullAndClaimTaskResponse

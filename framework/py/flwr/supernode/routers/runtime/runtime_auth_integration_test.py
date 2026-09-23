@@ -31,6 +31,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    PullAndClaimTaskRequest,
+    PullAndClaimTaskResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
     PushTaskEventsRequest,
@@ -50,6 +52,7 @@ from flwr.supernode.servicer.runtime import runtime_handlers
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
 _PULL_PENDING_TASKS_METHOD = "/flwr.proto.Runtime/PullPendingTasks"
+_PULL_AND_CLAIM_TASK_METHOD = "/flwr.proto.Runtime/PullAndClaimTask"
 
 
 @pytest.fixture(name="state")
@@ -184,6 +187,29 @@ def test_pull_pending_tasks_allows_with_superexec_metadata(
     assert isinstance(
         PullPendingTasksResponse.FromString(response.content), PullPendingTasksResponse
     )
+
+
+def test_pull_and_claim_task_round_trip_with_superexec_metadata(
+    client: TestClient, state: NodeState
+) -> None:
+    """Signed acquisition returns one task and its atomic claim token."""
+    task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
+    assert task_id is not None
+    request = PullAndClaimTaskRequest(supported_task_types=[TaskType.CLIENT_APP])
+    headers = create_superexec_auth_metadata(
+        auth_secret=derive_auth_secret(_SUPEREXEC_SECRET),
+        method=_PULL_AND_CLAIM_TASK_METHOD,
+        request=request,
+    )
+
+    response = _post(client, "pull-and-claim-task", request, auth_headers=headers)
+
+    assert response.status_code == 200
+    claimed = PullAndClaimTaskResponse.FromString(response.content)
+    assert claimed.task.task_id == task_id
+    assert claimed.token
+    claimed_task = state.get_task_by_token(claimed.token)
+    assert claimed_task is not None and claimed_task.task_id == task_id
 
 
 def test_get_nodes_allows_auth_then_returns_permission_denied(
