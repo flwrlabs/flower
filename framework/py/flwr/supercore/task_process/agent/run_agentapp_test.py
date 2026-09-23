@@ -503,6 +503,7 @@ def test_agentapp_lifecycle_runs_and_finalizes_once(  # pylint: disable=too-many
     output = client.PushTaskOutput.call_args.args[0]
     assert (output.sub_status, output.details) == (sub_status, details)
     assert lifecycle.event_details(exit_code) == {
+        "exit_code": exit_code,
         "run-id-hash": "run-hash",
         "success": failure is None,
     }
@@ -627,6 +628,7 @@ def test_run_agentapp_keeps_cold_process_behavior(
     """The cold entry point should keep validation, monitoring, and Flower exit."""
     lifecycle = Mock()
     lifecycle.event_details.return_value = {
+        "exit_code": ExitCode.TASK_PROC_EXCEPTION,
         "run-id-hash": "run-hash",
         "success": False,
     }
@@ -671,5 +673,9 @@ def test_run_agentapp_keeps_cold_process_behavior(
     flwr_exit.assert_called_once_with(
         code=ExitCode.TASK_PROC_EXCEPTION,
         event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
-        event_details={"run-id-hash": "run-hash", "success": False},
+        event_details={
+            "exit_code": ExitCode.TASK_PROC_EXCEPTION,
+            "run-id-hash": "run-hash",
+            "success": False,
+        },
     )

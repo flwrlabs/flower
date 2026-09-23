@@ -451,6 +451,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
     def event_details(self, exit_code: int) -> JSONObject:
         """Return the AgentApp leave-event details."""
         return {
+            "exit_code": exit_code,
             "run-id-hash": self._hash_run_id,
             "success": exit_code == ExitCode.SUCCESS,
         }
