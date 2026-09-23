@@ -14,6 +14,9 @@
 # ==============================================================================
 """Tests for the AgentApp process environment."""
 
+# pylint: disable=protected-access
+
+import hashlib
 import importlib
 import os
 from pathlib import Path
@@ -23,7 +26,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from flwr.agentapp import AgentApp
+from flwr.agentapp import AgentApp, LoadAgentAppError
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common.constant import SubStatus
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
@@ -40,11 +43,15 @@ from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType
 
 from .run_agentapp import (
+    PreloadedAgentApp,
+    _AgentAppTaskLifecycle,
     _run_agentapp_task,
     _set_runtime_environment,
     message_to_prompt,
+    preload_agentapp,
     pull_prompt,
     run_agentapp,
+    run_agentapp_once,
 )
 
 run_agentapp_module = importlib.import_module(
@@ -153,6 +160,166 @@ def test_pull_prompt_rejects_multiple_instructions() -> None:
 
     with pytest.raises(RuntimeError, match="exactly one"):
         pull_prompt(grid)
+
+
+def test_preload_agentapp_installs_the_verified_bytes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Preload an arbitrary absolute filename from the bytes that were hashed."""
+    fab_content = b"trusted-fab-content"
+    fab_path = tmp_path / "operator-selected-name"
+    fab_path.write_bytes(fab_content)
+    fab_hash = hashlib.sha256(fab_content).hexdigest()
+    app_path = tmp_path / "installed"
+    app = AgentApp()
+    install = Mock(return_value=app_path)
+    config = {
+        "project": {"name": "app", "version": "1.0.0"},
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "publisher",
+                    "components": {"agentapp": "pkg.app:app"},
+                }
+            }
+        },
+    }
+    monkeypatch.setattr(run_agentapp_module, "install_from_fab", install)
+    monkeypatch.setattr(
+        run_agentapp_module, "get_project_config", Mock(return_value=config)
+    )
+    monkeypatch.setattr(run_agentapp_module, "load_app", Mock(return_value=app))
+
+    assert preload_agentapp(fab_path, fab_hash) == PreloadedAgentApp(
+        app=app,
+        app_path=app_path,
+        fab_id="publisher/app",
+        fab_version="1.0.0",
+        fab_hash=fab_hash,
+    )
+    install.assert_called_once_with(fab_content, skip_prompt=True)
+    run_agentapp_module.load_app.assert_called_once_with(
+        "pkg.app:app", LoadAgentAppError, str(app_path)
+    )
+
+
+def test_preload_agentapp_rejects_invalid_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Reject non-absolute paths, invalid hashes, missing files, and mismatches."""
+    fab_path = tmp_path / "agent.fab"
+    fab_path.write_bytes(b"fab-content")
+    fab_hash = hashlib.sha256(b"fab-content").hexdigest()
+
+    with pytest.raises(ValueError, match="path must be absolute"):
+        preload_agentapp(Path("relative.fab"), fab_hash)
+    with pytest.raises(ValueError, match="full SHA-256"):
+        preload_agentapp(fab_path, "short-hash")
+    with pytest.raises(ValueError, match="does not exist"):
+        preload_agentapp(tmp_path / "missing.fab", fab_hash)
+    with pytest.raises(ValueError, match="does not match"):
+        preload_agentapp(fab_path, "0" * 64)
+
+    def unreadable(path: Path) -> bytes:
+        raise PermissionError(path)
+
+    monkeypatch.setattr(Path, "read_bytes", unreadable)
+    with pytest.raises(ValueError, match="could not be read"):
+        preload_agentapp(fab_path, fab_hash)
+
+
+def test_preload_agentapp_rejects_wrong_component_type(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Fail startup when the configured component is not an AgentApp."""
+    fab_content = b"trusted-fab-content"
+    fab_path = tmp_path / "agent.fab"
+    fab_path.write_bytes(fab_content)
+    app_path = tmp_path / "installed"
+    monkeypatch.setattr(
+        run_agentapp_module, "install_from_fab", Mock(return_value=app_path)
+    )
+    monkeypatch.setattr(
+        run_agentapp_module,
+        "get_project_config",
+        Mock(
+            return_value={
+                "project": {"name": "app", "version": "1.0.0"},
+                "tool": {
+                    "flwr": {
+                        "app": {
+                            "publisher": "publisher",
+                            "components": {"agentapp": "pkg.app:not_an_app"},
+                        }
+                    }
+                },
+            }
+        ),
+    )
+    monkeypatch.setattr(run_agentapp_module, "load_app", Mock(return_value=object()))
+
+    with pytest.raises(LoadAgentAppError, match="is not of type"):
+        preload_agentapp(fab_path, hashlib.sha256(fab_content).hexdigest())
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("fab_hash", "other-hash"),
+        ("fab_id", "other/app"),
+        ("fab_version", "2.0.0"),
+    ],
+)
+def test_preloaded_agentapp_requires_exact_task_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    field: str,
+    value: str,
+) -> None:
+    """Reject a pulled task unless its hash, id, and version all match."""
+    app = AgentApp()
+    preloaded = PreloadedAgentApp(
+        app=app,
+        app_path=tmp_path / "installed",
+        fab_id="publisher/app",
+        fab_version="1.0.0",
+        fab_hash="a" * 64,
+    )
+    lifecycle = _AgentAppTaskLifecycle(
+        "runtime.example:9092",
+        Queue(),
+        "task-token",
+        True,
+        None,
+        None,
+        False,
+        preloaded,
+    )
+    fab = SimpleNamespace(content=b"task-fab", hash_str=preloaded.fab_hash)
+    run = SimpleNamespace(
+        fab_id=preloaded.fab_id,
+        fab_version=preloaded.fab_version,
+    )
+    install = Mock()
+    load = Mock()
+    install_dependencies = Mock()
+    monkeypatch.setattr(run_agentapp_module, "install_from_fab", install)
+    monkeypatch.setattr(run_agentapp_module, "load_app", load)
+    monkeypatch.setattr(
+        run_agentapp_module, "install_app_dependencies", install_dependencies
+    )
+
+    assert lifecycle._load_task_app(fab, run) == (app, preloaded.app_path)
+    if field == "fab_hash":
+        fab.hash_str = value
+    else:
+        setattr(run, field, value)
+    with pytest.raises(RuntimeError, match="does not match"):
+        lifecycle._load_task_app(fab, run)
+    install.assert_not_called()
+    load.assert_not_called()
+    install_dependencies.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -297,6 +464,7 @@ def test_agentapp_lifecycle_runs_and_finalizes_once(  # pylint: disable=too-many
         b"root-certificates",
         "/runtime-ca.pem",
         True,
+        resident=False,
     )
     lifecycle.finalize()
     lifecycle.finalize()
@@ -331,6 +499,102 @@ def test_agentapp_lifecycle_runs_and_finalizes_once(  # pylint: disable=too-many
     run_agentapp_module.cleanup_app_runtime_environment.assert_called_once_with(
         runtime_env_dir
     )
+
+
+def test_resident_accepts_before_task_input_and_output_capture(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Accept authority after initialization and signals, before task work."""
+    calls: list[str] = []
+    lifecycle = Mock()
+    lifecycle.initialize.side_effect = lambda: calls.append("initialize")
+
+    def run() -> int:
+        calls.append("run")
+        return ExitCode.SUCCESS
+
+    lifecycle.run.side_effect = run
+    monkeypatch.setattr(
+        run_agentapp_module, "_AgentAppTaskLifecycle", Mock(return_value=lifecycle)
+    )
+    monkeypatch.setattr(
+        run_agentapp_module,
+        "_register_resident_signal_handlers",
+        lambda _: calls.append("signals"),
+    )
+    monkeypatch.setattr(
+        run_agentapp_module,
+        "mirror_output_to_queue",
+        lambda _: calls.append("output"),
+    )
+
+    returned_lifecycle, exit_code = _run_agentapp_task(
+        "runtime.example:9092",
+        Queue(),
+        "task-token",
+        True,
+        None,
+        None,
+        False,
+        resident=True,
+        preloaded=Mock(),
+        on_started=lambda: calls.append("accepted"),
+    )
+
+    assert calls == ["initialize", "signals", "accepted", "output", "run"]
+    assert (returned_lifecycle, exit_code) == (lifecycle, ExitCode.SUCCESS)
+
+
+def test_run_agentapp_once_bounds_resident_finalization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A resident task should finalize under the worker force-exit timeout."""
+    lifecycle = Mock()
+    run_task = Mock(return_value=(lifecycle, ExitCode.TASK_PROC_EXCEPTION))
+    force_exit_timer = Mock()
+    timer_cls = Mock(return_value=force_exit_timer)
+    monkeypatch.setattr(run_agentapp_module, "_run_agentapp_task", run_task)
+    monkeypatch.setattr(run_agentapp_module.threading, "Timer", timer_cls)
+    preloaded = Mock()
+    on_started = Mock()
+
+    assert (
+        run_agentapp_once(
+            "runtime.example:9092",
+            "task-token",
+            False,
+            b"root-certificates",
+            on_started,
+            preloaded=preloaded,
+            certificates_path="/runtime-ca.pem",
+        )
+        == 1
+    )
+
+    args = run_task.call_args.args
+    assert args[0] == "runtime.example:9092"
+    assert isinstance(args[1], Queue)
+    assert args[2:] == (
+        "task-token",
+        False,
+        b"root-certificates",
+        "/runtime-ca.pem",
+        False,
+    )
+    assert run_task.call_args.kwargs == {
+        "resident": True,
+        "preloaded": preloaded,
+        "on_started": on_started,
+    }
+    timer_cls.assert_called_once_with(
+        run_agentapp_module.FORCE_EXIT_TIMEOUT_SECONDS,
+        os._exit,
+        args=(1,),
+    )
+    assert force_exit_timer.daemon
+    force_exit_timer.start.assert_called_once_with()
+    lifecycle.complete.assert_called_once_with(ExitCode.TASK_PROC_EXCEPTION)
+    force_exit_timer.cancel.assert_called_once_with()
 
 
 def test_run_agentapp_keeps_cold_process_behavior(
@@ -378,6 +642,7 @@ def test_run_agentapp_keeps_cold_process_behavior(
         b"root-certificates",
         "/runtime-ca.pem",
         False,
+        resident=False,
     )
     flwr_exit.assert_called_once_with(
         code=ExitCode.TASK_PROC_EXCEPTION,
