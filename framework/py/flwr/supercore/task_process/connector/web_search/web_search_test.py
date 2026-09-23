@@ -22,9 +22,9 @@ from unittest.mock import Mock
 import pytest
 import requests
 
-from . import WEB_SEARCH_ENDPOINT_ENV, search
+from . import search
 from .brave import BRAVE_API_KEY_ENV, BRAVE_WEB_SEARCH_URL
-from .proxy import PROXY_WEB_SEARCH_PROVIDER
+from .proxy import PROXY_WEB_SEARCH_PROVIDER, WEB_SEARCH_ENDPOINT_ENV
 
 _PROXY_ENDPOINT = "http://proxy/v1/web-search"
 

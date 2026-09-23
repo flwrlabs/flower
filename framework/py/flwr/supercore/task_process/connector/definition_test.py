@@ -33,8 +33,8 @@ def _executor(arguments: JSONObject, context: ConnectorExecutionContext) -> JSON
     return {}
 
 
-def test_connector_definition_rejects_handler_drift() -> None:
-    """Every tool should have exactly one matching handler."""
+def test_connector_definition_rejects_executor_drift() -> None:
+    """Every tool should have exactly one matching executor."""
     action = ActionDefinition(
         name="read",
         description="Read an example.",
@@ -48,4 +48,21 @@ def test_connector_definition_rejects_handler_drift() -> None:
         actions=(action,),
     )
     with pytest.raises(ValueError, match="actions and executors do not match"):
-        ConnectorDefinition(provider=provider, executors={})
+        ConnectorDefinition.from_provider(provider=provider, executors={})
+
+
+def test_account_scoping_does_not_require_oauth() -> None:
+    """An account-scoped connector can require credentials without supporting OAuth."""
+    connector = ConnectorDefinition.from_provider(
+        provider=ProviderDefinition(
+            ref="example",
+            display_name="Example",
+            description="Example connector.",
+            actions=(),
+        ),
+        executors={},
+    )
+    assert connector.requires_credentials
+    assert connector.provider is not None
+    assert connector.provider.oauth is None
+    assert connector.oauth_flow is None

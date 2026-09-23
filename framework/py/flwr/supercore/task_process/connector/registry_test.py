@@ -26,6 +26,6 @@ def test_connector_references_are_unique() -> None:
 
 def test_connector_tool_names_are_unique() -> None:
     """Connector tool names should be unique."""
-    tool_names = [name for connector in CONNECTORS for name in connector.handlers]
+    tool_names = [name for connector in CONNECTORS for name in connector.executors]
 
     assert len(tool_names) == len(set(tool_names))

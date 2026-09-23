@@ -20,6 +20,8 @@ import os
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 
+from ..definition import ConnectorDefinition, builtin_executor
+
 # Prevent browser-use from configuring logging and duplicating Flower logs
 os.environ["BROWSER_USE_SETUP_LOGGING"] = "false"
 
@@ -76,8 +78,13 @@ def make_browser_use_tool() -> JSONObject:
     }
 
 
-__all__ = [
-    "BROWSER_USE_CONNECTOR_NAME",
-    "invoke_browser_use_provider",
-    "make_browser_use_tool",
-]
+CONNECTOR = ConnectorDefinition(
+    ref=BROWSER_USE_CONNECTOR_NAME,
+    tools=(make_browser_use_tool(),),
+    executors={
+        BROWSER_USE_CONNECTOR_NAME: builtin_executor(invoke_browser_use_provider)
+    },
+)
+
+
+__all__ = ["CONNECTOR"]

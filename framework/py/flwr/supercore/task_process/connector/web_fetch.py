@@ -28,6 +28,8 @@ import requests
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
+from .definition import ConnectorDefinition, builtin_executor
+
 WEB_FETCH_CONNECTOR_NAME = "web_fetch"
 WEB_FETCH_ENDPOINT_ENV = "FLWR_WEB_FETCH_ENDPOINT"
 
@@ -366,3 +368,10 @@ def _read_response_body(response: requests.Response) -> bytes:
             detail=str(exc),
         ) from exc
     return bytes(body)
+
+
+CONNECTOR = ConnectorDefinition(
+    ref=WEB_FETCH_CONNECTOR_NAME,
+    tools=(make_web_fetch_tool(),),
+    executors={WEB_FETCH_CONNECTOR_NAME: builtin_executor(invoke_web_fetch_provider)},
+)

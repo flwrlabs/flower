@@ -21,10 +21,11 @@ from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
 from flwr.supercore.task_process.usage import WEB_SEARCH_USAGE_TYPE, TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 
+from ..definition import ConnectorDefinition, builtin_executor
 from .brave import BraveWebSearchProvider
 from .exa import ExaWebSearchProvider
 from .provider import WebSearchProvider
-from .proxy import WEB_SEARCH_ENDPOINT_ENV, ProxyWebSearchProvider
+from .proxy import ProxyWebSearchProvider
 from .tavily import TavilyWebSearchProvider
 
 WEB_SEARCH_CONNECTOR_NAME = "web_search"
@@ -80,9 +81,11 @@ def search(query: str, *, usage_recorder: TaskUsageRecorder) -> JSONObject:
     return output
 
 
-__all__ = [
-    "WEB_SEARCH_CONNECTOR_NAME",
-    "WEB_SEARCH_ENDPOINT_ENV",
-    "make_web_search_tool",
-    "search",
-]
+CONNECTOR = ConnectorDefinition(
+    ref=WEB_SEARCH_CONNECTOR_NAME,
+    tools=(make_web_search_tool(),),
+    executors={WEB_SEARCH_CONNECTOR_NAME: builtin_executor(search)},
+)
+
+
+__all__ = ["CONNECTOR"]
