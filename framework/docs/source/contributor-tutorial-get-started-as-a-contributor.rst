@@ -68,7 +68,7 @@ Create Flower Dev Environment
 
        ::
 
-           $ ./dev/bootstrap.sh 3.11.14
+           $ ./dev/bootstrap.sh 3.12.14
 
 *********************
  Convenience Scripts
