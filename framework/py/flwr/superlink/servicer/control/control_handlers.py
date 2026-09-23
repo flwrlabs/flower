@@ -208,6 +208,17 @@ class ConnectorFailureError(FlowerError):
         )
 
 
+def _get_personal_connector_federation_id(
+    account: AccountInfo, state: LinkState
+) -> str:
+    """Return the account's personal federation ID."""
+    state.federation_manager.ensure_default_federations_exist(account.flwr_aid)
+    for federation in state.federation_manager.get_federations(account.flwr_aid):
+        if not federation.can_invite_members and not federation.can_add_supernodes:
+            return federation.id
+    raise ConnectorFailureError("Personal federation was not found")
+
+
 def list_connectors(
     request: ListConnectorsRequest,
     account: AccountInfo,
@@ -222,8 +233,6 @@ def list_connectors(
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     _validate_federation_membership_in_request(state, flwr_aid, request.federation)
     federation = state.federation_manager.get_details(request.federation)
-    # Until connectors are federation-scoped, expose account-scoped connectors only
-    # in the personal agent federation.
     if federation.can_invite_members or federation.can_add_supernodes:
         return ListConnectorsResponse()
 
@@ -234,7 +243,9 @@ def list_connectors(
     ):
         connector_ref = flow.connector_ref
         connected = (
-            state.get_connector(flwr_aid=flwr_aid, connector_ref=connector_ref)
+            state.get_connector(
+                federation_id=request.federation, connector_ref=connector_ref
+            )
             is not None
         )
         connectors.append(
@@ -253,7 +264,7 @@ def disconnect_connector(
     account: AccountInfo,
     state: LinkState,
 ) -> DisconnectConnectorResponse:
-    """Delete one account-scoped connector connection."""
+    """Delete one connector from the account's personal federation."""
     log(INFO, "ControlServicer.DisconnectConnector")
     connector_ref = request.connector_ref.strip().lower()
     if not connector_ref:
@@ -266,13 +277,12 @@ def disconnect_connector(
             f"OAuth flow for connector '{connector_ref}' was not found.",
         ) from None
 
-    deleted = state.delete_connector(
-        flwr_aid=account.flwr_aid, connector_ref=connector_ref
-    )
+    federation_id = _get_personal_connector_federation_id(account, state)
+    deleted = state.delete_connector(federation_id, connector_ref)
     if not deleted:
         raise FlowerError(
             ApiErrorCode.CONNECTOR_NOT_FOUND,
-            f"Connector '{connector_ref}' is not connected for this account.",
+            f"Connector '{connector_ref}' is not connected for this federation.",
         )
     return DisconnectConnectorResponse()
 
@@ -282,7 +292,7 @@ def begin_connector_oauth(
     account: AccountInfo,
     state: LinkState,
 ) -> BeginConnectorOAuthResponse:
-    """Create a short-lived account-scoped OAuth session."""
+    """Create a short-lived OAuth session for a personal federation."""
     log(INFO, "ControlServicer.BeginConnectorOAuth")
     connector_ref = request.connector_ref.strip().lower()
     if not connector_ref:
@@ -364,7 +374,7 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
     account: AccountInfo,
     state: LinkState,
 ) -> CompleteConnectorOAuthResponse:
-    """Exchange an OAuth code and persist one account-scoped connection."""
+    """Exchange an OAuth code and persist a federation-scoped connection."""
     log(INFO, "ControlServicer.CompleteConnectorOAuth")
     oauth_session_id = request.oauth_session_id.strip()
     if not oauth_session_id:
@@ -442,20 +452,22 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
         ) from None
 
     stored = state.upsert_connector(
-        flwr_aid=account.flwr_aid,
+        federation_id=_get_personal_connector_federation_id(account, state),
         connector_ref=connector_ref,
         credentials_json=credentials_json,
         config_json=config_json,
+        created_by=account.flwr_aid,
     )
     if not stored:
         raise ConnectorFailureError("Connector credentials could not be stored")
     return CompleteConnectorOAuthResponse(connector_ref=connector_ref)
 
 
-def validate_run_connector_refs(
+def validate_run_connector_refs(  # pylint: disable=unused-argument
     connector_refs: Sequence[str],
     account: AccountInfo,
     state: LinkState,
+    federation_id: str,
 ) -> list[str]:
     """Validate and canonicalize OAuth connector references for a new run."""
     canonical_refs = list(
@@ -471,11 +483,11 @@ def validate_run_connector_refs(
                 ApiErrorCode.CONNECTOR_NOT_FOUND,
                 f"OAuth flow for connector '{connector_ref}' was not found.",
             ) from None
-        connector = state.get_connector(account.flwr_aid, connector_ref)
+        connector = state.get_connector(federation_id, connector_ref)
         if connector is None:
             raise FlowerError(
                 ApiErrorCode.CONNECTOR_NOT_FOUND,
-                f"Connector '{connector_ref}' is not connected for this account.",
+                f"Connector '{connector_ref}' is not connected for this federation.",
             )
     return canonical_refs
 
@@ -640,7 +652,9 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         return StartRunResponse()
 
     override_config = user_config_from_proto(request.override_config)
-    connector_refs = validate_run_connector_refs(request.connector_refs, account, state)
+    connector_refs = validate_run_connector_refs(
+        request.connector_refs, account, state, federation_id
+    )
 
     if connector_refs:
         federation = state.federation_manager.get_details(federation_id)

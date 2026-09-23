@@ -76,7 +76,7 @@ def invoke_connector(
 
 
 def requires_connector_credentials(tool_name: str) -> bool:
-    """Return whether a tool's connector uses account-scoped credentials."""
+    """Return whether a tool's connector uses federation-scoped credentials."""
     connector = _CONNECTORS_BY_TOOL.get(tool_name)
     return connector is not None and connector.requires_credentials
 
@@ -106,6 +106,6 @@ def get_oauth_flow(connector_ref: str) -> OAuthFlow:
 
 
 def has_builtin_connector(connector_ref: str) -> bool:
-    """Return whether a reference identifies a connector without account credentials."""
+    """Return whether a reference identifies a connector without stored credentials."""
     connector = _CONNECTORS_BY_REF.get(connector_ref)
     return connector is not None and not connector.requires_credentials

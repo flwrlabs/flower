@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Definitions shared by built-in and account-scoped connectors."""
+"""Definitions shared by built-in and federation-scoped connectors."""
 
 from __future__ import annotations
 
@@ -88,7 +88,7 @@ class OAuth2Definition:
 
 @dataclass(frozen=True)
 class ProviderDefinition:
-    """Describe one account-scoped connector provider."""
+    """Describe one federation-scoped connector provider."""
 
     ref: str
     display_name: str
@@ -127,7 +127,7 @@ class ConnectorDefinition:
         executors: Mapping[str, ConnectorExecutor],
         oauth_flow: OAuthFlow | None = None,
     ) -> ConnectorDefinition:
-        """Build an account-scoped connector from its provider actions."""
+        """Build a federation-scoped connector from its provider actions."""
         action_names = {action.name for action in provider.actions}
         if action_names != set(executors):
             raise ValueError(

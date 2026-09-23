@@ -508,41 +508,45 @@ class InMemoryCoreState(
                 self.federation_app_store.pop((federation_id, app_id), None) is not None
             )
 
-    def upsert_connector(
+    def upsert_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        flwr_aid: str,
+        federation_id: str,
         connector_ref: str,
         credentials_json: str,
         config_json: str,
+        created_by: str,
     ) -> bool:
-        """Create or update a connector for an account."""
-        if not flwr_aid or not connector_ref:
+        """Create or update a connector for a federation."""
+        if not federation_id or not connector_ref or not created_by:
             return False
         connector = ConnectorRecord(
-            flwr_aid=flwr_aid,
+            federation_id=federation_id,
             connector_ref=connector_ref,
             credentials_json=credentials_json,
             config_json=config_json,
         )
         with self.lock_connector_store:
-            self.connector_store[(flwr_aid, connector_ref)] = connector
+            self.connector_store[(federation_id, connector_ref)] = connector
         return True
 
     def get_connector(
-        self, flwr_aid: str, connector_ref: str
+        self, federation_id: str, connector_ref: str
     ) -> ConnectorRecord | None:
-        """Return an account's connector, if present."""
-        if not flwr_aid or not connector_ref:
+        """Return a federation's connector, if present."""
+        if not federation_id or not connector_ref:
             return None
         with self.lock_connector_store:
-            return self.connector_store.get((flwr_aid, connector_ref))
+            return self.connector_store.get((federation_id, connector_ref))
 
-    def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
-        """Delete an account's connector if it exists."""
-        if not flwr_aid or not connector_ref:
+    def delete_connector(self, federation_id: str, connector_ref: str) -> bool:
+        """Delete a federation's connector if it exists."""
+        if not federation_id or not connector_ref:
             return False
         with self.lock_connector_store:
-            return self.connector_store.pop((flwr_aid, connector_ref), None) is not None
+            return (
+                self.connector_store.pop((federation_id, connector_ref), None)
+                is not None
+            )
 
     def bind_connectors_to_run(
         self, run_id: int, connector_refs: Sequence[str]

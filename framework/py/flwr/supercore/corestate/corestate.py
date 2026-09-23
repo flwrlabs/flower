@@ -228,25 +228,28 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Delete one federation-app association; its FAB remains in state."""
 
     @abstractmethod
-    def upsert_connector(
+    def upsert_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        flwr_aid: str,
+        federation_id: str,
         connector_ref: str,
         credentials_json: str,
         config_json: str,
+        created_by: str,
     ) -> bool:
-        """Create or update a connector for an account.
+        """Create or update a connector for a federation.
 
         Parameters
         ----------
-        flwr_aid : str
-            Account ID owning the connector.
+        federation_id : str
+            Federation ID owning the connector.
         connector_ref : str
-            Connector reference unique within the account.
+            Connector reference unique within the federation.
         credentials_json : str
             Serialized connector credentials.
         config_json : str
             Serialized connector configuration.
+        created_by : str
+            Account ID creating the connector.
 
         Returns
         -------
@@ -256,14 +259,14 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def get_connector(
-        self, flwr_aid: str, connector_ref: str
+        self, federation_id: str, connector_ref: str
     ) -> ConnectorRecord | None:
-        """Return an account's connector, if present.
+        """Return a federation's connector, if present.
 
         Parameters
         ----------
-        flwr_aid : str
-            Account ID owning the connector.
+        federation_id : str
+            Federation ID owning the connector.
         connector_ref : str
             Connector reference unique within the account.
 
@@ -274,13 +277,13 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
-        """Delete an account's connector if it exists.
+    def delete_connector(self, federation_id: str, connector_ref: str) -> bool:
+        """Delete a federation's connector if it exists.
 
         Parameters
         ----------
-        flwr_aid : str
-            Account ID owning the connector.
+        federation_id : str
+            Federation ID owning the connector.
         connector_ref : str
             Connector reference unique within the account.
 
