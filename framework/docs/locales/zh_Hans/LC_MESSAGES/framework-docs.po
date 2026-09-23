@@ -51,7 +51,7 @@ msgstr "更新日志"
 #: ../../source/changelog/v1.38.0.md:2
 #, fuzzy
 msgid "v1.38.0 (2026-09-22)"
-msgstr "v1.3.0 (2023-02-06)"
+msgstr ""
 
 #: ../../source/changelog/v1.0.0.md:11 ../../source/changelog/v1.1.0.md:4
 #: ../../source/changelog/v1.10.0.md:4 ../../source/changelog/v1.11.0.md:4
@@ -113,11 +113,6 @@ msgid ""
 "Nugraha`, `Dimitris Stripelis`, `Heng Pan`, `Javier`, `Lorenzo Sani`, "
 "`Mohammad Naseri`, `Ruth Galindo`, `Taner Topal`, `Yan Gao`"
 msgstr ""
-"`Adam Narozniak`, `Anass Anhari`, `Charles Beauville`, `Dana-Farber`, "
-"`Daniel J. Beutel`, `Daniel Nata Nugraha`, `Edoardo Gabrielli`, `Gustavo "
-"Bertoli`, `Heng Pan`, `Javier`, `Mahdi`, `Steven Hé (Sīchàng)`, `Taner "
-"Topal`, `achiverram28`, `danielnugraha`, `eunchung`, `ruthgal` <!---"
-"TOKEN_v1.5.0-->"
 
 #: ../../source/changelog/v0.13.0.md:4 ../../source/changelog/v0.14.0.md:4
 #: ../../source/changelog/v0.15.0.md:4 ../../source/changelog/v0.16.0.md:4
@@ -172,13 +167,6 @@ msgid ""
 "[#8216](https://github.com/flwrlabs/flower/pull/8216), "
 "[#8219](https://github.com/flwrlabs/flower/pull/8219))"
 msgstr ""
-"** 更新文档** ([#1629](https://github.com/adap/flower/pull/1629), "
-"[#1628](https://github.com/adap/flower/pull/1628), "
-"[#1620](https://github.com/adap/flower/pull/1620), "
-"[#1618](https://github.com/adap/flower/pull/1618), "
-"[#1617](https://github.com/adap/flower/pull/1617), "
-"[#1613](https://github.com/adap/flower/pull/1613), "
-"[#1614](https://github.com/adap/flower/pull/1614)))"
 
 #: ../../source/changelog/v1.38.0.md:14
 msgid ""
@@ -202,10 +190,6 @@ msgid ""
 "[#8202](https://github.com/flwrlabs/flower/pull/8202), "
 "[#8222](https://github.com/flwrlabs/flower/pull/8222))"
 msgstr ""
-"** 更新 C++ SDK** ([#2537](https://github/com/adap/flower/pull/2537), "
-"[#2528](https://github/com/adap/flower/pull/2528), "
-"[#2523](https://github.com/adap/flower/pull/2523), "
-"[#2522](https://github.com/adap/flower/pull/2522))"
 
 #: ../../source/changelog/v1.38.0.md:18
 msgid ""
@@ -227,13 +211,6 @@ msgid ""
 "[#8191](https://github.com/flwrlabs/flower/pull/8191), "
 "[#8203](https://github.com/flwrlabs/flower/pull/8203))"
 msgstr ""
-"** 更新文档** ([#1629](https://github.com/adap/flower/pull/1629), "
-"[#1628](https://github.com/adap/flower/pull/1628), "
-"[#1620](https://github.com/adap/flower/pull/1620), "
-"[#1618](https://github.com/adap/flower/pull/1618), "
-"[#1617](https://github.com/adap/flower/pull/1617), "
-"[#1613](https://github.com/adap/flower/pull/1613), "
-"[#1614](https://github.com/adap/flower/pull/1614)))"
 
 #: ../../source/changelog/v1.38.0.md:22
 msgid ""
@@ -254,11 +231,6 @@ msgid ""
 "[#8217](https://github.com/flwrlabs/flower/pull/8217), "
 "[#8218](https://github.com/flwrlabs/flower/pull/8218))"
 msgstr ""
-"**引入新的 Flower Baseline： FedProx MNIST** "
-"（[#1513](https://github.com/adap/flower/pull/1513), "
-"[#1680](https://github.com/adap/flower/pull/1680), "
-"[#1681](https://github.com/adap/flower/pull/1681), "
-"[#1679](https://github.com/adap/flower/pull/1679)"
 
 #: ../../source/changelog/v1.38.0.md:26
 msgid ""
@@ -275,10 +247,6 @@ msgid ""
 "[#8153](https://github.com/flwrlabs/flower/pull/8153), "
 "[#8157](https://github.com/flwrlabs/flower/pull/8157))"
 msgstr ""
-"更新开发人员工具（[#1231](https://github.com/adap/flower/pull/1231), "
-"[#1276](https://github.com/adap/flower/pull/1276), "
-"[#1301](https://github.com/adap/flower/pull/1301), "
-"[#1310](https://github.com/adap/flower/pull/1310)"
 
 #: ../../source/changelog/v1.38.0.md:30
 msgid ""
@@ -295,9 +263,6 @@ msgid ""
 "[#8188](https://github.com/flwrlabs/flower/pull/8188), "
 "[#8189](https://github.com/flwrlabs/flower/pull/8189))"
 msgstr ""
-"**更新代码示例** ([#1291](https://github.com/adap/flower/pull/1291), "
-"[#1286](https://github.com/adap/flower/pull/1286), "
-"[#1282](https://github.com/adap/flower/pull/1282))"
 
 #: ../../source/changelog/v1.38.0.md:34
 #, fuzzy
@@ -323,12 +288,6 @@ msgid ""
 "[#8223](https://github.com/flwrlabs/flower/pull/8223), "
 "[#8224](https://github.com/flwrlabs/flower/pull/8224))"
 msgstr ""
-"**改进教程** ([#1468](https://github.com/adap/flower/pull/1468), "
-"[#1470](https://github.com/adap/flower/pull/1470), "
-"[#1472](https://github.com/adap/flower/pull/1472), "
-"[#1473](https://github.com/adap/flower/pull/1473), "
-"[#1474](https://github.com/adap/flower/pull/1474), "
-"[#1475](https://github.com/adap/flower/pull/1475)))"
 
 #: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
 #: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
@@ -89050,4 +89009,3 @@ msgstr ""
 #~ "``127.0.0.1:9094``, and set ``--plugin-type"
 #~ " clientapp``."
 #~ msgstr ""
-
