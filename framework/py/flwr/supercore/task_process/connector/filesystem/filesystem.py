@@ -19,7 +19,7 @@ from __future__ import annotations
 import os
 import stat
 
-from flwr.supercore.typing import JSONObject
+from flwr.supercore.typing import JSONObject, JSONValue
 
 from ..http import ConnectorApiError
 
@@ -97,18 +97,26 @@ def make_filesystem_tools() -> list[JSONObject]:
     ]
 
 
-def invoke_filesystem(name: str, arguments: JSONObject) -> JSONObject:
+def invoke_filesystem(name: str, arguments: JSONValue) -> JSONObject:
     """Invoke one filesystem tool."""
-    if not _PLATFORM_SUPPORTED:
-        raise FilesystemApiError("unsupported_platform")
-    path = arguments.get("path")
-    if not isinstance(path, str):
+    try:
+        if not _PLATFORM_SUPPORTED:
+            raise FilesystemApiError("unsupported_platform")
+        if not isinstance(arguments, dict):
+            raise FilesystemApiError("invalid_request")
+        path = arguments.get("path")
+        if not isinstance(path, str):
+            raise FilesystemApiError("invalid_request")
+        if name == FILESYSTEM_LIST_DIRECTORY_TOOL_NAME:
+            return _list_directory(path, _allowed_dirs())
+        if name == FILESYSTEM_READ_FILE_TOOL_NAME:
+            return _read_file(path, _allowed_dirs())
         raise FilesystemApiError("invalid_request")
-    if name == FILESYSTEM_LIST_DIRECTORY_TOOL_NAME:
-        return _list_directory(path, _allowed_dirs())
-    if name == FILESYSTEM_READ_FILE_TOOL_NAME:
-        return _read_file(path, _allowed_dirs())
-    raise FilesystemApiError("invalid_request")
+    except FilesystemApiError as ex:
+        error: JSONObject = {"code": ex.code}
+        if ex.message is not None:
+            error["message"] = ex.message
+        return {"error": error}
 
 
 def _list_directory(path: str, allowed: list[str]) -> JSONObject:
@@ -174,6 +182,8 @@ def _open_sandboxed(path: str, allowed: list[str], flags: int) -> tuple[int, str
         # with a symlink before it is opened. Parent-directory rename races require
         # hostile filesystem control and are outside this connector's threat model.
         return os.open(resolved, flags | _O_NOFOLLOW), resolved
+    except FileNotFoundError:
+        raise FilesystemApiError("not_found", message="Path not found.") from None
     except OSError:
         raise FilesystemApiError("access_denied") from None
 
