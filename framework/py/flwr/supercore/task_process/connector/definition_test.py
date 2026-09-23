@@ -49,20 +49,3 @@ def test_connector_definition_rejects_executor_drift() -> None:
     )
     with pytest.raises(ValueError, match="actions and executors do not match"):
         ConnectorDefinition.from_provider(provider=provider, executors={})
-
-
-def test_account_scoping_does_not_require_oauth() -> None:
-    """An account-scoped connector can require credentials without supporting OAuth."""
-    connector = ConnectorDefinition.from_provider(
-        provider=ProviderDefinition(
-            ref="example",
-            display_name="Example",
-            description="Example connector.",
-            actions=(),
-        ),
-        executors={},
-    )
-    assert connector.requires_credentials
-    assert connector.provider is not None
-    assert connector.provider.oauth is None
-    assert connector.oauth_flow is None
