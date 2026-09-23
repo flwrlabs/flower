@@ -25,7 +25,6 @@ from .filesystem import (
     FILESYSTEM_ALLOWED_DIRS_ENV,
     FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
     FILESYSTEM_READ_FILE_TOOL_NAME,
-    FilesystemApiError,
     invoke_filesystem,
     make_filesystem_tools,
 )
@@ -96,6 +95,24 @@ def test_reads_file_and_lists_directory(
     }
 
 
+def test_read_missing_file_returns_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A missing file should be reported to the model without raising."""
+    _allow(monkeypatch, tmp_path)
+
+    assert _read(tmp_path / "missing.txt") == {
+        "error": {"code": "not_found", "message": "Path not found."}
+    }
+
+
+def test_rejects_non_object_arguments() -> None:
+    """Tool arguments must be a JSON object."""
+    assert invoke_filesystem(FILESYSTEM_READ_FILE_TOOL_NAME, None) == {
+        "error": {"code": "invalid_request"}
+    }
+
+
 def test_denies_symlink_outside_allowed_directory(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -110,8 +127,7 @@ def test_denies_symlink_outside_allowed_directory(
     link.symlink_to(secret)
     _allow(monkeypatch, allowed)
 
-    with pytest.raises(FilesystemApiError, match="access_denied"):
-        _read(link)
+    assert _read(link) == {"error": {"code": "access_denied"}}
 
 
 def test_denies_path_traversal(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -122,8 +138,7 @@ def test_denies_path_traversal(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     secret.write_text("secret", encoding="utf-8")
     _allow(monkeypatch, allowed)
 
-    with pytest.raises(FilesystemApiError, match="access_denied"):
-        _read(allowed / ".." / secret.name)
+    assert _read(allowed / ".." / secret.name) == {"error": {"code": "access_denied"}}
 
 
 def test_rejects_wrong_target_types(
@@ -134,10 +149,8 @@ def test_rejects_wrong_target_types(
     file.write_text("hello", encoding="utf-8")
     _allow(monkeypatch, tmp_path)
 
-    with pytest.raises(FilesystemApiError, match="not_a_file"):
-        _read(tmp_path)
-    with pytest.raises(FilesystemApiError, match="access_denied"):
-        _list(file)
+    assert _read(tmp_path) == {"error": {"code": "not_a_file"}}
+    assert _list(file) == {"error": {"code": "access_denied"}}
 
 
 def test_requires_absolute_configured_directory(
@@ -146,8 +159,7 @@ def test_requires_absolute_configured_directory(
     """The sandbox must have an absolute configured root."""
     monkeypatch.setenv(FILESYSTEM_ALLOWED_DIRS_ENV, "relative")
 
-    with pytest.raises(FilesystemApiError, match="invalid_config"):
-        _list(tmp_path)
+    assert _list(tmp_path) == {"error": {"code": "invalid_config"}}
 
 
 def test_enforces_file_size_limit(
@@ -158,5 +170,4 @@ def test_enforces_file_size_limit(
     file.write_bytes(b"x" * (1024 * 1024 + 1))
     _allow(monkeypatch, tmp_path)
 
-    with pytest.raises(FilesystemApiError, match="file_too_large"):
-        _read(file)
+    assert _read(file) == {"error": {"code": "file_too_large"}}
