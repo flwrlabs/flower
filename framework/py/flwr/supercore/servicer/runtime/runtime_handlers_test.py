@@ -243,10 +243,12 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         """CreateTask should keep credential-free built-in connectors available."""
         self.state.create_task.return_value = 456
 
-        response = self._create_connector_task("web_search")
+        for connector_ref in ("web_search", "filesystem"):
+            with self.subTest(connector_ref=connector_ref):
+                response = self._create_connector_task(connector_ref)
 
-        self.state.get_run_connector_refs.assert_not_called()
-        self.assertEqual(response.task_id, 456)
+                self.state.get_run_connector_refs.assert_not_called()
+                self.assertEqual(response.task_id, 456)
 
     def test_create_task_propagates_state_error(self) -> None:
         """CreateTask should let state-layer run validation errors propagate."""

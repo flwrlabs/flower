@@ -16,9 +16,11 @@
 
 import os
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
+from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
 from flwr.supercore.typing import JSONObject
 
 from .filesystem import (
@@ -26,7 +28,9 @@ from .filesystem import (
     FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
     FILESYSTEM_READ_FILE_TOOL_NAME,
     invoke_filesystem,
+    list_directory,
     make_filesystem_tools,
+    read_file,
 )
 
 
@@ -93,6 +97,25 @@ def test_reads_file_and_lists_directory(
             {"name": "subdir", "type": "directory"},
         ]
     }
+
+
+def test_handlers_record_usage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Filesystem handlers should record their tool usage."""
+    file = tmp_path / "note.txt"
+    file.write_text("hello", encoding="utf-8")
+    _allow(monkeypatch, tmp_path)
+    usage_recorder = Mock()
+
+    list_directory(str(tmp_path), usage_recorder=usage_recorder)
+    usage_recorder.record.assert_called_once_with(
+        TaskUsage(usage_type="filesystem_list_directory")
+    )
+
+    usage_recorder.reset_mock()
+    read_file(str(file), usage_recorder=usage_recorder)
+    usage_recorder.record.assert_called_once_with(
+        TaskUsage(usage_type="filesystem_read_file")
+    )
 
 
 def test_read_missing_file_returns_error(
