@@ -23,10 +23,10 @@ from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
 from flwr.supercore.task_process.usage import (
     FILESYSTEM_LIST_DIRECTORY_USAGE_TYPE,
     FILESYSTEM_READ_FILE_USAGE_TYPE,
-    TaskUsageRecorder,
 )
 from flwr.supercore.typing import JSONObject, JSONValue
 
+from ..definition import ConnectorExecutionContext
 from ..http import ConnectorApiError
 
 FILESYSTEM_CONNECTOR_REF = "filesystem"
@@ -128,26 +128,28 @@ def invoke_filesystem(name: str, arguments: JSONValue) -> JSONObject:
 def list_directory(
     path: str | None = None,
     *,
-    usage_recorder: TaskUsageRecorder,
+    context: ConnectorExecutionContext,
     **extra: JSONValue,
 ) -> JSONObject:
     """List a directory through the built-in connector interface."""
     output = invoke_filesystem(
         FILESYSTEM_LIST_DIRECTORY_TOOL_NAME, {"path": path, **extra}
     )
-    usage_recorder.record(TaskUsage(usage_type=FILESYSTEM_LIST_DIRECTORY_USAGE_TYPE))
+    context.usage_recorder.record(
+        TaskUsage(usage_type=FILESYSTEM_LIST_DIRECTORY_USAGE_TYPE)
+    )
     return output
 
 
 def read_file(
     path: str | None = None,
     *,
-    usage_recorder: TaskUsageRecorder,
+    context: ConnectorExecutionContext,
     **extra: JSONValue,
 ) -> JSONObject:
     """Read a file through the built-in connector interface."""
     output = invoke_filesystem(FILESYSTEM_READ_FILE_TOOL_NAME, {"path": path, **extra})
-    usage_recorder.record(TaskUsage(usage_type=FILESYSTEM_READ_FILE_USAGE_TYPE))
+    context.usage_recorder.record(TaskUsage(usage_type=FILESYSTEM_READ_FILE_USAGE_TYPE))
     return output
 
 

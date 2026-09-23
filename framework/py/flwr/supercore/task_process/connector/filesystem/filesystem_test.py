@@ -23,6 +23,7 @@ import pytest
 from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
 from flwr.supercore.typing import JSONObject
 
+from ..definition import ConnectorExecutionContext
 from ..registry import invoke_connector
 from .filesystem import (
     FILESYSTEM_ALLOWED_DIRS_ENV,
@@ -107,13 +108,15 @@ def test_handlers_record_usage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     _allow(monkeypatch, tmp_path)
     usage_recorder = Mock()
 
-    list_directory(str(tmp_path), usage_recorder=usage_recorder)
+    list_directory(
+        str(tmp_path), context=ConnectorExecutionContext({}, {}, usage_recorder)
+    )
     usage_recorder.record.assert_called_once_with(
         TaskUsage(usage_type="filesystem_list_directory")
     )
 
     usage_recorder.reset_mock()
-    read_file(str(file), usage_recorder=usage_recorder)
+    read_file(str(file), context=ConnectorExecutionContext({}, {}, usage_recorder))
     usage_recorder.record.assert_called_once_with(
         TaskUsage(usage_type="filesystem_read_file")
     )

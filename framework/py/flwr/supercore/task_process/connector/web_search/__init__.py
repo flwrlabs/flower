@@ -18,10 +18,10 @@
 import os
 
 from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
-from flwr.supercore.task_process.usage import WEB_SEARCH_USAGE_TYPE, TaskUsageRecorder
+from flwr.supercore.task_process.usage import WEB_SEARCH_USAGE_TYPE
 from flwr.supercore.typing import JSONObject
 
-from ..definition import ConnectorDefinition, builtin_executor
+from ..definition import ConnectorDefinition, ConnectorExecutionContext, build_executor
 from .brave import BraveWebSearchProvider
 from .exa import ExaWebSearchProvider
 from .provider import WebSearchProvider
@@ -57,7 +57,7 @@ def make_web_search_tool() -> JSONObject:
     }
 
 
-def search(query: str, *, usage_recorder: TaskUsageRecorder) -> JSONObject:
+def search(query: str, *, context: ConnectorExecutionContext) -> JSONObject:
     """Execute one web search request."""
     provider: WebSearchProvider
     if proxy_endpoint := os.getenv(ProxyWebSearchProvider.env, "").strip():
@@ -75,7 +75,7 @@ def search(query: str, *, usage_recorder: TaskUsageRecorder) -> JSONObject:
         )
 
     output = provider.search(query)
-    usage_recorder.record(
+    context.usage_recorder.record(
         TaskUsage(usage_type=WEB_SEARCH_USAGE_TYPE, provider=provider.name)
     )
     return output
@@ -84,7 +84,7 @@ def search(query: str, *, usage_recorder: TaskUsageRecorder) -> JSONObject:
 CONNECTOR = ConnectorDefinition(
     ref=WEB_SEARCH_CONNECTOR_NAME,
     tools=(make_web_search_tool(),),
-    executors={WEB_SEARCH_CONNECTOR_NAME: builtin_executor(search)},
+    executors={WEB_SEARCH_CONNECTOR_NAME: build_executor(search)},
 )
 
 

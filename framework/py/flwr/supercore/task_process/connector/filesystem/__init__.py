@@ -14,7 +14,7 @@
 # ==============================================================================
 """Built-in filesystem connector."""
 
-from ..definition import ConnectorDefinition, builtin_executor
+from ..definition import ConnectorDefinition, build_executor
 from .filesystem import (
     FILESYSTEM_CONNECTOR_REF,
     FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
@@ -28,8 +28,8 @@ CONNECTOR = ConnectorDefinition(
     ref=FILESYSTEM_CONNECTOR_REF,
     tools=tuple(make_filesystem_tools()),
     executors={
-        FILESYSTEM_LIST_DIRECTORY_TOOL_NAME: builtin_executor(list_directory),
-        FILESYSTEM_READ_FILE_TOOL_NAME: builtin_executor(read_file),
+        FILESYSTEM_LIST_DIRECTORY_TOOL_NAME: build_executor(list_directory),
+        FILESYSTEM_READ_FILE_TOOL_NAME: build_executor(read_file),
     },
 )
 

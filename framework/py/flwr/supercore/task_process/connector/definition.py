@@ -146,10 +146,10 @@ class ConnectorDefinition:
         )
 
 
-def builtin_executor(handler: ConnectorHandler) -> ConnectorExecutor:
-    """Adapt a keyword-argument built-in handler to the shared execution context."""
+def build_executor(handler: ConnectorHandler) -> ConnectorExecutor:
+    """Build an executor that unpacks tool arguments and forwards the context."""
 
     def execute(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONValue:
-        return handler(**arguments, usage_recorder=context.usage_recorder)
+        return handler(**arguments, context=context)
 
     return execute
