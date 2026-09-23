@@ -423,8 +423,8 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         self.assertEqual(run.fab_hash, fab_hash)
 
-    def test_start_run_persists_user_prompt_event(self) -> None:
-        """Persist the user prompt as a primary-task message item."""
+    def test_start_run_persists_user_prompt_instruction(self) -> None:
+        """Persist the user prompt as an AgentApp instruction."""
         request = StartRunRequest(federation=NOOP_FEDERATION_ID)
         request.fab.content = b"AgentApp FAB"
         request.user_prompt = "Hello"
@@ -433,7 +433,16 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             patch(
                 "flwr.superlink.servicer.control.control_handlers.get_fab_config",
                 return_value={
-                    "tool": {"flwr": {"app": {"config": {"agent": {"input": ""}}}}}
+                    "project": {"description": "Local agent"},
+                    "tool": {
+                        "flwr": {
+                            "app": {
+                                "config": {"agent": {"input": ""}},
+                                "display-name": "Local Agent",
+                                "color": "rose",
+                            }
+                        }
+                    },
                 },
             ),
             patch(
@@ -453,15 +462,11 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             response = start_run(request, self.account, self.state, None)
 
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
-        event = self.state.get_task_events(run_ids=[response.run_id])[0]
-        self.assertEqual(
-            (event.task_id, event.event, event.data),
-            (
-                run.primary_task_id,
-                "message",
-                '{"type":"message","role":"user","content":"Hello"}',
-            ),
-        )
+        app = self.state.list_apps(NOOP_FEDERATION_ID)[0]
+        self.assertEqual(app.display_name, "Local Agent")
+        self.assertEqual(app.description, "Local agent")
+        self.assertEqual(app.color, "rose")
+        self.assertEqual(self.state.get_task_events(run_ids=[response.run_id]), [])
         start_title.assert_called_once_with(
             self.state,
             run.series_id,
@@ -596,6 +601,10 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 (FLOWER_AGENT_APP_ID, "", TaskType.AGENT_APP),
             ],
         )
+        flower_agent = response.apps[1]
+        self.assertEqual(flower_agent.display_name, "Flower Agent")
+        self.assertEqual(flower_agent.description, "Chat with Flower Agent")
+        self.assertEqual(flower_agent.color, "yellow")
 
     def test_list_app_associations_only_returns_accessible_federations(self) -> None:
         """Exclude non-member and archived federations from app associations."""
@@ -728,9 +737,16 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             patch(
                 "flwr.superlink.servicer.control.control_handlers.get_fab_config",
                 return_value={
+                    "project": {"description": "Demo agent"},
                     "tool": {
-                        "flwr": {"app": {"components": {"agentapp": "module:app"}}}
-                    }
+                        "flwr": {
+                            "app": {
+                                "components": {"agentapp": "module:app"},
+                                "display-name": "Demo Agent",
+                                "color": "sky",
+                            }
+                        }
+                    },
                 },
             ),
         ):
@@ -753,6 +769,9 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             [("@flwr/demo", fab_hash, TaskType.AGENT_APP)],
         )
         self.assertTrue(apps[0].is_hub_app)
+        self.assertEqual(apps[0].display_name, "Demo Agent")
+        self.assertEqual(apps[0].description, "Demo agent")
+        self.assertEqual(apps[0].color, "sky")
         self.assertEqual(
             self.state.get_app(NOOP_FEDERATION_ID, "@flwr/demo", fab_hash),
             Fab(fab_hash, fab_content, verification_dict),

@@ -832,13 +832,24 @@ class RegisterNodeRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     PUBLIC_KEY_FIELD_NUMBER: builtins.int
+    LOCATION_FIELD_NUMBER: builtins.int
+    NAME_FIELD_NUMBER: builtins.int
     public_key: builtins.bytes
+    location: builtins.str
+    name: builtins.str
     def __init__(
         self,
         *,
         public_key: builtins.bytes = ...,
+        location: builtins.str | None = ...,
+        name: builtins.str | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["public_key", b"public_key"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_location", b"_location", "_name", b"_name", "location", b"location", "name", b"name"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_location", b"_location", "_name", b"_name", "location", b"location", "name", b"name", "public_key", b"public_key"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_location", b"_location"]) -> typing.Literal["location"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_name", b"_name"]) -> typing.Literal["name"] | None: ...
 
 global___RegisterNodeRequest = RegisterNodeRequest
 
@@ -947,6 +958,9 @@ class AppInfo(google.protobuf.message.Message):
     FAB_HASH_FIELD_NUMBER: builtins.int
     APP_TYPE_FIELD_NUMBER: builtins.int
     IS_HUB_APP_FIELD_NUMBER: builtins.int
+    DISPLAY_NAME_FIELD_NUMBER: builtins.int
+    DESCRIPTION_FIELD_NUMBER: builtins.int
+    COLOR_FIELD_NUMBER: builtins.int
     app_id: builtins.str
     fab_hash: builtins.str
     app_type: builtins.str
@@ -954,6 +968,9 @@ class AppInfo(google.protobuf.message.Message):
     """True for Hub apps, false for local/custom apps, and absent for legacy apps
     whose provenance is unknown.
     """
+    display_name: builtins.str
+    description: builtins.str
+    color: builtins.str
     def __init__(
         self,
         *,
@@ -961,9 +978,12 @@ class AppInfo(google.protobuf.message.Message):
         fab_hash: builtins.str = ...,
         app_type: builtins.str = ...,
         is_hub_app: builtins.bool | None = ...,
+        display_name: builtins.str = ...,
+        description: builtins.str = ...,
+        color: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_is_hub_app", b"_is_hub_app", "is_hub_app", b"is_hub_app"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_is_hub_app", b"_is_hub_app", "app_id", b"app_id", "app_type", b"app_type", "fab_hash", b"fab_hash", "is_hub_app", b"is_hub_app"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_is_hub_app", b"_is_hub_app", "app_id", b"app_id", "app_type", b"app_type", "color", b"color", "description", b"description", "display_name", b"display_name", "fab_hash", b"fab_hash", "is_hub_app", b"is_hub_app"]) -> None: ...
     def WhichOneof(self, oneof_group: typing.Literal["_is_hub_app", b"_is_hub_app"]) -> typing.Literal["is_hub_app"] | None: ...
 
 global___AppInfo = AppInfo

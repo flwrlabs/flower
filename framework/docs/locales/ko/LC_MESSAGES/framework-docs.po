@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-17 00:09+0000\n"
+"POT-Creation-Date: 2026-09-22 00:10+0000\n"
 "PO-Revision-Date: 2026-05-23 06:53+0000\n"
 "Last-Translator: Seulki Yun <icstuckyi@gmail.com>\n"
 "Language: ko\n"
@@ -31578,6 +31578,17 @@ msgid "Add a SuperNode to the federation."
 msgstr ""
 
 #: ../../flwr register:1 supernode
+msgid ""
+"Location of the SuperNode as \"<latitude>,<longitude>\", for example "
+"\"37.4056,-122.0775\"."
+msgstr ""
+
+#: ../../flwr register:1 supernode
+#, fuzzy
+msgid "Name of the SuperNode."
+msgstr ""
+
+#: ../../flwr register:1 supernode
 msgid "Path to a P-384 (or any other NIST EC curve) public key file."
 msgstr ""
 
@@ -32125,13 +32136,13 @@ msgstr ""
 #: ../../source/ref-api/flwr.common.RecordSet.rst:61
 #: ../../source/ref-api/flwr.common.ServerMessage.rst:25
 #: ../../source/ref-api/flwr.common.Status.rst:25
-#: ../../source/ref-api/flwr.server.Driver.rst:43
-#: ../../source/ref-api/flwr.server.Grid.rst:43
+#: ../../source/ref-api/flwr.server.Driver.rst:46
+#: ../../source/ref-api/flwr.server.Grid.rst:46
 #: ../../source/ref-api/flwr.server.LegacyContext.rst:25
 #: ../../source/ref-api/flwr.server.ServerAppComponents.rst:25
 #: ../../source/ref-api/flwr.server.ServerConfig.rst:25
 #: ../../source/ref-api/flwr.serverapp.GaussianPrivacyEvent.rst:25
-#: ../../source/ref-api/flwr.serverapp.Grid.rst:43
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:46
 #: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:166
 #: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:46
 #: ../../source/ref-api/flwr.serverapp.PrivacyConfig.rst:25
@@ -32171,6 +32182,16 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
 #: flwr.agentapp.AgentSession.grid:1 of
 msgid "Model-facing federation Grid API."
+msgstr ""
+
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`prompt <flwr.agentapp.AgentSession.prompt>`\\"
+msgstr ""
+
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
+#: flwr.agentapp.AgentSession.prompt:1 of
+msgid "Return the initial prompt for this AgentApp run."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.LoadAgentAppError.rst:2
@@ -38766,7 +38787,7 @@ msgstr ""
 msgid "Updated usage::"
 msgstr ""
 
-#: ../../source/ref-api/flwr.server.Driver.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`create_message <flwr.server.Driver.create_message>`\\ "
@@ -38775,75 +38796,87 @@ msgstr ""
 ":py:obj:`create_reply <flwr.common.Message.create_reply>`\\ "
 "\\(content\\[\\, ttl\\]\\)"
 
-#: ../../source/ref-api/flwr.server.Driver.rst:41:<autosummary>:1
-#: ../../source/ref-api/flwr.server.Grid.rst:41:<autosummary>:1
-#: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #: flwr.serverapp.grid.grid.Grid.create_message:1 of
 msgid "Create a new message with specified parameters."
 msgstr ""
 
-#: ../../source/ref-api/flwr.server.Driver.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`get_node_ids <flwr.server.Driver.get_node_ids>`\\ \\(\\)"
 msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
 
-#: ../../source/ref-api/flwr.server.Driver.rst:41:<autosummary>:1
-#: ../../source/ref-api/flwr.server.Grid.rst:41:<autosummary>:1
-#: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #: flwr.serverapp.grid.grid.Grid.get_node_ids:1 of
 msgid "Get node IDs."
 msgstr ""
 
-#: ../../source/ref-api/flwr.server.Driver.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`get_nodes <flwr.server.Driver.get_nodes>`\\ \\(\\)"
+msgstr ""
+
+#: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
+#: flwr.serverapp.grid.grid.Grid.get_nodes:1 of
+msgid "Get nodes."
+msgstr ""
+
+#: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`pull_messages <flwr.server.Driver.pull_messages>`\\ "
 "\\(message\\_ids\\)"
 msgstr ":py:obj:`flwr.server <flwr.server>`\\"
 
-#: ../../source/ref-api/flwr.server.Driver.rst:41:<autosummary>:1
-#: ../../source/ref-api/flwr.server.Grid.rst:41:<autosummary>:1
-#: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #: flwr.serverapp.grid.grid.Grid.pull_messages:1 of
 msgid "Pull messages based on message IDs."
 msgstr ""
 
-#: ../../source/ref-api/flwr.server.Driver.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`push_messages <flwr.server.Driver.push_messages>`\\ "
 "\\(messages\\)"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.server.Driver.rst:41:<autosummary>:1
-#: ../../source/ref-api/flwr.server.Grid.rst:41:<autosummary>:1
-#: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #: flwr.serverapp.grid.grid.Grid.push_messages:1 of
 msgid "Push messages to specified node IDs."
 msgstr ""
 
-#: ../../source/ref-api/flwr.server.Driver.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`send_and_receive <flwr.server.Driver.send_and_receive>`\\ "
 "\\(messages\\, \\*\\[\\, timeout\\]\\)"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.server.Driver.rst:41:<autosummary>:1
-#: ../../source/ref-api/flwr.server.Grid.rst:41:<autosummary>:1
-#: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #: flwr.serverapp.grid.grid.Grid.send_and_receive:1 of
 msgid "Push messages to specified node IDs and pull the reply messages."
 msgstr ""
 
-#: ../../source/ref-api/flwr.server.Driver.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`set_run <flwr.server.Driver.set_run>`\\ \\(run\\)"
 msgstr ":py:obj:`flwr.server <flwr.server>`\\"
 
-#: ../../source/ref-api/flwr.server.Driver.rst:41:<autosummary>:1
-#: ../../source/ref-api/flwr.server.Grid.rst:41:<autosummary>:1
-#: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #: flwr.serverapp.grid.grid.Grid.set_run:1 of
 msgid "Set the run this ``Grid`` object operates in."
 msgstr ""
@@ -38969,7 +39002,7 @@ msgstr ""
 msgid "Grid"
 msgstr ""
 
-#: ../../source/ref-api/flwr.server.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`create_message <flwr.server.Grid.create_message>`\\ "
@@ -38978,31 +39011,36 @@ msgstr ""
 ":py:obj:`create_reply <flwr.common.Message.create_reply>`\\ "
 "\\(content\\[\\, ttl\\]\\)"
 
-#: ../../source/ref-api/flwr.server.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`get_node_ids <flwr.server.Grid.get_node_ids>`\\ \\(\\)"
 msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
 
-#: ../../source/ref-api/flwr.server.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`get_nodes <flwr.server.Grid.get_nodes>`\\ \\(\\)"
+msgstr ""
+
+#: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`pull_messages <flwr.server.Grid.pull_messages>`\\ "
 "\\(message\\_ids\\)"
 msgstr ":py:obj:`flwr.server <flwr.server>`\\"
 
-#: ../../source/ref-api/flwr.server.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`push_messages <flwr.server.Grid.push_messages>`\\ \\(messages\\)"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.server.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`send_and_receive <flwr.server.Grid.send_and_receive>`\\ "
 "\\(messages\\, \\*\\[\\, timeout\\]\\)"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.server.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`set_run <flwr.server.Grid.set_run>`\\ \\(run\\)"
 msgstr ":py:obj:`flwr.server <flwr.server>`\\"
@@ -43008,7 +43046,7 @@ msgid ""
 "<flwr.serverapp.GaussianPrivacyEvent.population_size>`\\"
 msgstr ":py:obj:`flwr.server <flwr.server>`\\"
 
-#: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`create_message <flwr.serverapp.Grid.create_message>`\\ "
@@ -43017,33 +43055,38 @@ msgstr ""
 ":py:obj:`create_reply <flwr.common.Message.create_reply>`\\ "
 "\\(content\\[\\, ttl\\]\\)"
 
-#: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`get_node_ids <flwr.serverapp.Grid.get_node_ids>`\\ \\(\\)"
 msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
 
-#: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`get_nodes <flwr.serverapp.Grid.get_nodes>`\\ \\(\\)"
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`pull_messages <flwr.serverapp.Grid.pull_messages>`\\ "
 "\\(message\\_ids\\)"
 msgstr ":py:obj:`flwr.server <flwr.server>`\\"
 
-#: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`push_messages <flwr.serverapp.Grid.push_messages>`\\ "
 "\\(messages\\)"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`send_and_receive <flwr.serverapp.Grid.send_and_receive>`\\ "
 "\\(messages\\, \\*\\[\\, timeout\\]\\)"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`set_run <flwr.serverapp.Grid.set_run>`\\ \\(run\\)"
 msgstr ":py:obj:`flwr.server <flwr.server>`\\"
@@ -88894,3 +88937,4 @@ msgstr ""
 #~ "``127.0.0.1:9094``, and set ``--plugin-type"
 #~ " clientapp``."
 #~ msgstr ""
+

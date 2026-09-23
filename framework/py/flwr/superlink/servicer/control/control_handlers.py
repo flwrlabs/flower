@@ -33,6 +33,7 @@ from flwr.cli.utils import validate_federation_name
 from flwr.common.config import (
     flatten_dict,
     fuse_dicts,
+    get_app_presentation_metadata,
     get_fab_config,
     get_metadata_from_config,
 )
@@ -140,7 +141,6 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
-from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
@@ -167,7 +167,6 @@ from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
     CreateInvitationContext,
-    JSONObject,
     RegisterSupernodeContext,
     StartRunContext,
 )
@@ -177,6 +176,7 @@ from flwr.supercore.utils import (
     request_download_link,
     resolve_account_ids,
     strict_json_dumps,
+    validate_node_location,
 )
 from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
@@ -719,6 +719,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             )
 
         if not is_stored_app and not is_cached_hub_app:
+            metadata = get_app_presentation_metadata(fab_config)
             state.store_app(
                 fab=fab,
                 federation_id=federation_id,
@@ -726,24 +727,15 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 app_type=app_type,
                 added_by=flwr_aid,
                 is_hub_app=is_hub_app,
+                display_name=metadata.display_name,
+                description=metadata.description,
+                color=metadata.color,
             )
 
         series_id = request.series_id if request.HasField("series_id") else None
         series_description: str | None = None
         if primary_task_type == TaskType.AGENT_APP and series_id is None:
             series_description = _derive_run_series_description(user_prompt) or None
-
-        initial_task_event = None
-        if primary_task_type == TaskType.AGENT_APP:
-            input_item: JSONObject = {
-                "type": "message",
-                "role": "user",
-                "content": user_prompt,
-            }
-            initial_task_event = TaskEvent(
-                event="message",
-                data=strict_json_dumps(input_item, compact=True),
-            )
 
         run_id = state.create_run(
             fab_id,
@@ -758,7 +750,6 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             series_id=series_id,
             series_description=series_description,
             connector_refs=connector_refs,
-            initial_task_event=initial_task_event,
         )
 
         if run_id == 0:
@@ -1550,6 +1541,17 @@ def register_node(
             f"Invalid public key in RegisterNode request: {err}",
         ) from err
 
+    location = request.location if request.HasField("location") else None
+    if location is not None:
+        try:
+            validate_node_location(location)
+        except ValueError as err:
+            raise FlowerError(
+                ApiErrorCode.INVALID_SUPERNODE_LOCATION,
+                f"Invalid location in RegisterNode request: {err}",
+                public_details=str(err),
+            ) from err
+
     node_id = 0
 
     flwr_aid = account.flwr_aid
@@ -1567,6 +1569,8 @@ def register_node(
             owner_name=account_name,
             public_key=request.public_key,
             heartbeat_interval=HEARTBEAT_DEFAULT_INTERVAL,
+            location=location,
+            name=request.name if request.HasField("name") else None,
         )
 
     except ValueError as err:
@@ -1676,6 +1680,9 @@ def list_apps(
             app_id=FLOWER_AGENT_APP_ID,
             app_type=TaskType.AGENT_APP,
             is_hub_app=True,
+            display_name="Flower Agent",
+            description="Chat with Flower Agent",
+            color="yellow",
         )
         if limit is not None:
             apps = apps[: limit - 1]
@@ -1711,13 +1718,15 @@ def add_app(
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
     fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, request.app_id)
     try:
-        app_type = _get_app_type(get_fab_config(fab_file))
+        fab_config = get_fab_config(fab_file)
+        app_type = _get_app_type(fab_config)
     except ValueError as e:
         raise FlowerError(
             ApiErrorCode.INVALID_APP_SPEC,
             f"Failed to read app metadata: {e}",
         ) from e
 
+    metadata = get_app_presentation_metadata(fab_config)
     state.store_app(
         fab=Fab(hashlib.sha256(fab_file).hexdigest(), fab_file, verification_dict),
         federation_id=federation_id,
@@ -1725,6 +1734,9 @@ def add_app(
         app_type=app_type,
         added_by=account.flwr_aid,
         is_hub_app=True,
+        display_name=metadata.display_name,
+        description=metadata.description,
+        color=metadata.color,
     )
 
     return AddAppResponse()
