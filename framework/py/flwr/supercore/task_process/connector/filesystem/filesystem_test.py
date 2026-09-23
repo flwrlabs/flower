@@ -106,6 +106,13 @@ def test_read_missing_file_returns_error(
     }
 
 
+def test_rejects_non_object_arguments() -> None:
+    """Tool arguments must be a JSON object."""
+    assert invoke_filesystem(FILESYSTEM_READ_FILE_TOOL_NAME, None) == {
+        "error": {"code": "invalid_request"}
+    }
+
+
 def test_denies_symlink_outside_allowed_directory(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

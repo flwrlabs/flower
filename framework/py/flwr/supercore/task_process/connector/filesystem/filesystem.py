@@ -19,7 +19,7 @@ from __future__ import annotations
 import os
 import stat
 
-from flwr.supercore.typing import JSONObject
+from flwr.supercore.typing import JSONObject, JSONValue
 
 from ..http import ConnectorApiError
 
@@ -97,11 +97,13 @@ def make_filesystem_tools() -> list[JSONObject]:
     ]
 
 
-def invoke_filesystem(name: str, arguments: JSONObject) -> JSONObject:
+def invoke_filesystem(name: str, arguments: JSONValue) -> JSONObject:
     """Invoke one filesystem tool."""
     try:
         if not _PLATFORM_SUPPORTED:
             raise FilesystemApiError("unsupported_platform")
+        if not isinstance(arguments, dict):
+            raise FilesystemApiError("invalid_request")
         path = arguments.get("path")
         if not isinstance(path, str):
             raise FilesystemApiError("invalid_request")
