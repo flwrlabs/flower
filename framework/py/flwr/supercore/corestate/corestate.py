@@ -243,7 +243,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         federation_id : str
             Federation ID owning the connector.
         connector_ref : str
-            Connector reference unique within the account.
+            Connector reference unique within the federation.
         credentials_json : str
             Serialized connector credentials.
         config_json : str
