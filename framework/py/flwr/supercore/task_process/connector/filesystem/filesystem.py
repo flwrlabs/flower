@@ -52,11 +52,8 @@ def make_filesystem_tools() -> list[JSONObject]:
             "type": "function",
             "name": FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
             "description": (
-                "List all immediate entries in a local directory, sorted by name. "
-                "A successful response is the ground truth for that directory: an "
-                "absent name does not exist there. Do not invent entries or metadata, "
-                "and do not search elsewhere unless the user asks. Returns only each "
-                "entry's name and type: file, directory, or other."
+                "List a local directory's immediate entries, sorted by name. Returns "
+                "each entry's name and type: file, directory, or other."
             ),
             "parameters": {
                 "type": "object",
@@ -79,10 +76,7 @@ def make_filesystem_tools() -> list[JSONObject]:
             "name": FILESYSTEM_READ_FILE_TOOL_NAME,
             "description": (
                 "Read a local UTF-8 text file up to 1 MiB. Returns its content and "
-                "resolved absolute path. First list its parent directory and read only "
-                "a file present in that result. If it is absent or this tool returns "
-                "not_found, report that it does not exist; do not guess other paths "
-                "unless the user asks to search."
+                "resolved absolute path."
             ),
             "parameters": {
                 "type": "object",
