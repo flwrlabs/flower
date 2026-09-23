@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Bounded protocol and output relay for the prestarted Model worker."""
+"""Bounded protocol and output relay for prestarted task workers."""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ class MessageChannel(Protocol):
 
 
 class ProtocolOutputSender:
-    """Send bounded output frames without blocking Model task execution."""
+    """Send bounded output frames without blocking task execution."""
 
     def __init__(self, channel: MessageChannel) -> None:
         self._channel = channel
@@ -267,12 +267,12 @@ def send_message(channel: MessageChannel, payload: JSONObject) -> None:
     """Send one bounded newline-delimited JSON protocol message."""
     encoded = encode_message(payload)
     if len(encoded) > MAX_PROTOCOL_MESSAGE_BYTES:
-        raise ValueError("Model worker protocol message is too large.")
+        raise ValueError("Task worker protocol message is too large.")
     offset = 0
     while offset < len(encoded):
         written = channel.write(encoded[offset:])
         if written <= 0:
-            raise OSError("Model worker protocol write made no progress.")
+            raise OSError("Task worker protocol write made no progress.")
         offset += written
     channel.flush()
 
@@ -288,14 +288,14 @@ def read_message(channel: MessageChannel) -> JSONObject:
     """Read one bounded newline-delimited JSON protocol message."""
     encoded = channel.readline(MAX_PROTOCOL_MESSAGE_BYTES + 1)
     if not encoded:
-        raise ValueError("Model worker protocol connection closed.")
+        raise ValueError("Task worker protocol connection closed.")
     if len(encoded) > MAX_PROTOCOL_MESSAGE_BYTES or not encoded.endswith(b"\n"):
-        raise ValueError("Model worker protocol message is too large.")
+        raise ValueError("Task worker protocol message is too large.")
     raw = encoded[:-1]
     try:
         payload = json.loads(raw)
     except (UnicodeDecodeError, json.JSONDecodeError) as err:
-        raise ValueError("Model worker protocol message must be valid JSON.") from err
+        raise ValueError("Task worker protocol message must be valid JSON.") from err
     if not isinstance(payload, dict):
-        raise ValueError("Model worker protocol message must be a JSON object.")
+        raise ValueError("Task worker protocol message must be a JSON object.")
     return payload
