@@ -527,12 +527,13 @@ class FedAvgStreaming(FedAvg):
             INFO,
             (
                 "[Layer download] sending %s batches (%s chunks across %s layers, "
-                "%.2f MB/message max, %.2f MB/chunk max, pipeline depth %s) "
-                "to %s clients"
+                "%.2f GB tensor data, %.2f MB/message max, %.2f MB/chunk max, "
+                "pipeline depth %s) to %s clients"
             ),
             len(batches),
             len(entries),
             len(layer_names),
+            sum(int(entry["nbytes"]) for entry in entries) / (1024**3),
             self._download_max_chunk_bytes / (1024 * 1024),
             max_bytes_per_layer_chunk / (1024 * 1024),
             self._download_pipeline_depth,
@@ -549,6 +550,10 @@ class FedAvgStreaming(FedAvg):
             payload_layer_shapes: list[str] = []
             payload_chunk_starts: list[int] = []
             payload_chunk_ends: list[int] = []
+            payload_chunk_idxs: list[int] = []
+            payload_chunk_counts: list[int] = []
+            payload_chunk_nbytes: list[int] = []
+            payload_layer_dtypes: list[str] = []
             payload_is_last_chunk: list[bool] = []
             for entry in batch_entries:
                 start = int(entry["start"])
@@ -563,6 +568,10 @@ class FedAvgStreaming(FedAvg):
                 payload_layer_shapes.append(_shape_to_text(entry["layer_shape"]))
                 payload_chunk_starts.append(start)
                 payload_chunk_ends.append(end)
+                payload_chunk_idxs.append(int(entry["chunk_idx"]))
+                payload_chunk_counts.append(int(entry["chunk_count"]))
+                payload_chunk_nbytes.append(int(entry["nbytes"]))
+                payload_layer_dtypes.append(str(tensor.dtype))
                 payload_is_last_chunk.append(bool(entry["is_last_chunk"]))
 
             config = ConfigRecord(
@@ -572,6 +581,10 @@ class FedAvgStreaming(FedAvg):
                     "download_layer_shapes": payload_layer_shapes,
                     "download_chunk_starts": payload_chunk_starts,
                     "download_chunk_ends": payload_chunk_ends,
+                    "download_chunk_idxs": payload_chunk_idxs,
+                    "download_chunk_counts": payload_chunk_counts,
+                    "download_chunk_nbytes": payload_chunk_nbytes,
+                    "download_layer_dtypes": payload_layer_dtypes,
                     "download_is_last_chunk": payload_is_last_chunk,
                     "download_batch_idx": batch_idx,
                     "download_batch_count": len(batches),

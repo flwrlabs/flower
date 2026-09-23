@@ -8,6 +8,7 @@ import sys
 import types
 from pathlib import Path
 
+import pytest
 import torch
 from flwr.app import Context, RecordDict
 
@@ -721,6 +722,35 @@ def test_state_file_dcp_conversion_round_trip(tmp_path) -> None:
     actual = torch.load(output_state, map_location="cpu")
     assert actual.keys() == expected.keys()
     assert all(torch.equal(actual[name], tensor) for name, tensor in expected.items())
+
+
+def test_dcp_write_failure_includes_filesystem_diagnostics(
+    tmp_path, monkeypatch
+) -> None:
+    """DCP write failures should report enough context for remote debugging."""
+    from torch.distributed import checkpoint as dcp
+
+    def fail_save(*_args, **_kwargs):
+        raise OSError("simulated filesystem write failure")
+
+    monkeypatch.setattr(dcp, "save", fail_save)
+    output_directory = tmp_path / "checkpoint.dcp"
+
+    with pytest.raises(RuntimeError) as exc_info:
+        task_module._save_state_dict_as_dcp(
+            {"weight": torch.ones(2)},
+            str(output_directory),
+            train_spec_name="llama3",
+            model_args_key="auto",
+            dcp_threads=1,
+        )
+
+    message = str(exc_info.value)
+    assert "DCP checkpoint write failed" in message
+    assert f"output={output_directory}" in message
+    assert "threads=1" in message
+    assert "partial_files=0" in message
+    assert "filesystem_free=" in message
 
 
 def test_dcp_converter_reads_and_publishes_layer_files(tmp_path, monkeypatch) -> None:

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import os
 import pickle
 import warnings
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
+from logging import INFO
 from time import perf_counter
 from typing import Any
 
@@ -19,6 +21,7 @@ from flwr.app import (
     RecordDict,
 )
 from flwr.clientapp import ClientApp
+from flwr.common.logger import log
 from flwr.common.profiling import (
     PROFILE_CLIENT_NAME_KEY,
     PROFILE_CONFIG_RECORD_NAME,
@@ -92,11 +95,188 @@ def _layer_file_path(context: Context, layer_name: str) -> str:
     return os.path.join(layer_dir(context), f"{sanitize_layer_name(layer_name)}.pt")
 
 
+def _download_receipt_dir(context: Context) -> str:
+    return os.path.join(layer_dir(context), ".download-receipts")
+
+
+@contextmanager
+def _layer_download_lock(file_path: str):
+    """Serialize updates to a split layer across ClientApp processes."""
+    lock_path = f"{file_path}.download.lock"
+    os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+    with open(lock_path, "a", encoding="utf-8") as lock_file:
+        try:
+            import fcntl
+
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        except ImportError:
+            pass
+        try:
+            yield
+        finally:
+            try:
+                import fcntl
+
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            except ImportError:
+                pass
+
+
+def _record_download_receipt(
+    context: Context,
+    *,
+    layer_idx: int,
+    layer_name: str,
+    layer_shape: list[int],
+    dtype: str,
+    chunk_idx: int,
+    chunk_count: int,
+    start: int,
+    end: int,
+    nbytes: int,
+) -> None:
+    """Persist receipt metadata so validation survives ClientApp restarts."""
+    receipt_dir = _download_receipt_dir(context)
+    os.makedirs(receipt_dir, exist_ok=True)
+    receipt_path = os.path.join(receipt_dir, f"{layer_idx:06d}-{chunk_idx:06d}.json")
+    temporary_path = f"{receipt_path}.{os.getpid()}.tmp"
+    receipt = {
+        "layer_idx": layer_idx,
+        "layer_name": layer_name,
+        "layer_shape": layer_shape,
+        "dtype": dtype,
+        "chunk_idx": chunk_idx,
+        "chunk_count": chunk_count,
+        "start": start,
+        "end": end,
+        "nbytes": nbytes,
+    }
+    with open(temporary_path, "w", encoding="utf-8") as file:
+        json.dump(receipt, file, sort_keys=True)
+    os.replace(temporary_path, receipt_path)
+
+
+def _validate_downloaded_layers(context: Context, layer_names: list[str]) -> None:
+    """Verify every advertised layer chunk before training or conversion."""
+    receipt_dir = _download_receipt_dir(context)
+    if not os.path.isdir(receipt_dir):
+        raise RuntimeError(
+            "Layer download receipts are missing; refusing to use an unverified "
+            f"model for run_id={context.run_id} node_id={context.node_id}."
+        )
+
+    receipts_by_layer: dict[int, list[dict[str, Any]]] = {}
+    for file_name in os.listdir(receipt_dir):
+        if not file_name.endswith(".json"):
+            continue
+        with open(os.path.join(receipt_dir, file_name), encoding="utf-8") as file:
+            receipt = json.load(file)
+        receipts_by_layer.setdefault(int(receipt["layer_idx"]), []).append(receipt)
+
+    errors: list[str] = []
+    total_chunks = 0
+    total_tensor_bytes = 0
+    total_file_bytes = 0
+    for layer_idx, layer_name in enumerate(layer_names):
+        receipts = receipts_by_layer.get(layer_idx, [])
+        if not receipts:
+            errors.append(f"{layer_name}: no chunks received")
+            continue
+        first = receipts[0]
+        shape = [int(value) for value in first["layer_shape"]]
+        dtype = str(first["dtype"])
+        chunk_count = int(first["chunk_count"])
+        if any(
+            str(item["layer_name"]) != layer_name
+            or [int(value) for value in item["layer_shape"]] != shape
+            or str(item["dtype"]) != dtype
+            or int(item["chunk_count"]) != chunk_count
+            for item in receipts
+        ):
+            errors.append(f"{layer_name}: inconsistent chunk metadata")
+            continue
+
+        by_chunk = {int(item["chunk_idx"]): item for item in receipts}
+        expected_chunks = set(range(chunk_count))
+        if set(by_chunk) != expected_chunks:
+            missing = sorted(expected_chunks - set(by_chunk))
+            errors.append(f"{layer_name}: missing chunk indexes {missing[:8]}")
+            continue
+
+        ranges = sorted(
+            (int(item["start"]), int(item["end"])) for item in by_chunk.values()
+        )
+        if shape and ranges:
+            expected_start = 0
+            for start, end in ranges:
+                if start != expected_start or end < start:
+                    errors.append(
+                        f"{layer_name}: non-contiguous chunk range {start}:{end}, "
+                        f"expected start {expected_start}"
+                    )
+                    break
+                expected_start = end
+            else:
+                if expected_start != shape[0]:
+                    errors.append(
+                        f"{layer_name}: chunks end at {expected_start}, "
+                        f"expected {shape[0]}"
+                    )
+                    continue
+
+        file_path = _layer_file_path(context, layer_name)
+        tensor = load_layer_from_disk(file_path, layer_name)
+        if tensor is None:
+            errors.append(f"{layer_name}: persisted layer file is unreadable")
+            continue
+        actual_shape = list(tensor.shape)
+        actual_dtype = str(tensor.dtype)
+        actual_nbytes = tensor.numel() * tensor.element_size()
+        expected_nbytes = sum(int(item["nbytes"]) for item in by_chunk.values())
+        if actual_shape != shape:
+            errors.append(f"{layer_name}: shape {actual_shape}, expected {shape}")
+        if actual_dtype != dtype:
+            errors.append(f"{layer_name}: dtype {actual_dtype}, expected {dtype}")
+        if actual_nbytes != expected_nbytes:
+            errors.append(
+                f"{layer_name}: tensor bytes {actual_nbytes}, "
+                f"expected {expected_nbytes}"
+            )
+        total_chunks += len(by_chunk)
+        total_tensor_bytes += actual_nbytes
+        total_file_bytes += os.path.getsize(file_path)
+
+    unexpected_layers = sorted(set(receipts_by_layer) - set(range(len(layer_names))))
+    if unexpected_layers:
+        errors.append(f"unexpected layer indexes: {unexpected_layers[:8]}")
+    if errors:
+        preview = "; ".join(errors[:8])
+        suffix = "" if len(errors) <= 8 else f"; and {len(errors) - 8} more"
+        raise RuntimeError(
+            "Layer download verification failed for "
+            f"run_id={context.run_id} node_id={context.node_id}: "
+            f"{preview}{suffix}"
+        )
+
+    log(
+        INFO,
+        "[Layer download] verified run_id=%s node_id=%s layers=%s chunks=%s "
+        "tensor_data=%.2f GB serialized_files=%.2f GB",
+        context.run_id,
+        context.node_id,
+        len(layer_names),
+        total_chunks,
+        total_tensor_bytes / (1024**3),
+        total_file_bytes / (1024**3),
+    )
+
+
 def _restore_layer_state_from_names(
     context: Context,
     layer_names: list[str],
     *,
     require_all: bool,
+    validate_download: bool = False,
 ) -> None:
     """Restore layer-wise context state from deterministic layer file paths."""
     if not layer_names:
@@ -118,6 +298,8 @@ def _restore_layer_state_from_names(
             f"or empty: {preview}{suffix}. The operation was stopped before "
             "incomplete weights could be used."
         )
+    if require_all and validate_download:
+        _validate_downloaded_layers(context, layer_names)
     existing_pairs = [
         (layer_name, layer_path)
         for layer_name, layer_path in zip(layer_names, layer_paths, strict=True)
@@ -160,6 +342,15 @@ def _cleanup_layer_files_for_context(
     _flush_comms_caches_for_context(context)
     cleanup_layer_paths(layer_paths)
     node_layer_dir = layer_dir(context)
+    receipt_dir = _download_receipt_dir(context)
+    if os.path.isdir(receipt_dir):
+        for file_name in os.listdir(receipt_dir):
+            os.remove(os.path.join(receipt_dir, file_name))
+        os.rmdir(receipt_dir)
+    node_files = os.listdir(node_layer_dir) if os.path.isdir(node_layer_dir) else []
+    for file_name in node_files:
+        if file_name.endswith(".download.lock"):
+            os.remove(os.path.join(node_layer_dir, file_name))
     layer_base_dir = os.path.dirname(os.path.dirname(node_layer_dir))
     remove_empty_dirs_up_to(node_layer_dir, layer_base_dir)
     context.state.pop(STATE_LAYER_NAMES, None)
@@ -181,15 +372,32 @@ def _persist_layer_files(
         else []
     )
     cleanup_layer_paths(previous_layer_paths)
+    receipt_dir = _download_receipt_dir(context)
+    if os.path.isdir(receipt_dir):
+        for receipt_name in os.listdir(receipt_dir):
+            os.remove(os.path.join(receipt_dir, receipt_name))
     serialized_layer_paths: list[str] = []
-    for layer_name in layer_names:
+    for layer_idx, layer_name in enumerate(layer_names):
         if layer_name not in state_dict:
             continue
+        tensor = state_dict[layer_name].detach().cpu()
         file_name = f"{sanitize_layer_name(layer_name)}.pt"
         file_path = os.path.join(write_dir, file_name)
         serialized_layer_paths.append(file_path)
         with open(file_path, "wb") as file:
-            pickle.dump({layer_name: state_dict[layer_name]}, file)
+            pickle.dump({layer_name: tensor}, file)
+        _record_download_receipt(
+            context,
+            layer_idx=layer_idx,
+            layer_name=layer_name,
+            layer_shape=list(tensor.shape),
+            dtype=str(tensor.dtype),
+            chunk_idx=0,
+            chunk_count=1,
+            start=0,
+            end=int(tensor.shape[0]) if tensor.ndim else 0,
+            nbytes=tensor.numel() * tensor.element_size(),
+        )
 
     context.state[STATE_LAYER_NAMES] = ConfigRecord({"names": layer_names})
     context.state[STATE_LAYER_PATHS] = ConfigRecord({"paths": serialized_layer_paths})
@@ -418,7 +626,7 @@ def train_download(msg: Message, context: Context):
 
     config = msg.content["config"]
     arrays = msg.content["arrays"]
-    entries: list[tuple[int | None, str, list[int], int, int, bool]] = []
+    entries: list[tuple[int, str, list[int], str, int, int, int, int, int, bool]] = []
     if "download_layer_names" in config:
         layer_idxs = (
             [int(v) for v in list(config["download_layer_idxs"])]
@@ -429,23 +637,40 @@ def train_download(msg: Message, context: Context):
         layer_shapes = [str(v) for v in list(config["download_layer_shapes"])]
         chunk_starts = [int(v) for v in list(config["download_chunk_starts"])]
         chunk_ends = [int(v) for v in list(config["download_chunk_ends"])]
+        chunk_idxs = [int(v) for v in list(config["download_chunk_idxs"])]
+        chunk_counts = [int(v) for v in list(config["download_chunk_counts"])]
+        chunk_nbytes = [int(v) for v in list(config["download_chunk_nbytes"])]
+        layer_dtypes = [str(v) for v in list(config["download_layer_dtypes"])]
         is_last_values = list(config["download_is_last_chunk"])
-        range_count = min(
+        lengths = {
             len(layer_idxs),
             len(layer_names),
             len(layer_shapes),
+            len(layer_dtypes),
             len(chunk_starts),
             len(chunk_ends),
+            len(chunk_idxs),
+            len(chunk_counts),
+            len(chunk_nbytes),
             len(is_last_values),
-        )
+        }
+        if len(lengths) != 1:
+            raise ValueError(
+                f"Layer download metadata lengths do not match: {sorted(lengths)}"
+            )
+        range_count = len(layer_names)
         for idx in range(range_count):
             entries.append(
                 (
                     layer_idxs[idx],
                     layer_names[idx],
                     shape_from_text(layer_shapes[idx]),
+                    layer_dtypes[idx],
                     chunk_starts[idx],
                     chunk_ends[idx],
+                    chunk_idxs[idx],
+                    chunk_counts[idx],
+                    chunk_nbytes[idx],
                     bool(is_last_values[idx]),
                 )
             )
@@ -454,9 +679,20 @@ def train_download(msg: Message, context: Context):
         if layer_name:
             layer_shape = [int(x) for x in list(config.get("layer_shape", []))]
             chunk_ranges = parse_chunk_ranges(config)
-            for start, end in chunk_ranges:
+            for chunk_idx, (start, end) in enumerate(chunk_ranges):
                 entries.append(
-                    (None, layer_name, layer_shape, start, end, is_last_batch(config))
+                    (
+                        int(config.get("layer_idx", 0)),
+                        layer_name,
+                        layer_shape,
+                        str(config.get("layer_dtype", "")),
+                        start,
+                        end,
+                        chunk_idx,
+                        len(chunk_ranges),
+                        int(config.get("chunk_nbytes", 0)),
+                        is_last_batch(config),
+                    )
                 )
 
     if not entries:
@@ -466,25 +702,64 @@ def train_download(msg: Message, context: Context):
         )
 
     layer_base_dir = layer_dir(context)
-    touched_layers: list[tuple[int | None, str, str]] = []
+    touched_layers: list[tuple[int, str, str]] = []
     touched_layer_paths_seen: set[str] = set()
 
-    for layer_idx, layer_name, layer_shape, start, end, is_last_chunk in entries:
+    received_bytes = 0
+    for (
+        layer_idx,
+        layer_name,
+        layer_shape,
+        expected_dtype,
+        start,
+        end,
+        chunk_idx,
+        chunk_count,
+        expected_nbytes,
+        _is_last_chunk,
+    ) in entries:
         chunk_name = chunk_key(layer_name, start, end)
         array = arrays.pop(chunk_name, None)
         if array is None:
             array = arrays.pop(layer_name, None)
         if array is None:
-            continue
+            raise ValueError(
+                f"Layer download payload is missing advertised array '{chunk_name}'"
+            )
         incoming = torch.from_numpy(array.numpy())
         del array
         incoming = incoming.detach().cpu()
 
+        actual_dtype = str(incoming.dtype)
+        actual_nbytes = incoming.numel() * incoming.element_size()
+        expected_chunk_shape = (
+            list(layer_shape)
+            if incoming.ndim == 0 or not layer_shape
+            else [end - start, *layer_shape[1:]]
+        )
+        if list(incoming.shape) != expected_chunk_shape:
+            raise ValueError(
+                f"Layer chunk '{chunk_name}' has shape {list(incoming.shape)}, "
+                f"expected {expected_chunk_shape}"
+            )
+        if expected_dtype and actual_dtype != expected_dtype:
+            raise ValueError(
+                f"Layer chunk '{chunk_name}' has dtype {actual_dtype}, "
+                f"expected {expected_dtype}"
+            )
+        if expected_nbytes and actual_nbytes != expected_nbytes:
+            raise ValueError(
+                f"Layer chunk '{chunk_name}' contains {actual_nbytes} bytes, "
+                f"expected {expected_nbytes}"
+            )
+
         file_name = f"{sanitize_layer_name(layer_name)}.pt"
         file_path = os.path.join(layer_base_dir, file_name)
         cache_key = context_layer_key(context, layer_name)
-        cached = _DOWNLOAD_LAYER_CACHE.get(cache_key)
-        if cached is None:
+        with _layer_download_lock(file_path):
+            # Reload under the filesystem lock. Pipelined batches can execute in
+            # separate ClientApp processes, so a process-local cache alone is
+            # insufficient for split layers.
             loaded = load_layer_from_disk(file_path, layer_name)
             if loaded is None:
                 if getattr(incoming, "ndim", 0) == 0 or not layer_shape:
@@ -500,23 +775,31 @@ def train_download(msg: Message, context: Context):
                 tensor=loaded,
             )
             _DOWNLOAD_LAYER_CACHE[cache_key] = cached
-
-        if (
-            getattr(cached.tensor, "ndim", 0) == 0
-            or getattr(incoming, "ndim", 0) == 0
-            or end <= start
-        ):
-            cached.tensor = incoming.clone()
-        else:
-            cached.tensor[start:end] = incoming
-        cached.dirty = True
-
-        # Persist every chunk because deployment can execute each download
-        # message in a fresh ClientApp process. Keeping partial chunks only in
-        # the process-local cache can corrupt split layers.
-        flush_cached_layer(_DOWNLOAD_LAYER_CACHE, cache_key)
-        if is_last_chunk:
+            if (
+                getattr(cached.tensor, "ndim", 0) == 0
+                or getattr(incoming, "ndim", 0) == 0
+                or end <= start
+            ):
+                cached.tensor = incoming.clone()
+            else:
+                cached.tensor[start:end] = incoming
+            cached.dirty = True
+            flush_cached_layer(_DOWNLOAD_LAYER_CACHE, cache_key)
             _DOWNLOAD_LAYER_CACHE.pop(cache_key, None)
+
+        _record_download_receipt(
+            context,
+            layer_idx=layer_idx,
+            layer_name=layer_name,
+            layer_shape=layer_shape,
+            dtype=actual_dtype,
+            chunk_idx=chunk_idx,
+            chunk_count=chunk_count,
+            start=start,
+            end=end,
+            nbytes=actual_nbytes,
+        )
+        received_bytes += actual_nbytes
 
         if file_path not in touched_layer_paths_seen:
             touched_layer_paths_seen.add(file_path)
@@ -532,13 +815,6 @@ def train_download(msg: Message, context: Context):
         layer_names = list(context.state[STATE_LAYER_NAMES]["names"])
 
     for layer_idx, layer_name, file_path in touched_layers:
-        if layer_idx is None:
-            if file_path not in layer_paths:
-                layer_paths.append(file_path)
-            if layer_name not in layer_names:
-                layer_names.append(layer_name)
-            continue
-
         while len(layer_paths) <= layer_idx:
             layer_paths.append("")
         while len(layer_names) <= layer_idx:
@@ -548,6 +824,17 @@ def train_download(msg: Message, context: Context):
 
     context.state[STATE_LAYER_PATHS] = ConfigRecord({"paths": layer_paths})
     context.state[STATE_LAYER_NAMES] = ConfigRecord({"names": layer_names})
+
+    batch_idx = int(config.get("download_batch_idx", 0))
+    batch_count = int(config.get("download_batch_count", 1))
+    log(
+        INFO,
+        "[Layer download] client persisted batch %s/%s: chunks=%s data=%.2f MB",
+        batch_idx + 1,
+        batch_count,
+        len(entries),
+        received_bytes / (1024**2),
+    )
 
     t1 = perf_counter()
     metrics = MetricRecord({"profile.client.train_download.ms": (t1 - t0) * 1000.0})
@@ -583,6 +870,7 @@ def train(msg: Message, context: Context):
             context,
             [str(layer_name) for layer_name in list(config["layer_names"])],
             require_all=True,
+            validate_download=True,
         )
 
     # If layerwise model was streamed from server already, skip full model load.
@@ -724,6 +1012,11 @@ def train(msg: Message, context: Context):
     if layerwise_dcp:
         layer_paths = list(context.state[STATE_LAYER_PATHS]["paths"])
         input_fingerprint = state_dict_fingerprint_from_layer_paths(layer_paths)
+        log(
+            INFO,
+            "[Layer download] verified input fingerprint before TorchTitan: %.12g",
+            input_fingerprint,
+        )
 
         server_round = None
         if "server-round" in config:

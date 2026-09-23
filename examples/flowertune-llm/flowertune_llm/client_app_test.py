@@ -27,6 +27,7 @@ sys.modules.setdefault("omegaconf", omegaconf_stub)
 
 transformers_stub = types.ModuleType("transformers")
 transformers_stub.AutoModelForCausalLM = object()
+transformers_stub.AutoTokenizer = types.SimpleNamespace(from_pretrained=None)
 transformers_stub.BitsAndBytesConfig = object()
 sys.modules.setdefault("transformers", transformers_stub)
 
@@ -37,6 +38,7 @@ from flowertune_llm.client_app import (  # noqa: E402
     STATE_LAYER_PATHS,
     STATE_NUM_EXAMPLES,
     _persist_layer_files,
+    _validate_downloaded_layers,
     train,
     train_download,
     train_comms,
@@ -119,8 +121,12 @@ def test_train_download_persists_split_chunks_across_processes(tmp_path) -> None
                         "download_layer_idxs": [0],
                         "download_layer_names": ["layer.big"],
                         "download_layer_shapes": ["4"],
+                        "download_layer_dtypes": ["torch.float32"],
                         "download_chunk_starts": [2],
                         "download_chunk_ends": [4],
+                        "download_chunk_idxs": [1],
+                        "download_chunk_counts": [2],
+                        "download_chunk_nbytes": [8],
                         "download_is_last_chunk": [True],
                     }
                 ),
@@ -143,8 +149,12 @@ def test_train_download_persists_split_chunks_across_processes(tmp_path) -> None
                         "download_layer_idxs": [0],
                         "download_layer_names": ["layer.big"],
                         "download_layer_shapes": ["4"],
+                        "download_layer_dtypes": ["torch.float32"],
                         "download_chunk_starts": [0],
                         "download_chunk_ends": [2],
+                        "download_chunk_idxs": [0],
+                        "download_chunk_counts": [2],
+                        "download_chunk_nbytes": [8],
                         "download_is_last_chunk": [False],
                     }
                 ),
@@ -158,6 +168,84 @@ def test_train_download_persists_split_chunks_across_processes(tmp_path) -> None
     layer_path = context.state[STATE_LAYER_PATHS]["paths"][0]
     layer = load_layer_from_disk(layer_path, "layer.big")
     assert torch.equal(layer, torch.tensor([1.0, 2.0, 3.0, 4.0]))
+    _validate_downloaded_layers(context, ["layer.big"])
+
+
+def test_train_download_rejects_missing_advertised_array(tmp_path) -> None:
+    """A batch must not be acknowledged when its advertised chunk is absent."""
+    context = Context(
+        run_id=322,
+        node_id=655,
+        node_config={},
+        state=RecordDict(),
+        run_config={"aggregation.layer-write-dir": str(tmp_path)},
+    )
+    message = Message(
+        content=RecordDict(
+            {
+                "arrays": ArrayRecord(),
+                "config": ConfigRecord(
+                    {
+                        "download_layer_idxs": [0],
+                        "download_layer_names": ["layer.big"],
+                        "download_layer_shapes": ["4"],
+                        "download_layer_dtypes": ["torch.float32"],
+                        "download_chunk_starts": [0],
+                        "download_chunk_ends": [2],
+                        "download_chunk_idxs": [0],
+                        "download_chunk_counts": [2],
+                        "download_chunk_nbytes": [8],
+                        "download_is_last_chunk": [False],
+                    }
+                ),
+            }
+        ),
+        dst_node_id=1,
+        message_type="train.layer_wise_download",
+    )
+
+    with pytest.raises(ValueError, match="missing advertised array"):
+        train_download(message, context)
+
+
+def test_layer_verification_rejects_missing_chunk_receipt(tmp_path) -> None:
+    """A present layer file is insufficient when not all chunks were received."""
+    context = Context(
+        run_id=323,
+        node_id=656,
+        node_config={},
+        state=RecordDict(),
+        run_config={"aggregation.layer-write-dir": str(tmp_path)},
+    )
+    message = Message(
+        content=RecordDict(
+            {
+                "arrays": ArrayRecord(
+                    {"layer.big::chunk_0_2": torch.tensor([1.0, 2.0])}
+                ),
+                "config": ConfigRecord(
+                    {
+                        "download_layer_idxs": [0],
+                        "download_layer_names": ["layer.big"],
+                        "download_layer_shapes": ["4"],
+                        "download_layer_dtypes": ["torch.float32"],
+                        "download_chunk_starts": [0],
+                        "download_chunk_ends": [2],
+                        "download_chunk_idxs": [0],
+                        "download_chunk_counts": [2],
+                        "download_chunk_nbytes": [8],
+                        "download_is_last_chunk": [False],
+                    }
+                ),
+            }
+        ),
+        dst_node_id=1,
+        message_type="train.layer_wise_download",
+    )
+    train_download(message, context)
+
+    with pytest.raises(RuntimeError, match=r"missing chunk indexes \[1\]"):
+        _validate_downloaded_layers(context, ["layer.big"])
 
 
 def test_layerwise_torchtitan_dcp_does_not_load_hf_model(tmp_path, monkeypatch) -> None:

@@ -908,12 +908,73 @@ def _save_state_dict_as_dcp(
     """Save state_dict in DCP format, preferring TorchTitan adapter when available."""
     from torch.distributed import checkpoint as dcp
 
+    if os.path.isdir(output_dir) and os.listdir(output_dir):
+        raise RuntimeError(
+            f"DCP output directory must be empty before conversion: {output_dir}"
+        )
     os.makedirs(output_dir, exist_ok=True)
-    writer = dcp.filesystem.FileSystemWriter(output_dir, thread_count=dcp_threads)
+
+    def save_with_diagnostics(converted_state: dict[str, Any]) -> None:
+        tensors: list[torch.Tensor] = []
+
+        def collect_tensors(value: Any) -> None:
+            if torch.is_tensor(value):
+                tensors.append(value)
+            elif isinstance(value, dict):
+                for nested in value.values():
+                    collect_tensors(nested)
+
+        collect_tensors(converted_state)
+        tensor_bytes = sum(tensor.numel() * tensor.element_size() for tensor in tensors)
+        usage = shutil.disk_usage(output_dir)
+        real_output_dir = os.path.realpath(output_dir)
+        log(
+            INFO,
+            "[DCP conversion] writing checkpoint: output=%s real_output=%s "
+            "torch=%s threads=%s tensors=%s tensor_data=%.2f GB "
+            "filesystem_free=%.2f GB",
+            output_dir,
+            real_output_dir,
+            torch.__version__,
+            dcp_threads,
+            len(tensors),
+            tensor_bytes / (1024**3),
+            usage.free / (1024**3),
+        )
+        writer = dcp.filesystem.FileSystemWriter(output_dir, thread_count=dcp_threads)
+        started = time.monotonic()
+        try:
+            dcp.save(converted_state, storage_writer=writer)
+        except Exception as exc:
+            usage_after = shutil.disk_usage(output_dir)
+            written_files = []
+            written_bytes = 0
+            for file_name in os.listdir(output_dir):
+                file_path = os.path.join(output_dir, file_name)
+                if os.path.isfile(file_path):
+                    written_files.append(file_name)
+                    written_bytes += os.path.getsize(file_path)
+            raise RuntimeError(
+                "DCP checkpoint write failed after "
+                f"{time.monotonic() - started:.2f}s: output={output_dir}, "
+                f"real_output={real_output_dir}, torch={torch.__version__}, "
+                f"threads={dcp_threads}, tensors={len(tensors)}, "
+                f"tensor_data={tensor_bytes / (1024**3):.2f} GB, "
+                f"partial_files={len(written_files)}, "
+                f"partial_data={written_bytes / (1024**3):.2f} GB, "
+                f"filesystem_free={usage_after.free / (1024**3):.2f} GB."
+            ) from exc
+        log(
+            INFO,
+            "[DCP conversion] checkpoint complete: files=%s elapsed=%.2fs",
+            len(os.listdir(output_dir)),
+            time.monotonic() - started,
+        )
+
     try:
         import torchtitan.protocols.train_spec as train_spec_module
     except Exception:
-        dcp.save(state_dict, storage_writer=writer)
+        save_with_diagnostics(state_dict)
         return
 
     train_spec = train_spec_module.get_train_spec(train_spec_name)
@@ -931,7 +992,7 @@ def _save_state_dict_as_dcp(
             f"Incoming state_dict shape: {state_text}. "
             f"TorchTitan model args shape: {args_text}."
         ) from exc
-    dcp.save(titan_state_dict, storage_writer=writer)
+    save_with_diagnostics(titan_state_dict)
 
 
 def _load_state_dict_from_dcp(
