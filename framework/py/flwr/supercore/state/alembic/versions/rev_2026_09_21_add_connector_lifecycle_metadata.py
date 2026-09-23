@@ -15,7 +15,7 @@
 """Add connector lifecycle metadata.
 
 Revision ID: f670d1ed8681
-Revises: 6ea9c44bb683
+Revises: dfdbe2a8f936
 Create Date: 2026-09-21 09:09:03.187252
 """
 from collections.abc import Sequence
@@ -29,7 +29,7 @@ from flwr.supercore.state.schema.types import UTCDateTime
 
 # revision identifiers, used by Alembic.
 revision: str = "f670d1ed8681"
-down_revision: str | Sequence[str] | None = "6ea9c44bb683"
+down_revision: str | Sequence[str] | None = "dfdbe2a8f936"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
