@@ -19,6 +19,12 @@ from __future__ import annotations
 import os
 import stat
 
+from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
+from flwr.supercore.task_process.usage import (
+    FILESYSTEM_LIST_DIRECTORY_USAGE_TYPE,
+    FILESYSTEM_READ_FILE_USAGE_TYPE,
+    TaskUsageRecorder,
+)
 from flwr.supercore.typing import JSONObject, JSONValue
 
 from ..http import ConnectorApiError
@@ -102,7 +108,7 @@ def invoke_filesystem(name: str, arguments: JSONValue) -> JSONObject:
     try:
         if not _PLATFORM_SUPPORTED:
             raise FilesystemApiError("unsupported_platform")
-        if not isinstance(arguments, dict):
+        if not isinstance(arguments, dict) or set(arguments) != {"path"}:
             raise FilesystemApiError("invalid_request")
         path = arguments.get("path")
         if not isinstance(path, str):
@@ -117,6 +123,32 @@ def invoke_filesystem(name: str, arguments: JSONValue) -> JSONObject:
         if ex.message is not None:
             error["message"] = ex.message
         return {"error": error}
+
+
+def list_directory(
+    path: str | None = None,
+    *,
+    usage_recorder: TaskUsageRecorder,
+    **extra: JSONValue,
+) -> JSONObject:
+    """List a directory through the built-in connector interface."""
+    output = invoke_filesystem(
+        FILESYSTEM_LIST_DIRECTORY_TOOL_NAME, {"path": path, **extra}
+    )
+    usage_recorder.record(TaskUsage(usage_type=FILESYSTEM_LIST_DIRECTORY_USAGE_TYPE))
+    return output
+
+
+def read_file(
+    path: str | None = None,
+    *,
+    usage_recorder: TaskUsageRecorder,
+    **extra: JSONValue,
+) -> JSONObject:
+    """Read a file through the built-in connector interface."""
+    output = invoke_filesystem(FILESYSTEM_READ_FILE_TOOL_NAME, {"path": path, **extra})
+    usage_recorder.record(TaskUsage(usage_type=FILESYSTEM_READ_FILE_USAGE_TYPE))
+    return output
 
 
 def _list_directory(path: str, allowed: list[str]) -> JSONObject:

@@ -21,7 +21,9 @@ from .filesystem import (
     FILESYSTEM_READ_FILE_TOOL_NAME,
     FilesystemApiError,
     invoke_filesystem,
+    list_directory,
     make_filesystem_tools,
+    read_file,
 )
 
 __all__ = [
@@ -31,5 +33,7 @@ __all__ = [
     "FILESYSTEM_READ_FILE_TOOL_NAME",
     "FilesystemApiError",
     "invoke_filesystem",
+    "list_directory",
     "make_filesystem_tools",
+    "read_file",
 ]
