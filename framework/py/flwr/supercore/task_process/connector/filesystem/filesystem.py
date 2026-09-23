@@ -48,12 +48,15 @@ class FilesystemApiError(ConnectorApiError):
     provider = "Filesystem"
 
 
-def make_filesystem_tools() -> list[JSONObject]:
-    """Return the filesystem function tool schemas."""
+def make_filesystem_tools() -> tuple[JSONObject, ...]:
+    """Return tool schemas, or no tools when filesystem access is unavailable."""
     if not _PLATFORM_SUPPORTED or not os.getenv(FILESYSTEM_ALLOWED_DIRS_ENV):
-        return []
-    allowed_dirs = ", ".join(_allowed_dirs())
-    return [
+        return ()
+    try:
+        allowed_dirs = ", ".join(_allowed_dirs())
+    except FilesystemApiError:
+        return ()
+    return (
         {
             "type": "function",
             "name": FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
@@ -100,7 +103,7 @@ def make_filesystem_tools() -> list[JSONObject]:
                 "additionalProperties": False,
             },
         },
-    ]
+    )
 
 
 def invoke_filesystem(name: str, arguments: JSONValue) -> JSONObject:

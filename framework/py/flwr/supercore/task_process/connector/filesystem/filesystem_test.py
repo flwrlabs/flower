@@ -15,6 +15,8 @@
 """Tests for the filesystem connector."""
 
 import os
+import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -78,6 +80,37 @@ def test_tool_schema_is_empty_without_config(
     monkeypatch.delenv(FILESYSTEM_ALLOWED_DIRS_ENV, raising=False)
 
     assert not make_filesystem_tools()
+
+
+@pytest.mark.parametrize("root", ["relative", "missing", "file"])
+def test_invalid_config_hides_tools_without_allowing_execution(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, root: str
+) -> None:
+    """Invalid roots should hide tools while execution still rejects the config."""
+    (tmp_path / "file").write_text("not a directory", encoding="utf-8")
+    monkeypatch.setenv(
+        FILESYSTEM_ALLOWED_DIRS_ENV,
+        "relative" if root == "relative" else str(tmp_path / root),
+    )
+
+    assert not make_filesystem_tools()
+    assert _list(tmp_path) == {"error": {"code": "invalid_config"}}
+
+
+def test_invalid_config_does_not_prevent_runtime_import() -> None:
+    """Invalid optional filesystem settings must not prevent service imports."""
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import flwr.supercore.servicer.runtime.runtime_handlers\n"
+            "from flwr.supercore.task_process.connector.filesystem import CONNECTOR\n"
+            "assert CONNECTOR.tools == ()\n",
+        ],
+        env={**os.environ, FILESYSTEM_ALLOWED_DIRS_ENV: "relative"},
+        check=True,
+        timeout=30,
+    )
 
 
 def test_reads_file_and_lists_directory(
