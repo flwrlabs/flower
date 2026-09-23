@@ -14,20 +14,41 @@
 # ==============================================================================
 """Tests for the AgentApp process environment."""
 
+# pylint: disable=protected-access
+
+import importlib
 import os
+import signal
+import threading
+from queue import Queue
 from unittest.mock import Mock
 
 import pytest
 
 from flwr.app import ConfigRecord, Message, RecordDict
+from flwr.common.constant import SubStatus
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
     SYSTEM_MESSAGE_TYPE,
 )
+from flwr.supercore.exit import ExitCode
 from flwr.supercore.task_identity import TaskIdentity
+from flwr.supercore.telemetry import EventType
 
-from .run_agentapp import _set_runtime_environment, message_to_prompt, pull_prompt
+from .run_agentapp import (
+    _AgentAppTaskLifecycle,
+    _ignore_graceful_signals,
+    _run_agentapp_task,
+    _set_runtime_environment,
+    message_to_prompt,
+    pull_prompt,
+    run_agentapp,
+)
+
+run_agentapp_module = importlib.import_module(
+    "flwr.supercore.task_process.agent.run_agentapp"
+)
 
 
 @pytest.fixture(autouse=True)
@@ -131,3 +152,162 @@ def test_pull_prompt_rejects_multiple_instructions() -> None:
 
     with pytest.raises(RuntimeError, match="exactly one"):
         pull_prompt(grid)
+
+
+def test_run_agentapp_task_constructs_lifecycle_with_keywords(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Construct and run the lifecycle after installing its signal handler."""
+    lifecycle = Mock()
+    lifecycle.run.return_value = ExitCode.SUCCESS
+    lifecycle_cls = Mock(return_value=lifecycle)
+    register_signal_handlers = Mock()
+    monkeypatch.setattr(run_agentapp_module, "_AgentAppTaskLifecycle", lifecycle_cls)
+    monkeypatch.setattr(
+        run_agentapp_module, "register_signal_handlers", register_signal_handlers
+    )
+    log_queue: Queue[str | None] = Queue()
+
+    assert _run_agentapp_task(
+        "runtime.example:9092",
+        log_queue,
+        "task-token",
+        False,
+        b"root-certificates",
+        "/runtime-ca.pem",
+        True,
+    ) == (lifecycle, ExitCode.SUCCESS)
+
+    lifecycle_cls.assert_called_once_with(
+        runtime_api_address="runtime.example:9092",
+        log_queue=log_queue,
+        token="task-token",
+        insecure=False,
+        certificates=b"root-certificates",
+        certificates_path="/runtime-ca.pem",
+        runtime_dependency_install=True,
+    )
+    register_signal_handlers.assert_called_once_with(
+        event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
+        exit_message="Task stopped by user.",
+        exit_handlers=[lifecycle.finalize],
+    )
+
+
+def test_agentapp_lifecycle_finalizes_once_across_threads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Concurrent cleanup should report and release task state only once."""
+    client = Mock()
+    client.PushTaskOutput.side_effect = RuntimeError("Runtime unavailable")
+    retry_invoker = Mock(max_tries=10)
+    grid = Mock(_runtime_client=client, _retry_invoker=retry_invoker)
+    heartbeat = Mock(is_running=True)
+    cleanup_runtime = Mock()
+    monkeypatch.setattr(run_agentapp_module, "HttpGrid", Mock(return_value=grid))
+    monkeypatch.setattr(
+        run_agentapp_module, "cleanup_app_runtime_environment", cleanup_runtime
+    )
+    lifecycle = _AgentAppTaskLifecycle(
+        runtime_api_address="runtime.example:9092",
+        log_queue=Queue(),
+        token="task-token",
+        insecure=False,
+        certificates=b"root-certificates",
+        certificates_path="/runtime-ca.pem",
+        runtime_dependency_install=False,
+    )
+    lifecycle._heartbeat_sender = heartbeat
+
+    threads = [threading.Thread(target=lifecycle.finalize) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=1.0)
+        assert not thread.is_alive()
+
+    client.PushTaskOutput.assert_called_once()
+    output = client.PushTaskOutput.call_args.args[0]
+    assert (output.sub_status, output.details) == (
+        SubStatus.FAILED,
+        "Task failed with unknown error.",
+    )
+    heartbeat.stop.assert_called_once_with()
+    grid.close.assert_called_once_with()
+    cleanup_runtime.assert_called_once_with(None)
+    assert retry_invoker.max_tries == 1
+
+
+def test_finalization_ignores_graceful_signals_process_wide(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Finalization should restore the process-wide graceful signal handlers."""
+    previous_handlers = {
+        sig: object() for sig in run_agentapp_module.SIGNAL_TO_EXIT_CODE
+    }
+    handlers = previous_handlers.copy()
+
+    def register(sig: int, handler: object) -> object:
+        previous = handlers[sig]
+        handlers[sig] = handler
+        return previous
+
+    monkeypatch.setattr(signal, "signal", register)
+
+    with _ignore_graceful_signals():
+        assert all(handler == signal.SIG_IGN for handler in handlers.values())
+
+    assert handlers == previous_handlers
+
+
+def test_run_agentapp_keeps_cold_process_behavior(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The cold entry point should keep validation, monitoring, and Flower exit."""
+    lifecycle = Mock()
+    lifecycle.event_details.return_value = {
+        "run-id-hash": "run-hash",
+        "success": False,
+    }
+    run_task = Mock(return_value=(lifecycle, ExitCode.TASK_PROC_EXCEPTION))
+    parent_monitor = Mock()
+    validate_certificates = Mock(return_value=b"root-certificates")
+    flwr_exit = Mock()
+    monkeypatch.setattr(run_agentapp_module, "_run_agentapp_task", run_task)
+    monkeypatch.setattr(
+        run_agentapp_module, "start_parent_process_monitor", parent_monitor
+    )
+    monkeypatch.setattr(
+        run_agentapp_module,
+        "validate_and_resolve_root_certificates",
+        validate_certificates,
+    )
+    monkeypatch.setattr(run_agentapp_module, "flwr_exit", flwr_exit)
+    log_queue: Queue[str | None] = Queue()
+
+    run_agentapp(
+        "runtime.example:9092",
+        log_queue,
+        "task-token",
+        False,
+        certificates_path="/runtime-ca.pem",
+        parent_pid=123,
+        runtime_dependency_install=False,
+    )
+
+    parent_monitor.assert_called_once_with(123)
+    validate_certificates.assert_called_once_with("/runtime-ca.pem", False)
+    run_task.assert_called_once_with(
+        "runtime.example:9092",
+        log_queue,
+        "task-token",
+        False,
+        b"root-certificates",
+        "/runtime-ca.pem",
+        False,
+    )
+    flwr_exit.assert_called_once_with(
+        code=ExitCode.TASK_PROC_EXCEPTION,
+        event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
+        event_details={"run-id-hash": "run-hash", "success": False},
+    )
