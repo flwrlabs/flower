@@ -120,12 +120,21 @@ def test_handlers_record_usage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
 
 
 @pytest.mark.parametrize(
-    "name",
-    [FILESYSTEM_LIST_DIRECTORY_TOOL_NAME, FILESYSTEM_READ_FILE_TOOL_NAME],
+    ("name", "arguments"),
+    [
+        (FILESYSTEM_LIST_DIRECTORY_TOOL_NAME, {}),
+        (FILESYSTEM_READ_FILE_TOOL_NAME, {}),
+        (FILESYSTEM_LIST_DIRECTORY_TOOL_NAME, {"path": "/allowed", "extra": True}),
+        (FILESYSTEM_READ_FILE_TOOL_NAME, {"path": "/allowed", "extra": True}),
+    ],
 )
-def test_handler_missing_path_returns_structured_error(name: str) -> None:
-    """A missing path should remain a model-facing validation error."""
-    assert invoke_connector(name, {}, Mock()) == {"error": {"code": "invalid_request"}}
+def test_handler_invalid_arguments_return_structured_error(
+    name: str, arguments: JSONObject
+) -> None:
+    """Malformed arguments should remain a model-facing validation error."""
+    assert invoke_connector(name, arguments, Mock()) == {
+        "error": {"code": "invalid_request"}
+    }
 
 
 def test_read_missing_file_returns_error(

@@ -108,7 +108,7 @@ def invoke_filesystem(name: str, arguments: JSONValue) -> JSONObject:
     try:
         if not _PLATFORM_SUPPORTED:
             raise FilesystemApiError("unsupported_platform")
-        if not isinstance(arguments, dict):
+        if not isinstance(arguments, dict) or set(arguments) != {"path"}:
             raise FilesystemApiError("invalid_request")
         path = arguments.get("path")
         if not isinstance(path, str):
@@ -126,19 +126,27 @@ def invoke_filesystem(name: str, arguments: JSONValue) -> JSONObject:
 
 
 def list_directory(
-    path: str | None = None, *, usage_recorder: TaskUsageRecorder
+    path: str | None = None,
+    *,
+    usage_recorder: TaskUsageRecorder,
+    **extra: JSONValue,
 ) -> JSONObject:
     """List a directory through the built-in connector interface."""
-    output = invoke_filesystem(FILESYSTEM_LIST_DIRECTORY_TOOL_NAME, {"path": path})
+    output = invoke_filesystem(
+        FILESYSTEM_LIST_DIRECTORY_TOOL_NAME, {"path": path, **extra}
+    )
     usage_recorder.record(TaskUsage(usage_type=FILESYSTEM_LIST_DIRECTORY_USAGE_TYPE))
     return output
 
 
 def read_file(
-    path: str | None = None, *, usage_recorder: TaskUsageRecorder
+    path: str | None = None,
+    *,
+    usage_recorder: TaskUsageRecorder,
+    **extra: JSONValue,
 ) -> JSONObject:
     """Read a file through the built-in connector interface."""
-    output = invoke_filesystem(FILESYSTEM_READ_FILE_TOOL_NAME, {"path": path})
+    output = invoke_filesystem(FILESYSTEM_READ_FILE_TOOL_NAME, {"path": path, **extra})
     usage_recorder.record(TaskUsage(usage_type=FILESYSTEM_READ_FILE_USAGE_TYPE))
     return output
 
