@@ -52,8 +52,11 @@ def make_filesystem_tools() -> list[JSONObject]:
             "type": "function",
             "name": FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
             "description": (
-                "List a local directory's immediate entries, sorted by name. Returns "
-                "each entry's name and type: file, directory, or other."
+                "List all immediate entries in a local directory, sorted by name. "
+                "A successful response is the ground truth for that directory: an "
+                "absent name does not exist there. Do not invent entries or metadata, "
+                "and do not search elsewhere unless the user asks. Returns only each "
+                "entry's name and type: file, directory, or other."
             ),
             "parameters": {
                 "type": "object",
@@ -76,7 +79,10 @@ def make_filesystem_tools() -> list[JSONObject]:
             "name": FILESYSTEM_READ_FILE_TOOL_NAME,
             "description": (
                 "Read a local UTF-8 text file up to 1 MiB. Returns its content and "
-                "resolved absolute path."
+                "resolved absolute path. First list its parent directory and read only "
+                "a file present in that result. If it is absent or this tool returns "
+                "not_found, report that it does not exist; do not guess other paths "
+                "unless the user asks to search."
             ),
             "parameters": {
                 "type": "object",
@@ -99,16 +105,22 @@ def make_filesystem_tools() -> list[JSONObject]:
 
 def invoke_filesystem(name: str, arguments: JSONObject) -> JSONObject:
     """Invoke one filesystem tool."""
-    if not _PLATFORM_SUPPORTED:
-        raise FilesystemApiError("unsupported_platform")
-    path = arguments.get("path")
-    if not isinstance(path, str):
+    try:
+        if not _PLATFORM_SUPPORTED:
+            raise FilesystemApiError("unsupported_platform")
+        path = arguments.get("path")
+        if not isinstance(path, str):
+            raise FilesystemApiError("invalid_request")
+        if name == FILESYSTEM_LIST_DIRECTORY_TOOL_NAME:
+            return _list_directory(path, _allowed_dirs())
+        if name == FILESYSTEM_READ_FILE_TOOL_NAME:
+            return _read_file(path, _allowed_dirs())
         raise FilesystemApiError("invalid_request")
-    if name == FILESYSTEM_LIST_DIRECTORY_TOOL_NAME:
-        return _list_directory(path, _allowed_dirs())
-    if name == FILESYSTEM_READ_FILE_TOOL_NAME:
-        return _read_file(path, _allowed_dirs())
-    raise FilesystemApiError("invalid_request")
+    except FilesystemApiError as ex:
+        error: JSONObject = {"code": ex.code}
+        if ex.message is not None:
+            error["message"] = ex.message
+        return {"error": error}
 
 
 def _list_directory(path: str, allowed: list[str]) -> JSONObject:
@@ -174,6 +186,8 @@ def _open_sandboxed(path: str, allowed: list[str], flags: int) -> tuple[int, str
         # with a symlink before it is opened. Parent-directory rename races require
         # hostile filesystem control and are outside this connector's threat model.
         return os.open(resolved, flags | _O_NOFOLLOW), resolved
+    except FileNotFoundError:
+        raise FilesystemApiError("not_found", message="Path not found.") from None
     except OSError:
         raise FilesystemApiError("access_denied") from None
 
