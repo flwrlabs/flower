@@ -29,8 +29,6 @@ from queue import Queue
 from types import FrameType
 from typing import Any, cast
 
-import httpx
-
 from flwr.agentapp import AgentApp, LoadAgentAppError
 from flwr.app import Context, Message
 from flwr.app.exception import AppExitException
@@ -118,8 +116,23 @@ class PreloadedAgentApp:
     fab_hash: str
 
 
+def _load_agentapp_component(agent_app_attr: str, app_path: Path) -> AgentApp:
+    """Load and validate one AgentApp component."""
+    agent_app = load_app(agent_app_attr, LoadAgentAppError, str(app_path))
+    if not isinstance(agent_app, AgentApp):
+        raise LoadAgentAppError(
+            f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
+        ) from None
+    return agent_app
+
+
 def preload_agentapp(fab_path: Path, expected_fab_hash: str) -> PreloadedAgentApp:
-    """Verify, install, and import one deployment-configured AgentApp FAB."""
+    """Verify, install, and import one deployment-configured AgentApp FAB.
+
+    Dependencies must be deployment-provisioned, and app imports must not
+    require task-scoped Runtime values because authority is unavailable before
+    readiness.
+    """
     if not fab_path.is_absolute():
         raise ValueError("Preloaded AgentApp FAB path must be absolute.")
     if len(expected_fab_hash) != 64 or any(
@@ -145,11 +158,7 @@ def preload_agentapp(fab_path: Path, expected_fab_hash: str) -> PreloadedAgentAp
     config = get_project_config(app_path)
     fab_id, fab_version = get_metadata_from_config(config)
     agent_app_attr = config["tool"]["flwr"]["app"]["components"]["agentapp"]
-    agent_app = load_app(agent_app_attr, LoadAgentAppError, str(app_path))
-    if not isinstance(agent_app, AgentApp):
-        raise LoadAgentAppError(
-            f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
-        ) from None
+    agent_app = _load_agentapp_component(agent_app_attr, app_path)
     return PreloadedAgentApp(
         app=agent_app,
         app_path=app_path,
@@ -206,11 +215,15 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
         self._certificates_path = certificates_path
         self._runtime_dependency_install = runtime_dependency_install
         self._preloaded = preloaded
-        self._grid: HttpGrid | None = None
+        self._grid = HttpGrid(
+            runtime_api_address=self._runtime_api_address,
+            insecure=self._insecure,
+            root_certificates=self._certificates,
+            token=self._token,
+        )
         self._log_uploader: threading.Thread | None = None
         self._hash_run_id: str | None = None
-        self._sub_status = SubStatus.FAILED
-        self._details = "Task failed with unknown error."
+        self._outcome = (SubStatus.FAILED, "Task failed with unknown error.")
         self._heartbeat_sender: HeartbeatSender | None = None
         self._context: Context | None = None
         self._runtime_env_dir: Path | None = None
@@ -220,23 +233,10 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
         self._leave_event_started = False
         self._lock = threading.RLock()
 
-    def initialize(self) -> None:
-        """Create fresh task-scoped Runtime state if it is not initialized."""
-        if self._grid is not None:
-            return
-        self._grid = HttpGrid(
-            runtime_api_address=self._runtime_api_address,
-            insecure=self._insecure,
-            root_certificates=self._certificates,
-            token=self._token,
-        )
-
     def run(self) -> int:  # pylint: disable=too-many-locals,too-many-statements
         """Execute the AgentApp task and return its Flower exit code."""
         exit_code = ExitCode.SUCCESS
         try:
-            if self._grid is None:
-                raise RuntimeError("AgentApp Runtime client initialization failed.")
             grid = self._grid
 
             self._heartbeat_sender = HeartbeatSender(
@@ -294,7 +294,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 grid=RuntimeAgentGrid(grid, self._agent_events, self._context.node_id),
             )
 
-            agent_app, app_path = self._load_task_app(fab, run)
+            app_path, agent_app, agent_app_attr = self._prepare_task_app(fab, run)
             self._context.run_config = get_fused_config_from_dir(
                 app_path, run.override_config
             )
@@ -311,21 +311,25 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 self._certificates_path,
             )
 
+            if agent_app is None:
+                assert agent_app_attr is not None
+                agent_app = _load_agentapp_component(agent_app_attr, app_path)
             agent_app(agent=agent, context=self._context)
             self._agent_events.close()
 
             # Set sub_status and details for successful completion
             with self._lock:
-                self._sub_status = SubStatus.COMPLETED
-                self._details = ""
+                self._outcome = (SubStatus.COMPLETED, "")
                 self._task_finished = True
 
         except Exception as ex:  # pylint: disable=broad-exception-caught
             log(ERROR, "AgentApp raised an exception", exc_info=ex)
 
             with self._lock:
-                self._sub_status = SubStatus.FAILED
-                self._details = f"AgentApp failed with exception: {str(ex)}"
+                self._outcome = (
+                    SubStatus.FAILED,
+                    f"AgentApp failed with exception: {str(ex)}",
+                )
                 self._task_finished = True
 
             exit_code = ExitCode.TASK_PROC_EXCEPTION
@@ -338,8 +342,10 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
 
         return exit_code
 
-    def _load_task_app(self, fab: Any, run: Any) -> tuple[AgentApp, Path]:
-        """Return the exact preloaded app or prepare the cold task app."""
+    def _prepare_task_app(
+        self, fab: Any, run: Any
+    ) -> tuple[Path, AgentApp | None, str | None]:
+        """Return a preloaded app or prepare a cold app for task-time import."""
         if self._preloaded is not None:
             if (
                 fab.hash_str != self._preloaded.fab_hash
@@ -347,7 +353,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 or run.fab_version != self._preloaded.fab_version
             ):
                 raise RuntimeError("Task FAB does not match the preloaded AgentApp.")
-            return self._preloaded.app, self._preloaded.app_path
+            return self._preloaded.app_path, self._preloaded.app, None
 
         log(DEBUG, "[flwr-agentapp] Start FAB installation.")
         install_from_fab(fab.content, skip_prompt=True)
@@ -380,33 +386,23 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             agent_app_attr,
             app_path,
         )
-        agent_app = load_app(agent_app_attr, LoadAgentAppError, str(app_path))
-        if not isinstance(agent_app, AgentApp):
-            raise LoadAgentAppError(
-                f"Attribute '{agent_app_attr}' is not of type "
-                f"'{AgentApp.__name__}'.",
-            ) from None
-        return agent_app, app_path
+        return app_path, None, agent_app_attr
 
     def mark_interrupted(self) -> None:
         """Record a graceful interruption before final task output is pushed."""
         with self._lock:
             if self._finalized or self._task_finished:
                 return
-            self._sub_status = SubStatus.FAILED
-            self._details = "Task stopped by user."
+            self._outcome = (SubStatus.FAILED, "Task stopped by user.")
 
     def finalize(self) -> None:  # pylint: disable=protected-access
         """Push final status and release task state exactly once."""
-        with self._lock:
+        with _ignore_graceful_signals(), self._lock:
             if self._finalized:
                 return
             self._finalized = True
 
             log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
-            if self._grid is None:
-                return
-
             self._grid._retry_invoker.max_tries = 1
 
             if self._agent_events is not None:
@@ -415,32 +411,49 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 except Exception as err:  # pylint: disable=broad-exception-caught
                     log(ERROR, "Failed to close AgentApp event publisher", exc_info=err)
 
-            if self._log_uploader:
-                flush_logs(self._log_queue)
+            try:
+                if self._log_uploader:
+                    flush_logs(self._log_queue)
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to flush AgentApp task logs", exc_info=err)
 
+            sub_status, details = self._outcome
             pushoutput_req = PushTaskOutputRequest(
                 context=(context_to_proto(self._context) if self._context else None),
-                sub_status=self._sub_status,
-                details=self._details,
+                sub_status=sub_status,
+                details=details,
             )
             try:
                 self._grid._runtime_client.PushTaskOutput(pushoutput_req)
-            except httpx.HTTPError as err:
-                log(ERROR, "Failed to push task output: %s", str(err))
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to push AgentApp task output", exc_info=err)
 
-            if self._log_uploader:
-                stop_log_uploader(self._log_queue, self._log_uploader)
+            try:
+                if self._log_uploader:
+                    stop_log_uploader(self._log_queue, self._log_uploader)
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to stop AgentApp log uploader", exc_info=err)
 
-            if self._heartbeat_sender and self._heartbeat_sender.is_running:
-                self._heartbeat_sender.stop()
+            try:
+                if self._heartbeat_sender and self._heartbeat_sender.is_running:
+                    self._heartbeat_sender.stop()
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to stop AgentApp task heartbeat", exc_info=err)
 
-            self._grid.close()
+            try:
+                self._grid.close()
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to close AgentApp Runtime client", exc_info=err)
 
-            cleanup_app_runtime_environment(self._runtime_env_dir)
+            try:
+                cleanup_app_runtime_environment(self._runtime_env_dir)
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to clean up AgentApp runtime", exc_info=err)
 
     def event_details(self, exit_code: int) -> JSONObject:
         """Return the AgentApp leave-event details."""
         return {
+            "exit_code": exit_code,
             "run-id-hash": self._hash_run_id,
             "success": exit_code == ExitCode.SUCCESS,
         }
@@ -495,16 +508,15 @@ def _run_agentapp_task(  # pylint: disable=too-many-arguments,too-many-positiona
 ) -> tuple[_AgentAppTaskLifecycle, int]:
     """Create and execute one task through the AgentApp lifecycle."""
     lifecycle = _AgentAppTaskLifecycle(
-        runtime_api_address,
-        log_queue,
-        token,
-        insecure,
-        certificates,
-        certificates_path,
-        runtime_dependency_install,
-        preloaded,
+        runtime_api_address=runtime_api_address,
+        log_queue=log_queue,
+        token=token,
+        insecure=insecure,
+        certificates=certificates,
+        certificates_path=certificates_path,
+        runtime_dependency_install=runtime_dependency_install,
+        preloaded=preloaded,
     )
-    lifecycle.initialize()
     if resident:
         _register_resident_signal_handlers(lifecycle)
     else:

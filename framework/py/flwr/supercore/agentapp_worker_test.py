@@ -129,6 +129,23 @@ def test_agentapp_dispatch_includes_fab_hash(
     dispatch.assert_called_once_with(_payload(), socket_path, "AgentApp")
 
 
+def test_agentapp_dispatch_rejects_runtime_dependency_installation() -> None:
+    """Prestarted apps require deployment-provisioned dependencies."""
+    with pytest.raises(SystemExit):
+        agentapp_worker._parse_args().parse_args(  # pylint: disable=protected-access
+            [
+                "dispatch",
+                "--runtime-api-address",
+                "runtime.example:9092",
+                "--fab-hash",
+                FAB_HASH,
+                "--token",
+                "task-token",
+                "--allow-runtime-dependency-installation",
+            ]
+        )
+
+
 @pytest.mark.parametrize("fab_hash", ["", "short", "A" * 64, "z" * 64])
 def test_agentapp_invocation_requires_full_sha256(fab_hash: str) -> None:
     """Reject malformed or noncanonical FAB routing identities."""

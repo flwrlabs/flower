@@ -19,6 +19,8 @@
 import hashlib
 import importlib
 import os
+import signal
+import threading
 from pathlib import Path
 from queue import Queue
 from types import SimpleNamespace
@@ -29,22 +31,19 @@ import pytest
 from flwr.agentapp import AgentApp, LoadAgentAppError
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common.constant import SubStatus
-from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
     SYSTEM_MESSAGE_TYPE,
 )
 from flwr.supercore.exit import ExitCode
-from flwr.supercore.superexec.dependency_installer import (
-    RuntimeDependencyInstallationError,
-)
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType
 
 from .run_agentapp import (
     PreloadedAgentApp,
     _AgentAppTaskLifecycle,
+    _ignore_graceful_signals,
     _run_agentapp_task,
     _set_runtime_environment,
     message_to_prompt,
@@ -286,15 +285,16 @@ def test_preloaded_agentapp_requires_exact_task_identity(
         fab_version="1.0.0",
         fab_hash="a" * 64,
     )
+    monkeypatch.setattr(run_agentapp_module, "HttpGrid", Mock())
     lifecycle = _AgentAppTaskLifecycle(
-        "runtime.example:9092",
-        Queue(),
-        "task-token",
-        True,
-        None,
-        None,
-        False,
-        preloaded,
+        runtime_api_address="runtime.example:9092",
+        log_queue=Queue(),
+        token="task-token",
+        insecure=True,
+        certificates=None,
+        certificates_path=None,
+        runtime_dependency_install=False,
+        preloaded=preloaded,
     )
     fab = SimpleNamespace(content=b"task-fab", hash_str=preloaded.fab_hash)
     run = SimpleNamespace(
@@ -310,153 +310,37 @@ def test_preloaded_agentapp_requires_exact_task_identity(
         run_agentapp_module, "install_app_dependencies", install_dependencies
     )
 
-    assert lifecycle._load_task_app(fab, run) == (app, preloaded.app_path)
+    assert lifecycle._prepare_task_app(fab, run) == (
+        preloaded.app_path,
+        app,
+        None,
+    )
     if field == "fab_hash":
         fab.hash_str = value
     else:
         setattr(run, field, value)
     with pytest.raises(RuntimeError, match="does not match"):
-        lifecycle._load_task_app(fab, run)
+        lifecycle._prepare_task_app(fab, run)
     install.assert_not_called()
     load.assert_not_called()
     install_dependencies.assert_not_called()
 
 
-@pytest.mark.parametrize(
-    ("failure", "exit_code", "sub_status", "details"),
-    [
-        (None, ExitCode.SUCCESS, SubStatus.COMPLETED, ""),
-        (
-            RuntimeError("app failed"),
-            ExitCode.TASK_PROC_EXCEPTION,
-            SubStatus.FAILED,
-            "AgentApp failed with exception: app failed",
-        ),
-        (
-            ImportError("app missing"),
-            ExitCode.COMMON_APP_IMPORT_ERROR,
-            SubStatus.FAILED,
-            "AgentApp failed with exception: app missing",
-        ),
-        (
-            RuntimeDependencyInstallationError("dependencies failed"),
-            ExitCode.COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR,
-            SubStatus.FAILED,
-            "AgentApp failed with exception: dependencies failed",
-        ),
-    ],
-)
-def test_agentapp_lifecycle_runs_and_finalizes_once(  # pylint: disable=too-many-locals,too-many-statements
+def test_run_agentapp_task_constructs_lifecycle_with_keywords(
     monkeypatch: pytest.MonkeyPatch,
-    failure: Exception | None,
-    exit_code: int,
-    sub_status: SubStatus,
-    details: str,
 ) -> None:
-    """The extracted lifecycle should preserve task execution and cleanup."""
-    client = Mock()
-    client.PullTaskInput.return_value = SimpleNamespace(
-        context=object(),
-        run=object(),
-        fab=object(),
-        task_id=17,
-        federation_config=object(),
-    )
-    retry_invoker = Mock(max_tries=10)
-    grid = Mock(_runtime_client=client, _retry_invoker=retry_invoker)
-    heartbeat = Mock(is_running=True)
-    log_uploader = Mock()
-    agent_events = Mock()
-    context = SimpleNamespace(node_id=99, run_id=42, run_config=None)
-    run = SimpleNamespace(
-        run_id=42,
-        override_config={"setting": "value"},
-        federation_id="federation",
-        series_id=7,
-        fab_id="publisher/app",
-        fab_version="1.0.0",
-    )
-    fab = SimpleNamespace(content=b"fab", hash_str="fab-hash")
-    runtime_env_dir = Path("/runtime-env")
-    app_path = Path("/installed/app")
-    app_main = Mock(side_effect=failure)
-    app = AgentApp()
-    app.main()(app_main)
+    """Construct and run the lifecycle after installing its signal handler."""
+    lifecycle = Mock()
+    lifecycle.run.return_value = ExitCode.SUCCESS
+    lifecycle_cls = Mock(return_value=lifecycle)
     register_signal_handlers = Mock()
-
-    monkeypatch.setattr(run_agentapp_module, "HttpGrid", Mock(return_value=grid))
-    monkeypatch.setattr(
-        run_agentapp_module, "HeartbeatSender", Mock(return_value=heartbeat)
-    )
-    monkeypatch.setattr(
-        run_agentapp_module, "context_from_proto", Mock(return_value=context)
-    )
-    monkeypatch.setattr(run_agentapp_module, "run_from_proto", Mock(return_value=run))
-    monkeypatch.setattr(run_agentapp_module, "fab_from_proto", Mock(return_value=fab))
-    monkeypatch.setattr(
-        run_agentapp_module, "get_sha256_hash", Mock(return_value="run-hash")
-    )
-    monkeypatch.setattr(
-        run_agentapp_module, "start_log_uploader", Mock(return_value=log_uploader)
-    )
-    monkeypatch.setattr(run_agentapp_module, "pull_prompt", Mock(return_value="prompt"))
-    monkeypatch.setattr(
-        run_agentapp_module, "RuntimeAgentEvents", Mock(return_value=agent_events)
-    )
-    monkeypatch.setattr(
-        run_agentapp_module, "StartRunRequest", Mock(return_value=Mock())
-    )
-    monkeypatch.setattr(run_agentapp_module, "fab_to_proto", Mock())
-    monkeypatch.setattr(run_agentapp_module, "user_config_to_proto", Mock())
-    monkeypatch.setattr(run_agentapp_module, "AgentRuntime", Mock())
-    monkeypatch.setattr(run_agentapp_module, "RuntimeAgentConnectors", Mock())
-    monkeypatch.setattr(run_agentapp_module, "RuntimeAgentGrid", Mock())
-    monkeypatch.setattr(run_agentapp_module, "RuntimeAgentSession", Mock())
-    monkeypatch.setattr(run_agentapp_module, "install_from_fab", Mock())
-    monkeypatch.setattr(
-        run_agentapp_module,
-        "get_fab_metadata",
-        Mock(return_value=("publisher/app", "1.0.0")),
-    )
-    monkeypatch.setattr(
-        run_agentapp_module, "get_project_dir", Mock(return_value=app_path)
-    )
-    monkeypatch.setattr(
-        run_agentapp_module,
-        "install_app_dependencies",
-        Mock(return_value=runtime_env_dir),
-    )
-    monkeypatch.setattr(
-        run_agentapp_module,
-        "get_project_config",
-        Mock(
-            return_value={
-                "tool": {"flwr": {"app": {"components": {"agentapp": "pkg.app:app"}}}}
-            }
-        ),
-    )
-    monkeypatch.setattr(
-        run_agentapp_module,
-        "get_fused_config_from_dir",
-        Mock(return_value={"setting": "value"}),
-    )
-    monkeypatch.setattr(run_agentapp_module, "event", Mock())
-    monkeypatch.setattr(run_agentapp_module, "_set_runtime_environment", Mock())
-    monkeypatch.setattr(run_agentapp_module, "load_app", Mock(return_value=app))
-    monkeypatch.setattr(
-        run_agentapp_module,
-        "context_to_proto",
-        Mock(return_value=ProtoContext(node_id=99)),
-    )
-    monkeypatch.setattr(run_agentapp_module, "flush_logs", Mock())
-    monkeypatch.setattr(run_agentapp_module, "stop_log_uploader", Mock())
-    monkeypatch.setattr(run_agentapp_module, "cleanup_app_runtime_environment", Mock())
+    monkeypatch.setattr(run_agentapp_module, "_AgentAppTaskLifecycle", lifecycle_cls)
     monkeypatch.setattr(
         run_agentapp_module, "register_signal_handlers", register_signal_handlers
     )
-
     log_queue: Queue[str | None] = Queue()
-    lifecycle, actual_exit_code = _run_agentapp_task(
+
+    assert _run_agentapp_task(
         "runtime.example:9092",
         log_queue,
         "task-token",
@@ -465,58 +349,110 @@ def test_agentapp_lifecycle_runs_and_finalizes_once(  # pylint: disable=too-many
         "/runtime-ca.pem",
         True,
         resident=False,
-    )
-    lifecycle.finalize()
-    lifecycle.finalize()
+    ) == (lifecycle, ExitCode.SUCCESS)
 
-    assert actual_exit_code == exit_code
-    assert (TaskIdentity.task_id, TaskIdentity.run_id, TaskIdentity.node_id) == (
-        17,
-        42,
-        99,
+    lifecycle_cls.assert_called_once_with(
+        runtime_api_address="runtime.example:9092",
+        log_queue=log_queue,
+        token="task-token",
+        insecure=False,
+        certificates=b"root-certificates",
+        certificates_path="/runtime-ca.pem",
+        runtime_dependency_install=True,
+        preloaded=None,
     )
-    assert context.run_config == {"setting": "value"}
-    output = client.PushTaskOutput.call_args.args[0]
-    assert (output.sub_status, output.details) == (sub_status, details)
-    assert lifecycle.event_details(exit_code) == {
-        "run-id-hash": "run-hash",
-        "success": failure is None,
-    }
-    assert register_signal_handlers.call_args.kwargs == {
-        "event_type": EventType.FLWR_AGENTAPP_RUN_LEAVE,
-        "exit_message": "Task stopped by user.",
-        "exit_handlers": [lifecycle.finalize],
-    }
-    app_main.assert_called_once()
+    register_signal_handlers.assert_called_once_with(
+        event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
+        exit_message="Task stopped by user.",
+        exit_handlers=[lifecycle.finalize],
+    )
+
+
+def test_agentapp_lifecycle_finalizes_once_across_threads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Concurrent cleanup should report and release task state only once."""
+    client = Mock()
+    client.PushTaskOutput.side_effect = RuntimeError("Runtime unavailable")
+    retry_invoker = Mock(max_tries=10)
+    grid = Mock(_runtime_client=client, _retry_invoker=retry_invoker)
+    heartbeat = Mock(is_running=True)
+    cleanup_runtime = Mock()
+    monkeypatch.setattr(run_agentapp_module, "HttpGrid", Mock(return_value=grid))
+    monkeypatch.setattr(
+        run_agentapp_module, "cleanup_app_runtime_environment", cleanup_runtime
+    )
+    lifecycle = _AgentAppTaskLifecycle(
+        runtime_api_address="runtime.example:9092",
+        log_queue=Queue(),
+        token="task-token",
+        insecure=False,
+        certificates=b"root-certificates",
+        certificates_path="/runtime-ca.pem",
+        runtime_dependency_install=False,
+        preloaded=None,
+    )
+    lifecycle._heartbeat_sender = heartbeat
+
+    threads = [threading.Thread(target=lifecycle.finalize) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=1.0)
+        assert not thread.is_alive()
+
     client.PushTaskOutput.assert_called_once()
-    assert retry_invoker.max_tries == 1
-    run_agentapp_module.flush_logs.assert_called_once_with(log_queue)
-    run_agentapp_module.stop_log_uploader.assert_called_once_with(
-        log_queue, log_uploader
+    output = client.PushTaskOutput.call_args.args[0]
+    assert (output.sub_status, output.details) == (
+        SubStatus.FAILED,
+        "Task failed with unknown error.",
     )
     heartbeat.stop.assert_called_once_with()
     grid.close.assert_called_once_with()
-    run_agentapp_module.cleanup_app_runtime_environment.assert_called_once_with(
-        runtime_env_dir
-    )
+    cleanup_runtime.assert_called_once_with(None)
+    assert retry_invoker.max_tries == 1
+
+
+def test_finalization_ignores_graceful_signals_process_wide(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Finalization should restore the process-wide graceful signal handlers."""
+    previous_handlers = {
+        sig: object() for sig in run_agentapp_module.SIGNAL_TO_EXIT_CODE
+    }
+    handlers = previous_handlers.copy()
+
+    def register(sig: int, handler: object) -> object:
+        previous = handlers[sig]
+        handlers[sig] = handler
+        return previous
+
+    monkeypatch.setattr(signal, "signal", register)
+
+    with _ignore_graceful_signals():
+        assert all(handler == signal.SIG_IGN for handler in handlers.values())
+
+    assert handlers == previous_handlers
 
 
 def test_resident_accepts_before_task_input_and_output_capture(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Accept authority after initialization and signals, before task work."""
+    """Accept authority after Runtime setup and signals, before task work."""
     calls: list[str] = []
     lifecycle = Mock()
-    lifecycle.initialize.side_effect = lambda: calls.append("initialize")
 
     def run() -> int:
         calls.append("run")
         return ExitCode.SUCCESS
 
+    def construct(**_: object) -> Mock:
+        calls.append("runtime")
+        return lifecycle
+
     lifecycle.run.side_effect = run
-    monkeypatch.setattr(
-        run_agentapp_module, "_AgentAppTaskLifecycle", Mock(return_value=lifecycle)
-    )
+    lifecycle_cls = Mock(side_effect=construct)
+    monkeypatch.setattr(run_agentapp_module, "_AgentAppTaskLifecycle", lifecycle_cls)
     monkeypatch.setattr(
         run_agentapp_module,
         "_register_resident_signal_handlers",
@@ -541,7 +477,7 @@ def test_resident_accepts_before_task_input_and_output_capture(
         on_started=lambda: calls.append("accepted"),
     )
 
-    assert calls == ["initialize", "signals", "accepted", "output", "run"]
+    assert calls == ["runtime", "signals", "accepted", "output", "run"]
     assert (returned_lifecycle, exit_code) == (lifecycle, ExitCode.SUCCESS)
 
 
@@ -603,6 +539,7 @@ def test_run_agentapp_keeps_cold_process_behavior(
     """The cold entry point should keep validation, monitoring, and Flower exit."""
     lifecycle = Mock()
     lifecycle.event_details.return_value = {
+        "exit_code": ExitCode.TASK_PROC_EXCEPTION,
         "run-id-hash": "run-hash",
         "success": False,
     }
@@ -647,5 +584,9 @@ def test_run_agentapp_keeps_cold_process_behavior(
     flwr_exit.assert_called_once_with(
         code=ExitCode.TASK_PROC_EXCEPTION,
         event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
-        event_details={"run-id-hash": "run-hash", "success": False},
+        event_details={
+            "exit_code": ExitCode.TASK_PROC_EXCEPTION,
+            "run-id-hash": "run-hash",
+            "success": False,
+        },
     )

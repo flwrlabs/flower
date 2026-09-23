@@ -139,7 +139,11 @@ def _parse_args() -> argparse.ArgumentParser:
     dispatch = modes.add_parser("dispatch")
     dispatch.add_argument("--runtime-api-address", required=True)
     dispatch.add_argument("--fab-hash", required=True)
-    add_args_flwr_app_common(dispatch, include_token_stdin=True)
+    add_args_flwr_app_common(
+        dispatch,
+        include_token_stdin=True,
+        include_runtime_dependency_install=False,
+    )
     return parser
 
 
