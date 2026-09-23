@@ -36,6 +36,8 @@ from flwr.common.constant import (
 )
 from flwr.supercore.constant import TaskType
 from flwr.supercore.warm_executor_constants import (
+    WARM_CONNECTOR_EXECUTOR_MODULE,
+    WARM_CONNECTOR_EXECUTOR_SOCKET,
     WARM_EXECUTOR_BUSY_FILE,
     WARM_EXECUTOR_READY_DIRECTORY,
     WARM_EXECUTOR_READY_FILE,
@@ -527,6 +529,7 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
     task_command: str,
 ) -> None:  # pylint: disable=too-many-locals
     """A dispatched warm Pod should be replaced before its child exits."""
+    # pylint: disable=too-many-locals
     client = Mock()
     pool_key = _warm_executor_pool_key(
         task_type=task_type, runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
@@ -589,40 +592,37 @@ def test_launch_dispatches_compatible_ready_pod_and_replenishes_idle_capacity(
         },
     )
     client.create_namespaced_pod.assert_called_once()
-    assert _as_dict(client.create_namespaced_pod.call_args.args[1])["spec"][
-        "containers"
-    ][0]["command"] == (
-        [
-            "python",
-            "-m",
-            WARM_MODEL_EXECUTOR_MODULE,
-            "serve",
-        ]
-        if task_type == TaskType.MODEL
+    worker_module = {
+        TaskType.CONNECTOR: WARM_CONNECTOR_EXECUTOR_MODULE,
+        TaskType.MODEL: WARM_MODEL_EXECUTOR_MODULE,
+    }.get(task_type)
+    expected_warm_command = (
+        ["python", "-m", worker_module, "serve"]
+        if worker_module is not None
         else ["python", "-m", WARM_EXECUTOR_MODULE]
+    )
+    assert (
+        _as_dict(client.create_namespaced_pod.call_args.args[1])["spec"]["containers"][
+            0
+        ]["command"]
+        == expected_warm_command
     )
     assert stream.call_args.args[0] is client.connect_get_namespaced_pod_exec
     assert stream.call_args.kwargs["container"] == "taskexecutor"
-    assert stream.call_args.kwargs["command"] == (
+    expected_dispatch_command = (
+        ["python", "-m", worker_module, "dispatch"]
+        if worker_module is not None
+        else [task_command]
+    )
+    expected_dispatch_command.extend(
         [
-            "python",
-            "-m",
-            WARM_MODEL_EXECUTOR_MODULE,
-            "dispatch",
-            "--runtime-api-address",
-            "appio.example.com:9092",
-            "--token-stdin",
-            *transport_args,
-        ]
-        if task_type == TaskType.MODEL
-        else [
-            task_command,
             "--runtime-api-address",
             "appio.example.com:9092",
             "--token-stdin",
             *transport_args,
         ]
     )
+    assert stream.call_args.kwargs["command"] == expected_dispatch_command
     assert "task-token" not in stream.call_args.kwargs["command"]
     assert len(started) == 1
     dispatch = cast(
@@ -1109,10 +1109,10 @@ def test_warm_idle_probe_requires_all_task_processes_to_have_exited(
     assert (result.stdout.strip() == "FLWR_WARM_EXECUTOR_IDLE") == (state == "Z")
 
 
-def test_warm_idle_probe_treats_prestarted_model_worker_as_busy(
+def test_warm_idle_probe_treats_prestarted_task_worker_as_busy(
     tmp_path: Path,
 ) -> None:
-    """A claimed Model worker remains busy even without a child process."""
+    """A claimed resident worker remains busy even without a child process."""
     busy_file = tmp_path / "busy"
     busy_file.touch()
     probe = warm_executor_dispatch._WARM_EXECUTOR_IDLE_CHECK.replace(  # pylint: disable=protected-access
@@ -1891,6 +1891,17 @@ def test_build_taskexecutor_pod_includes_configured_volumes() -> None:
             {
                 "volume_mounts": [
                     {"name": "busy-file", "mountPath": WARM_EXECUTOR_BUSY_FILE}
+                ]
+            },
+            "mount path",
+        ),
+        (
+            {
+                "volume_mounts": [
+                    {
+                        "name": "connector-socket",
+                        "mountPath": WARM_CONNECTOR_EXECUTOR_SOCKET,
+                    }
                 ]
             },
             "mount path",

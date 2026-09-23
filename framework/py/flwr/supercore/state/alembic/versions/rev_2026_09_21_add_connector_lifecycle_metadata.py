@@ -51,7 +51,11 @@ def upgrade() -> None:
         sa.Column("created_by", sa.String(), nullable=False),
         sa.Column("deleted_by", sa.String(), nullable=True),
         sa.PrimaryKeyConstraint("connector_id"),
-        sa.UniqueConstraint("federation_id", "connector_ref"),
+        sa.UniqueConstraint(
+            "federation_id",
+            "connector_ref",
+            name="uq_connector_federation_id_connector_ref",
+        ),
     )
 
     # ### end Alembic commands ###

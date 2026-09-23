@@ -208,6 +208,17 @@ class ConnectorFailureError(FlowerError):
         )
 
 
+def _get_personal_connector_federation_id(
+    account: AccountInfo, state: LinkState
+) -> str:
+    """Return the account's personal federation ID."""
+    state.federation_manager.ensure_default_federations_exist(account.flwr_aid)
+    for federation in state.federation_manager.get_federations(account.flwr_aid):
+        if not federation.can_invite_members and not federation.can_add_supernodes:
+            return federation.id
+    raise ConnectorFailureError("Personal federation was not found")
+
+
 def list_connectors(
     request: ListConnectorsRequest,
     account: AccountInfo,

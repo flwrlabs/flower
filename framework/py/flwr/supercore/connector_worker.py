@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Single-use prestarted worker for warm Model TaskExecutor Pods."""
+"""Single-use prestarted worker for warm Connector TaskExecutor Pods."""
 
 from __future__ import annotations
 
@@ -23,15 +23,15 @@ from pathlib import Path
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.supercore import task_worker
 from flwr.supercore.warm_executor_constants import (
+    WARM_CONNECTOR_EXECUTOR_SOCKET,
     WARM_EXECUTOR_BUSY_FILE,
     WARM_EXECUTOR_READY_FILE,
-    WARM_MODEL_EXECUTOR_SOCKET,
 )
 
 
 @dataclass(frozen=True)
-class ModelInvocation:
-    """Describe one token-scoped invocation for the prestarted Model worker."""
+class ConnectorInvocation:
+    """Describe one invocation for the prestarted Connector worker."""
 
     token: str
     runtime_api_address: str
@@ -39,10 +39,10 @@ class ModelInvocation:
     root_certificates_path: str | None
 
     @classmethod
-    def from_payload(cls, payload: object) -> ModelInvocation:
+    def from_payload(cls, payload: object) -> ConnectorInvocation:
         """Validate and construct one invocation request."""
         token, runtime_api_address, insecure, root_certificates_path = (
-            task_worker.parse_invocation_payload(payload, "Model")
+            task_worker.parse_invocation_payload(payload, "Connector")
         )
         return cls(
             token=token,
@@ -52,41 +52,41 @@ class ModelInvocation:
         )
 
 
-def serve_prestarted_model_worker(
-    socket_path: Path = Path(WARM_MODEL_EXECUTOR_SOCKET),
+def serve_prestarted_connector_worker(
+    socket_path: Path = Path(WARM_CONNECTOR_EXECUTOR_SOCKET),
     ready_file: Path = Path(WARM_EXECUTOR_READY_FILE),
     busy_file: Path = Path(WARM_EXECUTOR_BUSY_FILE),
 ) -> int:
-    """Preload the Model task path, then serve exactly one invocation."""
-    # Keep the exec-side dispatcher lightweight. Only the resident process pays
-    # the Model/provider import cost, and it does so before reporting readiness.
-    from .task_process.model.run_model import (  # pylint: disable=import-outside-toplevel
-        run_model_once,
+    """Preload the Connector task path, then serve exactly one invocation."""
+    # Import the trusted Connector registry and runner before publishing
+    # readiness. Runtime and account-scoped state remain task-local.
+    from .task_process.connector.run_connector import (  # pylint: disable=import-outside-toplevel
+        run_connector_once,
     )
 
     return task_worker.serve_prestarted_worker(
         socket_path,
         ready_file,
         busy_file,
-        run_model_once,
-        ModelInvocation.from_payload,
-        "Model",
+        run_connector_once,
+        ConnectorInvocation.from_payload,
+        "Connector",
     )
 
 
-def dispatch_prestarted_model(
-    invocation: ModelInvocation,
-    socket_path: Path = Path(WARM_MODEL_EXECUTOR_SOCKET),
+def dispatch_prestarted_connector(
+    invocation: ConnectorInvocation,
+    socket_path: Path = Path(WARM_CONNECTOR_EXECUTOR_SOCKET),
 ) -> int:
-    """Relay one exec-delivered invocation to the prestarted Model worker."""
+    """Relay one invocation to the prestarted Connector worker."""
     return task_worker.dispatch_prestarted_task(
-        asdict(invocation), socket_path, "Model"
+        asdict(invocation), socket_path, "Connector"
     )
 
 
 def _parse_args() -> argparse.ArgumentParser:
-    """Build the internal prestarted Model worker argument parser."""
-    parser = argparse.ArgumentParser(description="Run a prestarted Model worker")
+    """Build the internal prestarted Connector worker argument parser."""
+    parser = argparse.ArgumentParser(description="Run a prestarted Connector worker")
     modes = parser.add_subparsers(dest="mode", required=True)
     modes.add_parser("serve")
     dispatch = modes.add_parser("dispatch")
@@ -99,14 +99,14 @@ def main() -> None:
     """Run the resident worker or its exec-side dispatcher."""
     args = _parse_args().parse_args()
     if args.mode == "serve":
-        raise SystemExit(serve_prestarted_model_worker())
-    invocation = ModelInvocation(
+        raise SystemExit(serve_prestarted_connector_worker())
+    invocation = ConnectorInvocation(
         token=try_obtain_flwr_app_token(args),
         runtime_api_address=args.runtime_api_address,
         insecure=args.insecure,
         root_certificates_path=args.root_certificates,
     )
-    raise SystemExit(dispatch_prestarted_model(invocation))
+    raise SystemExit(dispatch_prestarted_connector(invocation))
 
 
 if __name__ == "__main__":
