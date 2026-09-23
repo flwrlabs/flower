@@ -21,7 +21,7 @@ from flwr.supercore.typing import JSONObject, JSONValue
 
 from . import browser_use, filesystem, web_fetch, web_search
 from .automation import START_AUTOMATION_TOOL_NAME, make_start_automation_tool
-from .definition import ConnectorDefinition, ConnectorExecutionContext
+from .definition import ConnectorExecutionContext
 from .loader import load_oauth_connectors
 from .oauth import OAuthFlow
 
@@ -42,14 +42,6 @@ OAUTH_FLOWS: dict[str, OAuthFlow] = {
     for connector in CONNECTORS
     if connector.oauth_flow is not None
 }
-
-
-def get_connector_for_tool(tool_name: str) -> ConnectorDefinition:
-    """Resolve a model-facing tool name to its owning connector."""
-    connector = _CONNECTORS_BY_TOOL.get(tool_name)
-    if connector is None:
-        raise ValueError(f"Unsupported connector '{tool_name}'.")
-    return connector
 
 
 def invoke_connector(
