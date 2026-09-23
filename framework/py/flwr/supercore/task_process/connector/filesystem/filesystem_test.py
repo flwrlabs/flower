@@ -23,6 +23,7 @@ import pytest
 from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
 from flwr.supercore.typing import JSONObject
 
+from ..registry import invoke_connector
 from .filesystem import (
     FILESYSTEM_ALLOWED_DIRS_ENV,
     FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
@@ -116,6 +117,15 @@ def test_handlers_record_usage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     usage_recorder.record.assert_called_once_with(
         TaskUsage(usage_type="filesystem_read_file")
     )
+
+
+@pytest.mark.parametrize(
+    "name",
+    [FILESYSTEM_LIST_DIRECTORY_TOOL_NAME, FILESYSTEM_READ_FILE_TOOL_NAME],
+)
+def test_handler_missing_path_returns_structured_error(name: str) -> None:
+    """A missing path should remain a model-facing validation error."""
+    assert invoke_connector(name, {}, Mock()) == {"error": {"code": "invalid_request"}}
 
 
 def test_read_missing_file_returns_error(

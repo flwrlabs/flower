@@ -125,14 +125,18 @@ def invoke_filesystem(name: str, arguments: JSONValue) -> JSONObject:
         return {"error": error}
 
 
-def list_directory(path: str, *, usage_recorder: TaskUsageRecorder) -> JSONObject:
+def list_directory(
+    path: str | None = None, *, usage_recorder: TaskUsageRecorder
+) -> JSONObject:
     """List a directory through the built-in connector interface."""
     output = invoke_filesystem(FILESYSTEM_LIST_DIRECTORY_TOOL_NAME, {"path": path})
     usage_recorder.record(TaskUsage(usage_type=FILESYSTEM_LIST_DIRECTORY_USAGE_TYPE))
     return output
 
 
-def read_file(path: str, *, usage_recorder: TaskUsageRecorder) -> JSONObject:
+def read_file(
+    path: str | None = None, *, usage_recorder: TaskUsageRecorder
+) -> JSONObject:
     """Read a file through the built-in connector interface."""
     output = invoke_filesystem(FILESYSTEM_READ_FILE_TOOL_NAME, {"path": path})
     usage_recorder.record(TaskUsage(usage_type=FILESYSTEM_READ_FILE_USAGE_TYPE))
