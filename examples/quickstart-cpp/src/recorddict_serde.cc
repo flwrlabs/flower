@@ -9,6 +9,9 @@
 namespace flwr_quickstart {
 namespace {
 
+std::vector<std::pair<std::string, flwr_local::Array>>
+records_in_tensor_order(const flwr_local::ParametersRecord &record);
+
 flwr::proto::Array array_to_proto(const flwr_local::Array &array) {
   flwr::proto::Array out;
   out.set_dtype(array.dtype);
@@ -32,7 +35,7 @@ flwr_local::Array array_from_proto(const flwr::proto::Array &array) {
 flwr::proto::ArrayRecord
 array_record_to_proto(const flwr_local::ParametersRecord &record) {
   flwr::proto::ArrayRecord out;
-  for (const auto &[key, value] : record) {
+  for (const auto &[key, value] : records_in_tensor_order(record)) {
     auto *item = out.add_items();
     item->set_key(key);
     *item->mutable_value() = array_to_proto(value);
@@ -214,9 +217,10 @@ std::vector<std::pair<std::string, flwr_local::Array>>
 records_in_tensor_order(const flwr_local::ParametersRecord &record) {
   std::vector<std::pair<std::string, flwr_local::Array>> ordered(record.begin(),
                                                                  record.end());
-  const bool all_indices = std::all_of(
-      ordered.begin(), ordered.end(),
-      [](const auto &entry) { return is_decimal_index(entry.first); });
+  const bool all_indices =
+      std::all_of(ordered.begin(), ordered.end(), [](const auto &entry) {
+        return is_decimal_index(entry.first);
+      });
   if (!all_indices) {
     return ordered;
   }
@@ -254,7 +258,8 @@ parameters_to_parameters_record(const flwr_local::Parameters &parameters) {
   return out;
 }
 
-flwr_local::Scalar scalar_from_config_value(const flwr_local::ConfigsRecord::mapped_type &value) {
+flwr_local::Scalar
+scalar_from_config_value(const flwr_local::ConfigsRecord::mapped_type &value) {
   flwr_local::Scalar scalar;
   std::visit(
       [&scalar](auto &&arg) {
@@ -273,7 +278,8 @@ flwr_local::Scalar scalar_from_config_value(const flwr_local::ConfigsRecord::map
   return scalar;
 }
 
-flwr_local::ConfigsRecord metrics_to_config_record(const flwr_local::Metrics &metrics) {
+flwr_local::ConfigsRecord
+metrics_to_config_record(const flwr_local::Metrics &metrics) {
   flwr_local::ConfigsRecord out;
   for (const auto &[key, value] : metrics) {
     flwr_local::Scalar scalar = value;
@@ -314,15 +320,19 @@ recorddict_from_proto(const flwr::proto::RecordDict &recorddict) {
 
   for (const auto &item : recorddict.items()) {
     if (item.has_array_record()) {
-      parameters_records[item.key()] = array_record_from_proto(item.array_record());
+      parameters_records[item.key()] =
+          array_record_from_proto(item.array_record());
     } else if (item.has_metric_record()) {
-      metrics_records[item.key()] = metric_record_from_proto(item.metric_record());
+      metrics_records[item.key()] =
+          metric_record_from_proto(item.metric_record());
     } else if (item.has_config_record()) {
-      configs_records[item.key()] = config_record_from_proto(item.config_record());
+      configs_records[item.key()] =
+          config_record_from_proto(item.config_record());
     }
   }
 
-  return flwr_local::RecordSet(parameters_records, metrics_records, configs_records);
+  return flwr_local::RecordSet(parameters_records, metrics_records,
+                               configs_records);
 }
 
 flwr::proto::RecordDict
@@ -346,10 +356,10 @@ recorddict_to_proto(const flwr_local::RecordSet &recordset) {
   return out;
 }
 
-flwr_local::FitIns recorddict_to_fit_ins(const flwr_local::RecordSet &recordset) {
-  const auto &parameters_record =
-      required_record(recordset.getParametersRecords(), "fitins.parameters",
-                      "parameters");
+flwr_local::FitIns
+recorddict_to_fit_ins(const flwr_local::RecordSet &recordset) {
+  const auto &parameters_record = required_record(
+      recordset.getParametersRecords(), "fitins.parameters", "parameters");
   const auto &configs_record =
       required_record(recordset.getConfigsRecords(), "fitins.config", "config");
   flwr_local::Config config;
@@ -362,12 +372,10 @@ flwr_local::FitIns recorddict_to_fit_ins(const flwr_local::RecordSet &recordset)
 
 flwr_local::EvaluateIns
 recorddict_to_evaluate_ins(const flwr_local::RecordSet &recordset) {
-  const auto &parameters_record =
-      required_record(recordset.getParametersRecords(), "evaluateins.parameters",
-                      "parameters");
-  const auto &configs_record =
-      required_record(recordset.getConfigsRecords(), "evaluateins.config",
-                      "config");
+  const auto &parameters_record = required_record(
+      recordset.getParametersRecords(), "evaluateins.parameters", "parameters");
+  const auto &configs_record = required_record(recordset.getConfigsRecords(),
+                                               "evaluateins.config", "config");
   flwr_local::Config config;
   for (const auto &[key, value] : configs_record) {
     config[key] = scalar_from_config_value(value);
@@ -376,19 +384,19 @@ recorddict_to_evaluate_ins(const flwr_local::RecordSet &recordset) {
       parameters_record_to_parameters(parameters_record), config);
 }
 
-flwr_local::RecordSet
-recorddict_from_get_parameters_res(const flwr_local::ParametersRes &parameters_res) {
+flwr_local::RecordSet recorddict_from_get_parameters_res(
+    const flwr_local::ParametersRes &parameters_res) {
   flwr_local::RecordSet out;
-  out.setParametersRecords({{"getparametersres.parameters",
-                             parameters_to_parameters_record(
-                                 parameters_res.getParameters())}});
+  out.setParametersRecords(
+      {{"getparametersres.parameters",
+        parameters_to_parameters_record(parameters_res.getParameters())}});
   out.setConfigsRecords({{"getparametersres.status",
                           {{"code", 0}, {"message", std::string("Success")}}}});
   return out;
 }
 
-flwr_local::RecordSet
-recorddict_from_get_properties_res(const flwr_local::PropertiesRes &properties_res) {
+flwr_local::RecordSet recorddict_from_get_properties_res(
+    const flwr_local::PropertiesRes &properties_res) {
   flwr_local::ConfigsRecord properties;
   flwr_local::PropertiesRes props = properties_res;
   for (const auto &[key, value] : props.getPropertiesRes()) {
@@ -412,29 +420,31 @@ recorddict_from_get_properties_res(const flwr_local::PropertiesRes &properties_r
   return out;
 }
 
-flwr_local::RecordSet recorddict_from_fit_res(const flwr_local::FitRes &fit_res) {
+flwr_local::RecordSet
+recorddict_from_fit_res(const flwr_local::FitRes &fit_res) {
   flwr_local::RecordSet out;
-  out.setParametersRecords({{"fitres.parameters",
-                             parameters_to_parameters_record(
-                                 fit_res.getParameters())}});
-  out.setMetricsRecords({{"fitres.num_examples",
-                          {{"num_examples", fit_res.getNum_example()}}}});
+  out.setParametersRecords(
+      {{"fitres.parameters",
+        parameters_to_parameters_record(fit_res.getParameters())}});
+  out.setMetricsRecords(
+      {{"fitres.num_examples", {{"num_examples", fit_res.getNum_example()}}}});
   flwr_local::ConfigsRecord metrics;
   if (fit_res.getMetrics().has_value()) {
     metrics = metrics_to_config_record(fit_res.getMetrics().value());
   }
-  out.setConfigsRecords({{"fitres.metrics", metrics},
-                         {"fitres.status",
-                          {{"code", 0}, {"message", std::string("Success")}}}});
+  out.setConfigsRecords(
+      {{"fitres.metrics", metrics},
+       {"fitres.status", {{"code", 0}, {"message", std::string("Success")}}}});
   return out;
 }
 
 flwr_local::RecordSet
 recorddict_from_evaluate_res(const flwr_local::EvaluateRes &evaluate_res) {
   flwr_local::RecordSet out;
-  out.setMetricsRecords({{"evaluateres.loss", {{"loss", evaluate_res.getLoss()}}},
-                         {"evaluateres.num_examples",
-                          {{"num_examples", evaluate_res.getNum_example()}}}});
+  out.setMetricsRecords(
+      {{"evaluateres.loss", {{"loss", evaluate_res.getLoss()}}},
+       {"evaluateres.num_examples",
+        {{"num_examples", evaluate_res.getNum_example()}}}});
   flwr_local::ConfigsRecord metrics;
   if (evaluate_res.getMetrics().has_value()) {
     metrics = metrics_to_config_record(evaluate_res.getMetrics().value());

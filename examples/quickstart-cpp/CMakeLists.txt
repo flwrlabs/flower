@@ -125,18 +125,41 @@ target_include_directories(flwr_client PRIVATE
 target_link_libraries(flwr_client PRIVATE flwr_proto ${QUICKSTART_GRPC_LIB})
 target_link_libraries(flwr_client PRIVATE OpenSSL::Crypto)
 
-# Regression test for RecordSet tensor ordering. Uses only the public serde API,
-# so it links src/recorddict_serde.cc directly instead of the client sources
-# (which pull in gRPC and OpenSSL).
-enable_testing()
-add_executable(test_tensor_order
-  test_tensor_order.cc
-  src/recorddict_serde.cc
-)
-target_include_directories(test_tensor_order PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/include"
-  "${GENERATED_PROTO_DIR}"
-  "${FLWR_SDK_PATH}/include"
-)
-target_link_libraries(test_tensor_order PRIVATE flwr_proto ${QUICKSTART_GRPC_LIB})
-add_test(NAME tensor_order COMMAND test_tensor_order)
+# Keep the native and cross-language regressions in the standard CTest suite.
+include(CTest)
+if(BUILD_TESTING)
+  find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter)
+  add_executable(test_tensor_order
+    test_tensor_order.cc
+    src/recorddict_serde.cc
+  )
+  target_include_directories(test_tensor_order PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${GENERATED_PROTO_DIR}"
+    "${FLWR_SDK_PATH}/include"
+  )
+  target_link_libraries(test_tensor_order PRIVATE flwr_proto ${QUICKSTART_GRPC_LIB})
+  add_test(NAME tensor_order COMMAND test_tensor_order)
+
+  add_executable(test_transport_client
+    test_transport_client.cc
+    src/recorddict_serde.cc
+    src/message_handler.cc
+    src/supernode_client.cc
+  )
+  target_include_directories(test_transport_client PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${GENERATED_PROTO_DIR}"
+    "${FLWR_SDK_PATH}/include"
+  )
+  target_link_libraries(test_transport_client PRIVATE
+    flwr_proto ${QUICKSTART_GRPC_LIB} OpenSSL::Crypto)
+
+  add_test(NAME python_serialization
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_fedavg_cpp.py" -v)
+  add_test(NAME transport_python
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_transport.py"
+      --transport-client $<TARGET_FILE:test_transport_client>
+      --client $<TARGET_FILE:flwr_client> -v)
+  set_tests_properties(python_serialization transport_python PROPERTIES TIMEOUT 60)
+endif()

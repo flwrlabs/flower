@@ -28,18 +28,21 @@ For This Version:
 Edge-Intelligence-Lab Fork: https://github.com/Edge-Intelligence-Lab/flower-C--SDK
 
 For Previous Version:
+
 - Lekang Jiang (original author and main contributor)
 - Francisco Jose Solis (code re-organization)
 - Andreea Zaharia (training algorithm and data generation)
 
 ## Install requirements
 
-You'll need Python with `flwr>=1.31.0`, CMake, a C++17 compiler, gRPC C++,
+You'll need Python 3.11 or newer, Flower **1.36.0**, CMake, a C++17 compiler, gRPC C++,
 protobuf, `protoc`, `grpc_cpp_plugin`, and OpenSSL.
 
 Install the Python dependencies from this directory:
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 python -m pip install -e .
 ```
 
@@ -69,62 +72,65 @@ If gRPC/protobuf are installed in a custom prefix:
 export CMAKE_PREFIX_PATH=/path/to/grpc-prefix
 export PATH=/path/to/grpc-prefix/bin:$PATH
 cmake -S . -B build \
-  -DFLWR_SOURCE_ROOT=/path/to/flower \
-  -DGRPC_CPP_PLUGIN_EXECUTABLE=/path/to/grpc_cpp_plugin
+    -DFLWR_SOURCE_ROOT=/path/to/flower \
+    -DGRPC_CPP_PLUGIN_EXECUTABLE=/path/to/grpc_cpp_plugin
 cmake --build build -j
 ```
 
 ## Flower version compatibility
 
-This example supports Flower **1.37 and earlier**, as declared by the
-`flwr>=1.31.0,<2.0.0` dependency. It is verified end to end on both the current
-release and the previous line:
+The Python dependency is pinned to **Flower 1.36.0**, the target validated for
+this quickstart. The real training run uses two external C++ clients and a Python
+ServerApp for three rounds. This does not imply compatibility with every older
+or future Flower release.
 
-| Flower | Status | Fleet API (C++ clients) | Control API (`flwr run`) |
-| --- | --- | --- | --- |
-| 1.36.0 | verified, 3 rounds | `127.0.0.1:9092` | `127.0.0.1:9093` (gRPC) |
-| 1.37.0 | verified, 3 rounds | `127.0.0.1:9092` | `127.0.0.1:8000` (HTTP) |
+On 1.36.0, the C++ clients use the `grpc-rere` Fleet API on `127.0.0.1:9092`,
+and `flwr run` uses the gRPC Control API on `127.0.0.1:9093`.
 
-The C++ client talks to the SuperLink over the `grpc-rere` Fleet API, which is
-versioned independently from the Control API. On 1.36.0 the address in
-`pyproject.toml` works as-is. On 1.37.0 the Control API moved to HTTP on the
-SuperLink's `--host`/`--port` (8000 by default), so the first `flwr run` fails
-with `502 Bad Gateway` and the port has to be corrected.
-
-### Running on 1.37
-
-`flwr run` migrates `[tool.flwr.federations]` from `pyproject.toml` into
-`~/.flwr/config.toml`, keeping whatever port `pyproject.toml` had. It also
-comments the block out, after which `config.toml` is authoritative. So: run
-`flwr run` once (it migrates and fails), then point `config.toml` at the HTTP
-port and run again.
+The first `flwr run` migrates `[tool.flwr.federations]` from `pyproject.toml`
+into the Flower config (normally `~/.flwr/config.toml`) and comments the old
+block out. This migration also happens on **1.36.0**. The address supplied by
+this example is already correct for that version. If an earlier run left a
+different address in the Flower config, check the named connection there:
 
 ```toml
 # ~/.flwr/config.toml
 [superlink.local-deployment]
-address = "127.0.0.1:8000"
+address = "127.0.0.1:9093"
 insecure = true
 ```
 
-Editing `config.toml` *before* the first `flwr run` does not work: the migration
-overwrites it. Re-adding the `[tool.flwr.federations]` block to `pyproject.toml`
-after migrating also re-triggers the migration, which resets the port again. The
-block stays active in `pyproject.toml` because Flower 1.36 and earlier read it
-directly.
+Do not re-add the legacy block after migration: that triggers another migration
+and may overwrite the named connection. For an isolated configuration, set
+`FLWR_HOME` to a separate directory in every terminal running Flower commands.
 
-### Other notes
+The protobuf sources are generated from `${FLWR_SOURCE_ROOT}/framework/proto`
+at build time. The C++ transport uses the legacy no-session-ID object-upload
+path accepted by Flower 1.36.0. This example is not a full production C++ SDK.
 
-- `requires-python` must be `>=3.11`; Flower does not support 3.10 on any of
-  these versions, and `uv sync` fails during dependency resolution if the
-  project claims 3.10 support.
-- The protos are generated from `${FLWR_SOURCE_ROOT}/framework/proto` at build
-  time, so building inside a Flower checkout always uses that checkout's protos.
-- Flower 1.36 added `session_id` to `PushMessagesResponse` and
-  `PushObjectRequest`. This client does not send it; the SuperLink handles that
-  case explicitly ("Support legacy SuperNodes that do not send a session ID") in
-  both the in-memory and SQL core state backends.
+## Run the regression tests
+
+After installing the Python dependencies and building, run:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+CTest runs the native tensor-order test, the Python serialization tests, and
+cross-language tests that launch the real C++ transport against a loopback gRPC
+Fleet fixture. The latter verifies that Python receives 1, 2, 9, 10, 11, 12, 21,
+and 100 tensors in their original order, and that fatal registration/polling
+errors cause a nonzero client exit status. The fixture uses ephemeral ports and
+does not contact an existing SuperLink. It is separate from the real training
+run below.
+
+CMake uses the active Python environment. If necessary, select it explicitly
+with `-DPython3_EXECUTABLE=/path/to/venv/bin/python`. To build only the example
+client without the test targets, configure with `-DBUILD_TESTING=OFF`.
 
 ## Run the `Flower SuperLink`, the two clients, and the `Flower ServerApp` in separate terminals
+
+Activate the same Python environment in each terminal running a Python command.
 
 ```bash
 flower-superlink --insecure

@@ -6,7 +6,6 @@ from flwr.common import Context
 
 from fedavg_cpp import FedAvgCpp, ndarrays_to_parameters
 
-
 MODEL_SIZE = 2
 
 

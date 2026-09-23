@@ -73,7 +73,10 @@ class FedAvgCpp(FedAvg):
             return None, {}
 
         loss_aggregated = weighted_loss_avg(
-            [(evaluate_res.num_examples, evaluate_res.loss) for _, evaluate_res in results]
+            [
+                (evaluate_res.num_examples, evaluate_res.loss)
+                for _, evaluate_res in results
+            ]
         )
         total_examples = sum(evaluate_res.num_examples for _, evaluate_res in results)
         weighted_metric = sum(

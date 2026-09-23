@@ -100,7 +100,7 @@ std::string sign_message(EVP_PKEY *key, const std::string &message) {
     throw std::runtime_error("EVP_MD_CTX_new failed");
   }
   std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> ctx(raw_ctx,
-                                                             EVP_MD_CTX_free);
+                                                              EVP_MD_CTX_free);
   if (EVP_DigestSignInit(ctx.get(), nullptr, EVP_sha256(), nullptr, key) <= 0 ||
       EVP_DigestSignUpdate(ctx.get(), message.data(), message.size()) <= 0) {
     throw std::runtime_error("EVP_DigestSign init/update failed");
@@ -110,9 +110,9 @@ std::string sign_message(EVP_PKEY *key, const std::string &message) {
     throw std::runtime_error("EVP_DigestSignFinal length failed");
   }
   std::string signature(sig_len, '\0');
-  if (EVP_DigestSignFinal(
-          ctx.get(), reinterpret_cast<unsigned char *>(signature.data()),
-          &sig_len) <= 0) {
+  if (EVP_DigestSignFinal(ctx.get(),
+                          reinterpret_cast<unsigned char *>(signature.data()),
+                          &sig_len) <= 0) {
     throw std::runtime_error("EVP_DigestSignFinal failed");
   }
   signature.resize(sig_len);
@@ -180,8 +180,8 @@ std::vector<std::string> object_child_ids(const std::string &content) {
       first_space == last_space) {
     throw std::runtime_error("Invalid Flower object header");
   }
-  const std::string children = head.substr(first_space + 1,
-                                           last_space - first_space - 1);
+  const std::string children =
+      head.substr(first_space + 1, last_space - first_space - 1);
   return split_csv(children);
 }
 
@@ -198,12 +198,12 @@ std::string object_type(const std::string &content) {
   return head.substr(0, first_space);
 }
 
-std::map<std::string, std::string> parse_json_string_map(
-    const std::string &json) {
+std::map<std::string, std::string>
+parse_json_string_map(const std::string &json) {
   std::map<std::string, std::string> out;
   const std::regex pair_re("\"([^\"]+)\"\\s*:\\s*\"([^\"]*)\"");
-  for (std::sregex_iterator it(json.begin(), json.end(), pair_re), end; it != end;
-       ++it) {
+  for (std::sregex_iterator it(json.begin(), json.end(), pair_re), end;
+       it != end; ++it) {
     out[(*it)[1].str()] = (*it)[2].str();
   }
   return out;
@@ -260,7 +260,8 @@ std::string sha256_hex(const std::string &bytes) {
   return oss.str();
 }
 
-ObjectBundle make_leaf_object(const std::string &type, const std::string &body) {
+ObjectBundle make_leaf_object(const std::string &type,
+                              const std::string &body) {
   ObjectBundle bundle;
   const std::string content = make_object_content(type, {}, body);
   const std::string id = sha256_hex(content);
@@ -284,8 +285,7 @@ ObjectBundle make_array_object(const flwr::proto::Array &array) {
     }
     body << array.shape(i);
   }
-  body << "],\"stype\":\"" << array.stype()
-       << "\",\"arraychunk_ids\":[0]}";
+  body << "],\"stype\":\"" << array.stype() << "\",\"arraychunk_ids\":[0]}";
 
   ObjectBundle bundle;
   const std::string content =
@@ -299,10 +299,12 @@ ObjectBundle make_array_object(const flwr::proto::Array &array) {
 
 ObjectBundle make_array_record_object(const flwr::proto::ArrayRecord &record) {
   ObjectBundle bundle;
-  std::map<std::string, std::string> refs;
+  // ArrayRecord order is significant: Python reconstructs Parameters in this
+  // order. Keep the protobuf item order instead of sorting decimal keys again.
+  std::vector<std::pair<std::string, std::string>> refs;
   for (const auto &item : record.items()) {
     ObjectBundle child = make_array_object(item.value());
-    refs[item.key()] = child.tree.object_id();
+    refs.emplace_back(item.key(), child.tree.object_id());
     merge_bundle(&bundle, child);
   }
   std::ostringstream body;
@@ -320,7 +322,8 @@ ObjectBundle make_array_record_object(const flwr::proto::ArrayRecord &record) {
   for (const auto &child : bundle.tree.children()) {
     ids.push_back(child.object_id());
   }
-  const std::string content = make_object_content("ArrayRecord", ids, body.str());
+  const std::string content =
+      make_object_content("ArrayRecord", ids, body.str());
   const std::string id = sha256_hex(content);
   bundle.tree.set_object_id(id);
   bundle.objects[id] = content;
@@ -367,7 +370,8 @@ ObjectBundle make_recorddict_object(const flwr::proto::RecordDict &recorddict) {
   for (const auto &child : bundle.tree.children()) {
     ids.push_back(child.object_id());
   }
-  const std::string content = make_object_content("RecordDict", ids, body.str());
+  const std::string content =
+      make_object_content("RecordDict", ids, body.str());
   const std::string id = sha256_hex(content);
   bundle.tree.set_object_id(id);
   bundle.objects[id] = content;
@@ -394,8 +398,9 @@ ObjectBundle make_message_object(const flwr::proto::Message &message) {
   return bundle;
 }
 
-const flwr::proto::ObjectTree *find_child_tree(const flwr::proto::ObjectTree &tree,
-                                               const std::string &object_id) {
+const flwr::proto::ObjectTree *
+find_child_tree(const flwr::proto::ObjectTree &tree,
+                const std::string &object_id) {
   for (const auto &child : tree.children()) {
     if (child.object_id() == object_id) {
       return &child;
@@ -411,8 +416,8 @@ public:
     grpc::ChannelArguments args;
     args.SetMaxReceiveMessageSize(grpc_max_message_length);
     args.SetMaxSendMessageSize(grpc_max_message_length);
-    channel_ = grpc::CreateCustomChannel(server_address,
-                                         grpc::InsecureChannelCredentials(), args);
+    channel_ = grpc::CreateCustomChannel(
+        server_address, grpc::InsecureChannelCredentials(), args);
     stub_ = flwr::proto::Fleet::NewStub(channel_);
     public_key_ = public_key_to_pem(private_key_.get());
   }
@@ -425,7 +430,8 @@ public:
     add_auth_metadata(&context);
     const auto status = stub_->RegisterNode(&context, request, &response);
     if (!status.ok()) {
-      throw std::runtime_error("RegisterNode failed: " + status.error_message());
+      throw std::runtime_error("RegisterNode failed: " +
+                               status.error_message());
     }
   }
 
@@ -438,7 +444,8 @@ public:
     add_auth_metadata(&context);
     const auto status = stub_->ActivateNode(&context, request, &response);
     if (!status.ok()) {
-      throw std::runtime_error("ActivateNode failed: " + status.error_message());
+      throw std::runtime_error("ActivateNode failed: " +
+                               status.error_message());
     }
     node_id_ = response.node_id();
     std::cout << "[flwr-cpp] activated node_id=" << node_id_ << std::endl;
@@ -456,8 +463,8 @@ public:
     add_auth_metadata(&context);
     const auto status = stub_->DeactivateNode(&context, request, &response);
     if (!status.ok()) {
-      std::cerr << "[flwr-cpp] DeactivateNode failed: " << status.error_message()
-                << std::endl;
+      std::cerr << "[flwr-cpp] DeactivateNode failed: "
+                << status.error_message() << std::endl;
     }
   }
 
@@ -472,8 +479,8 @@ public:
     add_auth_metadata(&context);
     const auto status = stub_->UnregisterNode(&context, request, &response);
     if (!status.ok()) {
-      std::cerr << "[flwr-cpp] UnregisterNode failed: " << status.error_message()
-                << std::endl;
+      std::cerr << "[flwr-cpp] UnregisterNode failed: "
+                << status.error_message() << std::endl;
     }
   }
 
@@ -507,7 +514,8 @@ public:
     add_auth_metadata(&context);
     const auto status = stub_->PullMessages(&context, request, &response);
     if (!status.ok()) {
-      throw std::runtime_error("PullMessages failed: " + status.error_message());
+      throw std::runtime_error("PullMessages failed: " +
+                               status.error_message());
     }
     if (response.messages_list_size() == 0) {
       return false;
@@ -552,7 +560,8 @@ public:
     add_auth_metadata(&context);
     const auto status = stub_->PushMessages(&context, request, &response);
     if (!status.ok()) {
-      throw std::runtime_error("PushMessages failed: " + status.error_message());
+      throw std::runtime_error("PushMessages failed: " +
+                               status.error_message());
     }
     for (const auto &object_id : response.objects_to_push()) {
       auto it = bundle.objects.find(object_id);
@@ -585,7 +594,8 @@ private:
       add_auth_metadata(&context);
       const auto status = stub_->PullObject(&context, request, &response);
       if (!status.ok()) {
-        throw std::runtime_error("PullObject failed: " + status.error_message());
+        throw std::runtime_error("PullObject failed: " +
+                                 status.error_message());
       }
       if (response.object_found() && response.object_available()) {
         return response.object_content();
@@ -610,7 +620,8 @@ private:
       throw std::runtime_error("PushObject failed: " + status.error_message());
     }
     if (!response.stored()) {
-      throw std::runtime_error("PushObject was rejected for object_id=" + object_id);
+      throw std::runtime_error("PushObject was rejected for object_id=" +
+                               object_id);
     }
   }
 
@@ -663,7 +674,8 @@ private:
   flwr::proto::ArrayRecord
   inflate_array_record(uint64_t run_id, const flwr::proto::ObjectTree &tree) {
     const std::string content = pull_object(run_id, tree.object_id());
-    const auto refs = parse_json_string_map(object_body(content, "ArrayRecord"));
+    const auto refs =
+        parse_json_string_map(object_body(content, "ArrayRecord"));
     flwr::proto::ArrayRecord out;
     for (const auto &[key, object_id] : refs) {
       const flwr::proto::ObjectTree *child = find_child_tree(tree, object_id);
@@ -750,8 +762,10 @@ void start_client(const std::string &server_address, flwr_local::Client *client,
           std::chrono::duration<double>(stop - start).count();
       rere.push_message(out, runtime);
     }
-  } catch (const std::exception &e) {
-    std::cerr << "[flwr-cpp] fatal: " << e.what() << std::endl;
+  } catch (...) {
+    rere.deactivate_node();
+    rere.unregister_node();
+    throw;
   }
 
   rere.deactivate_node();
