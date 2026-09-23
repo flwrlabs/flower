@@ -34,7 +34,7 @@ from uuid import uuid4
 
 from google.protobuf.message import DecodeError
 from parameterized import parameterized
-from sqlalchemy import event, insert
+from sqlalchemy import event, insert, select
 from sqlalchemy.sql.dml import Update
 
 from flwr.app import DEFAULT_TTL, Error, Message, RecordDict
@@ -2615,21 +2615,30 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
 
         with state.session() as session:
             state.upsert_connector(
-                flwr_aid="account-a",
+                federation_id="@bob/fed-a",
                 connector_ref="calendar",
                 credentials_json='{"token":"old"}',
                 config_json='{"calendar":"primary"}',
+                created_by="account-a",
             )
-            cached_row = session.get(ConnectorModel, ("account-a", "calendar"))
+            cached_row = session.scalar(
+                select(ConnectorModel).where(
+                    ConnectorModel.federation_id == "@bob/fed-a",
+                    ConnectorModel.connector_ref == "calendar",
+                )
+            )
             assert cached_row is not None
             self.assertEqual(cached_row.credentials_json, '{"token":"old"}')
             state.upsert_connector(
-                flwr_aid="account-a",
+                federation_id="@bob/fed-a",
                 connector_ref="calendar",
                 credentials_json='{"token":"new"}',
                 config_json='{"calendar":"work"}',
+                created_by="account-a",
             )
-            second = state.get_connector(flwr_aid="account-a", connector_ref="calendar")
+            second = state.get_connector(
+                federation_id="@bob/fed-a", connector_ref="calendar"
+            )
 
         assert second is not None
         self.assertEqual(second.credentials_json, '{"token":"new"}')

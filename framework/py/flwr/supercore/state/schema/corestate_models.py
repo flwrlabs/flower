@@ -29,6 +29,7 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
     String,
     Table,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -157,14 +158,22 @@ class FederationApp(FlwrBase):
 
 
 class Connector(FlwrBase):
-    """Represent connector configuration for an account."""
+    """Represent connector configuration for a federation."""
 
     __tablename__ = "connector"
+    __table_args__ = (UniqueConstraint("federation_id", "connector_ref"),)
 
-    flwr_aid: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
-    connector_ref: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    connector_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True, nullable=False
+    )
+    federation_id: Mapped[str] = mapped_column(String, nullable=False)
+    connector_ref: Mapped[str] = mapped_column(String, nullable=False)
     credentials_json: Mapped[str] = mapped_column(String, nullable=False)
     config_json: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    created_by: Mapped[str] = mapped_column(String, nullable=False)
+    deleted_by: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class ConnectorOAuthSession(FlwrBase):
