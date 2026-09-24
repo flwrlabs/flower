@@ -99,6 +99,7 @@ message PullTaskInputResponse {
   Fab fab = 3;
   SimulationConfig federation_config = 4;
   uint64 task_id = 5;
+  repeated uint64 connector_ids = 6;
 }
 
 // PushTaskOutput messages
