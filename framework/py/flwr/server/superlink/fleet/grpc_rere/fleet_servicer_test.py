@@ -24,7 +24,11 @@ from parameterized import parameterized
 
 from flwr.common import ConfigRecord
 from flwr.common.constant import (
+    APP_HEARTBEAT_CALL_TIMEOUT,
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
+    HEARTBEAT_CALL_TIMEOUT,
+    HEARTBEAT_CLIENTAPP_LEASE,
+    HEARTBEAT_DEFAULT_INTERVAL,
     NOOP_ACCOUNT_NAME,
     NOOP_FLWR_AID,
     SUPERLINK_NODE_ID,
@@ -243,6 +247,10 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         assert isinstance(response, ActivateNodeResponse)
         assert grpc.StatusCode.OK == call.code()
         assert response.node_id > 0
+        assert response.heartbeat_interval == HEARTBEAT_DEFAULT_INTERVAL
+        assert response.heartbeat_rpc_timeout == HEARTBEAT_CALL_TIMEOUT
+        assert response.app_heartbeat_rpc_timeout == APP_HEARTBEAT_CALL_TIMEOUT
+        assert response.clientapp_token_lease == HEARTBEAT_CLIENTAPP_LEASE
         # Verify node status is ONLINE
         node_info = self.state.get_node_info(node_ids=[response.node_id])[0]
         assert node_info.status == NodeStatus.ONLINE

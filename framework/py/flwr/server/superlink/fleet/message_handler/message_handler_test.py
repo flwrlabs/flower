@@ -18,9 +18,16 @@
 from unittest.mock import MagicMock
 
 from flwr.common import Metadata, RecordDict, now
+from flwr.common.constant import (
+    APP_HEARTBEAT_CALL_TIMEOUT,
+    HEARTBEAT_CALL_TIMEOUT,
+    HEARTBEAT_CLIENTAPP_LEASE,
+    HEARTBEAT_DEFAULT_INTERVAL,
+)
 from flwr.common.message import make_message
 from flwr.common.serde import message_to_proto
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
+    ActivateNodeRequest,
     NodeProfileEvent,
     PullMessagesRequest,
     PushMessagesRequest,
@@ -28,7 +35,30 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 
-from .message_handler import pull_messages, push_messages, push_node_profile_events
+from .message_handler import (
+    activate_node,
+    pull_messages,
+    push_messages,
+    push_node_profile_events,
+)
+
+
+def test_activate_node_returns_central_heartbeat_policy() -> None:
+    """SuperLink activation returns its heartbeat policy to the SuperNode."""
+    state = MagicMock()
+    state.get_node_id_by_public_key.return_value = 42
+    state.activate_node.return_value = True
+
+    response = activate_node(
+        ActivateNodeRequest(public_key=b"public-key", heartbeat_interval=30), state
+    )
+
+    assert response.node_id == 42
+    assert response.heartbeat_interval == HEARTBEAT_DEFAULT_INTERVAL
+    assert response.heartbeat_rpc_timeout == HEARTBEAT_CALL_TIMEOUT
+    assert response.app_heartbeat_rpc_timeout == APP_HEARTBEAT_CALL_TIMEOUT
+    assert response.clientapp_token_lease == HEARTBEAT_CLIENTAPP_LEASE
+    state.activate_node.assert_called_once_with(42, HEARTBEAT_DEFAULT_INTERVAL)
 
 
 def test_pull_messages() -> None:

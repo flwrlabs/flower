@@ -56,6 +56,21 @@ class StateTest(unittest.TestCase):
         # Assert: token should no longer be valid
         self.assertFalse(state.verify_token(run_id, token))
 
+    def test_set_clientapp_token_lease(self) -> None:
+        """A negotiated policy can update the token lease on either backend."""
+        state = self.state_factory()
+        lease_seconds = 2
+        state.set_clientapp_token_lease(lease_seconds)
+        created_at = now()
+        run_id = 99
+        token = state.create_token(run_id)
+        assert token is not None
+        state.acknowledge_app_heartbeat(token)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = created_at + timedelta(seconds=lease_seconds + 1)
+            self.assertFalse(state.verify_token(run_id, token))
+
     def test_create_token_already_exists(self) -> None:
         """Test creating a token that already exists."""
         # Prepare

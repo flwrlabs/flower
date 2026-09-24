@@ -85,13 +85,25 @@ class ActivateNodeResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     NODE_ID_FIELD_NUMBER: builtins.int
+    HEARTBEAT_INTERVAL_FIELD_NUMBER: builtins.int
+    HEARTBEAT_RPC_TIMEOUT_FIELD_NUMBER: builtins.int
+    APP_HEARTBEAT_RPC_TIMEOUT_FIELD_NUMBER: builtins.int
+    CLIENTAPP_TOKEN_LEASE_FIELD_NUMBER: builtins.int
     node_id: builtins.int
+    heartbeat_interval: builtins.float
+    heartbeat_rpc_timeout: builtins.float
+    app_heartbeat_rpc_timeout: builtins.float
+    clientapp_token_lease: builtins.int
     def __init__(
         self,
         *,
         node_id: builtins.int = ...,
+        heartbeat_interval: builtins.float = ...,
+        heartbeat_rpc_timeout: builtins.float = ...,
+        app_heartbeat_rpc_timeout: builtins.float = ...,
+        clientapp_token_lease: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["node_id", b"node_id"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["app_heartbeat_rpc_timeout", b"app_heartbeat_rpc_timeout", "clientapp_token_lease", b"clientapp_token_lease", "heartbeat_interval", b"heartbeat_interval", "heartbeat_rpc_timeout", b"heartbeat_rpc_timeout", "node_id", b"node_id"]) -> None: ...
 
 global___ActivateNodeResponse = ActivateNodeResponse
 

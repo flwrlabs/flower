@@ -218,7 +218,6 @@ class GetRunProfileResponse(google.protobuf.message.Message):
 
 global___GetRunProfileResponse = GetRunProfileResponse
 
-
 @typing.final
 class StreamRunProfileRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

@@ -17,11 +17,24 @@
 
 from abc import ABC, abstractmethod
 
+from flwr.common.constant import HEARTBEAT_CLIENTAPP_LEASE
+
 from ..object_store import ObjectStore
 
 
 class CoreState(ABC):
     """Abstract base class for core state."""
+
+    def set_clientapp_token_lease(self, lease_seconds: int) -> None:
+        """Set the lease duration used for ClientApp heartbeat tokens."""
+        if lease_seconds <= 0:
+            raise ValueError("ClientApp token lease must be positive")
+        self._clientapp_token_lease = lease_seconds
+
+    @property
+    def clientapp_token_lease(self) -> int:
+        """Return the configured ClientApp heartbeat token lease."""
+        return getattr(self, "_clientapp_token_lease", HEARTBEAT_CLIENTAPP_LEASE)
 
     @property
     @abstractmethod

@@ -16,7 +16,7 @@
 
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
-from logging import DEBUG, ERROR
+from logging import DEBUG, ERROR, INFO
 from pathlib import Path
 
 import grpc
@@ -62,7 +62,11 @@ from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
-from flwr.supercore.heartbeat import HeartbeatSender
+from flwr.supercore.heartbeat import (
+    DEFAULT_HEARTBEAT_CONFIG,
+    HeartbeatConfig,
+    HeartbeatSender,
+)
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 
 from .grpc_adapter import GrpcAdapter
@@ -73,6 +77,24 @@ def _event_number(event: dict[str, object], key: str) -> int | float:
     """Return a numeric profile event value."""
     value = event.get(key, 0)
     return value if isinstance(value, (int, float)) else 0
+
+
+def _heartbeat_config_from_response(
+    response: ActivateNodeResponse,
+) -> HeartbeatConfig:
+    """Build the local heartbeat configuration negotiated with the SuperLink."""
+    return HeartbeatConfig(
+        interval=response.heartbeat_interval or HEARTBEAT_DEFAULT_INTERVAL,
+        rpc_timeout=response.heartbeat_rpc_timeout or HEARTBEAT_CALL_TIMEOUT,
+        app_rpc_timeout=(
+            response.app_heartbeat_rpc_timeout
+            or DEFAULT_HEARTBEAT_CONFIG.app_rpc_timeout
+        ),
+        clientapp_token_lease=(
+            response.clientapp_token_lease
+            or DEFAULT_HEARTBEAT_CONFIG.clientapp_token_lease
+        ),
+    )
 
 
 @contextmanager
@@ -97,6 +119,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         Callable[[int, str, bytes], None],
         Callable[[int, str], None],
         Callable[[list[dict[str, object]]], None],
+        HeartbeatConfig,
     ]
 ]:
     """Primitives for request/response-based interaction with a server.
@@ -181,6 +204,8 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
     # this stub with the payload RPC retry invoker shared by the main connection.
     heartbeat_stub = adapter_cls(heartbeat_channel)
     node: Node | None = None
+    heartbeat_config = DEFAULT_HEARTBEAT_CONFIG
+    heartbeat_sender: HeartbeatSender | None = None
 
     # Wrap stub
     _wrap_stub(stub, retry_invoker)
@@ -198,18 +223,18 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
             DEBUG,
             "SuperNode heartbeat sending: node_id=%s interval_s=%s",
             node.node_id,
-            HEARTBEAT_DEFAULT_INTERVAL,
+            heartbeat_config.interval,
         )
 
         # Construct the heartbeat request
         req = SendNodeHeartbeatRequest(
-            node=node, heartbeat_interval=HEARTBEAT_DEFAULT_INTERVAL
+            node=node, heartbeat_interval=heartbeat_config.interval
         )
 
         # Call FleetAPI
         try:
             res: SendNodeHeartbeatResponse = heartbeat_stub.SendNodeHeartbeat(
-                req, timeout=HEARTBEAT_CALL_TIMEOUT
+                req, timeout=heartbeat_config.rpc_timeout
             )
         except grpc.RpcError as e:
             log(
@@ -233,24 +258,36 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         log(DEBUG, "SuperNode heartbeat acknowledged: node_id=%s", node.node_id)
         return True
 
-    heartbeat_sender = HeartbeatSender(send_node_heartbeat)
-
     def register_node() -> None:
         """Register node with SuperLink."""
         stub.RegisterNode(RegisterNodeFleetRequest(public_key=node_pk))
 
     def activate_node() -> int:
         """Activate node and start heartbeat."""
+        nonlocal heartbeat_config, heartbeat_sender, node
         req = ActivateNodeRequest(
             public_key=node_pk,
             heartbeat_interval=HEARTBEAT_DEFAULT_INTERVAL,
         )
         res: ActivateNodeResponse = stub.ActivateNode(req)
 
-        # Remember the node and start the heartbeat sender
-        nonlocal node
+        heartbeat_config = _heartbeat_config_from_response(res)
         node = Node(node_id=res.node_id)
+        heartbeat_sender = HeartbeatSender(
+            send_node_heartbeat,
+            interval=heartbeat_config.interval,
+            rpc_timeout=heartbeat_config.rpc_timeout,
+        )
         heartbeat_sender.start()
+        log(
+            INFO,
+            "[Heartbeat] Adopted SuperLink policy: interval_s=%s "
+            "rpc_timeout_s=%s app_rpc_timeout_s=%s token_lease_s=%s",
+            heartbeat_config.interval,
+            heartbeat_config.rpc_timeout,
+            heartbeat_config.app_rpc_timeout,
+            heartbeat_config.clientapp_token_lease,
+        )
         return node.node_id
 
     def deactivate_node() -> None:
@@ -262,7 +299,8 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
             return
 
         # Stop the heartbeat sender
-        heartbeat_sender.stop()
+        if heartbeat_sender is not None:
+            heartbeat_sender.stop()
 
         # Call FleetAPI
         req = DeactivateNodeRequest(node_id=node.node_id)
@@ -426,6 +464,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
             push_object,
             confirm_message_received,
             push_node_profile_events,
+            heartbeat_config,
         )
     except Exception as exc:  # pylint: disable=broad-except
         log(ERROR, exc)

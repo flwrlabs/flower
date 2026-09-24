@@ -15,6 +15,7 @@
 """Tests for the Main Loop of Flower SuperNode."""
 
 
+import os
 import unittest
 from unittest.mock import Mock, patch
 
@@ -22,8 +23,9 @@ from flwr.common import ConfigRecord, Context, Message, RecordDict
 from flwr.common.inflatable import get_all_nested_objects, get_object_tree
 from flwr.common.message import remove_content_from_message
 from flwr.common.typing import Fab
+from flwr.supercore.heartbeat import HeartbeatConfig
 
-from .start_client_internal import _pull_and_store_message
+from .start_client_internal import _apply_heartbeat_config, _pull_and_store_message
 
 
 class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
@@ -43,6 +45,24 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_push_object = Mock()
         self.mock_pull_object = Mock()
         self.simple_store: dict[str, bytes] = {}
+
+    def test_apply_heartbeat_config_forwards_superlink_policy(self) -> None:
+        """Apply negotiated timings to local lease and spawned ClientApps."""
+        config = HeartbeatConfig(
+            interval=60,
+            rpc_timeout=45,
+            app_rpc_timeout=180,
+            clientapp_token_lease=3600,
+        )
+
+        with patch.dict(os.environ, {}, clear=False):
+            _apply_heartbeat_config(self.mock_state, config)
+
+            self.assertEqual(os.environ["FLWR_HEARTBEAT_INTERVAL_S"], "60")
+            self.assertEqual(os.environ["FLWR_HEARTBEAT_RPC_TIMEOUT_S"], "45")
+            self.assertEqual(os.environ["FLWR_APP_HEARTBEAT_RPC_TIMEOUT_S"], "180")
+
+        self.mock_state.set_clientapp_token_lease.assert_called_once_with(3600)
 
     def test_pull_and_store_message_no_message(self) -> None:
         """Test that no message is pulled when there are no messages."""

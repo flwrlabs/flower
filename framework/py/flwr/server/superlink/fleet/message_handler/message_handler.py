@@ -18,6 +18,10 @@ from logging import ERROR, WARNING
 
 from flwr.common import Message, log, now
 from flwr.common.constant import (
+    APP_HEARTBEAT_CALL_TIMEOUT,
+    HEARTBEAT_CALL_TIMEOUT,
+    HEARTBEAT_CLIENTAPP_LEASE,
+    HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_MAX_INTERVAL,
     HEARTBEAT_MIN_INTERVAL,
     NOOP_ACCOUNT_NAME,
@@ -95,9 +99,16 @@ def activate_node(
     if node_id is None:
         raise ValueError("No SuperNode found with the given public key.")
     _validate_heartbeat_interval(request.heartbeat_interval)
-    if not state.activate_node(node_id, request.heartbeat_interval):
+    heartbeat_interval = HEARTBEAT_DEFAULT_INTERVAL
+    if not state.activate_node(node_id, heartbeat_interval):
         raise ValueError(f"SuperNode with node ID {node_id} could not be activated.")
-    return ActivateNodeResponse(node_id=node_id)
+    return ActivateNodeResponse(
+        node_id=node_id,
+        heartbeat_interval=heartbeat_interval,
+        heartbeat_rpc_timeout=HEARTBEAT_CALL_TIMEOUT,
+        app_heartbeat_rpc_timeout=APP_HEARTBEAT_CALL_TIMEOUT,
+        clientapp_token_lease=HEARTBEAT_CLIENTAPP_LEASE,
+    )
 
 
 def deactivate_node(

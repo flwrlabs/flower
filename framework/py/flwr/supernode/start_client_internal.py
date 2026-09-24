@@ -66,6 +66,7 @@ from flwr.common.typing import Fab, Run, RunNotRunningException, UserConfig
 from flwr.common.version import package_version
 from flwr.proto.clientappio_pb2_grpc import add_ClientAppIoServicer_to_server
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.supercore.heartbeat import DEFAULT_HEARTBEAT_CONFIG, HeartbeatConfig
 from flwr.supercore.ffs import Ffs, FfsFactory
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
@@ -80,6 +81,14 @@ from flwr.supernode.servicer.clientappio import ClientAppIoServicer
 DEFAULT_FFS_DIR = get_flwr_dir() / "supernode" / "ffs"
 
 FAB_VERIFICATION_ERROR = Error(ErrorCode.INVALID_FAB, "The FAB could not be verified.")
+
+
+def _apply_heartbeat_config(state: NodeState, config: HeartbeatConfig) -> None:
+    """Apply the SuperLink-negotiated policy to local state and child processes."""
+    state.set_clientapp_token_lease(config.clientapp_token_lease)
+    os.environ["FLWR_HEARTBEAT_INTERVAL_S"] = str(config.interval)
+    os.environ["FLWR_HEARTBEAT_RPC_TIMEOUT_S"] = str(config.rpc_timeout)
+    os.environ["FLWR_APP_HEARTBEAT_RPC_TIMEOUT_S"] = str(config.app_rpc_timeout)
 
 
 def _profile_enabled(state: NodeState, run_id: int) -> bool:
@@ -215,15 +224,6 @@ def start_client_internal(
     ffs = ffs_factory.ffs()
     store = object_store_factory.store()
 
-    # Launch the SuperExec if the isolation mode is `subprocess`
-    if isolation == ISOLATION_MODE_SUBPROCESS:
-        command = ["flower-superexec", "--insecure"]
-        command += ["--appio-api-address", clientappio_api_address]
-        command += ["--plugin-type", ExecPluginType.CLIENT_APP]
-        command += ["--parent-pid", str(os.getpid())]
-        # pylint: disable-next=consider-using-with
-        subprocess.Popen(command)
-
     with _init_connection(
         transport=transport,
         server_address=server_address,
@@ -243,7 +243,28 @@ def start_client_internal(
             push_object,
             confirm_message_received,
             push_node_profile_events,
+            heartbeat_config,
         ) = conn
+
+        _apply_heartbeat_config(state, heartbeat_config)
+        log(
+            INFO,
+            "[Heartbeat] Applied SuperLink ClientApp policy: "
+            "app_rpc_timeout_s=%s token_lease_s=%s",
+            heartbeat_config.app_rpc_timeout,
+            heartbeat_config.clientapp_token_lease,
+        )
+
+        # Start SuperExec after activation so its ClientApps inherit the policy
+        # negotiated with the SuperLink.
+        if isolation == ISOLATION_MODE_SUBPROCESS:
+            command = ["flower-superexec", "--insecure"]
+            command += ["--appio-api-address", clientappio_api_address]
+            command += ["--plugin-type", ExecPluginType.CLIENT_APP]
+            command += ["--parent-pid", str(os.getpid())]
+            # pylint: disable-next=consider-using-with
+            subprocess.Popen(command)
+
         clientappio_servicer.set_confirm_message_received_fn(confirm_message_received)
         # Store node_id in state
         state.set_node_id(node_id)
@@ -631,6 +652,7 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
         Callable[[int, str, bytes], None],
         Callable[[int, str], None],
         Callable[[list[dict[str, object]]], None],
+        HeartbeatConfig,
     ]
 ]:
     """Establish a connection to the Fleet API server at SuperLink."""
@@ -681,7 +703,9 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
         authentication_keys,
     ) as conn:
         if len(conn) == 8:
-            yield (*conn, lambda _events: None)
+            yield (*conn, lambda _events: None, DEFAULT_HEARTBEAT_CONFIG)
+        elif len(conn) == 9:
+            yield (*conn, DEFAULT_HEARTBEAT_CONFIG)
         else:
             yield conn
 

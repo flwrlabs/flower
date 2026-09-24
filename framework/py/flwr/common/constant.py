@@ -57,22 +57,71 @@ SIMULATIONIO_API_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{SIMULATIONIO_PORT}"
 SIMULATIONIO_API_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{SIMULATIONIO_PORT}"
 
 # Constants for heartbeat
-HEARTBEAT_DEFAULT_INTERVAL = 30
-HEARTBEAT_CALL_TIMEOUT = 5
+HEARTBEAT_MIN_INTERVAL = 10
+HEARTBEAT_MAX_INTERVAL = 1800  # 30 minutes
+_HEARTBEAT_PROFILES = {
+    "default": {
+        "interval": 30,
+        "rpc_timeout": 5,
+        "app_rpc_timeout": 30,
+        "patience": 2,
+        "token_lease": 600,
+    },
+    "slow": {
+        "interval": 60,
+        "rpc_timeout": 45,
+        "app_rpc_timeout": 180,
+        "patience": 20,
+        "token_lease": 3600,
+    },
+}
+_heartbeat_profile_name = os.getenv("FLWR_HEARTBEAT_PROFILE", "default").lower()
+if _heartbeat_profile_name not in _HEARTBEAT_PROFILES:
+    raise ValueError(
+        "FLWR_HEARTBEAT_PROFILE must be one of "
+        f"{', '.join(sorted(_HEARTBEAT_PROFILES))}"
+    )
+_heartbeat_profile = _HEARTBEAT_PROFILES[_heartbeat_profile_name]
+HEARTBEAT_DEFAULT_INTERVAL = int(
+    os.getenv("FLWR_HEARTBEAT_INTERVAL_S", str(_heartbeat_profile["interval"]))
+)
+HEARTBEAT_CALL_TIMEOUT = int(
+    os.getenv("FLWR_HEARTBEAT_RPC_TIMEOUT_S", str(_heartbeat_profile["rpc_timeout"]))
+)
 # App heartbeats use a local AppIO connection, but large object transfers can still
 # delay an RPC on a busy channel. Keep this separate from the remote node heartbeat
 # deadline so a slower app heartbeat does not weaken node-failure detection.
-APP_HEARTBEAT_CALL_TIMEOUT = 30
+APP_HEARTBEAT_CALL_TIMEOUT = int(
+    os.getenv(
+        "FLWR_APP_HEARTBEAT_RPC_TIMEOUT_S",
+        str(_heartbeat_profile["app_rpc_timeout"]),
+    )
+)
 HEARTBEAT_BASE_MULTIPLIER = 0.8
 HEARTBEAT_RANDOM_RANGE = (-0.1, 0.1)
-HEARTBEAT_MIN_INTERVAL = 10
-HEARTBEAT_MAX_INTERVAL = 1800  # 30 minutes
 HEARTBEAT_INTERVAL_INF = 1e300  # Large value, disabling heartbeats
-HEARTBEAT_PATIENCE = 2
+HEARTBEAT_PATIENCE = _heartbeat_profile["patience"]
 # Allow time for a large ClientApp message to start before its first heartbeat.
 HEARTBEAT_INITIAL_GRACE_PERIOD = 120
 # Allow heartbeat gaps while a large ClientApp message is being processed.
-HEARTBEAT_CLIENTAPP_LEASE = 600
+HEARTBEAT_CLIENTAPP_LEASE = _heartbeat_profile["token_lease"]
+
+if not HEARTBEAT_MIN_INTERVAL <= HEARTBEAT_DEFAULT_INTERVAL <= HEARTBEAT_MAX_INTERVAL:
+    raise ValueError(
+        "The heartbeat profile interval must be between "
+        f"{HEARTBEAT_MIN_INTERVAL} and {HEARTBEAT_MAX_INTERVAL} seconds"
+    )
+if HEARTBEAT_CALL_TIMEOUT <= 0 or HEARTBEAT_CALL_TIMEOUT >= HEARTBEAT_DEFAULT_INTERVAL:
+    raise ValueError(
+        "The heartbeat profile RPC timeout must be positive and less than "
+        "its interval"
+    )
+if APP_HEARTBEAT_CALL_TIMEOUT <= 0:
+    raise ValueError("The heartbeat profile app RPC timeout must be positive")
+if HEARTBEAT_PATIENCE <= 0:
+    raise ValueError("The heartbeat profile patience must be positive")
+if HEARTBEAT_CLIENTAPP_LEASE <= 0:
+    raise ValueError("The heartbeat profile token lease must be positive")
 RUN_FAILURE_DETAILS_NO_HEARTBEAT = "No heartbeat received from the run."
 
 # IDs

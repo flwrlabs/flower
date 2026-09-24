@@ -22,7 +22,6 @@ from typing import cast
 from flwr.common import now
 from flwr.common.constant import (
     FLWR_APP_TOKEN_LENGTH,
-    HEARTBEAT_CLIENTAPP_LEASE,
     HEARTBEAT_INITIAL_GRACE_PERIOD,
 )
 from flwr.common.logger import log
@@ -123,7 +122,7 @@ class SqliteCoreState(CoreState, SqliteMixin):
 
         # Update the active_until field
         current = now().timestamp()
-        active_until = current + HEARTBEAT_CLIENTAPP_LEASE
+        active_until = current + self.clientapp_token_lease
         query = """
             UPDATE token_store
             SET active_until = :active_until
@@ -138,7 +137,7 @@ class SqliteCoreState(CoreState, SqliteMixin):
                 "ClientApp heartbeat accepted: run_id=%s token=%s lease_s=%s",
                 int64_to_uint64(rows[0]["run_id"]),
                 mask_string(token),
-                HEARTBEAT_CLIENTAPP_LEASE,
+                self.clientapp_token_lease,
             )
         else:
             log(
@@ -174,7 +173,7 @@ class SqliteCoreState(CoreState, SqliteMixin):
                     INFO,
                     "ClientApp token lease expired: run_ids=%s lease_s=%s",
                     [run_id for run_id, _ in expired_records],
-                    HEARTBEAT_CLIENTAPP_LEASE,
+                    self.clientapp_token_lease,
                 )
                 log(
                     WARNING,

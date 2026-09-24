@@ -18,6 +18,7 @@ import random
 import signal
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 from logging import DEBUG, ERROR, WARNING
 
 import grpc
@@ -27,6 +28,7 @@ from flwr.common.constant import (
     HEARTBEAT_BASE_MULTIPLIER,
     HEARTBEAT_CALL_TIMEOUT,
     HEARTBEAT_DEFAULT_INTERVAL,
+    HEARTBEAT_CLIENTAPP_LEASE,
     HEARTBEAT_RANDOM_RANGE,
 )
 from flwr.common.logger import log
@@ -46,6 +48,24 @@ class HeartbeatFailure(Exception):
     """Exception raised when a heartbeat fails."""
 
 
+@dataclass(frozen=True)
+class HeartbeatConfig:
+    """Heartbeat timing selected by the SuperLink."""
+
+    interval: float
+    rpc_timeout: float
+    app_rpc_timeout: float
+    clientapp_token_lease: int
+
+
+DEFAULT_HEARTBEAT_CONFIG = HeartbeatConfig(
+    interval=HEARTBEAT_DEFAULT_INTERVAL,
+    rpc_timeout=HEARTBEAT_CALL_TIMEOUT,
+    app_rpc_timeout=APP_HEARTBEAT_CALL_TIMEOUT,
+    clientapp_token_lease=HEARTBEAT_CLIENTAPP_LEASE,
+)
+
+
 class HeartbeatSender:
     """Periodically send heartbeat signals to a server in a background thread.
 
@@ -63,8 +83,12 @@ class HeartbeatSender:
     def __init__(
         self,
         heartbeat_fn: Callable[[], bool],
+        interval: float = HEARTBEAT_DEFAULT_INTERVAL,
+        rpc_timeout: float = HEARTBEAT_CALL_TIMEOUT,
     ) -> None:
         self.heartbeat_fn = heartbeat_fn
+        self.interval = interval
+        self.rpc_timeout = rpc_timeout
         self._stop_event = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._retry_invoker = RetryInvoker(
@@ -105,7 +129,7 @@ class HeartbeatSender:
             # Calculate the interval for the next heartbeat
             # Formula: next_interval = (interval - timeout) * random.uniform(0.7, 0.9)
             rd = random.uniform(*HEARTBEAT_RANDOM_RANGE)
-            next_interval: float = HEARTBEAT_DEFAULT_INTERVAL - HEARTBEAT_CALL_TIMEOUT
+            next_interval: float = self.interval - self.rpc_timeout
             next_interval *= HEARTBEAT_BASE_MULTIPLIER + rd
 
             # Wait for the calculated interval or exit early if stopped
@@ -125,6 +149,7 @@ class HeartbeatSender:
 def make_app_heartbeat_fn_grpc(
     stub: ServerAppIoStub | SimulationIoStub | ClientAppIoStub,
     token: str,
+    timeout: float = APP_HEARTBEAT_CALL_TIMEOUT,
 ) -> Callable[[], bool]:
     """Get the function to send a heartbeat to gRPC endpoint from an app process.
 
@@ -146,7 +171,7 @@ def make_app_heartbeat_fn_grpc(
     def fn() -> bool:
         # Call ServerAppIo API
         try:
-            res = stub.SendAppHeartbeat(req, timeout=APP_HEARTBEAT_CALL_TIMEOUT)
+            res = stub.SendAppHeartbeat(req, timeout=timeout)
         except grpc.RpcError as e:
             status_code = e.code()
             retryable = status_code in {

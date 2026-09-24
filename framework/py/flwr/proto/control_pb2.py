@@ -5,7 +5,6 @@
 # Protobuf Python Version: 5.29.0
 """Generated protocol buffer code."""
 from google.protobuf import descriptor as _descriptor
-from google.protobuf import descriptor_pb2 as _descriptor_pb2
 from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
@@ -31,48 +30,11 @@ from flwr.proto import node_pb2 as flwr_dot_proto_dot_node__pb2
 from flwr.proto import federation_pb2 as flwr_dot_proto_dot_federation__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x18\x66lwr/proto/control.proto\x12\nflwr.proto\x1a\x14\x66lwr/proto/fab.proto\x1a\x1a\x66lwr/proto/transport.proto\x1a\x1b\x66lwr/proto/recorddict.proto\x1a\x14\x66lwr/proto/run.proto\x1a\x15\x66lwr/proto/node.proto\x1a\x1b\x66lwr/proto/federation.proto\"\xa0\x02\n\x0fStartRunRequest\x12\x1c\n\x03\x66\x61\x62\x18\x01 \x01(\x0b\x32\x0f.flwr.proto.Fab\x12H\n\x0foverride_config\x18\x02 \x03(\x0b\x32/.flwr.proto.StartRunRequest.OverrideConfigEntry\x12\x34\n\x12\x66\x65\x64\x65ration_options\x18\x03 \x01(\x0b\x32\x18.flwr.proto.ConfigRecord\x12\x10\n\x08\x61pp_spec\x18\x04 \x01(\t\x12\x12\n\nfederation\x18\x05 \x01(\t\x1aI\n\x13OverrideConfigEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12!\n\x05value\x18\x02 \x01(\x0b\x32\x12.flwr.proto.Scalar:\x02\x38\x01\"2\n\x10StartRunResponse\x12\x13\n\x06run_id\x18\x01 \x01(\x04H\x00\x88\x01\x01\x42\t\n\x07_run_id\"<\n\x11StreamLogsRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\x12\x17\n\x0f\x61\x66ter_timestamp\x18\x02 \x01(\x01\"B\n\x12StreamLogsResponse\x12\x12\n\nlog_output\x18\x01 \x01(\t\x12\x18\n\x10latest_timestamp\x18\x02 \x01(\x01\"1\n\x0fListRunsRequest\x12\x13\n\x06run_id\x18\x01 \x01(\x04H\x00\x88\x01\x01\x42\t\n\x07_run_id\"\x9d\x01\n\x10ListRunsResponse\x12;\n\x08run_dict\x18\x01 \x03(\x0b\x32).flwr.proto.ListRunsResponse.RunDictEntry\x12\x0b\n\x03now\x18\x02 \x01(\t\x1a?\n\x0cRunDictEntry\x12\x0b\n\x03key\x18\x01 \x01(\x04\x12\x1e\n\x05value\x18\x02 \x01(\x0b\x32\x0f.flwr.proto.Run:\x02\x38\x01\"\x18\n\x16GetLoginDetailsRequest\"\x8b\x01\n\x17GetLoginDetailsResponse\x12\x12\n\nauthn_type\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65vice_code\x18\x02 \x01(\t\x12!\n\x19verification_uri_complete\x18\x03 \x01(\t\x12\x12\n\nexpires_in\x18\x04 \x01(\x03\x12\x10\n\x08interval\x18\x05 \x01(\x03\"+\n\x14GetAuthTokensRequest\x12\x13\n\x0b\x64\x65vice_code\x18\x01 \x01(\t\"D\n\x15GetAuthTokensResponse\x12\x14\n\x0c\x61\x63\x63\x65ss_token\x18\x01 \x01(\t\x12\x15\n\rrefresh_token\x18\x02 \x01(\t\" \n\x0eStopRunRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\"\"\n\x0fStopRunResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\"&\n\x14PullArtifactsRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\"1\n\x15PullArtifactsResponse\x12\x10\n\x03url\x18\x01 \x01(\tH\x00\x88\x01\x01\x42\x06\n\x04_url\")\n\x13RegisterNodeRequest\x12\x12\n\npublic_key\x18\x01 \x01(\x0c\"8\n\x14RegisterNodeResponse\x12\x14\n\x07node_id\x18\x01 \x01(\x04H\x00\x88\x01\x01\x42\n\n\x08_node_id\"(\n\x15UnregisterNodeRequest\x12\x0f\n\x07node_id\x18\x01 \x01(\x04\"\x18\n\x16UnregisterNodeResponse\"\x12\n\x10ListNodesRequest\"J\n\x11ListNodesResponse\x12(\n\nnodes_info\x18\x01 \x03(\x0b\x32\x14.flwr.proto.NodeInfo\x12\x0b\n\x03now\x18\x02 \x01(\t\"\x18\n\x16ListFederationsRequest\"F\n\x17ListFederationsResponse\x12+\n\x0b\x66\x65\x64\x65rations\x18\x01 \x03(\x0b\x32\x16.flwr.proto.Federation\"0\n\x15ShowFederationRequest\x12\x17\n\x0f\x66\x65\x64\x65ration_name\x18\x01 \x01(\t\"Q\n\x16ShowFederationResponse\x12*\n\nfederation\x18\x01 \x01(\x0b\x32\x16.flwr.proto.Federation\x12\x0b\n\x03now\x18\x02 \x01(\t2\xf5\x07\n\x07\x43ontrol\x12G\n\x08StartRun\x12\x1b.flwr.proto.StartRunRequest\x1a\x1c.flwr.proto.StartRunResponse\"\x00\x12\x44\n\x07StopRun\x12\x1a.flwr.proto.StopRunRequest\x1a\x1b.flwr.proto.StopRunResponse\"\x00\x12O\n\nStreamLogs\x12\x1d.flwr.proto.StreamLogsRequest\x1a\x1e.flwr.proto.StreamLogsResponse\"\x00\x30\x01\x12G\n\x08ListRuns\x12\x1b.flwr.proto.ListRunsRequest\x1a\x1c.flwr.proto.ListRunsResponse\"\x00\x12\\\n\x0fGetLoginDetails\x12\".flwr.proto.GetLoginDetailsRequest\x1a#.flwr.proto.GetLoginDetailsResponse\"\x00\x12V\n\rGetAuthTokens\x12 .flwr.proto.GetAuthTokensRequest\x1a!.flwr.proto.GetAuthTokensResponse\"\x00\x12V\n\rPullArtifacts\x12 .flwr.proto.PullArtifactsRequest\x1a!.flwr.proto.PullArtifactsResponse\"\x00\x12S\n\x0cRegisterNode\x12\x1f.flwr.proto.RegisterNodeRequest\x1a .flwr.proto.RegisterNodeResponse\"\x00\x12Y\n\x0eUnregisterNode\x12!.flwr.proto.UnregisterNodeRequest\x1a\".flwr.proto.UnregisterNodeResponse\"\x00\x12J\n\tListNodes\x12\x1c.flwr.proto.ListNodesRequest\x1a\x1d.flwr.proto.ListNodesResponse\"\x00\x12\\\n\x0fListFederations\x12\".flwr.proto.ListFederationsRequest\x1a#.flwr.proto.ListFederationsResponse\"\x00\x12Y\n\x0eShowFederation\x12!.flwr.proto.ShowFederationRequest\x1a\".flwr.proto.ShowFederationResponse\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x18\x66lwr/proto/control.proto\x12\nflwr.proto\x1a\x14\x66lwr/proto/fab.proto\x1a\x1a\x66lwr/proto/transport.proto\x1a\x1b\x66lwr/proto/recorddict.proto\x1a\x14\x66lwr/proto/run.proto\x1a\x15\x66lwr/proto/node.proto\x1a\x1b\x66lwr/proto/federation.proto\"\xa0\x02\n\x0fStartRunRequest\x12\x1c\n\x03\x66\x61\x62\x18\x01 \x01(\x0b\x32\x0f.flwr.proto.Fab\x12H\n\x0foverride_config\x18\x02 \x03(\x0b\x32/.flwr.proto.StartRunRequest.OverrideConfigEntry\x12\x34\n\x12\x66\x65\x64\x65ration_options\x18\x03 \x01(\x0b\x32\x18.flwr.proto.ConfigRecord\x12\x10\n\x08\x61pp_spec\x18\x04 \x01(\t\x12\x12\n\nfederation\x18\x05 \x01(\t\x1aI\n\x13OverrideConfigEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12!\n\x05value\x18\x02 \x01(\x0b\x32\x12.flwr.proto.Scalar:\x02\x38\x01\"2\n\x10StartRunResponse\x12\x13\n\x06run_id\x18\x01 \x01(\x04H\x00\x88\x01\x01\x42\t\n\x07_run_id\"<\n\x11StreamLogsRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\x12\x17\n\x0f\x61\x66ter_timestamp\x18\x02 \x01(\x01\"B\n\x12StreamLogsResponse\x12\x12\n\nlog_output\x18\x01 \x01(\t\x12\x18\n\x10latest_timestamp\x18\x02 \x01(\x01\"1\n\x0fListRunsRequest\x12\x13\n\x06run_id\x18\x01 \x01(\x04H\x00\x88\x01\x01\x42\t\n\x07_run_id\"\x9d\x01\n\x10ListRunsResponse\x12;\n\x08run_dict\x18\x01 \x03(\x0b\x32).flwr.proto.ListRunsResponse.RunDictEntry\x12\x0b\n\x03now\x18\x02 \x01(\t\x1a?\n\x0cRunDictEntry\x12\x0b\n\x03key\x18\x01 \x01(\x04\x12\x1e\n\x05value\x18\x02 \x01(\x0b\x32\x0f.flwr.proto.Run:\x02\x38\x01\"&\n\x14GetRunProfileRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\"-\n\x15GetRunProfileResponse\x12\x14\n\x0csummary_json\x18\x01 \x01(\x0c\")\n\x17StreamRunProfileRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\"\x18\n\x16GetLoginDetailsRequest\"\x8b\x01\n\x17GetLoginDetailsResponse\x12\x12\n\nauthn_type\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65vice_code\x18\x02 \x01(\t\x12!\n\x19verification_uri_complete\x18\x03 \x01(\t\x12\x12\n\nexpires_in\x18\x04 \x01(\x03\x12\x10\n\x08interval\x18\x05 \x01(\x03\"+\n\x14GetAuthTokensRequest\x12\x13\n\x0b\x64\x65vice_code\x18\x01 \x01(\t\"D\n\x15GetAuthTokensResponse\x12\x14\n\x0c\x61\x63\x63\x65ss_token\x18\x01 \x01(\t\x12\x15\n\rrefresh_token\x18\x02 \x01(\t\" \n\x0eStopRunRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\"\"\n\x0fStopRunResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\"&\n\x14PullArtifactsRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\"1\n\x15PullArtifactsResponse\x12\x10\n\x03url\x18\x01 \x01(\tH\x00\x88\x01\x01\x42\x06\n\x04_url\")\n\x13RegisterNodeRequest\x12\x12\n\npublic_key\x18\x01 \x01(\x0c\"8\n\x14RegisterNodeResponse\x12\x14\n\x07node_id\x18\x01 \x01(\x04H\x00\x88\x01\x01\x42\n\n\x08_node_id\"(\n\x15UnregisterNodeRequest\x12\x0f\n\x07node_id\x18\x01 \x01(\x04\"\x18\n\x16UnregisterNodeResponse\"\x12\n\x10ListNodesRequest\"J\n\x11ListNodesResponse\x12(\n\nnodes_info\x18\x01 \x03(\x0b\x32\x14.flwr.proto.NodeInfo\x12\x0b\n\x03now\x18\x02 \x01(\t\"\x18\n\x16ListFederationsRequest\"F\n\x17ListFederationsResponse\x12+\n\x0b\x66\x65\x64\x65rations\x18\x01 \x03(\x0b\x32\x16.flwr.proto.Federation\"0\n\x15ShowFederationRequest\x12\x17\n\x0f\x66\x65\x64\x65ration_name\x18\x01 \x01(\t\"Q\n\x16ShowFederationResponse\x12*\n\nfederation\x18\x01 \x01(\x0b\x32\x16.flwr.proto.Federation\x12\x0b\n\x03now\x18\x02 \x01(\t2\xad\t\n\x07\x43ontrol\x12G\n\x08StartRun\x12\x1b.flwr.proto.StartRunRequest\x1a\x1c.flwr.proto.StartRunResponse\"\x00\x12\x44\n\x07StopRun\x12\x1a.flwr.proto.StopRunRequest\x1a\x1b.flwr.proto.StopRunResponse\"\x00\x12O\n\nStreamLogs\x12\x1d.flwr.proto.StreamLogsRequest\x1a\x1e.flwr.proto.StreamLogsResponse\"\x00\x30\x01\x12G\n\x08ListRuns\x12\x1b.flwr.proto.ListRunsRequest\x1a\x1c.flwr.proto.ListRunsResponse\"\x00\x12V\n\rGetRunProfile\x12 .flwr.proto.GetRunProfileRequest\x1a!.flwr.proto.GetRunProfileResponse\"\x00\x12^\n\x10StreamRunProfile\x12#.flwr.proto.StreamRunProfileRequest\x1a!.flwr.proto.GetRunProfileResponse\"\x00\x30\x01\x12\\\n\x0fGetLoginDetails\x12\".flwr.proto.GetLoginDetailsRequest\x1a#.flwr.proto.GetLoginDetailsResponse\"\x00\x12V\n\rGetAuthTokens\x12 .flwr.proto.GetAuthTokensRequest\x1a!.flwr.proto.GetAuthTokensResponse\"\x00\x12V\n\rPullArtifacts\x12 .flwr.proto.PullArtifactsRequest\x1a!.flwr.proto.PullArtifactsResponse\"\x00\x12S\n\x0cRegisterNode\x12\x1f.flwr.proto.RegisterNodeRequest\x1a .flwr.proto.RegisterNodeResponse\"\x00\x12Y\n\x0eUnregisterNode\x12!.flwr.proto.UnregisterNodeRequest\x1a\".flwr.proto.UnregisterNodeResponse\"\x00\x12J\n\tListNodes\x12\x1c.flwr.proto.ListNodesRequest\x1a\x1d.flwr.proto.ListNodesResponse\"\x00\x12\\\n\x0fListFederations\x12\".flwr.proto.ListFederationsRequest\x1a#.flwr.proto.ListFederationsResponse\"\x00\x12Y\n\x0eShowFederation\x12!.flwr.proto.ShowFederationRequest\x1a\".flwr.proto.ShowFederationResponse\"\x00\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'flwr.proto.control_pb2', _globals)
-
-# Additional messages for run profiling (manually added)
-_profile_fd = _descriptor_pb2.FileDescriptorProto()
-_profile_fd.name = "flwr/proto/control_profile.proto"
-_profile_fd.package = "flwr.proto"
-_profile_fd.syntax = "proto3"
-_req_msg = _profile_fd.message_type.add()
-_req_msg.name = "GetRunProfileRequest"
-_req_field = _req_msg.field.add()
-_req_field.name = "run_id"
-_req_field.number = 1
-_req_field.label = _descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL
-_req_field.type = _descriptor_pb2.FieldDescriptorProto.TYPE_UINT64
-_res_msg = _profile_fd.message_type.add()
-_res_msg.name = "GetRunProfileResponse"
-_res_field = _res_msg.field.add()
-_res_field.name = "summary_json"
-_res_field.number = 1
-_res_field.label = _descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL
-_res_field.type = _descriptor_pb2.FieldDescriptorProto.TYPE_BYTES
-
-# Add StreamRunProfileRequest for live profile streaming
-_stream_req_msg = _profile_fd.message_type.add()
-_stream_req_msg.name = "StreamRunProfileRequest"
-_stream_req_field = _stream_req_msg.field.add()
-_stream_req_field.name = "run_id"
-_stream_req_field.number = 1
-_stream_req_field.label = _descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL
-_stream_req_field.type = _descriptor_pb2.FieldDescriptorProto.TYPE_UINT64
-
-PROFILE_DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    _profile_fd.SerializeToString()
-)
-_builder.BuildMessageAndEnumDescriptors(PROFILE_DESCRIPTOR, _globals)
-_builder.BuildTopDescriptorsAndMessages(
-    PROFILE_DESCRIPTOR, 'flwr.proto.control_pb2', _globals
-)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_STARTRUNREQUEST_OVERRIDECONFIGENTRY']._loaded_options = None
@@ -95,42 +57,48 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_LISTRUNSRESPONSE']._serialized_end=875
   _globals['_LISTRUNSRESPONSE_RUNDICTENTRY']._serialized_start=812
   _globals['_LISTRUNSRESPONSE_RUNDICTENTRY']._serialized_end=875
-  _globals['_GETLOGINDETAILSREQUEST']._serialized_start=877
-  _globals['_GETLOGINDETAILSREQUEST']._serialized_end=901
-  _globals['_GETLOGINDETAILSRESPONSE']._serialized_start=904
-  _globals['_GETLOGINDETAILSRESPONSE']._serialized_end=1043
-  _globals['_GETAUTHTOKENSREQUEST']._serialized_start=1045
-  _globals['_GETAUTHTOKENSREQUEST']._serialized_end=1088
-  _globals['_GETAUTHTOKENSRESPONSE']._serialized_start=1090
-  _globals['_GETAUTHTOKENSRESPONSE']._serialized_end=1158
-  _globals['_STOPRUNREQUEST']._serialized_start=1160
-  _globals['_STOPRUNREQUEST']._serialized_end=1192
-  _globals['_STOPRUNRESPONSE']._serialized_start=1194
-  _globals['_STOPRUNRESPONSE']._serialized_end=1228
-  _globals['_PULLARTIFACTSREQUEST']._serialized_start=1230
-  _globals['_PULLARTIFACTSREQUEST']._serialized_end=1268
-  _globals['_PULLARTIFACTSRESPONSE']._serialized_start=1270
-  _globals['_PULLARTIFACTSRESPONSE']._serialized_end=1319
-  _globals['_REGISTERNODEREQUEST']._serialized_start=1321
-  _globals['_REGISTERNODEREQUEST']._serialized_end=1362
-  _globals['_REGISTERNODERESPONSE']._serialized_start=1364
-  _globals['_REGISTERNODERESPONSE']._serialized_end=1420
-  _globals['_UNREGISTERNODEREQUEST']._serialized_start=1422
-  _globals['_UNREGISTERNODEREQUEST']._serialized_end=1462
-  _globals['_UNREGISTERNODERESPONSE']._serialized_start=1464
-  _globals['_UNREGISTERNODERESPONSE']._serialized_end=1488
-  _globals['_LISTNODESREQUEST']._serialized_start=1490
-  _globals['_LISTNODESREQUEST']._serialized_end=1508
-  _globals['_LISTNODESRESPONSE']._serialized_start=1510
-  _globals['_LISTNODESRESPONSE']._serialized_end=1584
-  _globals['_LISTFEDERATIONSREQUEST']._serialized_start=1586
-  _globals['_LISTFEDERATIONSREQUEST']._serialized_end=1610
-  _globals['_LISTFEDERATIONSRESPONSE']._serialized_start=1612
-  _globals['_LISTFEDERATIONSRESPONSE']._serialized_end=1682
-  _globals['_SHOWFEDERATIONREQUEST']._serialized_start=1684
-  _globals['_SHOWFEDERATIONREQUEST']._serialized_end=1732
-  _globals['_SHOWFEDERATIONRESPONSE']._serialized_start=1734
-  _globals['_SHOWFEDERATIONRESPONSE']._serialized_end=1815
-  _globals['_CONTROL']._serialized_start=1818
-  _globals['_CONTROL']._serialized_end=2831
+  _globals['_GETRUNPROFILEREQUEST']._serialized_start=877
+  _globals['_GETRUNPROFILEREQUEST']._serialized_end=915
+  _globals['_GETRUNPROFILERESPONSE']._serialized_start=917
+  _globals['_GETRUNPROFILERESPONSE']._serialized_end=962
+  _globals['_STREAMRUNPROFILEREQUEST']._serialized_start=964
+  _globals['_STREAMRUNPROFILEREQUEST']._serialized_end=1005
+  _globals['_GETLOGINDETAILSREQUEST']._serialized_start=1007
+  _globals['_GETLOGINDETAILSREQUEST']._serialized_end=1031
+  _globals['_GETLOGINDETAILSRESPONSE']._serialized_start=1034
+  _globals['_GETLOGINDETAILSRESPONSE']._serialized_end=1173
+  _globals['_GETAUTHTOKENSREQUEST']._serialized_start=1175
+  _globals['_GETAUTHTOKENSREQUEST']._serialized_end=1218
+  _globals['_GETAUTHTOKENSRESPONSE']._serialized_start=1220
+  _globals['_GETAUTHTOKENSRESPONSE']._serialized_end=1288
+  _globals['_STOPRUNREQUEST']._serialized_start=1290
+  _globals['_STOPRUNREQUEST']._serialized_end=1322
+  _globals['_STOPRUNRESPONSE']._serialized_start=1324
+  _globals['_STOPRUNRESPONSE']._serialized_end=1358
+  _globals['_PULLARTIFACTSREQUEST']._serialized_start=1360
+  _globals['_PULLARTIFACTSREQUEST']._serialized_end=1398
+  _globals['_PULLARTIFACTSRESPONSE']._serialized_start=1400
+  _globals['_PULLARTIFACTSRESPONSE']._serialized_end=1449
+  _globals['_REGISTERNODEREQUEST']._serialized_start=1451
+  _globals['_REGISTERNODEREQUEST']._serialized_end=1492
+  _globals['_REGISTERNODERESPONSE']._serialized_start=1494
+  _globals['_REGISTERNODERESPONSE']._serialized_end=1550
+  _globals['_UNREGISTERNODEREQUEST']._serialized_start=1552
+  _globals['_UNREGISTERNODEREQUEST']._serialized_end=1592
+  _globals['_UNREGISTERNODERESPONSE']._serialized_start=1594
+  _globals['_UNREGISTERNODERESPONSE']._serialized_end=1618
+  _globals['_LISTNODESREQUEST']._serialized_start=1620
+  _globals['_LISTNODESREQUEST']._serialized_end=1638
+  _globals['_LISTNODESRESPONSE']._serialized_start=1640
+  _globals['_LISTNODESRESPONSE']._serialized_end=1714
+  _globals['_LISTFEDERATIONSREQUEST']._serialized_start=1716
+  _globals['_LISTFEDERATIONSREQUEST']._serialized_end=1740
+  _globals['_LISTFEDERATIONSRESPONSE']._serialized_start=1742
+  _globals['_LISTFEDERATIONSRESPONSE']._serialized_end=1812
+  _globals['_SHOWFEDERATIONREQUEST']._serialized_start=1814
+  _globals['_SHOWFEDERATIONREQUEST']._serialized_end=1862
+  _globals['_SHOWFEDERATIONRESPONSE']._serialized_start=1864
+  _globals['_SHOWFEDERATIONRESPONSE']._serialized_end=1945
+  _globals['_CONTROL']._serialized_start=1948
+  _globals['_CONTROL']._serialized_end=3145
 # @@protoc_insertion_point(module_scope)

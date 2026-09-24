@@ -80,7 +80,13 @@ message ActivateNodeRequest {
   bytes public_key = 1;
   double heartbeat_interval = 2;
 }
-message ActivateNodeResponse { uint64 node_id = 1; }
+message ActivateNodeResponse {
+  uint64 node_id = 1;
+  double heartbeat_interval = 2;
+  double heartbeat_rpc_timeout = 3;
+  double app_heartbeat_rpc_timeout = 4;
+  uint32 clientapp_token_lease = 5;
+}
 
 // DeactivateNode messages
 message DeactivateNodeRequest { uint64 node_id = 1; }

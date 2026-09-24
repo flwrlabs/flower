@@ -201,6 +201,30 @@ any) or set the insecure flag (only when testing locally, real deployments requi
    If you want to rerun the project or test an updated version by making changes to the
    code, simply re-run the command above.
 
+*****************************************
+ Heartbeat Settings for Slow Connections
+*****************************************
+
+For federations that transfer very large messages over slow or intermittently delayed
+connections, select the ``slow`` heartbeat profile once in the SuperLink startup
+environment, before launching it:
+
+.. code-block:: bash
+
+    export FLWR_HEARTBEAT_PROFILE=slow
+
+The SuperLink sends the selected heartbeat policy to each SuperNode when it connects;
+the SuperNode applies the ClientApp settings locally. This requires the updated Flower
+version on the SuperLink and SuperNodes, but no per-site heartbeat environment settings.
+Central policy propagation currently applies to the gRPC Fleet transports
+(``grpc-rere`` and ``grpc-adapter``).
+The ``slow`` profile uses a 60-second heartbeat interval, a 45-second SuperNode
+heartbeat RPC timeout, a 180-second ClientApp heartbeat RPC timeout, a 20-minute
+SuperNode offline threshold, and a 1-hour ClientApp token lease. It delays detection of
+genuinely failed nodes and apps, so use it only when long transfer stalls are expected.
+This is a service-level setting, not a ``flwr run --run-config`` option; set it before
+starting the SuperLink.
+
 ******************
  Step 4: Clean Up
 ******************

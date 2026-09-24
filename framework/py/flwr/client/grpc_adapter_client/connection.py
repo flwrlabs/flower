@@ -29,6 +29,7 @@ from flwr.common.message import Message
 from flwr.common.retry_invoker import RetryInvoker
 from flwr.common.typing import Fab, Run
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.supercore.heartbeat import HeartbeatConfig
 
 
 @contextmanager
@@ -52,6 +53,7 @@ def grpc_adapter(  # pylint: disable=R0913,too-many-positional-arguments
         Callable[[int, str, bytes], None],
         Callable[[int, str], None],
         Callable[[list[dict[str, object]]], None],
+        HeartbeatConfig,
     ]
 ]:
     """Primitives for request/response-based interaction with a server via GrpcAdapter.

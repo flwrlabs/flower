@@ -93,6 +93,12 @@ class TestHeartbeatSender(unittest.TestCase):
         """Test that the thread is a daemon thread."""
         self.assertTrue(self.heartbeat_sender._thread.daemon)
 
+    def test_sender_accepts_negotiated_timing(self) -> None:
+        """SuperNodes can use timing negotiated with the SuperLink."""
+        sender = HeartbeatSender(self.mock_heartbeat_fn, interval=60, rpc_timeout=45)
+        self.assertEqual(sender.interval, 60)
+        self.assertEqual(sender.rpc_timeout, 45)
+
     def test_grpc_heartbeat_has_call_deadline(self) -> None:
         """A stalled heartbeat RPC must not block lease renewal indefinitely."""
         stub = Mock()
@@ -107,3 +113,12 @@ class TestHeartbeatSender(unittest.TestCase):
             stub.SendAppHeartbeat.call_args.kwargs["timeout"],
             APP_HEARTBEAT_CALL_TIMEOUT,
         )
+
+    def test_grpc_heartbeat_uses_negotiated_deadline(self) -> None:
+        """ClientApp heartbeat calls use the deadline passed by their SuperNode."""
+        stub = Mock()
+        stub.SendAppHeartbeat.return_value = Mock(success=True)
+        heartbeat_fn = make_app_heartbeat_fn_grpc(stub, "test-token", timeout=180)
+
+        self.assertTrue(heartbeat_fn())
+        self.assertEqual(stub.SendAppHeartbeat.call_args.kwargs["timeout"], 180)
