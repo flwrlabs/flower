@@ -70,6 +70,7 @@ from flwr.supercore.auth.typing import (
     AccountAuthLoginDetails,
     AccountInfo,
 )
+from flwr.supercore.constant import NOOP_FEDERATION_ID
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
@@ -161,7 +162,9 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
         ),
         (
             "/v1/control/disconnect-connector",
-            DisconnectConnectorRequest(connector_ref="google-drive"),
+            DisconnectConnectorRequest(
+                connector_ref="google-drive", federation="agent"
+            ),
             DisconnectConnectorResponse.FromString,
             DisconnectConnectorResponse(),
             "disconnect_connector",
@@ -171,6 +174,7 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
             BeginConnectorOAuthRequest(
                 connector_ref="google-drive",
                 redirect_uri="https://example.test/oauth/callback",
+                federation="agent",
             ),
             BeginConnectorOAuthResponse.FromString,
             BeginConnectorOAuthResponse(
@@ -234,7 +238,9 @@ def test_connector_route_returns_existing_structured_error() -> None:
 
     response = TestClient(app).post(
         "/v1/control/begin-connector-oauth",
-        content=BeginConnectorOAuthRequest().SerializeToString(),
+        content=BeginConnectorOAuthRequest(
+            federation=NOOP_FEDERATION_ID
+        ).SerializeToString(),
         headers={
             "authorization": "Bearer access-token",
             "content-type": PROTOBUF_MEDIA_TYPE,

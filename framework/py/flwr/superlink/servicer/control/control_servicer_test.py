@@ -238,11 +238,15 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             run_ids=run_ids or [],
         )
 
-    def _begin_connector_oauth(self) -> tuple[str, str]:
+    def _begin_connector_oauth(
+        self, federation_id: str = NOOP_FEDERATION_ID
+    ) -> tuple[str, str]:
         """Begin OAuth and return the persisted session ID and state."""
         response = self.servicer.BeginConnectorOAuth(
             BeginConnectorOAuthRequest(
-                connector_ref=" Slack ", redirect_uri="https://client.example/"
+                connector_ref=" Slack ",
+                redirect_uri="https://client.example/",
+                federation=federation_id,
             ),
             Mock(),
         )
@@ -252,6 +256,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         )
         assert session is not None
         self.assertEqual(response.connector_ref, "slack")
+        self.assertEqual(session.federation_id, federation_id)
         self.assertEqual(session.redirect_uri, "https://client.example/oauth/callback")
         self.assertTrue(session.pkce_verifier)
         return session.oauth_session_id, session.state
@@ -259,8 +264,15 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     def test_connector_oauth_flow(self) -> None:
         """Begin and complete a single-use OAuth flow."""
         flow = _OAuthFlow()
-        with patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}):
-            oauth_session_id, oauth_state = self._begin_connector_oauth()
+        federation_id = "@bob/fed-a"
+        with (
+            patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}),
+            patch.object(self.state.federation_manager, "exists", return_value=True),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=True
+            ),
+        ):
+            oauth_session_id, oauth_state = self._begin_connector_oauth(federation_id)
             request = CompleteConnectorOAuthRequest(
                 oauth_session_id=oauth_session_id,
                 code=" authorization-code ",
@@ -271,7 +283,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
             self.assertEqual(response.connector_ref, "slack")
             connector = self.state.get_connector(
-                federation_id=NOOP_FEDERATION_ID, connector_ref="slack"
+                federation_id=federation_id, connector_ref="slack"
             )
             assert connector is not None
             self.assertEqual(
@@ -300,19 +312,28 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 )
             )
 
-        with patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}):
+        with (
+            patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}),
+            patch.object(self.state.federation_manager, "exists", return_value=True),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=True
+            ),
+        ):
             response = self.servicer.ListConnectors(
-                ListConnectorsRequest(federation=NOOP_FEDERATION_ID), Mock()
+                ListConnectorsRequest(federation="@bob/fed-a"), Mock()
             )
             self.assertEqual(len(response.connectors), 1)
             self.assertTrue(response.connectors[0].connected)
 
             self.servicer.DisconnectConnector(
-                DisconnectConnectorRequest(connector_ref=" Slack "), Mock()
+                DisconnectConnectorRequest(
+                    connector_ref=" Slack ", federation="@bob/fed-a"
+                ),
+                Mock(),
             )
 
-        self.assertIsNone(self.state.get_connector(NOOP_FEDERATION_ID, "slack"))
-        self.assertIsNotNone(self.state.get_connector("@bob/fed-a", "slack"))
+        self.assertIsNotNone(self.state.get_connector(NOOP_FEDERATION_ID, "slack"))
+        self.assertIsNone(self.state.get_connector("@bob/fed-a", "slack"))
 
     def test_list_connectors_without_federation_returns_empty(self) -> None:
         """ListConnectors should return no connectors without a federation."""
@@ -337,6 +358,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             expired = self.state.create_connector_oauth_session(
                 oauth_session_id="expired-session",
                 flwr_aid=self.aid,
+                federation_id=NOOP_FEDERATION_ID,
                 connector_ref="slack",
                 state="expected-state",
                 redirect_uri="https://client.example/oauth/callback",
@@ -493,30 +515,21 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ["slack"],
         )
 
-    @parameterized.expand(  # type: ignore
-        [
-            (True, False),
-            (False, True),
-            (True, True),
-        ]
-    )
-    def test_start_run_rejects_connectors_for_capable_federation(
-        self,
-        can_invite_members: bool,
-        can_add_supernodes: bool,
-    ) -> None:
-        """StartRun should restrict connectors to personal-style federations."""
+    def test_start_run_allows_connectors_for_shared_federation(self) -> None:
+        """StartRun should allow connectors in a shared federation."""
+        federation_id = "@bob/fed-a"
         self.state.upsert_connector(
-            federation_id=NOOP_FEDERATION_ID,
+            federation_id=federation_id,
             connector_ref="slack",
             credentials_json="{}",
             config_json="{}",
             created_by=self.aid,
         )
         request = StartRunRequest(
-            federation=NOOP_FEDERATION_ID,
+            federation=federation_id,
             connector_refs=["slack"],
         )
+        request.fab.content = b"test FAB content with connector refs"
 
         with (
             patch.object(
@@ -526,22 +539,35 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ),
             patch.object(
                 self.state.federation_manager,
-                "get_details",
-                return_value=SimpleNamespace(
-                    can_invite_members=can_invite_members,
-                    can_add_supernodes=can_add_supernodes,
-                ),
+                "exists",
+                return_value=True,
             ),
-            self.assertRaises(FlowerError) as error,
+            patch.object(
+                self.state.federation_manager,
+                "has_member",
+                return_value=True,
+            ),
+            patch.object(
+                self.state.federation_manager,
+                "get_simulation_config",
+                return_value=None,
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers."
+                "get_metadata_from_config",
+                return_value=("flwr/demo", "1.0.0"),
+            ),
         ):
-            self.servicer.StartRun(request, self._make_start_run_context())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
 
-        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST)
         self.assertEqual(
-            error.exception.public_details,
-            "Connectors are currently available only in your personal workspace.",
+            list(self.state.get_run_connector_refs(run_id=response.run_id)),
+            ["slack"],
         )
-        self.assertEqual(list(self.state.get_run_info()), [])
 
     @parameterized.expand(  # type: ignore
         [

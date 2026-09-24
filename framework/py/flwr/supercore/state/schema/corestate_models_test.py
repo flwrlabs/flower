@@ -73,6 +73,13 @@ def test_connector_uses_incrementing_id_and_unique_federation_reference() -> Non
         assert table.c[column_name].nullable is True
 
 
+def test_connector_oauth_session_requires_federation_id() -> None:
+    """Ensure each OAuth session records its target federation."""
+    table = FlwrBase.metadata.tables["connector_oauth_session"]
+
+    assert table.c.federation_id.nullable is False
+
+
 def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:
     """Ensure keyless task_logs stays a table, not an ORM mapper."""
     assert "task_logs" in create_corestate_metadata().tables

@@ -55,6 +55,7 @@ from flwr.supercore.auth.typing import (
     AccountAuthLoginDetails,
     AccountInfo,
 )
+from flwr.supercore.constant import NOOP_FEDERATION_ID
 from flwr.supercore.error import ApiErrorCode
 from flwr.supercore.event_log.typing import LogEntry
 from flwr.supercore.license_plugin import LicensePlugin
@@ -195,6 +196,7 @@ def test_auth_routes_disable_caching_and_skip_event_logging(
             BeginConnectorOAuthRequest(
                 connector_ref="google-drive",
                 redirect_uri="https://example.test/oauth/callback",
+                federation="agent",
             ),
             BeginConnectorOAuthResponse(
                 oauth_session_id="oauth-session",
@@ -257,7 +259,9 @@ def test_connector_oauth_routes_disable_caching_and_skip_event_logging(
         ),
         (
             "/v1/control/disconnect-connector",
-            DisconnectConnectorRequest(connector_ref="google-drive"),
+            DisconnectConnectorRequest(
+                connector_ref="google-drive", federation="agent"
+            ),
             DisconnectConnectorResponse(),
             "disconnect_connector",
         ),
@@ -327,7 +331,9 @@ def test_connector_oauth_handler_error_disables_caching(
 
     response = client.post(
         "/v1/control/begin-connector-oauth",
-        content=BeginConnectorOAuthRequest().SerializeToString(),
+        content=BeginConnectorOAuthRequest(
+            federation=NOOP_FEDERATION_ID
+        ).SerializeToString(),
         headers={"content-type": PROTOBUF_MEDIA_TYPE},
     )
 
