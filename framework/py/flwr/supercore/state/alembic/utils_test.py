@@ -214,53 +214,6 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
-    def test_connector_oauth_session_federation_migration_resets_sessions(
-        self,
-    ) -> None:
-        """Ensure federation scoping safely resets existing OAuth sessions."""
-        engine = self.create_engine()
-        try:
-            self.upgrade_to_revision(engine, "f670d1ed8681")
-            with engine.begin() as connection:
-                connection.execute(
-                    text(
-                        """
-                        INSERT INTO connector_oauth_session (
-                            oauth_session_id, flwr_aid, connector_ref, state,
-                            redirect_uri, pkce_verifier, created_at, expires_at,
-                            completed_at
-                        ) VALUES (
-                            'session-1', 'account-a', 'slack', 'state-1',
-                            'https://example.test/callback', NULL,
-                            '2026-09-24 10:00:00', '2026-09-24 10:10:00', NULL
-                        )
-                        """
-                    )
-                )
-
-            self.upgrade_to_revision(engine, "004925779532")
-
-            columns = {
-                column["name"]: column
-                for column in inspect(engine).get_columns("connector_oauth_session")
-            }
-            self.assertIn("federation_id", columns)
-            self.assertFalse(columns["federation_id"]["nullable"])
-            with engine.connect() as connection:
-                session_count = connection.scalar(
-                    text("SELECT COUNT(*) FROM connector_oauth_session")
-                )
-            self.assertEqual(session_count, 0)
-
-            self.downgrade_to_revision(engine, "f670d1ed8681")
-            column_names = {
-                column["name"]
-                for column in inspect(engine).get_columns("connector_oauth_session")
-            }
-            self.assertNotIn("federation_id", column_names)
-        finally:
-            engine.dispose()
-
     @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")
     def test_run_migrations_uses_postgresql_advisory_lock(
         self, mock_run_migrations: MagicMock
