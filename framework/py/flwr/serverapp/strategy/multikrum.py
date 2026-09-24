@@ -180,16 +180,21 @@ def compute_distances(records: list[ArrayRecord]) -> NDArray:
         axis=0,
     )  # shape: (n, d) with n number of records and d the dimension of model
 
-    # Center the vectors, which leaves pairwise distances unchanged. Otherwise, when
-    # the models are much larger than their differences, the formula subtracts
-    # nearly equal terms and floating-point rounding swamps the distances
-    flat_w = flat_w - flat_w.mean(axis=0)
+    # The formula subtracts nearly equal terms when the models are much larger than
+    # their differences, so float32 rounding can swamp the distances. Accumulate in
+    # float64, one block of columns at a time to keep the extra memory small
+    num_records, dim = flat_w.shape
+    block_size = 2**16
+    distance_matrix: NDArray = np.zeros((num_records, num_records))
+    for start in range(0, dim, block_size):
+        stop = start + block_size
+        block = flat_w[:, start:stop].astype(np.float64)
 
-    # Compute squared norms of each vector
-    norms: NDArray = np.square(flat_w).sum(axis=1)  # shape (n,)
+        # Compute squared norms of each vector
+        norms: NDArray = np.square(block).sum(axis=1)  # shape (n,)
 
-    # Use broadcasting to compute pairwise distances
-    distance_matrix: NDArray = norms[:, None] + norms[None, :] - 2 * flat_w @ flat_w.T
+        # Use broadcasting to compute pairwise distances
+        distance_matrix += norms[:, None] + norms[None, :] - 2 * block @ block.T
 
     # Rounding can still leave tiny negative values and a nonzero diagonal, which
     # would break the assumption that each node's own distance sorts first

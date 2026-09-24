@@ -72,11 +72,12 @@ def test_aggregate_train_multikrum() -> None:
 
 def test_compute_distances_with_large_shared_component() -> None:
     """Test that distances stay accurate when the models dwarf their differences."""
-    # Prepare
+    # Prepare: enough parameters to span more than one block of the computation
     rng = np.random.default_rng(0)
-    weights = rng.normal(0, 10, size=1000)
+    size = 100_000
+    weights = rng.normal(0, 10, size=size)
     arrays = [
-        (weights + rng.normal(0, 1e-4, size=1000)).astype(np.float32) for _ in range(4)
+        (weights + rng.normal(0, 1e-4, size=size)).astype(np.float32) for _ in range(4)
     ]
     stacked = np.stack(arrays).astype(np.float64)
     expected = np.square(stacked[:, None] - stacked[None, :]).sum(axis=-1)
@@ -88,6 +89,24 @@ def test_compute_distances_with_large_shared_component() -> None:
     np.testing.assert_allclose(actual, expected, rtol=1e-4, atol=1e-9)
     np.testing.assert_array_equal(np.diag(actual), 0)
     assert (actual >= 0).all()
+
+
+def test_compute_distances_isolates_extreme_updates() -> None:
+    """Test that an extreme update does not change the distances between others."""
+    # Prepare: a malicious update with huge values and a NaN
+    rng = np.random.default_rng(0)
+    records = [
+        ArrayRecord([rng.normal(0, 1, size=1000).astype(np.float32)]) for _ in range(3)
+    ]
+    extreme = np.full(1000, 1e20, dtype=np.float32)
+    extreme[0] = np.nan
+
+    # Execute
+    expected = compute_distances(records)
+    actual = compute_distances(records + [ArrayRecord([extreme])])
+
+    # Assert
+    np.testing.assert_allclose(actual[:3, :3], expected, rtol=1e-6)
 
 
 def test_select_multikrum_with_large_shared_component() -> None:
