@@ -54,45 +54,16 @@ def upgrade() -> None:
     ) as batch_op:
         batch_op.drop_constraint(constraint_name, type_="unique")
 
+    op.drop_table("run_connector")
     op.create_table(
-        "_run_connector_by_id",
+        "run_connector",
         sa.Column("run_id", sa.BigInteger(), nullable=False),
         sa.Column("connector_id", sa.Integer(), nullable=False),
         sa.PrimaryKeyConstraint("run_id", "connector_id"),
     )
-    op.execute(
-        sa.text(
-            """
-            INSERT INTO _run_connector_by_id (run_id, connector_id)
-            SELECT run_connector.run_id, connector.connector_id
-            FROM run_connector
-            JOIN run ON run.run_id = run_connector.run_id
-            JOIN connector
-              ON connector.federation_id = run.federation_id
-             AND connector.connector_ref = run_connector.connector_ref
-            """
-        )
-    )
-    op.drop_table("run_connector")
-    op.rename_table("_run_connector_by_id", "run_connector")
 
     with op.batch_alter_table("task", schema=None) as batch_op:
         batch_op.add_column(sa.Column("connector_id", sa.Integer(), nullable=True))
-    op.execute(
-        sa.text(
-            """
-            UPDATE task
-            SET connector_id = (
-                SELECT connector.connector_id
-                FROM connector
-                JOIN run ON run.run_id = task.run_id
-                WHERE connector.federation_id = run.federation_id
-                  AND connector.connector_ref = task.connector_ref
-            )
-            WHERE task.connector_ref IS NOT NULL
-            """
-        )
-    )
 
     # ### end Alembic commands ###
 
@@ -103,34 +74,21 @@ def downgrade() -> None:
     with op.batch_alter_table("task", schema=None) as batch_op:
         batch_op.drop_column("connector_id")
 
+    op.drop_table("run_connector")
     op.create_table(
-        "_run_connector_by_ref",
+        "run_connector",
         sa.Column("run_id", sa.BigInteger(), nullable=False),
         sa.Column("connector_ref", sa.String(), nullable=False),
         sa.PrimaryKeyConstraint("run_id", "connector_ref"),
     )
-    op.execute(
-        sa.text(
-            """
-            INSERT INTO _run_connector_by_ref (run_id, connector_ref)
-            SELECT DISTINCT run_connector.run_id, connector.connector_ref
-            FROM run_connector
-            JOIN connector
-              ON connector.connector_id = run_connector.connector_id
-            """
-        )
-    )
-    op.drop_table("run_connector")
-    op.rename_table("_run_connector_by_ref", "run_connector")
 
-    # The previous schema can retain only one account for each connector provider.
+    # The previous schema can retain only one account for each provider.
     op.execute(
         sa.text(
             """
             DELETE FROM connector
             WHERE connector_id NOT IN (
-                SELECT MIN(connector_id)
-                FROM connector
+                SELECT MIN(connector_id) FROM connector
                 GROUP BY federation_id, connector_ref
             )
             """
@@ -142,8 +100,7 @@ def downgrade() -> None:
         table_kwargs={"sqlite_autoincrement": False},
     ) as batch_op:
         batch_op.create_unique_constraint(
-            CONNECTOR_UNIQUE_NAME,
-            ["federation_id", "connector_ref"],
+            CONNECTOR_UNIQUE_NAME, ["federation_id", "connector_ref"]
         )
 
     # ### end Alembic commands ###

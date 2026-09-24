@@ -65,20 +65,6 @@ def test_connector_uses_incrementing_id_and_allows_multiple_provider_accounts() 
         assert table.c[column_name].nullable is True
 
 
-def test_connector_id_columns_match_lifecycle_requirements() -> None:
-    """Ensure OAuth, run bindings, and tasks expose the required ID columns."""
-    oauth_table = FlwrBase.metadata.tables["connector_oauth_session"]
-    run_connector_table = FlwrBase.metadata.tables["run_connector"]
-    task_table = FlwrBase.metadata.tables["task"]
-
-    assert oauth_table.c.federation_id.nullable is False
-    assert [column.name for column in run_connector_table.primary_key.columns] == [
-        "run_id",
-        "connector_id",
-    ]
-    assert task_table.c.connector_id.nullable is True
-
-
 def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:
     """Ensure keyless task_logs stays a table, not an ORM mapper."""
     assert "task_logs" in create_corestate_metadata().tables

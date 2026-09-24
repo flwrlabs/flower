@@ -171,49 +171,6 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(response.task_id, 456)
 
-    def test_create_task_resolves_single_bound_connector_for_compatibility(
-        self,
-    ) -> None:
-        """Provider-only requests resolve when exactly one connection is bound."""
-        self.state.get_run_connector_ids.return_value = [42]
-        self.state.get_connector_by_id.return_value = SimpleNamespace(
-            connector_ref="notion"
-        )
-        self.state.create_task.return_value = 456
-
-        with patch.object(
-            connector_registry,
-            "OAUTH_FLOWS",
-            {"notion": Mock(connector_ref="notion")},
-        ):
-            self._create_connector_task("notion", connector_id=None)
-
-        self.assertEqual(self.state.create_task.call_args.kwargs["connector_id"], 42)
-
-    def test_create_task_rejects_ambiguous_provider_only_request(self) -> None:
-        """Provider-only requests require an ID when multiple accounts are bound."""
-        self.state.get_run_connector_ids.return_value = [42, 43]
-        self.state.get_connector_by_id.side_effect = [
-            SimpleNamespace(connector_ref="notion"),
-            SimpleNamespace(connector_ref="notion"),
-        ]
-
-        with (
-            patch.object(
-                connector_registry,
-                "OAUTH_FLOWS",
-                {"notion": Mock(connector_ref="notion")},
-            ),
-            self.assertRaises(FlowerError) as error,
-        ):
-            self._create_connector_task("notion", connector_id=None)
-
-        self.assertEqual(
-            error.exception.code,
-            ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
-        )
-        self.state.create_task.assert_not_called()
-
     def test_create_task_allows_app_task_types_to_request_creation(self) -> None:
         """CreateTask should allow app tasks to request task creation."""
         # Prepare
@@ -243,8 +200,8 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                 )
                 self.assertEqual(response.task_id, 456)
 
-    def test_create_task_allows_bound_oauth_connector(self) -> None:
-        """CreateTask should allow an OAuth connector bound to the run."""
+    def test_create_task_resolves_single_bound_oauth_connector(self) -> None:
+        """CreateTask should resolve one legacy provider reference to its ID."""
         self.state.get_run_connector_ids.return_value = [42]
         self.state.get_connector_by_id.return_value = SimpleNamespace(
             connector_ref="notion"
@@ -256,15 +213,33 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             "OAUTH_FLOWS",
             {"notion": Mock(connector_ref="notion")},
         ):
-            response = self._create_connector_task("notion")
+            response = self._create_connector_task("notion", connector_id=None)
 
         self.state.get_run_connector_ids.assert_called_once_with(123)
-        self.state.get_connector_by_id.assert_called_once_with(42)
         self.assertEqual(
             self.state.create_task.call_args.kwargs["connector_ref"], "notion"
         )
         self.assertEqual(self.state.create_task.call_args.kwargs["connector_id"], 42)
         self.assertEqual(response.task_id, 456)
+
+        self.state.get_run_connector_ids.return_value = [42, 43]
+        self.state.get_connector_by_id.side_effect = [
+            SimpleNamespace(connector_ref="notion"),
+            SimpleNamespace(connector_ref="notion"),
+        ]
+        with (
+            patch.object(
+                connector_registry,
+                "OAUTH_FLOWS",
+                {"notion": Mock(connector_ref="notion")},
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            self._create_connector_task("notion", connector_id=None)
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
+        )
 
     def test_create_task_rejects_unbound_oauth_connector(self) -> None:
         """CreateTask should reject OAuth credentials unavailable to the run."""

@@ -328,17 +328,17 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 [connector.connector_id for connector in connected],
                 [first_id, second_id],
             )
-            self.assertEqual(
-                len(
-                    [
-                        connector
-                        for connector in response.connectors
-                        if not connector.connected
-                    ]
-                ),
-                1,
-            )
 
+            with self.assertRaises(FlowerError) as error:
+                self.servicer.DisconnectConnector(
+                    DisconnectConnectorRequest(
+                        connector_ref="slack", federation=NOOP_FEDERATION_ID
+                    ),
+                    Mock(),
+                )
+            self.assertEqual(
+                error.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST
+            )
             self.servicer.DisconnectConnector(
                 DisconnectConnectorRequest(
                     connector_id=first_id, federation=NOOP_FEDERATION_ID
@@ -348,47 +348,13 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertIsNone(self.state.get_connector_by_id(first_id))
         self.assertIsNotNone(self.state.get_connector_by_id(second_id))
-
-    def test_disconnect_connector_supports_legacy_reference(self) -> None:
-        """Disconnect should resolve an unambiguous legacy connector reference."""
-        connector_id = self.state.create_connector(
-            federation_id=NOOP_FEDERATION_ID,
-            connector_ref="slack",
-            credentials_json="{}",
-            config_json="{}",
-            created_by=self.aid,
-        )
-        assert connector_id is not None
-
         self.servicer.DisconnectConnector(
             DisconnectConnectorRequest(
                 connector_ref="slack", federation=NOOP_FEDERATION_ID
             ),
             Mock(),
         )
-
-        self.assertIsNone(self.state.get_connector_by_id(connector_id))
-
-    def test_disconnect_connector_rejects_ambiguous_legacy_reference(self) -> None:
-        """Disconnect should require an ID when a provider has multiple accounts."""
-        for credentials_json in ('{"account":"first"}', '{"account":"second"}'):
-            self.state.create_connector(
-                federation_id=NOOP_FEDERATION_ID,
-                connector_ref="slack",
-                credentials_json=credentials_json,
-                config_json="{}",
-                created_by=self.aid,
-            )
-
-        with self.assertRaises(FlowerError) as error:
-            self.servicer.DisconnectConnector(
-                DisconnectConnectorRequest(
-                    connector_ref="slack", federation=NOOP_FEDERATION_ID
-                ),
-                Mock(),
-            )
-
-        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST)
+        self.assertIsNone(self.state.get_connector_by_id(second_id))
 
     def test_list_connectors_without_federation_returns_empty(self) -> None:
         """ListConnectors should return no connectors without a federation."""
@@ -542,6 +508,13 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             created_by=self.aid,
         )
         assert connector_id is not None
+        self.state.create_connector(
+            federation_id=NOOP_FEDERATION_ID,
+            connector_ref="slack",
+            credentials_json='{"account":"second"}',
+            config_json="{}",
+            created_by=self.aid,
+        )
         request = StartRunRequest(
             federation=NOOP_FEDERATION_ID,
             connector_ids=[connector_id, connector_id],
@@ -565,75 +538,16 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ),
         ):
             response = self.servicer.StartRun(request, self._make_start_run_context())
+            with self.assertRaises(FlowerError) as error:
+                self.servicer.StartRun(
+                    StartRunRequest(connector_refs=["slack"]),
+                    self._make_start_run_context(),
+                )
 
         self.assertEqual(
             list(self.state.get_run_connector_ids(run_id=response.run_id)),
             [connector_id],
         )
-
-    def test_start_run_supports_legacy_connector_reference(self) -> None:
-        """StartRun should resolve an unambiguous legacy connector reference."""
-        connector_id = self.state.create_connector(
-            federation_id=NOOP_FEDERATION_ID,
-            connector_ref="slack",
-            credentials_json="{}",
-            config_json="{}",
-            created_by=self.aid,
-        )
-        assert connector_id is not None
-        request = StartRunRequest(
-            federation=NOOP_FEDERATION_ID,
-            connector_refs=[" Slack "],
-        )
-        request.fab.content = b"test FAB content with connector refs"
-
-        with (
-            patch.object(
-                connector_registry,
-                "OAUTH_FLOWS",
-                {"slack": _OAuthFlow()},
-            ),
-            patch(
-                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
-                return_value={"tool": {"flwr": {"app": {}}}},
-            ),
-            patch(
-                "flwr.superlink.servicer.control.control_handlers."
-                "get_metadata_from_config",
-                return_value=("flwr/demo", "1.0.0"),
-            ),
-        ):
-            response = self.servicer.StartRun(request, self._make_start_run_context())
-
-        self.assertEqual(
-            list(self.state.get_run_connector_ids(response.run_id)),
-            [connector_id],
-        )
-
-    def test_start_run_rejects_ambiguous_legacy_connector_reference(self) -> None:
-        """StartRun should require IDs for multiple accounts of one provider."""
-        for credentials_json in ('{"account":"first"}', '{"account":"second"}'):
-            self.state.create_connector(
-                federation_id=NOOP_FEDERATION_ID,
-                connector_ref="slack",
-                credentials_json=credentials_json,
-                config_json="{}",
-                created_by=self.aid,
-            )
-
-        with (
-            patch.object(
-                connector_registry,
-                "OAUTH_FLOWS",
-                {"slack": _OAuthFlow()},
-            ),
-            self.assertRaises(FlowerError) as error,
-        ):
-            self.servicer.StartRun(
-                StartRunRequest(connector_refs=["slack"]),
-                self._make_start_run_context(),
-            )
-
         self.assertEqual(error.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST)
 
     def test_start_run_allows_connectors_for_shared_federation(self) -> None:
