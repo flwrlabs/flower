@@ -72,6 +72,7 @@ from flwr.supercore.exit import (
     register_signal_handlers,
 )
 from flwr.supercore.exit.signal_handler import SIGNAL_TO_EXIT_CODE
+from flwr.supercore.fab import Fab
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
 from flwr.supercore.logger import (
     flush_logs,
@@ -80,6 +81,7 @@ from flwr.supercore.logger import (
     stop_log_uploader,
 )
 from flwr.supercore.object_ref import load_app
+from flwr.supercore.run import Run
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
@@ -343,7 +345,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
         return exit_code
 
     def _prepare_task_app(
-        self, fab: Any, run: Any
+        self, fab: Fab, run: Run
     ) -> tuple[Path, AgentApp | None, str | None]:
         """Return a preloaded app or prepare a cold app for task-time import."""
         if self._preloaded is not None:
