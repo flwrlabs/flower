@@ -181,6 +181,7 @@ message StartRunRequest {
   optional uint64 series_id = 6;
   repeated string connector_refs = 7;
   string user_prompt = 8;
+  repeated uint64 connector_ids = 9;
 }
 message StartRunResponse {
   optional uint64 run_id = 1;
@@ -280,15 +281,21 @@ message Connector {
   string display_name = 2;
   string description = 3;
   bool connected = 4;
+  uint64 connector_id = 5;
 }
 message ListConnectorsResponse { repeated Connector connectors = 1; }
 
-message DisconnectConnectorRequest { string connector_ref = 1; }
+message DisconnectConnectorRequest {
+  string connector_ref = 1;
+  uint64 connector_id = 2;
+  string federation = 3;
+}
 message DisconnectConnectorResponse {}
 
 message BeginConnectorOAuthRequest {
   string connector_ref = 1;
   string redirect_uri = 2;
+  string federation = 3;
 }
 message BeginConnectorOAuthResponse {
   string oauth_session_id = 1;
@@ -302,7 +309,10 @@ message CompleteConnectorOAuthRequest {
   string code = 2;
   string state = 3;
 }
-message CompleteConnectorOAuthResponse { string connector_ref = 1; }
+message CompleteConnectorOAuthResponse {
+  string connector_ref = 1;
+  uint64 connector_id = 2;
+}
 
 message StopRunRequest { uint64 run_id = 1; }
 message StopRunResponse { bool success = 1; }
