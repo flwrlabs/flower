@@ -521,12 +521,12 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 return
             self._reconcile_owned_pods()
 
-    def record_prestarted_agentapp_failures(self) -> None:
+    def _record_preload_failures(self, pods: list[object] | None = None) -> None:
         """Rate-limit replacement before general cleanup removes failed Pods."""
         with self._lock:
             if self._closed:
                 return
-            pods = self._owned_warm_pods()
+            pods = self._owned_warm_pods() if pods is None else pods
             if pods is None:
                 return
             for pod in pods:
@@ -646,6 +646,9 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             self._pool_creation_not_before.pop(pool.key, None)
         pods = self._owned_warm_pods()
         if pods is None:
+            return
+        self._record_preload_failures(pods)
+        if pool.key in self._pool_creation_not_before:
             return
         compatible_count = sum(
             1

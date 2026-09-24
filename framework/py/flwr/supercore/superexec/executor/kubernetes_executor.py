@@ -375,7 +375,7 @@ class _WarmExecutorPoolManager(WarmExecutorPoolManager):
         with self._lock, self._lifecycle_lock:
             # Observe preload failures before the general completed-Pod sweeper
             # removes the evidence used to rate-limit their replacement.
-            self.record_prestarted_agentapp_failures()
+            self._record_preload_failures()
             sweep()
 
     def _delete_pod(self, pod_name: str) -> bool:

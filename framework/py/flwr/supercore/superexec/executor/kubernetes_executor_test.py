@@ -1379,7 +1379,7 @@ def test_failed_prestarted_agentapp_pool_recreation_is_rate_limited() -> None:
     )
     config = _executor_config(
         warm_executor_owner="superexec-a",
-        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=2),),
         monotonic=lambda: now[0],
     )
     pool = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
@@ -1387,10 +1387,15 @@ def test_failed_prestarted_agentapp_pool_recreation_is_rate_limited() -> None:
     )
     failed_pod = _ready_warm_pod(pool_key, config, name="failed-preload")
     failed_pod["status"] = {"phase": "Failed", "conditions": []}
+    ready_pod = _ready_warm_pod(pool_key, config, name="ready")
     client.reset_mock()
-    client.list_namespaced_pod.return_value = {"items": [failed_pod]}
+    client.list_namespaced_pod.return_value = {"items": [failed_pod, ready_pod]}
     sweep = Mock()
 
+    # Exercise the direct refill path used after a task retires.
+    pool._ensure_pool_capacity(  # pylint: disable=protected-access
+        config.warm_executor_pools[0]
+    )
     pool.sweep_completed_pods(sweep)
     pool.ensure_capacity()
 
@@ -1404,7 +1409,7 @@ def test_failed_prestarted_agentapp_pool_recreation_is_rate_limited() -> None:
         warm_executor_dispatch._PRESTARTED_AGENTAPP_FAILURE_BACKOFF_SECONDS  # pylint: disable=protected-access
     )
     client.reset_mock()
-    client.list_namespaced_pod.return_value = {"items": []}
+    client.list_namespaced_pod.return_value = {"items": [ready_pod]}
 
     pool.ensure_capacity()
 
