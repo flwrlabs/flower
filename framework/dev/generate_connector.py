@@ -191,7 +191,7 @@ PROVIDER = ProviderDefinition(
     actions=ACTIONS,
 )
 
-CONNECTOR = ConnectorDefinition(provider=PROVIDER, executors=EXECUTORS)
+CONNECTOR = ConnectorDefinition.from_provider(provider=PROVIDER, executors=EXECUTORS)
 '''
     )
     return {

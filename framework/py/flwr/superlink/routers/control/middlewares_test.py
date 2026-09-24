@@ -70,6 +70,8 @@ from flwr.superlink.servicer.control import control_handlers
 
 from . import middlewares
 
+CONNECTOR_FEDERATION_ID = "@bob/fed-a"
+
 
 def _create_app(
     monkeypatch: MonkeyPatch,
@@ -195,6 +197,7 @@ def test_auth_routes_disable_caching_and_skip_event_logging(
             BeginConnectorOAuthRequest(
                 connector_ref="google-drive",
                 redirect_uri="https://example.test/oauth/callback",
+                federation=CONNECTOR_FEDERATION_ID,
             ),
             BeginConnectorOAuthResponse(
                 oauth_session_id="oauth-session",
@@ -251,13 +254,15 @@ def test_connector_oauth_routes_disable_caching_and_skip_event_logging(
     [
         (
             "/v1/control/list-connectors",
-            ListConnectorsRequest(federation="agent"),
+            ListConnectorsRequest(federation=CONNECTOR_FEDERATION_ID),
             ListConnectorsResponse(),
             "list_connectors",
         ),
         (
             "/v1/control/disconnect-connector",
-            DisconnectConnectorRequest(connector_ref="google-drive"),
+            DisconnectConnectorRequest(
+                connector_ref="google-drive", federation=CONNECTOR_FEDERATION_ID
+            ),
             DisconnectConnectorResponse(),
             "disconnect_connector",
         ),
@@ -324,10 +329,21 @@ def test_connector_oauth_handler_error_disables_caching(
 ) -> None:
     """Apply no-cache headers after translating connector handler errors."""
     _, client = _create_app(monkeypatch, None)
+    monkeypatch.setattr(
+        control_handlers,
+        "begin_connector_oauth",
+        Mock(
+            side_effect=control_handlers.InvalidConnectorRequestError(
+                "connector_ref is required"
+            )
+        ),
+    )
 
     response = client.post(
         "/v1/control/begin-connector-oauth",
-        content=BeginConnectorOAuthRequest().SerializeToString(),
+        content=BeginConnectorOAuthRequest(
+            federation=CONNECTOR_FEDERATION_ID
+        ).SerializeToString(),
         headers={"content-type": PROTOBUF_MEDIA_TYPE},
     )
 

@@ -43,6 +43,7 @@ class ConnectorOAuthSessionRecord:  # pylint: disable=too-many-instance-attribut
 
     oauth_session_id: str
     flwr_aid: str
+    federation_id: str
     connector_ref: str
     state: str
     redirect_uri: str

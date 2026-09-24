@@ -412,17 +412,20 @@ class GetConnectorResponse(google.protobuf.message.Message):
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
     CREDENTIALS_JSON_FIELD_NUMBER: builtins.int
     CONFIG_JSON_FIELD_NUMBER: builtins.int
+    CONNECTOR_ID_FIELD_NUMBER: builtins.int
     connector_ref: builtins.str
     credentials_json: builtins.str
     config_json: builtins.str
+    connector_id: builtins.int
     def __init__(
         self,
         *,
         connector_ref: builtins.str = ...,
         credentials_json: builtins.str = ...,
         config_json: builtins.str = ...,
+        connector_id: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["config_json", b"config_json", "connector_ref", b"connector_ref", "credentials_json", b"credentials_json"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["config_json", b"config_json", "connector_id", b"connector_id", "connector_ref", b"connector_ref", "credentials_json", b"credentials_json"]) -> None: ...
 
 global___GetConnectorResponse = GetConnectorResponse
 
@@ -520,10 +523,12 @@ class CreateTaskRequest(google.protobuf.message.Message):
     FAB_HASH_FIELD_NUMBER: builtins.int
     MODEL_REF_FIELD_NUMBER: builtins.int
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
+    CONNECTOR_ID_FIELD_NUMBER: builtins.int
     type: builtins.str
     fab_hash: builtins.str
     model_ref: builtins.str
     connector_ref: builtins.str
+    connector_id: builtins.int
     def __init__(
         self,
         *,
@@ -531,9 +536,12 @@ class CreateTaskRequest(google.protobuf.message.Message):
         fab_hash: builtins.str | None = ...,
         model_ref: builtins.str | None = ...,
         connector_ref: builtins.str | None = ...,
+        connector_id: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref", "type", b"type"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_connector_id", b"_connector_id", "_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_id", b"connector_id", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_connector_id", b"_connector_id", "_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_id", b"connector_id", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref", "type", b"type"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_connector_id", b"_connector_id"]) -> typing.Literal["connector_id"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_connector_ref", b"_connector_ref"]) -> typing.Literal["connector_ref"] | None: ...
     @typing.overload

@@ -752,6 +752,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         oauth_session_id: str,
         flwr_aid: str,
+        federation_id: str,
         connector_ref: str,
         state: str,
         redirect_uri: str,
@@ -762,6 +763,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if (
             not oauth_session_id
             or not flwr_aid
+            or not federation_id
             or not connector_ref
             or expires_at.utcoffset() is None
         ):
@@ -771,6 +773,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         model = ConnectorOAuthSessionModel(
             oauth_session_id=oauth_session_id,
             flwr_aid=flwr_aid,
+            federation_id=federation_id,
             connector_ref=connector_ref,
             state=state,
             redirect_uri=redirect_uri,
@@ -1892,6 +1895,7 @@ def _connector_oauth_session_from_model(
     return ConnectorOAuthSessionRecord(
         oauth_session_id=model.oauth_session_id,
         flwr_aid=model.flwr_aid,
+        federation_id=model.federation_id,
         connector_ref=model.connector_ref,
         state=model.state,
         redirect_uri=model.redirect_uri,
