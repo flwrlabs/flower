@@ -341,6 +341,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         session = state.create_connector_oauth_session(
             oauth_session_id="session-1",
             flwr_aid="account-a",
+            federation_id="@account-a/fed-a",
             connector_ref="calendar",
             state="oauth-state",
             redirect_uri="https://example.test/callback",
@@ -348,6 +349,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             expires_at=expires_at,
         )
         assert session is not None
+        self.assertEqual(session.federation_id, "@account-a/fed-a")
         self.assertEqual(session.expires_at, expires_at.isoformat())
         self.assertIsNone(session.completed_at)
         self.assertEqual(
@@ -360,6 +362,19 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state.create_connector_oauth_session(
                 oauth_session_id="session-1",
                 flwr_aid="account-a",
+                federation_id="@account-a/fed-a",
+                connector_ref="calendar",
+                state="oauth-state",
+                redirect_uri="https://example.test/callback",
+                pkce_verifier=None,
+                expires_at=expires_at,
+            )
+        )
+        self.assertIsNone(
+            state.create_connector_oauth_session(
+                oauth_session_id="missing-federation",
+                flwr_aid="account-a",
+                federation_id="",
                 connector_ref="calendar",
                 state="oauth-state",
                 redirect_uri="https://example.test/callback",
@@ -395,6 +410,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         expired = state.create_connector_oauth_session(
             oauth_session_id="expired-session",
             flwr_aid="account-a",
+            federation_id="@account-a/fed-a",
             connector_ref="calendar",
             state="oauth-state",
             redirect_uri="https://example.test/callback",
