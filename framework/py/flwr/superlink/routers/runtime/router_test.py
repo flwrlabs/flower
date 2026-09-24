@@ -214,6 +214,7 @@ def test_pull_pending_tasks_waits_for_task_created_by_another_state(
     combined: bool,
 ) -> None:
     """A request sees committed work with or without an in-process signal."""
+    # pylint: disable=too-many-locals
     database_path = str(tmp_path / "runtime.db")
     states = [
         SqlLinkState(
@@ -392,7 +393,7 @@ def test_pull_and_claim_wait_grants_one_task_to_one_waiter(
     claimed = False
     lock = Lock()
 
-    def get_tasks(*args: object, **kwargs: object) -> list[Task]:
+    def get_tasks(*_args: object, **_kwargs: object) -> list[Task]:
         nonlocal reads
         with lock:
             reads += 1
@@ -402,7 +403,7 @@ def test_pull_and_claim_wait_grants_one_task_to_one_waiter(
 
     state.get_tasks.side_effect = get_tasks
 
-    def claim_task(task_id: int) -> str | None:
+    def claim_task(_task_id: int) -> str | None:
         nonlocal claimed
         with lock:
             if claimed:

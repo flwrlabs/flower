@@ -178,6 +178,7 @@ def test_unary_unary_skips_retry_for_claims() -> None:
     retry_invoker.max_tries = 2
     retry_invoker.jitter = None
     retry_invoker.wait_function = lambda _: None
+    client = ProtobufClient("http://api.example", retry_invoker=retry_invoker)
 
     with (
         patch(
@@ -186,7 +187,7 @@ def test_unary_unary_skips_retry_for_claims() -> None:
         ) as send,
         pytest.raises(httpx.ReadError),
     ):
-        ProtobufClient("http://api.example", retry_invoker=retry_invoker)._unary_unary(
+        client._unary_unary(  # pylint: disable=protected-access
             path=_PATH,
             rpc_method=_METHOD,
             request=_REQUEST,
