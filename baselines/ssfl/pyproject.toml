@@ -1,0 +1,125 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ssfl"
+version = "1.0.0"
+description = "SSFL: Discovering Unified Sparse Subnetworks at Initialization for Efficient Federated Learning"
+license = { file = "LICENSE" }
+requires-python = ">=3.12"
+dependencies = [
+    # Flower 1.31+ and flwr-datasets 0.6.0 have incompatible rich bounds.
+    # Flower 1.30 provides the Message API used here and resolves with pip.
+    "flwr[simulation]>=1.28.0,<1.31.0",
+    "flwr-datasets[vision]==0.6.0",
+    "torch==2.10.0",
+    "torchvision==0.25.0",
+    "numpy>=1.24.0",
+    # Keep wandb as a main dep so `flwr run` installs it into the isolated
+    # runtime env. Logging itself stays opt-in via wandb-mode.
+    "wandb>=0.16.0",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[project.optional-dependencies]
+dev = [
+    "isort==5.13.2",
+    "black==24.2.0",
+    "mypy==1.8.0",
+    "pylint==3.2.6",
+    "flake8==5.0.4",
+    "pytest>=8.0.0",
+    "ruff==0.1.9",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["ssfl"]
+
+[tool.isort]
+profile = "black"
+known_first_party = ["flwr", "ssfl"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311", "py312"]
+
+[tool.pytest.ini_options]
+minversion = "6.2"
+addopts = "-qq"
+testpaths = ["tests"]
+
+[tool.mypy]
+ignore_missing_imports = true
+strict = false
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = "duplicate-code,too-few-public-methods,useless-import-alias"
+good-names = "i,j,k,_,x,y,X,Y,K,N"
+max-args = 13
+max-attributes = 20
+max-locals = 40
+max-branches = 24
+max-statements = 80
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+select = ["D", "E", "F", "W", "B", "ISC", "C4"]
+ignore = ["B024", "B027"]
+
+[tool.ruff.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.per-file-ignores]
+"tests/*.py" = ["D101", "D102", "D103"]
+
+[tool.flwr.app]
+publisher = "riohib"
+fab-format-version = 1
+flwr-version-target = "1.30.0"
+
+[tool.flwr.app.components]
+serverapp = "ssfl.server_app:app"
+clientapp = "ssfl.client_app:app"
+
+[tool.flwr.app.config]
+# Demo defaults (fast). Paper profiles override these at runtime.
+num-server-rounds = 3
+num-clients = 2
+fraction-train = 1.0
+fraction-evaluate = 0.0
+local-epochs = 1
+batch-size = 16
+# Keep the default four-client demo fast; paper profiles set 0 (all samples).
+max-partition-samples = 512
+learning-rate = 0.1
+lr-scheduler = "default"
+lr-decay = 0.998
+scheduler-cycle-length = 10
+momentum = 0.0
+weight-decay = 0.0005
+max-grad-norm = 10.0
+dataset = "cifar10"
+model = "resnet18"
+partition-alpha = 0.3
+partition-method = "balanced-dirichlet"
+dense-ratio = 0.5
+saliency-method = "ssfl"
+saliency-batches = 1
+saliency-fraction = 1.0
+saliency-weighting = "uniform"
+seed = 550
+transport = "sparse"
+data-path = ""
+evaluate-every = 1
+save-model = false
+save-checkpoints = false
+save-metrics = true
+checkpoint-dir = "outputs"
+wandb-mode = "disabled"
+wandb-entity = ""
+wandb-project = "ssfl-flower"
+wandb-run-name = ""
