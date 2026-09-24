@@ -7,19 +7,11 @@ a model-provider API key.
 
 This guide targets Flower {{ stable_flwr_version }}.
 
-## Start from the AgentApp template
+## Prepare an AgentApp project
 
-Create a project from the AgentApp published on Flower Hub:
-
-```{code-block} console
-:substitutions:
-
-$ uvx --from flwr==|stable_flwr_version| flwr new @flwrlabs/agent
-$ cd agent
-$ uv sync
-```
-
-The template already includes compatible Flower and OpenAI SDK dependencies:
+Start with an AgentApp project from [Write your first
+AgentApp](../tutorials/write-your-first-agentapp.md). Its template already
+includes compatible Flower and OpenAI SDK dependencies:
 
 ```{code-block} toml
 :substitutions:
@@ -198,12 +190,8 @@ rebuilds user and assistant messages from the trace.
 Use `Context` only when the AgentApp needs additional app-defined state beyond
 the recorded event trace.
 
-## Build and run the AgentApp
-
-```console
-$ uv run flwr build
-$ uv run flwr login supergrid
-$ uv run flwr run . supergrid --stream
+```{tip}
+To test your AgentApp, see {ref}`load-an-agentapp-in-flower-chat`.
 ```
 
 The runtime injects both environment variables when it starts the AgentApp. Do

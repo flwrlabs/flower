@@ -26,7 +26,7 @@ Go to [flower.ai/app](https://flower.ai/app), select **Sign in**, and complete
 the authentication flow. When you return, you should see **New chat**, a prompt
 field, an agent selector, and your federations in the sidebar.
 
-Flower starts in your `@account/personal` federation. The federation shown in
+Flower starts in your `@<account>/personal` federation. The federation shown in
 the page header or breadcrumb is where this conversation's runs will execute.
 
 ```{figure} ../_static/screenshots/browser-new-chat.png

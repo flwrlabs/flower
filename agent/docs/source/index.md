@@ -39,8 +39,9 @@ releases.
 - A **connector** gives an AgentApp a runtime-provided tool. Some connectors are
   built in; account connectors use access granted by the signed-in user.
 
-Read [Use agents and federations](how-to-guides/use-agents-and-federations.md)
-to see how these pieces fit together and how to select agents and federations.
+Read [Understand the AgentApp runtime](explanations/agentapp-runtime.md) for the
+full model, or [Use agents and federations](how-to-guides/use-agents-and-federations.md)
+to choose where an app runs.
 
 ```{toctree}
 :caption: Tutorials
@@ -56,12 +57,12 @@ tutorials/build-a-collaborative-agent
 :caption: How-to guides
 :maxdepth: 1
 
+how-to-guides/run-on-supergrid
 how-to-guides/use-agents-and-federations
 how-to-guides/connect-accounts
 how-to-guides/create-automations
 how-to-guides/use-flower-hub
 how-to-guides/use-openai-sdk
-how-to-guides/run-on-supergrid
 how-to-guides/troubleshoot-agent-runs
 how-to-guides/run-with-local-superlink
 how-to-guides/run-with-ollama

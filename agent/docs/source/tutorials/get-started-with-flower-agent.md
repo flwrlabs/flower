@@ -73,7 +73,7 @@ Flower Chat shows the selected agent above the prompt.
 ```
 
 Flower verifies your stored login before opening the full-screen interface. At
-startup, it selects your `@account/personal` federation. At the `❯` prompt,
+startup, it selects your `@<account>/personal` federation. At the `❯` prompt,
 ask:
 
 ```text
@@ -109,7 +109,7 @@ available in the active federation. Select one, add a request, and press
 {kbd}`Enter`:
 
 ```text
-@publisher/agent Describe what you can help me with.
+@<publisher>/<agent> Describe what you can help me with.
 ```
 
 Only a leading app spec selects an agent. After a successful selection, the
@@ -126,7 +126,7 @@ Enter `/federation` to open the federation completion menu. Select a federation
 visible to your account, or type its full name:
 
 ```text
-/federation @account/federation-name
+/federation @<account>/<federation-name>
 ```
 
 Flower clears the current transcript, selects the default Flower Agent, and

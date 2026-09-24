@@ -85,7 +85,7 @@ def main(agent: AgentSession, context: Context) -> None:
 `AgentApp.main` registers the function Flower calls. The runtime passes:
 
 - `agent`, an `AgentSession` for connectors and frontend-visible events
-- `context`, which contains the fused run configuration and persistent state
+- `context`, which contains run configuration and persistent state
 
 Flower also injects `FLWR_RUNTIME_BASE_URL` and `FLWR_RUNTIME_API_KEY` into the
 AgentApp process. The OpenAI client uses them to send the request through
@@ -110,23 +110,12 @@ dependencies = ["flwr>=|stable_flwr_version|,<2.0", "openai>=2.16.0,<3.0.0"]
 [tool.flwr.app]
 flwr-version-target = "|stable_flwr_version|"
 
-[tool.flwr.app.config.agent]
-input = "Explain why flowers turn toward light."
-
 [tool.flwr.app.components]
 agentapp = "agent.agent_app:app"
 ```
 
 The component value uses `<module>:<attribute>`. Flower imports `app` from
-`agent/agent_app.py`. The nested `config.agent.input` value becomes
-`context.run_config["agent.input"]`.
-
-Change the default prompt to something easy to recognize:
-
-```toml
-[tool.flwr.app.config.agent]
-input = "Explain Flower Agent in one sentence."
-```
+`agent/agent_app.py`. It receives your prompt and processes it using a model and available tools.
 
 ## Create the environment
 
@@ -161,34 +150,28 @@ If Flower cannot load the component, check:
 
 ## Run on SuperGrid
 
-Log in, then submit the project and stream its logs:
+From the project directory, log in and open Flower Chat:
 
 ```console
 $ uv run flwr login supergrid
-$ uv run flwr run . supergrid --stream
+$ uv run flwr chat
 ```
 
-Override the configured prompt for one run:
+At the chat prompt, load the app and send a message:
 
-```console
-$ uv run flwr run . supergrid \
-    --run-config 'agent.input="Describe photosynthesis for a five-year-old."' \
-    --stream
+```text
+/load .
+Explain Flower Agent in one sentence.
 ```
 
 ```{admonition} Success checkpoint
 :class: tip
 
-The command prints a run ID, the run reaches a finished state, and the streamed
-model response appears in the run activity and logs.
+The model response appears in the chat transcript.
 ```
 
-If the run fails, use the printed ID with:
-
-```console
-$ uv run flwr list --run-id <run-id> supergrid
-$ uv run flwr log <run-id> supergrid --show
-```
+If the run fails, see [Troubleshoot AgentApp
+runs](../how-to-guides/troubleshoot-agent-runs.md).
 
 ## Understand this app's limits
 

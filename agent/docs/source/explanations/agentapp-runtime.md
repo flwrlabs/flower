@@ -158,8 +158,8 @@ as conversation messages.
 
 Alongside the `AgentSession`, your main function receives a Flower `Context`:
 
-- `context.run_config` contains defaults from `pyproject.toml` fused with
-  per-run overrides
+- `context.run_config` contains the configuration supplied for the run,
+  including the chat message as `agent.input`
 - `context.state` stores records persisted for the run series
 - `context.run_id` identifies the current run
 
