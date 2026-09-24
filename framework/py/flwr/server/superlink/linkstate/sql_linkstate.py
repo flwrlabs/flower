@@ -954,10 +954,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         user_prompt: str | None = None,
     ) -> int:
         """Create a new run."""
-        if isinstance(connector_ids, (str, bytes)) or any(
-            connector_id <= 0 for connector_id in connector_ids
-        ):
-            return 0
         if initial_task_event is not None:
             try:
                 validate_task_event_data(initial_task_event.data)
