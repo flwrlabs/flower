@@ -87,13 +87,6 @@ def run(
             help=FEDERATION_CONFIG_HELP_MESSAGE,
         ),
     ] = None,
-    user_prompt: Annotated[
-        str | None,
-        typer.Option(
-            "--prompt",
-            help="User prompt for an AgentApp run.",
-        ),
-    ] = None,
     stream: Annotated[
         bool,
         typer.Option(
@@ -155,7 +148,6 @@ def run(
             federation_config_overrides,
             stream,
             is_json,
-            user_prompt,
             app_spec,
         )
 
@@ -170,7 +162,6 @@ def _run_with_control_api(
     federation_config_overrides: list[str] | None,
     stream: bool,
     is_json: bool,
-    user_prompt: str | None,
     app_spec: str | None,
 ) -> None:
     control_client = None
@@ -208,7 +199,6 @@ def _run_with_control_api(
                 federation_config_overrides, superlink_connection
             ),
             app_spec=app_spec or "",
-            user_prompt=user_prompt or "",
         )
         with flwr_cli_exc_handler():
             res = control_client.StartRun(req)

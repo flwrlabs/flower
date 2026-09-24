@@ -92,19 +92,10 @@ def test_run_command_accepts_remote_app_spec() -> None:
             federation=None, name="mock-superlink", address="localhost:9093"
         )
 
-        result = runner.invoke(
-            app,
-            [
-                "run",
-                "@flwrlabs/quickstart-numpy",
-                "--prompt",
-                "Hello AgentApp",
-            ],
-        )
+        result = runner.invoke(app, ["run", "@flwrlabs/quickstart-numpy"])
 
     assert result.exit_code == 0
     assert mock_run_with_control_api.call_args is not None
-    assert mock_run_with_control_api.call_args.args[-2] == "Hello AgentApp"
     assert mock_run_with_control_api.call_args.args[-1] == "@flwrlabs/quickstart-numpy"
 
 
