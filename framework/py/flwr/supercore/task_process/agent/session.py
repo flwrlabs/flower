@@ -206,8 +206,16 @@ class RuntimeAgentSession(AgentSession):
 class RuntimeAgentConnectors(AgentConnectors):
     """AgentConnectors implementation for model tools."""
 
-    def __init__(self, agent_runtime: AgentRuntime) -> None:
+    def __init__(
+        self, agent_runtime: AgentRuntime, connector_ids: Sequence[int]
+    ) -> None:
         self._agent_runtime = agent_runtime
+        self._connector_ids = tuple(connector_ids)
+
+    @property
+    def connector_ids(self) -> Sequence[int]:
+        """Return the connector IDs selected for this run."""
+        return self._connector_ids
 
     def tools(self, names: Sequence[str]) -> list[JSONObject]:
         """Return model-facing tool schemas for the requested connectors."""

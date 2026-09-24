@@ -516,10 +516,10 @@ class InMemoryCoreState(
         credentials_json: str,
         config_json: str,
         created_by: str,
-    ) -> int | None:
+    ) -> bool:
         """Create a connector for a federation."""
         if not federation_id or not connector_ref or not created_by:
-            return None
+            return False
         with self.lock_connector_store:
             self.connector_id_counter += 1
             connector_id = self.connector_id_counter
@@ -531,13 +531,13 @@ class InMemoryCoreState(
                 config_json=config_json,
             )
             self.connector_store[connector_id] = connector
-        return connector_id
+        return True
 
-    def get_connectors(
-        self, federation_id: str, connector_ref: str | None = None
+    def get_connectors_by_ref(
+        self, federation_id: str, connector_ref: str
     ) -> Sequence[ConnectorRecord]:
-        """Return a federation's connectors, optionally filtered by provider."""
-        if not federation_id:
+        """Return a federation's connectors for one provider."""
+        if not federation_id or not connector_ref:
             return []
         with self.lock_connector_store:
             return sorted(
@@ -545,10 +545,7 @@ class InMemoryCoreState(
                     connector
                     for connector in self.connector_store.values()
                     if connector.federation_id == federation_id
-                    and (
-                        connector_ref is None
-                        or connector.connector_ref == connector_ref
-                    )
+                    and connector.connector_ref == connector_ref
                 ),
                 key=lambda connector: connector.connector_id,
             )

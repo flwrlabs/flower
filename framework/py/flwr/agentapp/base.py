@@ -27,6 +27,11 @@ from flwr.supercore.typing import JSONObject
 class AgentConnectors(ABC):
     """Abstract base class for AgentApp connector execution."""
 
+    @property
+    def connector_ids(self) -> Sequence[int]:
+        """Return the connector IDs selected for this run."""
+        return ()
+
     @abstractmethod
     def tools(self, names: Sequence[str]) -> list[JSONObject]:
         """Return model-facing tool schemas for built-in connectors."""
@@ -35,7 +40,7 @@ class AgentConnectors(ABC):
     def call(
         self, tool_call: JSONObject, *, connector_id: int | None = None
     ) -> JSONObject:
-        """Execute one model function call using an optional exact connection."""
+        """Execute a model call; use ``connector_ids`` to select an OAuth account."""
 
 
 class AgentEvents(ABC):

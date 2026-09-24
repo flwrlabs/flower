@@ -654,36 +654,32 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         credentials_json: str,
         config_json: str,
         created_by: str,
-    ) -> int | None:
+    ) -> bool:
         """Create a connector for a federation."""
         if not federation_id or not connector_ref or not created_by:
-            return None
-        stmt = (
-            insert(ConnectorModel)
-            .values(
-                federation_id=federation_id,
-                connector_ref=connector_ref,
-                credentials_json=credentials_json,
-                config_json=config_json,
-                created_at=now(),
-                created_by=created_by,
-            )
-            .returning(ConnectorModel.connector_id)
+            return False
+        stmt = insert(ConnectorModel).values(
+            federation_id=federation_id,
+            connector_ref=connector_ref,
+            credentials_json=credentials_json,
+            config_json=config_json,
+            created_at=now(),
+            created_by=created_by,
         )
         with self.session() as session:
-            return session.scalar(stmt)
+            session.execute(stmt)
+        return True
 
-    def get_connectors(
-        self, federation_id: str, connector_ref: str | None = None
+    def get_connectors_by_ref(
+        self, federation_id: str, connector_ref: str
     ) -> Sequence[ConnectorRecord]:
-        """Return a federation's connectors, optionally filtered by provider."""
-        if not federation_id:
+        """Return a federation's connectors for one provider."""
+        if not federation_id or not connector_ref:
             return []
         stmt = select(ConnectorModel).where(
-            ConnectorModel.federation_id == federation_id
+            ConnectorModel.federation_id == federation_id,
+            ConnectorModel.connector_ref == connector_ref,
         )
-        if connector_ref is not None:
-            stmt = stmt.where(ConnectorModel.connector_ref == connector_ref)
         stmt = stmt.execution_options(populate_existing=True)
         with self.session() as session:
             rows = session.scalars(stmt.order_by(ConnectorModel.connector_id)).all()

@@ -235,7 +235,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         credentials_json: str,
         config_json: str,
         created_by: str,
-    ) -> int | None:
+    ) -> bool:
         """Create a connector for a federation.
 
         Parameters
@@ -253,22 +253,22 @@ class CoreState(ABC):  # pylint: disable=R0904
 
         Returns
         -------
-        int | None
-            The connector ID if it was stored, otherwise ``None``.
+        bool
+            ``True`` if the connector was stored, otherwise ``False``.
         """
 
     @abstractmethod
-    def get_connectors(
-        self, federation_id: str, connector_ref: str | None = None
+    def get_connectors_by_ref(
+        self, federation_id: str, connector_ref: str
     ) -> Sequence[ConnectorRecord]:
-        """Return a federation's connectors, optionally filtered by provider.
+        """Return a federation's connectors for one provider.
 
         Parameters
         ----------
         federation_id : str
             Federation ID owning the connector.
-        connector_ref : str | None
-            Optional connector provider reference.
+        connector_ref : str
+            Connector provider reference.
 
         Returns
         -------

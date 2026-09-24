@@ -41,6 +41,7 @@ from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
     FAB_MAX_SIZE,
     HEARTBEAT_DEFAULT_INTERVAL,
+    INT64_MAX_VALUE,
     LOG_STREAM_INTERVAL,
     REFRESH_TOKEN_KEY,
     RUN_EVENTS_STREAM_INTERVAL,
@@ -228,7 +229,9 @@ def list_connectors(
         key=lambda item: item.connector_ref,
     ):
         connector_ref = flow.connector_ref
-        stored_connectors = state.get_connectors(request.federation, connector_ref)
+        stored_connectors = state.get_connectors_by_ref(
+            request.federation, connector_ref
+        )
         connectors.extend(
             Connector(
                 connector_id=stored_connector.connector_id,
@@ -261,13 +264,17 @@ def disconnect_connector(
     federation_id = request.federation.strip()
     state.federation_manager.ensure_default_federations_exist(account.flwr_aid)
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    if connector_id > INT64_MAX_VALUE:
+        raise InvalidConnectorRequestError(
+            f"connector_id must not exceed {INT64_MAX_VALUE}"
+        )
     if connector_id <= 0:
         connector_ref = request.connector_ref.strip().lower()
         if not connector_ref:
             raise InvalidConnectorRequestError(
                 "connector_id or connector_ref is required"
             )
-        matching_connectors = state.get_connectors(federation_id, connector_ref)
+        matching_connectors = state.get_connectors_by_ref(federation_id, connector_ref)
         if not matching_connectors:
             raise FlowerError(
                 ApiErrorCode.CONNECTOR_NOT_FOUND,
@@ -460,18 +467,16 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals,too-many-branch
             f"credentials ({type(err).__name__})"
         ) from None
 
-    connector_id = state.create_connector(
+    stored = state.create_connector(
         federation_id=session.federation_id,
         connector_ref=connector_ref,
         credentials_json=credentials_json,
         config_json=config_json,
         created_by=account.flwr_aid,
     )
-    if connector_id is None:
+    if not stored:
         raise ConnectorFailureError("Connector credentials could not be stored")
-    return CompleteConnectorOAuthResponse(
-        connector_ref=connector_ref, connector_id=connector_id
-    )
+    return CompleteConnectorOAuthResponse(connector_ref=connector_ref)
 
 
 def validate_run_connector_ids(
@@ -481,8 +486,13 @@ def validate_run_connector_ids(
 ) -> list[int]:
     """Validate and deduplicate connector IDs for a new run."""
     canonical_ids = list(dict.fromkeys(connector_ids))
-    if any(connector_id <= 0 for connector_id in canonical_ids):
-        raise InvalidConnectorRequestError("connector_id must be positive")
+    if any(
+        connector_id <= 0 or connector_id > INT64_MAX_VALUE
+        for connector_id in canonical_ids
+    ):
+        raise InvalidConnectorRequestError(
+            f"connector_id must be between 1 and {INT64_MAX_VALUE}"
+        )
     for connector_id in canonical_ids:
         connector = state.get_connector_by_id(connector_id)
         if connector is None or connector.federation_id != federation_id:
@@ -513,7 +523,7 @@ def resolve_run_connector_refs(
                 ApiErrorCode.CONNECTOR_NOT_FOUND,
                 f"OAuth flow for connector '{connector_ref}' was not found.",
             ) from None
-        matching_connectors = state.get_connectors(federation_id, connector_ref)
+        matching_connectors = state.get_connectors_by_ref(federation_id, connector_ref)
         if not matching_connectors:
             raise FlowerError(
                 ApiErrorCode.CONNECTOR_NOT_FOUND,

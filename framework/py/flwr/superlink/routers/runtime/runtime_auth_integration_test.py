@@ -113,14 +113,16 @@ def test_get_connector_requires_and_uses_connector_task_token(
 ) -> None:
     """Derive connector credential access from the authenticated task token."""
     assert _post(client, "get-connector", GetConnectorRequest()).status_code == 401
-    connector_id = state.create_connector(
+    assert state.create_connector(
         federation_id=NOOP_FEDERATION_ID,
         connector_ref="notion",
         credentials_json='{"token":"secret"}',
         config_json="{}",
         created_by="account-a",
     )
-    assert connector_id is not None
+    connector_id = state.get_connectors_by_ref(NOOP_FEDERATION_ID, "notion")[
+        0
+    ].connector_id
     run_id = state.create_run(
         "",
         "",

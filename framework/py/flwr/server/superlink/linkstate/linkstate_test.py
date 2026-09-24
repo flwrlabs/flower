@@ -2614,14 +2614,18 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state = self.state_factory()
 
         with state.session() as session:
-            connector_id = state.create_connector(
-                federation_id="@bob/fed-a",
-                connector_ref="calendar",
-                credentials_json='{"token":"old"}',
-                config_json='{"calendar":"primary"}',
-                created_by="account-a",
+            self.assertTrue(
+                state.create_connector(
+                    federation_id="@bob/fed-a",
+                    connector_ref="calendar",
+                    credentials_json='{"token":"old"}',
+                    config_json='{"calendar":"primary"}',
+                    created_by="account-a",
+                )
             )
-            assert connector_id is not None
+            connector_id = state.get_connectors_by_ref("@bob/fed-a", "calendar")[
+                0
+            ].connector_id
             cached_row = session.scalar(
                 select(ConnectorModel).where(
                     ConnectorModel.federation_id == "@bob/fed-a",
@@ -2638,7 +2642,7 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
                     config_json='{"calendar":"work"}',
                 )
             )
-            second = state.get_connectors("@bob/fed-a", "calendar")[0]
+            second = state.get_connectors_by_ref("@bob/fed-a", "calendar")[0]
 
         assert second is not None
         self.assertEqual(second.credentials_json, '{"token":"new"}')
