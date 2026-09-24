@@ -88,10 +88,10 @@ app = AgentApp()
 
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
-    """Send the configured input to the model."""
-    prompt = context.run_config.get("agent.input")
+    """Send the chat prompt to the model."""
+    prompt = agent.prompt
     if not isinstance(prompt, str) or not prompt.strip():
-        raise ValueError("agent.input must be a non-empty string")
+        raise ValueError("Prompt must be a non-empty string")
 
     client = OpenAI(
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
@@ -168,8 +168,8 @@ loop.
 
 ## Read conversation history
 
-Before calling the AgentApp, Flower records a non-empty `agent.input` as a
-user-message event. Events published with `agent.events.emit(...)` and connector
+Before calling the AgentApp, Flower records `agent.prompt` as a user-message
+event. Events published with `agent.events.emit(...)` and connector
 activity are stored in the same run-series trace. Read that trace at the start of
 a later run:
 

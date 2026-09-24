@@ -55,10 +55,10 @@ app = AgentApp()
 
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
-    """Send the configured input to the model."""
-    prompt = context.run_config.get("agent.input")
+    """Send the chat prompt to the model."""
+    prompt = agent.prompt
     if not isinstance(prompt, str) or not prompt.strip():
-        raise ValueError("agent.input must be a non-empty string")
+        raise ValueError("Prompt must be a non-empty string")
 
     client = OpenAI(
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
@@ -84,7 +84,7 @@ def main(agent: AgentSession, context: Context) -> None:
 
 `AgentApp.main` registers the function Flower calls. The runtime passes:
 
-- `agent`, an `AgentSession` for connectors and frontend-visible events
+- `agent`, an `AgentSession` with the prompt, connectors, and frontend-visible events
 - `context`, which contains run configuration and persistent state
 
 Flower also injects `FLWR_RUNTIME_BASE_URL` and `FLWR_RUNTIME_API_KEY` into the
@@ -115,7 +115,8 @@ agentapp = "agent.agent_app:app"
 ```
 
 The component value uses `<module>:<attribute>`. Flower imports `app` from
-`agent/agent_app.py`. It receives your prompt and processes it using a model and available tools.
+`agent/agent_app.py`. When you chat, Flower passes your message to `app` as
+`agent.prompt`.
 
 ## Create the environment
 

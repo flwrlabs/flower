@@ -77,7 +77,7 @@ order.
 
 The main function receives:
 
-- `AgentSession` for connectors and frontend-visible events
+- `AgentSession` for the prompt, connectors, and frontend-visible events
 - `Context` for run configuration and state shared by the run series
 
 The OpenAI client sends model requests through the runtime URL and credential
@@ -207,7 +207,7 @@ def connector_error_output(
 
 The main function has five phases:
 
-1. Validate `agent.input` and rebuild the conversation messages from the trace
+1. Validate `agent.prompt` and rebuild the conversation messages from the trace
 1. Create the OpenAI client and request the connector tool schemas
 1. Execute up to `MAX_TOOL_TURNS` rounds of model-requested function calls
 1. Make one final model request without tools and publish its stream
@@ -219,9 +219,8 @@ Add the entry point:
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
     """Research the chat input with a bounded connector loop."""
-    prompt = context.run_config.get("agent.input")
-    if not isinstance(prompt, str) or not prompt.strip():
-        raise ValueError("agent.input must be a non-empty string")
+    if not isinstance(agent.prompt, str) or not agent.prompt.strip():
+        raise ValueError("Prompt must be a non-empty string")
 
     client = OpenAI(
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
@@ -302,8 +301,8 @@ def main(agent: AgentSession, context: Context) -> None:
     print(final_text)
 ```
 
-The trace already contains the current `agent.input` event when the AgentApp
-starts. The planning calls remain local to this run because the app publishes
+The trace already contains the current prompt's user-message event when the
+AgentApp starts. The planning calls remain local to this run because the app publishes
 only the final streamed response. The complete planning output and connector
 outputs stay in `input_items` for subsequent tool turns within this run; the
 trace loader does not replay them on later runs.
@@ -428,9 +427,8 @@ def connector_error_output(
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
     """Research the chat input with a bounded connector loop."""
-    prompt = context.run_config.get("agent.input")
-    if not isinstance(prompt, str) or not prompt.strip():
-        raise ValueError("agent.input must be a non-empty string")
+    if not isinstance(agent.prompt, str) or not agent.prompt.strip():
+        raise ValueError("Prompt must be a non-empty string")
 
     client = OpenAI(
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],

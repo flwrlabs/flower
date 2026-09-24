@@ -35,11 +35,12 @@ and logs.
 ## AgentSession
 
 Flower creates an `AgentSession` for each AgentApp run and passes it to your
-main function. It exposes three capabilities:
+main function. It provides:
 
-- `agent.responses` provides a lower-level JSON model API
+- `agent.prompt`, the submitted chat message
 - `agent.connectors` returns connector tools and executes function calls
 - `agent.events` publishes structured events selected by the AgentApp
+- `agent.grid` provides model-facing access to the federation Grid
 
 Provider credentials and connector implementations remain outside the FAB. New
 AgentApps normally make model requests with the OpenAI SDK and use
@@ -85,11 +86,6 @@ those events to publish and which output to persist in `Context`.
 The endpoint is authenticated for the current AgentApp task. It is not a public
 model API for an external client. See [Use the OpenAI SDK in an
 AgentApp](../how-to-guides/use-openai-sdk.md) for a complete example.
-
-`agent.responses.create(request)` remains available as a lower-level interface
-for JSON-based workflows. It returns a JSON response object and automatically
-appends its model output items to the Flower `Context`. New AgentApps should
-prefer the OpenAI SDK when they need typed responses or streaming events.
 
 The default model provider at `api.flower.ai` does not currently support
 continuing with `previous_response_id`. Rebuild `input` from stored messages for
@@ -137,7 +133,7 @@ See {ref}`publish-agentapp-generated-text` for the event sequence used to
 present text that does not come from an SDK stream.
 
 `agent.events.get_trace()` returns the events from every run in the current run
-series. This includes the user-message event Flower creates from `agent.input`,
+series. This includes the user-message event Flower creates from `agent.prompt`,
 events published by the AgentApp, and connector activity:
 
 ```python
@@ -158,8 +154,7 @@ as conversation messages.
 
 Alongside the `AgentSession`, your main function receives a Flower `Context`:
 
-- `context.run_config` contains the configuration supplied for the run,
-  including the chat message as `agent.input`
+- `context.run_config` contains configuration from the FAB and per-run overrides
 - `context.state` stores records persisted for the run series
 - `context.run_id` identifies the current run
 

@@ -161,7 +161,7 @@ You can also press {kbd}`Ctrl+C`:
 Each submitted message started one `AgentApp` run. SuperGrid supplied:
 
 - an OpenAI-compatible endpoint for model requests
-- an `AgentSession` for connector calls and frontend-visible events
+- an `AgentSession` for the prompt, connector calls, and frontend-visible events
 - a Flower `Context` containing run configuration and persistent series state
 - the selected AgentApp, resolved from its app spec or FAB hash
 - a federation in which the run and its series are stored

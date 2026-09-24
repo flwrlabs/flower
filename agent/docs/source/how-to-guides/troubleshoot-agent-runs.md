@@ -161,7 +161,7 @@ Common causes are:
 - an invalid `<module>:<attribute>` AgentApp component;
 - an undeclared Python dependency;
 - an unsupported model or connector; or
-- missing or empty `agent.input`.
+- a missing or empty chat prompt.
 
 Compare with [Write your first
 AgentApp](../tutorials/write-your-first-agentapp.md) before adding more control
