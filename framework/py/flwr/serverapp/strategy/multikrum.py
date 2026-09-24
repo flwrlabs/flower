@@ -180,6 +180,11 @@ def compute_distances(records: list[ArrayRecord]) -> NDArray:
         axis=0,
     )  # shape: (n, d) with n number of records and d the dimension of model
 
+    # Center the vectors, which leaves pairwise distances unchanged. Otherwise, when
+    # the models are much larger than their differences, the formula subtracts
+    # nearly equal terms and floating-point rounding swamps the distances
+    flat_w = flat_w - flat_w.mean(axis=0)
+
     # Compute squared norms of each vector
     norms: NDArray = np.square(flat_w).sum(axis=1)  # shape (n,)
 
