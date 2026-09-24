@@ -29,7 +29,6 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
     String,
     Table,
-    UniqueConstraint,
     text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -161,7 +160,7 @@ class Connector(FlwrBase):
     """Represent connector configuration for a federation."""
 
     __tablename__ = "connector"
-    __table_args__ = (UniqueConstraint("federation_id", "connector_ref"),)
+    __table_args__ = ({"sqlite_autoincrement": True},)
 
     connector_id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True, nullable=False
@@ -185,6 +184,7 @@ class ConnectorOAuthSession(FlwrBase):
         String, primary_key=True, nullable=False
     )
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    federation_id: Mapped[str] = mapped_column(String, nullable=False)
     connector_ref: Mapped[str] = mapped_column(String, nullable=False)
     state: Mapped[str] = mapped_column(String, nullable=False)
     redirect_uri: Mapped[str] = mapped_column(String, nullable=False)
@@ -200,7 +200,7 @@ class RunConnector(FlwrBase):
     __tablename__ = "run_connector"
 
     run_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
-    connector_ref: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    connector_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
 
 
 class Task(FlwrBase):
@@ -219,6 +219,7 @@ class Task(FlwrBase):
     fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     model_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     connector_ref: Mapped[str | None] = mapped_column(String, nullable=True)
+    connector_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     token: Mapped[str | None] = mapped_column(String, nullable=True)
     active_until: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     pending_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)

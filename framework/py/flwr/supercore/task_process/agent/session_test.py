@@ -376,11 +376,14 @@ def test_create_connector_response_resolves_canonical_name() -> None:
             name=" NoTiOn_Search ",
             call_id="call-1",
             arguments={},
+            connector_id=42,
         )
 
     get_connector_ref.assert_called_once_with("notion_search")
     stub.CreateTask.assert_called_once_with(
-        CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref="notion")
+        CreateTaskRequest(
+            type=TaskType.CONNECTOR, connector_ref="notion", connector_id=42
+        )
     )
     request = send_and_receive.call_args.args[0]
     assert isinstance(request, ConnectorRequest)

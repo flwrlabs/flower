@@ -17,6 +17,7 @@
 
 import unittest
 from logging import ERROR
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
@@ -59,13 +60,18 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.state = Mock()
         self.state.get_tasks.return_value = []
 
-    def _create_connector_task(self, connector_ref: str) -> CreateTaskResponse:
+    def _create_connector_task(
+        self, connector_ref: str, connector_id: int | None = 42
+    ) -> CreateTaskResponse:
         """Create a connector task as an authenticated AgentApp task."""
+        request = CreateTaskRequest(
+            type=TaskType.CONNECTOR,
+            connector_ref=connector_ref,
+        )
+        if connector_id is not None:
+            request.connector_id = connector_id
         return runtime_handlers.create_task(
-            CreateTaskRequest(
-                type=TaskType.CONNECTOR,
-                connector_ref=connector_ref,
-            ),
+            request,
             self.state,
             Mock(task_id=789, run_id=123, type=TaskType.AGENT_APP),
         )
@@ -160,9 +166,53 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             fab_hash=None,
             model_ref="models/abc",
             connector_ref=None,
+            connector_id=None,
             requesting_task_id=789,
         )
         self.assertEqual(response.task_id, 456)
+
+    def test_create_task_resolves_single_bound_connector_for_compatibility(
+        self,
+    ) -> None:
+        """Provider-only requests resolve when exactly one connection is bound."""
+        self.state.get_run_connector_ids.return_value = [42]
+        self.state.get_connector_by_id.return_value = SimpleNamespace(
+            connector_ref="notion"
+        )
+        self.state.create_task.return_value = 456
+
+        with patch.object(
+            connector_registry,
+            "OAUTH_FLOWS",
+            {"notion": Mock(connector_ref="notion")},
+        ):
+            self._create_connector_task("notion", connector_id=None)
+
+        self.assertEqual(self.state.create_task.call_args.kwargs["connector_id"], 42)
+
+    def test_create_task_rejects_ambiguous_provider_only_request(self) -> None:
+        """Provider-only requests require an ID when multiple accounts are bound."""
+        self.state.get_run_connector_ids.return_value = [42, 43]
+        self.state.get_connector_by_id.side_effect = [
+            SimpleNamespace(connector_ref="notion"),
+            SimpleNamespace(connector_ref="notion"),
+        ]
+
+        with (
+            patch.object(
+                connector_registry,
+                "OAUTH_FLOWS",
+                {"notion": Mock(connector_ref="notion")},
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            self._create_connector_task("notion", connector_id=None)
+
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
+        )
+        self.state.create_task.assert_not_called()
 
     def test_create_task_allows_app_task_types_to_request_creation(self) -> None:
         """CreateTask should allow app tasks to request task creation."""
@@ -188,13 +238,17 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                     fab_hash=None,
                     model_ref="model",
                     connector_ref=None,
+                    connector_id=None,
                     requesting_task_id=789,
                 )
                 self.assertEqual(response.task_id, 456)
 
     def test_create_task_allows_bound_oauth_connector(self) -> None:
         """CreateTask should allow an OAuth connector bound to the run."""
-        self.state.get_run_connector_refs.return_value = ["notion"]
+        self.state.get_run_connector_ids.return_value = [42]
+        self.state.get_connector_by_id.return_value = SimpleNamespace(
+            connector_ref="notion"
+        )
         self.state.create_task.return_value = 456
 
         with patch.object(
@@ -204,15 +258,17 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         ):
             response = self._create_connector_task("notion")
 
-        self.state.get_run_connector_refs.assert_called_once_with(run_id=123)
+        self.state.get_run_connector_ids.assert_called_once_with(123)
+        self.state.get_connector_by_id.assert_called_once_with(42)
         self.assertEqual(
             self.state.create_task.call_args.kwargs["connector_ref"], "notion"
         )
+        self.assertEqual(self.state.create_task.call_args.kwargs["connector_id"], 42)
         self.assertEqual(response.task_id, 456)
 
     def test_create_task_rejects_unbound_oauth_connector(self) -> None:
         """CreateTask should reject OAuth credentials unavailable to the run."""
-        self.state.get_run_connector_refs.return_value = []
+        self.state.get_run_connector_ids.return_value = []
 
         with (
             patch.object(
@@ -236,7 +292,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             self._create_connector_task("unknown")
 
         self.assertEqual(error.exception.code, ApiErrorCode.CONNECTOR_NOT_FOUND)
-        self.state.get_run_connector_refs.assert_not_called()
+        self.state.get_run_connector_ids.assert_not_called()
         self.state.create_task.assert_not_called()
 
     def test_create_task_preserves_builtin_connector_access(self) -> None:
@@ -246,9 +302,9 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         for connector_ref in ("web_search", "filesystem"):
             with self.subTest(connector_ref=connector_ref):
                 response = self._create_connector_task(connector_ref)
-
-                self.state.get_run_connector_refs.assert_not_called()
                 self.assertEqual(response.task_id, 456)
+
+        self.state.get_run_connector_ids.assert_not_called()
 
     def test_create_task_propagates_state_error(self) -> None:
         """CreateTask should let state-layer run validation errors propagate."""
@@ -276,6 +332,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             fab_hash=None,
             model_ref="model",
             connector_ref=None,
+            connector_id=None,
             requesting_task_id=789,
         )
 

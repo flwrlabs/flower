@@ -232,28 +232,29 @@ def list_connectors(
     flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     _validate_federation_membership_in_request(state, flwr_aid, request.federation)
-    federation = state.federation_manager.get_details(request.federation)
-    if federation.can_invite_members or federation.can_add_supernodes:
-        return ListConnectorsResponse()
-
     connectors: list[Connector] = []
     for flow in sorted(
         connector_registry.OAUTH_FLOWS.values(),
         key=lambda item: item.connector_ref,
     ):
         connector_ref = flow.connector_ref
-        connected = (
-            state.get_connector(
-                federation_id=request.federation, connector_ref=connector_ref
+        stored_connectors = state.get_connectors(request.federation, connector_ref)
+        connectors.extend(
+            Connector(
+                connector_id=stored_connector.connector_id,
+                connector_ref=connector_ref,
+                display_name=flow.display_name,
+                description=flow.description,
+                connected=True,
             )
-            is not None
+            for stored_connector in stored_connectors
         )
         connectors.append(
             Connector(
                 connector_ref=connector_ref,
                 display_name=flow.display_name,
                 description=flow.description,
-                connected=connected,
+                connected=False,
             )
         )
     return ListConnectorsResponse(connectors=connectors)
@@ -264,37 +265,37 @@ def disconnect_connector(
     account: AccountInfo,
     state: LinkState,
 ) -> DisconnectConnectorResponse:
-    """Delete one connector from the account's personal federation."""
+    """Delete one connector from a federation."""
     log(INFO, "ControlServicer.DisconnectConnector")
-    connector_ref = request.connector_ref.strip().lower()
-    if not connector_ref:
-        raise InvalidConnectorRequestError("connector_ref is required")
-    try:
-        connector_registry.get_oauth_flow(connector_ref)
-    except ValueError:
-        raise FlowerError(
-            ApiErrorCode.CONNECTOR_NOT_FOUND,
-            f"OAuth flow for connector '{connector_ref}' was not found.",
-        ) from None
+    connector_id = request.connector_id
+    federation_id = request.federation.strip()
+    if not federation_id:
+        raise InvalidConnectorRequestError("federation is required")
+    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    if connector_id <= 0:
+        raise InvalidConnectorRequestError("connector_id must be positive")
 
-    federation_id = _get_personal_connector_federation_id(account, state)
-    deleted = state.delete_connector(federation_id, connector_ref)
+    deleted = state.delete_connector(federation_id, connector_id)
     if not deleted:
         raise FlowerError(
             ApiErrorCode.CONNECTOR_NOT_FOUND,
-            f"Connector '{connector_ref}' is not connected for this federation.",
+            f"Connector '{connector_id}' is not connected for this federation.",
         )
     return DisconnectConnectorResponse()
 
 
-def begin_connector_oauth(
+def begin_connector_oauth(  # pylint: disable=too-many-locals
     request: BeginConnectorOAuthRequest,
     account: AccountInfo,
     state: LinkState,
 ) -> BeginConnectorOAuthResponse:
-    """Create a short-lived OAuth session for a personal federation."""
+    """Create a short-lived OAuth session for a federation."""
     log(INFO, "ControlServicer.BeginConnectorOAuth")
     connector_ref = request.connector_ref.strip().lower()
+    federation_id = request.federation.strip()
+    if not federation_id:
+        raise InvalidConnectorRequestError("federation is required")
+    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
     if not connector_ref:
         raise InvalidConnectorRequestError("connector_ref is required")
     redirect_uri = request.redirect_uri.strip()
@@ -352,6 +353,7 @@ def begin_connector_oauth(
     session = state.create_connector_oauth_session(
         oauth_session_id=oauth_session_id,
         flwr_aid=account.flwr_aid,
+        federation_id=federation_id,
         connector_ref=connector_ref,
         state=oauth_state,
         redirect_uri=redirect_uri,
@@ -369,7 +371,7 @@ def begin_connector_oauth(
     )
 
 
-def complete_connector_oauth(  # pylint: disable=too-many-locals
+def complete_connector_oauth(  # pylint: disable=too-many-locals,too-many-branches
     request: CompleteConnectorOAuthRequest,
     account: AccountInfo,
     state: LinkState,
@@ -393,6 +395,9 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
             ApiErrorCode.CONNECTOR_NOT_FOUND,
             "Connector OAuth session was not found for this account.",
         )
+    _validate_federation_membership_in_request(
+        state, account.flwr_aid, session.federation_id
+    )
 
     try:
         expires_at = datetime.fromisoformat(session.expires_at)
@@ -451,45 +456,37 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
             f"credentials ({type(err).__name__})"
         ) from None
 
-    stored = state.upsert_connector(
-        federation_id=_get_personal_connector_federation_id(account, state),
+    connector_id = state.create_connector(
+        federation_id=session.federation_id,
         connector_ref=connector_ref,
         credentials_json=credentials_json,
         config_json=config_json,
         created_by=account.flwr_aid,
     )
-    if not stored:
+    if connector_id is None:
         raise ConnectorFailureError("Connector credentials could not be stored")
-    return CompleteConnectorOAuthResponse(connector_ref=connector_ref)
+    return CompleteConnectorOAuthResponse(
+        connector_ref=connector_ref, connector_id=connector_id
+    )
 
 
-def validate_run_connector_refs(  # pylint: disable=unused-argument
-    connector_refs: Sequence[str],
-    account: AccountInfo,
+def validate_run_connector_ids(
+    connector_ids: Sequence[int],
     state: LinkState,
     federation_id: str,
-) -> list[str]:
-    """Validate and canonicalize OAuth connector references for a new run."""
-    canonical_refs = list(
-        dict.fromkeys(requested_ref.strip().lower() for requested_ref in connector_refs)
-    )
-    if "" in canonical_refs:
-        raise InvalidConnectorRequestError("connector_ref is required")
-    for connector_ref in canonical_refs:
-        try:
-            connector_registry.get_oauth_flow(connector_ref)
-        except ValueError:
+) -> list[int]:
+    """Validate and deduplicate connector IDs for a new run."""
+    canonical_ids = list(dict.fromkeys(connector_ids))
+    if any(connector_id <= 0 for connector_id in canonical_ids):
+        raise InvalidConnectorRequestError("connector_id must be positive")
+    for connector_id in canonical_ids:
+        connector = state.get_connector_by_id(connector_id)
+        if connector is None or connector.federation_id != federation_id:
             raise FlowerError(
                 ApiErrorCode.CONNECTOR_NOT_FOUND,
-                f"OAuth flow for connector '{connector_ref}' was not found.",
-            ) from None
-        connector = state.get_connector(federation_id, connector_ref)
-        if connector is None:
-            raise FlowerError(
-                ApiErrorCode.CONNECTOR_NOT_FOUND,
-                f"Connector '{connector_ref}' is not connected for this federation.",
+                f"Connector '{connector_id}' is not connected for this federation.",
             )
-    return canonical_refs
+    return canonical_ids
 
 
 def _get_hub_app_id(
@@ -652,20 +649,9 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         return StartRunResponse()
 
     override_config = user_config_from_proto(request.override_config)
-    connector_refs = validate_run_connector_refs(
-        request.connector_refs, account, state, federation_id
+    connector_ids = validate_run_connector_ids(
+        request.connector_ids, state, federation_id
     )
-
-    if connector_refs:
-        federation = state.federation_manager.get_details(federation_id)
-        if federation.can_invite_members or federation.can_add_supernodes:
-            raise InvalidConnectorRequestError(
-                "connector refs are not supported for this federation",
-                public_details=(
-                    "Connectors are currently available only in your personal "
-                    "workspace."
-                ),
-            )
 
     try:
         # Validate user config overrides matches keys in run config in FAB
@@ -749,7 +735,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             user_prompt=user_prompt or None,
             series_id=series_id,
             series_description=series_description,
-            connector_refs=connector_refs,
+            connector_ids=connector_ids,
         )
 
         if run_id == 0:

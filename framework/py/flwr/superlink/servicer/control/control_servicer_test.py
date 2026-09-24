@@ -242,7 +242,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         """Begin OAuth and return the persisted session ID and state."""
         response = self.servicer.BeginConnectorOAuth(
             BeginConnectorOAuthRequest(
-                connector_ref=" Slack ", redirect_uri="https://client.example/"
+                connector_ref=" Slack ",
+                redirect_uri="https://client.example/",
+                federation=NOOP_FEDERATION_ID,
             ),
             Mock(),
         )
@@ -270,9 +272,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             response = self.servicer.CompleteConnectorOAuth(request, Mock())
 
             self.assertEqual(response.connector_ref, "slack")
-            connector = self.state.get_connector(
-                federation_id=NOOP_FEDERATION_ID, connector_ref="slack"
-            )
+            self.assertGreater(response.connector_id, 0)
+            connector = self.state.get_connector_by_id(response.connector_id)
             assert connector is not None
             self.assertEqual(
                 json.loads(connector.credentials_json),
@@ -289,30 +290,53 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     def test_list_and_disconnect_connectors_are_federation_scoped(self) -> None:
         """List and disconnect only the requested federation's connector."""
         flow = _OAuthFlow()
-        for federation_id in (NOOP_FEDERATION_ID, "@bob/fed-a"):
-            self.assertTrue(
-                self.state.upsert_connector(
-                    federation_id=federation_id,
-                    connector_ref="slack",
-                    credentials_json="{}",
-                    config_json="{}",
-                    created_by=self.aid,
-                )
-            )
+        first_id = self.state.create_connector(
+            federation_id=NOOP_FEDERATION_ID,
+            connector_ref="slack",
+            credentials_json='{"account":"first"}',
+            config_json="{}",
+            created_by=self.aid,
+        )
+        second_id = self.state.create_connector(
+            federation_id=NOOP_FEDERATION_ID,
+            connector_ref="slack",
+            credentials_json='{"account":"second"}',
+            config_json="{}",
+            created_by=self.aid,
+        )
+        assert first_id is not None and second_id is not None
 
         with patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}):
             response = self.servicer.ListConnectors(
                 ListConnectorsRequest(federation=NOOP_FEDERATION_ID), Mock()
             )
-            self.assertEqual(len(response.connectors), 1)
-            self.assertTrue(response.connectors[0].connected)
-
-            self.servicer.DisconnectConnector(
-                DisconnectConnectorRequest(connector_ref=" Slack "), Mock()
+            connected = [
+                connector for connector in response.connectors if connector.connected
+            ]
+            self.assertEqual(
+                [connector.connector_id for connector in connected],
+                [first_id, second_id],
+            )
+            self.assertEqual(
+                len(
+                    [
+                        connector
+                        for connector in response.connectors
+                        if not connector.connected
+                    ]
+                ),
+                1,
             )
 
-        self.assertIsNone(self.state.get_connector(NOOP_FEDERATION_ID, "slack"))
-        self.assertIsNotNone(self.state.get_connector("@bob/fed-a", "slack"))
+            self.servicer.DisconnectConnector(
+                DisconnectConnectorRequest(
+                    connector_id=first_id, federation=NOOP_FEDERATION_ID
+                ),
+                Mock(),
+            )
+
+        self.assertIsNone(self.state.get_connector_by_id(first_id))
+        self.assertIsNotNone(self.state.get_connector_by_id(second_id))
 
     def test_list_connectors_without_federation_returns_empty(self) -> None:
         """ListConnectors should return no connectors without a federation."""
@@ -337,6 +361,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             expired = self.state.create_connector_oauth_session(
                 oauth_session_id="expired-session",
                 flwr_aid=self.aid,
+                federation_id=NOOP_FEDERATION_ID,
                 connector_ref="slack",
                 state="expected-state",
                 redirect_uri="https://client.example/oauth/callback",
@@ -455,20 +480,21 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(start_run.call_args.kwargs["source"], "unknown")
 
     def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
-        """StartRun should bind canonical connected OAuth connector refs."""
+        """StartRun should bind connected OAuth connector IDs."""
         flow = _OAuthFlow()
-        self.state.upsert_connector(
+        connector_id = self.state.create_connector(
             federation_id=NOOP_FEDERATION_ID,
             connector_ref="slack",
             credentials_json="{}",
             config_json="{}",
             created_by=self.aid,
         )
+        assert connector_id is not None
         request = StartRunRequest(
             federation=NOOP_FEDERATION_ID,
-            connector_refs=[" Slack ", "slack"],
+            connector_ids=[connector_id, connector_id],
         )
-        request.fab.content = b"test FAB content with connector refs"
+        request.fab.content = b"test FAB content with connector IDs"
 
         with (
             patch.object(
@@ -489,8 +515,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             response = self.servicer.StartRun(request, self._make_start_run_context())
 
         self.assertEqual(
-            list(self.state.get_run_connector_refs(run_id=response.run_id)),
-            ["slack"],
+            list(self.state.get_run_connector_ids(run_id=response.run_id)),
+            [connector_id],
         )
 
     @parameterized.expand(  # type: ignore
@@ -500,23 +526,25 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             (True, True),
         ]
     )
-    def test_start_run_rejects_connectors_for_capable_federation(
+    def test_start_run_allows_connectors_for_capable_federation(
         self,
         can_invite_members: bool,
         can_add_supernodes: bool,
     ) -> None:
-        """StartRun should restrict connectors to personal-style federations."""
-        self.state.upsert_connector(
+        """StartRun should allow connectors in capable federations."""
+        connector_id = self.state.create_connector(
             federation_id=NOOP_FEDERATION_ID,
             connector_ref="slack",
             credentials_json="{}",
             config_json="{}",
             created_by=self.aid,
         )
+        assert connector_id is not None
         request = StartRunRequest(
             federation=NOOP_FEDERATION_ID,
-            connector_refs=["slack"],
+            connector_ids=[connector_id],
         )
+        request.fab.content = b"test FAB content"
 
         with (
             patch.object(
@@ -532,41 +560,39 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                     can_add_supernodes=can_add_supernodes,
                 ),
             ),
-            self.assertRaises(FlowerError) as error,
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers."
+                "get_metadata_from_config",
+                return_value=("flwr/demo", "1.0.0"),
+            ),
         ):
-            self.servicer.StartRun(request, self._make_start_run_context())
+            response = self.servicer.StartRun(request, self._make_start_run_context())
 
-        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST)
+        self.assertGreater(response.run_id, 0)
         self.assertEqual(
-            error.exception.public_details,
-            "Connectors are currently available only in your personal workspace.",
+            list(self.state.get_run_connector_ids(response.run_id)),
+            [connector_id],
         )
-        self.assertEqual(list(self.state.get_run_info()), [])
 
     @parameterized.expand(  # type: ignore
         [
-            ("unknown", "unknown", ApiErrorCode.CONNECTOR_NOT_FOUND),
-            ("empty", "  ", ApiErrorCode.INVALID_CONNECTOR_REQUEST),
-            ("other_account", "slack", ApiErrorCode.CONNECTOR_NOT_FOUND),
+            ("unknown", 999, ApiErrorCode.CONNECTOR_NOT_FOUND),
+            ("invalid", 0, ApiErrorCode.INVALID_CONNECTOR_REQUEST),
         ]
     )
     def test_start_run_rejects_unavailable_oauth_connector(
         self,
         _name: str,
-        connector_ref: str,
+        connector_id: int,
         expected_code: ApiErrorCode,
     ) -> None:
-        """StartRun should reject invalid, unknown, and other-federation refs."""
+        """StartRun should reject invalid and unknown connector IDs."""
         flow = _OAuthFlow()
-        if connector_ref == "slack":
-            self.state.upsert_connector(
-                federation_id="@bob/fed-a",
-                connector_ref="slack",
-                credentials_json="{}",
-                config_json="{}",
-                created_by="other-account",
-            )
-        request = StartRunRequest(connector_refs=[connector_ref])
+        request = StartRunRequest(connector_ids=[connector_id])
 
         with (
             patch.object(

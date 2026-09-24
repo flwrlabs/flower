@@ -31,6 +31,13 @@ from ..utils import flwr_cli_exc_handler
 CHAT_CONNECTOR_CLEAR = "clear"
 
 
+def connector_selector(connector: Connector) -> str:
+    """Return the unambiguous selector for a connected connector."""
+    if connector.HasField("connector_id"):
+        return f"{connector.connector_ref}:{connector.connector_id}"
+    return connector.connector_ref
+
+
 def fetch_chat_connectors(stub: ControlHttpClient, federation: str) -> list[Connector]:
     """Return connected connectors available in a federation."""
     with flwr_cli_exc_handler():
@@ -44,7 +51,7 @@ def complete_connectors(
     """Yield connected connectors matching a completion query."""
     ref_width = max(
         len(CHAT_CONNECTOR_CLEAR),
-        *(len(connector.connector_ref) for connector in connectors),
+        *(len(connector_selector(connector)) for connector in connectors),
     )
     if CHAT_CONNECTOR_CLEAR.startswith(query.lower()):
         yield Completion(
@@ -57,22 +64,20 @@ def complete_connectors(
             selected_style="#ffffff bg:#dc8400 noreverse",
         )
     for connector in connectors:
-        if connector.connector_ref.lower().startswith(query.lower()):
+        selector = connector_selector(connector)
+        if selector.lower().startswith(query.lower()):
             yield Completion(
-                connector.connector_ref,
+                selector,
                 start_position=-len(query),
-                display=(
-                    f"{connector.connector_ref:<{ref_width}}        "
-                    f"{connector.description}"
-                ),
+                display=f"{selector:<{ref_width}}        {connector.description}",
                 selected_style="#ffffff bg:#dc8400 noreverse",
             )
 
 
 def select_connector(prompt: str, connectors: list[Connector]) -> Connector:
     """Return the connector selected by a command prompt."""
-    connector_ref = prompt[len(CHAT_CONNECTOR_COMMAND) :].strip()
+    selected = prompt[len(CHAT_CONNECTOR_COMMAND) :].strip()
     for connector in connectors:
-        if connector.connector_ref == connector_ref:
+        if connector_selector(connector) == selected:
             return connector
-    raise click.ClickException(f"Unknown connector: {connector_ref}")
+    raise click.ClickException(f"Unknown connector: {selected}")

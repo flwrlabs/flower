@@ -195,6 +195,7 @@ def test_auth_routes_disable_caching_and_skip_event_logging(
             BeginConnectorOAuthRequest(
                 connector_ref="google-drive",
                 redirect_uri="https://example.test/oauth/callback",
+                federation="@flower/fed-a",
             ),
             BeginConnectorOAuthResponse(
                 oauth_session_id="oauth-session",
@@ -257,7 +258,7 @@ def test_connector_oauth_routes_disable_caching_and_skip_event_logging(
         ),
         (
             "/v1/control/disconnect-connector",
-            DisconnectConnectorRequest(connector_ref="google-drive"),
+            DisconnectConnectorRequest(connector_id=42, federation="@flower/fed-a"),
             DisconnectConnectorResponse(),
             "disconnect_connector",
         ),
