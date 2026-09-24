@@ -43,6 +43,7 @@ erDiagram
     VARCHAR connector_ref
     TIMESTAMP created_at
     TIMESTAMP expires_at
+    VARCHAR federation_id
     VARCHAR flwr_aid
     VARCHAR pkce_verifier "nullable"
     VARCHAR redirect_uri

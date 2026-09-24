@@ -35,7 +35,7 @@ FEDERATION = f"@flower/{CHAT_DEFAULT_FEDERATION_NAME}"
 
 def _create_chat(stub: Mock) -> ChatApplication:
     with patch.object(ChatApplication, "_create_application", return_value=Mock()):
-        return ChatApplication(stub, [Federation(name=FEDERATION)], Mock())
+        return ChatApplication(stub, [Federation(name=FEDERATION)])
 
 
 def test_history_widget_restores_selected_events() -> None:

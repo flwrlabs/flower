@@ -32,8 +32,11 @@ from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 chat_module = importlib.import_module("flwr.cli.chat.chat")
 
 
-def test_chat_requires_login_before_interactive_application() -> None:
+def test_chat_requires_login_before_interactive_application(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Chat should fail before launching the app if the user has not logged in."""
+    monkeypatch.delenv("FLWR_CHAT_SUPERLINK", raising=False)
     superlink_connection = SuperLinkConnection(
         name=CHAT_SUPERGRID_CONNECTION_NAME,
         address="supergrid.flower.ai",
@@ -48,59 +51,53 @@ def test_chat_requires_login_before_interactive_application() -> None:
             chat_module,
             "read_superlink_connection",
             return_value=superlink_connection,
-        ),
+        ) as mock_read_connection,
         patch.object(
             chat_module,
             "init_http_client_from_connection",
             return_value=control_client,
         ),
-        patch.object(chat_module, "load_cli_auth_plugin_from_connection"),
         patch.object(chat_module, "ChatApplication") as mock_chat_application,
     ):
         with pytest.raises(click.ClickException, match="login first"):
             chat_module.chat()
 
     mock_chat_application.assert_not_called()
+    mock_read_connection.assert_called_once_with(CHAT_SUPERGRID_CONNECTION_NAME)
     control_client.close.assert_called_once()
 
 
-def test_chat_runs_interactive_application() -> None:
+def test_chat_runs_interactive_application(monkeypatch: pytest.MonkeyPatch) -> None:
     """Chat should launch the interactive application after authentication."""
+    monkeypatch.setenv("FLWR_CHAT_SUPERLINK", "other-superlink")
     superlink_connection = SuperLinkConnection(
-        name=CHAT_SUPERGRID_CONNECTION_NAME,
-        address="supergrid.flower.ai",
+        name="other-superlink",
+        address="localhost:9093",
+        insecure=True,
     )
     control_client = Mock()
     federations = [Federation(name=f"@flower/{CHAT_DEFAULT_FEDERATION_NAME}")]
     control_client.ListFederations.return_value = ListFederationsResponse(
         federations=federations
     )
-    auth_plugin = Mock()
-
     with (
         patch.object(
             chat_module,
             "read_superlink_connection",
             return_value=superlink_connection,
-        ),
+        ) as mock_read_connection,
         patch.object(
             chat_module,
             "init_http_client_from_connection",
             return_value=control_client,
         ) as mock_init_client,
-        patch.object(
-            chat_module,
-            "load_cli_auth_plugin_from_connection",
-            return_value=auth_plugin,
-        ),
         patch.object(chat_module, "ChatApplication") as mock_chat_application,
     ):
         chat_module.chat()
 
     control_client.ListFederations.assert_called_once()
-    mock_init_client.assert_called_once_with(superlink_connection, auth_plugin)
-    mock_chat_application.assert_called_once_with(
-        control_client, federations, auth_plugin
-    )
+    mock_init_client.assert_called_once_with(superlink_connection)
+    mock_chat_application.assert_called_once_with(control_client, federations, None)
+    mock_read_connection.assert_called_once_with("other-superlink")
     mock_chat_application.return_value.run.assert_called_once_with()
     control_client.close.assert_called_once()

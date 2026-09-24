@@ -189,22 +189,22 @@ def test_pull_pending_tasks_allows_with_superexec_metadata(
     )
 
 
-def test_pull_and_claim_task_round_trip_with_superexec_metadata(
+def test_pull_and_claim_task_allows_with_superexec_metadata(
     client: TestClient, state: NodeState
 ) -> None:
-    """Signed acquisition returns one task and its atomic claim token."""
+    """Signed acquisition returns a task and its claim token."""
     task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
     assert task_id is not None
-    request = PullAndClaimTaskRequest(
+    proto_request = PullAndClaimTaskRequest(
         supported_task_types=[TaskType.CLIENT_APP], wait_timeout_ms=5_000
     )
     headers = create_superexec_auth_metadata(
         auth_secret=derive_auth_secret(_SUPEREXEC_SECRET),
         method=_PULL_AND_CLAIM_TASK_METHOD,
-        request=request,
+        request=proto_request,
     )
 
-    response = _post(client, "pull-and-claim-task", request, auth_headers=headers)
+    response = _post(client, "pull-and-claim-task", proto_request, auth_headers=headers)
 
     assert response.status_code == 200
     claimed = PullAndClaimTaskResponse.FromString(response.content)

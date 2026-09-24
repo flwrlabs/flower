@@ -568,6 +568,7 @@ class InMemoryCoreState(
         self,
         oauth_session_id: str,
         flwr_aid: str,
+        federation_id: str,
         connector_ref: str,
         state: str,
         redirect_uri: str,
@@ -578,6 +579,7 @@ class InMemoryCoreState(
         if (
             not oauth_session_id
             or not flwr_aid
+            or not federation_id
             or not connector_ref
             or expires_at.utcoffset() is None
         ):
@@ -586,6 +588,7 @@ class InMemoryCoreState(
         session = ConnectorOAuthSessionRecord(
             oauth_session_id=oauth_session_id,
             flwr_aid=flwr_aid,
+            federation_id=federation_id,
             connector_ref=connector_ref,
             state=state,
             redirect_uri=redirect_uri,

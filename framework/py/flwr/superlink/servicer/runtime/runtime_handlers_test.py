@@ -54,7 +54,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
     PullAndClaimTaskRequest,
-    PullAndClaimTaskResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -70,7 +69,6 @@ from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.supercore.constant import (
-    AUTOMATION_BATCH_LIMIT,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     AutomationStatus,
@@ -388,31 +386,8 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         if num_transitions > 2:
             assert self.state.finish_task(task_id, "", "")
 
-    def test_pull_and_claim_task_processes_due_automations_first(self) -> None:
-        """Combined acquisition triggers automations before reading pending tasks."""
-        request = PullAndClaimTaskRequest(supported_task_types=[TaskType.SERVER_APP])
-        expected = PullAndClaimTaskResponse()
-        calls = Mock()
-
-        with (
-            patch.object(runtime_handlers, "process_due_automations") as process,
-            patch.object(
-                core_runtime_handlers, "pull_and_claim_task", return_value=expected
-            ) as claim,
-        ):
-            calls.attach_mock(process, "automation")
-            calls.attach_mock(claim, "claim")
-            response = runtime_handlers.pull_and_claim_task(request, self.state)
-
-        self.assertIs(response, expected)
-        self.assertEqual(
-            [call[0] for call in calls.mock_calls], ["automation", "claim"]
-        )
-        process.assert_called_once_with(self.state, limit=AUTOMATION_BATCH_LIMIT)
-        claim.assert_called_once_with(request, self.state)
-
-    def test_pull_pending_tasks_processes_due_automations(self) -> None:
-        """A SuperExec poll should create and return a due automation's task."""
+    def test_pull_and_claim_task_processes_due_automations(self) -> None:
+        """A SuperExec poll should create and claim a due automation's task."""
         series_id = self.state.get_run_info(run_ids=[self._auth_run_id])[0].series_id
         automation = self.state.store_automation(
             federation_id=NOOP_FEDERATION_ID,
@@ -442,12 +417,13 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
                 return_value=("flwr/demo", "0.1.0"),
             ),
         ):
-            response = runtime_handlers.pull_pending_tasks(
-                PullPendingTasksRequest(), self.state
+            response = runtime_handlers.pull_and_claim_task(
+                PullAndClaimTaskRequest(supported_task_types=[TaskType.SERVER_APP]),
+                self.state,
             )
 
-        self.assertEqual(len(response.tasks), 1)
-        run = self.state.get_run_info(run_ids=[response.tasks[0].run_id])[0]
+        self.assertTrue(response.token)
+        run = self.state.get_run_info(run_ids=[response.task.run_id])[0]
         self.assertEqual(run.series_id, automation.series_id)
         completed = self.state.list_automations(
             automation_ids=[automation.automation_id],

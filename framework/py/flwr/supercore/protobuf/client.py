@@ -155,7 +155,7 @@ class ProtobufClient:
             retry_invoker=retry_invoker,
         )
 
-    def _unary_unary(
+    def _unary_unary(  # pylint: disable=too-many-arguments
         self,
         *,
         path: str,

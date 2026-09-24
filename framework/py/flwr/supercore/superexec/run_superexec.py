@@ -309,12 +309,14 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                             wait_timeout_ms=_TASK_WAIT_TIMEOUT_MS,
                         )
                     )
-                except _SAFE_CONNECTION_ERRORS:
-                    log(
-                        WARNING,
-                        "Runtime connection unavailable during task acquisition",
-                    )
-                    time.sleep(task_poll_interval)
+                except _SAFE_CONNECTION_ERRORS as exc:
+                    if any(
+                        term in str(exc).lower()
+                        for term in ("certificate", "ssl", "tls")
+                    ):
+                        raise
+                    log(WARNING, "Runtime API connection failed: %s", exc)
+                    time.sleep(max(task_poll_interval, 1.0))
                     continue
                 except (httpx.TransportError, httpx.HTTPStatusError, ValueError) as err:
                     if (

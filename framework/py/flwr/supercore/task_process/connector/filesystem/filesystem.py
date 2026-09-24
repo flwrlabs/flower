@@ -23,10 +23,10 @@ from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
 from flwr.supercore.task_process.usage import (
     FILESYSTEM_LIST_DIRECTORY_USAGE_TYPE,
     FILESYSTEM_READ_FILE_USAGE_TYPE,
-    TaskUsageRecorder,
 )
 from flwr.supercore.typing import JSONObject, JSONValue
 
+from ..definition import ConnectorExecutionContext
 from ..http import ConnectorApiError
 
 FILESYSTEM_CONNECTOR_REF = "filesystem"
@@ -48,12 +48,15 @@ class FilesystemApiError(ConnectorApiError):
     provider = "Filesystem"
 
 
-def make_filesystem_tools() -> list[JSONObject]:
-    """Return the filesystem function tool schemas."""
+def make_filesystem_tools() -> tuple[JSONObject, ...]:
+    """Return tool schemas, or no tools when filesystem access is unavailable."""
     if not _PLATFORM_SUPPORTED or not os.getenv(FILESYSTEM_ALLOWED_DIRS_ENV):
-        return []
-    allowed_dirs = ", ".join(_allowed_dirs())
-    return [
+        return ()
+    try:
+        allowed_dirs = ", ".join(_allowed_dirs())
+    except FilesystemApiError:
+        return ()
+    return (
         {
             "type": "function",
             "name": FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
@@ -100,7 +103,7 @@ def make_filesystem_tools() -> list[JSONObject]:
                 "additionalProperties": False,
             },
         },
-    ]
+    )
 
 
 def invoke_filesystem(name: str, arguments: JSONValue) -> JSONObject:
@@ -128,26 +131,28 @@ def invoke_filesystem(name: str, arguments: JSONValue) -> JSONObject:
 def list_directory(
     path: str | None = None,
     *,
-    usage_recorder: TaskUsageRecorder,
+    context: ConnectorExecutionContext,
     **extra: JSONValue,
 ) -> JSONObject:
     """List a directory through the built-in connector interface."""
     output = invoke_filesystem(
         FILESYSTEM_LIST_DIRECTORY_TOOL_NAME, {"path": path, **extra}
     )
-    usage_recorder.record(TaskUsage(usage_type=FILESYSTEM_LIST_DIRECTORY_USAGE_TYPE))
+    context.usage_recorder.record(
+        TaskUsage(usage_type=FILESYSTEM_LIST_DIRECTORY_USAGE_TYPE)
+    )
     return output
 
 
 def read_file(
     path: str | None = None,
     *,
-    usage_recorder: TaskUsageRecorder,
+    context: ConnectorExecutionContext,
     **extra: JSONValue,
 ) -> JSONObject:
     """Read a file through the built-in connector interface."""
     output = invoke_filesystem(FILESYSTEM_READ_FILE_TOOL_NAME, {"path": path, **extra})
-    usage_recorder.record(TaskUsage(usage_type=FILESYSTEM_READ_FILE_USAGE_TYPE))
+    context.usage_recorder.record(TaskUsage(usage_type=FILESYSTEM_READ_FILE_USAGE_TYPE))
     return output
 
 

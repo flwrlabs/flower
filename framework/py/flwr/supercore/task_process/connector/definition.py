@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Definitions for federation-scoped connectors."""
+"""Definitions shared by built-in and federation-scoped connectors."""
+
+from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -109,34 +111,45 @@ ConnectorExecutor = Callable[[JSONObject, ConnectorExecutionContext], JSONValue]
 
 @dataclass(frozen=True)
 class ConnectorDefinition:
-    """Combine one provider definition with its action executors."""
+    """Group a connector's identity, tools, execution, and optional authentication."""
 
-    provider: ProviderDefinition
+    ref: str
+    tools: tuple[JSONObject, ...]
     executors: Mapping[str, ConnectorExecutor]
+    requires_credentials: bool = False
+    provider: ProviderDefinition | None = None
     oauth_flow: OAuthFlow | None = None
 
-    def __post_init__(self) -> None:
-        """Reject incomplete definitions when the connector is imported."""
-        action_names = {action.name for action in self.provider.actions}
-        if action_names != set(self.executors):
+    @classmethod
+    def from_provider(
+        cls,
+        provider: ProviderDefinition,
+        executors: Mapping[str, ConnectorExecutor],
+        oauth_flow: OAuthFlow | None = None,
+    ) -> ConnectorDefinition:
+        """Build a federation-scoped connector from its provider actions."""
+        action_names = {action.name for action in provider.actions}
+        if action_names != set(executors):
             raise ValueError(
-                f"Provider '{self.ref}' actions and executors do not match."
+                f"Provider '{provider.ref}' actions and executors do not match."
             )
+        return cls(
+            ref=provider.ref,
+            tools=tuple(action.tool(provider.ref) for action in provider.actions),
+            executors={
+                action.tool_name(provider.ref): executors[action.name]
+                for action in provider.actions
+            },
+            requires_credentials=True,
+            provider=provider,
+            oauth_flow=oauth_flow,
+        )
 
-    @property
-    def ref(self) -> str:
-        """Return the provider reference."""
-        return self.provider.ref
 
-    @property
-    def tools(self) -> tuple[JSONObject, ...]:
-        """Return model-facing tools for this connector."""
-        return tuple(action.tool(self.ref) for action in self.provider.actions)
+def build_executor(handler: ConnectorHandler) -> ConnectorExecutor:
+    """Build an executor that unpacks tool arguments and forwards the context."""
 
-    @property
-    def handlers(self) -> Mapping[str, ConnectorExecutor]:
-        """Return executors keyed by globally unique tool name."""
-        return {
-            action.tool_name(self.ref): self.executors[action.name]
-            for action in self.provider.actions
-        }
+    def execute(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONValue:
+        return handler(**arguments, context=context)
+
+    return execute

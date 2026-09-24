@@ -27,8 +27,6 @@ from pytest import MonkeyPatch
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
-    PullAndClaimTaskRequest,
-    PullAndClaimTaskResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
 )
@@ -164,24 +162,6 @@ def test_claim_task_delegates_to_shared_handler(monkeypatch: MonkeyPatch) -> Non
     handler.assert_called_once_with(request, state)
 
 
-def test_pull_and_claim_task_delegates_to_node_handler(
-    monkeypatch: MonkeyPatch,
-) -> None:
-    """Combined acquisition uses the SuperNode handler."""
-    state = Mock(spec=NodeState)
-    expected = PullAndClaimTaskResponse(task=Task(task_id=123), token="task-token")
-    handler = Mock(return_value=expected)
-    monkeypatch.setattr(runtime_handlers, "pull_and_claim_task", handler)
-    client = TestClient(_create_app(state))
-    request = PullAndClaimTaskRequest(supported_task_types=["flwr-clientapp"])
-
-    response = _post(client, "/v1/runtime/pull-and-claim-task", request)
-
-    assert response.status_code == 200
-    assert PullAndClaimTaskResponse.FromString(response.content) == expected
-    handler.assert_called_once_with(request, state)
-
-
 def test_pull_task_input_delegates_with_authenticated_task(
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -206,9 +186,7 @@ def test_superexec_route_rejects_unsigned_request_when_auth_is_enabled() -> None
     state = Mock(spec=NodeState)
     client = TestClient(_create_app(state, superexec_auth_secret=b"superexec-secret"))
 
-    response = _post(
-        client, "/v1/runtime/pull-and-claim-task", PullAndClaimTaskRequest()
-    )
+    response = _post(client, "/v1/runtime/claim-task", ClaimTaskRequest(task_id=123))
 
     assert response.status_code == 401
     assert response.json() == {

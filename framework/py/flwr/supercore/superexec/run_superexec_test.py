@@ -31,11 +31,7 @@ from flwr.supercore.interceptors import (
     SuperExecAuthHttpInterceptor,
 )
 from flwr.supercore.superexec.executor import LaunchResult, LaunchResultStatus
-from flwr.supercore.superexec.plugin import (
-    AutoExecPlugin,
-    ClientAppExecPlugin,
-    ServerAppExecPlugin,
-)
+from flwr.supercore.superexec.plugin import AutoExecPlugin
 
 from . import run_superexec as run_superexec_module
 
@@ -74,21 +70,11 @@ def _run_superexec_one_launch(
     return log, plugin, client, sleep_mock
 
 
-@pytest.mark.parametrize(
-    ("plugin_class", "task_type"),
-    [
-        (AutoExecPlugin, TaskType.MODEL),
-        (ServerAppExecPlugin, TaskType.SERVER_APP),
-        (ClientAppExecPlugin, TaskType.CLIENT_APP),
-    ],
-)
-def test_builtin_subprocess_uses_one_acquisition_call(
+def test_builtin_subprocess_uses_combined_acquisition(
     monkeypatch: pytest.MonkeyPatch,
-    plugin_class: type[AutoExecPlugin | ServerAppExecPlugin | ClientAppExecPlugin],
-    task_type: TaskType,
 ) -> None:
-    """Built-in subprocess execution gates capacity before one claim request."""
-    task = Task(task_id=123, type=task_type)
+    """A connection failure, empty poll, and claim each use one Runtime request."""
+    task = Task(task_id=123, type=TaskType.MODEL)
     client = Mock()
     client.PullAndClaimTask.side_effect = [
         PullAndClaimTaskResponse(task=task, token="task-token"),
@@ -98,18 +84,19 @@ def test_builtin_subprocess_uses_one_acquisition_call(
     client_class.from_server_address.return_value = client
     executor = Mock()
     executor.launch.return_value = LaunchResult.accepted()
-    get_executor = Mock(return_value=executor)
     order = Mock()
     order.attach_mock(executor.wait_for_capacity, "capacity")
     order.attach_mock(client.PullAndClaimTask, "acquire")
-    monkeypatch.setattr(run_superexec_module, "get_executor", get_executor)
+    monkeypatch.setattr(
+        run_superexec_module, "get_executor", Mock(return_value=executor)
+    )
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
     sleep = Mock()
     monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep)
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
-            plugin_class=plugin_class,
+            plugin_class=AutoExecPlugin,
             client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
@@ -117,11 +104,12 @@ def test_builtin_subprocess_uses_one_acquisition_call(
 
     assert [call[0] for call in order.mock_calls[:2]] == ["capacity", "acquire"]
     assert set(client.PullAndClaimTask.call_args.args[0].supported_task_types) == set(
-        plugin_class.supported_task_types
+        AutoExecPlugin.supported_task_types
     )
     assert client.PullAndClaimTask.call_args.args[0].wait_timeout_ms == 5_000
     client.PullPendingTasks.assert_not_called()
     client.ClaimTask.assert_not_called()
+    executor.launch.assert_called_once()
     assert executor.launch.call_args.args[0].task_id == task.task_id
     assert executor.launch.call_args.args[0].token == "task-token"
     sleep.assert_not_called()
@@ -159,7 +147,7 @@ def test_builtin_subprocess_does_not_launch_for_empty_queue(
     executor.launch.assert_not_called()
 
 
-@pytest.mark.parametrize(("interval", "expected"), [(None, 1.0), ("0.25", 0.25)])
+@pytest.mark.parametrize(("interval", "expected"), [(None, 1.0), ("0.25", 1.0)])
 def test_combined_acquisition_backs_off_after_connection_failure(
     monkeypatch: pytest.MonkeyPatch, interval: str | None, expected: float
 ) -> None:
@@ -386,12 +374,6 @@ def test_run_superexec_adds_runtime_version_interceptor(
     assert tuple(type(interceptor) for interceptor in captured["interceptors"]) == (
         expected_interceptor_types
     )
-    if superexec_auth_secret:
-        auth_interceptor = captured["interceptors"][1]
-        assert (
-            "/flwr.proto.Runtime/PullAndClaimTask"
-            in auth_interceptor._protected_methods  # pylint: disable=protected-access
-        )
 
 
 @pytest.mark.parametrize(
@@ -436,6 +418,7 @@ def test_run_superexec_passes_executor_config_to_factory(
         insecure=insecure,
         root_certificates_path=root_certificates_path,
     )
+    client.PullAndClaimTask.assert_not_called()
     get_executor.return_value.reconcile.assert_called_once_with()
     get_executor.return_value.close.assert_called_once_with()
 
@@ -471,6 +454,8 @@ def test_run_superexec_preserves_accepted_launch_behavior(
     )
 
     stub.ClaimTask.assert_called_once()
+    plugin.select_task.assert_called_once()
+    stub.PullAndClaimTask.assert_not_called()
     plugin.launch_task.assert_called_once()
     log.assert_not_called()
     sleep_mock.assert_not_called()

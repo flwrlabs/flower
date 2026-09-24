@@ -30,7 +30,7 @@ from flwr.supercore.json_message.connector_message import (
 from flwr.supercore.task_identity import TaskIdentity
 
 from . import registry
-from .definition import ConnectorExecutionContext
+from .definition import ConnectorDefinition, ConnectorExecutionContext
 from .http import ConnectorApiError
 from .task import handle_task
 
@@ -81,21 +81,20 @@ class TestHandleTask(unittest.TestCase):
         self.pull_connector_request = self.enterContext(
             patch("flwr.supercore.task_process.connector.task._pull_connector_request")
         )
-        self.credential_handlers = (
-            registry._CREDENTIAL_CONNECTOR_HANDLERS  # pylint: disable=protected-access
+        self.connectors_by_tool = (
+            registry._CONNECTORS_BY_TOOL  # pylint: disable=protected-access
         )
-        self.connector_refs = (
-            registry._CREDENTIAL_CONNECTOR_REFS  # pylint: disable=protected-access
-        )
-        self.enterContext(patch.dict(self.credential_handlers, clear=True))
-        self.enterContext(patch.dict(self.connector_refs, clear=True))
+        self.enterContext(patch.dict(self.connectors_by_tool, clear=True))
 
     def _configure_connector(self, name: str, connector_ref: str | None = None) -> None:
         """Configure the request and registry entry for one connector tool."""
         self.pull_connector_request.return_value = _connector_request(name)
-        self.credential_handlers[name] = self.provider
-        if connector_ref is not None:
-            self.connector_refs[name] = connector_ref
+        self.connectors_by_tool[name] = ConnectorDefinition(
+            ref=connector_ref or name,
+            tools=(),
+            executors={name: self.provider},
+            requires_credentials=True,
+        )
 
     def test_passes_credentials_to_matching_provider(self) -> None:
         """Credential-backed providers should receive credentials and config."""
