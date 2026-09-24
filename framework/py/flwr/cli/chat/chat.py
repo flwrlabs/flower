@@ -17,6 +17,7 @@
 
 import os
 
+from flwr.cli.constant import CHAT_SUPERGRID_CONNECTION_NAME
 from flwr.cli.flower_config import read_superlink_connection
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListFederationsRequest,
@@ -33,7 +34,7 @@ def chat() -> None:
     Set FLWR_CHAT_SUPERLINK to use a different SuperLink connection.
     """
     superlink_connection = read_superlink_connection(
-        os.environ.get("FLWR_CHAT_SUPERLINK", "supergrid")
+        os.environ.get("FLWR_CHAT_SUPERLINK", CHAT_SUPERGRID_CONNECTION_NAME)
     )
     control_client = init_http_client_from_connection(superlink_connection)
     try:
