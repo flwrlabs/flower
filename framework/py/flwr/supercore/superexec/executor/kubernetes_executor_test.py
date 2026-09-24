@@ -260,7 +260,9 @@ def test_fab_specific_agentapp_pool_uses_resident_worker_and_exact_routing() -> 
     ]
 
 
-def test_exact_agentapp_pool_falls_back_to_ready_generic_pool() -> None:
+def test_exact_agentapp_pool_falls_back_to_ready_generic_pool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Admission and reservation should use the same exact-then-generic order."""
     client = Mock()
     specific_key = _warm_executor_pool_key(
@@ -285,10 +287,9 @@ def test_exact_agentapp_pool_falls_back_to_ready_generic_pool() -> None:
     )
     dispatch = Mock()
     dispatch.wait_for_acceptance.return_value = True
-    manager._open_dispatch = Mock(
-        return_value=dispatch
-    )  # pylint: disable=protected-access
-    manager._retire_after_dispatch = Mock()  # pylint: disable=protected-access
+    open_dispatch = Mock(return_value=dispatch)
+    monkeypatch.setattr(manager, "_open_dispatch", open_dispatch)
+    monkeypatch.setattr(manager, "_retire_after_dispatch", Mock())
     spec = _execution_spec(
         task_type=TaskType.AGENT_APP, fab_hash=_FAB_HASH, insecure=True
     )
@@ -297,17 +298,14 @@ def test_exact_agentapp_pool_falls_back_to_ready_generic_pool() -> None:
     result = manager.launch(spec, None)
 
     assert result is not None and result.status == LaunchResultStatus.ACCEPTED
-    assert (
-        manager._open_dispatch.call_args.kwargs[  # pylint: disable=protected-access
-            "pool_key"
-        ]
-        == generic_key
-    )
+    assert open_dispatch.call_args.kwargs["pool_key"] == generic_key
     dispatch.send_token.assert_called_once_with("task-token")
     dispatch.wait_for_acceptance.assert_called_once()
 
 
-def test_launch_capacity_retry_preserves_task_fab_hash() -> None:
+def test_launch_capacity_retry_preserves_task_fab_hash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A warm retry must not select readiness using a different FAB identity."""
     client = Mock()
     pool_key = _warm_executor_pool_key(
@@ -322,11 +320,10 @@ def test_launch_capacity_retry_preserves_task_fab_hash() -> None:
     executor = KubernetesExecutor(client=client, config=config)
     manager = Mock()
     manager.launch.side_effect = [None, LaunchResult.accepted()]
-    executor._warm_executor_pool_manager = manager  # pylint: disable=protected-access
-    executor._sweep_completed_pods_if_due = Mock()  # pylint: disable=protected-access
-    executor._wait_for_capacity = Mock(  # pylint: disable=protected-access
-        return_value=True
-    )
+    wait_for_capacity = Mock(return_value=True)
+    monkeypatch.setattr(executor, "_warm_executor_pool_manager", manager)
+    monkeypatch.setattr(executor, "_sweep_completed_pods_if_due", Mock())
+    monkeypatch.setattr(executor, "_wait_for_capacity", wait_for_capacity)
     spec = _execution_spec(
         task_type=TaskType.AGENT_APP, fab_hash=_FAB_HASH, insecure=True
     )
@@ -335,7 +332,7 @@ def test_launch_capacity_retry_preserves_task_fab_hash() -> None:
 
     assert result.status == LaunchResultStatus.ACCEPTED
     assert manager.launch.call_count == 2
-    executor._wait_for_capacity.assert_called_once_with(  # pylint: disable=protected-access
+    wait_for_capacity.assert_called_once_with(
         TaskType.AGENT_APP,
         fab_hash=_FAB_HASH,
         allow_warm_dispatch=True,

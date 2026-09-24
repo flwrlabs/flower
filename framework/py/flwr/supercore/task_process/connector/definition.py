@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Definitions for account-scoped connectors."""
+"""Definitions for federation-scoped connectors."""
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -86,7 +86,7 @@ class OAuth2Definition:
 
 @dataclass(frozen=True)
 class ProviderDefinition:
-    """Describe one account-scoped connector provider."""
+    """Describe one federation-scoped connector provider."""
 
     ref: str
     display_name: str

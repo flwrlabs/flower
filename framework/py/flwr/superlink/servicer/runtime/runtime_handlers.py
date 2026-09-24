@@ -229,11 +229,11 @@ def get_connector(
 
     runs = state.get_run_info(run_ids=[task.run_id])
     run = runs[0] if runs else None
-    if run is None or not run.flwr_aid:
+    if run is None or not run.federation_id:
         raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
 
     connector = state.get_connector(
-        flwr_aid=run.flwr_aid,
+        federation_id=run.federation_id,
         connector_ref=connector_ref,
     )
     if connector is None:

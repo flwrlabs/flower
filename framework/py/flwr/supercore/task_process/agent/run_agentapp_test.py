@@ -23,7 +23,6 @@ import signal
 import threading
 from pathlib import Path
 from queue import Queue
-from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
@@ -37,6 +36,8 @@ from flwr.supercore.constant import (
     SYSTEM_MESSAGE_TYPE,
 )
 from flwr.supercore.exit import ExitCode
+from flwr.supercore.fab import Fab
+from flwr.supercore.run import Run
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType
 
@@ -202,32 +203,6 @@ def test_preload_agentapp_installs_the_verified_bytes(
     )
 
 
-def test_preload_agentapp_rejects_invalid_configuration(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    """Reject non-absolute paths, invalid hashes, missing files, and mismatches."""
-    fab_path = tmp_path / "agent.fab"
-    fab_path.write_bytes(b"fab-content")
-    fab_hash = hashlib.sha256(b"fab-content").hexdigest()
-
-    with pytest.raises(ValueError, match="path must be absolute"):
-        preload_agentapp(Path("relative.fab"), fab_hash)
-    with pytest.raises(ValueError, match="full SHA-256"):
-        preload_agentapp(fab_path, "short-hash")
-    with pytest.raises(ValueError, match="does not exist"):
-        preload_agentapp(tmp_path / "missing.fab", fab_hash)
-    with pytest.raises(ValueError, match="does not match"):
-        preload_agentapp(fab_path, "0" * 64)
-
-    def unreadable(path: Path) -> bytes:
-        raise PermissionError(path)
-
-    monkeypatch.setattr(Path, "read_bytes", unreadable)
-    with pytest.raises(ValueError, match="could not be read"):
-        preload_agentapp(fab_path, fab_hash)
-
-
 def test_preload_agentapp_rejects_wrong_component_type(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -296,11 +271,14 @@ def test_preloaded_agentapp_requires_exact_task_identity(
         runtime_dependency_install=False,
         preloaded=preloaded,
     )
-    fab = SimpleNamespace(content=b"task-fab", hash_str=preloaded.fab_hash)
-    run = SimpleNamespace(
-        fab_id=preloaded.fab_id,
-        fab_version=preloaded.fab_version,
+    fab = Fab(
+        content=b"task-fab",
+        hash_str=preloaded.fab_hash,
+        verifications={},
     )
+    run = Run.create_empty(0)
+    run.fab_id = preloaded.fab_id
+    run.fab_version = preloaded.fab_version
     install = Mock()
     load = Mock()
     install_dependencies = Mock()

@@ -230,16 +230,17 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertTrue(
             state.upsert_connector(
-                flwr_aid="account-a",
+                federation_id="@bob/fed-a",
                 connector_ref="calendar",
                 credentials_json='{"token":"first"}',
                 config_json='{"calendar":"primary"}',
+                created_by="account-a",
             )
         )
         self.assertEqual(
-            state.get_connector(flwr_aid="account-a", connector_ref="calendar"),
+            state.get_connector(federation_id="@bob/fed-a", connector_ref="calendar"),
             ConnectorRecord(
-                flwr_aid="account-a",
+                federation_id="@bob/fed-a",
                 connector_ref="calendar",
                 credentials_json='{"token":"first"}',
                 config_json='{"calendar":"primary"}',
@@ -247,25 +248,28 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertTrue(
             state.upsert_connector(
-                flwr_aid="account-a",
+                federation_id="@bob/fed-a",
                 connector_ref="calendar",
                 credentials_json='{"token":"updated"}',
                 config_json='{"calendar":"work"}',
+                created_by="account-a",
             )
         )
-        updated = state.get_connector(flwr_aid="account-a", connector_ref="calendar")
+        updated = state.get_connector(
+            federation_id="@bob/fed-a", connector_ref="calendar"
+        )
         assert updated is not None
         self.assertEqual(updated.credentials_json, '{"token":"updated"}')
         self.assertEqual(updated.config_json, '{"calendar":"work"}')
 
         self.assertTrue(
-            state.delete_connector(flwr_aid="account-a", connector_ref="calendar")
+            state.delete_connector(federation_id="@bob/fed-a", connector_ref="calendar")
         )
         self.assertIsNone(
-            state.get_connector(flwr_aid="account-a", connector_ref="calendar")
+            state.get_connector(federation_id="@bob/fed-a", connector_ref="calendar")
         )
         self.assertFalse(
-            state.delete_connector(flwr_aid="account-a", connector_ref="calendar")
+            state.delete_connector(federation_id="@bob/fed-a", connector_ref="calendar")
         )
 
     def test_bind_and_get_run_connectors(self) -> None:
@@ -337,6 +341,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         session = state.create_connector_oauth_session(
             oauth_session_id="session-1",
             flwr_aid="account-a",
+            federation_id="@account-a/fed-a",
             connector_ref="calendar",
             state="oauth-state",
             redirect_uri="https://example.test/callback",
@@ -344,6 +349,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             expires_at=expires_at,
         )
         assert session is not None
+        self.assertEqual(session.federation_id, "@account-a/fed-a")
         self.assertEqual(session.expires_at, expires_at.isoformat())
         self.assertIsNone(session.completed_at)
         self.assertEqual(
@@ -356,6 +362,19 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state.create_connector_oauth_session(
                 oauth_session_id="session-1",
                 flwr_aid="account-a",
+                federation_id="@account-a/fed-a",
+                connector_ref="calendar",
+                state="oauth-state",
+                redirect_uri="https://example.test/callback",
+                pkce_verifier=None,
+                expires_at=expires_at,
+            )
+        )
+        self.assertIsNone(
+            state.create_connector_oauth_session(
+                oauth_session_id="missing-federation",
+                flwr_aid="account-a",
+                federation_id="",
                 connector_ref="calendar",
                 state="oauth-state",
                 redirect_uri="https://example.test/callback",
@@ -391,6 +410,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         expired = state.create_connector_oauth_session(
             oauth_session_id="expired-session",
             flwr_aid="account-a",
+            federation_id="@account-a/fed-a",
             connector_ref="calendar",
             state="oauth-state",
             redirect_uri="https://example.test/callback",
