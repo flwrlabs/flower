@@ -1,0 +1,21 @@
+{
+  "inputs": {
+    "package-version": "",
+    "docker-registry": "",
+    "docker-registry-user": "",
+    "docker-image-namespace": ""
+  },
+  "ref": "refs/heads/main",
+  "ref_name": "main",
+  "repository": {
+    "default_branch": "main",
+    "full_name": "flwrlabs/flower",
+    "name": "flower",
+    "owner": {
+      "login": "flwrlabs"
+    }
+  },
+  "sender": {
+    "login": "act"
+  }
+}
