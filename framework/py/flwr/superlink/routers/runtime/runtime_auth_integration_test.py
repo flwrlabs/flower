@@ -113,6 +113,16 @@ def test_get_connector_requires_and_uses_connector_task_token(
 ) -> None:
     """Derive connector credential access from the authenticated task token."""
     assert _post(client, "get-connector", GetConnectorRequest()).status_code == 401
+    assert state.create_connector(
+        federation_id=NOOP_FEDERATION_ID,
+        connector_ref="notion",
+        credentials_json='{"token":"secret"}',
+        config_json="{}",
+        created_by="account-a",
+    )
+    connector_id = state.get_connectors_by_ref(NOOP_FEDERATION_ID, "notion")[
+        0
+    ].connector_id
     run_id = state.create_run(
         "",
         "",
@@ -122,25 +132,23 @@ def test_get_connector_requires_and_uses_connector_task_token(
         None,
         "account-a",
         TaskType.AGENT_APP,
-        connector_refs=["notion"],
+        connector_ids=[connector_id],
     )
-    task_id = state.create_task(TaskType.CONNECTOR, run_id, connector_ref="notion")
+    task_id = state.create_task(
+        TaskType.CONNECTOR,
+        run_id,
+        connector_ref="notion",
+        connector_id=connector_id,
+    )
     assert task_id is not None
     token = state.claim_task(task_id)
     assert token is not None
     assert state.activate_task(task_id)
-    assert state.upsert_connector(
-        federation_id=NOOP_FEDERATION_ID,
-        connector_ref="notion",
-        credentials_json='{"token":"secret"}',
-        config_json="{}",
-        created_by="account-a",
-    )
-
     response = _post(client, "get-connector", GetConnectorRequest(), token=token)
 
     assert response.status_code == 200
     assert GetConnectorResponse.FromString(response.content) == GetConnectorResponse(
+        connector_id=connector_id,
         connector_ref="notion",
         credentials_json='{"token":"secret"}',
         config_json="{}",

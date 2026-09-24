@@ -949,13 +949,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         primary_task_type: str,
         series_id: int | None = None,
         series_description: str | None = None,
-        connector_refs: Sequence[str] = (),
+        connector_ids: Sequence[int] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
     ) -> int:
         """Create a new run."""
-        if isinstance(connector_refs, str) or any(
-            not connector_ref for connector_ref in connector_refs
+        if isinstance(connector_ids, (str, bytes)) or any(
+            connector_id <= 0 for connector_id in connector_ids
         ):
             return 0
         if initial_task_event is not None:
@@ -1048,7 +1048,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     )
                 self.bind_connectors_to_run(
                     run_id=run_id,
-                    connector_refs=connector_refs,
+                    connector_ids=connector_ids,
                 )
                 return run_id
 
