@@ -65,7 +65,7 @@ WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH = (
     f"{WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH}/ca.crt"
 )
 _WARM_EXECUTOR_ACK_TIMEOUT_SECONDS = 5.0
-_PRESTARTED_AGENTAPP_FAILURE_BACKOFF_SECONDS = 5.0
+_PRESTARTED_AGENTAPP_CREATION_INTERVAL_SECONDS = 5.0
 # A surviving consumed Pod is safe to retire only after all task processes exit.
 # Ignore PID 1 (the idle parent), this probe, and zombies. A concurrent readiness
 # probe can delay retirement, but cannot make a running task appear finished.
@@ -521,31 +521,6 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 return
             self._reconcile_owned_pods()
 
-    def _record_preload_failures(self, pods: list[object] | None = None) -> None:
-        """Rate-limit replacement before general cleanup removes failed Pods."""
-        with self._lock:
-            if self._closed:
-                return
-            pods = self._owned_warm_pods() if pods is None else pods
-            if pods is None:
-                return
-            for pod in pods:
-                if _object_field(
-                    _object_field(pod, "status"), "phase"
-                ) != "Failed" or _is_consumed_warm_executor(pod):
-                    continue
-                pool = next(
-                    (
-                        candidate
-                        for candidate in self._pools.values()
-                        if candidate.key.fab_hash is not None
-                        and is_compatible_warm_executor(pod, candidate.key)
-                    ),
-                    None,
-                )
-                if pool is not None:
-                    self._delay_pool_creation(pool.key)
-
     def has_ready_pod(self, task_type: TaskType, fab_hash: str | None = None) -> bool:
         """Return whether a matching warm Pod can take a task without new capacity."""
         candidates = self._candidate_pools(task_type, fab_hash)
@@ -647,9 +622,6 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
         pods = self._owned_warm_pods()
         if pods is None:
             return
-        self._record_preload_failures(pods)
-        if pool.key in self._pool_creation_not_before:
-            return
         compatible_count = sum(
             1
             for pod in pods
@@ -674,6 +646,8 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 )
                 return
             pods_to_create = min(pods_to_create, max(available_pod_capacity, 0))
+        if pool.key.fab_hash is not None and pods_to_create:
+            self._delay_pool_creation(pool.key)
         for _ in range(pods_to_create):
             try:
                 self._create_warm_executor(
@@ -687,10 +661,10 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 return
 
     def _delay_pool_creation(self, key: WarmExecutorPoolKey) -> None:
-        """Delay creation for one pool after its resident preload failed."""
+        """Rate-limit creation for one FAB-specific pool."""
         self._pool_creation_not_before[key] = max(
             self._pool_creation_not_before.get(key, float("-inf")),
-            self._config.monotonic() + _PRESTARTED_AGENTAPP_FAILURE_BACKOFF_SECONDS,
+            self._config.monotonic() + _PRESTARTED_AGENTAPP_CREATION_INTERVAL_SECONDS,
         )
 
     def _reconcile_owned_pods(self) -> bool:
@@ -736,13 +710,6 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 continue
             if pool is None:
                 if pod_name is not None and pod_name not in self._busy_pods:
-                    if (
-                        retiring_pool is not None
-                        and retiring_pool.key.fab_hash is not None
-                        and _object_field(_object_field(pod, "status"), "phase")
-                        == "Failed"
-                    ):
-                        self._delay_pool_creation(retiring_pool.key)
                     self._retire_pod(
                         pod_name,
                         retiring_pool.key if retiring_pool is not None else None,

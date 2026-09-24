@@ -371,11 +371,7 @@ class _WarmExecutorPoolManager(WarmExecutorPoolManager):
 
     def sweep_completed_pods(self, sweep: Callable[[], None]) -> None:
         """Run completed-Pod cleanup without racing warm Pod creation."""
-        # Match the pool-lock then lifecycle-lock order used during creation.
-        with self._lock, self._lifecycle_lock:
-            # Observe preload failures before the general completed-Pod sweeper
-            # removes the evidence used to rate-limit their replacement.
-            self._record_preload_failures()
+        with self._lifecycle_lock:
             sweep()
 
     def _delete_pod(self, pod_name: str) -> bool:

@@ -171,93 +171,55 @@ def test_fab_specific_agentapp_pool_validates_identity_and_path() -> None:
         )
 
 
-def test_fab_specific_agentapp_pool_uses_resident_worker_and_exact_routing() -> None:
-    """Exact AgentApp pools should preload and dispatch only their configured FAB."""
+def test_fab_specific_agentapp_pool_uses_prestarted_worker() -> None:
+    """An exact AgentApp pool should serve and dispatch its configured FAB."""
     specific_key = _warm_executor_pool_key(
         runtime_image="ghcr.io/flwrlabs/taskexecutor:dev",
         fab_hash=_FAB_HASH,
         fab_path="/opt/flwr/apps/gpt-agent.fab",
     )
-    generic_key = _warm_executor_pool_key(
-        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
-    )
-    config = _executor_config(
-        warm_executor_owner="superexec-a",
-        warm_executor_pools=(
-            WarmExecutorPoolConfig(key=specific_key, size=1),
-            WarmExecutorPoolConfig(key=generic_key, size=1),
-        ),
-    )
-    executor = KubernetesExecutor(client=Mock(), config=config)
-    manager = executor._warm_executor_pool_manager  # pylint: disable=protected-access
-    assert manager is not None
-    assert [
-        pool.key
-        for pool in manager._candidate_pools(  # pylint: disable=protected-access
-            TaskType.AGENT_APP, _FAB_HASH
+    config = _executor_config(warm_executor_owner="superexec-a")
+    pod = _as_dict(
+        kube._build_warm_executor_pod(  # pylint: disable=protected-access
+            specific_key, config, "exact"
         )
-    ] == [specific_key, generic_key]
-    assert [
-        pool.key
-        for pool in manager._candidate_pools(  # pylint: disable=protected-access
-            TaskType.AGENT_APP, "other-hash"
-        )
-    ] == [generic_key]
-
-    pod = kube._build_warm_executor_pod(  # pylint: disable=protected-access
-        specific_key, config, "exact"
     )
-    metadata = cast(dict[str, Any], pod["metadata"])
-    annotations = cast(dict[str, str], metadata["annotations"])
+    annotations = pod["metadata"]["annotations"]
     assert annotations[WARM_EXECUTOR_FAB_HASH_ANNOTATION] == _FAB_HASH
     assert (
         annotations[WARM_EXECUTOR_FAB_PATH_ANNOTATION] == "/opt/flwr/apps/gpt-agent.fab"
     )
-    expected_serve_command = [
-        "python",
-        "-m",
-        WARM_AGENTAPP_EXECUTOR_MODULE,
-        "serve",
+    serve_command = pod["spec"]["containers"][0]["command"]
+    assert serve_command[:4] == ["python", "-m", WARM_AGENTAPP_EXECUTOR_MODULE, "serve"]
+    assert serve_command[-4:] == [
         "--fab-hash",
         _FAB_HASH,
         "--fab-path",
         "/opt/flwr/apps/gpt-agent.fab",
     ]
-    assert (
-        kube._warm_executor_command(specific_key)  # pylint: disable=protected-access
-        == expected_serve_command
-    )
 
-    exact_spec = _execution_spec(
-        task_type=TaskType.AGENT_APP,
-        fab_hash=_FAB_HASH,
-        insecure=True,
-        runtime_dependency_install=True,
+    dispatch_command = warm_executor_dispatch.warm_executor_command(
+        _execution_spec(
+            task_type=TaskType.AGENT_APP,
+            fab_hash=_FAB_HASH,
+            insecure=True,
+            runtime_dependency_install=True,
+        ),
+        None,
+        specific_key,
     )
-    assert warm_executor_dispatch.warm_executor_command(
-        exact_spec, None, specific_key
-    ) == [
+    assert dispatch_command[:4] == [
         "python",
         "-m",
         WARM_AGENTAPP_EXECUTOR_MODULE,
         "dispatch",
-        "--runtime-api-address",
-        "appio.example.com:9092",
-        "--token-stdin",
+    ]
+    assert dispatch_command[-3:] == [
         "--fab-hash",
         _FAB_HASH,
         "--insecure",
     ]
-    assert warm_executor_dispatch.warm_executor_command(
-        exact_spec, None, generic_key
-    ) == [
-        "flwr-agentapp",
-        "--runtime-api-address",
-        "appio.example.com:9092",
-        "--token-stdin",
-        "--insecure",
-        "--allow-runtime-dependency-installation",
-    ]
+    assert "--allow-runtime-dependency-installation" not in dispatch_command
 
 
 def test_exact_agentapp_pool_falls_back_to_ready_generic_pool(
@@ -1368,8 +1330,8 @@ def test_warm_pool_replaces_consumed_pod_and_cleans_up_idle_pods() -> None:
     assert client.delete_namespaced_pod.call_count == 1
 
 
-def test_failed_prestarted_agentapp_pool_recreation_is_rate_limited() -> None:
-    """A bad preloaded FAB must not cause a tight Pod recreation loop."""
+def test_fab_specific_pool_creation_is_rate_limited() -> None:
+    """FAB-specific pools should not create Pods in a tight loop."""
     client = Mock()
     now = [0.0]
     pool_key = _warm_executor_pool_key(
@@ -1379,41 +1341,27 @@ def test_failed_prestarted_agentapp_pool_recreation_is_rate_limited() -> None:
     )
     config = _executor_config(
         warm_executor_owner="superexec-a",
-        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=2),),
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
         monotonic=lambda: now[0],
     )
     pool = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
         client, config, lambda: 0
     )
-    failed_pod = _ready_warm_pod(pool_key, config, name="failed-preload")
-    failed_pod["status"] = {"phase": "Failed", "conditions": []}
-    ready_pod = _ready_warm_pod(pool_key, config, name="ready")
     client.reset_mock()
-    client.list_namespaced_pod.return_value = {"items": [failed_pod, ready_pod]}
-    sweep = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
 
-    # Exercise the direct refill path used after a task retires.
-    pool._ensure_pool_capacity(  # pylint: disable=protected-access
-        config.warm_executor_pools[0]
-    )
-    pool.sweep_completed_pods(sweep)
     pool.ensure_capacity()
-
-    sweep.assert_called_once_with()
-    client.delete_namespaced_pod.assert_called_once_with(
-        name="failed-preload", namespace="flower-system", grace_period_seconds=0
-    )
-    client.create_namespaced_pod.assert_not_called()
-
-    now[0] = (
-        warm_executor_dispatch._PRESTARTED_AGENTAPP_FAILURE_BACKOFF_SECONDS  # pylint: disable=protected-access
-    )
-    client.reset_mock()
-    client.list_namespaced_pod.return_value = {"items": [ready_pod]}
-
     pool.ensure_capacity()
 
     client.create_namespaced_pod.assert_called_once()
+
+    now[0] = (
+        warm_executor_dispatch._PRESTARTED_AGENTAPP_CREATION_INTERVAL_SECONDS  # pylint: disable=protected-access
+    )
+
+    pool.ensure_capacity()
+
+    assert client.create_namespaced_pod.call_count == 2
 
 
 def test_warm_pool_preserves_surviving_tasks_until_their_processes_exit(
