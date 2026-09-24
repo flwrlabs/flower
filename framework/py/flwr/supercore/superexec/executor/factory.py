@@ -170,6 +170,8 @@ def _warm_executor_pools_from_config(
         if not isinstance(entry, dict):
             raise ValueError("Warm executor pool entries must be mappings.")
         allowed_fields = {
+            "fab-hash",
+            "fab-path",
             "task-type",
             "size",
         }
@@ -197,6 +199,8 @@ def _warm_executor_pools_from_config(
                 key=WarmExecutorPoolKey(
                     task_type=task_type,
                     runtime_image=runtime_image,
+                    fab_hash=entry.get("fab-hash"),
+                    fab_path=entry.get("fab-path"),
                 ),
                 size=size,
             )
@@ -204,5 +208,5 @@ def _warm_executor_pools_from_config(
 
     keys = [pool.key for pool in pools]
     if len(keys) != len(set(keys)):
-        raise ValueError("Warm executor pools must not repeat a compatibility key.")
+        raise ValueError("Warm executor pools must not repeat a routed identity.")
     return tuple(pools)
