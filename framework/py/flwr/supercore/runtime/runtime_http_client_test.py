@@ -16,8 +16,10 @@
 
 from unittest.mock import Mock, patch
 
+import httpx
 import pytest
 
+from flwr.proto.runtime_pb2 import PullAndClaimTaskRequest  # pylint: disable=E0611
 from flwr.supercore.protobuf.client import ProtobufClient
 from flwr.supercore.runtime import RuntimeHttpClient
 
@@ -73,3 +75,21 @@ def test_runtime_method(endpoint: str) -> None:
         endpoint, f"{method_name}Response"
     )
     assert call.call_args.kwargs["response_type"].__name__ == expected_response_name
+
+
+def test_pull_and_claim_does_not_retry_lost_response() -> None:
+    """A failed acquisition must not claim another task through a retry."""
+    retry_invoker = Mock()
+    client = RuntimeHttpClient("http://runtime.example", retry_invoker=retry_invoker)
+
+    with (
+        patch(
+            "flwr.supercore.protobuf.client.httpx.Client.send",
+            side_effect=httpx.ReadTimeout("response lost"),
+        ) as send,
+        pytest.raises(httpx.ReadTimeout),
+    ):
+        client.PullAndClaimTask(PullAndClaimTaskRequest(supported_task_types=["model"]))
+
+    send.assert_called_once()
+    retry_invoker.invoke.assert_not_called()

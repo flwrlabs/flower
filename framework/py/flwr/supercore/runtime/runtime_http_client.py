@@ -81,6 +81,9 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/PullAndClaimTask",
             request=request,
             response_type=PullAndClaimTaskResponse,
+            # A lost response may follow a successful claim; retrying could claim
+            # another task without launching the first one.
+            retry=False,
         )
 
     def PullPendingTasks(
