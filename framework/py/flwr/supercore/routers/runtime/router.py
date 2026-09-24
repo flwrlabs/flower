@@ -14,9 +14,13 @@
 # ==============================================================================
 """Shared Runtime API router."""
 
-from typing import Annotated
+import asyncio
+from collections.abc import Callable
+from time import monotonic
+from typing import Annotated, TypeVar
 
 from fastapi import APIRouter, Depends
+from starlette.concurrency import run_in_threadpool
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
@@ -77,6 +81,7 @@ from flwr.supercore.dependencies.runtime import (
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_DEPENDENCY
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
+from flwr.supercore.task_notification import subscribe_to_task_notifications
 
 router = APIRouter(
     prefix="/v1/runtime",
@@ -97,27 +102,66 @@ ClaimTaskAuthDependency = Annotated[
     Depends(SuperExecAuthDependency("/flwr.proto.Runtime/ClaimTask")),
 ]
 
+_MAX_TASK_WAIT_MS = 5_000
+_TASK_RECHECK_SECONDS = 0.2
+ResponseT = TypeVar("ResponseT")
+
+
+async def _wait_for_task(
+    wait_timeout_ms: int,
+    pull: Callable[[], ResponseT],
+    has_task: Callable[[ResponseT], bool],
+) -> ResponseT:
+    """Recheck shared state until work appears or the bounded wait expires.
+
+    Local notifications wake the request promptly. Periodic reads also see tasks
+    created by other processes and dispatch due SuperLink automations. No database
+    transaction is held between reads.
+    """
+    deadline = monotonic() + min(wait_timeout_ms, _MAX_TASK_WAIT_MS) / 1_000
+    with subscribe_to_task_notifications() as task_event:
+        while True:
+            task_event.clear()
+            response = await run_in_threadpool(pull)
+            remaining = deadline - monotonic()
+            if has_task(response) or remaining <= 0:
+                return response
+            try:
+                await asyncio.wait_for(
+                    task_event.wait(), min(_TASK_RECHECK_SECONDS, remaining)
+                )
+            except TimeoutError:
+                pass
+
 
 @router.post("/pull-pending-tasks")
-def pull_pending_tasks(
+async def pull_pending_tasks(
     request: Annotated[PullPendingTasksRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
     handlers: RuntimeHandlersDependency,
     _auth: PullPendingTasksAuthDependency,
 ) -> PullPendingTasksResponse:
     """Pull pending tasks."""
-    return handlers.pull_pending_tasks(request, state)
+    return await _wait_for_task(
+        request.wait_timeout_ms,
+        lambda: handlers.pull_pending_tasks(request, state),
+        lambda response: bool(response.tasks),
+    )
 
 
 @router.post("/pull-and-claim-task")
-def pull_and_claim_task(
+async def pull_and_claim_task(
     request: Annotated[PullAndClaimTaskRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
     handlers: RuntimeHandlersDependency,
     _auth: PullAndClaimTaskAuthDependency,
 ) -> PullAndClaimTaskResponse:
     """Pull and claim the oldest supported pending task."""
-    return handlers.pull_and_claim_task(request, state)
+    return await _wait_for_task(
+        request.wait_timeout_ms if request.supported_task_types else 0,
+        lambda: handlers.pull_and_claim_task(request, state),
+        lambda response: response.HasField("task") and bool(response.token),
+    )
 
 
 @router.post("/claim-task")

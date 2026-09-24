@@ -73,3 +73,5 @@ def test_runtime_method(endpoint: str) -> None:
         endpoint, f"{method_name}Response"
     )
     assert call.call_args.kwargs["response_type"].__name__ == expected_response_name
+    if method_name in {"PullAndClaimTask", "ClaimTask"}:
+        assert call.call_args.kwargs["retry"] is False

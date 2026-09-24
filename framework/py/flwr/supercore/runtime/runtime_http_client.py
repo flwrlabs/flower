@@ -81,6 +81,7 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/PullAndClaimTask",
             request=request,
             response_type=PullAndClaimTaskResponse,
+            retry=False,
         )
 
     def PullPendingTasks(
@@ -101,6 +102,7 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/ClaimTask",
             request=request,
             response_type=ClaimTaskResponse,
+            retry=False,
         )
 
     def SendTaskHeartbeat(

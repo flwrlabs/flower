@@ -57,6 +57,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
+from flwr.supercore.task_notification import notify_task_available
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
@@ -1019,7 +1020,9 @@ class InMemoryCoreState(
             )
 
             self.task_store[task_id] = task
-            return task_id
+
+        notify_task_available()
+        return task_id
 
     def get_tasks(  # pylint: disable=too-many-arguments
         self,

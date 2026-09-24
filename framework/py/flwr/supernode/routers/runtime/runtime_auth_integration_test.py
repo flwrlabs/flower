@@ -174,7 +174,7 @@ def test_pull_pending_tasks_allows_with_superexec_metadata(
     client: TestClient,
 ) -> None:
     """SuperExec routes should allow requests with valid signed metadata."""
-    proto_request = PullPendingTasksRequest()
+    proto_request = PullPendingTasksRequest(wait_timeout_ms=50)
     headers = create_superexec_auth_metadata(
         auth_secret=derive_auth_secret(_SUPEREXEC_SECRET),
         method=_PULL_PENDING_TASKS_METHOD,
@@ -195,7 +195,9 @@ def test_pull_and_claim_task_round_trip_with_superexec_metadata(
     """Signed acquisition returns one task and its atomic claim token."""
     task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
     assert task_id is not None
-    request = PullAndClaimTaskRequest(supported_task_types=[TaskType.CLIENT_APP])
+    request = PullAndClaimTaskRequest(
+        supported_task_types=[TaskType.CLIENT_APP], wait_timeout_ms=5_000
+    )
     headers = create_superexec_auth_metadata(
         auth_secret=derive_auth_secret(_SUPEREXEC_SECRET),
         method=_PULL_AND_CLAIM_TASK_METHOD,
