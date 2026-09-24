@@ -163,8 +163,7 @@ execution remain on the `AgentSession`:
 
 The SDK returns typed output items. Convert a function-call item with
 `item.to_dict()` before passing it to `agent.connectors.call`. See [Build a
-collaborative research
-agent](../tutorials/build-a-collaborative-agent.md) for a complete bounded tool
+research agent](../tutorials/build-a-research-agent.md) for a complete bounded tool
 loop.
 
 ## Read conversation history
@@ -183,8 +182,7 @@ for entry in trace:
 
 Each entry also includes `id`, `timestamp`, `run_id`, and `task_id`. Filter out
 connector, reasoning, failed, and incomplete events before constructing the
-next model input. See [Build a collaborative research
-agent](../tutorials/build-a-collaborative-agent.md) for a complete loader that
+next model input. See [Build a research agent](../tutorials/build-a-research-agent.md) for a complete loader that
 rebuilds user and assistant messages from the trace.
 
 Use `Context` only when the AgentApp needs additional app-defined state beyond

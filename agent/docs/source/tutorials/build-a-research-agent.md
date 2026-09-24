@@ -1,4 +1,4 @@
-# Build a collaborative research agent
+# Build a research agent
 
 Build an AgentApp that searches and fetches public web sources over a bounded
 number of tool-call rounds. It replays earlier conversation turns and can

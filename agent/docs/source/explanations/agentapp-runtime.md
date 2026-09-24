@@ -94,7 +94,7 @@ prefer the OpenAI SDK when they need typed responses or streaming events.
 The default model provider at `api.flower.ai` does not currently support
 continuing with `previous_response_id`. Rebuild `input` from stored messages for
 a follow-up request instead. See **Rebuild conversation input** in [Build a
-collaborative research agent](../tutorials/build-a-collaborative-agent.md) for a
+research agent](../tutorials/build-a-research-agent.md) for a
 complete example.
 
 ### Connectors

@@ -184,8 +184,7 @@ The app makes one model request and exits. It does not:
 - create automations
 
 Those behaviors belong in AgentApp code rather than appearing automatically.
-Continue with [Build a collaborative research
-agent](build-a-collaborative-agent.md) for a bounded connector loop with
+Continue with [Build a research agent](build-a-research-agent.md) for a bounded connector loop with
 conversation state, read [Use the OpenAI SDK in an
 AgentApp](../how-to-guides/use-openai-sdk.md) for the runtime details, or
 [publish the AgentApp to Flower
