@@ -103,8 +103,10 @@ def _grid_tools() -> list[JSONObject]:
             "push_messages",
             (
                 "Send messages to nodes in the federation (SuperLink or SuperNodes) "
-                "and return one result per message in the same order. Pass accepted "
-                "message IDs to pull_messages if replies are required."
+                "and return one result per message in the same order. When replying, "
+                "copy the received message_id exactly into reply_to_message_id and "
+                "send only one message for that ID; do not resend earlier replies. "
+                "Pass accepted message IDs to pull_messages if replies are required."
             ),
             properties={
                 "messages": {
@@ -123,8 +125,9 @@ def _grid_tools() -> list[JSONObject]:
                                 "type": ["string", "null"],
                                 "minLength": 1,
                                 "description": (
-                                    "ID of the message being replied to, or null when "
-                                    "sending a new message."
+                                    "Copy the message_id of the message being "
+                                    "replied to exactly, or use null for a new "
+                                    "message."
                                 ),
                             },
                         },
