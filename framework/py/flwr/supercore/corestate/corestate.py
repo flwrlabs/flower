@@ -308,6 +308,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         oauth_session_id: str,
         flwr_aid: str,
+        federation_id: str,
         connector_ref: str,
         state: str,
         redirect_uri: str,
@@ -322,6 +323,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Unique ID of the OAuth session.
         flwr_aid : str
             Account ID owning the OAuth session.
+        federation_id : str
+            Federation receiving the connector.
         connector_ref : str
             Reference of the connector being authorized.
         state : str

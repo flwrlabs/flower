@@ -185,6 +185,7 @@ class ConnectorOAuthSession(FlwrBase):
         String, primary_key=True, nullable=False
     )
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    federation_id: Mapped[str] = mapped_column(String, nullable=False)
     connector_ref: Mapped[str] = mapped_column(String, nullable=False)
     state: Mapped[str] = mapped_column(String, nullable=False)
     redirect_uri: Mapped[str] = mapped_column(String, nullable=False)

@@ -92,6 +92,7 @@ from flwr.superlink.routers.control.router import start_run as start_run_route
 from flwr.superlink.servicer.control import control_handlers
 
 _ACCOUNT = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
+CONNECTOR_FEDERATION_ID = "@bob/fed-a"
 
 
 def _create_app(authn_plugin: Mock | None = None) -> FastAPI:
@@ -145,7 +146,7 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
     [
         (
             "/v1/control/list-connectors",
-            ListConnectorsRequest(federation="agent"),
+            ListConnectorsRequest(federation=CONNECTOR_FEDERATION_ID),
             ListConnectorsResponse.FromString,
             ListConnectorsResponse(
                 connectors=[
@@ -161,7 +162,9 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
         ),
         (
             "/v1/control/disconnect-connector",
-            DisconnectConnectorRequest(connector_ref="google-drive"),
+            DisconnectConnectorRequest(
+                connector_ref="google-drive", federation=CONNECTOR_FEDERATION_ID
+            ),
             DisconnectConnectorResponse.FromString,
             DisconnectConnectorResponse(),
             "disconnect_connector",
@@ -171,6 +174,7 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
             BeginConnectorOAuthRequest(
                 connector_ref="google-drive",
                 redirect_uri="https://example.test/oauth/callback",
+                federation=CONNECTOR_FEDERATION_ID,
             ),
             BeginConnectorOAuthResponse.FromString,
             BeginConnectorOAuthResponse(
@@ -234,7 +238,9 @@ def test_connector_route_returns_existing_structured_error() -> None:
 
     response = TestClient(app).post(
         "/v1/control/begin-connector-oauth",
-        content=BeginConnectorOAuthRequest().SerializeToString(),
+        content=BeginConnectorOAuthRequest(
+            federation=CONNECTOR_FEDERATION_ID
+        ).SerializeToString(),
         headers={
             "authorization": "Bearer access-token",
             "content-type": PROTOBUF_MEDIA_TYPE,
