@@ -15,6 +15,7 @@
 """Notion action executors."""
 
 from typing import cast
+from urllib.parse import quote
 
 import requests
 
@@ -104,9 +105,33 @@ def get_page(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONO
     return {"page": page, "block_children": block_children}
 
 
+def get_users(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """List workspace users or retrieve one user."""
+    user_id = optional_string(arguments.get("user_id"), "Notion", "user_id")
+    if user_id:
+        if "page_size" in arguments or "start_cursor" in arguments:
+            raise ValueError("Notion pagination arguments cannot be used with user_id.")
+        path = "/users/me" if user_id == "self" else f"/users/{quote(user_id, safe='')}"
+        return _call_notion_api("GET", path, context.credentials)
+
+    params: dict[str, str] = {}
+    if "page_size" in arguments:
+        params["page_size"] = str(
+            require_int_range(
+                arguments["page_size"], "Notion", "page_size", maximum=100
+            )
+        )
+    if cursor := optional_string(
+        arguments.get("start_cursor"), "Notion", "start_cursor"
+    ):
+        params["start_cursor"] = cursor
+    return _call_notion_api("GET", "/users", context.credentials, params=params)
+
+
 EXECUTORS: dict[str, ConnectorExecutor] = {
     "search": search,
     "get_page": get_page,
+    "get_users": get_users,
 }
 
 

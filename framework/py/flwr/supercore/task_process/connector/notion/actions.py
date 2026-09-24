@@ -19,7 +19,7 @@ from ..tool_schema import integer_property, string_property
 
 _CURSOR = string_property(
     "Opaque cursor returned in next_cursor by the previous response for the same "
-    "search parameters. Omit to retrieve the first page."
+    "request parameters. Omit to retrieve the first page."
 )
 _PAGE_SIZE = integer_property(
     "Number of results per page. Omit to use Notion's default.",
@@ -124,6 +124,28 @@ ACTIONS = (
                 "page_id": string_property("The page ID to retrieve."),
             },
             "required": ["page_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_users",
+        description=(
+            "List workspace users, retrieve one user by ID, or retrieve the "
+            "current connection bot by passing 'self'. Pagination applies only "
+            "when listing users and must be omitted when user_id is provided."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "user_id": string_property(
+                    "User ID to retrieve. Pass 'self' for the current connection "
+                    "bot, or omit to list workspace users. When provided, omit "
+                    "page_size and start_cursor."
+                ),
+                "page_size": _PAGE_SIZE,
+                "start_cursor": _CURSOR,
+            },
             "additionalProperties": False,
         },
     ),

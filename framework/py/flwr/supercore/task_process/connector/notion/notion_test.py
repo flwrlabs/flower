@@ -35,11 +35,11 @@ _CREDENTIALS: JSONObject = {"access_token": "ntn-secret"}
 
 def test_notion_definition_is_registered() -> None:
     """Notion schemas and executors should form one federation-scoped connector."""
-    assert len(ACTIONS) == 2
+    assert len(ACTIONS) == 3
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     assert [
         tool["name"] for tool in registry.get_connector_tools(NOTION_CONNECTOR_REF)
-    ] == ["notion_search", "notion_get_page"]
+    ] == ["notion_search", "notion_get_page", "notion_get_users"]
 
 
 def test_notion_search_forwards_api_inputs() -> None:
@@ -167,6 +167,66 @@ def test_notion_get_page_returns_page_and_block_children() -> None:
     assert request.call_args_list[-1].kwargs["params"] == {"start_cursor": "cursor-1"}
 
 
+@pytest.mark.parametrize(
+    ("arguments", "expected_url", "expected_params"),
+    [
+        (
+            {"page_size": 50, "start_cursor": "cursor-1"},
+            "https://api.notion.com/v1/users",
+            {"page_size": "50", "start_cursor": "cursor-1"},
+        ),
+        (
+            {"user_id": "user/1"},
+            "https://api.notion.com/v1/users/user%2F1",
+            None,
+        ),
+        (
+            {"user_id": "self"},
+            "https://api.notion.com/v1/users/me",
+            None,
+        ),
+    ],
+)
+def test_notion_get_users_routes_requests(
+    arguments: JSONObject,
+    expected_url: str,
+    expected_params: dict[str, str] | None,
+) -> None:
+    """Get users should route list, retrieve, and self requests."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"object": "user", "id": "user-1"}
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_users",
+            arguments,
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == ("GET", expected_url)
+    assert request.call_args.kwargs["params"] == expected_params
+
+
+def test_notion_get_users_rejects_pagination_with_user_id() -> None:
+    """Pagination applies only when listing workspace users."""
+    with (
+        patch(_HTTP_REQUEST) as request,
+        pytest.raises(
+            ValueError,
+            match="pagination arguments cannot be used with user_id",
+        ),
+    ):
+        registry.invoke_connector(
+            "notion_get_users",
+            {"user_id": "user-1", "page_size": 50},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    request.assert_not_called()
+
+
 def test_notion_api_errors_include_code_and_message() -> None:
     """Notion's documented error fields should remain readable to callers."""
     response = Mock(status_code=400)
@@ -183,8 +243,7 @@ def test_notion_api_errors_include_code_and_message() -> None:
         )
     assert error.value.code == "validation_error"
     assert str(error.value) == (
-        "Notion API request failed: validation_error (400): "
-        "Invalid start_cursor value."
+        "Notion API request failed: validation_error (400): Invalid start_cursor value."
     )
     assert "ntn-secret" not in str(error.value)
 
