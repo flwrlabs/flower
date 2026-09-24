@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Load connector packages from the generated registry."""
+"""Load OAuth connector packages from the generated registry."""
 
 from importlib import import_module
 
@@ -20,16 +20,9 @@ from .definition import ConnectorDefinition
 from .registry_generated import CONNECTOR_PACKAGES
 
 
-def load_connectors() -> tuple[ConnectorDefinition, ...]:
-    """Load registered connectors and validate global identifiers."""
-    connectors = tuple(_load_connector(package) for package in CONNECTOR_PACKAGES)
-    refs = [connector.ref for connector in connectors]
-    if len(refs) != len(set(refs)):
-        raise ValueError("Connector references must be globally unique.")
-    tool_names = [name for connector in connectors for name in connector.handlers]
-    if len(tool_names) != len(set(tool_names)):
-        raise ValueError("Connector tool names must be globally unique.")
-    return connectors
+def load_oauth_connectors() -> tuple[ConnectorDefinition, ...]:
+    """Load OAuth connectors listed in the generated package registry."""
+    return tuple(_load_connector(package) for package in CONNECTOR_PACKAGES)
 
 
 def _load_connector(package: str) -> ConnectorDefinition:
