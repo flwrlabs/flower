@@ -21,6 +21,8 @@ import time
 from logging import ERROR, WARNING
 from typing import Any, cast
 
+import httpx
+
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
@@ -280,13 +282,23 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                     insecure=insecure,
                     root_certificates_path=root_certificates_path,
                 )
-                combined_res = client.PullAndClaimTask(
-                    PullAndClaimTaskRequest(
-                        supported_task_types=sorted(
-                            cast(BaseExecPlugin, plugin).supported_task_types
+                try:
+                    combined_res = client.PullAndClaimTask(
+                        PullAndClaimTaskRequest(
+                            supported_task_types=sorted(
+                                cast(BaseExecPlugin, plugin).supported_task_types
+                            )
                         )
                     )
-                )
+                except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+                    if any(
+                        term in str(exc).lower()
+                        for term in ("certificate", "ssl", "tls")
+                    ):
+                        raise
+                    log(WARNING, "Runtime API connection failed: %s", exc)
+                    time.sleep(max(task_poll_interval, 1.0))
+                    continue
                 if combined_res.HasField("task") and combined_res.token:
                     task, token = combined_res.task, combined_res.token
             else:

@@ -19,6 +19,7 @@ from logging import ERROR, WARNING
 from typing import Any
 from unittest.mock import Mock
 
+import httpx
 import pytest
 
 from flwr.proto.runtime_pb2 import PullAndClaimTaskResponse  # pylint: disable=E0611
@@ -77,10 +78,11 @@ def _run_superexec_one_launch(
 def test_builtin_subprocess_uses_combined_acquisition(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """An empty poll and a successful claim each use one Runtime request."""
+    """A connection failure, empty poll, and claim each use one Runtime request."""
     task = Task(task_id=123, type=TaskType.MODEL)
     client = Mock()
     client.PullAndClaimTask.side_effect = [
+        httpx.ConnectError("connection refused"),
         PullAndClaimTaskResponse(),
         PullAndClaimTaskResponse(task=task, token="task-token"),
     ]
@@ -97,7 +99,7 @@ def test_builtin_subprocess_uses_combined_acquisition(
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
     monkeypatch.setattr(
         "flwr.supercore.superexec.run_superexec.time.sleep",
-        Mock(side_effect=[None, KeyboardInterrupt()]),
+        Mock(side_effect=[None, None, KeyboardInterrupt()]),
     )
 
     with pytest.raises(KeyboardInterrupt):
@@ -109,6 +111,8 @@ def test_builtin_subprocess_uses_combined_acquisition(
         )
 
     assert [call[0] for call in order.mock_calls] == [
+        "capacity",
+        "acquire",
         "capacity",
         "acquire",
         "capacity",
