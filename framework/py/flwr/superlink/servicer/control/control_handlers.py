@@ -221,6 +221,7 @@ def list_connectors(
     flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     _validate_federation_membership_in_request(state, flwr_aid, request.federation)
+
     connectors: list[Connector] = []
     for flow in sorted(
         connector_registry.OAUTH_FLOWS.values(),
@@ -254,7 +255,7 @@ def disconnect_connector(
     account: AccountInfo,
     state: LinkState,
 ) -> DisconnectConnectorResponse:
-    """Delete one connector from a federation."""
+    """Delete one connector from the requested federation."""
     log(INFO, "ControlServicer.DisconnectConnector")
     connector_id = request.connector_id
     federation_id = request.federation.strip()
@@ -293,7 +294,7 @@ def begin_connector_oauth(  # pylint: disable=too-many-locals
     account: AccountInfo,
     state: LinkState,
 ) -> BeginConnectorOAuthResponse:
-    """Create a short-lived OAuth session for a federation."""
+    """Create a short-lived OAuth session for the requested federation."""
     log(INFO, "ControlServicer.BeginConnectorOAuth")
     connector_ref = request.connector_ref.strip().lower()
     federation_id = request.federation.strip()
