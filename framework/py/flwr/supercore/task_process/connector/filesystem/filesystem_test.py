@@ -15,6 +15,8 @@
 """Tests for the filesystem connector."""
 
 import os
+import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -23,6 +25,7 @@ import pytest
 from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
 from flwr.supercore.typing import JSONObject
 
+from ..definition import ConnectorExecutionContext
 from ..registry import invoke_connector
 from .filesystem import (
     FILESYSTEM_ALLOWED_DIRS_ENV,
@@ -79,6 +82,37 @@ def test_tool_schema_is_empty_without_config(
     assert not make_filesystem_tools()
 
 
+@pytest.mark.parametrize("root", ["relative", "missing", "file"])
+def test_invalid_config_hides_tools_without_allowing_execution(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, root: str
+) -> None:
+    """Invalid roots should hide tools while execution still rejects the config."""
+    (tmp_path / "file").write_text("not a directory", encoding="utf-8")
+    monkeypatch.setenv(
+        FILESYSTEM_ALLOWED_DIRS_ENV,
+        "relative" if root == "relative" else str(tmp_path / root),
+    )
+
+    assert not make_filesystem_tools()
+    assert _list(tmp_path) == {"error": {"code": "invalid_config"}}
+
+
+def test_invalid_config_does_not_prevent_runtime_import() -> None:
+    """Invalid optional filesystem settings must not prevent service imports."""
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import flwr.supercore.servicer.runtime.runtime_handlers\n"
+            "from flwr.supercore.task_process.connector.filesystem import CONNECTOR\n"
+            "assert CONNECTOR.tools == ()\n",
+        ],
+        env={**os.environ, FILESYSTEM_ALLOWED_DIRS_ENV: "relative"},
+        check=True,
+        timeout=30,
+    )
+
+
 def test_reads_file_and_lists_directory(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -107,13 +141,15 @@ def test_handlers_record_usage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     _allow(monkeypatch, tmp_path)
     usage_recorder = Mock()
 
-    list_directory(str(tmp_path), usage_recorder=usage_recorder)
+    list_directory(
+        str(tmp_path), context=ConnectorExecutionContext({}, {}, usage_recorder)
+    )
     usage_recorder.record.assert_called_once_with(
         TaskUsage(usage_type="filesystem_list_directory")
     )
 
     usage_recorder.reset_mock()
-    read_file(str(file), usage_recorder=usage_recorder)
+    read_file(str(file), context=ConnectorExecutionContext({}, {}, usage_recorder))
     usage_recorder.record.assert_called_once_with(
         TaskUsage(usage_type="filesystem_read_file")
     )
