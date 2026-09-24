@@ -3,22 +3,16 @@
 import json
 import os
 import time
-from typing import Dict, Optional, Tuple, Union
 
+import numpy as np
 import torch
-
-from flwr.common import (
-    Context,
-    NDArrays,
-    Scalar,
-    bytes_to_ndarray,
-    ndarrays_to_parameters,
-)
-from flwr.server import ServerApp, ServerAppComponents, ServerConfig
+from flwr.app import ArrayRecord, Context, MetricRecord
+from flwr.serverapp import Grid, ServerApp
+from flwr.serverapp.strategy import FedAvg
 
 from .dataset import get_testloader
-from .model import Net, SimplexModel, get_weights, set_weights, test
-from .strategy import CustomFedAvg, Floco
+from .model import SimplexModel, create_model, test
+from .strategy import Floco
 
 DEVICE = torch.device(
     "cuda:0"
@@ -26,120 +20,45 @@ DEVICE = torch.device(
     else "mps" if torch.backends.mps.is_available() else "cpu"
 )
 
-RESULTS_FILE = "result-{}.json"
+app = ServerApp()
 
 
-def config_json_file(context: Context) -> None:
-    """Initialize the json file and write the run configurations."""
-    # Initialize the execution results directory.
-    res_save_path = "./results"
-    if not os.path.exists(res_save_path):
-        os.makedirs(res_save_path)
-    res_save_name = time.strftime("%Y-%m-%d-%H-%M-%S")
-    # Set the date and full path of the file to save the results.
-    global RESULTS_FILE  # pylint: disable=global-statement
-    RESULTS_FILE = RESULTS_FILE.format(res_save_name)
-    RESULTS_FILE = f"{res_save_path}/{RESULTS_FILE}"
-    data = {
-        "run_config": dict(context.run_config.items()),
-        "round_res": [],
-    }
-    with open(RESULTS_FILE, "w+", encoding="UTF-8") as fout:
-        json.dump(data, fout, indent=4)
+@app.main()
+def main(grid: Grid, context: Context) -> None:
+    """Run entry point for the ServerApp."""
+    num_rounds = int(context.run_config["num-server-rounds"])
+    strategy = get_strategy(context)
+    initial_arrays = ArrayRecord(create_model(context).state_dict())
+    evaluate_fn = make_evaluate_fn(context, strategy)
 
-
-def write_res(new_res: Dict[str, float]) -> None:
-    """Load the json file, append result and re-write json collection."""
-    with open(RESULTS_FILE, "r", encoding="UTF-8") as fin:
-        data = json.load(fin)
-    data["round_res"].append(new_res)
-
-    # Write the updated data back to the JSON file
-    with open(RESULTS_FILE, "w", encoding="UTF-8") as fout:
-        json.dump(data, fout, indent=4)
-
-
-def weighted_average(metrics):
-    """Aggregate metrics by computing a weighted average of local accuracies."""
-    accuracies = [num_examples * m["accuracy"] for num_examples, m in metrics]
-    losses = [num_examples * m["loss"] for num_examples, m in metrics]
-    examples = [num_examples for num_examples, _ in metrics]
-    fed_acc = sum(accuracies) / sum(examples)
-    fed_loss = sum(losses) / sum(examples)
-    write_res(
-        {"federated_evaluate_accuracy": fed_acc, "federated_evaluate_loss": fed_loss}
+    result = strategy.start(
+        grid=grid,
+        initial_arrays=initial_arrays,
+        num_rounds=num_rounds,
+        evaluate_fn=evaluate_fn,
     )
-    return {"federated_evaluate_accuracy": fed_acc}
+
+    save_results(context, result)
 
 
-def server_evaluate(
-    server_round: int,
-    parameters: NDArrays,
-    config: Dict[str, Scalar],
-    context: Context,
-) -> Optional[Tuple[float, Dict[str, Scalar]]]:
-    """Evaluate the current global model on the test set."""
-    _ = server_round
-    if context.run_config["algorithm"] == "Floco":
-        server_model = SimplexModel(endpoints=context.run_config["endpoints"], seed=0)
-        set_weights(server_model, parameters)
-        server_model.training = False
-        center_value = config.get("center")
-        if isinstance(center_value, bytes):
-            center = bytes_to_ndarray(center_value)
-        else:
-            center = None
-        radius_value = config.get("radius")
-        if isinstance(radius_value, (int, float)):
-            radius = float(radius_value)
-        else:
-            radius = None
-        server_model.subregion_parameters = (
-            (center, radius) if center is not None and radius is not None else None
-        )
-    else:
-        server_model = Net(seed=0)
-        set_weights(server_model, parameters)
-    dataset = str(context.run_config["dataset"])
-
-    testloader = get_testloader(dataset)
-
-    loss, accuracy = test(server_model, testloader, DEVICE)
-    write_res({"centralized_loss": loss, "centralized_accuracy": accuracy})
-    return loss, {"centralized_accuracy": accuracy}
-
-
-def get_strategy(context: Context) -> Union[CustomFedAvg, Floco]:
-    """Get the strategy."""
-    fraction_fit = float(context.run_config["fraction-fit"])
-    seed = int(context.run_config["seed"])
+def get_strategy(context: Context) -> FedAvg | Floco:
+    """Get the strategy based on run config."""
+    fraction_train = float(context.run_config["fraction-train"])
 
     if context.run_config["algorithm"] == "FedAvg":
-        init_model = Net(seed=seed)
-        init_parameters = ndarrays_to_parameters(get_weights(init_model))
-        return CustomFedAvg(
-            fraction_fit=fraction_fit,
+        return FedAvg(
+            fraction_train=fraction_train,
             fraction_evaluate=1.0,
-            min_available_clients=2,
-            initial_parameters=init_parameters,
-            evaluate_metrics_aggregation_fn=weighted_average,
-            evaluate_fn=server_evaluate,
-            context=context,
+            min_available_nodes=2,
         )
     if context.run_config["algorithm"] == "Floco":
         tau = int(context.run_config["tau"])
         rho = float(context.run_config["rho"])
         endpoints = int(context.run_config["endpoints"])
-        init_model = SimplexModel(endpoints=endpoints, seed=seed)
-        init_parameters = ndarrays_to_parameters(get_weights(init_model))
         return Floco(
-            fraction_fit=fraction_fit,
+            fraction_train=fraction_train,
             fraction_evaluate=1.0,
-            min_available_clients=2,
-            initial_parameters=init_parameters,
-            evaluate_metrics_aggregation_fn=weighted_average,
-            evaluate_fn=server_evaluate,
-            context=context,
+            min_available_nodes=2,
             tau=tau,
             rho=rho,
             endpoints=endpoints,
@@ -147,15 +66,55 @@ def get_strategy(context: Context) -> Union[CustomFedAvg, Floco]:
     raise ValueError("Algorithm not implemented")
 
 
-def server_fn(context: Context):
-    """Construct components that set the ServerApp behaviour."""
-    # Read from config
-    config_json_file(context)
-    num_rounds = int(context.run_config["num-server-rounds"])
-    strategy = get_strategy(context)
-    config = ServerConfig(num_rounds=int(num_rounds))
-    return ServerAppComponents(strategy=strategy, config=config)
+def make_evaluate_fn(context: Context, strategy):
+    """Create a centralized evaluation closure."""
+    dataset = str(context.run_config["dataset"])
+
+    def evaluate_fn(server_round: int, arrays: ArrayRecord) -> MetricRecord | None:
+        server_model = create_model(context)
+        server_model.load_state_dict(arrays.to_torch_state_dict())
+        if isinstance(server_model, SimplexModel):
+            server_model.training = False
+            center = np.array(
+                [1 / strategy.endpoints for _ in range(strategy.endpoints)]
+            )
+            server_model.subregion_parameters = (center, strategy.rho)
+
+        testloader = get_testloader(dataset)
+        loss, accuracy = test(server_model, testloader, DEVICE)
+        return MetricRecord(
+            {"centralized_loss": loss, "centralized_accuracy": accuracy}
+        )
+
+    return evaluate_fn
 
 
-# Create ServerApp
-app = ServerApp(server_fn=server_fn)
+def save_results(context: Context, result) -> None:
+    """Write all results from the Result object to a single JSON file."""
+    res_save_path = "./results"
+    if not os.path.exists(res_save_path):
+        os.makedirs(res_save_path)
+    res_save_name = time.strftime("%Y-%m-%d-%H-%M-%S")
+    filepath = f"{res_save_path}/result-{res_save_name}.json"
+
+    round_res = []
+    all_rounds = sorted(
+        set(result.evaluate_metrics_clientapp.keys())
+        | set(result.evaluate_metrics_serverapp.keys())
+    )
+    for rnd in all_rounds:
+        entry = {}
+        if rnd in result.evaluate_metrics_serverapp:
+            for k, v in result.evaluate_metrics_serverapp[rnd].items():
+                entry[k] = v
+        if rnd in result.evaluate_metrics_clientapp:
+            for k, v in result.evaluate_metrics_clientapp[rnd].items():
+                entry[k] = v
+        round_res.append(entry)
+
+    data = {
+        "run_config": dict(context.run_config.items()),
+        "round_res": round_res,
+    }
+    with open(filepath, "w", encoding="UTF-8") as fout:
+        json.dump(data, fout, indent=4)

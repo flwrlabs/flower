@@ -8,7 +8,7 @@ version = "1.0.0"
 description = ""
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.18.0",
+    "flwr[simulation]>=1.26.0",
     "flwr-datasets[vision]>=0.5.0",
     "torch==2.8.0",
     "torchvision==0.23.0",
@@ -39,7 +39,7 @@ known_first_party = ["flwr"]
 
 [tool.black]
 line-length = 88
-target-version = ["py38", "py39", "py310", "py311"]
+target-version = ["py310", "py311", "py312"]
 
 [tool.pytest.ini_options]
 minversion = "6.2"
@@ -80,7 +80,7 @@ follow_imports = "skip"
 follow_imports_for_stubs = true
 
 [tool.ruff]
-target-version = "py38"
+target-version = "py310"
 line-length = 88
 select = ["D", "E", "F", "W", "B", "ISC", "C4"]
 fixable = ["D", "E", "F", "W", "B", "ISC", "C4"]
@@ -125,7 +125,7 @@ clientapp = "floco.client_app:app"
 [tool.flwr.app.config]
 algorithm = "FedAvg"
 num-server-rounds = 500
-fraction-fit = 0.3
+fraction-train = 0.3
 local-epochs = 5
 tau = 250
 rho = 0
@@ -139,10 +139,4 @@ dataset = "CIFAR10"
 dataset-split = "Dirichlet"
 dataset-split-arg = 0.5
 
-[tool.flwr.federations]
-default = "local-simulation"
 
-[tool.flwr.federations.local-simulation]
-options.num-supernodes = 100
-options.backend.client-resources.num-cpus = 1
-options.backend.client-resources.num-gpus = 0.0

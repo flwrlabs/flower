@@ -1,15 +1,12 @@
 """floco: A Flower Baseline."""
 
-from typing import Tuple
-
-from datasets import load_dataset
+from flwr.app import Context
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import InnerDirichletPartitioner
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from flwr.common import Context
-
+from datasets import load_dataset
 from .partitioners import FoldPartitioner
 
 # pylint: disable=C0103, W0603
@@ -35,7 +32,7 @@ def get_testloader(dataset: str) -> DataLoader:
 
 def get_federated_dataloaders(
     partition_id: int, num_partitions: int, context: Context
-) -> Tuple[DataLoader, DataLoader]:
+) -> tuple[DataLoader, DataLoader]:
     """Create dataloaders for a specified dataset and partition.
 
     partition_id : int
