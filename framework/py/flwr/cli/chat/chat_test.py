@@ -21,7 +21,10 @@ from unittest.mock import Mock, patch
 import click
 import pytest
 
-from flwr.cli.constant import CHAT_DEFAULT_FEDERATION_NAME
+from flwr.cli.constant import (
+    CHAT_DEFAULT_FEDERATION_NAME,
+    CHAT_SUPERGRID_CONNECTION_NAME,
+)
 from flwr.cli.typing import SuperLinkConnection
 from flwr.proto.control_pb2 import ListFederationsResponse  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
@@ -35,7 +38,7 @@ def test_chat_requires_login_before_interactive_application(
     """Chat should fail before launching the app if the user has not logged in."""
     monkeypatch.delenv("FLWR_CHAT_SUPERLINK", raising=False)
     superlink_connection = SuperLinkConnection(
-        name="supergrid",
+        name=CHAT_SUPERGRID_CONNECTION_NAME,
         address="supergrid.flower.ai",
     )
     control_client = Mock()
@@ -60,7 +63,7 @@ def test_chat_requires_login_before_interactive_application(
             chat_module.chat()
 
     mock_chat_application.assert_not_called()
-    mock_read_connection.assert_called_once_with("supergrid")
+    mock_read_connection.assert_called_once_with(CHAT_SUPERGRID_CONNECTION_NAME)
     control_client.close.assert_called_once()
 
 
