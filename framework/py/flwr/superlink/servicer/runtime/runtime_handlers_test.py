@@ -278,9 +278,17 @@ class TestGetConnector(unittest.TestCase):
 
     def test_returns_authenticated_task_credentials(self) -> None:
         """GetConnector should return the run owner's matching credentials."""
-        task = Mock(type=TaskType.CONNECTOR, connector_ref="notion", run_id=123)
+        task = Mock(
+            type=TaskType.CONNECTOR,
+            connector_ref="notion",
+            connector_id=42,
+            run_id=123,
+        )
         self.state.get_run_info.return_value = [Mock(federation_id="@bob/fed-a")]
-        self.state.get_connector.return_value = Mock(
+        self.state.get_run_connector_ids.return_value = [42]
+        self.state.get_connector_by_id.return_value = Mock(
+            connector_id=42,
+            federation_id="@bob/fed-a",
             connector_ref="notion",
             credentials_json='{"token":"secret"}',
             config_json='{"workspace":"primary"}',
@@ -293,15 +301,14 @@ class TestGetConnector(unittest.TestCase):
         self.assertEqual(
             response,
             GetConnectorResponse(
+                connector_id=42,
                 connector_ref="notion",
                 credentials_json='{"token":"secret"}',
                 config_json='{"workspace":"primary"}',
             ),
         )
-        self.state.get_connector.assert_called_once_with(
-            federation_id="@bob/fed-a",
-            connector_ref="notion",
-        )
+        self.state.get_run_connector_ids.assert_called_once_with(123)
+        self.state.get_connector_by_id.assert_called_once_with(42)
 
     @parameterized.expand(  # type: ignore
         [
@@ -316,7 +323,12 @@ class TestGetConnector(unittest.TestCase):
         connector_ref: str,
     ) -> None:
         """GetConnector should reject tasks without a connector identity."""
-        task = Mock(type=task_type, connector_ref=connector_ref, run_id=123)
+        task = Mock(
+            type=task_type,
+            connector_ref=connector_ref,
+            connector_id=42,
+            run_id=123,
+        )
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.get_connector(GetConnectorRequest(), self.state, task)
 
@@ -324,21 +336,28 @@ class TestGetConnector(unittest.TestCase):
             error.exception.code,
             ApiErrorCode.RUNTIME_CONNECTOR_CREDENTIALS_NOT_AVAILABLE,
         )
-        self.state.get_connector.assert_not_called()
+        self.state.get_run_connector_ids.assert_not_called()
+        self.state.get_connector_by_id.assert_not_called()
 
     def test_hides_other_federation_credentials(self) -> None:
         """GetConnector should not fall back to another federation's credentials."""
-        task = Mock(type=TaskType.CONNECTOR, connector_ref="notion", run_id=123)
+        task = Mock(
+            type=TaskType.CONNECTOR,
+            connector_ref="notion",
+            connector_id=42,
+            run_id=123,
+        )
         self.state.get_run_info.return_value = [Mock(federation_id="@bob/fed-b")]
-        self.state.get_connector.return_value = None
+        self.state.get_run_connector_ids.return_value = [42]
+        self.state.get_connector_by_id.return_value = Mock(
+            federation_id="@bob/fed-a", connector_ref="notion"
+        )
 
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.get_connector(GetConnectorRequest(), self.state, task)
 
-        self.state.get_connector.assert_called_once_with(
-            federation_id="@bob/fed-b",
-            connector_ref="notion",
-        )
+        self.state.get_run_connector_ids.assert_called_once_with(123)
+        self.state.get_connector_by_id.assert_called_once_with(42)
         self.assertEqual(error.exception.code, ApiErrorCode.CONNECTOR_NOT_FOUND)
 
 
@@ -463,11 +482,13 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         assert task.type == TaskType.MODEL
         assert task.model_ref == "models/abc"
 
-    def test_start_automation_enriches_connector_refs(self) -> None:
-        """Enrich connector refs and delegate automation creation."""
+    def test_start_automation_enriches_connector_ids(self) -> None:
+        """Enrich connector IDs and delegate automation creation."""
         # Prepare
         request = StartAutomationRequest(
-            start_run_request=StartRunRequest(connector_refs=["untrusted"])
+            start_run_request=StartRunRequest(
+                connector_ids=[999], connector_refs=["legacy"]
+            )
         )
         expected = StartAutomationResponse(automation_id=1)
 
@@ -478,9 +499,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
                 "start_control_automation",
                 return_value=expected,
             ) as start_automation_mock,
-            patch.object(
-                self.state, "get_run_connector_refs", return_value=["calendar"]
-            ),
+            patch.object(self.state, "get_run_connector_ids", return_value=[42]),
         ):
             response = runtime_handlers.start_automation(
                 request,
@@ -490,7 +509,8 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
 
         # Assert
         assert response is expected
-        assert list(request.start_run_request.connector_refs) == ["calendar"]
+        assert list(request.start_run_request.connector_ids) == [42]
+        assert not request.start_run_request.connector_refs
         assert start_automation_mock.call_args.args[0] is request
 
     def test_start_automation_rejects_clientapp_task(self) -> None:

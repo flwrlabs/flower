@@ -41,6 +41,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore.constant import (
     FLOWER_AGENT_APP_ID,
+    NOOP_FEDERATION_ID,
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
     TaskType,
@@ -224,53 +225,68 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertIsNotNone(state.get_fab(updated_hash))
 
-    def test_connector_upsert_get_and_delete(self) -> None:
-        """A connector can be created, updated, retrieved, and deleted."""
+    def test_connector_create_list_and_delete(self) -> None:
+        """Multiple connectors of one provider can be created and deleted by ID."""
         state = self.state_factory()
 
-        self.assertTrue(
-            state.upsert_connector(
-                federation_id="@bob/fed-a",
-                connector_ref="calendar",
-                credentials_json='{"token":"first"}',
-                config_json='{"calendar":"primary"}',
-                created_by="account-a",
-            )
+        first_id = state.create_connector(
+            federation_id=NOOP_FEDERATION_ID,
+            connector_ref="calendar",
+            credentials_json='{"token":"first"}',
+            config_json='{"calendar":"primary"}',
+            created_by="account-a",
+        )
+        second_id = state.create_connector(
+            federation_id=NOOP_FEDERATION_ID,
+            connector_ref="calendar",
+            credentials_json='{"token":"second"}',
+            config_json='{"calendar":"work"}',
+            created_by="account-a",
+        )
+        assert first_id is not None and second_id is not None
+        self.assertGreater(second_id, first_id)
+        self.assertEqual(
+            list(state.get_connectors(NOOP_FEDERATION_ID, "calendar")),
+            [
+                ConnectorRecord(
+                    connector_id=first_id,
+                    federation_id=NOOP_FEDERATION_ID,
+                    connector_ref="calendar",
+                    credentials_json='{"token":"first"}',
+                    config_json='{"calendar":"primary"}',
+                ),
+                ConnectorRecord(
+                    connector_id=second_id,
+                    federation_id=NOOP_FEDERATION_ID,
+                    connector_ref="calendar",
+                    credentials_json='{"token":"second"}',
+                    config_json='{"calendar":"work"}',
+                ),
+            ],
         )
         self.assertEqual(
-            state.get_connector(federation_id="@bob/fed-a", connector_ref="calendar"),
-            ConnectorRecord(
-                federation_id="@bob/fed-a",
-                connector_ref="calendar",
-                credentials_json='{"token":"first"}',
-                config_json='{"calendar":"primary"}',
-            ),
+            state.get_connector_by_id(second_id),
+            state.get_connectors(NOOP_FEDERATION_ID, "calendar")[1],
         )
-        self.assertTrue(
-            state.upsert_connector(
-                federation_id="@bob/fed-a",
-                connector_ref="calendar",
-                credentials_json='{"token":"updated"}',
-                config_json='{"calendar":"work"}',
-                created_by="account-a",
-            )
-        )
-        updated = state.get_connector(
-            federation_id="@bob/fed-a", connector_ref="calendar"
-        )
-        assert updated is not None
-        self.assertEqual(updated.credentials_json, '{"token":"updated"}')
-        self.assertEqual(updated.config_json, '{"calendar":"work"}')
 
-        self.assertTrue(
-            state.delete_connector(federation_id="@bob/fed-a", connector_ref="calendar")
+        self.assertTrue(state.delete_connector(NOOP_FEDERATION_ID, second_id))
+        self.assertEqual(
+            [
+                connector.connector_id
+                for connector in state.get_connectors(NOOP_FEDERATION_ID)
+            ],
+            [first_id],
         )
-        self.assertIsNone(
-            state.get_connector(federation_id="@bob/fed-a", connector_ref="calendar")
+        self.assertFalse(state.delete_connector(NOOP_FEDERATION_ID, second_id))
+        third_id = state.create_connector(
+            federation_id=NOOP_FEDERATION_ID,
+            connector_ref="calendar",
+            credentials_json='{"token":"third"}',
+            config_json="{}",
+            created_by="account-a",
         )
-        self.assertFalse(
-            state.delete_connector(federation_id="@bob/fed-a", connector_ref="calendar")
-        )
+        assert third_id is not None
+        self.assertGreater(third_id, second_id)
 
     def test_bind_and_get_run_connectors(self) -> None:
         """Run connector bindings should be deterministic and idempotent."""
@@ -278,19 +294,19 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         state.bind_connectors_to_run(
             run_id=42,
-            connector_refs=["notion", "calendar", "notion"],
+            connector_ids=[2, 1, 2],
         )
-        state.bind_connectors_to_run(run_id=42, connector_refs=["notion"])
+        state.bind_connectors_to_run(run_id=42, connector_ids=[2])
 
         self.assertEqual(
-            list(state.get_run_connector_refs(run_id=42)),
-            ["calendar", "notion"],
+            list(state.get_run_connector_ids(run_id=42)),
+            [1, 2],
         )
 
         self.assertFalse(
-            state.bind_connectors_to_run(run_id=43, connector_refs="notion")
+            state.bind_connectors_to_run(run_id=43, connector_ids="notion")  # type: ignore
         )
-        self.assertEqual(list(state.get_run_connector_refs(run_id=43)), [])
+        self.assertEqual(list(state.get_run_connector_ids(run_id=43)), [])
 
     def test_run_series_context_roundtrip(self) -> None:
         """A run series context can be stored and retrieved."""
@@ -341,7 +357,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         session = state.create_connector_oauth_session(
             oauth_session_id="session-1",
             flwr_aid="account-a",
-            federation_id="@account-a/fed-a",
+            federation_id=NOOP_FEDERATION_ID,
             connector_ref="calendar",
             state="oauth-state",
             redirect_uri="https://example.test/callback",
@@ -349,7 +365,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             expires_at=expires_at,
         )
         assert session is not None
-        self.assertEqual(session.federation_id, "@account-a/fed-a")
+        self.assertEqual(session.federation_id, NOOP_FEDERATION_ID)
         self.assertEqual(session.expires_at, expires_at.isoformat())
         self.assertIsNone(session.completed_at)
         self.assertEqual(
@@ -362,7 +378,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state.create_connector_oauth_session(
                 oauth_session_id="session-1",
                 flwr_aid="account-a",
-                federation_id="@account-a/fed-a",
+                federation_id=NOOP_FEDERATION_ID,
                 connector_ref="calendar",
                 state="oauth-state",
                 redirect_uri="https://example.test/callback",
@@ -410,7 +426,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         expired = state.create_connector_oauth_session(
             oauth_session_id="expired-session",
             flwr_aid="account-a",
-            federation_id="@account-a/fed-a",
+            federation_id=NOOP_FEDERATION_ID,
             connector_ref="calendar",
             state="oauth-state",
             redirect_uri="https://example.test/callback",
@@ -1076,10 +1092,28 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(task.model_ref, "model://test")
         self.assertFalse(task.HasField("fab_hash"))
         self.assertFalse(task.HasField("connector_ref"))
+        self.assertFalse(task.HasField("connector_id"))
         self.assertTrue(task.pending_at)
         self.assertEqual(task.starting_at, "")
         self.assertEqual(task.running_at, "")
         self.assertEqual(task.finished_at, "")
+
+    def test_create_and_get_connector_task_with_id(self) -> None:
+        """Connector task identity should include its exact connection ID."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR,
+            run_id=run_id,
+            connector_ref="calendar",
+            connector_id=42,
+        )
+        assert task_id is not None
+
+        task = state.get_tasks(task_ids=[task_id])[0]
+        self.assertEqual(task.connector_ref, "calendar")
+        self.assertEqual(task.connector_id, 42)
 
     def test_create_task_rejects_finished_requesting_task(self) -> None:
         """Task creation should fail if the requesting task is already finished."""

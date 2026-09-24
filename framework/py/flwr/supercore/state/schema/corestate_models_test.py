@@ -14,8 +14,6 @@
 # ==============================================================================
 """Tests for CoreState declarative models."""
 
-from sqlalchemy import UniqueConstraint
-
 from flwr.supercore.state.schema.corestate_models import FlwrBase, Task, TaskLogsTable
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 
@@ -55,29 +53,30 @@ def test_task_mapper_uses_task_id_as_identity_key() -> None:
     assert [column.name for column in Task.__mapper__.primary_key] == ["task_id"]
 
 
-def test_connector_uses_incrementing_id_and_unique_federation_reference() -> None:
-    """Ensure connectors have a surrogate ID and retain their natural uniqueness."""
+def test_connector_uses_incrementing_id_and_allows_multiple_provider_accounts() -> None:
+    """Ensure connectors use an ID without provider-level uniqueness."""
     table = FlwrBase.metadata.tables["connector"]
 
     assert [column.name for column in table.primary_key.columns] == ["connector_id"]
     assert table.c.connector_id.autoincrement is True
-    assert any(
-        {column.name for column in constraint.columns}
-        == {"federation_id", "connector_ref"}
-        for constraint in table.constraints
-        if isinstance(constraint, UniqueConstraint)
-    )
     for column_name in ("federation_id", "created_at", "created_by"):
         assert table.c[column_name].nullable is False
     for column_name in ("deleted_at", "deleted_by"):
         assert table.c[column_name].nullable is True
 
 
-def test_connector_oauth_session_requires_federation_id() -> None:
-    """Ensure each OAuth session records its target federation."""
-    table = FlwrBase.metadata.tables["connector_oauth_session"]
+def test_connector_id_columns_match_lifecycle_requirements() -> None:
+    """Ensure OAuth, run bindings, and tasks expose the required ID columns."""
+    oauth_table = FlwrBase.metadata.tables["connector_oauth_session"]
+    run_connector_table = FlwrBase.metadata.tables["run_connector"]
+    task_table = FlwrBase.metadata.tables["task"]
 
-    assert table.c.federation_id.nullable is False
+    assert oauth_table.c.federation_id.nullable is False
+    assert [column.name for column in run_connector_table.primary_key.columns] == [
+        "run_id",
+        "connector_id",
+    ]
+    assert task_table.c.connector_id.nullable is True
 
 
 def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:

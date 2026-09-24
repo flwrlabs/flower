@@ -31,6 +31,7 @@ JSONObject: TypeAlias = dict[str, JSONValue]
 class ConnectorRecord:
     """Persisted connector configuration and credentials."""
 
+    connector_id: int
     federation_id: str
     connector_ref: str
     credentials_json: str

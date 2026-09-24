@@ -134,9 +134,10 @@ class InMemoryCoreState(
         self.lock_fab_store = Lock()
         self.federation_app_store: dict[tuple[str, str], FederationAppRecord] = {}
         self.lock_federation_app_store = Lock()
-        self.connector_store: dict[tuple[str, str], ConnectorRecord] = {}
+        self.connector_store: dict[int, ConnectorRecord] = {}
+        self.connector_id_counter = 0
         self.lock_connector_store = Lock()
-        self.run_connector_store: dict[int, set[str]] = {}
+        self.run_connector_store: dict[int, set[int]] = {}
         self.lock_run_connector_store = Lock()
         self.connector_oauth_session_store: dict[str, ConnectorOAuthSessionRecord] = {}
         self.lock_connector_oauth_session_store = Lock()
@@ -508,58 +509,76 @@ class InMemoryCoreState(
                 self.federation_app_store.pop((federation_id, app_id), None) is not None
             )
 
-    def upsert_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def create_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         federation_id: str,
         connector_ref: str,
         credentials_json: str,
         config_json: str,
         created_by: str,
-    ) -> bool:
-        """Create or update a connector for a federation."""
+    ) -> int | None:
+        """Create a connector for a federation."""
         if not federation_id or not connector_ref or not created_by:
-            return False
-        connector = ConnectorRecord(
-            federation_id=federation_id,
-            connector_ref=connector_ref,
-            credentials_json=credentials_json,
-            config_json=config_json,
-        )
-        with self.lock_connector_store:
-            self.connector_store[(federation_id, connector_ref)] = connector
-        return True
-
-    def get_connector(
-        self, federation_id: str, connector_ref: str
-    ) -> ConnectorRecord | None:
-        """Return a federation's connector, if present."""
-        if not federation_id or not connector_ref:
             return None
         with self.lock_connector_store:
-            return self.connector_store.get((federation_id, connector_ref))
+            self.connector_id_counter += 1
+            connector_id = self.connector_id_counter
+            connector = ConnectorRecord(
+                connector_id=connector_id,
+                federation_id=federation_id,
+                connector_ref=connector_ref,
+                credentials_json=credentials_json,
+                config_json=config_json,
+            )
+            self.connector_store[connector_id] = connector
+        return connector_id
 
-    def delete_connector(self, federation_id: str, connector_ref: str) -> bool:
-        """Delete a federation's connector if it exists."""
-        if not federation_id or not connector_ref:
-            return False
+    def get_connectors(
+        self, federation_id: str, connector_ref: str | None = None
+    ) -> Sequence[ConnectorRecord]:
+        """Return a federation's connectors, optionally filtered by provider."""
+        if not federation_id:
+            return []
         with self.lock_connector_store:
-            return (
-                self.connector_store.pop((federation_id, connector_ref), None)
-                is not None
+            return sorted(
+                (
+                    connector
+                    for connector in self.connector_store.values()
+                    if connector.federation_id == federation_id
+                    and (
+                        connector_ref is None
+                        or connector.connector_ref == connector_ref
+                    )
+                ),
+                key=lambda connector: connector.connector_id,
             )
 
-    def bind_connectors_to_run(
-        self, run_id: int, connector_refs: Sequence[str]
-    ) -> bool:
-        """Associate connector references with a run."""
-        if isinstance(connector_refs, str):
+    def get_connector_by_id(self, connector_id: int) -> ConnectorRecord | None:
+        """Return a connector by ID, if present."""
+        with self.lock_connector_store:
+            return self.connector_store.get(connector_id)
+
+    def delete_connector(self, federation_id: str, connector_id: int) -> bool:
+        """Delete a federation's connector if it exists."""
+        if not federation_id or connector_id <= 0:
+            return False
+        with self.lock_connector_store:
+            connector = self.connector_store.get(connector_id)
+            if connector is None or connector.federation_id != federation_id:
+                return False
+            del self.connector_store[connector_id]
+            return True
+
+    def bind_connectors_to_run(self, run_id: int, connector_ids: Sequence[int]) -> bool:
+        """Associate connector IDs with a run."""
+        if isinstance(connector_ids, (str, bytes)):
             return False
         with self.lock_run_connector_store:
-            self.run_connector_store.setdefault(run_id, set()).update(connector_refs)
+            self.run_connector_store.setdefault(run_id, set()).update(connector_ids)
         return True
 
-    def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
-        """Return connector references associated with a run."""
+    def get_run_connector_ids(self, run_id: int) -> Sequence[int]:
+        """Return connector IDs associated with a run."""
         with self.lock_run_connector_store:
             return sorted(self.run_connector_store.get(run_id, set()))
 
@@ -996,6 +1015,7 @@ class InMemoryCoreState(
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        connector_id: int | None = None,
         requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a task and return its ID."""
@@ -1019,6 +1039,7 @@ class InMemoryCoreState(
                 fab_hash=fab_hash,
                 model_ref=model_ref,
                 connector_ref=connector_ref,
+                connector_id=connector_id,
             )
 
             self.task_store[task_id] = task

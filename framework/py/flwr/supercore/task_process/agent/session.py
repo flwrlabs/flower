@@ -213,7 +213,9 @@ class RuntimeAgentConnectors(AgentConnectors):
         """Return model-facing tool schemas for the requested connectors."""
         return [tool for name in names for tool in get_connector_tools(name)]
 
-    def call(self, tool_call: JSONObject) -> JSONObject:
+    def call(
+        self, tool_call: JSONObject, *, connector_id: int | None = None
+    ) -> JSONObject:
         """Execute one model function_call and return a function_call_output item."""
         arguments = tool_call["arguments"]
         if isinstance(arguments, str):
@@ -232,6 +234,7 @@ class RuntimeAgentConnectors(AgentConnectors):
             name=name,
             call_id=call_id,
             arguments=arguments_obj,
+            connector_id=connector_id,
         )
 
 
@@ -254,14 +257,22 @@ class AgentRuntime:
         self._events = events
 
     def create_connector_response(
-        self, *, name: str, call_id: str, arguments: JSONObject
+        self,
+        *,
+        name: str,
+        call_id: str,
+        arguments: JSONObject,
+        connector_id: int | None = None,
     ) -> JSONValue:
         """Create one connector response."""
         name = name.strip().lower()
         connector_ref = get_connector_ref(name)
-        create_res = self._stub.CreateTask(
-            CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=connector_ref)
+        create_request = CreateTaskRequest(
+            type=TaskType.CONNECTOR, connector_ref=connector_ref
         )
+        if connector_id is not None:
+            create_request.connector_id = connector_id
+        create_res = self._stub.CreateTask(create_request)
         if not create_res.HasField("task_id"):
             raise RuntimeError("Connector task could not be created.")
 
@@ -285,7 +296,12 @@ class AgentRuntime:
         return response_payload["output"]
 
     def call_connector_with_events(
-        self, *, name: str, call_id: str, arguments: JSONObject
+        self,
+        *,
+        name: str,
+        call_id: str,
+        arguments: JSONObject,
+        connector_id: int | None = None,
     ) -> JSONObject:
         """Call a connector and emit/persist its activity events."""
         name = name.strip().lower()
@@ -302,6 +318,7 @@ class AgentRuntime:
                 name=name,
                 call_id=call_id,
                 arguments=arguments,
+                connector_id=connector_id,
             )
         except Exception:  # pylint: disable=broad-exception-caught
             error_output: JSONObject = {
