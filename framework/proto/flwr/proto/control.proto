@@ -179,8 +179,9 @@ message StartRunRequest {
   string app_spec = 4;
   string federation = 5;
   optional uint64 series_id = 6;
-  repeated uint64 connector_ids = 7;
+  repeated string connector_refs = 7;
   string user_prompt = 8;
+  repeated uint64 connector_ids = 9;
 }
 message StartRunResponse {
   optional uint64 run_id = 1;
@@ -280,13 +281,14 @@ message Connector {
   string display_name = 2;
   string description = 3;
   bool connected = 4;
-  optional uint64 connector_id = 5;
+  uint64 connector_id = 5;
 }
 message ListConnectorsResponse { repeated Connector connectors = 1; }
 
 message DisconnectConnectorRequest {
-  uint64 connector_id = 1;
-  string federation = 2;
+  string connector_ref = 1;
+  uint64 connector_id = 2;
+  string federation = 3;
 }
 message DisconnectConnectorResponse {}
 
