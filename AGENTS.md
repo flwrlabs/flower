@@ -71,3 +71,14 @@ After autogeneration:
 - Confirm the generated operations match the SQLAlchemy metadata change.
 - Review generated `batch_alter_table` blocks for SQLite compatibility.
 - Update generated schema documentation if table metadata changed.
+
+### Testing and Python Execution
+
+Never run `pytest` or `python` directly from the global environment, as this will result in missing dependencies (e.g., `ModuleNotFoundError: No module named 'grpc'`).
+
+Instead, always run tests and scripts using the project's `uv` environment from within the `framework/` directory:
+
+```bash
+cd framework
+uv run --no-sync --python=3.11.14 pytest <path_to_test>
+```
