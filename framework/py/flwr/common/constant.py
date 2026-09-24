@@ -82,20 +82,27 @@ if _heartbeat_profile_name not in _HEARTBEAT_PROFILES:
         f"{', '.join(sorted(_HEARTBEAT_PROFILES))}"
     )
 _heartbeat_profile = _HEARTBEAT_PROFILES[_heartbeat_profile_name]
-HEARTBEAT_DEFAULT_INTERVAL = int(
-    os.getenv("FLWR_HEARTBEAT_INTERVAL_S", str(_heartbeat_profile["interval"]))
+
+
+def _heartbeat_seconds_from_env(name: str, default: int) -> int:
+    """Parse a whole number of seconds, accepting protobuf float formatting."""
+    value = float(os.getenv(name, str(default)))
+    if not value.is_integer():
+        raise ValueError(f"{name} must be a whole number of seconds")
+    return int(value)
+
+
+HEARTBEAT_DEFAULT_INTERVAL = _heartbeat_seconds_from_env(
+    "FLWR_HEARTBEAT_INTERVAL_S", _heartbeat_profile["interval"]
 )
-HEARTBEAT_CALL_TIMEOUT = int(
-    os.getenv("FLWR_HEARTBEAT_RPC_TIMEOUT_S", str(_heartbeat_profile["rpc_timeout"]))
+HEARTBEAT_CALL_TIMEOUT = _heartbeat_seconds_from_env(
+    "FLWR_HEARTBEAT_RPC_TIMEOUT_S", _heartbeat_profile["rpc_timeout"]
 )
 # App heartbeats use a local AppIO connection, but large object transfers can still
 # delay an RPC on a busy channel. Keep this separate from the remote node heartbeat
 # deadline so a slower app heartbeat does not weaken node-failure detection.
-APP_HEARTBEAT_CALL_TIMEOUT = int(
-    os.getenv(
-        "FLWR_APP_HEARTBEAT_RPC_TIMEOUT_S",
-        str(_heartbeat_profile["app_rpc_timeout"]),
-    )
+APP_HEARTBEAT_CALL_TIMEOUT = _heartbeat_seconds_from_env(
+    "FLWR_APP_HEARTBEAT_RPC_TIMEOUT_S", _heartbeat_profile["app_rpc_timeout"]
 )
 HEARTBEAT_BASE_MULTIPLIER = 0.8
 HEARTBEAT_RANDOM_RANGE = (-0.1, 0.1)

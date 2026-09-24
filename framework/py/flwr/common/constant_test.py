@@ -74,9 +74,9 @@ class TestHeartbeatEnvironmentConfiguration(unittest.TestCase):
         result = self._run_import(
             {
                 "FLWR_HEARTBEAT_PROFILE": "slow",
-                "FLWR_HEARTBEAT_INTERVAL_S": "90",
-                "FLWR_HEARTBEAT_RPC_TIMEOUT_S": "30",
-                "FLWR_APP_HEARTBEAT_RPC_TIMEOUT_S": "240",
+                "FLWR_HEARTBEAT_INTERVAL_S": "90.0",
+                "FLWR_HEARTBEAT_RPC_TIMEOUT_S": "30.0",
+                "FLWR_APP_HEARTBEAT_RPC_TIMEOUT_S": "240.0",
             }
         )
         self.assertEqual(result.returncode, 0, result.stderr)

@@ -49,18 +49,18 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
     def test_apply_heartbeat_config_forwards_superlink_policy(self) -> None:
         """Apply negotiated timings to local lease and spawned ClientApps."""
         config = HeartbeatConfig(
-            interval=60,
-            rpc_timeout=45,
-            app_rpc_timeout=180,
+            interval=60.0,
+            rpc_timeout=45.0,
+            app_rpc_timeout=180.0,
             clientapp_token_lease=3600,
         )
 
         with patch.dict(os.environ, {}, clear=False):
             _apply_heartbeat_config(self.mock_state, config)
 
-            self.assertEqual(os.environ["FLWR_HEARTBEAT_INTERVAL_S"], "60")
-            self.assertEqual(os.environ["FLWR_HEARTBEAT_RPC_TIMEOUT_S"], "45")
-            self.assertEqual(os.environ["FLWR_APP_HEARTBEAT_RPC_TIMEOUT_S"], "180")
+            self.assertEqual(os.environ["FLWR_HEARTBEAT_INTERVAL_S"], "60.0")
+            self.assertEqual(os.environ["FLWR_HEARTBEAT_RPC_TIMEOUT_S"], "45.0")
+            self.assertEqual(os.environ["FLWR_APP_HEARTBEAT_RPC_TIMEOUT_S"], "180.0")
 
         self.mock_state.set_clientapp_token_lease.assert_called_once_with(3600)
 
