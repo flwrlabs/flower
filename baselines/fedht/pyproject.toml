@@ -1,0 +1,102 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fedht"
+version = "1.0.0"
+description = "Flower Baseline for Federated Nonconvex Sparse Learning (Fed-HT and FedIter-HT)"
+license = "Apache-2.0"
+dependencies = [
+    "flwr[simulation]>=1.18.0,<2.0.0",
+    "flwr-datasets>=0.5.0,<1.0.0",
+    "torch>=2.0.0",
+    "numpy>=1.24.0",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.isort]
+profile = "black"
+known_first_party = ["flwr"]
+
+[tool.black]
+line-length = 88
+target-version = ["py39", "py310", "py311", "py312"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["D", "E", "F", "W", "B", "ISC", "C4"]
+fixable = ["D", "E", "F", "W", "B", "ISC", "C4"]
+ignore = ["B024", "B027"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.mypy]
+ignore_missing_imports = true
+strict = false
+
+[tool.flwr.app]
+publisher = "hrshl4codes"
+
+[tool.flwr.app.components]
+serverapp = "fedht.server_app:app"
+clientapp = "fedht.client_app:app"
+
+# ---------------------------------------------------------------------------
+# Default config: Simulation I (sparse linear regression), Fed-HT
+# ---------------------------------------------------------------------------
+
+[tool.flwr.app.config.algorithm]
+name = "FedHT"                # "FedHT" or "FedIterHT"
+num-server-rounds = 100
+num-clients = 100             # total number of simulated clients
+fraction-fit = 1.0            # use all clients each round
+min-available-clients = 2
+local-steps = 5               # K: searched from {3, 5, 8, 10} in the paper
+learning-rate = 0.001         # gamma: searched from {10,1,0.6,0.3,0.1,0.06,0.03,0.01,0.001}
+tau = 200                     # sparsity level: 200 for simulations and real data, 500 for MNIST
+
+[tool.flwr.app.config.dataset]
+name = "simulation_I"         # "simulation_I", "simulation_II", or "mnist"
+batch-size = 20               # 20 for simulations and real data, 64 for MNIST
+
+[tool.flwr.app.config.model]
+input-dim = 1000              # 1000 for simulations, 784 for MNIST, 150360 for E2006
+num-classes = 10              # only used for MNIST softmax regression
+
+# ---------------------------------------------------------------------------
+# Federation options for local simulation
+# ---------------------------------------------------------------------------
+
+
+#######################################################################
+# CONFIGURATION MIGRATION NOTICE:
+#
+# What was previously called "federation config" for SuperLink
+# connections in pyproject.toml has been renamed and moved.
+#
+# These settings are now SuperLink connection configuration
+# and are defined in the Flower configuration file.
+#
+# The entries below are commented out intentionally and are kept
+# only as a migration reference.
+#
+# Docs: https://flower.ai/docs/framework/ref-flower-configuration.html
+#######################################################################
+
+# [tool.flwr.federations]
+# default = "local-simulation"
+
+# [tool.flwr.federations.local-simulation]
+# options.num-supernodes = 100
+# options.backend.client-resources.num-cpus = 2
+# options.backend.client-resources.num-gpus = 0.0
