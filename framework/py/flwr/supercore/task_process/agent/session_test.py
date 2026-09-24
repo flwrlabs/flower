@@ -41,8 +41,8 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorResponse,
 )
 from flwr.supercore.task_identity import TaskIdentity
+from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
-from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject
 
 from .session import (
@@ -224,7 +224,9 @@ def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
     expected_properties = {"input", "start_at", "fixed_interval", "max_runs"}
 
     # Execute
-    parameters = get_builtin_connector_tool(START_AUTOMATION_TOOL_NAME)["parameters"]
+    parameters = connector_registry.get_connector_tools(START_AUTOMATION_TOOL_NAME)[0][
+        "parameters"
+    ]
 
     # Assert
     assert isinstance(parameters, dict)
@@ -419,3 +421,15 @@ def test_create_connector_response_uses_connector_task_for_filesystem() -> None:
     stub.CreateTask.assert_called_once_with(
         CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref="filesystem")
     )
+
+
+def test_connector_tools_include_agent_handled_automation() -> None:
+    """Automation and connector schemas should remain available in request order."""
+    connectors = RuntimeAgentConnectors(Mock())
+
+    assert [
+        tool["name"]
+        for tool in connectors.tools(
+            ["web_search", START_AUTOMATION_TOOL_NAME, "notion"]
+        )
+    ] == ["web_search", "start_automation", "notion_search", "notion_get_page"]

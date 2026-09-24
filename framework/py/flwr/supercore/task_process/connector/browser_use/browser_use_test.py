@@ -25,7 +25,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from .browser_use import FlowerResponsesChatModel, invoke_browser_use_provider
+from ..definition import ConnectorExecutionContext
+from . import invoke_browser_use_provider
+from .browser_use import FlowerResponsesChatModel
 
 
 class _History:
@@ -86,7 +88,7 @@ def test_invoke_browser_use_provider_uses_flower_headless(
         " Find Flower docs ",
         allowed_domains=["*.flower.ai", "docs.python.org"],
         model=" gpt-5 ",
-        usage_recorder=Mock(),
+        context=ConnectorExecutionContext({}, {}, Mock()),
     )
 
     assert result == {

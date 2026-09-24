@@ -14,26 +14,23 @@
 # ==============================================================================
 """Built-in filesystem connector."""
 
+from ..definition import ConnectorDefinition, build_executor
 from .filesystem import (
-    FILESYSTEM_ALLOWED_DIRS_ENV,
     FILESYSTEM_CONNECTOR_REF,
     FILESYSTEM_LIST_DIRECTORY_TOOL_NAME,
     FILESYSTEM_READ_FILE_TOOL_NAME,
-    FilesystemApiError,
-    invoke_filesystem,
     list_directory,
     make_filesystem_tools,
     read_file,
 )
 
-__all__ = [
-    "FILESYSTEM_ALLOWED_DIRS_ENV",
-    "FILESYSTEM_CONNECTOR_REF",
-    "FILESYSTEM_LIST_DIRECTORY_TOOL_NAME",
-    "FILESYSTEM_READ_FILE_TOOL_NAME",
-    "FilesystemApiError",
-    "invoke_filesystem",
-    "list_directory",
-    "make_filesystem_tools",
-    "read_file",
-]
+CONNECTOR = ConnectorDefinition(
+    ref=FILESYSTEM_CONNECTOR_REF,
+    tools=make_filesystem_tools(),
+    executors={
+        FILESYSTEM_LIST_DIRECTORY_TOOL_NAME: build_executor(list_directory),
+        FILESYSTEM_READ_FILE_TOOL_NAME: build_executor(read_file),
+    },
+)
+
+__all__ = ["CONNECTOR"]

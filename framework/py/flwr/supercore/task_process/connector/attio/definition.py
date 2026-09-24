@@ -36,7 +36,7 @@ PROVIDER = ProviderDefinition(
     ),
 )
 
-CONNECTOR = ConnectorDefinition(
+CONNECTOR = ConnectorDefinition.from_provider(
     provider=PROVIDER,
     executors=EXECUTORS,
     oauth_flow=load_oauth_flow(PROVIDER),
