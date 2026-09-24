@@ -190,6 +190,11 @@ def compute_distances(records: list[ArrayRecord]) -> NDArray:
 
     # Use broadcasting to compute pairwise distances
     distance_matrix: NDArray = norms[:, None] + norms[None, :] - 2 * flat_w @ flat_w.T
+
+    # Rounding can still leave tiny negative values and a nonzero diagonal, which
+    # would break the assumption that each node's own distance sorts first
+    np.maximum(distance_matrix, 0, out=distance_matrix)
+    np.fill_diagonal(distance_matrix, 0)
     return distance_matrix
 
 

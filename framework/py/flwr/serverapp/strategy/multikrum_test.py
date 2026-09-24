@@ -86,6 +86,8 @@ def test_compute_distances_with_large_shared_component() -> None:
 
     # Assert
     np.testing.assert_allclose(actual, expected, rtol=1e-4, atol=1e-9)
+    np.testing.assert_array_equal(np.diag(actual), 0)
+    assert (actual >= 0).all()
 
 
 def test_select_multikrum_with_large_shared_component() -> None:
