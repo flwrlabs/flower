@@ -128,24 +128,41 @@ ACTIONS = (
         },
     ),
     ActionDefinition(
-        name="get_users",
+        name="list_users",
         description=(
-            "List workspace users, retrieve one user by ID, or retrieve the "
-            "current connection bot by passing 'self'. Pagination applies only "
-            "when listing users and must be omitted when user_id is provided."
+            "List workspace users with optional pagination. Personal access tokens "
+            "cannot use this action."
         ),
         access=ActionAccess.READ,
         input_schema={
             "type": "object",
             "properties": {
-                "user_id": string_property(
-                    "User ID to retrieve. Pass 'self' for the current connection "
-                    "bot, or omit to list workspace users. When provided, omit "
-                    "page_size and start_cursor."
-                ),
                 "page_size": _PAGE_SIZE,
                 "start_cursor": _CURSOR,
             },
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_user",
+        description="Retrieve a workspace user by ID.",
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "user_id": string_property("The user ID to retrieve."),
+            },
+            "required": ["user_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_self",
+        description="Retrieve the bot user associated with the current access token.",
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {},
             "additionalProperties": False,
         },
     ),

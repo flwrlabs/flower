@@ -35,11 +35,17 @@ _CREDENTIALS: JSONObject = {"access_token": "ntn-secret"}
 
 def test_notion_definition_is_registered() -> None:
     """Notion schemas and executors should form one federation-scoped connector."""
-    assert len(ACTIONS) == 3
+    assert len(ACTIONS) == 5
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     assert [
         tool["name"] for tool in registry.get_connector_tools(NOTION_CONNECTOR_REF)
-    ] == ["notion_search", "notion_get_page", "notion_get_users"]
+    ] == [
+        "notion_search",
+        "notion_get_page",
+        "notion_list_users",
+        "notion_get_user",
+        "notion_get_self",
+    ]
 
 
 def test_notion_search_forwards_api_inputs() -> None:
@@ -167,64 +173,59 @@ def test_notion_get_page_returns_page_and_block_children() -> None:
     assert request.call_args_list[-1].kwargs["params"] == {"start_cursor": "cursor-1"}
 
 
-@pytest.mark.parametrize(
-    ("arguments", "expected_url", "expected_params"),
-    [
-        (
-            {"page_size": 50, "start_cursor": "cursor-1"},
-            "https://api.notion.com/v1/users",
-            {"page_size": "50", "start_cursor": "cursor-1"},
-        ),
-        (
-            {"user_id": "user/1"},
-            "https://api.notion.com/v1/users/user%2F1",
-            None,
-        ),
-        (
-            {"user_id": "self"},
-            "https://api.notion.com/v1/users/me",
-            None,
-        ),
-    ],
-)
-def test_notion_get_users_routes_requests(
-    arguments: JSONObject,
-    expected_url: str,
-    expected_params: dict[str, str] | None,
-) -> None:
-    """Get users should route list, retrieve, and self requests."""
+def test_notion_list_users_forwards_pagination() -> None:
+    """List users should forward Notion's pagination parameters."""
     response = Mock(status_code=200)
-    response.json.return_value = {"object": "user", "id": "user-1"}
+    response.json.return_value = {"object": "list", "results": []}
     with patch(_HTTP_REQUEST, return_value=response) as request:
         result = registry.invoke_connector(
-            "notion_get_users",
-            arguments,
+            "notion_list_users",
+            {"page_size": 50, "start_cursor": "cursor-1"},
             Mock(),
             credentials=_CREDENTIALS,
             config={},
         )
     assert result == response.json.return_value
-    assert request.call_args.args == ("GET", expected_url)
-    assert request.call_args.kwargs["params"] == expected_params
+    assert request.call_args.args == ("GET", "https://api.notion.com/v1/users")
+    assert request.call_args.kwargs["params"] == {
+        "page_size": "50",
+        "start_cursor": "cursor-1",
+    }
 
 
-def test_notion_get_users_rejects_pagination_with_user_id() -> None:
-    """Pagination applies only when listing workspace users."""
-    with (
-        patch(_HTTP_REQUEST) as request,
-        pytest.raises(
-            ValueError,
-            match="pagination arguments cannot be used with user_id",
-        ),
-    ):
-        registry.invoke_connector(
-            "notion_get_users",
-            {"user_id": "user-1", "page_size": 50},
+def test_notion_get_user_encodes_id() -> None:
+    """Get user should retrieve exactly one safely encoded user ID."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"object": "user", "id": "user-1"}
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_user",
+            {"user_id": "user/1"},
             Mock(),
             credentials=_CREDENTIALS,
             config={},
         )
-    request.assert_not_called()
+    assert result == response.json.return_value
+    assert request.call_args.args == (
+        "GET",
+        "https://api.notion.com/v1/users/user%2F1",
+    )
+
+
+def test_notion_get_self_retrieves_token_bot() -> None:
+    """Get self should retrieve the bot associated with the access token."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"object": "user", "id": "bot-1"}
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_self",
+            {},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == ("GET", "https://api.notion.com/v1/users/me")
 
 
 def test_notion_api_errors_include_code_and_message() -> None:
