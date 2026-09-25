@@ -142,8 +142,8 @@ ACTIONS = (
         name="get_page_property",
         description=(
             "Retrieve one property from a Notion page. Title, rich text, people, "
-            "relation, and rollup properties return paginated lists; continue with "
-            "next_cursor until has_more is false to retrieve the complete value. A "
+            "relation, and rollup properties can return paginated lists. Pagination "
+            "is optional; only continue with next_cursor when has_more is true. A "
             "rollup's calculation is final only on the last page."
         ),
         access=ActionAccess.READ,
@@ -155,9 +155,8 @@ ACTIONS = (
                 ),
                 "property_id": string_property(
                     "The stable property ID found at properties.<property name>.id "
-                    "in the notion_get_page response. Pass it exactly as returned, "
-                    "including URL encoding. This is not the property name, type, "
-                    "or value."
+                    "in the notion_get_page response. This is not the property name, "
+                    "type, or value."
                 ),
                 "page_size": _PAGE_SIZE,
                 "start_cursor": _CURSOR,
