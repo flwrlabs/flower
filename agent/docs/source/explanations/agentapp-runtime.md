@@ -37,7 +37,7 @@ and logs.
 Flower creates an `AgentSession` for each AgentApp run and passes it to your
 main function. It provides:
 
-- `agent.prompt`, the submitted chat message
+- `agent.prompt`, the initial prompt for the current AgentApp run
 - `agent.connectors` returns connector tools and executes function calls
 - `agent.events` publishes structured events selected by the AgentApp
 - `agent.grid` provides model-facing access to the federation Grid
