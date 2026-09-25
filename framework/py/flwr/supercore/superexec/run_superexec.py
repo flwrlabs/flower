@@ -23,7 +23,7 @@ from typing import Any, cast
 
 import httpx
 
-from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
+from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL, RUNTIME_DEPENDENCY_INSTALL
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     PullAndClaimTaskRequest,
@@ -298,6 +298,21 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                         raise
                     log(WARNING, "Runtime API connection failed: %s", exc)
                     time.sleep(max(task_poll_interval, 1.0))
+                    continue
+                except (
+                    httpx.NetworkError,
+                    httpx.TimeoutException,
+                    httpx.RemoteProtocolError,
+                    httpx.HTTPStatusError,
+                ) as exc:
+                    if isinstance(exc, httpx.HTTPStatusError):
+                        if exc.response.status_code not in (
+                            httpx.codes.SERVICE_UNAVAILABLE,
+                            httpx.codes.GATEWAY_TIMEOUT,
+                        ):
+                            raise
+                    log(WARNING, "Task acquisition outcome unknown: %s", exc)
+                    time.sleep(HEARTBEAT_DEFAULT_INTERVAL)
                     continue
                 if combined_res.HasField("task") and combined_res.token:
                     task, token = combined_res.task, combined_res.token
