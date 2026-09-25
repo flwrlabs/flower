@@ -13,6 +13,10 @@ public:
   // ms_size and given bias b.
   SyntheticDataset(std::vector<double> ms, double b, size_t size);
 
+  // Construct explicit feature/label rows (the label is the last column).
+  explicit SyntheticDataset(
+      const std::vector<std::vector<double>> &data_points);
+
   // Returns the size of the dataset.
   size_t size();
 

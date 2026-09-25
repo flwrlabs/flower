@@ -7,7 +7,9 @@
 
 #include <algorithm>
 #include <iostream>
+#include <numeric>
 #include <random>
+#include <stdexcept>
 #include <vector>
 
 LineFitModel::LineFitModel(int num_iterations, double learning_rate,
@@ -51,16 +53,19 @@ std::vector<double> LineFitModel::predict(std::vector<std::vector<double>> X) {
 
 std::tuple<size_t, double, double>
 LineFitModel::train_SGD(SyntheticDataset &dataset) {
+  if (dataset.size() == 0) {
+    throw std::invalid_argument("Cannot train on an empty dataset");
+  }
+  const size_t current_batch_size =
+      std::min(static_cast<size_t>(this->batch_size), dataset.size());
   int features = dataset.get_features_count();
   std::vector<std::vector<double>> data_points = dataset.get_data_points();
 
-  std::vector<double> data_indices(dataset.size());
-  for (int i = 0; i < dataset.size(); i++) {
-    data_indices.push_back(i);
-  }
+  std::vector<size_t> data_indices(dataset.size());
+  std::iota(data_indices.begin(), data_indices.end(), size_t{0});
 
   std::vector<double> dW(features);
-  std::vector<double> err(batch_size, 10000);
+  std::vector<double> err(current_batch_size, 10000);
   std::vector<double> pW(features);
   double training_error = 0.0;
   for (int iteration = 0; iteration < num_iterations; iteration++) {
@@ -68,11 +73,11 @@ LineFitModel::train_SGD(SyntheticDataset &dataset) {
     std::mt19937 g(rd());
     std::shuffle(data_indices.begin(), data_indices.end(), g);
 
-    std::vector<std::vector<double>> X(this->batch_size,
+    std::vector<std::vector<double>> X(current_batch_size,
                                        std::vector<double>(features));
-    std::vector<double> y(this->batch_size);
+    std::vector<double> y(current_batch_size);
 
-    for (int i = 0; i < this->batch_size; i++) {
+    for (size_t i = 0; i < current_batch_size; i++) {
       std::vector<double> point = data_points[data_indices[i]];
       y[i] = point.back();
       point.pop_back();
@@ -90,9 +95,9 @@ LineFitModel::train_SGD(SyntheticDataset &dataset) {
     dW = LinearAlgebraUtil::multiply_matrix_vector(
         LinearAlgebraUtil::transpose_vector(X), err);
     dW = LinearAlgebraUtil::multiply_vector_scalar(dW,
-                                                   (-2.0 / this->batch_size));
+                                                   (-2.0 / current_batch_size));
 
-    dB = (-2.0 / this->batch_size) *
+    dB = (-2.0 / current_batch_size) *
          std::accumulate(err.begin(), err.end(), 0.0);
 
     this->pred_weights = LinearAlgebraUtil::subtract_vector(

@@ -138,13 +138,18 @@ After installing the Python dependencies and building, run:
 ctest --test-dir build --output-on-failure
 ```
 
-CTest runs the native tensor-order test, the Python serialization tests, and
+CTest runs native model-training and tensor-order tests, Python serialization
+tests, and
 cross-language tests that launch the real C++ transport against a loopback gRPC
 Fleet fixture. The latter verifies that Python receives 1, 2, 9, 10, 11, 12, 21,
 and 100 tensors in their original order, and that fatal registration/polling
 errors cause a nonzero client exit status. The fixture uses ephemeral ports and
 does not contact an existing SuperLink. It is separate from the real training
 run below.
+
+The training regression checks that the sampling indices contain each row only
+once, small datasets use a correctly sized batch, empty datasets are rejected,
+and a high-leverage first sample does not cause training to diverge.
 
 CMake uses the active Python environment. If necessary, select it explicitly
 with `-DPython3_EXECUTABLE=/path/to/venv/bin/python`. To build only the example

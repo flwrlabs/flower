@@ -129,6 +129,16 @@ target_link_libraries(flwr_client PRIVATE OpenSSL::Crypto)
 include(CTest)
 if(BUILD_TESTING)
   find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter)
+  add_executable(test_model_training
+    test_model_training.cc
+    src/line_fit_model.cc
+    src/synthetic_dataset.cc
+    src/linear_algebra_util.cc
+  )
+  target_include_directories(test_model_training PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include")
+  add_test(NAME model_training COMMAND test_model_training)
+
   add_executable(test_tensor_order
     test_tensor_order.cc
     src/recorddict_serde.cc
