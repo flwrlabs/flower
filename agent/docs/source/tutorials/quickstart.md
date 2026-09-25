@@ -9,12 +9,8 @@ The browser interface is experimental and may change between releases.
 
 ## Before you start
 
-Confirm that you have:
-
-- a Flower account with Flower Agent access
-- access to the email or identity provider used to sign in
-- a current desktop browser
-- a reliable network connection
+Make sure you have a Flower account with access to Flower Agent. If needed,
+[sign up at flower.ai](https://flower.ai) and request Flower Agent access.
 
 If you plan to use Slack, Notion, GitHub, or Attio later, make sure you can
 authorize the relevant account. Account connectors work only in your personal
@@ -26,7 +22,7 @@ Go to [flower.ai/app](https://flower.ai/app), select **Sign in**, and complete
 the authentication flow. When you return, you should see **New chat**, a prompt
 field, an agent selector, and your federations in the sidebar.
 
-Flower starts in your `@account/personal` federation. The federation shown in
+Flower starts in your `@<account>/personal` federation. The federation shown in
 the page header or breadcrumb is where this conversation's runs will execute.
 
 ```{figure} ../_static/screenshots/browser-new-chat.png
@@ -101,8 +97,9 @@ in the sidebar and start a chat with one of the agents assigned to it.
 Each submitted message starts one **run** of the selected **AgentApp**. Flower
 groups related runs in a **run series**, which the browser presents as a
 conversation. The run series belongs to a **federation**. The runtime gives the
-AgentApp an OpenAI-compatible model endpoint, an `AgentSession` for connectors
-and frontend-visible events, and a `Context` for run configuration and state.
+AgentApp an OpenAI-compatible model endpoint, an `AgentSession` for the prompt,
+connectors, and frontend-visible events, and a `Context` for run configuration
+and state.
 
 See [Use agents and
 federations](../how-to-guides/use-agents-and-federations.md) to learn how these
@@ -127,6 +124,6 @@ private source content in a support report.
 - Prefer a terminal workflow? [Chat in your
   terminal](get-started-with-flower-agent.md) introduces `flwr chat`
 - [Write your first AgentApp](write-your-first-agentapp.md)
-- [Build a collaborative research agent](build-a-collaborative-agent.md)
+- [Build a research agent](build-a-research-agent.md)
 - [Connect accounts](../how-to-guides/connect-accounts.md) only if your project
   needs account data

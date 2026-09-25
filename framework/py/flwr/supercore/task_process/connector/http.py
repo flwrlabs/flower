@@ -54,7 +54,7 @@ def request_json_object(
     *,
     error: ConnectorErrorFactory,
     headers: Mapping[str, str] | None = None,
-    params: Mapping[str, str] | None = None,
+    params: Mapping[str, str | list[str]] | None = None,
     json: JSONObject | None = None,
     timeout: float = 30.0,
     http_error_code: HttpErrorCode | None = None,

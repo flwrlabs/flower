@@ -7,19 +7,11 @@ a model-provider API key.
 
 This guide targets Flower {{ stable_flwr_version }}.
 
-## Start from the AgentApp template
+## Prepare an AgentApp project
 
-Create a project from the AgentApp published on Flower Hub:
-
-```{code-block} console
-:substitutions:
-
-$ uvx --from flwr==|stable_flwr_version| flwr new @flwrlabs/agent
-$ cd agent
-$ uv sync
-```
-
-The template already includes compatible Flower and OpenAI SDK dependencies:
+Start with an AgentApp project from [Write your first
+AgentApp](../tutorials/write-your-first-agentapp.md). Its template already
+includes compatible Flower and OpenAI SDK dependencies:
 
 ```{code-block} toml
 :substitutions:
@@ -96,11 +88,7 @@ app = AgentApp()
 
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
-    """Send the configured input to the model."""
-    prompt = context.run_config.get("agent.input")
-    if not isinstance(prompt, str) or not prompt.strip():
-        raise ValueError("agent.input must be a non-empty string")
-
+    """Send the chat prompt to the model."""
     client = OpenAI(
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
         api_key=os.environ["FLWR_RUNTIME_API_KEY"],
@@ -108,7 +96,7 @@ def main(agent: AgentSession, context: Context) -> None:
     )
     stream = client.responses.create(
         model=MODEL,
-        input=prompt.strip(),
+        input=agent.prompt,
         stream=True,
     )
 
@@ -171,14 +159,13 @@ execution remain on the `AgentSession`:
 
 The SDK returns typed output items. Convert a function-call item with
 `item.to_dict()` before passing it to `agent.connectors.call`. See [Build a
-collaborative research
-agent](../tutorials/build-a-collaborative-agent.md) for a complete bounded tool
+research agent](../tutorials/build-a-research-agent.md) for a complete bounded tool
 loop.
 
 ## Read conversation history
 
-Before calling the AgentApp, Flower records a non-empty `agent.input` as a
-user-message event. Events published with `agent.events.emit(...)` and connector
+Before calling the AgentApp, Flower records `agent.prompt` as a user-message
+event. Events published with `agent.events.emit(...)` and connector
 activity are stored in the same run-series trace. Read that trace at the start of
 a later run:
 
@@ -191,19 +178,14 @@ for entry in trace:
 
 Each entry also includes `id`, `timestamp`, `run_id`, and `task_id`. Filter out
 connector, reasoning, failed, and incomplete events before constructing the
-next model input. See [Build a collaborative research
-agent](../tutorials/build-a-collaborative-agent.md) for a complete loader that
+next model input. See [Build a research agent](../tutorials/build-a-research-agent.md) for a complete loader that
 rebuilds user and assistant messages from the trace.
 
 Use `Context` only when the AgentApp needs additional app-defined state beyond
 the recorded event trace.
 
-## Build and run the AgentApp
-
-```console
-$ uv run flwr build
-$ uv run flwr login supergrid
-$ uv run flwr run . supergrid --stream
+```{tip}
+To test your AgentApp, see {ref}`load-an-agentapp-in-flower-chat`.
 ```
 
 The runtime injects both environment variables when it starts the AgentApp. Do
