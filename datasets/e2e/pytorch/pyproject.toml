@@ -5,7 +5,7 @@ description = "Flower Datasets with PyTorch"
 requires-python = ">=3.11"
 dependencies = [
     "flwr-datasets[vision]",
-    "torch>=2.10.0,<3.0.0",
+    "torch>=2.13.0,<3.0.0",
     "torchvision>=0.25.0,<1.0.0",
     "parameterized==0.9.0",
 ]
