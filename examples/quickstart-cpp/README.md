@@ -35,7 +35,7 @@ For Previous Version:
 
 ## Install requirements
 
-You'll need Python 3.11 or newer, Flower **1.36.0 or 1.37.0**, CMake, a C++17
+You'll need Python 3.11 or newer, Flower **\<=1.37.0**, CMake, a C++17
 compiler, gRPC C++, protobuf, `protoc`, `grpc_cpp_plugin`, and OpenSSL.
 
 Install the Python dependencies from this directory:
@@ -139,8 +139,7 @@ ctest --test-dir build --output-on-failure
 ```
 
 CTest runs native model-training and tensor-order tests, Python serialization
-tests, and
-cross-language tests that launch the real C++ transport against a loopback gRPC
+tests, and cross-language tests that launch the real C++ transport against a loopback gRPC
 Fleet fixture. The latter verifies that Python receives 1, 2, 9, 10, 11, 12, 21,
 and 100 tensors in their original order, and that fatal registration/polling
 errors cause a nonzero client exit status. The fixture uses ephemeral ports and

@@ -23,7 +23,7 @@
 int main() {
   // A dataset smaller than the batch must use every row exactly once.
   // The old index vector prepended 32 extra zeros before appending 0..31.
-  // Its 64-element batch therefore gave row zero 33 times the correct weight.
+  // Its 64-element batch therefore included row zero 33 times instead of once.
   std::vector<std::vector<double>> rows(32, {0.0, 1.0});
   rows[0].back() = 0.0;
   SyntheticDataset small_dataset(rows);
