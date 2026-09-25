@@ -9,12 +9,8 @@ The browser interface is experimental and may change between releases.
 
 ## Before you start
 
-Confirm that you have:
-
-- a Flower account with Flower Agent access
-- access to the email or identity provider used to sign in
-- a current desktop browser
-- a reliable network connection
+Make sure you have a Flower account with access to Flower Agent. If needed,
+[sign up at flower.ai](https://flower.ai) and request Flower Agent access.
 
 If you plan to use Slack, Notion, GitHub, or Attio later, make sure you can
 authorize the relevant account. Account connectors work only in your personal
