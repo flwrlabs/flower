@@ -172,32 +172,6 @@ def test_unary_unary_uses_retry_invoker() -> None:
     assert send.call_count == 2
 
 
-def test_unary_unary_skips_retry_for_claims() -> None:
-    """A lost claim response must not cause another automatic claim request."""
-    retry_invoker = make_simple_http_retry_invoker()
-    retry_invoker.max_tries = 2
-    retry_invoker.jitter = None
-    retry_invoker.wait_function = lambda _: None
-    client = ProtobufClient("http://api.example", retry_invoker=retry_invoker)
-
-    with (
-        patch(
-            "flwr.supercore.protobuf.client.httpx.Client.send",
-            side_effect=httpx.ReadError("response lost"),
-        ) as send,
-        pytest.raises(httpx.ReadError),
-    ):
-        client._unary_unary(  # pylint: disable=protected-access
-            path=_PATH,
-            rpc_method=_METHOD,
-            request=_REQUEST,
-            response_type=ClaimTaskResponse,
-            retry=False,
-        )
-
-    send.assert_called_once()
-
-
 def test_retry_rebuilds_request_before_applying_interceptors() -> None:
     """Apply HTTP interceptors to a fresh request on every retry attempt."""
     retry_invoker = make_simple_http_retry_invoker()

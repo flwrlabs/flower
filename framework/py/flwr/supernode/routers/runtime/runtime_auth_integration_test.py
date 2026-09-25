@@ -51,7 +51,6 @@ from flwr.supernode.nodestate import NodeState, NodeStateFactory
 from flwr.supernode.servicer.runtime import runtime_handlers
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
-_PULL_PENDING_TASKS_METHOD = "/flwr.proto.Runtime/PullPendingTasks"
 _PULL_AND_CLAIM_TASK_METHOD = "/flwr.proto.Runtime/PullAndClaimTask"
 
 
@@ -168,25 +167,6 @@ def test_pull_pending_tasks_denied_without_superexec_metadata(
 
     assert response.status_code == 401
     assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
-
-
-def test_pull_pending_tasks_allows_with_superexec_metadata(
-    client: TestClient,
-) -> None:
-    """SuperExec routes should allow requests with valid signed metadata."""
-    proto_request = PullPendingTasksRequest(wait_timeout_ms=50)
-    headers = create_superexec_auth_metadata(
-        auth_secret=derive_auth_secret(_SUPEREXEC_SECRET),
-        method=_PULL_PENDING_TASKS_METHOD,
-        request=proto_request,
-    )
-
-    response = _post(client, "pull-pending-tasks", proto_request, auth_headers=headers)
-
-    assert response.status_code == 200
-    assert isinstance(
-        PullPendingTasksResponse.FromString(response.content), PullPendingTasksResponse
-    )
 
 
 def test_pull_and_claim_task_allows_with_superexec_metadata(

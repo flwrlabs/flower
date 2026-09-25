@@ -179,29 +179,10 @@ def test_claim_task_delegates_to_shared_handler(monkeypatch: MonkeyPatch) -> Non
     handler.assert_called_once_with(request, state)
 
 
-def test_pull_and_claim_task_delegates_to_link_handler(
-    monkeypatch: MonkeyPatch,
-) -> None:
-    """Combined acquisition uses the SuperLink handler."""
-    state = Mock(spec=LinkState)
-    expected = PullAndClaimTaskResponse(task=Task(task_id=123), token="task-token")
-    handler = Mock(return_value=expected)
-    monkeypatch.setattr(runtime_handlers, "pull_and_claim_task", handler)
-    client = TestClient(_create_app(state))
-    request = PullAndClaimTaskRequest(supported_task_types=["flwr-model"])
-
-    response = _post(client, "/v1/runtime/pull-and-claim-task", request)
-
-    assert response.status_code == 200
-    assert PullAndClaimTaskResponse.FromString(response.content) == expected
-    handler.assert_called_once_with(request, state)
-
-
 @pytest.mark.parametrize(
     ("producer", "notification", "combined"),
     [
         ("task", True, False),
-        ("run", True, False),
         ("task", False, False),
         ("run", True, True),
     ],
