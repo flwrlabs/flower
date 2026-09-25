@@ -532,9 +532,13 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             config_json="{}",
             created_by=self.aid,
         )
-        connector_id = self.state.get_connectors_by_ref(
-            CONNECTOR_FEDERATION_ID, "slack"
-        )[0].connector_id
+        connector_ids = [
+            connector.connector_id
+            for connector in self.state.get_connectors_by_ref(
+                CONNECTOR_FEDERATION_ID, "slack"
+            )
+        ]
+        connector_id = connector_ids[0]
         request = StartRunRequest(
             federation=CONNECTOR_FEDERATION_ID,
             connector_ids=[connector_id, connector_id],
@@ -561,12 +565,26 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                     ),
                     self._make_start_run_context(),
                 )
+            with self.assertRaises(FlowerError) as duplicate_error:
+                duplicate_request = StartRunRequest(
+                    federation=CONNECTOR_FEDERATION_ID,
+                    connector_ids=connector_ids,
+                )
+                duplicate_request.fab.content = b"test FAB content"
+                self.servicer.StartRun(
+                    duplicate_request,
+                    self._make_start_run_context(),
+                )
 
         self.assertEqual(
             list(self.state.get_run_connector_ids(run_id=response.run_id)),
             [connector_id],
         )
         self.assertEqual(error.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST)
+        self.assertEqual(
+            duplicate_error.exception.code,
+            ApiErrorCode.INVALID_CONNECTOR_REQUEST,
+        )
 
     @parameterized.expand(  # type: ignore
         [

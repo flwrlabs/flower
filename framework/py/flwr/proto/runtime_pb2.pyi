@@ -450,7 +450,6 @@ class PullTaskInputResponse(google.protobuf.message.Message):
     FAB_FIELD_NUMBER: builtins.int
     FEDERATION_CONFIG_FIELD_NUMBER: builtins.int
     TASK_ID_FIELD_NUMBER: builtins.int
-    CONNECTOR_IDS_FIELD_NUMBER: builtins.int
     task_id: builtins.int
     @property
     def context(self) -> flwr.proto.message_pb2.Context: ...
@@ -460,8 +459,6 @@ class PullTaskInputResponse(google.protobuf.message.Message):
     def fab(self) -> flwr.proto.fab_pb2.Fab: ...
     @property
     def federation_config(self) -> flwr.proto.federation_config_pb2.SimulationConfig: ...
-    @property
-    def connector_ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
     def __init__(
         self,
         *,
@@ -470,10 +467,9 @@ class PullTaskInputResponse(google.protobuf.message.Message):
         fab: flwr.proto.fab_pb2.Fab | None = ...,
         federation_config: flwr.proto.federation_config_pb2.SimulationConfig | None = ...,
         task_id: builtins.int = ...,
-        connector_ids: collections.abc.Iterable[builtins.int] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["connector_ids", b"connector_ids", "context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run", "task_id", b"task_id"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run", "task_id", b"task_id"]) -> None: ...
 
 global___PullTaskInputResponse = PullTaskInputResponse
 

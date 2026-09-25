@@ -952,7 +952,6 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
 
         # Set run series context as if it was persisted by an earlier run.
         run = self.state.get_run_info(run_ids=[run_id])[0]
-        self.state.bind_connectors_to_run(run_id, [42, 43])
         context = Context(
             123,
             SUPERLINK_NODE_ID,
@@ -975,7 +974,6 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         assert isinstance(response, PullTaskInputResponse)
         assert response.context.run_id == 123
         assert response.context.series_id == run.series_id
-        assert list(response.connector_ids) == [42, 43]
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.RUNNING
 

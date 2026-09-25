@@ -493,6 +493,7 @@ def validate_run_connector_ids(
         raise InvalidConnectorRequestError(
             f"connector_id must be between 1 and {INT64_MAX_VALUE}"
         )
+    connector_refs: set[str] = set()
     for connector_id in canonical_ids:
         connector = state.get_connector_by_id(connector_id)
         if connector is None or connector.federation_id != federation_id:
@@ -500,6 +501,11 @@ def validate_run_connector_ids(
                 ApiErrorCode.CONNECTOR_NOT_FOUND,
                 f"Connector '{connector_id}' is not connected for this federation.",
             )
+        if connector.connector_ref in connector_refs:
+            raise InvalidConnectorRequestError(
+                "only one connection per connector type can be selected for a run"
+            )
+        connector_refs.add(connector.connector_ref)
     return canonical_ids
 
 
@@ -699,14 +705,12 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
     override_config = user_config_from_proto(request.override_config)
     connector_ids = validate_run_connector_ids(
-        request.connector_ids, state, federation_id
-    )
-    connector_ids.extend(
-        connector_id
-        for connector_id in resolve_run_connector_refs(
-            request.connector_refs, state, federation_id
-        )
-        if connector_id not in connector_ids
+        [
+            *request.connector_ids,
+            *resolve_run_connector_refs(request.connector_refs, state, federation_id),
+        ],
+        state,
+        federation_id,
     )
 
     try:

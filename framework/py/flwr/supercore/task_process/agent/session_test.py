@@ -236,8 +236,7 @@ def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
 
 def test_runtime_connectors_expand_one_connector_into_multiple_tools() -> None:
     """One connector reference can advertise multiple model-facing tools."""
-    agent_runtime = Mock()
-    connectors = RuntimeAgentConnectors(agent_runtime, connector_ids=[42, 43])
+    connectors = RuntimeAgentConnectors(Mock())
     tools: list[JSONObject] = [
         {"type": "function", "name": "example_search"},
         {"type": "function", "name": "example_read"},
@@ -249,16 +248,7 @@ def test_runtime_connectors_expand_one_connector_into_multiple_tools() -> None:
     ) as get_connector_tools:
         assert connectors.tools(["example"]) == tools
 
-    assert list(connectors.connector_ids) == [42, 43]
     get_connector_tools.assert_called_once_with("example")
-
-    connectors.call(
-        {"name": "example_search", "call_id": "call-1", "arguments": {}},
-        connector_id=43,
-    )
-    agent_runtime.call_connector_with_events.assert_called_once_with(
-        name="example_search", call_id="call-1", arguments={}, connector_id=43
-    )
 
 
 def test_call_automation_embeds_input_in_control_request() -> None:
@@ -271,7 +261,6 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         override_config=user_config_to_proto({"existing": "value"}),
         federation="@account/federation",
         series_id=2,
-        connector_ids=[42],
     )
     agent_runtime = AgentRuntime(
         stub=stub,
@@ -303,7 +292,6 @@ def test_call_automation_embeds_input_in_control_request() -> None:
             federation="@account/federation",
             series_id=2,
             user_prompt="Do work",
-            connector_ids=[42],
         ),
     )
     items = [item.args[0][0] for item in push_run_events.call_args_list]
@@ -388,14 +376,11 @@ def test_create_connector_response_resolves_canonical_name() -> None:
             name=" NoTiOn_Search ",
             call_id="call-1",
             arguments={},
-            connector_id=42,
         )
 
     get_connector_ref.assert_called_once_with("notion_search")
     stub.CreateTask.assert_called_once_with(
-        CreateTaskRequest(
-            type=TaskType.CONNECTOR, connector_ref="notion", connector_id=42
-        )
+        CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref="notion")
     )
     request = send_and_receive.call_args.args[0]
     assert isinstance(request, ConnectorRequest)
