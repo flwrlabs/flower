@@ -115,7 +115,7 @@ dev = [
     "pytest-cov==4.1.0",
     "pytest-xdist==3.8.0",
     "pytest-watcher==0.4.3",
-    "jupyterlab==4.5.7",
+    "jupyterlab==4.5.10",
     "rope==1.13.0",
     "semver==3.0.2",
     "sphinx==7.4.7",
