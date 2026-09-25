@@ -16,6 +16,7 @@
 
 
 import unittest
+from collections import Counter
 
 from parameterized import parameterized
 
@@ -110,6 +111,76 @@ class TestIidPartitioner(unittest.TestCase):
             # element of the partition of partition_index
             dataset[partition_size * partition_index + row_id]["features"],
         )
+
+    def test_default_partitioning_preserves_contiguous_order(self) -> None:
+        """Test that default partitioning preserves historical contiguous sharding."""
+        data = {"features": list(range(10)), "labels": [0] * 5 + [1] * 5}
+        dataset = Dataset.from_dict(data)
+        partitioner = IidPartitioner(num_partitions=2)
+        partitioner.dataset = dataset
+
+        partition = partitioner.load_partition(0)
+
+        self.assertEqual(partition["features"], list(range(5)))
+        self.assertEqual(Counter(partition["labels"]), Counter({0: 5}))
+
+    def test_shuffle_mixes_sorted_dataset(self) -> None:
+        """Test that shuffling prevents sorted labels from becoming single-label shards."""
+        data = {"features": list(range(200)), "labels": [0] * 100 + [1] * 100}
+        dataset = Dataset.from_dict(data)
+        partitioner = IidPartitioner(num_partitions=2, shuffle=True, seed=42)
+        partitioner.dataset = dataset
+
+        first_partition = partitioner.load_partition(0)
+        second_partition = partitioner.load_partition(1)
+
+        self.assertGreater(Counter(first_partition["labels"])[0], 0)
+        self.assertGreater(Counter(first_partition["labels"])[1], 0)
+        self.assertGreater(Counter(second_partition["labels"])[0], 0)
+        self.assertGreater(Counter(second_partition["labels"])[1], 0)
+
+    def test_shuffle_with_same_seed_is_deterministic(self) -> None:
+        """Test that the same seed produces the same shuffled partition."""
+        dataset = Dataset.from_dict(
+            {"features": list(range(100)), "labels": [idx % 2 for idx in range(100)]}
+        )
+        first_partitioner = IidPartitioner(num_partitions=5, shuffle=True, seed=42)
+        second_partitioner = IidPartitioner(num_partitions=5, shuffle=True, seed=42)
+        first_partitioner.dataset = dataset
+        second_partitioner.dataset = dataset
+
+        self.assertEqual(
+            first_partitioner.load_partition(2)["features"],
+            second_partitioner.load_partition(2)["features"],
+        )
+
+    def test_shuffle_with_different_seed_changes_order(self) -> None:
+        """Test that different seeds produce different shuffled partitions."""
+        dataset = Dataset.from_dict(
+            {"features": list(range(100)), "labels": [idx % 2 for idx in range(100)]}
+        )
+        first_partitioner = IidPartitioner(num_partitions=5, shuffle=True, seed=42)
+        second_partitioner = IidPartitioner(num_partitions=5, shuffle=True, seed=43)
+        first_partitioner.dataset = dataset
+        second_partitioner.dataset = dataset
+
+        self.assertNotEqual(
+            first_partitioner.load_partition(2)["features"],
+            second_partitioner.load_partition(2)["features"],
+        )
+
+    def test_shuffle_with_no_seed_is_stable_after_first_load(self) -> None:
+        """Test that seedless shuffling is cached within one partitioner instance."""
+        dataset = Dataset.from_dict(
+            {"features": list(range(100)), "labels": [idx % 2 for idx in range(100)]}
+        )
+        partitioner = IidPartitioner(num_partitions=5, shuffle=True, seed=None)
+        partitioner.dataset = dataset
+
+        first_load = partitioner.load_partition(2)["features"]
+        second_load = partitioner.load_partition(2)["features"]
+
+        self.assertEqual(first_load, second_load)
 
     @parameterized.expand(  # type: ignore
         [

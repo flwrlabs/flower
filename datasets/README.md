@@ -67,7 +67,7 @@ Here's a basic quickstart example of how to partition the MNIST dataset:
 
 ```
 from flwr_datasets import FederatedDataset
-from flwr_datasets.partitioners import IidPartitioner
+from flwr_datasets.partitioner import IidPartitioner
 
 # The train split of the MNIST dataset will be partitioned into 100 partitions
 partitioner = IidPartitioner(num_partitions=100)
