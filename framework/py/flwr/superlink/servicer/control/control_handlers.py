@@ -485,7 +485,7 @@ def validate_run_connector_ids(
     federation_id: str,
 ) -> list[int]:
     """Validate and deduplicate connector IDs for a new run."""
-    canonical_ids = list(dict.fromkeys(connector_ids))
+    canonical_ids = list(set(connector_ids))
     if any(
         connector_id <= 0 or connector_id > INT64_MAX_VALUE
         for connector_id in canonical_ids
