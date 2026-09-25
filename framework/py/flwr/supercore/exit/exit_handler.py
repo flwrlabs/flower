@@ -37,7 +37,9 @@ class _RegisteredExitHandler:
 
 
 registered_exit_handlers: list[_RegisteredExitHandler] = []
-_lock_handlers = threading.Lock()
+# Python signal handlers run synchronously on the main thread and can interrupt this
+# critical section, so nested exit handling must be able to reacquire the lock.
+_lock_handlers = threading.RLock()
 
 # SIGQUIT is not available on Windows
 if hasattr(signal, "SIGQUIT"):
@@ -61,11 +63,13 @@ def add_exit_handler(
         other actions before the application exits.
     run_before_force_exit : bool (default: False)
         Whether to execute the handler before starting the force-exit timer.
+        Handlers in this phase must be short and non-blocking because the
+        watchdog has not started yet.
 
     Notes
     -----
-    The registered exit handlers will be called in LIFO order, i.e.,
-    the last registered handler will be the first to be called.
+    Handlers are called in LIFO order within each phase. Pre-force handlers
+    run before the watchdog starts; regular handlers run after it starts.
     """
     with _lock_handlers:
         registered_exit_handlers.append(
@@ -74,7 +78,16 @@ def add_exit_handler(
 
 
 def trigger_exit_handlers(*, run_before_force_exit: bool) -> None:
-    """Trigger one phase of registered exit handlers in LIFO order."""
+    """Trigger one phase of registered exit handlers in LIFO order.
+
+    The pre-force phase runs before the force-exit watchdog starts and must only
+    contain short, non-blocking operations. The regular phase runs after the
+    watchdog starts and is bounded by that watchdog.
+
+    Handlers selected for this phase are removed before execution, so each is
+    invoked at most once. Handlers registered while callbacks run remain for a
+    subsequent trigger.
+    """
     with _lock_handlers:
         handlers = []
         remaining_handlers = []
@@ -85,6 +98,8 @@ def trigger_exit_handlers(*, run_before_force_exit: bool) -> None:
                 remaining_handlers.append(registered_handler)
         registered_exit_handlers[:] = remaining_handlers
 
+    # Run callbacks without holding the registry lock. Callbacks may block or
+    # register additional handlers.
     for exit_handler in reversed(handlers):
         try:
             exit_handler()
