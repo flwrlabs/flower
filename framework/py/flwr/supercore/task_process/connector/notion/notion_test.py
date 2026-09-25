@@ -149,7 +149,7 @@ def test_notion_get_page_forwards_property_filter() -> None:
         "https://api.notion.com/v1/pages/page%2F1",
     )
     assert request.call_args.kwargs["params"] == {
-        "filter_properties": ["title", "f%5C%3Ap"]
+        "filter_properties": ["title", "f\\:p"]
     }
 
 

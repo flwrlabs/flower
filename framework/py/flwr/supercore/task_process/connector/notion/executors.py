@@ -94,7 +94,10 @@ def _property_ids(value: object) -> list[str]:
         raise ValueError(
             "Notion filter_properties must be an array of at most 100 IDs."
         )
-    return [require_string(item, "Notion", "filter_properties item") for item in value]
+    return [
+        unquote(require_string(item, "Notion", "filter_properties item"))
+        for item in value
+    ]
 
 
 def get_page_property(
