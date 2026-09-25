@@ -20,7 +20,7 @@ import numpy as np
 from flwr.app import ArrayRecord
 
 from .krum import Krum
-from .multikrum import MultiKrum
+from .multikrum import MultiKrum, compute_distances, select_multikrum
 from .strategy_utils_test import create_mock_reply
 
 
@@ -68,3 +68,63 @@ def test_aggregate_train_multikrum() -> None:
     actual, _ = strategy.aggregate_train(server_round=1, replies=replies)
     assert actual
     assert actual.object_id == expected.object_id
+
+
+def test_compute_distances_with_large_shared_component() -> None:
+    """Test that distances stay accurate when the models dwarf their differences."""
+    # Prepare: enough parameters to span more than one block of the computation
+    rng = np.random.default_rng(0)
+    size = 100_000
+    weights = rng.normal(0, 10, size=size)
+    arrays = [
+        (weights + rng.normal(0, 1e-4, size=size)).astype(np.float32) for _ in range(4)
+    ]
+    stacked = np.stack(arrays).astype(np.float64)
+    expected = np.square(stacked[:, None] - stacked[None, :]).sum(axis=-1)
+
+    # Execute
+    actual = compute_distances([ArrayRecord([array]) for array in arrays])
+
+    # Assert
+    np.testing.assert_allclose(actual, expected, rtol=1e-4, atol=1e-9)
+    np.testing.assert_array_equal(np.diag(actual), 0)
+    assert (actual >= 0).all()
+
+
+def test_compute_distances_isolates_extreme_updates() -> None:
+    """Test that an extreme update does not change the distances between others."""
+    # Prepare: a malicious update with huge values and a NaN
+    rng = np.random.default_rng(0)
+    records = [
+        ArrayRecord([rng.normal(0, 1, size=1000).astype(np.float32)]) for _ in range(3)
+    ]
+    extreme = np.full(1000, 1e20, dtype=np.float32)
+    extreme[0] = np.nan
+
+    # Execute
+    expected = compute_distances(records)
+    actual = compute_distances(records + [ArrayRecord([extreme])])
+
+    # Assert
+    np.testing.assert_allclose(actual[:3, :3], expected, rtol=1e-6)
+
+
+def test_select_multikrum_with_large_shared_component() -> None:
+    """Test that multi-Krum discards outliers when the models dwarf their spread."""
+    # Prepare: seven honest updates and three malicious ones with a larger spread
+    rng = np.random.default_rng(0)
+    weights = rng.normal(0, 10, size=1000)
+    contents = [
+        create_mock_reply(
+            ArrayRecord([(weights + rng.normal(0, std, size=1000)).astype(np.float32)]),
+            num_examples=5,
+        ).content
+        for std in [1e-4] * 7 + [3e-4] * 3
+    ]
+    honest_ids = {id(content) for content in contents[:7]}
+
+    # Execute
+    selected = select_multikrum(contents, num_malicious_nodes=3, num_nodes_to_select=5)
+
+    # Assert
+    assert {id(content) for content in selected} <= honest_ids
