@@ -220,16 +220,11 @@ def get_connector(
 ) -> GetConnectorResponse:
     """Return credentials authorized for the authenticated connector task."""
     log(DEBUG, "Runtime.GetConnector")
-    if (
-        task.type != TaskType.CONNECTOR
-        or not task.connector_ref
-        or not task.connector_id
-    ):
+    if task.type != TaskType.CONNECTOR or not task.connector_id:
         raise FlowerError(
             ApiErrorCode.RUNTIME_CONNECTOR_CREDENTIALS_NOT_AVAILABLE,
             "Connector credentials are not available to this task.",
         )
-    connector_ref = task.connector_ref
 
     runs = state.get_run_info(run_ids=[task.run_id])
     run = runs[0] if runs else None
@@ -241,10 +236,7 @@ def get_connector(
     connector = state.get_connector_by_id(task.connector_id)
     if connector is None:
         raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
-    if (
-        connector.federation_id != run.federation_id
-        or connector.connector_ref != connector_ref
-    ):
+    if connector.federation_id != run.federation_id:
         raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
 
     return GetConnectorResponse(

@@ -18,7 +18,7 @@
 
 from logging import DEBUG, ERROR
 
-from flwr.common.constant import INT64_MAX_VALUE, Status
+from flwr.common.constant import Status
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
@@ -275,11 +275,6 @@ def _resolve_connector_id(
     """Resolve the connector ID for a connector task."""
     if connector_registry.has_builtin_connector(connector_ref):
         return None
-    if connector_id is not None and connector_id > INT64_MAX_VALUE:
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE,
-            "Connector is not available to this run.",
-        )
 
     bound_connector_ids = state.get_run_connector_ids(requesting_task.run_id)
     if connector_id is not None:

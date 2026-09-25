@@ -243,7 +243,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         federation_id : str
             Federation ID owning the connector.
         connector_ref : str
-            Connector provider reference.
+            Connector reference.
         credentials_json : str
             Serialized connector credentials.
         config_json : str
@@ -268,7 +268,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         federation_id : str
             Federation ID owning the connector.
         connector_ref : str
-            Connector provider reference.
+            Connector reference.
 
         Returns
         -------

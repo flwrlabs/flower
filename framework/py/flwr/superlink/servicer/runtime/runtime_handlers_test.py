@@ -280,7 +280,7 @@ class TestGetConnector(unittest.TestCase):
         """GetConnector should return the run owner's matching credentials."""
         task = Mock(
             type=TaskType.CONNECTOR,
-            connector_ref="notion",
+            connector_ref="",
             connector_id=42,
             run_id=123,
         )
@@ -312,21 +312,21 @@ class TestGetConnector(unittest.TestCase):
 
     @parameterized.expand(  # type: ignore
         [
-            ("wrong_task_type", TaskType.AGENT_APP, "notion"),
-            ("missing_ref", TaskType.CONNECTOR, ""),
+            ("wrong_task_type", TaskType.AGENT_APP, 42),
+            ("missing_id", TaskType.CONNECTOR, 0),
         ]
     )
     def test_rejects_wrong_task_identity(
         self,
         _name: str,
         task_type: str,
-        connector_ref: str,
+        connector_id: int,
     ) -> None:
         """GetConnector should reject tasks without a connector identity."""
         task = Mock(
             type=task_type,
-            connector_ref=connector_ref,
-            connector_id=42,
+            connector_ref="notion",
+            connector_id=connector_id,
             run_id=123,
         )
         with self.assertRaises(FlowerError) as error:
