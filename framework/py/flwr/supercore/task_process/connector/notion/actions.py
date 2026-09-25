@@ -26,6 +26,14 @@ _PAGE_SIZE = integer_property(
     minimum=1,
     maximum=100,
 )
+_MEETING_NOTE_PROPERTIES = [
+    "title",
+    "attendees",
+    "created_time",
+    "created_by",
+    "last_edited_time",
+    "last_edited_by",
+]
 
 ACTIONS = (
     ActionDefinition(
@@ -162,6 +170,100 @@ ACTIONS = (
                 "start_cursor": _CURSOR,
             },
             "required": ["page_id", "property_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_block",
+        description=(
+            "Retrieve a single Notion block. If has_children is true, use "
+            "notion_get_block_children with the block ID to retrieve its direct "
+            "children."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "block_id": string_property("The block ID to retrieve."),
+            },
+            "required": ["block_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_block_children",
+        description=(
+            "Retrieve one page of direct children for a Notion block or page. This "
+            "does not retrieve nested descendants. Continue with next_cursor only "
+            "when has_more is true. For a returned block with has_children set to "
+            "true, call this action again with that block's ID."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "block_id": string_property(
+                    "The block or page ID whose direct children should be retrieved."
+                ),
+                "page_size": _PAGE_SIZE,
+                "start_cursor": _CURSOR,
+            },
+            "required": ["block_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="query_meeting_notes",
+        description=(
+            "Query AI meeting notes available to the integration's workspace user. "
+            "Filters, sorts, and a result limit are optional. This endpoint does "
+            "not support cursor pagination. Use returned summary, notes, or "
+            "transcript block IDs with notion_get_block_children to read their "
+            "content."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "filter": {
+                    "type": "object",
+                    "description": (
+                        "A Notion meeting-note property filter or an and/or "
+                        "combinator. Supported properties are title, attendees, "
+                        "created_time, created_by, last_edited_time, and "
+                        "last_edited_by."
+                    ),
+                },
+                "sort": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "property": {
+                                "type": "string",
+                                "enum": _MEETING_NOTE_PROPERTIES,
+                                "description": "Meeting-note property to sort by.",
+                            },
+                            "direction": {
+                                "type": "string",
+                                "enum": ["ascending", "descending"],
+                                "description": "Sort direction.",
+                            },
+                        },
+                        "required": ["property", "direction"],
+                        "additionalProperties": False,
+                    },
+                    "maxItems": 100,
+                    "description": (
+                        "Ordered meeting-note sorts. Earlier entries take precedence."
+                    ),
+                },
+                "limit": integer_property(
+                    "Maximum number of meeting notes to return. Omit to use 50.",
+                    minimum=1,
+                    maximum=50,
+                ),
+            },
             "additionalProperties": False,
         },
     ),
