@@ -112,6 +112,23 @@ def test_arrayrecords_aggregation_with_ndim_zero() -> None:
     assert aggrd.object_id == ArrayRecord([np.array(avg_list[0])]).object_id
 
 
+def test_aggregation_with_zero_total_weight() -> None:
+    """aggregate_*records must raise, not divide by zero, when weights sum to zero."""
+    records = [
+        RecordDict(
+            {
+                "arrays": ArrayRecord([np.ones((2, 2))]),
+                "metrics": MetricRecord({"weight": 0.0, "acc": 1.0}),
+            }
+        )
+        for _ in range(3)
+    ]
+    with pytest.raises(InconsistentMessageReplies):
+        aggregate_arrayrecords(records, weighting_metric_name="weight")
+    with pytest.raises(InconsistentMessageReplies):
+        aggregate_metricrecords(records, weighting_metric_name="weight")
+
+
 def test_metricrecords_aggregation() -> None:
     """Test aggregation of MetricRecords."""
     num_replies = 3
