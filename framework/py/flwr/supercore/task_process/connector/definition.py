@@ -44,6 +44,7 @@ class ActionDefinition:
     description: str
     access: ActionAccess
     input_schema: JSONObject
+    strict: bool = False
 
     def tool_name(self, provider_ref: str) -> str:
         """Return the globally unique model-facing action name."""
@@ -56,6 +57,7 @@ class ActionDefinition:
             "name": self.tool_name(provider_ref),
             "description": self.description,
             "parameters": self.input_schema,
+            "strict": self.strict,
         }
 
 
