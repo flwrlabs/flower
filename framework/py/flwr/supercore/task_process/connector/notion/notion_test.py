@@ -35,13 +35,14 @@ _CREDENTIALS: JSONObject = {"access_token": "ntn-secret"}
 
 def test_notion_definition_is_registered() -> None:
     """Notion schemas and executors should form one federation-scoped connector."""
-    assert len(ACTIONS) == 5
+    assert len(ACTIONS) == 6
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     assert [
         tool["name"] for tool in registry.get_connector_tools(NOTION_CONNECTOR_REF)
     ] == [
         "notion_search",
         "notion_get_page",
+        "notion_get_page_property",
         "notion_list_users",
         "notion_get_user",
         "notion_get_self",
@@ -130,47 +131,80 @@ def test_notion_search_rejects_invalid_filter(filter_: JSONObject) -> None:
     request.assert_not_called()
 
 
-def test_notion_get_page_returns_page_and_block_children() -> None:
-    """Get page should aggregate the page and its first-level child blocks."""
-    page_response = Mock(status_code=200)
-    page_response.json.return_value = {"object": "page", "id": "page-1"}
-    first_blocks = Mock(status_code=200)
-    first_blocks.json.return_value = {
-        "object": "list",
-        "results": [{"id": "block-1"}],
-        "has_more": True,
-        "next_cursor": "cursor-1",
-    }
-    last_blocks = Mock(status_code=200)
-    last_blocks.json.return_value = {
-        "object": "list",
-        "results": [{"id": "block-2"}],
-        "has_more": False,
-        "next_cursor": None,
-    }
-    with patch(
-        _HTTP_REQUEST, side_effect=[page_response, first_blocks, last_blocks]
-    ) as request:
+def test_notion_get_page_forwards_property_filter() -> None:
+    """Get page should call only its endpoint and forward property filters."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"object": "page", "id": "page-1"}
+    with patch(_HTTP_REQUEST, return_value=response) as request:
         result = registry.invoke_connector(
             "notion_get_page",
-            {"page_id": "page-1"},
+            {"page_id": "page/1", "filter_properties": ["title", "f%5C%3Ap"]},
             Mock(),
             credentials=_CREDENTIALS,
             config={},
         )
-    assert result == {
-        "page": page_response.json.return_value,
-        "block_children": {
-            **last_blocks.json.return_value,
-            "results": [{"id": "block-1"}, {"id": "block-2"}],
-        },
+    assert result == response.json.return_value
+    assert request.call_args.args == (
+        "GET",
+        "https://api.notion.com/v1/pages/page%2F1",
+    )
+    assert request.call_args.kwargs["params"] == {
+        "filter_properties": ["title", "f\\:p"]
     }
-    assert [call.args[:2] for call in request.call_args_list] == [
-        ("GET", "https://api.notion.com/v1/pages/page-1"),
-        ("GET", "https://api.notion.com/v1/blocks/page-1/children"),
-        ("GET", "https://api.notion.com/v1/blocks/page-1/children"),
-    ]
-    assert request.call_args_list[-1].kwargs["params"] == {"start_cursor": "cursor-1"}
+
+
+def test_notion_get_page_property_forwards_pagination() -> None:
+    """Get page property should preserve encoded IDs and forward pagination."""
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "object": "list",
+        "type": "property_item",
+        "results": [],
+        "has_more": True,
+        "next_cursor": "cursor-2",
+    }
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_page_property",
+            {
+                "page_id": "page/1",
+                "property_id": "f%5C%5C%3Ap",
+                "page_size": 50,
+                "start_cursor": "cursor-1",
+            },
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == (
+        "GET",
+        "https://api.notion.com/v1/pages/page%2F1/properties/f%5C%5C%3Ap",
+    )
+    assert request.call_args.kwargs["params"] == {
+        "page_size": "50",
+        "start_cursor": "cursor-1",
+    }
+
+
+def test_notion_get_page_property_returns_single_item() -> None:
+    """Get page property should also pass through single-item responses."""
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "object": "property_item",
+        "id": "status",
+        "type": "status",
+        "status": None,
+    }
+    with patch(_HTTP_REQUEST, return_value=response):
+        result = registry.invoke_connector(
+            "notion_get_page_property",
+            {"page_id": "page-1", "property_id": "status"},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
 
 
 def test_notion_list_users_forwards_pagination() -> None:

@@ -114,16 +114,54 @@ ACTIONS = (
     ActionDefinition(
         name="get_page",
         description=(
-            "Get a Notion page together with all its direct child blocks. Nested "
-            "child blocks are not retrieved."
+            "Retrieve a Notion page and its property values. This does not retrieve "
+            "page content or child blocks. Some properties can be truncated; use "
+            "notion_get_page_property with the property's returned ID when you need "
+            "its complete value."
         ),
         access=ActionAccess.READ,
         input_schema={
             "type": "object",
             "properties": {
                 "page_id": string_property("The page ID to retrieve."),
+                "filter_properties": {
+                    "type": "array",
+                    "items": string_property("A property ID to include."),
+                    "maxItems": 100,
+                    "description": (
+                        "Property IDs to include in the response. Omit to return all "
+                        "available properties."
+                    ),
+                },
             },
             "required": ["page_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_page_property",
+        description=(
+            "Retrieve one property from a Notion page. Title, rich text, people, "
+            "relation, and rollup properties can return paginated lists. Pagination "
+            "is optional; only continue with next_cursor when has_more is true. A "
+            "rollup's calculation is final only on the last page."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "page_id": string_property(
+                    "The ID of the page containing the property."
+                ),
+                "property_id": string_property(
+                    "The stable property ID found at properties.<property name>.id "
+                    "in the notion_get_page response. This is not the property name, "
+                    "type, or value."
+                ),
+                "page_size": _PAGE_SIZE,
+                "start_cursor": _CURSOR,
+            },
+            "required": ["page_id", "property_id"],
             "additionalProperties": False,
         },
     ),
