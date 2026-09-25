@@ -212,10 +212,10 @@ def test_notion_get_user_encodes_id() -> None:
     )
 
 
-def test_notion_get_self_retrieves_token_bot() -> None:
-    """Get self should retrieve the bot associated with the access token."""
+def test_notion_get_self_retrieves_token_user() -> None:
+    """Get self should retrieve the user associated with the access token."""
     response = Mock(status_code=200)
-    response.json.return_value = {"object": "user", "id": "bot-1"}
+    response.json.return_value = {"object": "user", "id": "user-1"}
     with patch(_HTTP_REQUEST, return_value=response) as request:
         result = registry.invoke_connector(
             "notion_get_self",

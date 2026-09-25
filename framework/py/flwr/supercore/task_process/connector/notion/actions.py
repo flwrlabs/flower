@@ -158,7 +158,7 @@ ACTIONS = (
     ),
     ActionDefinition(
         name="get_self",
-        description="Retrieve the bot user associated with the current access token.",
+        description="Retrieve the user associated with the current access token.",
         access=ActionAccess.READ,
         input_schema={
             "type": "object",

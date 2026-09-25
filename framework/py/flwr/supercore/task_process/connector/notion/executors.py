@@ -130,7 +130,7 @@ def get_user(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONO
 
 
 def get_self(_arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
-    """Retrieve the bot user associated with the access token."""
+    """Retrieve the user associated with the access token."""
     return _call_notion_api("GET", "/users/me", context.credentials)
 
 
