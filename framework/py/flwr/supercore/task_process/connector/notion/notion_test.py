@@ -35,11 +35,17 @@ _CREDENTIALS: JSONObject = {"access_token": "ntn-secret"}
 
 def test_notion_definition_is_registered() -> None:
     """Notion schemas and executors should form one federation-scoped connector."""
-    assert len(ACTIONS) == 2
+    assert len(ACTIONS) == 5
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     assert [
         tool["name"] for tool in registry.get_connector_tools(NOTION_CONNECTOR_REF)
-    ] == ["notion_search", "notion_get_page"]
+    ] == [
+        "notion_search",
+        "notion_get_page",
+        "notion_list_users",
+        "notion_get_user",
+        "notion_get_self",
+    ]
 
 
 def test_notion_search_forwards_api_inputs() -> None:
@@ -167,6 +173,61 @@ def test_notion_get_page_returns_page_and_block_children() -> None:
     assert request.call_args_list[-1].kwargs["params"] == {"start_cursor": "cursor-1"}
 
 
+def test_notion_list_users_forwards_pagination() -> None:
+    """List users should forward Notion's pagination parameters."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"object": "list", "results": []}
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_list_users",
+            {"page_size": 50, "start_cursor": "cursor-1"},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == ("GET", "https://api.notion.com/v1/users")
+    assert request.call_args.kwargs["params"] == {
+        "page_size": "50",
+        "start_cursor": "cursor-1",
+    }
+
+
+def test_notion_get_user_encodes_id() -> None:
+    """Get user should retrieve exactly one safely encoded user ID."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"object": "user", "id": "user-1"}
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_user",
+            {"user_id": "user/1"},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == (
+        "GET",
+        "https://api.notion.com/v1/users/user%2F1",
+    )
+
+
+def test_notion_get_self_retrieves_token_user() -> None:
+    """Get self should retrieve the user associated with the access token."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"object": "user", "id": "user-1"}
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_self",
+            {},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == ("GET", "https://api.notion.com/v1/users/me")
+
+
 def test_notion_api_errors_include_code_and_message() -> None:
     """Notion's documented error fields should remain readable to callers."""
     response = Mock(status_code=400)
@@ -183,8 +244,7 @@ def test_notion_api_errors_include_code_and_message() -> None:
         )
     assert error.value.code == "validation_error"
     assert str(error.value) == (
-        "Notion API request failed: validation_error (400): "
-        "Invalid start_cursor value."
+        "Notion API request failed: validation_error (400): Invalid start_cursor value."
     )
     assert "ntn-secret" not in str(error.value)
 

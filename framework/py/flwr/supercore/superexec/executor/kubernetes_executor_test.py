@@ -36,6 +36,7 @@ from flwr.common.constant import (
 )
 from flwr.supercore.constant import TaskType
 from flwr.supercore.warm_executor_constants import (
+    WARM_AGENTAPP_EXECUTOR_MODULE,
     WARM_CONNECTOR_EXECUTOR_MODULE,
     WARM_CONNECTOR_EXECUTOR_SOCKET,
     WARM_EXECUTOR_BUSY_FILE,
@@ -62,10 +63,12 @@ from .kubernetes_executor import (
     _build_taskexecutor_pod,
     _get_runtime_root_certificates,
 )
-from .types import ExecutionSpec, LaunchResultStatus
+from .types import ExecutionSpec, LaunchResult, LaunchResultStatus
 from .warm_executor import WARM_EXECUTOR_MODULE, WARM_EXECUTOR_READINESS_COMMAND
 from .warm_executor_pool import (
     WARM_EXECUTOR_CONFIGURATION_ANNOTATION,
+    WARM_EXECUTOR_FAB_HASH_ANNOTATION,
+    WARM_EXECUTOR_FAB_PATH_ANNOTATION,
     WARM_EXECUTOR_LABEL,
     WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION,
     WarmExecutorPoolConfig,
@@ -88,6 +91,7 @@ _POD_NAME = f"flwr-taskexecutor-123-{_LAUNCH_ATTEMPT_ID}"
 _NEXT_POD_NAME = f"flwr-taskexecutor-123-{_NEXT_LAUNCH_ATTEMPT_ID}"
 _SECRET_NAME = f"{_POD_NAME}-appio"
 _NEXT_SECRET_NAME = f"{_NEXT_POD_NAME}-appio"
+_FAB_HASH = "a" * 64
 
 
 def _execution_spec(**overrides: Any) -> ExecutionSpec:
@@ -149,6 +153,154 @@ def test_kubernetes_executor_config_rejects_unsupported_warm_pool() -> None:
             warm_executor_owner="superexec-a",
             warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
         )
+
+
+def test_fab_specific_agentapp_pool_validates_identity_and_path() -> None:
+    """Exact pools require paired, valid FAB fields only for AgentApps."""
+    with pytest.raises(ValueError, match="fab_hash and fab_path"):
+        _warm_executor_pool_key(fab_hash=_FAB_HASH)
+    with pytest.raises(ValueError, match="full SHA-256"):
+        _warm_executor_pool_key(fab_hash="short", fab_path="/apps/agent.fab")
+    with pytest.raises(ValueError, match="absolute fab_path"):
+        _warm_executor_pool_key(fab_hash=_FAB_HASH, fab_path="agent.fab")
+    with pytest.raises(ValueError, match="Only AgentApp"):
+        _warm_executor_pool_key(
+            task_type=TaskType.MODEL,
+            fab_hash=_FAB_HASH,
+            fab_path="/apps/agent.fab",
+        )
+
+
+def test_fab_specific_agentapp_pool_uses_prestarted_worker() -> None:
+    """An exact AgentApp pool should serve and dispatch its configured FAB."""
+    specific_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev",
+        fab_hash=_FAB_HASH,
+        fab_path="/opt/flwr/apps/gpt-agent.fab",
+    )
+    config = _executor_config(warm_executor_owner="superexec-a")
+    pod = _as_dict(
+        kube._build_warm_executor_pod(  # pylint: disable=protected-access
+            specific_key, config, "exact"
+        )
+    )
+    annotations = pod["metadata"]["annotations"]
+    assert annotations[WARM_EXECUTOR_FAB_HASH_ANNOTATION] == _FAB_HASH
+    assert (
+        annotations[WARM_EXECUTOR_FAB_PATH_ANNOTATION] == "/opt/flwr/apps/gpt-agent.fab"
+    )
+    serve_command = pod["spec"]["containers"][0]["command"]
+    assert serve_command[:4] == ["python", "-m", WARM_AGENTAPP_EXECUTOR_MODULE, "serve"]
+    assert serve_command[-4:] == [
+        "--fab-hash",
+        _FAB_HASH,
+        "--fab-path",
+        "/opt/flwr/apps/gpt-agent.fab",
+    ]
+
+    dispatch_command = warm_executor_dispatch.warm_executor_command(
+        _execution_spec(
+            task_type=TaskType.AGENT_APP,
+            fab_hash=_FAB_HASH,
+            insecure=True,
+            runtime_dependency_install=True,
+        ),
+        None,
+        specific_key,
+    )
+    assert dispatch_command[:4] == [
+        "python",
+        "-m",
+        WARM_AGENTAPP_EXECUTOR_MODULE,
+        "dispatch",
+    ]
+    assert dispatch_command[-3:] == [
+        "--fab-hash",
+        _FAB_HASH,
+        "--insecure",
+    ]
+    assert "--allow-runtime-dependency-installation" not in dispatch_command
+
+
+def test_exact_agentapp_pool_falls_back_to_ready_generic_pool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Admission and reservation should use the same exact-then-generic order."""
+    client = Mock()
+    specific_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev",
+        fab_hash=_FAB_HASH,
+        fab_path="/opt/flwr/apps/gpt-agent.fab",
+    )
+    generic_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
+    config = _executor_config(
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(
+            WarmExecutorPoolConfig(key=specific_key, size=1),
+            WarmExecutorPoolConfig(key=generic_key, size=1),
+        ),
+    )
+    generic_pod = _ready_warm_pod(generic_key, config, name="generic-ready")
+    client.list_namespaced_pod.return_value = {"items": [generic_pod]}
+    manager = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
+        client, config, lambda: 0
+    )
+    dispatch = Mock()
+    dispatch.wait_for_acceptance.return_value = True
+    open_dispatch = Mock(return_value=dispatch)
+    monkeypatch.setattr(manager, "_open_dispatch", open_dispatch)
+    monkeypatch.setattr(manager, "_retire_after_dispatch", Mock())
+    spec = _execution_spec(
+        task_type=TaskType.AGENT_APP, fab_hash=_FAB_HASH, insecure=True
+    )
+
+    assert manager.has_ready_pod(TaskType.AGENT_APP, _FAB_HASH)
+    result = manager.launch(spec, None)
+
+    assert result is not None and result.status == LaunchResultStatus.ACCEPTED
+    assert open_dispatch.call_args.kwargs["pool_key"] == generic_key
+    dispatch.send_token.assert_called_once_with("task-token")
+    dispatch.wait_for_acceptance.assert_called_once()
+
+
+def test_launch_capacity_retry_preserves_task_fab_hash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A warm retry must not select readiness using a different FAB identity."""
+    client = Mock()
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev",
+        fab_hash=_FAB_HASH,
+        fab_path="/opt/flwr/apps/gpt-agent.fab",
+    )
+    config = _executor_config(
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+    )
+    executor = KubernetesExecutor(client=client, config=config)
+    manager = Mock()
+    manager.launch.side_effect = [None, LaunchResult.accepted()]
+    wait_for_capacity = Mock(return_value=True)
+    monkeypatch.setattr(executor, "_warm_executor_pool_manager", manager)
+    monkeypatch.setattr(executor, "_sweep_completed_pods_if_due", Mock())
+    monkeypatch.setattr(executor, "_wait_for_capacity", wait_for_capacity)
+    spec = _execution_spec(
+        task_type=TaskType.AGENT_APP, fab_hash=_FAB_HASH, insecure=True
+    )
+
+    result = executor.launch(spec)
+
+    assert result.status == LaunchResultStatus.ACCEPTED
+    assert manager.launch.call_count == 2
+    wait_for_capacity.assert_called_once_with(
+        TaskType.AGENT_APP,
+        fab_hash=_FAB_HASH,
+        allow_warm_dispatch=True,
+        reconcile_warm_pools=False,
+    )
+    client.create_namespaced_pod.assert_not_called()
 
 
 def test_kubernetes_executor_config_preserves_positional_callback_binding() -> None:
@@ -397,6 +549,8 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
         annotations={
             "example.com/setting": "configured",
             _WARM_EXECUTOR_CONSUMED_ANNOTATION: "true",
+            WARM_EXECUTOR_FAB_HASH_ANNOTATION: _FAB_HASH,
+            WARM_EXECUTOR_FAB_PATH_ANNOTATION: "/untrusted/agent.fab",
         },
         container_security_context={"readOnlyRootFilesystem": True},
     )
@@ -432,6 +586,8 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
     assert len(annotations[WARM_EXECUTOR_CONFIGURATION_ANNOTATION]) == 64
     assert len(annotations) == 3
     assert _WARM_EXECUTOR_CONSUMED_ANNOTATION not in annotations
+    assert WARM_EXECUTOR_FAB_HASH_ANNOTATION not in annotations
+    assert WARM_EXECUTOR_FAB_PATH_ANNOTATION not in annotations
     assert _TASK_ID_LABEL not in metadata["labels"]
     assert LAUNCH_ATTEMPT_LABEL not in metadata["labels"]
     assert root_certificates_secret["stringData"] == {"ca.crt": "root-ca"}
@@ -724,7 +880,7 @@ def test_launch_retires_warm_pod_when_consumption_cannot_be_persisted(
         assert manager is not None
         assert not manager.has_ready_pod(TaskType.AGENT_APP)
         # pylint: disable-next=protected-access
-        assert manager._take_ready_pod(pool_key) is None
+        assert manager._take_ready_pod(config.warm_executor_pools) is None
     cold_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
     assert cold_pod["spec"]["containers"][0]["command"] == ["flwr-agentapp"]
 
@@ -1174,6 +1330,40 @@ def test_warm_pool_replaces_consumed_pod_and_cleans_up_idle_pods() -> None:
     assert client.delete_namespaced_pod.call_count == 1
 
 
+def test_fab_specific_pool_creation_is_rate_limited() -> None:
+    """FAB-specific pools should not create Pods in a tight loop."""
+    client = Mock()
+    now = [0.0]
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev",
+        fab_hash=_FAB_HASH,
+        fab_path="/opt/flwr/apps/gpt-agent.fab",
+    )
+    config = _executor_config(
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
+        monotonic=lambda: now[0],
+    )
+    pool = kube._WarmExecutorPoolManager(  # pylint: disable=protected-access
+        client, config, lambda: 0
+    )
+    client.reset_mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+
+    pool.ensure_capacity()
+    pool.ensure_capacity()
+
+    client.create_namespaced_pod.assert_called_once()
+
+    now[0] = (
+        warm_executor_dispatch._PRESTARTED_AGENTAPP_CREATION_INTERVAL_SECONDS  # pylint: disable=protected-access
+    )
+
+    pool.ensure_capacity()
+
+    assert client.create_namespaced_pod.call_count == 2
+
+
 def test_warm_pool_preserves_surviving_tasks_until_their_processes_exit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1207,7 +1397,9 @@ def test_warm_pool_preserves_surviving_tasks_until_their_processes_exit(
     client.reset_mock()
     client.list_namespaced_pod.return_value = {"items": [consumed_pod]}
 
-    assert pool._take_ready_pod(pool_key) is None  # pylint: disable=protected-access
+    assert (  # pylint: disable=protected-access
+        pool._take_ready_pod(config.warm_executor_pools) is None
+    )
     pool.ensure_capacity()
 
     client.delete_namespaced_pod.assert_not_called()

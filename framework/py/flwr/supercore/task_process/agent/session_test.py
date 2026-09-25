@@ -14,7 +14,6 @@
 # ==============================================================================
 """Runtime AgentApp session tests."""
 
-
 from unittest.mock import Mock, call, patch
 
 import pytest
@@ -432,4 +431,12 @@ def test_connector_tools_include_agent_handled_automation() -> None:
         for tool in connectors.tools(
             ["web_search", START_AUTOMATION_TOOL_NAME, "notion"]
         )
-    ] == ["web_search", "start_automation", "notion_search", "notion_get_page"]
+    ] == [
+        "web_search",
+        "start_automation",
+        "notion_search",
+        "notion_get_page",
+        "notion_list_users",
+        "notion_get_user",
+        "notion_get_self",
+    ]
