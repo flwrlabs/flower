@@ -17,6 +17,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
 
 ROOT_DIR = Path(__file__).parents[2]
 STABLE_DOCS = (
+    "agent/docs/source/conf.py",
     "baselines/docs/source/conf.py",
     "examples/docs/source/conf.py",
 )
