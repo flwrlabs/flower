@@ -40,7 +40,7 @@ def _run_superexec_one_launch(
     monkeypatch: pytest.MonkeyPatch,
     launch_result: LaunchResult,
     task_poll_interval: str | None = None,
-) -> tuple[Mock, Mock, Mock, Mock]:
+) -> tuple[Mock, Mock, Mock, Mock, Mock]:
     """Run one SuperExec launch loop and stop at the loop sleep."""
     if task_poll_interval is None:
         monkeypatch.delenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", raising=False)
@@ -49,6 +49,8 @@ def _run_superexec_one_launch(
 
     task = Mock()
     task.task_id = 123
+    task.type = TaskType.AGENT_APP.value
+    task.fab_hash = "fab-hash"
     client = Mock()
     client.PullPendingTasks.return_value = Mock(tasks=[task])
     client.ClaimTask.return_value = Mock(token="token-123")
@@ -60,7 +62,10 @@ def _run_superexec_one_launch(
     log = Mock()
 
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
-    monkeypatch.setattr(run_superexec_module, "get_executor", Mock())
+    executor = Mock()
+    monkeypatch.setattr(
+        run_superexec_module, "get_executor", Mock(return_value=executor)
+    )
     monkeypatch.setattr(run_superexec_module, "log", log)
     sleep_mock = Mock(side_effect=KeyboardInterrupt())
     monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep_mock)
@@ -73,7 +78,7 @@ def _run_superexec_one_launch(
             insecure=True,
         )
 
-    return log, plugin, client, sleep_mock
+    return log, plugin, client, executor, sleep_mock
 
 
 def test_builtin_subprocess_uses_combined_acquisition(
@@ -246,7 +251,7 @@ def test_run_superexec_preserves_accepted_launch_behavior(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """SuperExec should launch and continue quietly when launch is accepted."""
-    log, plugin, stub, sleep_mock = _run_superexec_one_launch(
+    log, plugin, stub, executor, sleep_mock = _run_superexec_one_launch(
         monkeypatch, LaunchResult.accepted()
     )
 
@@ -254,6 +259,12 @@ def test_run_superexec_preserves_accepted_launch_behavior(
     plugin.select_task.assert_called_once()
     stub.PullAndClaimTask.assert_not_called()
     plugin.launch_task.assert_called_once()
+    executor.wait_for_capacity.assert_called_once_with(
+        task_type=TaskType.AGENT_APP,
+        fab_hash="fab-hash",
+        insecure=True,
+        root_certificates_path=None,
+    )
     log.assert_not_called()
     sleep_mock.assert_called_once_with(1.0)
 
@@ -285,7 +296,7 @@ def test_run_superexec_logs_non_accepted_launch_result(
     expected_message: str,
 ) -> None:
     """SuperExec should log non-accepted launch results and keep loop behavior."""
-    log, plugin, stub, _ = _run_superexec_one_launch(monkeypatch, launch_result)
+    log, plugin, stub, _, _ = _run_superexec_one_launch(monkeypatch, launch_result)
 
     stub.ClaimTask.assert_called_once()
     plugin.launch_task.assert_called_once()
@@ -299,7 +310,7 @@ def test_run_superexec_uses_configured_task_poll_interval(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """SuperExec should use the task polling interval from the environment."""
-    _, _, _, sleep_mock = _run_superexec_one_launch(
+    _, _, _, _, sleep_mock = _run_superexec_one_launch(
         monkeypatch, LaunchResult.accepted(), task_poll_interval="0.25"
     )
 
