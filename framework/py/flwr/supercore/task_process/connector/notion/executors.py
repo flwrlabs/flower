@@ -15,6 +15,7 @@
 """Notion action executors."""
 
 from typing import cast
+from urllib.parse import quote
 
 import requests
 
@@ -104,9 +105,41 @@ def get_page(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONO
     return {"page": page, "block_children": block_children}
 
 
+def list_users(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """List workspace users."""
+    params: dict[str, str] = {}
+    if "page_size" in arguments:
+        params["page_size"] = str(
+            require_int_range(
+                arguments["page_size"], "Notion", "page_size", maximum=100
+            )
+        )
+    if cursor := optional_string(
+        arguments.get("start_cursor"), "Notion", "start_cursor"
+    ):
+        params["start_cursor"] = cursor
+    return _call_notion_api("GET", "/users", context.credentials, params=params)
+
+
+def get_user(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """Retrieve one workspace user by ID."""
+    user_id = require_string(arguments.get("user_id"), "Notion", "user_id")
+    return _call_notion_api(
+        "GET", f"/users/{quote(user_id, safe='')}", context.credentials
+    )
+
+
+def get_self(_arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """Retrieve the user associated with the access token."""
+    return _call_notion_api("GET", "/users/me", context.credentials)
+
+
 EXECUTORS: dict[str, ConnectorExecutor] = {
     "search": search,
     "get_page": get_page,
+    "list_users": list_users,
+    "get_user": get_user,
+    "get_self": get_self,
 }
 
 
