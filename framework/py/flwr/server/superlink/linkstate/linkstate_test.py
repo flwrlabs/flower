@@ -2623,9 +2623,8 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
                     created_by="account-a",
                 )
             )
-            connector_id = state.get_connectors_by_ref("@bob/fed-a", "calendar")[
-                0
-            ].connector_id
+            connectors = state.get_connectors_by_ref("@bob/fed-a", "calendar")
+            connector_id = connectors[0].connector_id
             cached_row = session.scalar(
                 select(ConnectorModel).where(
                     ConnectorModel.federation_id == "@bob/fed-a",
