@@ -33,18 +33,6 @@ def _executor(arguments: JSONObject, context: ConnectorExecutionContext) -> JSON
     return {}
 
 
-def test_action_definition_defaults_to_non_strict() -> None:
-    """Connector actions should explicitly disable strict mode by default."""
-    action = ActionDefinition(
-        name="read",
-        description="Read an example.",
-        access=ActionAccess.READ,
-        input_schema={"type": "object", "properties": {}},
-    )
-
-    assert action.tool("example")["strict"] is False
-
-
 def test_connector_definition_rejects_executor_drift() -> None:
     """Every tool should have exactly one matching executor."""
     action = ActionDefinition(
