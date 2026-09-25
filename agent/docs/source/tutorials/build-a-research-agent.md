@@ -207,7 +207,7 @@ def connector_error_output(
 
 The main function has five phases:
 
-1. Validate `agent.prompt` and rebuild the conversation messages from the trace
+1. Rebuild the conversation messages from the trace
 1. Create the OpenAI client and request the connector tool schemas
 1. Execute up to `MAX_TOOL_TURNS` rounds of model-requested function calls
 1. Make one final model request without tools and publish its stream
@@ -219,9 +219,6 @@ Add the entry point:
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
     """Research the chat input with a bounded connector loop."""
-    if not isinstance(agent.prompt, str) or not agent.prompt.strip():
-        raise ValueError("Prompt must be a non-empty string")
-
     client = OpenAI(
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
         api_key=os.environ["FLWR_RUNTIME_API_KEY"],
@@ -427,9 +424,6 @@ def connector_error_output(
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
     """Research the chat input with a bounded connector loop."""
-    if not isinstance(agent.prompt, str) or not agent.prompt.strip():
-        raise ValueError("Prompt must be a non-empty string")
-
     client = OpenAI(
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
         api_key=os.environ["FLWR_RUNTIME_API_KEY"],

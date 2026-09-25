@@ -89,10 +89,6 @@ app = AgentApp()
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
     """Send the chat prompt to the model."""
-    prompt = agent.prompt
-    if not isinstance(prompt, str) or not prompt.strip():
-        raise ValueError("Prompt must be a non-empty string")
-
     client = OpenAI(
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
         api_key=os.environ["FLWR_RUNTIME_API_KEY"],
@@ -100,7 +96,7 @@ def main(agent: AgentSession, context: Context) -> None:
     )
     stream = client.responses.create(
         model=MODEL,
-        input=prompt.strip(),
+        input=agent.prompt,
         stream=True,
     )
 
