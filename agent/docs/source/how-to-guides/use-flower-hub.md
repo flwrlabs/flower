@@ -2,7 +2,7 @@
 
 Flower Hub lets you discover AgentApps that you can run on SuperGrid and share
 your own AgentApps with other Flower users. Published apps use an app spec such
-as `@publisher/agent-name`.
+as `@<publisher>/<agent>`.
 
 ## Explore AgentApps
 
@@ -19,20 +19,10 @@ button, choose one of your active federations, and select **Confirm**.
 Open that federation from the Flower Agent sidebar and select **New chat**.
 The AgentApp is now available in the agent selector above the prompt.
 
-### Run an AgentApp from the terminal
-
-Use the publisher and project name from the app spec:
-
-```{code-block} console
-:substitutions:
-
-$ uvx --from flwr==|stable_flwr_version| flwr run @publisher/agent-name supergrid \
-    --run-config 'agent.input="What can you help me with?"' \
-    --stream
+```{tip}
+To chat with a Hub AgentApp from your terminal, see {ref}`get-an-agentapp-project`
+and {ref}`load-an-agentapp-in-flower-chat`.
 ```
-
-See [Run an AgentApp on SuperGrid](run-on-supergrid.md) to choose a federation,
-inspect logs, and stop a run.
 
 ## Publish your AgentApp
 

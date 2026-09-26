@@ -145,7 +145,13 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state.get_run.return_value = Mock(
             fab_hash=fab_hash, primary_task_type=TaskType.SERVER_APP
         )
-        self.mock_state.create_task.return_value = 123
+
+        def create_task(**_kwargs: object) -> int:
+            self.mock_state.store_message.assert_called_once()
+            assert self.mock_object_store.put.call_count == len(self.simple_store)
+            return 123
+
+        self.mock_state.create_task.side_effect = create_task
 
         # Execute
         res = _pull_and_store_message(
@@ -201,8 +207,10 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             run_id=self.run_id,
             fab_hash=fab_hash,
         )
-        self.mock_object_store.preregister.assert_not_called()
-        self.mock_state.store_message.assert_not_called()
+        self.mock_object_store.preregister.assert_called_once()
+        self.mock_state.store_message.assert_called_once()
+        self.mock_state.delete_messages.assert_called_once()
+        self.mock_object_store.delete.assert_called_once()
         self.mock_confirm_message_received.assert_not_called()
 
     def test_pull_and_store_message_marks_task_failed_if_object_pull_fails(

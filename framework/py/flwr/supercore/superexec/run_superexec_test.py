@@ -21,6 +21,7 @@ from unittest.mock import Mock
 
 import httpx
 import pytest
+from google.protobuf.message import DecodeError
 
 from flwr.proto.runtime_pb2 import PullAndClaimTaskResponse  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
@@ -38,10 +39,12 @@ from . import run_superexec as run_superexec_module
 def _run_superexec_one_launch(
     monkeypatch: pytest.MonkeyPatch,
     launch_result: LaunchResult,
-) -> tuple[Mock, Mock, Mock, Mock]:
+) -> tuple[Mock, Mock, Mock, Mock, Mock]:
     """Run one SuperExec launch loop and stop at the next acquisition."""
     task = Mock()
     task.task_id = 123
+    task.type = TaskType.AGENT_APP.value
+    task.fab_hash = "fab-hash"
     client = Mock()
     client.PullPendingTasks.side_effect = [Mock(tasks=[task]), KeyboardInterrupt()]
     client.ClaimTask.return_value = Mock(token="token-123")
@@ -53,7 +56,10 @@ def _run_superexec_one_launch(
     log = Mock()
 
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
-    monkeypatch.setattr(run_superexec_module, "get_executor", Mock())
+    executor = Mock()
+    monkeypatch.setattr(
+        run_superexec_module, "get_executor", Mock(return_value=executor)
+    )
     monkeypatch.setattr(run_superexec_module, "log", log)
     sleep_mock = Mock()
     monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep_mock)
@@ -66,18 +72,24 @@ def _run_superexec_one_launch(
             insecure=True,
         )
 
-    return log, plugin, client, sleep_mock
+    return log, plugin, client, executor, sleep_mock
 
 
 def test_builtin_subprocess_uses_combined_acquisition(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Connection failure backs off; empty wait and launch need no extra sleep."""
+    """Connection and response failures back off before task acquisition."""
     monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", "0.25")
+    monkeypatch.setattr(
+        run_superexec_module, "monotonic", Mock(side_effect=[0, 0, 0, 5, 5, 5])
+    )
     task = Task(task_id=123, type=TaskType.MODEL)
+    invalid_response = ValueError("Invalid protobuf response payload")
+    invalid_response.__cause__ = DecodeError("malformed response")
     client = Mock()
     client.PullAndClaimTask.side_effect = [
         httpx.ConnectError("unavailable"),
+        invalid_response,
         PullAndClaimTaskResponse(),
         PullAndClaimTaskResponse(task=task, token="task-token"),
         KeyboardInterrupt(),
@@ -104,7 +116,7 @@ def test_builtin_subprocess_uses_combined_acquisition(
             insecure=True,
         )
 
-    assert [call[0] for call in order.mock_calls[:2]] == ["capacity", "acquire"]
+    assert [call[0] for call in order.mock_calls] == ["capacity", "acquire"] * 5
     assert set(client.PullAndClaimTask.call_args.args[0].supported_task_types) == set(
         AutoExecPlugin.supported_task_types
     )
@@ -114,8 +126,10 @@ def test_builtin_subprocess_uses_combined_acquisition(
     executor.launch.assert_called_once()
     assert executor.launch.call_args.args[0].task_id == task.task_id
     assert executor.launch.call_args.args[0].token == "task-token"
-    sleep.assert_called_once_with(1.0)
-    assert client.PullAndClaimTask.call_count == 4
+    assert sleep.call_args_list[0].args == (1.0,)
+    assert [call.args for call in sleep.call_args_list[1:7]] == [(5.0,)] * 6
+    assert sleep.call_count == 7
+    assert client.PullAndClaimTask.call_count == 5
 
 
 def test_combined_acquisition_stops_after_lost_response(
@@ -146,9 +160,9 @@ def test_combined_acquisition_stops_after_lost_response(
         )
 
     assert client.PullAndClaimTask.call_count == 2
-    assert sleep.call_count == 12
+    assert sleep.call_count == 6
     assert all(call.args == (5.0,) for call in sleep.call_args_list)
-    assert executor.reconcile.call_count == 14
+    assert executor.reconcile.call_count == 8
     client.close.assert_called_once()
 
 
@@ -198,7 +212,7 @@ def test_kubernetes_keeps_task_specific_capacity_before_claim(
     assert executor.wait_for_capacity.call_args.kwargs["task_type"] == TaskType.MODEL
     assert executor.reconcile.call_count == 3
     client.PullAndClaimTask.assert_not_called()
-    sleep.assert_not_called()
+    sleep.assert_called_once_with(1.0)
 
 
 @pytest.mark.parametrize(
@@ -316,7 +330,7 @@ def test_run_superexec_preserves_accepted_launch_behavior(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """SuperExec should launch and continue quietly when launch is accepted."""
-    log, plugin, stub, sleep_mock = _run_superexec_one_launch(
+    log, plugin, stub, executor, sleep_mock = _run_superexec_one_launch(
         monkeypatch, LaunchResult.accepted()
     )
 
@@ -324,6 +338,12 @@ def test_run_superexec_preserves_accepted_launch_behavior(
     plugin.select_task.assert_called_once()
     stub.PullAndClaimTask.assert_not_called()
     plugin.launch_task.assert_called_once()
+    executor.wait_for_capacity.assert_called_once_with(
+        task_type=TaskType.AGENT_APP,
+        fab_hash="fab-hash",
+        insecure=True,
+        root_certificates_path=None,
+    )
     log.assert_not_called()
     sleep_mock.assert_not_called()
 
@@ -355,7 +375,7 @@ def test_run_superexec_logs_non_accepted_launch_result(
     expected_message: str,
 ) -> None:
     """SuperExec should log non-accepted launch results and keep loop behavior."""
-    log, plugin, stub, _ = _run_superexec_one_launch(monkeypatch, launch_result)
+    log, plugin, stub, _, _ = _run_superexec_one_launch(monkeypatch, launch_result)
 
     stub.ClaimTask.assert_called_once()
     plugin.launch_task.assert_called_once()

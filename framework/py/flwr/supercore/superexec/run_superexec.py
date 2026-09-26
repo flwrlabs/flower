@@ -19,15 +19,13 @@ import math
 import os
 import time
 from logging import ERROR, WARNING
+from time import monotonic
 from typing import Any, cast
 
 import httpx
+from google.protobuf.message import DecodeError
 
-from flwr.common.constant import (
-    HEARTBEAT_DEFAULT_INTERVAL,
-    HEARTBEAT_PATIENCE,
-    RUNTIME_DEPENDENCY_INSTALL,
-)
+from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL, RUNTIME_DEPENDENCY_INSTALL
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     PullAndClaimTaskRequest,
@@ -59,7 +57,7 @@ _MIN_TASK_POLL_INTERVAL_SECONDS = 0.01
 _MAX_TASK_POLL_INTERVAL_SECONDS = 60.0
 _DEFAULT_TASK_POLL_INTERVAL_SECONDS = 1.0
 _TASK_WAIT_TIMEOUT_MS = 5_000
-_UNCERTAIN_CLAIM_BACKOFF_SECONDS = HEARTBEAT_DEFAULT_INTERVAL * HEARTBEAT_PATIENCE
+_UNCERTAIN_CLAIM_BACKOFF_SECONDS = HEARTBEAT_DEFAULT_INTERVAL
 _SAFE_CONNECTION_ERRORS = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
 _SUPEREXEC_AUTH_METHODS = frozenset(
     {
@@ -149,6 +147,14 @@ def _wait_for_claim_expiry(executor: Executor) -> None:
         time.sleep(interval)
         executor.reconcile()
         remaining -= interval
+
+
+def _backoff_after_fast_empty_poll(
+    started_at: float, task_poll_interval: float
+) -> None:
+    """Limit request rate when an older Runtime ignores the long-poll field."""
+    if monotonic() - started_at < 1.0:
+        time.sleep(max(task_poll_interval, 1.0))
 
 
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
@@ -300,6 +306,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                     insecure=insecure,
                     root_certificates_path=root_certificates_path,
                 )
+                poll_started_at = monotonic()
                 try:
                     combined_res = client.PullAndClaimTask(
                         PullAndClaimTaskRequest(
@@ -318,25 +325,38 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                     log(WARNING, "Runtime API connection failed: %s", exc)
                     time.sleep(max(task_poll_interval, 1.0))
                     continue
-                except (httpx.TransportError, httpx.HTTPStatusError, ValueError) as err:
-                    if (
-                        isinstance(err, httpx.HTTPStatusError)
-                        and err.response.status_code < 500
+                except (
+                    httpx.NetworkError,
+                    httpx.TimeoutException,
+                    httpx.RemoteProtocolError,
+                    httpx.HTTPStatusError,
+                    ValueError,
+                ) as exc:
+                    if isinstance(exc, httpx.HTTPStatusError):
+                        if exc.response.status_code not in (
+                            httpx.codes.SERVICE_UNAVAILABLE,
+                            httpx.codes.GATEWAY_TIMEOUT,
+                        ):
+                            raise
+                    if isinstance(exc, ValueError) and not isinstance(
+                        exc.__cause__, DecodeError
                     ):
                         raise
                     log(
                         WARNING,
                         "Acquisition outcome unknown (%s); waiting for claim expiry",
-                        type(err).__name__,
+                        type(exc).__name__,
                     )
                     _wait_for_claim_expiry(executor)
                     continue
                 if combined_res.HasField("task") and combined_res.token:
                     task, token = combined_res.task, combined_res.token
                 else:
+                    _backoff_after_fast_empty_poll(poll_started_at, task_poll_interval)
                     sleep_after_poll = False
             else:
                 # Preserve custom selection and task-specific capacity checks.
+                poll_started_at = monotonic()
                 tasks_res = client.PullPendingTasks(
                     request=PullPendingTasksRequest(
                         wait_timeout_ms=_TASK_WAIT_TIMEOUT_MS
@@ -345,6 +365,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                 if tasks_res.tasks:
                     task = plugin.select_task(tasks_res.tasks)
                 else:
+                    _backoff_after_fast_empty_poll(poll_started_at, task_poll_interval)
                     sleep_after_poll = False
 
             if task is not None and not use_combined_acquisition:
@@ -354,6 +375,12 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                     task_type = None
                 executor.wait_for_capacity(
                     task_type=task_type,
+                    fab_hash=(
+                        task.fab_hash
+                        if isinstance(getattr(task, "fab_hash", None), str)
+                        and task.fab_hash
+                        else None
+                    ),
                     insecure=insecure,
                     root_certificates_path=root_certificates_path,
                 )
