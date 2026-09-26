@@ -29,6 +29,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     CreateTaskRequest,
     CreateTaskResponse,
+    PullAndClaimTaskRequest,
     PullPendingTasksRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
@@ -91,6 +92,38 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(len(response.tasks), 1)
         self.assertEqual(response.tasks[0].task_id, 123)
+
+    def test_pull_and_claim_task_returns_empty_when_queue_is_empty(self) -> None:
+        """An empty queue must not claim a task."""
+        response = runtime_handlers.pull_and_claim_task(
+            PullAndClaimTaskRequest(supported_task_types=[TaskType.MODEL]),
+            self.state,
+        )
+
+        self.assertFalse(response.HasField("task"))
+        self.assertFalse(response.token)
+        self.state.claim_task.assert_not_called()
+
+    def test_pull_and_claim_task_retries_after_lost_claim_race(self) -> None:
+        """A contender should try the next eligible task after losing a claim."""
+        tasks = [
+            Task(task_id=1, type=TaskType.MODEL),
+            Task(task_id=2, type=TaskType.CLIENT_APP),
+            Task(task_id=3, type=TaskType.MODEL),
+        ]
+        self.state.get_tasks.return_value = tasks
+        self.state.claim_task.side_effect = [None, "task-token"]
+
+        response = runtime_handlers.pull_and_claim_task(
+            PullAndClaimTaskRequest(supported_task_types=[TaskType.MODEL]), self.state
+        )
+
+        self.assertEqual(response.task, tasks[2])
+        self.assertEqual(response.token, "task-token")
+        self.assertEqual(self.state.claim_task.call_count, 2)
+        self.assertEqual(
+            [call.args[0] for call in self.state.claim_task.call_args_list], [1, 3]
+        )
 
     def test_claim_task_returns_token_when_claim_succeeds(self) -> None:
         """ClaimTask should return the token from state."""

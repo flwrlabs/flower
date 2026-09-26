@@ -19,11 +19,15 @@ import math
 import os
 import time
 from logging import ERROR, WARNING
-from typing import Any
+from typing import Any, cast
 
-from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
+import httpx
+from google.protobuf.message import DecodeError
+
+from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL, RUNTIME_DEPENDENCY_INSTALL
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
+    PullAndClaimTaskRequest,
     PullPendingTasksRequest,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
@@ -44,7 +48,8 @@ from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 from .executor import LaunchResult, LaunchResultStatus, get_executor
 from .executor.config import ExecutorConfig
-from .plugin import ExecPlugin
+from .plugin import AutoExecPlugin, ClientAppExecPlugin, ExecPlugin, ServerAppExecPlugin
+from .plugin.base_exec_plugin import BaseExecPlugin
 
 _TASK_POLL_INTERVAL_ENV = "FLWR_SUPEREXEC_TASK_POLL_INTERVAL"
 _MIN_TASK_POLL_INTERVAL_SECONDS = 0.01
@@ -52,6 +57,7 @@ _MAX_TASK_POLL_INTERVAL_SECONDS = 60.0
 _DEFAULT_TASK_POLL_INTERVAL_SECONDS = 1.0
 _SUPEREXEC_AUTH_METHODS = frozenset(
     {
+        "/flwr.proto.Runtime/PullAndClaimTask",
         "/flwr.proto.Runtime/PullPendingTasks",
         "/flwr.proto.Runtime/ClaimTask",
     }
@@ -255,20 +261,74 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             message=f"Invalid plugin config: {e!r}",
         )
 
+    # Custom selection and Kubernetes capacity depend on seeing a candidate first.
+    use_combined_acquisition = (
+        executor_type == ExecutorType.SUBPROCESS
+        and plugin_class
+        in (
+            AutoExecPlugin,
+            ClientAppExecPlugin,
+            ServerAppExecPlugin,
+        )
+    )
+
     # Start the main loop
     try:
         while True:
             executor.reconcile()
-            # Fetch pending tasks
-            tasks_res = client.PullPendingTasks(request=PullPendingTasksRequest())
-
-            # Select a task to execute using the plugin's selection logic
             task = None
-            if tasks_res.tasks:
-                task = plugin.select_task(tasks_res.tasks)
+            token = None
+            if use_combined_acquisition:
+                executor.wait_for_capacity(
+                    insecure=insecure,
+                    root_certificates_path=root_certificates_path,
+                )
+                try:
+                    combined_res = client.PullAndClaimTask(
+                        PullAndClaimTaskRequest(
+                            supported_task_types=sorted(
+                                cast(BaseExecPlugin, plugin).supported_task_types
+                            )
+                        )
+                    )
+                except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+                    if any(
+                        term in str(exc).lower()
+                        for term in ("certificate", "ssl", "tls")
+                    ):
+                        raise
+                    log(WARNING, "Runtime API connection failed: %s", exc)
+                    time.sleep(max(task_poll_interval, 1.0))
+                    continue
+                except (
+                    httpx.NetworkError,
+                    httpx.TimeoutException,
+                    httpx.RemoteProtocolError,
+                    httpx.HTTPStatusError,
+                    ValueError,
+                ) as exc:
+                    if isinstance(exc, httpx.HTTPStatusError):
+                        if exc.response.status_code not in (
+                            httpx.codes.SERVICE_UNAVAILABLE,
+                            httpx.codes.GATEWAY_TIMEOUT,
+                        ):
+                            raise
+                    if isinstance(exc, ValueError) and not isinstance(
+                        exc.__cause__, DecodeError
+                    ):
+                        raise
+                    log(WARNING, "Task acquisition outcome unknown: %s", exc)
+                    time.sleep(HEARTBEAT_DEFAULT_INTERVAL)
+                    continue
+                if combined_res.HasField("task") and combined_res.token:
+                    task, token = combined_res.task, combined_res.token
+            else:
+                # Preserve custom selection and task-specific capacity checks.
+                tasks_res = client.PullPendingTasks(request=PullPendingTasksRequest())
+                if tasks_res.tasks:
+                    task = plugin.select_task(tasks_res.tasks)
 
-            # If a task was selected, claim it
-            if task is not None:
+            if task is not None and not use_combined_acquisition:
                 try:
                     task_type = TaskType(task.type)
                 except ValueError:
@@ -287,11 +347,12 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
                 claim_req = ClaimTaskRequest(task_id=task.task_id)
                 claim_res = client.ClaimTask(claim_req)
+                token = claim_res.token
 
-                # Launch the app if a token was granted; do nothing if not
-                if claim_res.token:
-                    launch_result = plugin.launch_task(token=claim_res.token, task=task)
-                    _handle_launch_result(launch_result, task)
+            # Launch only when the atomic claim granted a token.
+            if task is not None and token:
+                launch_result = plugin.launch_task(token=token, task=task)
+                _handle_launch_result(launch_result, task)
 
             # Sleep for a while before checking again
             time.sleep(task_poll_interval)

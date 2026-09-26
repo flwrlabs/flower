@@ -17,16 +17,22 @@
 
 from logging import ERROR, WARNING
 from typing import Any
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
+import httpx
 import pytest
+from google.protobuf.message import DecodeError
 
+from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL
+from flwr.proto.runtime_pb2 import PullAndClaimTaskResponse  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import ExecutorType, TaskType
 from flwr.supercore.interceptors import (
     RuntimeVersionHttpInterceptor,
     SuperExecAuthHttpInterceptor,
 )
 from flwr.supercore.superexec.executor import LaunchResult, LaunchResultStatus
+from flwr.supercore.superexec.plugin import AutoExecPlugin
 
 from . import run_superexec as run_superexec_module
 
@@ -74,6 +80,70 @@ def _run_superexec_one_launch(
         )
 
     return log, plugin, client, executor, sleep_mock
+
+
+def test_builtin_subprocess_uses_combined_acquisition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Connection and response failures do not stop task acquisition."""
+    task = Task(task_id=123, type=TaskType.MODEL)
+    invalid_response = ValueError("Invalid protobuf response payload")
+    invalid_response.__cause__ = DecodeError("malformed response")
+    client = Mock()
+    client.PullAndClaimTask.side_effect = [
+        httpx.ConnectError("connection refused"),
+        httpx.ReadTimeout("response lost"),
+        invalid_response,
+        PullAndClaimTaskResponse(),
+        PullAndClaimTaskResponse(task=task, token="task-token"),
+    ]
+    client_class = Mock()
+    client_class.from_server_address.return_value = client
+    executor = Mock()
+    executor.launch.return_value = LaunchResult.accepted()
+    order = Mock()
+    order.attach_mock(executor.wait_for_capacity, "capacity")
+    order.attach_mock(client.PullAndClaimTask, "acquire")
+    monkeypatch.setattr(
+        run_superexec_module, "get_executor", Mock(return_value=executor)
+    )
+    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
+    sleep = Mock(side_effect=[None, None, None, None, KeyboardInterrupt()])
+    monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep)
+
+    with pytest.raises(KeyboardInterrupt):
+        run_superexec_module.run_superexec(
+            plugin_class=AutoExecPlugin,
+            client_class=client_class,
+            runtime_api_address="127.0.0.1:9091",
+            insecure=True,
+        )
+
+    assert [call[0] for call in order.mock_calls] == [
+        "capacity",
+        "acquire",
+        "capacity",
+        "acquire",
+        "capacity",
+        "acquire",
+        "capacity",
+        "acquire",
+        "capacity",
+        "acquire",
+    ]
+    assert sleep.call_args_list[:3] == [
+        call(1.0),
+        call(HEARTBEAT_DEFAULT_INTERVAL),
+        call(HEARTBEAT_DEFAULT_INTERVAL),
+    ]
+    assert set(client.PullAndClaimTask.call_args.args[0].supported_task_types) == set(
+        AutoExecPlugin.supported_task_types
+    )
+    client.PullPendingTasks.assert_not_called()
+    client.ClaimTask.assert_not_called()
+    executor.launch.assert_called_once()
+    assert executor.launch.call_args.args[0].task_id == task.task_id
+    assert executor.launch.call_args.args[0].token == "task-token"
 
 
 @pytest.mark.parametrize(
@@ -160,6 +230,7 @@ def test_run_superexec_passes_executor_config_to_factory(
         insecure=insecure,
         root_certificates_path=root_certificates_path,
     )
+    client.PullAndClaimTask.assert_not_called()
     get_executor.return_value.reconcile.assert_called_once_with()
     get_executor.return_value.close.assert_called_once_with()
 
@@ -195,6 +266,8 @@ def test_run_superexec_preserves_accepted_launch_behavior(
     )
 
     stub.ClaimTask.assert_called_once()
+    plugin.select_task.assert_called_once()
+    stub.PullAndClaimTask.assert_not_called()
     plugin.launch_task.assert_called_once()
     executor.wait_for_capacity.assert_called_once_with(
         task_type=TaskType.AGENT_APP,

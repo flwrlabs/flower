@@ -45,6 +45,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    PullAndClaimTaskRequest,
+    PullAndClaimTaskResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -86,6 +88,10 @@ PullPendingTasksAuthDependency = Annotated[
     None,
     Depends(SuperExecAuthDependency("/flwr.proto.Runtime/PullPendingTasks")),
 ]
+PullAndClaimTaskAuthDependency = Annotated[
+    None,
+    Depends(SuperExecAuthDependency("/flwr.proto.Runtime/PullAndClaimTask")),
+]
 ClaimTaskAuthDependency = Annotated[
     None,
     Depends(SuperExecAuthDependency("/flwr.proto.Runtime/ClaimTask")),
@@ -101,6 +107,17 @@ def pull_pending_tasks(
 ) -> PullPendingTasksResponse:
     """Pull pending tasks."""
     return handlers.pull_pending_tasks(request, state)
+
+
+@router.post("/pull-and-claim-task")
+def pull_and_claim_task(
+    request: Annotated[PullAndClaimTaskRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
+    _auth: PullAndClaimTaskAuthDependency,
+) -> PullAndClaimTaskResponse:
+    """Pull and claim the oldest supported pending task."""
+    return handlers.pull_and_claim_task(request, state)
 
 
 @router.post("/claim-task")

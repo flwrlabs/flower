@@ -51,6 +51,7 @@ from flwr.supernode.servicer.runtime import runtime_handlers
 
 _SUPEREXEC_PATHS = {
     "/v1/runtime/pull-pending-tasks",
+    "/v1/runtime/pull-and-claim-task",
     "/v1/runtime/claim-task",
 }
 
@@ -129,7 +130,7 @@ def test_all_runtime_routes_have_protobuf_request_types() -> None:
         if route_key[1].startswith("/v1/runtime/")
     }
 
-    assert len(route_keys) == 20
+    assert len(route_keys) == 21
     assert route_keys == runtime_request_types
 
 

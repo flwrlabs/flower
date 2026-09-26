@@ -41,6 +41,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    PullAndClaimTaskRequest,
+    PullAndClaimTaskResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -67,8 +69,22 @@ from flwr.supercore.protobuf.client import ProtobufClient
 
 # Match the method names defined by the Runtime protobuf service.
 # pylint: disable=invalid-name
-class RuntimeHttpClient(ProtobufClient):
+class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-methods
     """Protobuf-over-HTTP client for the Runtime API."""
+
+    def PullAndClaimTask(
+        self, request: PullAndClaimTaskRequest
+    ) -> PullAndClaimTaskResponse:
+        """Claim the oldest pending task with a supported type."""
+        return self._unary_unary(
+            path="/v1/runtime/pull-and-claim-task",
+            rpc_method="/flwr.proto.Runtime/PullAndClaimTask",
+            request=request,
+            response_type=PullAndClaimTaskResponse,
+            # A lost response may follow a successful claim; retrying could claim
+            # another task without launching the first one.
+            retry=False,
+        )
 
     def PullPendingTasks(
         self, request: PullPendingTasksRequest

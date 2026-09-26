@@ -45,6 +45,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    PullAndClaimTaskRequest,
+    PullAndClaimTaskResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -69,6 +71,13 @@ def pull_pending_tasks(
 ) -> PullPendingTasksResponse:
     """Pull pending tasks."""
     return core_runtime_handlers.pull_pending_tasks(request, state)
+
+
+def pull_and_claim_task(
+    request: PullAndClaimTaskRequest, state: NodeState
+) -> PullAndClaimTaskResponse:
+    """Claim a supported pending task."""
+    return core_runtime_handlers.pull_and_claim_task(request, state)
 
 
 def pull_task_input(
