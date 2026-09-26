@@ -286,12 +286,15 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                     override_federation_config=res.federation_config,
                     federation=run.federation_id,
                     series_id=run.series_id,
+                    connector_ids=res.connector_ids,
                 ),
                 events=self._agent_events,
             )
             agent = RuntimeAgentSession(
                 prompt=prompt,
-                connectors=RuntimeAgentConnectors(agent_runtime),
+                connectors=RuntimeAgentConnectors(
+                    agent_runtime, connector_ids=res.connector_ids
+                ),
                 events=self._agent_events,
                 grid=RuntimeAgentGrid(grid, self._agent_events, self._context.node_id),
             )

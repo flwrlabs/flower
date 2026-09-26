@@ -34,7 +34,7 @@ from uuid import uuid4
 
 from google.protobuf.message import DecodeError
 from parameterized import parameterized
-from sqlalchemy import event, insert, select
+from sqlalchemy import event, insert, select, update
 from sqlalchemy.sql.dml import Update
 
 from flwr.app import DEFAULT_TTL, Error, Message, RecordDict
@@ -376,28 +376,28 @@ class StateTest(CoreStateTest):
 
         run_id = create_dummy_run(
             state,
-            connector_refs=["notion", "github", "notion"],
+            connector_ids=[2, 1, 2],
         )
 
         self.assertEqual(
-            list(state.get_run_connector_refs(run_id=run_id)),
-            ["github", "notion"],
+            list(state.get_run_connector_ids(run_id=run_id)),
+            [1, 2],
         )
 
-    def test_create_run_rejects_empty_connector_ref(self) -> None:
+    def test_create_run_rejects_invalid_connector_id(self) -> None:
         """An invalid connector allowlist should prevent run creation."""
         state = self.state_factory()
 
-        run_id = create_dummy_run(state, connector_refs=[""])
+        run_id = create_dummy_run(state, connector_ids=[0])
 
         self.assertEqual(run_id, 0)
         self.assertEqual(list(state.get_run_info()), [])
 
-    def test_create_run_rejects_string_connector_refs(self) -> None:
-        """A string should not be interpreted as a sequence of connector refs."""
+    def test_create_run_rejects_string_connector_ids(self) -> None:
+        """A string should not be interpreted as a sequence of connector IDs."""
         state = self.state_factory()
 
-        run_id = create_dummy_run(state, connector_refs="notion")
+        run_id = create_dummy_run(state, connector_ids="1")  # type: ignore
 
         self.assertEqual(run_id, 0)
         self.assertEqual(list(state.get_run_info()), [])
@@ -2490,7 +2490,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     flwr_aid: str | None = "mock_flwr_aid",
     primary_task_type: str = TaskType.SERVER_APP,
     series_id: int | None = None,
-    connector_refs: Sequence[str] = (),
+    connector_ids: Sequence[int] = (),
 ) -> int:
     """Create a dummy run."""
     return state.create_run(
@@ -2503,7 +2503,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         flwr_aid=flwr_aid,
         primary_task_type=primary_task_type,
         series_id=series_id,
-        connector_refs=connector_refs,
+        connector_ids=connector_ids,
     )
 
 
@@ -2614,13 +2614,18 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state = self.state_factory()
 
         with state.session() as session:
-            state.upsert_connector(
-                federation_id="@bob/fed-a",
-                connector_ref="calendar",
-                credentials_json='{"token":"old"}',
-                config_json='{"calendar":"primary"}',
-                created_by="account-a",
+            self.assertTrue(
+                state.create_connector(
+                    federation_id="@bob/fed-a",
+                    connector_ref="calendar",
+                    credentials_json='{"token":"old"}',
+                    config_json='{"calendar":"primary"}',
+                    created_by="account-a",
+                )
             )
+            connector_id = state.get_connectors_by_ref("@bob/fed-a", "calendar")[
+                0
+            ].connector_id
             cached_row = session.scalar(
                 select(ConnectorModel).where(
                     ConnectorModel.federation_id == "@bob/fed-a",
@@ -2629,16 +2634,15 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
             )
             assert cached_row is not None
             self.assertEqual(cached_row.credentials_json, '{"token":"old"}')
-            state.upsert_connector(
-                federation_id="@bob/fed-a",
-                connector_ref="calendar",
-                credentials_json='{"token":"new"}',
-                config_json='{"calendar":"work"}',
-                created_by="account-a",
+            session.execute(
+                update(ConnectorModel)
+                .where(ConnectorModel.connector_id == connector_id)
+                .values(
+                    credentials_json='{"token":"new"}',
+                    config_json='{"calendar":"work"}',
+                )
             )
-            second = state.get_connector(
-                federation_id="@bob/fed-a", connector_ref="calendar"
-            )
+            second = state.get_connectors_by_ref("@bob/fed-a", "calendar")[0]
 
         assert second is not None
         self.assertEqual(second.credentials_json, '{"token":"new"}')
