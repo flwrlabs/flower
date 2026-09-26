@@ -24,7 +24,7 @@ from parameterized import parameterized
 
 from flwr.app import ConfigRecord, Message, Metadata, RecordDict
 from flwr.app.message import make_message
-from flwr.common.constant import SUPERLINK_NODE_ID, ErrorCode
+from flwr.common.constant import SUPERLINK_NODE_ID, ErrorCode, SubStatus
 from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.corestate.utils_test import create_task_message
@@ -278,6 +278,69 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.assertGreater(
             self.state.get_message_processing_duration(msg.metadata.message_id), 0.0
         )
+
+    def test_failed_agent_task_creates_error_reply(self) -> None:
+        """A failed AgentApp task should reply to its retrieved request."""
+        run_id = 110
+        task_id = self.state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+        assert self.state.claim_task(task_id)
+        assert self.state.activate_task(task_id)
+        msg = make_dummy_message(run_id=run_id)
+        self.state.store_message(msg)
+        assert self.state.get_messages(run_ids=[run_id], is_reply=False) == [msg]
+        self.state.record_message_processing_start(msg.metadata.message_id)
+
+        assert self.state.finish_task(task_id, SubStatus.FAILED, "AgentApp crashed")
+
+        replies = self.state.get_messages(is_reply=True)
+        self.assertEqual(len(replies), 1)
+        self.assertEqual(
+            replies[0].metadata.reply_to_message_id, msg.metadata.message_id
+        )
+        self.assertEqual(replies[0].error.code, ErrorCode.UNKNOWN)
+        self.assertEqual(replies[0].error.reason, "AgentApp failed before replying.")
+
+    def test_failed_agent_task_does_not_duplicate_reply(self) -> None:
+        """Failure after an AgentApp reply should not generate another reply."""
+        run_id = 110
+        task_id = self.state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+        assert self.state.claim_task(task_id)
+        assert self.state.activate_task(task_id)
+        msg = make_dummy_message(run_id=run_id)
+        self.state.store_message(msg)
+        assert self.state.get_messages(run_ids=[run_id], is_reply=False) == [msg]
+        reply = Message(RecordDict(), reply_to=msg)
+        reply.metadata.__dict__["_message_id"] = reply.object_id
+        self.state.store_message(reply)
+
+        assert self.state.finish_task(task_id, SubStatus.FAILED, "AgentApp crashed")
+
+        self.assertEqual(self.state.get_messages(is_reply=True), [reply])
+
+    def test_expired_agent_task_creates_error_reply(self) -> None:
+        """An AgentApp that exits without reporting failure should still reply."""
+        run_id = 110
+        created_at = now()
+        task_id = self.state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+        assert self.state.claim_task(task_id)
+        assert self.state.activate_task(task_id)
+        msg = make_dummy_message(run_id=run_id)
+        self.state.store_message(msg)
+        assert self.state.get_messages(run_ids=[run_id], is_reply=False) == [msg]
+        self.state.record_message_processing_start(msg.metadata.message_id)
+
+        with patch("datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = created_at + timedelta(seconds=1e5)
+            replies = self.state.get_messages(is_reply=True)
+
+        self.assertEqual(len(replies), 1)
+        self.assertEqual(
+            replies[0].metadata.reply_to_message_id, msg.metadata.message_id
+        )
+        self.assertEqual(replies[0].error.code, ErrorCode.UNKNOWN)
 
     def test_record_message_processing_timing(self) -> None:
         """Test recording message processing start and end times."""
