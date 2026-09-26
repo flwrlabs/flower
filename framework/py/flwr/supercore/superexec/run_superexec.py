@@ -19,6 +19,7 @@ import math
 import os
 import time
 from logging import ERROR, WARNING
+from time import monotonic
 from typing import Any, cast
 
 import httpx
@@ -46,7 +47,7 @@ from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
-from .executor import LaunchResult, LaunchResultStatus, get_executor
+from .executor import Executor, LaunchResult, LaunchResultStatus, get_executor
 from .executor.config import ExecutorConfig
 from .plugin import AutoExecPlugin, ClientAppExecPlugin, ExecPlugin, ServerAppExecPlugin
 from .plugin.base_exec_plugin import BaseExecPlugin
@@ -55,6 +56,9 @@ _TASK_POLL_INTERVAL_ENV = "FLWR_SUPEREXEC_TASK_POLL_INTERVAL"
 _MIN_TASK_POLL_INTERVAL_SECONDS = 0.01
 _MAX_TASK_POLL_INTERVAL_SECONDS = 60.0
 _DEFAULT_TASK_POLL_INTERVAL_SECONDS = 1.0
+_TASK_WAIT_TIMEOUT_MS = 5_000
+_UNCERTAIN_CLAIM_BACKOFF_SECONDS = HEARTBEAT_DEFAULT_INTERVAL
+_SAFE_CONNECTION_ERRORS = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
 _SUPEREXEC_AUTH_METHODS = frozenset(
     {
         "/flwr.proto.Runtime/PullAndClaimTask",
@@ -133,6 +137,24 @@ def _handle_launch_result(result: LaunchResult, task: Task) -> None:
         f"Executor returned unrecognized launch result '{result.status}' "
         f"for task_id {task.task_id}. Reason: {message}"
     )
+
+
+def _wait_for_claim_expiry(executor: Executor) -> None:
+    """Avoid a second claim until an unknown first claim has expired."""
+    remaining = float(_UNCERTAIN_CLAIM_BACKOFF_SECONDS)
+    while remaining > 0:
+        interval = min(_TASK_WAIT_TIMEOUT_MS / 1_000, remaining)
+        time.sleep(interval)
+        executor.reconcile()
+        remaining -= interval
+
+
+def _backoff_after_fast_empty_poll(
+    started_at: float, task_poll_interval: float
+) -> None:
+    """Limit request rate when an older Runtime ignores the long-poll field."""
+    if monotonic() - started_at < 1.0:
+        time.sleep(max(task_poll_interval, 1.0))
 
 
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
@@ -278,20 +300,23 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             executor.reconcile()
             task = None
             token = None
+            sleep_after_poll = True
             if use_combined_acquisition:
                 executor.wait_for_capacity(
                     insecure=insecure,
                     root_certificates_path=root_certificates_path,
                 )
+                poll_started_at = monotonic()
                 try:
                     combined_res = client.PullAndClaimTask(
                         PullAndClaimTaskRequest(
                             supported_task_types=sorted(
                                 cast(BaseExecPlugin, plugin).supported_task_types
-                            )
+                            ),
+                            wait_timeout_ms=_TASK_WAIT_TIMEOUT_MS,
                         )
                     )
-                except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+                except _SAFE_CONNECTION_ERRORS as exc:
                     if any(
                         term in str(exc).lower()
                         for term in ("certificate", "ssl", "tls")
@@ -317,16 +342,31 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                         exc.__cause__, DecodeError
                     ):
                         raise
-                    log(WARNING, "Task acquisition outcome unknown: %s", exc)
-                    time.sleep(HEARTBEAT_DEFAULT_INTERVAL)
+                    log(
+                        WARNING,
+                        "Acquisition outcome unknown (%s); waiting for claim expiry",
+                        type(exc).__name__,
+                    )
+                    _wait_for_claim_expiry(executor)
                     continue
                 if combined_res.HasField("task") and combined_res.token:
                     task, token = combined_res.task, combined_res.token
+                else:
+                    _backoff_after_fast_empty_poll(poll_started_at, task_poll_interval)
+                    sleep_after_poll = False
             else:
                 # Preserve custom selection and task-specific capacity checks.
-                tasks_res = client.PullPendingTasks(request=PullPendingTasksRequest())
+                poll_started_at = monotonic()
+                tasks_res = client.PullPendingTasks(
+                    request=PullPendingTasksRequest(
+                        wait_timeout_ms=_TASK_WAIT_TIMEOUT_MS
+                    )
+                )
                 if tasks_res.tasks:
                     task = plugin.select_task(tasks_res.tasks)
+                else:
+                    _backoff_after_fast_empty_poll(poll_started_at, task_poll_interval)
+                    sleep_after_poll = False
 
             if task is not None and not use_combined_acquisition:
                 try:
@@ -346,16 +386,36 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                 )
 
                 claim_req = ClaimTaskRequest(task_id=task.task_id)
-                claim_res = client.ClaimTask(claim_req)
+                try:
+                    claim_res = client.ClaimTask(claim_req)
+                except _SAFE_CONNECTION_ERRORS:
+                    log(WARNING, "Runtime connection unavailable during task claim")
+                    time.sleep(task_poll_interval)
+                    continue
+                except (httpx.TransportError, httpx.HTTPStatusError, ValueError) as err:
+                    if (
+                        isinstance(err, httpx.HTTPStatusError)
+                        and err.response.status_code < 500
+                    ):
+                        raise
+                    log(
+                        WARNING,
+                        "Task claim outcome unknown (%s); waiting for claim expiry",
+                        type(err).__name__,
+                    )
+                    _wait_for_claim_expiry(executor)
+                    continue
                 token = claim_res.token
 
             # Launch only when the atomic claim granted a token.
             if task is not None and token:
                 launch_result = plugin.launch_task(token=token, task=task)
                 _handle_launch_result(launch_result, task)
+                sleep_after_poll = False
 
-            # Sleep for a while before checking again
-            time.sleep(task_poll_interval)
+            # A completed long poll or launch needs no extra delay.
+            if sleep_after_poll:
+                time.sleep(task_poll_interval)
     finally:
         client.close()
         executor.close()

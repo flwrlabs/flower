@@ -104,6 +104,7 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/ClaimTask",
             request=request,
             response_type=ClaimTaskResponse,
+            retry=False,
         )
 
     def SendTaskHeartbeat(

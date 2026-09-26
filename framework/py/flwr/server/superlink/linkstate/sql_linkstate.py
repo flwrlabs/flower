@@ -69,6 +69,7 @@ from flwr.supercore.state.schema.linkstate_models import MessageRes as MessageRe
 from flwr.supercore.state.schema.linkstate_models import Node as NodeModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
+from flwr.supercore.task_notification import TASK_AVAILABLE_SESSION_KEY
 from flwr.supercore.utils import (
     int64_to_uint64,
     simulation_config_from_json,
@@ -1030,6 +1031,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         details="",
                     )
                 )
+                session.info[TASK_AVAILABLE_SESSION_KEY] = True
                 if primary_task_type == TaskType.AGENT_APP and user_prompt is not None:
                     message = create_user_prompt_message(run_id, user_prompt)
                     self.store_message_ins(message)

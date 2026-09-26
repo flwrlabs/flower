@@ -17,12 +17,13 @@
 # pylint: disable=too-many-lines
 
 
+import asyncio
 import hashlib
 import os
 import tempfile
 import threading
 import unittest
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock, patch
 
 from parameterized import parameterized
@@ -55,6 +56,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullAndClaimTaskRequest,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
+    PullPendingTasksRequest,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushAppMessagesRequest,
@@ -81,6 +83,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     iterate_object_tree,
 )
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.routers.runtime.router import _wait_for_task
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.runtime import runtime_handlers
@@ -434,6 +437,52 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             order_by="updated_at",
         )
         self.assertEqual(active, [])
+
+    def test_due_automation_runs_during_idle_wait(self) -> None:
+        """A due automation is dispatched while an acquisition request waits."""
+        series_id = self.state.get_run_info(run_ids=[self._auth_run_id])[0].series_id
+        automation = self.state.store_automation(
+            federation_id=NOOP_FEDERATION_ID,
+            flwr_aid=NOOP_FLWR_AID,
+            start_run_request=StartRunRequest(
+                app_spec="@flwr/demo",
+                federation=NOOP_FEDERATION_ID,
+                series_id=series_id,
+            ),
+            series_id=series_id,
+            next_run_at=(
+                datetime.now(tz=UTC) + timedelta(milliseconds=200)
+            ).isoformat(),
+            max_runs=1,
+        )
+        request = PullPendingTasksRequest(wait_timeout_ms=2_000)
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
+                return_value=(b"fab", {}, None),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/demo", "0.1.0"),
+            ),
+        ):
+            response = asyncio.run(
+                _wait_for_task(
+                    request.wait_timeout_ms,
+                    lambda: runtime_handlers.pull_pending_tasks(request, self.state),
+                    lambda result: bool(result.tasks),
+                )
+            )
+
+        self.assertEqual(len(response.tasks), 1)
+        run = self.state.get_run_info(run_ids=[response.tasks[0].run_id])[0]
+        self.assertEqual(run.series_id, automation.series_id)
 
     def _create_dummy_run(self, running: bool = True, *, fab_hash: str = "") -> int:
         run_id = self.state.create_run(

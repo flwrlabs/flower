@@ -175,7 +175,9 @@ def test_pull_and_claim_task_allows_with_superexec_metadata(
     """Signed acquisition returns a task and its claim token."""
     task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
     assert task_id is not None
-    proto_request = PullAndClaimTaskRequest(supported_task_types=[TaskType.CLIENT_APP])
+    proto_request = PullAndClaimTaskRequest(
+        supported_task_types=[TaskType.CLIENT_APP], wait_timeout_ms=5_000
+    )
     headers = create_superexec_auth_metadata(
         auth_secret=derive_auth_secret(_SUPEREXEC_SECRET),
         method=_PULL_AND_CLAIM_TASK_METHOD,

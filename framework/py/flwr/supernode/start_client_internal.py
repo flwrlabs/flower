@@ -397,15 +397,50 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             state.store_run(run_info)
             state.store_fab(fab)
 
-        # Create task
+        # Preregister the object tree of the message
+        obj_ids_to_pull = object_store.preregister(run_id, object_tree)
+
+        # Store the message in the state (note this message has no content)
+        state.store_message(message)
+
+        task_type = (
+            TaskType.AGENT_APP
+            if run_info.primary_task_type == TaskType.AGENT_APP
+            else TaskType.CLIENT_APP
+        )
+        try:
+            # Pull and store objects of the message in the ObjectStore
+            obj_contents = pull_objects(
+                obj_ids_to_pull,
+                pull_object_fn=lambda obj_id: pull_object(run_id, obj_id),
+            )
+            for obj_id in list(obj_contents.keys()):
+                object_store.put(obj_id, obj_contents.pop(obj_id))
+        except Exception as err:  # pylint: disable=broad-except
+            log(
+                ERROR,
+                "Failed to receive message %s: %s",
+                message.metadata.message_id,
+                err,
+            )
+            state.delete_messages(message_ids=[message.metadata.message_id])
+            object_store.delete(message.metadata.message_id)
+            # Preserve the failed-task record without exposing incomplete input
+            # to a task executor during the object transfer.
+            failed_task_id = state.create_task(
+                task_type=task_type, run_id=run_id, fab_hash=run_info.fab_hash
+            )
+            if failed_task_id is not None:
+                state.finish_task(
+                    failed_task_id,
+                    sub_status=SubStatus.FAILED,
+                    details=f"Pulling message objects failed: {err}",
+                )
+            return None
+
+        # A pending task becomes visible only after its message objects are ready.
         task_id = state.create_task(
-            task_type=(
-                TaskType.AGENT_APP
-                if run_info.primary_task_type == TaskType.AGENT_APP
-                else TaskType.CLIENT_APP
-            ),
-            run_id=run_id,
-            fab_hash=run_info.fab_hash,
+            task_type=task_type, run_id=run_id, fab_hash=run_info.fab_hash
         )
         if task_id is None:
             # Task creation can fail if the generated uint64 task ID collides
@@ -415,23 +450,11 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                 "processed.",
                 run_id,
             )
+            state.delete_messages(message_ids=[message.metadata.message_id])
+            object_store.delete(message.metadata.message_id)
             return None
 
-        # Preregister the object tree of the message
-        obj_ids_to_pull = object_store.preregister(run_id, object_tree)
-
-        # Store the message in the state (note this message has no content)
-        state.store_message(message)
-
         try:
-            # Pull and store objects of the message in the ObjectStore
-            obj_contents = pull_objects(
-                obj_ids_to_pull,
-                pull_object_fn=lambda obj_id: pull_object(run_id, obj_id),
-            )
-            for obj_id in list(obj_contents.keys()):
-                object_store.put(obj_id, obj_contents.pop(obj_id))
-
             # Confirm that the message was received
             confirm_message_received(run_id, message.metadata.message_id)
             log(INFO, "Received successfully")

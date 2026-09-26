@@ -38,9 +38,14 @@ class PullPendingTasksRequest(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    WAIT_TIMEOUT_MS_FIELD_NUMBER: builtins.int
+    wait_timeout_ms: builtins.int
     def __init__(
         self,
+        *,
+        wait_timeout_ms: builtins.int = ...,
     ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["wait_timeout_ms", b"wait_timeout_ms"]) -> None: ...
 
 global___PullPendingTasksRequest = PullPendingTasksRequest
 
@@ -575,14 +580,17 @@ class PullAndClaimTaskRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SUPPORTED_TASK_TYPES_FIELD_NUMBER: builtins.int
+    WAIT_TIMEOUT_MS_FIELD_NUMBER: builtins.int
+    wait_timeout_ms: builtins.int
     @property
     def supported_task_types(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
         supported_task_types: collections.abc.Iterable[builtins.str] | None = ...,
+        wait_timeout_ms: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["supported_task_types", b"supported_task_types"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["supported_task_types", b"supported_task_types", "wait_timeout_ms", b"wait_timeout_ms"]) -> None: ...
 
 global___PullAndClaimTaskRequest = PullAndClaimTaskRequest
 

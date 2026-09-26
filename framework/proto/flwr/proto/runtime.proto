@@ -25,7 +25,7 @@ import "flwr/proto/run.proto";
 import "flwr/proto/task.proto";
 
 // PullPendingTasks messages
-message PullPendingTasksRequest {}
+message PullPendingTasksRequest { uint32 wait_timeout_ms = 1; }
 message PullPendingTasksResponse { repeated Task tasks = 1; }
 
 // ClaimTask messages
@@ -122,7 +122,10 @@ message CreateTaskRequest {
 message CreateTaskResponse { optional uint64 task_id = 1; }
 
 // PullAndClaimTask messages
-message PullAndClaimTaskRequest { repeated string supported_task_types = 1; }
+message PullAndClaimTaskRequest {
+  repeated string supported_task_types = 1;
+  uint32 wait_timeout_ms = 2;
+}
 message PullAndClaimTaskResponse {
   Task task = 1;
   string token = 2;
