@@ -22,6 +22,7 @@ from logging import ERROR, WARNING
 from typing import Any, cast
 
 import httpx
+from google.protobuf.message import DecodeError
 
 from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL, RUNTIME_DEPENDENCY_INSTALL
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
@@ -304,6 +305,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                     httpx.TimeoutException,
                     httpx.RemoteProtocolError,
                     httpx.HTTPStatusError,
+                    ValueError,
                 ) as exc:
                     if isinstance(exc, httpx.HTTPStatusError):
                         if exc.response.status_code not in (
@@ -311,6 +313,10 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                             httpx.codes.GATEWAY_TIMEOUT,
                         ):
                             raise
+                    if isinstance(exc, ValueError) and not isinstance(
+                        exc.__cause__, DecodeError
+                    ):
+                        raise
                     log(WARNING, "Task acquisition outcome unknown: %s", exc)
                     time.sleep(HEARTBEAT_DEFAULT_INTERVAL)
                     continue
