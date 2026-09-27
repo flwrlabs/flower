@@ -21,7 +21,6 @@ import time
 from logging import ERROR, WARNING
 from typing import Any, cast
 
-import httpx
 from google.protobuf.message import DecodeError
 
 from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL, RUNTIME_DEPENDENCY_INSTALL
@@ -291,31 +290,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                             )
                         )
                     )
-                except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
-                    if any(
-                        term in str(exc).lower()
-                        for term in ("certificate", "ssl", "tls")
-                    ):
-                        raise
-                    log(WARNING, "Runtime API connection failed: %s", exc)
-                    time.sleep(max(task_poll_interval, 1.0))
-                    continue
-                except (
-                    httpx.NetworkError,
-                    httpx.TimeoutException,
-                    httpx.RemoteProtocolError,
-                    httpx.HTTPStatusError,
-                    ValueError,
-                ) as exc:
-                    if isinstance(exc, httpx.HTTPStatusError):
-                        if exc.response.status_code not in (
-                            httpx.codes.SERVICE_UNAVAILABLE,
-                            httpx.codes.GATEWAY_TIMEOUT,
-                        ):
-                            raise
-                    if isinstance(exc, ValueError) and not isinstance(
-                        exc.__cause__, DecodeError
-                    ):
+                except ValueError as exc:
+                    if not isinstance(exc.__cause__, DecodeError):
                         raise
                     log(WARNING, "Task acquisition outcome unknown: %s", exc)
                     time.sleep(HEARTBEAT_DEFAULT_INTERVAL)

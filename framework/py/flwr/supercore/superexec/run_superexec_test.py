@@ -19,7 +19,6 @@ from logging import ERROR, WARNING
 from typing import Any
 from unittest.mock import Mock, call
 
-import httpx
 import pytest
 from google.protobuf.message import DecodeError
 
@@ -85,14 +84,12 @@ def _run_superexec_one_launch(
 def test_builtin_subprocess_uses_combined_acquisition(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Connection and response failures do not stop task acquisition."""
+    """Malformed responses do not stop combined task acquisition."""
     task = Task(task_id=123, type=TaskType.MODEL)
     invalid_response = ValueError("Invalid protobuf response payload")
     invalid_response.__cause__ = DecodeError("malformed response")
     client = Mock()
     client.PullAndClaimTask.side_effect = [
-        httpx.ConnectError("connection refused"),
-        httpx.ReadTimeout("response lost"),
         invalid_response,
         PullAndClaimTaskResponse(),
         PullAndClaimTaskResponse(task=task, token="task-token"),
@@ -108,7 +105,7 @@ def test_builtin_subprocess_uses_combined_acquisition(
         run_superexec_module, "get_executor", Mock(return_value=executor)
     )
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
-    sleep = Mock(side_effect=[None, None, None, None, KeyboardInterrupt()])
+    sleep = Mock(side_effect=[None, None, KeyboardInterrupt()])
     monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep)
 
     with pytest.raises(KeyboardInterrupt):
@@ -126,15 +123,11 @@ def test_builtin_subprocess_uses_combined_acquisition(
         "acquire",
         "capacity",
         "acquire",
-        "capacity",
-        "acquire",
-        "capacity",
-        "acquire",
     ]
-    assert sleep.call_args_list[:3] == [
+    assert sleep.call_args_list == [
+        call(HEARTBEAT_DEFAULT_INTERVAL),
         call(1.0),
-        call(HEARTBEAT_DEFAULT_INTERVAL),
-        call(HEARTBEAT_DEFAULT_INTERVAL),
+        call(1.0),
     ]
     assert set(client.PullAndClaimTask.call_args.args[0].supported_task_types) == set(
         AutoExecPlugin.supported_task_types
