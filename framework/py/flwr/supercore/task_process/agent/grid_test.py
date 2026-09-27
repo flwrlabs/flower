@@ -152,45 +152,40 @@ def test_runtime_agent_grid_tools() -> None:
 
 
 def test_supernode_agent_grid_only_pushes_one_reply() -> None:
-    """SuperNode agents should send one reply through their only Grid tool."""
+    """Reply using the received instruction's IDs, not model-supplied IDs."""
     grid = Mock()
     grid.push_messages.return_value = ["reply-1"]
-    agent_grid = RuntimeAgentGrid(grid, Mock(), node_id=789)
+    instruction = Message(
+        RecordDict(
+            {
+                AGENT_MESSAGE_CONTENT_RECORD_KEY: ConfigRecord(
+                    {AGENT_MESSAGE_TEXT_KEY: "request"}
+                )
+            }
+        ),
+        dst_node_id=789,
+        message_type="query",
+    )
+    instruction.metadata.__dict__["_message_id"] = "request-1"
+    instruction.metadata.__dict__["_src_node_id"] = 11
+    agent_grid = RuntimeAgentGrid(
+        grid, Mock(), node_id=789, instruction_metadata=instruction.metadata
+    )
 
     tools = agent_grid.tools()
     assert [tool["name"] for tool in tools] == ["push_reply_message"]
     parameters = cast(JSONObject, tools[0]["parameters"])
-    assert parameters["required"] == [
-        "dst_node_id",
-        "payload",
-        "reply_to_message_id",
-    ]
-    assert "messages" not in cast(JSONObject, parameters["properties"])
+    assert parameters["required"] == ["payload"]
+    assert list(cast(JSONObject, parameters["properties"])) == ["payload"]
     with pytest.raises(ValueError, match="Unsupported Grid tool 'push_messages'"):
         agent_grid.call({"name": "push_messages", "call_id": "call-0", "arguments": {}})
-    with pytest.raises(ValueError, match="A reply_to_message_id is required"):
-        agent_grid.call(
-            {
-                "name": "push_reply_message",
-                "call_id": "call-0",
-                "arguments": {
-                    "dst_node_id": "1",
-                    "payload": "done",
-                    "reply_to_message_id": "",
-                },
-            }
-        )
     grid.push_messages.assert_not_called()
 
     pushed = agent_grid.call(
         {
             "name": "push_reply_message",
             "call_id": "call-1",
-            "arguments": {
-                "dst_node_id": "1",
-                "payload": "done",
-                "reply_to_message_id": "request-1",
-            },
+            "arguments": {"payload": "done"},
         }
     )
 
@@ -198,7 +193,7 @@ def test_supernode_agent_grid_only_pushes_one_reply() -> None:
     grid.push_messages.assert_called_once()
     sent = list(grid.push_messages.call_args.args[0])
     assert len(sent) == 1
-    assert sent[0].metadata.dst_node_id == 1
+    assert sent[0].metadata.dst_node_id == 11
     assert sent[0].metadata.reply_to_message_id == "request-1"
     assert (
         sent[0].content[AGENT_MESSAGE_CONTENT_RECORD_KEY][AGENT_MESSAGE_TEXT_KEY]
