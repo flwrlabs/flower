@@ -39,7 +39,7 @@ from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
 _GRID_TOOL_NAMES = {"get_nodes", "push_messages", "pull_messages"}
-_SUPERNODE_GRID_TOOL_NAMES = {"push_messages"}
+_SUPERNODE_GRID_TOOL_NAMES = {"push_reply_message"}
 
 
 def _grid_tools() -> list[JSONObject]:
@@ -169,6 +169,41 @@ def _grid_tools() -> list[JSONObject]:
                     }
                 },
                 "required": ["results"],
+                "additionalProperties": False,
+            },
+            strict=True,
+        ),
+        function_tool(
+            "push_reply_message",
+            (
+                "Send one reply to the current message. Copy its message_id into "
+                "reply_to_message_id exactly and its src_node_id into dst_node_id. "
+                "Do not resend a reply already sent."
+            ),
+            properties={
+                "dst_node_id": string_property(
+                    "Source node ID of the message being replied to, as a decimal "
+                    "uint64 string."
+                ),
+                "payload": string_property("Reply payload to send."),
+                "reply_to_message_id": string_property(
+                    "Message ID of the message being replied to."
+                ),
+            },
+            required=["dst_node_id", "payload", "reply_to_message_id"],
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "message_id": {
+                        "type": ["string", "null"],
+                        "description": "Accepted reply ID, or null if rejected.",
+                    },
+                    "error": {
+                        "type": ["string", "null"],
+                        "description": "Failure reason, or null if accepted.",
+                    },
+                },
+                "required": ["message_id", "error"],
                 "additionalProperties": False,
             },
             strict=True,
@@ -317,6 +352,24 @@ class RuntimeAgentGrid(AgentGrid):
         }
 
     def _push_messages(self, messages: list[JSONObject]) -> JSONObject:
+        return {"results": self._send_messages(messages)}
+
+    def _push_reply_message(
+        self, dst_node_id: str, payload: str, reply_to_message_id: str
+    ) -> JSONObject:
+        if not reply_to_message_id:
+            raise ValueError("A reply_to_message_id is required.")
+        return self._send_messages(
+            [
+                {
+                    "dst_node_id": dst_node_id,
+                    "payload": payload,
+                    "reply_to_message_id": reply_to_message_id,
+                }
+            ]
+        )[0]
+
+    def _send_messages(self, messages: list[JSONObject]) -> list[JSONObject]:
         if not messages:
             raise ValueError("At least one message is required.")
 
@@ -345,15 +398,13 @@ class RuntimeAgentGrid(AgentGrid):
         message_ids = list(self._grid.push_messages(outgoing))
         if len(message_ids) != len(outgoing):
             raise RuntimeError("Grid returned an unexpected number of message IDs.")
-        return {
-            "results": [
-                {
-                    "message_id": message_id or None,
-                    "error": None if message_id else "Message was not accepted.",
-                }
-                for message_id in message_ids
-            ]
-        }
+        return [
+            {
+                "message_id": message_id or None,
+                "error": None if message_id else "Message was not accepted.",
+            }
+            for message_id in message_ids
+        ]
 
     def _pull_messages(self, message_ids: list[str], timeout: float) -> JSONObject:
         if not 0 <= timeout <= 300:

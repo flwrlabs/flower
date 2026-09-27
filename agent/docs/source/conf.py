@@ -23,7 +23,7 @@ project = "Flower Agent"
 copyright = f"{datetime.date.today().year} Flower Labs GmbH"
 author = "The Flower Authors"
 
-release = "1.37.0"
+release = "1.38.0"
 
 extensions = ["myst_parser", "sphinx_substitution_extensions"]
 
