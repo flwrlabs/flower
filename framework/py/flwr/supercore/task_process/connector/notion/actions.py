@@ -226,12 +226,76 @@ ACTIONS = (
             "type": "object",
             "properties": {
                 "filter": {
-                    "type": "object",
+                    "anyOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "property": {
+                                    "type": "string",
+                                    "enum": [
+                                        "title",
+                                        "attendees",
+                                        "created_time",
+                                        "created_by",
+                                        "last_edited_time",
+                                        "last_edited_by",
+                                    ],
+                                    "description": "Meeting-note property to filter.",
+                                },
+                                "filter": {
+                                    "type": "object",
+                                    "properties": {
+                                        "operator": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "description": (
+                                                "Notion filter operator for the "
+                                                "selected property."
+                                            ),
+                                        },
+                                        "value": {
+                                            "description": (
+                                                "Optional operator-specific value "
+                                                "using Notion's documented text, "
+                                                "date, or person-filter shape."
+                                            ),
+                                        },
+                                    },
+                                    "required": ["operator"],
+                                    "additionalProperties": False,
+                                },
+                            },
+                            "required": ["property", "filter"],
+                            "additionalProperties": False,
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "operator": {
+                                    "type": "string",
+                                    "enum": ["and", "or"],
+                                    "description": "Filter combinator.",
+                                },
+                                "filters": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                    "items": {
+                                        "type": "object",
+                                        "description": (
+                                            "A property filter, or one nested and/or "
+                                            "combinator whose filters contain only "
+                                            "property filters."
+                                        ),
+                                    },
+                                },
+                            },
+                            "required": ["operator", "filters"],
+                            "additionalProperties": False,
+                        },
+                    ],
                     "description": (
-                        "A Notion meeting-note property filter or an and/or "
-                        "combinator. Supported properties are title, attendees, "
-                        "created_time, created_by, last_edited_time, and "
-                        "last_edited_by."
+                        "A single meeting-note property filter or an and/or "
+                        "combinator. Combinators may be nested one level."
                     ),
                 },
                 "sort": {
