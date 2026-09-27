@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from flwr.supercore.typing import JSONObject
+from flwr.supercore.typing import JSONObject, JSONValue
 
 from .. import registry
 from ..definition import ActionAccess
@@ -315,6 +315,20 @@ def test_notion_query_meeting_notes_rejects_non_string_sort_values(
         registry.invoke_connector(
             "notion_query_meeting_notes",
             {"sort": sort},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    request.assert_not_called()
+
+
+@pytest.mark.parametrize("limit", [0, 51, True, "25"])
+def test_notion_query_meeting_notes_rejects_invalid_limit(limit: JSONValue) -> None:
+    """Meeting-note limits should be integers between 1 and 50."""
+    with patch(_HTTP_REQUEST) as request, pytest.raises(ValueError):
+        registry.invoke_connector(
+            "notion_query_meeting_notes",
+            {"limit": limit},
             Mock(),
             credentials=_CREDENTIALS,
             config={},
