@@ -37,6 +37,8 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.warm_executor_constants import (
+    WARM_AGENTAPP_EXECUTOR_MODULE,
+    WARM_AGENTAPP_EXECUTOR_SOCKET,
     WARM_CONNECTOR_EXECUTOR_MODULE,
     WARM_CONNECTOR_EXECUTOR_SOCKET,
     WARM_EXECUTOR_BUSY_FILE,
@@ -56,6 +58,8 @@ from .warm_executor_dispatch import (
 )
 from .warm_executor_pool import (
     WARM_EXECUTOR_CONFIGURATION_ANNOTATION,
+    WARM_EXECUTOR_FAB_HASH_ANNOTATION,
+    WARM_EXECUTOR_FAB_PATH_ANNOTATION,
     WARM_EXECUTOR_LABEL,
     WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION,
     WARM_EXECUTOR_TASK_TYPES,
@@ -106,6 +110,7 @@ _RESERVED_TASKEXECUTOR_VOLUME_MOUNT_PATHS = frozenset(
         WARM_EXECUTOR_BUSY_FILE,
         WARM_EXECUTOR_READY_DIRECTORY,
         WARM_EXECUTOR_READY_FILE,
+        WARM_AGENTAPP_EXECUTOR_SOCKET,
         WARM_CONNECTOR_EXECUTOR_SOCKET,
         WARM_MODEL_EXECUTOR_SOCKET,
         WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH,
@@ -316,13 +321,11 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
         if self.warm_executor_owner and not _is_dns_label(self.warm_executor_owner):
             raise ValueError("warm_executor_owner must be a DNS label.")
         identities = [
-            (pool.key.task_type, pool.key.runtime_image)
+            (pool.key.task_type, pool.key.runtime_image, pool.key.fab_hash)
             for pool in self.warm_executor_pools
         ]
         if len(identities) != len(set(identities)):
-            raise ValueError(
-                "warm executor pools must not repeat a task type and image."
-            )
+            raise ValueError("warm executor pools must not repeat a routed identity.")
         warm_pod_count = sum(pool.size for pool in self.warm_executor_pools)
         if (
             self.active_pod_budget is not None
@@ -409,12 +412,14 @@ class KubernetesExecutor:
         self,
         task_type: TaskType | None = None,
         *,
+        fab_hash: str | None = None,
         insecure: bool = False,
         root_certificates_path: str | None = None,
     ) -> None:
         """Wait until the configured resource pool is below its active Pod budget."""
         self._wait_for_capacity(
             task_type,
+            fab_hash=fab_hash,
             allow_warm_dispatch=self._can_dispatch_warm(
                 insecure, root_certificates_path
             ),
@@ -431,6 +436,7 @@ class KubernetesExecutor:
         self,
         task_type: TaskType | None,
         *,
+        fab_hash: str | None = None,
         allow_warm_dispatch: bool,
         reconcile_warm_pools: bool,
     ) -> bool:
@@ -440,7 +446,7 @@ class KubernetesExecutor:
             has_ready_warm_pod = (
                 allow_warm_dispatch
                 and task_type is not None
-                and self._warm_executor_pool_manager.has_ready_pod(task_type)
+                and self._warm_executor_pool_manager.has_ready_pod(task_type, fab_hash)
             )
             self._warm_executor_pool_manager.ensure_capacity(
                 reserved_pod_capacity=0 if has_ready_warm_pod else 1
@@ -458,7 +464,7 @@ class KubernetesExecutor:
                 allow_warm_dispatch
                 and self._warm_executor_pool_manager is not None
                 and task_type is not None
-                and self._warm_executor_pool_manager.has_ready_pod(task_type)
+                and self._warm_executor_pool_manager.has_ready_pod(task_type, fab_hash)
             ):
                 return True
             try:
@@ -548,6 +554,7 @@ class KubernetesExecutor:
                     # capacity is full. Retry reservation when that happens.
                     if not self._wait_for_capacity(
                         spec.task_type,
+                        fab_hash=spec.fab_hash,
                         allow_warm_dispatch=allow_warm_dispatch,
                         reconcile_warm_pools=False,
                     ):
@@ -823,6 +830,18 @@ def _build_taskexecutor_pod(
 
 def _warm_executor_command(pool_key: WarmExecutorPoolKey) -> list[str]:
     """Return the process command compatible with a warm executor pool."""
+    if pool_key.task_type == TaskType.AGENT_APP and pool_key.fab_hash is not None:
+        assert pool_key.fab_path is not None
+        return [
+            "python",
+            "-m",
+            WARM_AGENTAPP_EXECUTOR_MODULE,
+            "serve",
+            "--fab-hash",
+            pool_key.fab_hash,
+            "--fab-path",
+            pool_key.fab_path,
+        ]
     if pool_key.task_type == TaskType.CONNECTOR:
         return ["python", "-m", WARM_CONNECTOR_EXECUTOR_MODULE, "serve"]
     if pool_key.task_type == TaskType.MODEL:
@@ -1216,7 +1235,12 @@ def _warm_executor_metadata(
 
     annotations: JSONObject = {}
     annotations.update(config.annotations or {})
-    annotations.pop(_WARM_EXECUTOR_CONSUMED_ANNOTATION, None)
+    for reserved_annotation in (
+        _WARM_EXECUTOR_CONSUMED_ANNOTATION,
+        WARM_EXECUTOR_FAB_HASH_ANNOTATION,
+        WARM_EXECUTOR_FAB_PATH_ANNOTATION,
+    ):
+        annotations.pop(reserved_annotation, None)
     annotations.update(
         {
             WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION: pool_key.runtime_image,
@@ -1225,6 +1249,10 @@ def _warm_executor_metadata(
             ),
         }
     )
+    if pool_key.fab_hash is not None:
+        assert pool_key.fab_path is not None
+        annotations[WARM_EXECUTOR_FAB_HASH_ANNOTATION] = pool_key.fab_hash
+        annotations[WARM_EXECUTOR_FAB_PATH_ANNOTATION] = pool_key.fab_path
     return {
         "name": name,
         "namespace": config.namespace,

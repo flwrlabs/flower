@@ -15,6 +15,7 @@
 """Runtime AgentGrid tests."""
 
 
+from typing import cast
 from unittest.mock import Mock
 
 import pytest
@@ -27,6 +28,7 @@ from flwr.supercore.constant import (
     AGENT_MESSAGE_TEXT_KEY,
 )
 from flwr.supercore.task_identity import TaskIdentity
+from flwr.supercore.typing import JSONObject
 
 from .grid import RuntimeAgentGrid
 
@@ -149,10 +151,56 @@ def test_runtime_agent_grid_tools() -> None:
     assert events.emit.call_count == 8
 
 
-def test_supernode_agent_grid_only_exposes_push_messages() -> None:
-    """SuperNode agents should only receive the Grid tool they can use."""
-    agent_grid = RuntimeAgentGrid(Mock(), Mock(), node_id=789)
+def test_supernode_agent_grid_only_pushes_one_reply() -> None:
+    """SuperNode agents should send one reply through their only Grid tool."""
+    grid = Mock()
+    grid.push_messages.return_value = ["reply-1"]
+    agent_grid = RuntimeAgentGrid(grid, Mock(), node_id=789)
 
-    assert [tool["name"] for tool in agent_grid.tools()] == ["push_messages"]
-    with pytest.raises(ValueError, match="Unsupported Grid tool 'get_nodes'"):
-        agent_grid.call({"name": "get_nodes", "call_id": "call-0", "arguments": {}})
+    tools = agent_grid.tools()
+    assert [tool["name"] for tool in tools] == ["push_reply_message"]
+    parameters = cast(JSONObject, tools[0]["parameters"])
+    assert parameters["required"] == [
+        "dst_node_id",
+        "payload",
+        "reply_to_message_id",
+    ]
+    assert "messages" not in cast(JSONObject, parameters["properties"])
+    with pytest.raises(ValueError, match="Unsupported Grid tool 'push_messages'"):
+        agent_grid.call({"name": "push_messages", "call_id": "call-0", "arguments": {}})
+    with pytest.raises(ValueError, match="A reply_to_message_id is required"):
+        agent_grid.call(
+            {
+                "name": "push_reply_message",
+                "call_id": "call-0",
+                "arguments": {
+                    "dst_node_id": "1",
+                    "payload": "done",
+                    "reply_to_message_id": "",
+                },
+            }
+        )
+    grid.push_messages.assert_not_called()
+
+    pushed = agent_grid.call(
+        {
+            "name": "push_reply_message",
+            "call_id": "call-1",
+            "arguments": {
+                "dst_node_id": "1",
+                "payload": "done",
+                "reply_to_message_id": "request-1",
+            },
+        }
+    )
+
+    assert pushed["output"] == '{"message_id":"reply-1","error":null}'
+    grid.push_messages.assert_called_once()
+    sent = list(grid.push_messages.call_args.args[0])
+    assert len(sent) == 1
+    assert sent[0].metadata.dst_node_id == 1
+    assert sent[0].metadata.reply_to_message_id == "request-1"
+    assert (
+        sent[0].content[AGENT_MESSAGE_CONTENT_RECORD_KEY][AGENT_MESSAGE_TEXT_KEY]
+        == "done"
+    )

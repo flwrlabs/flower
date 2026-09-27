@@ -28,11 +28,17 @@ from flwr.supercore.superexec.plugin.clientapp_exec_plugin import ClientAppExecP
 from .serverapp_exec_plugin import ServerAppExecPlugin
 
 
-def _get_task(*, task_id: int = 1, task_type: str = TaskType.CLIENT_APP) -> Mock:
+def _get_task(
+    *,
+    task_id: int = 1,
+    task_type: str = TaskType.CLIENT_APP,
+    fab_hash: str | None = None,
+) -> Mock:
     """Return a minimal dummy task-like object."""
     task = Mock()
     task.task_id = task_id
     task.type = task_type
+    task.fab_hash = fab_hash
     return task
 
 
@@ -95,7 +101,7 @@ def test_serverapp_launch_delegates_suppressed_stdio_spec() -> None:
 
 
 def test_default_plugin_uses_task_type() -> None:
-    """Default plugin should pass the pulled task type to the executor."""
+    """Default plugin should pass task type and FAB identity to the executor."""
     executor = Mock()
     plugin = AutoExecPlugin(
         runtime_api_address="127.0.0.1:9091",
@@ -104,9 +110,14 @@ def test_default_plugin_uses_task_type() -> None:
         executor=executor,
     )
 
-    plugin.launch_task(token="token", task=_get_task(task_type=TaskType.AGENT_APP))
+    plugin.launch_task(
+        token="token",
+        task=_get_task(task_type=TaskType.AGENT_APP, fab_hash="fab-hash"),
+    )
 
-    assert _execution_spec_from_executor(executor).task_type == TaskType.AGENT_APP
+    spec = _execution_spec_from_executor(executor)
+    assert spec.task_type == TaskType.AGENT_APP
+    assert spec.fab_hash == "fab-hash"
 
 
 def test_serverapp_launch_configures_task_output_visibility() -> None:

@@ -81,7 +81,7 @@ def handle_task(
             config = _parse_connector_json(connector.config_json)
         response = {
             "output": invoke_connector(
-                name=name,
+                tool_name=name,
                 arguments=cast(JSONObject, request_message.payload["arguments"]),
                 usage_recorder=TaskUsageRecorder(client),
                 credentials=credentials,

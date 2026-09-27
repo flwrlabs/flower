@@ -15,14 +15,18 @@
 """Flower AgentApp process."""
 
 
+import hashlib
 import os
 import signal
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from concurrent.futures import Future
 from contextlib import contextmanager
+from dataclasses import dataclass
 from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
+from types import FrameType
 from typing import Any, cast
 
 from flwr.agentapp import AgentApp, LoadAgentAppError
@@ -33,6 +37,7 @@ from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
 from flwr.common.config import (
     get_fused_config_from_dir,
+    get_metadata_from_config,
     get_project_config,
     get_project_dir,
 )
@@ -56,13 +61,27 @@ from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
+    FORCE_EXIT_TIMEOUT_SECONDS,
     SYSTEM_MESSAGE_TYPE,
+    TELEMETRY_TIMEOUT_SECONDS,
 )
-from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.supercore.exit import (
+    ExitCode,
+    add_exit_handler,
+    flwr_exit,
+    register_signal_handlers,
+)
 from flwr.supercore.exit.signal_handler import SIGNAL_TO_EXIT_CODE
+from flwr.supercore.fab import Fab
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
-from flwr.supercore.logger import flush_logs, start_log_uploader, stop_log_uploader
+from flwr.supercore.logger import (
+    flush_logs,
+    mirror_output_to_queue,
+    start_log_uploader,
+    stop_log_uploader,
+)
 from flwr.supercore.object_ref import load_app
+from flwr.supercore.run import Run
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
@@ -86,6 +105,69 @@ from .session import (
 _RUNTIME_API_KEY_ENV = "FLWR_RUNTIME_API_KEY"
 _RUNTIME_BASE_URL_ENV = "FLWR_RUNTIME_BASE_URL"
 _SSL_CERT_FILE_ENV = "SSL_CERT_FILE"
+
+
+@dataclass(frozen=True)
+class PreloadedAgentApp:
+    """One trusted FAB installed and imported before worker readiness."""
+
+    app: AgentApp
+    app_path: Path
+    fab_id: str
+    fab_version: str
+    fab_hash: str
+
+
+def _load_agentapp_component(agent_app_attr: str, app_path: Path) -> AgentApp:
+    """Load and validate one AgentApp component."""
+    agent_app = load_app(agent_app_attr, LoadAgentAppError, str(app_path))
+    if not isinstance(agent_app, AgentApp):
+        raise LoadAgentAppError(
+            f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
+        ) from None
+    return agent_app
+
+
+def preload_agentapp(fab_path: Path, expected_fab_hash: str) -> PreloadedAgentApp:
+    """Verify, install, and import one deployment-configured AgentApp FAB.
+
+    Dependencies must be deployment-provisioned, and app imports must not
+    require task-scoped Runtime values because authority is unavailable before
+    readiness.
+    """
+    if not fab_path.is_absolute():
+        raise ValueError("Preloaded AgentApp FAB path must be absolute.")
+    if len(expected_fab_hash) != 64 or any(
+        char not in "0123456789abcdef" for char in expected_fab_hash
+    ):
+        raise ValueError("Preloaded AgentApp FAB hash must be a full SHA-256 hash.")
+
+    resolved_fab_path = fab_path.resolve()
+    if not resolved_fab_path.is_file():
+        raise ValueError(f"Preloaded AgentApp FAB does not exist: {resolved_fab_path}")
+    try:
+        fab_content = resolved_fab_path.read_bytes()
+    except OSError as err:
+        raise ValueError(
+            f"Preloaded AgentApp FAB could not be read: {resolved_fab_path}"
+        ) from err
+
+    actual_fab_hash = hashlib.sha256(fab_content).hexdigest()
+    if actual_fab_hash != expected_fab_hash:
+        raise ValueError("Preloaded AgentApp FAB hash does not match its pool.")
+
+    app_path = install_from_fab(fab_content, skip_prompt=True)
+    config = get_project_config(app_path)
+    fab_id, fab_version = get_metadata_from_config(config)
+    agent_app_attr = config["tool"]["flwr"]["app"]["components"]["agentapp"]
+    agent_app = _load_agentapp_component(agent_app_attr, app_path)
+    return PreloadedAgentApp(
+        app=agent_app,
+        app_path=app_path,
+        fab_id=fab_id,
+        fab_version=fab_version,
+        fab_hash=expected_fab_hash,
+    )
 
 
 def message_to_prompt(message: Message) -> str:
@@ -125,6 +207,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
         certificates: bytes | None,
         certificates_path: str | None,
         runtime_dependency_install: bool,
+        preloaded: PreloadedAgentApp | None,
     ) -> None:
         self._runtime_api_address = runtime_api_address
         self._log_queue = log_queue
@@ -133,6 +216,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
         self._certificates = certificates
         self._certificates_path = certificates_path
         self._runtime_dependency_install = runtime_dependency_install
+        self._preloaded = preloaded
         self._grid = HttpGrid(
             runtime_api_address=self._runtime_api_address,
             insecure=self._insecure,
@@ -147,6 +231,8 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
         self._runtime_env_dir: Path | None = None
         self._agent_events: RuntimeAgentEvents | None = None
         self._finalized = False
+        self._task_finished = False
+        self._leave_event_started = False
         self._lock = threading.RLock()
 
     def run(self) -> int:  # pylint: disable=too-many-locals,too-many-statements
@@ -210,47 +296,9 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 grid=RuntimeAgentGrid(grid, self._agent_events, self._context.node_id),
             )
 
-            log(DEBUG, "[flwr-agentapp] Start FAB installation.")
-            install_from_fab(fab.content, skip_prompt=True)
-
-            fab_id, fab_version = get_fab_metadata(fab.content)
-
-            app_path = str(get_project_dir(fab_id, fab_version, fab.hash_str))
-
-            if self._runtime_dependency_install:
-                log(DEBUG, "[flwr-agentapp] Installing app dependencies.")
-                self._runtime_env_dir = install_app_dependencies(
-                    app_path,
-                    launch_id=self._token,
-                    run_id=run.run_id,
-                    index_context={
-                        "component": "agentapp",
-                        "project_dir": app_path,
-                        "run_id": run.run_id,
-                        "launch_id": self._token,
-                        "fab_id": run.fab_id,
-                        "fab_version": run.fab_version,
-                        "fab_hash": fab.hash_str,
-                    },
-                )
-            else:
-                log(
-                    DEBUG,
-                    "[flwr-agentapp] Runtime dependency installation is disabled.",
-                )
-
-            config = get_project_config(app_path)
-
-            agent_app_attr = config["tool"]["flwr"]["app"]["components"]["agentapp"]
+            app_path, agent_app, agent_app_attr = self._prepare_task_app(fab, run)
             self._context.run_config = get_fused_config_from_dir(
-                Path(app_path), run.override_config
-            )
-
-            log(
-                DEBUG,
-                "[flwr-agentapp] Will load AgentApp `%s` in %s",
-                agent_app_attr,
-                app_path,
+                app_path, run.override_config
             )
 
             event(
@@ -265,19 +313,16 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 self._certificates_path,
             )
 
-            # Load and run the AgentApp
-            agent_app = load_app(agent_app_attr, LoadAgentAppError, app_path)
-            if not isinstance(agent_app, AgentApp):
-                raise LoadAgentAppError(
-                    f"Attribute '{agent_app_attr}' is not of type "
-                    f"'{AgentApp.__name__}'.",
-                ) from None
+            if agent_app is None:
+                assert agent_app_attr is not None
+                agent_app = _load_agentapp_component(agent_app_attr, app_path)
             agent_app(agent=agent, context=self._context)
             self._agent_events.close()
 
             # Set sub_status and details for successful completion
             with self._lock:
                 self._outcome = (SubStatus.COMPLETED, "")
+                self._task_finished = True
 
         except Exception as ex:  # pylint: disable=broad-exception-caught
             log(ERROR, "AgentApp raised an exception", exc_info=ex)
@@ -287,6 +332,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                     SubStatus.FAILED,
                     f"AgentApp failed with exception: {str(ex)}",
                 )
+                self._task_finished = True
 
             exit_code = ExitCode.TASK_PROC_EXCEPTION
             if isinstance(ex, AppExitException):
@@ -297,6 +343,59 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 exit_code = ExitCode.COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR
 
         return exit_code
+
+    def _prepare_task_app(
+        self, fab: Fab, run: Run
+    ) -> tuple[Path, AgentApp | None, str | None]:
+        """Return a preloaded app or prepare a cold app for task-time import."""
+        if self._preloaded is not None:
+            if (
+                fab.hash_str != self._preloaded.fab_hash
+                or run.fab_id != self._preloaded.fab_id
+                or run.fab_version != self._preloaded.fab_version
+            ):
+                raise RuntimeError("Task FAB does not match the preloaded AgentApp.")
+            return self._preloaded.app_path, self._preloaded.app, None
+
+        log(DEBUG, "[flwr-agentapp] Start FAB installation.")
+        install_from_fab(fab.content, skip_prompt=True)
+        fab_id, fab_version = get_fab_metadata(fab.content)
+        app_path = get_project_dir(fab_id, fab_version, fab.hash_str)
+        if self._runtime_dependency_install:
+            log(DEBUG, "[flwr-agentapp] Installing app dependencies.")
+            self._runtime_env_dir = install_app_dependencies(
+                app_path,
+                launch_id=self._token,
+                run_id=run.run_id,
+                index_context={
+                    "component": "agentapp",
+                    "project_dir": str(app_path),
+                    "run_id": run.run_id,
+                    "launch_id": self._token,
+                    "fab_id": run.fab_id,
+                    "fab_version": run.fab_version,
+                    "fab_hash": fab.hash_str,
+                },
+            )
+        else:
+            log(DEBUG, "[flwr-agentapp] Runtime dependency installation is disabled.")
+
+        config = get_project_config(app_path)
+        agent_app_attr = config["tool"]["flwr"]["app"]["components"]["agentapp"]
+        log(
+            DEBUG,
+            "[flwr-agentapp] Will load AgentApp `%s` in %s",
+            agent_app_attr,
+            app_path,
+        )
+        return app_path, None, agent_app_attr
+
+    def mark_interrupted(self) -> None:
+        """Record a graceful interruption before final task output is pushed."""
+        with self._lock:
+            if self._finalized or self._task_finished:
+                return
+            self._outcome = (SubStatus.FAILED, "Task stopped by user.")
 
     def finalize(self) -> None:  # pylint: disable=protected-access
         """Push final status and release task state exactly once."""
@@ -356,9 +455,27 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
     def event_details(self, exit_code: int) -> JSONObject:
         """Return the AgentApp leave-event details."""
         return {
+            "exit_code": exit_code,
             "run-id-hash": self._hash_run_id,
             "success": exit_code == ExitCode.SUCCESS,
         }
+
+    def complete(self, exit_code: int) -> None:
+        """Finalize and emit one bounded leave event for a resident worker."""
+        with _ignore_graceful_signals():
+            self.finalize()
+            with self._lock:
+                if self._leave_event_started:
+                    return
+                self._leave_event_started = True
+            try:
+                future: Future[str] = event(
+                    EventType.FLWR_AGENTAPP_RUN_LEAVE,
+                    self.event_details(exit_code),
+                )
+                future.result(timeout=TELEMETRY_TIMEOUT_SECONDS)
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
 
 
 @contextmanager
@@ -386,6 +503,10 @@ def _run_agentapp_task(  # pylint: disable=too-many-arguments,too-many-positiona
     certificates: bytes | None,
     certificates_path: str | None,
     runtime_dependency_install: bool,
+    *,
+    resident: bool,
+    preloaded: PreloadedAgentApp | None = None,
+    on_started: Callable[[], None] | None = None,
 ) -> tuple[_AgentAppTaskLifecycle, int]:
     """Create and execute one task through the AgentApp lifecycle."""
     lifecycle = _AgentAppTaskLifecycle(
@@ -396,13 +517,88 @@ def _run_agentapp_task(  # pylint: disable=too-many-arguments,too-many-positiona
         certificates=certificates,
         certificates_path=certificates_path,
         runtime_dependency_install=runtime_dependency_install,
+        preloaded=preloaded,
     )
-    register_signal_handlers(
-        event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
-        exit_message="Task stopped by user.",
-        exit_handlers=[lifecycle.finalize],
-    )
+    if resident:
+        _register_resident_signal_handlers(lifecycle)
+    else:
+        register_signal_handlers(
+            event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
+            exit_message="Task stopped by user.",
+            exit_handlers=[lifecycle.finalize],
+        )
+    if on_started is not None:
+        on_started()
+    if resident:
+        mirror_output_to_queue(log_queue)
     return lifecycle, lifecycle.run()
+
+
+def _register_resident_signal_handlers(lifecycle: _AgentAppTaskLifecycle) -> None:
+    """Register coordinated graceful exits for the resident PID 1 worker."""
+    default_handlers: dict[int, Any] = {}
+    is_exiting = False
+    lock = threading.Lock()
+
+    def graceful_exit_handler(signalnum: int, _frame: FrameType | None) -> None:
+        nonlocal is_exiting
+        with lock:
+            if is_exiting:
+                return
+            is_exiting = True
+
+        for sig, default_handler in default_handlers.items():
+            signal.signal(sig, default_handler)
+
+        exit_code = SIGNAL_TO_EXIT_CODE[signalnum]
+        lifecycle.mark_interrupted()
+        add_exit_handler(lambda: lifecycle.complete(exit_code))
+        flwr_exit(
+            exit_code,
+            message="Task stopped by user.",
+            emit_telemetry=False,
+        )
+
+    for sig in SIGNAL_TO_EXIT_CODE:
+        default_handlers[sig] = signal.signal(sig, graceful_exit_handler)
+
+
+def run_agentapp_once(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    runtime_api_address: str,
+    token: str,
+    insecure: bool,
+    certificates: bytes | None,
+    on_started: Callable[[], None],
+    *,
+    preloaded: PreloadedAgentApp,
+    certificates_path: str | None = None,
+) -> int:
+    """Run one preloaded AgentApp task without terminating the worker."""
+    lifecycle, exit_code = _run_agentapp_task(
+        runtime_api_address,
+        Queue(),
+        token,
+        insecure,
+        certificates,
+        certificates_path,
+        False,
+        resident=True,
+        preloaded=preloaded,
+        on_started=on_started,
+    )
+    returncode = 0 if exit_code == ExitCode.SUCCESS else 1
+    force_exit_timer = threading.Timer(
+        FORCE_EXIT_TIMEOUT_SECONDS,
+        os._exit,
+        args=(returncode,),
+    )
+    force_exit_timer.daemon = True
+    force_exit_timer.start()
+    try:
+        lifecycle.complete(exit_code)
+    finally:
+        force_exit_timer.cancel()
+    return returncode
 
 
 def run_agentapp(  # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -427,6 +623,7 @@ def run_agentapp(  # pylint: disable=too-many-arguments,too-many-positional-argu
         validate_and_resolve_root_certificates(certificates_path, insecure),
         certificates_path,
         runtime_dependency_install,
+        resident=False,
     )
 
     flwr_exit(

@@ -21,18 +21,57 @@ from unittest.mock import Mock, patch
 from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
 
-from flwr.cli.chat.chat_app import ChatApplication, _ChatCompleter, start_chat_run
+from flwr.cli.chat.chat_app import (
+    ChatApplication,
+    _ChatCompleter,
+    fetch_chat_agents,
+    start_chat_run,
+)
 from flwr.cli.chat.chat_local_agent import LocalAgent
 from flwr.cli.constant import CHAT_AGENT_NAME, CHAT_DEFAULT_FEDERATION_NAME
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AppInfo,
     Connector,
+    ListAppsRequest,
+    ListAppsResponse,
     ListConnectorsResponse,
     StartRunResponse,
 )
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
-from flwr.supercore.constant import FLOWER_AGENT_APP_ID
+from flwr.supercore.constant import FLOWER_AGENT_APP_ID, TaskType
 
 _CHAT_FED_ID = f"@flower/{CHAT_DEFAULT_FEDERATION_NAME}"
+
+
+def test_chat_uses_available_federation_and_lists_agents() -> None:
+    """Chat should use the selected SuperLink's federation and AgentApps."""
+    stub = Mock()
+    federation = Federation(name="@local/default")
+    stub.ListApps.return_value = ListAppsResponse(
+        apps=[
+            AppInfo(
+                app_id="@local/agent",
+                app_type=TaskType.AGENT_APP,
+                display_name="Local Agent",
+                fab_hash="hash",
+            ),
+            AppInfo(app_id="@local/other", app_type=TaskType.SERVER_APP),
+        ]
+    )
+    with patch.object(ChatApplication, "_create_application"):
+        chat = ChatApplication(stub, [federation])
+        configured_chat = ChatApplication(
+            stub, [Federation(name=_CHAT_FED_ID), federation], federation.name
+        )
+
+    assert chat.federation == federation.name
+    assert configured_chat.federation == federation.name
+    assert [agent.app_spec for agent in fetch_chat_agents(stub, chat.federation)] == [
+        "@local/agent"
+    ]
+    stub.ListApps.assert_called_once_with(
+        ListAppsRequest(federation_id=federation.name)
+    )
 
 
 def test_chat_selects_federation_from_dropdown() -> None:
@@ -41,7 +80,7 @@ def test_chat_selects_federation_from_dropdown() -> None:
         Federation(name=_CHAT_FED_ID, description="Default"),
         Federation(name="@flower/other", description="Other"),
     ]
-    completer = _ChatCompleter(Mock(), Mock(), federations[0].name, federations)
+    completer = _ChatCompleter(Mock(), federations[0].name, federations)
     completions = list(
         completer.get_completions(Document("/federation @flower/o"), CompleteEvent())
     )
@@ -49,7 +88,7 @@ def test_chat_selects_federation_from_dropdown() -> None:
 
     application = Mock()
     with patch.object(ChatApplication, "_create_application", return_value=application):
-        chat = ChatApplication(Mock(), federations, Mock())
+        chat = ChatApplication(Mock(), federations)
     assert chat.federation == _CHAT_FED_ID
     chat.input_buffer = Mock()
     event = Mock(app=application)
@@ -92,7 +131,7 @@ def test_chat_loads_and_rebuilds_local_agent_before_prompt() -> None:
     """A loaded local AgentApp should be rebuilt before each prompt."""
     application = Mock()
     with patch.object(ChatApplication, "_create_application", return_value=application):
-        chat = ChatApplication(Mock(), [Federation(name=_CHAT_FED_ID)], Mock())
+        chat = ChatApplication(Mock(), [Federation(name=_CHAT_FED_ID)])
     event = Mock(app=application)
     first_agent = LocalAgent(
         path=Path(r"C:\Users\me\agent"),
@@ -189,7 +228,7 @@ def test_chat_selects_connector_from_dropdown() -> None:
         ]
     )
     with patch.object(ChatApplication, "_create_application", return_value=application):
-        chat = ChatApplication(stub, [Federation(name=_CHAT_FED_ID)], Mock())
+        chat = ChatApplication(stub, [Federation(name=_CHAT_FED_ID)])
     chat.input_buffer = Mock()
     event = Mock(app=application)
 
@@ -256,7 +295,7 @@ def test_chat_connector_command_directs_to_webui_when_empty() -> None:
         ),
     ]
     with patch.object(ChatApplication, "_create_application", return_value=application):
-        chat = ChatApplication(stub, [Federation(name=_CHAT_FED_ID)], Mock())
+        chat = ChatApplication(stub, [Federation(name=_CHAT_FED_ID)])
     chat.input_buffer = Mock()
 
     event = Mock(app=application)
@@ -280,7 +319,7 @@ def test_chat_rejects_connector_selection_outside_personal_federation() -> None:
         Federation(name="@flower/other"),
     ]
     with patch.object(ChatApplication, "_create_application", return_value=application):
-        chat = ChatApplication(Mock(), federations, Mock())
+        chat = ChatApplication(Mock(), federations)
     chat.connector_refs = ["github"]
 
     assert chat._handle_command(  # pylint: disable=protected-access

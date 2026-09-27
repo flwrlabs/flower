@@ -1,8 +1,8 @@
-# Build a collaborative research agent
+# Build a research agent
 
-Build an AgentApp that searches and fetches public web sources through multiple
-bounded rounds of model-directed tool use. It preserves conversation messages,
-recovers from connector failures, and always ends its tool loop.
+Build an AgentApp that searches and fetches public web sources over a bounded
+number of tool-call rounds. It replays earlier conversation turns and can
+recover from connector failures.
 
 The finished project uses:
 
@@ -61,15 +61,12 @@ fab-format-version = 1
 flwr-version-target = "|stable_flwr_version|"
 fab-include = ["agent/**/*.py", "LICENSE"]
 
-[tool.flwr.app.config.agent]
-input = "Find two public sources that explain federated AI and compare them."
-
 [tool.flwr.app.components]
 agentapp = "agent.agent_app:app"
 ```
 
-The configuration pins the runtime contract, includes the SDK, provides a
-default input, and tells Flower where to load the `AgentApp` object.
+The configuration sets the Flower version target, lists the SDK dependency, and
+tells Flower where to load the `AgentApp` object.
 
 ## Implement the AgentApp
 
@@ -78,15 +75,14 @@ order.
 
 ### Define the app and its limits
 
-Every `AgentApp` entry point receives:
+The main function receives:
 
-- `AgentSession` for connectors and frontend-visible events
+- `AgentSession` for the prompt, connectors, and frontend-visible events
 - `Context` for run configuration and state shared by the run series
 
 The OpenAI client sends model requests through the runtime URL and credential
-injected into the AgentApp process. Keep the model, connector set, and tool-turn
-limit near the top of the file. The finite limit prevents an unbounded tool
-loop.
+injected into the AgentApp process. Keep the model, connector references, and
+tool-turn limit near the top of the file.
 
 ```python
 from __future__ import annotations
@@ -184,9 +180,9 @@ def conversation_messages(agent: AgentSession) -> list[dict[str, Any]]:
 
 `message_text` raises an error for an unexpected shape instead of silently
 sending incomplete history to the model. The loader groups each user message
-and completed assistant response by run, then flattens those turns in user-event
-order. Overlapping runs therefore cannot mix or reorder their output, and a
-failed or incomplete response is not replayed as a finished answer.
+and completed assistant response by run, then flattens the turns in the order
+their user events appear. This keeps overlapping runs from mixing their output.
+Failed or incomplete responses are not replayed as finished answers.
 
 ### Let the model recover from connector failures
 
@@ -211,7 +207,7 @@ def connector_error_output(
 
 The main function has five phases:
 
-1. Validate `agent.input` and rebuild the conversation messages from the trace
+1. Rebuild the conversation messages from the trace
 1. Create the OpenAI client and request the connector tool schemas
 1. Execute up to `MAX_TOOL_TURNS` rounds of model-requested function calls
 1. Make one final model request without tools and publish its stream
@@ -222,11 +218,7 @@ Add the entry point:
 ```python
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
-    """Research the configured prompt with a bounded connector loop."""
-    prompt = context.run_config.get("agent.input")
-    if not isinstance(prompt, str) or not prompt.strip():
-        raise ValueError("agent.input must be a non-empty string")
-
+    """Research the chat input with a bounded connector loop."""
     client = OpenAI(
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
         api_key=os.environ["FLWR_RUNTIME_API_KEY"],
@@ -306,18 +298,18 @@ def main(agent: AgentSession, context: Context) -> None:
     print(final_text)
 ```
 
-The trace already contains the current `agent.input` event when the AgentApp
-starts. The planning calls remain local to this run because the app publishes
+The trace already contains the current prompt's user-message event when the
+AgentApp starts. The planning calls remain local to this run because the app publishes
 only the final streamed response. The complete planning output and connector
 outputs stay in `input_items` for subsequent tool turns within this run; the
 trace loader does not replay them on later runs.
 
-The allowed names come from the returned schemas because one connector
-reference can expose several tools. The final request omits `tools`, which
-forces an answer instead of another connector round. The stream collects both
-answer and refusal text, then publishes that result. If the stream is
-incomplete, the app raises an error and the trace loader discards its partial
-text on the next run.
+The allowed tool names come from the returned schemas because one connector
+reference can expose several tools. The final request omits `tools` so the model
+cannot request another connector round. The app publishes the stream and
+collects answer or refusal text for its logs. If the stream is incomplete, the
+app raises an error and the trace loader discards its partial text on the next
+run.
 
 ```{note}
 Connector calls still record their outputs and activity for run inspection.
@@ -431,11 +423,7 @@ def connector_error_output(
 
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
-    """Research the configured prompt with a bounded connector loop."""
-    prompt = context.run_config.get("agent.input")
-    if not isinstance(prompt, str) or not prompt.strip():
-        raise ValueError("agent.input must be a non-empty string")
-
+    """Research the chat input with a bounded connector loop."""
     client = OpenAI(
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
         api_key=os.environ["FLWR_RUNTIME_API_KEY"],
@@ -525,23 +513,21 @@ def main(agent: AgentSession, context: Context) -> None:
 $ uv sync
 $ uv run flwr build
 $ uv run flwr login supergrid
-$ uv run flwr run . supergrid --stream
+$ uv run flwr chat
 ```
 
-Override the research prompt:
+At the chat prompt:
 
-```console
-$ uv run flwr run . supergrid \
-    --run-config 'agent.input="Compare two recent public explanations of federated AI."' \
-    --stream
+```text
+/load .
+Find two public sources that explain federated AI and compare them.
 ```
 
 ```{admonition} Success checkpoint
 :class: tip
 
-The run finishes with one streamed answer. In SuperGrid run activity, you can
-see zero or more search or fetch calls and any connector failure that the final
-answer had to handle.
+The answer streams into the chat transcript. SuperGrid run activity shows any
+search or fetch calls and connector failures.
 ```
 
 ## Adapt it safely

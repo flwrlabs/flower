@@ -275,6 +275,12 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                     task_type = None
                 executor.wait_for_capacity(
                     task_type=task_type,
+                    fab_hash=(
+                        task.fab_hash
+                        if isinstance(getattr(task, "fab_hash", None), str)
+                        and task.fab_hash
+                        else None
+                    ),
                     insecure=insecure,
                     root_certificates_path=root_certificates_path,
                 )
