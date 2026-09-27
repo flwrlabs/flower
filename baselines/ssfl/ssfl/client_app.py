@@ -16,6 +16,7 @@ from flwr.app import (
     RecordDict,
 )
 from flwr.clientapp import ClientApp
+from ssfl.app_utils import array_record, config_record
 from ssfl.data import first_batches, load_partition_dataloaders
 from ssfl.mask import mask_digest, masks_from_uint8, masks_to_cpu_uint8
 from ssfl.model import create_model, num_classes_for_dataset
@@ -25,20 +26,6 @@ from ssfl.sparse_codec import pack_state_dict, unpack_state_dict
 from ssfl.training import count_nonzero_params, sparsity_from_state_dict, train_local
 
 app = ClientApp()
-
-
-def _array_record(records: RecordDict, key: str = "arrays") -> ArrayRecord:
-    record = records[key]
-    if not isinstance(record, ArrayRecord):
-        raise TypeError(f"Expected ArrayRecord under {key!r}")
-    return record
-
-
-def _config_record(records: RecordDict, key: str = "config") -> ConfigRecord:
-    record = records[key]
-    if not isinstance(record, ConfigRecord):
-        raise TypeError(f"Expected ConfigRecord under {key!r}")
-    return record
 
 
 def _run_config(context: Context) -> dict:
@@ -70,7 +57,7 @@ def _device() -> torch.device:
 def _load_masks_from_state(context: Context) -> dict[str, torch.Tensor] | None:
     if "ssfl-mask" not in context.state:
         return None
-    mask_record = _array_record(context.state, "ssfl-mask")
+    mask_record = array_record(context.state, "ssfl-mask")
     return masks_from_uint8(mask_record.to_torch_state_dict())
 
 
@@ -88,7 +75,7 @@ def saliency(msg: Message, context: Context) -> Message:
     device = _device()
 
     model = create_model(model_name, num_classes_for_dataset(dataset_name))
-    model.load_state_dict(_array_record(msg.content).to_torch_state_dict())
+    model.load_state_dict(array_record(msg.content).to_torch_state_dict())
     model.to(device)
 
     trainloader, _ = load_partition_dataloaders(
@@ -123,10 +110,10 @@ def saliency(msg: Message, context: Context) -> Message:
 @app.query("install_mask")
 def install_mask(msg: Message, context: Context) -> Message:
     """Persist the global static mask in ClientApp context state."""
-    masks_uint8 = _array_record(msg.content).to_torch_state_dict()
+    masks_uint8 = array_record(msg.content).to_torch_state_dict()
     masks = masks_from_uint8(masks_uint8)
     digest = mask_digest(masks)
-    expected = str(_config_record(msg.content).get("mask-version", ""))
+    expected = str(config_record(msg.content).get("mask-version", ""))
     if expected and digest != expected:
         raise ValueError(f"Mask digest mismatch: got {digest}, expected {expected}")
 
@@ -152,7 +139,7 @@ def train(msg: Message, context: Context) -> Message:
     """Local masked SGD training for one federated round."""
     cfg = _run_config(context)
     client_id = _stable_client_id(context)
-    train_config = _config_record(msg.content)
+    train_config = config_record(msg.content)
     server_round = int(cast(int | float | str, train_config["server-round"]))
     seed_everything(client_round_seed(int(cfg["seed"]), client_id, server_round))
 
@@ -174,7 +161,7 @@ def train(msg: Message, context: Context) -> Message:
         )
 
     transport = str(train_config.get("transport", cfg.get("transport", "dense")))
-    incoming = _array_record(msg.content).to_torch_state_dict()
+    incoming = array_record(msg.content).to_torch_state_dict()
     if transport == "sparse":
         state_in = unpack_state_dict(incoming, masks)
     elif transport == "dense":

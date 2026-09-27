@@ -21,6 +21,7 @@ from flwr.app import (
 )
 from flwr.common import log
 from flwr.serverapp import Grid, ServerApp
+from ssfl.app_utils import array_record, metric_float, metric_record
 from ssfl.comm_stats import CommStats
 from ssfl.data import load_centralized_testloader
 from ssfl.mask import (
@@ -38,26 +39,6 @@ from ssfl.training import evaluate_model
 from ssfl.wandb_utils import WandbSession
 
 app = ServerApp()
-
-
-def _array_record(records: RecordDict, key: str = "arrays") -> ArrayRecord:
-    record = records[key]
-    if not isinstance(record, ArrayRecord):
-        raise TypeError(f"Expected ArrayRecord under {key!r}")
-    return record
-
-
-def _metric_record(records: RecordDict, key: str = "metrics") -> MetricRecord:
-    record = records[key]
-    if not isinstance(record, MetricRecord):
-        raise TypeError(f"Expected MetricRecord under {key!r}")
-    return record
-
-
-def _metric_float(value: object) -> float:
-    if not isinstance(value, (int, float)):
-        raise TypeError("Expected a scalar numeric metric")
-    return float(value)
 
 
 def _device(prefer_cpu: bool = True) -> torch.device:
@@ -122,15 +103,15 @@ def _run_saliency_discovery(
             errors.append((reply.metadata.src_node_id, reply.error.reason))
             continue
         src = int(reply.metadata.src_node_id)
-        metrics = _metric_record(reply.content)
-        client_id = int(_metric_float(metrics["client-id"]))
+        metrics = metric_record(reply.content)
+        client_id = int(metric_float(metrics["client-id"]))
         if client_id in node_to_client.values():
             raise RuntimeError(f"Duplicate client-id {client_id} in saliency replies")
         node_to_client[src] = client_id
-        score_record = _array_record(reply.content)
+        score_record = array_record(reply.content)
         uplink_bytes += int(score_record.count_bytes())
         score_dicts.append(score_record.to_torch_state_dict())
-        weights.append(_metric_float(metrics["num-examples"]))
+        weights.append(metric_float(metrics["num-examples"]))
 
     if errors:
         raise RuntimeError(f"Saliency discovery failed for nodes: {errors}")
@@ -475,10 +456,10 @@ def main(grid: Grid, context: Context) -> None:
     for _round_idx, round_metrics in sorted(result.train_metrics_clientapp.items()):
         if "arrayrecord_payload_bytes" in round_metrics:
             comm.train_uplink_payload_bytes += int(
-                _metric_float(round_metrics["arrayrecord_payload_bytes"])
+                metric_float(round_metrics["arrayrecord_payload_bytes"])
             )
         if "comm_params" in round_metrics:
-            comm.train_comm_params += int(_metric_float(round_metrics["comm_params"]))
+            comm.train_comm_params += int(metric_float(round_metrics["comm_params"]))
 
     for line in comm.summary_lines():
         log(INFO, "%s", line)

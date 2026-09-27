@@ -8,6 +8,7 @@ import sys
 import torch
 
 from flwr.app import ArrayRecord, ConfigRecord, MetricRecord
+from flwr.supercore.task_identity import TaskIdentity
 from ssfl.comm_stats import CommStats
 from ssfl.server_app import _append_jsonl, _build_train_record, _reset_jsonl
 from ssfl.strategy import SSFLStrategy
@@ -38,7 +39,10 @@ class _FakeGrid:
         return [10, 20, 30]
 
 
-def test_configure_train_counts_downlink_once_per_destination():
+def test_configure_train_counts_downlink_once_per_destination(monkeypatch):
+    monkeypatch.setattr(TaskIdentity, "_task_id", 1)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 1)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 1)
     arrays = ArrayRecord({"w": torch.ones(4)})
     strategy = SSFLStrategy(
         node_to_client_id={10: 0, 20: 1, 30: 2},

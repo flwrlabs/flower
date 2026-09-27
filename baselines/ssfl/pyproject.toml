@@ -9,10 +9,8 @@ description = "SSFL: Discovering Unified Sparse Subnetworks at Initialization fo
 license = { file = "LICENSE" }
 requires-python = ">=3.12"
 dependencies = [
-    # Flower 1.31+ and flwr-datasets 0.6.0 have incompatible rich bounds.
-    # Flower 1.30 provides the Message API used here and resolves with pip.
-    "flwr[simulation]>=1.28.0,<1.31.0",
-    "flwr-datasets[vision]==0.6.0",
+    "flwr[simulation]>=1.28.0",
+    "flwr-datasets[vision]>=0.6.1",
     "torch==2.10.0",
     "torchvision==0.25.0",
     "numpy>=1.24.0",
@@ -28,7 +26,7 @@ allow-direct-references = true
 dev = [
     "isort==5.13.2",
     "black==24.2.0",
-    "mypy==1.8.0",
+    "mypy==2.3.1",
     "pylint==3.2.6",
     "flake8==5.0.4",
     "pytest>=8.0.0",
