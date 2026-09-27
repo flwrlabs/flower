@@ -197,11 +197,15 @@ def _meeting_notes_sort(value: object) -> list[JSONObject]:
     if not isinstance(value, list) or len(value) > 100:
         raise ValueError("Notion meeting-notes sort must have at most 100 entries.")
     for item in value:
+        if not isinstance(item, dict) or set(item) != {"property", "direction"}:
+            raise ValueError("Notion meeting-notes sort is invalid.")
+        property_ = item["property"]
+        direction = item["direction"]
         if (
-            not isinstance(item, dict)
-            or set(item) != {"property", "direction"}
-            or item["property"] not in _MEETING_NOTE_PROPERTIES
-            or item["direction"] not in {"ascending", "descending"}
+            not isinstance(property_, str)
+            or property_ not in _MEETING_NOTE_PROPERTIES
+            or not isinstance(direction, str)
+            or direction not in {"ascending", "descending"}
         ):
             raise ValueError("Notion meeting-notes sort is invalid.")
     return cast(list[JSONObject], value)

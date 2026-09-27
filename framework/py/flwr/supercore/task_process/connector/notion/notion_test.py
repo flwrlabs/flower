@@ -300,6 +300,28 @@ def test_notion_query_meeting_notes_forwards_inputs() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    "sort",
+    [
+        [{"property": [], "direction": "ascending"}],
+        [{"property": "title", "direction": {}}],
+    ],
+)
+def test_notion_query_meeting_notes_rejects_non_string_sort_values(
+    sort: list[JSONObject],
+) -> None:
+    """Meeting-note sorts should reject non-string values before the request."""
+    with patch(_HTTP_REQUEST) as request, pytest.raises(ValueError):
+        registry.invoke_connector(
+            "notion_query_meeting_notes",
+            {"sort": sort},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    request.assert_not_called()
+
+
 def test_notion_list_users_forwards_pagination() -> None:
     """List users should forward Notion's pagination parameters."""
     response = Mock(status_code=200)
