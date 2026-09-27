@@ -48,8 +48,17 @@ def _access_record(path: str, status_code: object) -> logging.LogRecord:
         ("/health?probe=readiness", "200", False),
         ("/v1/runtime/pull-pending-tasks", 200, False),
         ("/v1/runtime/pull-pending-tasks?timeout=1", "200", False),
+        ("/v1/runtime/get-nodes", 200, False),
+        ("/v1/runtime/get-nodes?node_id=1", "200", False),
+        ("/v1/runtime/push-logs", 200, False),
+        ("/v1/runtime/push-logs?node_id=1", "200", False),
+        ("/v1/runtime/send-task-heartbeat", 200, False),
+        ("/v1/runtime/send-task-heartbeat?task_id=1", "200", False),
         ("/health", 500, True),
         ("/v1/runtime/pull-pending-tasks", 500, True),
+        ("/v1/runtime/get-nodes", 400, True),
+        ("/v1/runtime/push-logs", 500, True),
+        ("/v1/runtime/send-task-heartbeat", 503, True),
         ("/v1/user/profile", 200, True),
         ("//[", 200, True),
     ],
@@ -59,9 +68,19 @@ def test_routine_access_filter(path: str, status_code: object, expected: bool) -
     assert RoutineAccessFilter().filter(_access_record(path, status_code)) is expected
 
 
-def test_routine_access_filter_keeps_routine_requests_at_debug() -> None:
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/health",
+        "/v1/runtime/pull-pending-tasks",
+        "/v1/runtime/get-nodes",
+        "/v1/runtime/push-logs",
+        "/v1/runtime/send-task-heartbeat",
+    ],
+)
+def test_routine_access_filter_keeps_routine_requests_at_debug(path: str) -> None:
     """Keep successful routine requests as debug records in debug mode."""
-    record = _access_record("/v1/runtime/pull-pending-tasks", 200)
+    record = _access_record(path, 200)
 
     assert RoutineAccessFilter(debug_enabled=True).filter(record)
     assert record.levelno == logging.DEBUG
