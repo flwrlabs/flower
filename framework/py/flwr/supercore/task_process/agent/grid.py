@@ -39,7 +39,7 @@ from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
 _GRID_TOOL_NAMES = {"get_nodes", "push_messages", "pull_messages"}
-_SUPERNODE_GRID_TOOL_NAMES = {"push_message_reply"}
+_SUPERNODE_GRID_TOOL_NAMES = {"push_reply_message"}
 
 
 def _grid_tools() -> list[JSONObject]:
@@ -174,7 +174,7 @@ def _grid_tools() -> list[JSONObject]:
             strict=True,
         ),
         function_tool(
-            "push_message_reply",
+            "push_reply_message",
             (
                 "Send one reply to the current message. Copy its message_id into "
                 "reply_to_message_id exactly and its src_node_id into dst_node_id. "
@@ -354,7 +354,7 @@ class RuntimeAgentGrid(AgentGrid):
     def _push_messages(self, messages: list[JSONObject]) -> JSONObject:
         return {"results": self._send_messages(messages)}
 
-    def _push_message_reply(
+    def _push_reply_message(
         self, dst_node_id: str, payload: str, reply_to_message_id: str
     ) -> JSONObject:
         if not reply_to_message_id:

@@ -158,7 +158,7 @@ def test_supernode_agent_grid_only_pushes_one_reply() -> None:
     agent_grid = RuntimeAgentGrid(grid, Mock(), node_id=789)
 
     tools = agent_grid.tools()
-    assert [tool["name"] for tool in tools] == ["push_message_reply"]
+    assert [tool["name"] for tool in tools] == ["push_reply_message"]
     parameters = cast(JSONObject, tools[0]["parameters"])
     assert parameters["required"] == [
         "dst_node_id",
@@ -171,7 +171,7 @@ def test_supernode_agent_grid_only_pushes_one_reply() -> None:
     with pytest.raises(ValueError, match="A reply_to_message_id is required"):
         agent_grid.call(
             {
-                "name": "push_message_reply",
+                "name": "push_reply_message",
                 "call_id": "call-0",
                 "arguments": {
                     "dst_node_id": "1",
@@ -184,7 +184,7 @@ def test_supernode_agent_grid_only_pushes_one_reply() -> None:
 
     pushed = agent_grid.call(
         {
-            "name": "push_message_reply",
+            "name": "push_reply_message",
             "call_id": "call-1",
             "arguments": {
                 "dst_node_id": "1",
