@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for the Notion connector."""
 
+from typing import cast
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
 
@@ -31,6 +32,37 @@ from .executors import NotionApiError
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
 _OAUTH_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
 _CREDENTIALS: JSONObject = {"access_token": "ntn-secret"}
+
+
+def _meeting_note_operator_enums(property_filter: JSONObject) -> set[str]:
+    """Collect comparison operators from a meeting-note property schema."""
+    operator_enums: set[str] = set()
+    for property_option in cast(list[JSONObject], property_filter["anyOf"]):
+        option_properties = cast(JSONObject, property_option["properties"])
+        comparison_schema = cast(JSONObject, option_properties["filter"])
+        for comparison in cast(list[JSONObject], comparison_schema["anyOf"]):
+            comparison_properties = cast(JSONObject, comparison["properties"])
+            operator = cast(JSONObject, comparison_properties["operator"])
+            operator_enums.update(cast(list[str], operator["enum"]))
+            if operator["enum"] == ["is_empty", "is_not_empty"]:
+                assert "value" not in comparison_properties
+            else:
+                assert "value" in comparison_properties
+    return operator_enums
+
+
+def _nested_meeting_note_filter_items(
+    root_combinator: JSONObject, property_filter: JSONObject
+) -> JSONObject:
+    """Return the item schema inside the nested meeting-note combinator."""
+    root_properties = cast(JSONObject, root_combinator["properties"])
+    root_filters = cast(JSONObject, root_properties["filters"])
+    root_items = cast(JSONObject, root_filters["items"])
+    item_options = cast(list[JSONObject], root_items["anyOf"])
+    assert item_options[0] == property_filter
+    nested_properties = cast(JSONObject, item_options[1]["properties"])
+    nested_filters = cast(JSONObject, nested_properties["filters"])
+    return cast(JSONObject, nested_filters["items"])
 
 
 def test_notion_definition_is_registered() -> None:
@@ -298,6 +330,39 @@ def test_notion_query_meeting_notes_forwards_inputs() -> None:
         "sort": sort,
         "limit": 25,
     }
+
+
+def test_notion_meeting_note_filter_schema_is_explicit() -> None:
+    """Meeting-note tools should describe comparisons and one-level nesting."""
+    action = next(action for action in ACTIONS if action.name == "query_meeting_notes")
+    properties = cast(JSONObject, action.input_schema["properties"])
+    filter_schema = cast(JSONObject, properties["filter"])
+    root_options = cast(list[JSONObject], filter_schema["anyOf"])
+    property_filter, root_combinator = root_options
+
+    assert _meeting_note_operator_enums(property_filter) == {
+        "string_is",
+        "string_is_not",
+        "string_contains",
+        "string_does_not_contain",
+        "string_starts_with",
+        "string_ends_with",
+        "person_contains",
+        "person_does_not_contain",
+        "date_is",
+        "date_is_before",
+        "date_is_after",
+        "date_is_on_or_before",
+        "date_is_on_or_after",
+        "date_is_within",
+        "date_is_relative_to",
+        "is_empty",
+        "is_not_empty",
+    }
+    assert (
+        _nested_meeting_note_filter_items(root_combinator, property_filter)
+        == property_filter
+    )
 
 
 @pytest.mark.parametrize(
