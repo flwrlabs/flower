@@ -35,7 +35,7 @@ _CREDENTIALS: JSONObject = {"access_token": "ntn-secret"}
 
 def test_notion_definition_is_registered() -> None:
     """Notion schemas and executors should form one federation-scoped connector."""
-    assert len(ACTIONS) == 6
+    assert len(ACTIONS) == 9
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     assert [
         tool["name"] for tool in registry.get_connector_tools(NOTION_CONNECTOR_REF)
@@ -43,6 +43,9 @@ def test_notion_definition_is_registered() -> None:
         "notion_search",
         "notion_get_page",
         "notion_get_page_property",
+        "notion_get_block",
+        "notion_get_block_children",
+        "notion_query_meeting_notes",
         "notion_list_users",
         "notion_get_user",
         "notion_get_self",
@@ -205,6 +208,96 @@ def test_notion_get_page_property_returns_single_item() -> None:
             config={},
         )
     assert result == response.json.return_value
+
+
+def test_notion_get_block_encodes_id() -> None:
+    """Get block should retrieve exactly one safely encoded block ID."""
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "object": "block",
+        "id": "block-1",
+        "type": "paragraph",
+    }
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_block",
+            {"block_id": "block/1"},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == (
+        "GET",
+        "https://api.notion.com/v1/blocks/block%2F1",
+    )
+
+
+def test_notion_get_block_children_forwards_pagination() -> None:
+    """Get block children should forward Notion's pagination parameters."""
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "object": "list",
+        "type": "block",
+        "results": [],
+        "has_more": False,
+        "next_cursor": None,
+    }
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_block_children",
+            {
+                "block_id": "block/1",
+                "page_size": 50,
+                "start_cursor": "cursor-1",
+            },
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == (
+        "GET",
+        "https://api.notion.com/v1/blocks/block%2F1/children",
+    )
+    assert request.call_args.kwargs["params"] == {
+        "page_size": "50",
+        "start_cursor": "cursor-1",
+    }
+
+
+def test_notion_query_meeting_notes_forwards_inputs() -> None:
+    """Query meeting notes should forward filters, sorts, and the result limit."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"results": [], "has_more": False}
+    filter_: JSONObject = {
+        "property": "title",
+        "filter": {
+            "operator": "string_contains",
+            "value": {"type": "exact", "value": "standup"},
+        },
+    }
+    sort: list[JSONObject] = [
+        {"property": "last_edited_time", "direction": "descending"}
+    ]
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_query_meeting_notes",
+            {"filter": filter_, "sort": sort, "limit": 25},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == (
+        "POST",
+        "https://api.notion.com/v1/blocks/meeting_notes/query",
+    )
+    assert request.call_args.kwargs["json"] == {
+        "filter": filter_,
+        "sort": sort,
+        "limit": 25,
+    }
 
 
 def test_notion_list_users_forwards_pagination() -> None:
