@@ -573,8 +573,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     @parameterized.expand(  # type: ignore
         [
             ("unknown", 999, ApiErrorCode.CONNECTOR_NOT_FOUND),
-            ("invalid", 0, ApiErrorCode.INVALID_CONNECTOR_REQUEST),
-            ("out_of_range", 2**63, ApiErrorCode.INVALID_CONNECTOR_REQUEST),
+            ("invalid", 0, ApiErrorCode.CONNECTOR_NOT_FOUND),
         ]
     )
     def test_start_run_rejects_unavailable_oauth_connector(

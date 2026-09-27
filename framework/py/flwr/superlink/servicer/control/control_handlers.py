@@ -471,14 +471,6 @@ def _validate_run_connector_ids(
 ) -> list[int]:
     """Validate and deduplicate connector IDs for a new run."""
     canonical_ids = list(set(connector_ids))
-    # SQLite INTEGER cannot represent the full protobuf uint64 range.
-    if any(
-        connector_id <= 0 or connector_id > INT64_MAX_VALUE
-        for connector_id in canonical_ids
-    ):
-        raise InvalidConnectorRequestError(
-            f"connector_id must be between 1 and {INT64_MAX_VALUE}"
-        )
     connector_refs: set[str] = set()
     for connector_id in canonical_ids:
         connector = state.get_connector_by_id(connector_id)

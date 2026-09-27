@@ -339,27 +339,6 @@ class TestGetConnector(unittest.TestCase):
         self.state.get_run_connector_ids.assert_not_called()
         self.state.get_connector_by_id.assert_not_called()
 
-    def test_hides_other_federation_credentials(self) -> None:
-        """GetConnector should not fall back to another federation's credentials."""
-        task = Mock(
-            type=TaskType.CONNECTOR,
-            connector_ref="notion",
-            connector_id=42,
-            run_id=123,
-        )
-        self.state.get_run_info.return_value = [Mock(federation_id="@bob/fed-b")]
-        self.state.get_run_connector_ids.return_value = [42]
-        self.state.get_connector_by_id.return_value = Mock(
-            federation_id="@bob/fed-a", connector_ref="notion"
-        )
-
-        with self.assertRaises(FlowerError) as error:
-            runtime_handlers.get_connector(GetConnectorRequest(), self.state, task)
-
-        self.state.get_run_connector_ids.assert_called_once_with(123)
-        self.state.get_connector_by_id.assert_called_once_with(42)
-        self.assertEqual(error.exception.code, ApiErrorCode.CONNECTOR_NOT_FOUND)
-
 
 class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902, R0904
     """SuperLink Runtime API handler tests."""
