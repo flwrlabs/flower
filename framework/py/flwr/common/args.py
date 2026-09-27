@@ -67,7 +67,10 @@ def add_args_runtime_dependency_install(
 
 
 def add_args_flwr_app_common(
-    parser: argparse.ArgumentParser, *, include_token_stdin: bool = False
+    parser: argparse.ArgumentParser,
+    *,
+    include_token_stdin: bool = False,
+    include_runtime_dependency_install: bool = True,
 ) -> None:
     """Add common Flower arguments for flwr-*app to the provided parser."""
     token_group = parser.add_mutually_exclusive_group(required=True)
@@ -112,7 +115,8 @@ def add_args_flwr_app_common(
         help="The PID of the parent process. When set, the process will terminate "
         "when the parent process exits.",
     )
-    add_args_runtime_dependency_install(parser)
+    if include_runtime_dependency_install:
+        add_args_runtime_dependency_install(parser)
 
 
 def try_obtain_flwr_app_token(args: argparse.Namespace) -> str:

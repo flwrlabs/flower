@@ -24,11 +24,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 from time import monotonic
-from types import NoneType
-from typing import Any, cast
+from typing import cast
 
 import click
-import requests
 from prompt_toolkit.application import Application
 from prompt_toolkit.buffer import Buffer, CompletionState
 from prompt_toolkit.completion import (
@@ -61,7 +59,6 @@ from prompt_toolkit.widgets import Frame
 
 from flwr.cli.constant import (
     CHAT_AGENT_NAME,
-    CHAT_AGENTS_API_PATH,
     CHAT_APP_STYLE,
     CHAT_COMMANDS,
     CHAT_CONNECTOR_COMMAND,
@@ -88,6 +85,7 @@ from flwr.cli.constant import (
 )
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Connector,
+    ListAppsRequest,
     StartRunRequest,
     StopRunRequest,
     StreamRunEventsRequest,
@@ -95,15 +93,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.fab_pb2 import Fab  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
-from flwr.supercore.constant import (
-    APP_ID_PATTERN,
-    FLOWER_AGENT_APP_ID,
-    FLWR_SUPERGRID_API_URL,
-)
+from flwr.supercore.constant import APP_ID_PATTERN, FLOWER_AGENT_APP_ID, TaskType
 from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.typing import JSONObject
 
-from ..auth_plugin import CliAuthPlugin, OidcCliPlugin
 from ..utils import flwr_cli_exc_handler
 from .chat_connector import (
     CHAT_CONNECTOR_CLEAR,
@@ -156,12 +149,10 @@ class _ChatCompleter(Completer):
     def __init__(
         self,
         stub: ControlHttpClient,
-        auth_plugin: CliAuthPlugin,
         federation: str,
         federations: list[Federation],
     ) -> None:
         self.stub = stub
-        self.auth_plugin = auth_plugin
         self.federation = federation
         self.federations = federations
         self.agents: list[_Agent] | None = None
@@ -172,7 +163,7 @@ class _ChatCompleter(Completer):
         """Load and cache the available agents."""
         with self._completion_lock:
             if self.agents is None:
-                self.agents = fetch_chat_agents(self.auth_plugin, self.federation)
+                self.agents = fetch_chat_agents(self.stub, self.federation)
             return self.agents
 
     def load_connectors(self) -> list[Connector]:
@@ -280,13 +271,23 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self,
         stub: ControlHttpClient,
         federations: list[Federation],
-        auth_plugin: CliAuthPlugin,
+        preferred_federation: str | None = None,
     ) -> None:
         self.stub = stub
-        self.federation = next(
-            federation.name
-            for federation in federations
-            if federation.name.endswith(f"/{CHAT_DEFAULT_FEDERATION_NAME}")
+        if not federations:
+            raise click.ClickException("The SuperLink has no available federations.")
+        federation_names = [federation.name for federation in federations]
+        self.federation = (
+            preferred_federation
+            if preferred_federation in federation_names
+            else next(
+                (
+                    name
+                    for name in federation_names
+                    if name.endswith(f"/{CHAT_DEFAULT_FEDERATION_NAME}")
+                ),
+                federation_names[0],
+            )
         )
         self.federations = federations
         self.series_id: int | None = None
@@ -308,7 +309,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_name = CHAT_AGENT_NAME
         self.local_agent: LocalAgent | None = None
         self.connector_refs: list[str] = []
-        self.completer = _ChatCompleter(stub, auth_plugin, self.federation, federations)
+        self.completer = _ChatCompleter(stub, self.federation, federations)
         self.input_buffer = Buffer(
             completer=ThreadedCompleter(self.completer),
             complete_while_typing=True,
@@ -1107,56 +1108,20 @@ def parse_task_event(task_event: TaskEvent) -> tuple[str, JSONObject]:
     return event_type, payload
 
 
-def fetch_chat_agents(
-    auth_plugin: CliAuthPlugin, federation: str | None
-) -> list[_Agent]:
-    """Fetch agents available to the authenticated Flower account."""
-    if not isinstance(auth_plugin, OidcCliPlugin) or not auth_plugin.access_token:
-        raise click.ClickException("Missing authentication tokens. Please login first.")
-    headers = {"Authorization": f"Bearer {auth_plugin.access_token}"}
-    url = f"{FLWR_SUPERGRID_API_URL}{CHAT_AGENTS_API_PATH}"
-    try:
-        response = requests.get(
-            url,
-            headers=headers,
-            params={"federation_id": federation} if federation is not None else None,
-            timeout=10,
+def fetch_chat_agents(stub: ControlHttpClient, federation: str) -> list[_Agent]:
+    """Fetch AgentApps available in the selected federation."""
+    with flwr_cli_exc_handler():
+        response = stub.ListApps(ListAppsRequest(federation_id=federation))
+    return [
+        _Agent(
+            app.app_id,
+            app.display_name or app.app_id,
+            app.description or app.display_name or app.app_id,
+            app.fab_hash or None,
         )
-        response.raise_for_status()
-        payload = response.json()
-    except (requests.RequestException, ValueError) as exc:
-        raise click.ClickException("Failed to load available agents.") from exc
-
-    return _parse_agents(payload)
-
-
-def _parse_agents(payload: Any) -> list[_Agent]:
-    """Parse the user agents API response into completion entries."""
-    if not isinstance(payload, dict) or not isinstance(
-        raw_agents := payload.get("agents"), list
-    ):
-        raise click.ClickException("Invalid response from the agents API.")
-
-    agents: list[_Agent] = []
-    for raw_agent in raw_agents:
-        if not isinstance(raw_agent, dict):
-            raise click.ClickException("Invalid response from the agents API.")
-        app_spec = raw_agent.get("app_id")
-        display_name = raw_agent.get("display_name")
-        description = raw_agent.get("description")
-        fab_hash = raw_agent.get("fab_hash")
-        if not (
-            isinstance(app_spec, str)
-            and re.fullmatch(APP_ID_PATTERN, app_spec) is not None
-            and isinstance(fab_hash, (str, NoneType))
-            and isinstance(display_name, (str, NoneType))
-            and isinstance(description, (str, NoneType))
-        ):
-            raise click.ClickException("Invalid response from the agents API.")
-        display_name = display_name or app_spec
-        description = description or display_name
-        agents.append(_Agent(app_spec, display_name, description, fab_hash))
-    return agents
+        for app in response.apps
+        if app.app_type == TaskType.AGENT_APP
+    ]
 
 
 def _extract_agent_selection(prompt: str) -> tuple[str | None, str]:

@@ -73,7 +73,7 @@ Flower Chat shows the selected agent above the prompt.
 ```
 
 Flower verifies your stored login before opening the full-screen interface. At
-startup, it selects your `@account/personal` federation. At the `❯` prompt,
+startup, it selects your `@<account>/personal` federation. At the `❯` prompt,
 ask:
 
 ```text
@@ -109,7 +109,7 @@ available in the active federation. Select one, add a request, and press
 {kbd}`Enter`:
 
 ```text
-@publisher/agent Describe what you can help me with.
+@<publisher>/<agent> Describe what you can help me with.
 ```
 
 Only a leading app spec selects an agent. After a successful selection, the
@@ -126,7 +126,7 @@ Enter `/federation` to open the federation completion menu. Select a federation
 visible to your account, or type its full name:
 
 ```text
-/federation @account/federation-name
+/federation @<account>/<federation-name>
 ```
 
 Flower clears the current transcript, selects the default Flower Agent, and
@@ -161,7 +161,7 @@ You can also press {kbd}`Ctrl+C`:
 Each submitted message started one `AgentApp` run. SuperGrid supplied:
 
 - an OpenAI-compatible endpoint for model requests
-- an `AgentSession` for connector calls and frontend-visible events
+- an `AgentSession` for the prompt, connector calls, and frontend-visible events
 - a Flower `Context` containing run configuration and persistent series state
 - the selected AgentApp, resolved from its app spec or FAB hash
 - a federation in which the run and its series are stored
@@ -173,7 +173,7 @@ model.
 ## Next steps
 
 - [Write your first AgentApp](write-your-first-agentapp.md)
-- [Build a collaborative research agent](build-a-collaborative-agent.md)
+- [Build a research agent](build-a-research-agent.md)
 - [Use connectors](../explanations/use-connectors.md)
 - [Run an AgentApp on
   SuperGrid](../how-to-guides/run-on-supergrid.md)

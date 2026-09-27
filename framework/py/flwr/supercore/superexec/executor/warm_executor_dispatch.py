@@ -35,6 +35,7 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.warm_executor_constants import (
+    WARM_AGENTAPP_EXECUTOR_MODULE,
     WARM_CONNECTOR_EXECUTOR_MODULE,
     WARM_EXECUTOR_BUSY_FILE,
     WARM_MODEL_EXECUTOR_MODULE,
@@ -64,6 +65,7 @@ WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH = (
     f"{WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH}/ca.crt"
 )
 _WARM_EXECUTOR_ACK_TIMEOUT_SECONDS = 5.0
+_PRESTARTED_AGENTAPP_CREATION_INTERVAL_SECONDS = 5.0
 # A surviving consumed Pod is safe to retire only after all task processes exit.
 # Ignore PID 1 (the idle parent), this probe, and zombies. A concurrent readiness
 # probe can delay retirement, but cannot make a running task appear finished.
@@ -322,13 +324,23 @@ class KubernetesWarmExecutorDispatch:
 
 
 def warm_executor_command(
-    spec: ExecutionSpec, runtime_root_certificates: str | None
+    spec: ExecutionSpec,
+    runtime_root_certificates: str | None,
+    pool_key: WarmExecutorPoolKey | None = None,
 ) -> list[str]:
     """Build a one-task child command that receives authority on standard input."""
-    worker_module = {
-        TaskType.CONNECTOR: WARM_CONNECTOR_EXECUTOR_MODULE,
-        TaskType.MODEL: WARM_MODEL_EXECUTOR_MODULE,
-    }.get(spec.task_type)
+    prestarted_agentapp = (
+        spec.task_type == TaskType.AGENT_APP
+        and pool_key is not None
+        and pool_key.fab_hash is not None
+    )
+    worker_module = None
+    if prestarted_agentapp:
+        worker_module = WARM_AGENTAPP_EXECUTOR_MODULE
+    elif spec.task_type == TaskType.CONNECTOR:
+        worker_module = WARM_CONNECTOR_EXECUTOR_MODULE
+    elif spec.task_type == TaskType.MODEL:
+        worker_module = WARM_MODEL_EXECUTOR_MODULE
     if worker_module is not None:
         command = [
             "python",
@@ -339,6 +351,13 @@ def warm_executor_command(
             spec.runtime_api_address,
             "--token-stdin",
         ]
+        if prestarted_agentapp:
+            assert pool_key is not None
+            assert pool_key.fab_hash is not None
+            assert spec.fab_hash is not None
+            if spec.fab_hash != pool_key.fab_hash:
+                raise ValueError("AgentApp task does not match its warm executor pool.")
+            command.extend(["--fab-hash", spec.fab_hash])
     else:
         command = [
             TASK_TYPE_TO_COMMAND[spec.task_type],
@@ -355,7 +374,7 @@ def warm_executor_command(
                 WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH,
             ]
         )
-    if spec.runtime_dependency_install:
+    if spec.runtime_dependency_install and not prestarted_agentapp:
         command.append("--allow-runtime-dependency-installation")
     return command
 
@@ -393,6 +412,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
         self._pools = {pool.key: pool for pool in config.warm_executor_pools}
         self._busy_pods: set[str] = set()
         self._retiring_pods: dict[str, WarmExecutorPoolKey | None] = {}
+        self._pool_creation_not_before: dict[WarmExecutorPoolKey, float] = {}
         self._closed = False
         self._lock = threading.RLock()
 
@@ -401,29 +421,34 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
         self, spec: ExecutionSpec, runtime_root_certificates: str | None
     ) -> LaunchResult | None:
         """Dispatch a compatible task to a ready Pod or use the cold fallback."""
-        pool = self._pool_for_task(spec.task_type)
-        if pool is None:
+        candidates = self._candidate_pools(spec.task_type, spec.fab_hash)
+        if not candidates:
             return None
+        primary_pool = candidates[0]
 
         with self._lock:
             if self._closed:
-                self._log_dispatch(pool, "setup_unavailable")
+                self._log_dispatch(primary_pool, "setup_unavailable")
                 return None
             try:
-                pod_name = self._take_ready_pod(pool.key)
+                claimed = self._take_ready_pod(candidates)
             except WarmExecutorUnavailable:
-                self._log_dispatch(pool, "setup_unavailable")
+                self._log_dispatch(primary_pool, "setup_unavailable")
                 return None
-            if pod_name is None:
-                self._ensure_pool_capacity(pool, reserved_pod_capacity=1)
-                self._log_dispatch(pool, "capacity_unavailable")
+            if claimed is None:
+                for candidate in candidates:
+                    self._ensure_pool_capacity(candidate, reserved_pod_capacity=1)
+                self._log_dispatch(primary_pool, "capacity_unavailable")
                 return None
-            self._ensure_pool_capacity(pool)
+            pool, pod_name = claimed
+            for candidate in candidates:
+                self._ensure_pool_capacity(candidate)
 
         try:
             dispatch = self._open_dispatch(
                 pod_name=pod_name,
                 spec=spec,
+                pool_key=pool.key,
                 runtime_root_certificates=runtime_root_certificates,
             )
         except WarmExecutorUnavailable:
@@ -496,10 +521,10 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 return
             self._reconcile_owned_pods()
 
-    def has_ready_pod(self, task_type: TaskType) -> bool:
+    def has_ready_pod(self, task_type: TaskType, fab_hash: str | None = None) -> bool:
         """Return whether a matching warm Pod can take a task without new capacity."""
-        pool = self._pool_for_task(task_type)
-        if pool is None:
+        candidates = self._candidate_pools(task_type, fab_hash)
+        if not candidates:
             return False
         with self._lock:
             if self._closed:
@@ -507,7 +532,11 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             pods = self._owned_warm_pods()
             if pods is None:
                 return False
-            return any(self._is_dispatchable(pod, pool.key) for pod in pods)
+            return any(
+                self._is_dispatchable(pod, pool.key)
+                for pool in candidates
+                for pod in pods
+            )
 
     def close(self) -> None:
         """Stop dispatch and delete only idle Pods owned by this SuperExec."""
@@ -531,14 +560,23 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             ):
                 self._delete_pod(pod_name)
 
-    def _pool_for_task(self, task_type: TaskType) -> WarmExecutorPoolConfig | None:
-        for pool in self._pools.values():
-            if (
-                pool.key.task_type == task_type
-                and pool.key.runtime_image == self._config.image
-            ):
-                return pool
-        return None
+    def _candidate_pools(
+        self, task_type: TaskType, fab_hash: str | None
+    ) -> tuple[WarmExecutorPoolConfig, ...]:
+        """Return exact then generic pools used by admission and reservation."""
+        pools = tuple(
+            pool
+            for pool in self._pools.values()
+            if pool.key.task_type == task_type
+            and pool.key.runtime_image == self._config.image
+        )
+        exact = tuple(
+            pool
+            for pool in pools
+            if fab_hash is not None and pool.key.fab_hash == fab_hash
+        )
+        generic = tuple(pool for pool in pools if pool.key.fab_hash is None)
+        return (*exact, *generic)
 
     def _is_dispatchable(self, pod: object, key: WarmExecutorPoolKey) -> bool:
         """Use the same availability check for admission and reservation."""
@@ -552,20 +590,23 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             and is_warm_executor_ready(pod, key)
         )
 
-    def _take_ready_pod(self, key: WarmExecutorPoolKey) -> str | None:
+    def _take_ready_pod(
+        self, candidates: Sequence[WarmExecutorPoolConfig]
+    ) -> tuple[WarmExecutorPoolConfig, str] | None:
         pods = self._owned_warm_pods()
         if pods is None:
             raise WarmExecutorUnavailable("Warm executor Pods could not be listed.")
-        for pod in pods:
-            pod_name = _object_name(pod)
-            if pod_name is not None and self._is_dispatchable(pod, key):
-                try:
-                    self._mark_pod_consumed(pod_name)
-                except WarmExecutorUnavailable:
-                    self._retire_unavailable_pod(pod_name, key)
-                    raise
-                self._busy_pods.add(pod_name)
-                return pod_name
+        for pool in candidates:
+            for pod in pods:
+                pod_name = _object_name(pod)
+                if pod_name is not None and self._is_dispatchable(pod, pool.key):
+                    try:
+                        self._mark_pod_consumed(pod_name)
+                    except WarmExecutorUnavailable:
+                        self._retire_unavailable_pod(pod_name, pool.key)
+                        raise
+                    self._busy_pods.add(pod_name)
+                    return pool, pod_name
         return None
 
     def _ensure_pool_capacity(
@@ -573,6 +614,11 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
     ) -> None:
         if self._closed or pool.key in self._retiring_pods.values():
             return
+        creation_not_before = self._pool_creation_not_before.get(pool.key)
+        if creation_not_before is not None:
+            if self._config.monotonic() < creation_not_before:
+                return
+            self._pool_creation_not_before.pop(pool.key, None)
         pods = self._owned_warm_pods()
         if pods is None:
             return
@@ -600,6 +646,8 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 )
                 return
             pods_to_create = min(pods_to_create, max(available_pod_capacity, 0))
+        if pool.key.fab_hash is not None and pods_to_create:
+            self._delay_pool_creation(pool.key)
         for _ in range(pods_to_create):
             try:
                 self._create_warm_executor(
@@ -611,6 +659,13 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             except Exception:  # pylint: disable=broad-exception-caught
                 log(WARNING, "Failed to create a warm TaskExecutor Pod.", exc_info=True)
                 return
+
+    def _delay_pool_creation(self, key: WarmExecutorPoolKey) -> None:
+        """Rate-limit creation for one FAB-specific pool."""
+        self._pool_creation_not_before[key] = max(
+            self._pool_creation_not_before.get(key, float("-inf")),
+            self._config.monotonic() + _PRESTARTED_AGENTAPP_CREATION_INTERVAL_SECONDS,
+        )
 
     def _reconcile_owned_pods(self) -> bool:
         """Delete owned Pods that are obsolete or exceed configured capacity."""
@@ -707,6 +762,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
         *,
         pod_name: str,
         spec: ExecutionSpec,
+        pool_key: WarmExecutorPoolKey,
         runtime_root_certificates: str | None,
     ) -> KubernetesWarmExecutorDispatch:
         try:
@@ -719,7 +775,9 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
                     pod_name,
                     self._config.namespace,
                     container="taskexecutor",
-                    command=warm_executor_command(spec, runtime_root_certificates),
+                    command=warm_executor_command(
+                        spec, runtime_root_certificates, pool_key
+                    ),
                     stderr=True,
                     stdin=True,
                     stdout=True,
