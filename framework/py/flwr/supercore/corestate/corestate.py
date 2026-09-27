@@ -253,8 +253,8 @@ class CoreState(ABC):  # pylint: disable=R0904
 
         Returns
         -------
-        Optional[int]
-            The connector ID if the connector was stored, otherwise ``None``.
+        int | None
+            The connector ID if the connector is created, otherwise ``None``.
         """
 
     @abstractmethod
