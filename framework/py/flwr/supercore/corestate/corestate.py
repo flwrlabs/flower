@@ -235,7 +235,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         credentials_json: str,
         config_json: str,
         created_by: str,
-    ) -> bool:
+    ) -> int | None:
         """Create a connector for a federation.
 
         Parameters
@@ -253,8 +253,8 @@ class CoreState(ABC):  # pylint: disable=R0904
 
         Returns
         -------
-        bool
-            ``True`` if the connector was stored, otherwise ``False``.
+        Optional[int]
+            The connector ID if the connector was stored, otherwise ``None``.
         """
 
     @abstractmethod

@@ -236,6 +236,7 @@ def get_connector(
     connector = state.get_connector_by_id(task.connector_id)
     if connector is None:
         raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
+    # Run bindings do not enforce federation ownership at the database level.
     if connector.federation_id != run.federation_id:
         raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
 

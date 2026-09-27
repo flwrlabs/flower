@@ -228,26 +228,23 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         federation_id = "@bob/fed-a"
 
-        self.assertTrue(
-            state.create_connector(
-                federation_id=federation_id,
-                connector_ref="calendar",
-                credentials_json='{"token":"first"}',
-                config_json='{"calendar":"primary"}',
-                created_by="account-a",
-            )
+        first_id = state.create_connector(
+            federation_id=federation_id,
+            connector_ref="calendar",
+            credentials_json='{"token":"first"}',
+            config_json='{"calendar":"primary"}',
+            created_by="account-a",
         )
-        self.assertTrue(
-            state.create_connector(
-                federation_id=federation_id,
-                connector_ref="calendar",
-                credentials_json='{"token":"second"}',
-                config_json='{"calendar":"work"}',
-                created_by="account-a",
-            )
+        second_id = state.create_connector(
+            federation_id=federation_id,
+            connector_ref="calendar",
+            credentials_json='{"token":"second"}',
+            config_json='{"calendar":"work"}',
+            created_by="account-a",
         )
+        assert first_id is not None
+        assert second_id is not None
         connectors = list(state.get_connectors_by_ref(federation_id, "calendar"))
-        first_id, second_id = [connector.connector_id for connector in connectors]
         self.assertGreater(second_id, first_id)
         self.assertEqual(
             [item.connector_id for item in connectors], [first_id, second_id]

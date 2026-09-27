@@ -2614,17 +2614,15 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state = self.state_factory()
 
         with state.session() as session:
-            self.assertTrue(
-                state.create_connector(
-                    federation_id="@bob/fed-a",
-                    connector_ref="calendar",
-                    credentials_json='{"token":"old"}',
-                    config_json='{"calendar":"primary"}',
-                    created_by="account-a",
-                )
+            connector_id = state.create_connector(
+                federation_id="@bob/fed-a",
+                connector_ref="calendar",
+                credentials_json='{"token":"old"}',
+                config_json='{"calendar":"primary"}',
+                created_by="account-a",
             )
-            connectors = state.get_connectors_by_ref("@bob/fed-a", "calendar")
-            connector_id = connectors[0].connector_id
+            assert connector_id is not None
+            state.get_connectors_by_ref("@bob/fed-a", "calendar")
             cached_row = session.scalar(
                 select(ConnectorModel).where(
                     ConnectorModel.federation_id == "@bob/fed-a",

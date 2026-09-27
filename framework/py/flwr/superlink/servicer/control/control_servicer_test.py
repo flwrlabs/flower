@@ -287,10 +287,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         response = self.servicer.CompleteConnectorOAuth(request, Mock())
 
-        self.assertEqual(response.connector_ref, "slack")
         connector = self.state.get_connectors_by_ref(CONNECTOR_FEDERATION_ID, "slack")[
             0
         ]
+        self.assertEqual(response.connector_id, connector.connector_id)
         self.assertEqual(connector.federation_id, CONNECTOR_FEDERATION_ID)
         self.assertEqual(
             json.loads(connector.credentials_json),
@@ -306,30 +306,22 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     def test_list_and_disconnect_connectors_are_federation_scoped(self) -> None:
         """List and disconnect only the requested federation's connector."""
-        self.assertTrue(
-            self.state.create_connector(
-                federation_id=CONNECTOR_FEDERATION_ID,
-                connector_ref="slack",
-                credentials_json='{"account":"first"}',
-                config_json="{}",
-                created_by=self.aid,
-            )
+        first_id = self.state.create_connector(
+            federation_id=CONNECTOR_FEDERATION_ID,
+            connector_ref="slack",
+            credentials_json='{"account":"first"}',
+            config_json="{}",
+            created_by=self.aid,
         )
-        self.assertTrue(
-            self.state.create_connector(
-                federation_id=CONNECTOR_FEDERATION_ID,
-                connector_ref="slack",
-                credentials_json='{"account":"second"}',
-                config_json="{}",
-                created_by=self.aid,
-            )
+        second_id = self.state.create_connector(
+            federation_id=CONNECTOR_FEDERATION_ID,
+            connector_ref="slack",
+            credentials_json='{"account":"second"}',
+            config_json="{}",
+            created_by=self.aid,
         )
-        first_id, second_id = [
-            connector.connector_id
-            for connector in self.state.get_connectors_by_ref(
-                CONNECTOR_FEDERATION_ID, "slack"
-            )
-        ]
+        assert first_id is not None
+        assert second_id is not None
 
         response = self.servicer.ListConnectors(
             ListConnectorsRequest(federation=CONNECTOR_FEDERATION_ID), Mock()
@@ -344,9 +336,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         with self.assertRaises(FlowerError) as error:
             self.servicer.DisconnectConnector(
-                DisconnectConnectorRequest(
-                    connector_ref="slack", federation=CONNECTOR_FEDERATION_ID
-                ),
+                DisconnectConnectorRequest(federation=CONNECTOR_FEDERATION_ID),
                 Mock(),
             )
         self.assertEqual(error.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST)
@@ -370,7 +360,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertIsNotNone(self.state.get_connector_by_id(second_id))
         self.servicer.DisconnectConnector(
             DisconnectConnectorRequest(
-                connector_ref="slack", federation=CONNECTOR_FEDERATION_ID
+                connector_id=second_id, federation=CONNECTOR_FEDERATION_ID
             ),
             Mock(),
         )
@@ -516,29 +506,23 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
         """StartRun should bind connected OAuth connector IDs."""
-        self.assertTrue(
-            self.state.create_connector(
-                federation_id=CONNECTOR_FEDERATION_ID,
-                connector_ref="slack",
-                credentials_json="{}",
-                config_json="{}",
-                created_by=self.aid,
-            )
+        connector_id = self.state.create_connector(
+            federation_id=CONNECTOR_FEDERATION_ID,
+            connector_ref="slack",
+            credentials_json="{}",
+            config_json="{}",
+            created_by=self.aid,
         )
-        self.state.create_connector(
+        second_id = self.state.create_connector(
             federation_id=CONNECTOR_FEDERATION_ID,
             connector_ref="slack",
             credentials_json='{"account":"second"}',
             config_json="{}",
             created_by=self.aid,
         )
-        connector_ids = [
-            connector.connector_id
-            for connector in self.state.get_connectors_by_ref(
-                CONNECTOR_FEDERATION_ID, "slack"
-            )
-        ]
-        connector_id = connector_ids[0]
+        assert connector_id is not None
+        assert second_id is not None
+        connector_ids = [connector_id, second_id]
         request = StartRunRequest(
             federation=CONNECTOR_FEDERATION_ID,
             connector_ids=[connector_id, connector_id],

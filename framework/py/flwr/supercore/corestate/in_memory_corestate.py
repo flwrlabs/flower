@@ -516,10 +516,10 @@ class InMemoryCoreState(
         credentials_json: str,
         config_json: str,
         created_by: str,
-    ) -> bool:
+    ) -> int | None:
         """Create a connector for a federation."""
         if not federation_id or not connector_ref or not created_by:
-            return False
+            return None
         with self.lock_connector_store:
             self.connector_id_counter += 1
             connector_id = self.connector_id_counter
@@ -531,7 +531,7 @@ class InMemoryCoreState(
                 config_json=config_json,
             )
             self.connector_store[connector_id] = connector
-        return True
+        return connector_id
 
     def get_connectors_by_ref(
         self, federation_id: str, connector_ref: str

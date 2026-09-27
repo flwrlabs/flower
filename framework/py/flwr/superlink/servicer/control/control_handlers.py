@@ -264,28 +264,13 @@ def disconnect_connector(
     federation_id = request.federation.strip()
     state.federation_manager.ensure_default_federations_exist(account.flwr_aid)
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    # SQLite INTEGER cannot represent the full protobuf uint64 range.
     if connector_id > INT64_MAX_VALUE:
         raise InvalidConnectorRequestError(
             f"connector_id must not exceed {INT64_MAX_VALUE}"
         )
     if connector_id <= 0:
-        connector_ref = request.connector_ref.strip().lower()
-        if not connector_ref:
-            raise InvalidConnectorRequestError(
-                "connector_id or connector_ref is required"
-            )
-        matching_connectors = state.get_connectors_by_ref(federation_id, connector_ref)
-        if not matching_connectors:
-            raise FlowerError(
-                ApiErrorCode.CONNECTOR_NOT_FOUND,
-                f"Connector '{connector_ref}' is not connected for this federation.",
-            )
-        if len(matching_connectors) > 1:
-            raise InvalidConnectorRequestError(
-                f"connector_ref '{connector_ref}' is ambiguous; "
-                "connector_id is required"
-            )
-        connector_id = matching_connectors[0].connector_id
+        raise InvalidConnectorRequestError("connector_id is required")
 
     deleted = state.delete_connector(federation_id, connector_id)
     if not deleted:
@@ -467,25 +452,26 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals,too-many-branch
             f"credentials ({type(err).__name__})"
         ) from None
 
-    stored = state.create_connector(
+    connector_id = state.create_connector(
         federation_id=session.federation_id,
         connector_ref=connector_ref,
         credentials_json=credentials_json,
         config_json=config_json,
         created_by=account.flwr_aid,
     )
-    if not stored:
+    if connector_id is None:
         raise ConnectorFailureError("Connector credentials could not be stored")
-    return CompleteConnectorOAuthResponse(connector_ref=connector_ref)
+    return CompleteConnectorOAuthResponse(connector_id=connector_id)
 
 
-def validate_run_connector_ids(
+def _validate_run_connector_ids(
     connector_ids: Sequence[int],
     state: LinkState,
     federation_id: str,
 ) -> list[int]:
     """Validate and deduplicate connector IDs for a new run."""
     canonical_ids = list(set(connector_ids))
+    # SQLite INTEGER cannot represent the full protobuf uint64 range.
     if any(
         connector_id <= 0 or connector_id > INT64_MAX_VALUE
         for connector_id in canonical_ids
@@ -509,7 +495,7 @@ def validate_run_connector_ids(
     return canonical_ids
 
 
-def resolve_run_connector_refs(
+def _resolve_run_connector_refs(
     connector_refs: Sequence[str],
     state: LinkState,
     federation_id: str,
@@ -704,10 +690,10 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         return StartRunResponse()
 
     override_config = user_config_from_proto(request.override_config)
-    connector_ids = validate_run_connector_ids(
+    connector_ids = _validate_run_connector_ids(
         [
             *request.connector_ids,
-            *resolve_run_connector_refs(request.connector_refs, state, federation_id),
+            *_resolve_run_connector_refs(request.connector_refs, state, federation_id),
         ],
         state,
         federation_id,

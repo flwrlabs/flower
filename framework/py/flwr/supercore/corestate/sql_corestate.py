@@ -654,21 +654,24 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         credentials_json: str,
         config_json: str,
         created_by: str,
-    ) -> bool:
+    ) -> int | None:
         """Create a connector for a federation."""
         if not federation_id or not connector_ref or not created_by:
-            return False
-        stmt = insert(ConnectorModel).values(
-            federation_id=federation_id,
-            connector_ref=connector_ref,
-            credentials_json=credentials_json,
-            config_json=config_json,
-            created_at=now(),
-            created_by=created_by,
+            return None
+        stmt = (
+            insert(ConnectorModel)
+            .values(
+                federation_id=federation_id,
+                connector_ref=connector_ref,
+                credentials_json=credentials_json,
+                config_json=config_json,
+                created_at=now(),
+                created_by=created_by,
+            )
+            .returning(ConnectorModel.connector_id)
         )
         with self.session() as session:
-            session.execute(stmt)
-        return True
+            return session.scalar(stmt)
 
     def get_connectors_by_ref(
         self, federation_id: str, connector_ref: str

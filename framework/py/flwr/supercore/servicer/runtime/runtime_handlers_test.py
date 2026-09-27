@@ -60,16 +60,12 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.state = Mock()
         self.state.get_tasks.return_value = []
 
-    def _create_connector_task(
-        self, connector_ref: str, connector_id: int | None = 42
-    ) -> CreateTaskResponse:
+    def _create_connector_task(self, connector_ref: str) -> CreateTaskResponse:
         """Create a connector task as an authenticated AgentApp task."""
         request = CreateTaskRequest(
             type=TaskType.CONNECTOR,
             connector_ref=connector_ref,
         )
-        if connector_id is not None:
-            request.connector_id = connector_id
         return runtime_handlers.create_task(
             request,
             self.state,
@@ -201,7 +197,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                 self.assertEqual(response.task_id, 456)
 
     def test_create_task_resolves_single_bound_oauth_connector(self) -> None:
-        """CreateTask should resolve one legacy provider reference to its ID."""
+        """CreateTask should resolve the run-bound connector reference to its ID."""
         self.state.get_run_connector_ids.return_value = [42]
         self.state.get_connector_by_id.return_value = SimpleNamespace(
             connector_ref="notion"
@@ -213,7 +209,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             "OAUTH_FLOWS",
             {"notion": Mock(connector_ref="notion")},
         ):
-            response = self._create_connector_task("notion", connector_id=None)
+            response = self._create_connector_task("notion")
 
         self.state.get_run_connector_ids.assert_called_once_with(123)
         self.assertEqual(
@@ -221,25 +217,6 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(self.state.create_task.call_args.kwargs["connector_id"], 42)
         self.assertEqual(response.task_id, 456)
-
-        self.state.get_run_connector_ids.return_value = [42, 43]
-        self.state.get_connector_by_id.side_effect = [
-            SimpleNamespace(connector_ref="notion"),
-            SimpleNamespace(connector_ref="notion"),
-        ]
-        with (
-            patch.object(
-                connector_registry,
-                "OAUTH_FLOWS",
-                {"notion": Mock(connector_ref="notion")},
-            ),
-            self.assertRaises(FlowerError) as error,
-        ):
-            self._create_connector_task("notion", connector_id=None)
-        self.assertEqual(
-            error.exception.code,
-            ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
-        )
 
     def test_create_task_rejects_unbound_oauth_connector(self) -> None:
         """CreateTask should reject OAuth credentials unavailable to the run."""
