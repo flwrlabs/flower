@@ -15,6 +15,7 @@
 """Runtime AgentGrid tests."""
 
 
+from typing import cast
 from unittest.mock import Mock
 
 import pytest
@@ -27,6 +28,7 @@ from flwr.supercore.constant import (
     AGENT_MESSAGE_TEXT_KEY,
 )
 from flwr.supercore.task_identity import TaskIdentity
+from flwr.supercore.typing import JSONObject
 
 from .grid import RuntimeAgentGrid
 
@@ -157,12 +159,13 @@ def test_supernode_agent_grid_only_pushes_one_reply() -> None:
 
     tools = agent_grid.tools()
     assert [tool["name"] for tool in tools] == ["push_message_reply"]
-    assert tools[0]["parameters"]["required"] == [
+    parameters = cast(JSONObject, tools[0]["parameters"])
+    assert parameters["required"] == [
         "dst_node_id",
         "payload",
         "reply_to_message_id",
     ]
-    assert "messages" not in tools[0]["parameters"]["properties"]
+    assert "messages" not in cast(JSONObject, parameters["properties"])
     with pytest.raises(ValueError, match="Unsupported Grid tool 'push_messages'"):
         agent_grid.call({"name": "push_messages", "call_id": "call-0", "arguments": {}})
     with pytest.raises(ValueError, match="A reply_to_message_id is required"):
