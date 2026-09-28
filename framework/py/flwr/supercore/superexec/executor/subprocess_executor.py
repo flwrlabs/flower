@@ -29,7 +29,7 @@ from .types import ExecutionSpec, LaunchResult
 class SubprocessExecutor:
     """Run TaskExecutor processes as local subprocesses."""
 
-    def wait_for_eligible_capacity(
+    def get_eligible_capacity(
         self,
         supported_task_types: set[TaskType],
         *,

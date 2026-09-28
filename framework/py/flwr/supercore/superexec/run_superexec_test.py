@@ -57,7 +57,7 @@ def _run_superexec_one_launch(
 
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
     executor = Mock()
-    executor.wait_for_eligible_capacity.return_value = (
+    executor.get_eligible_capacity.return_value = (
         set(AutoExecPlugin.supported_task_types),
         set(),
     )
@@ -79,20 +79,26 @@ def _run_superexec_one_launch(
     return log, plugin, client, executor, sleep_mock
 
 
+@pytest.mark.parametrize("ready_fabs", [{"ready-fab"}, set()])
 def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
     monkeypatch: pytest.MonkeyPatch,
+    ready_fabs: set[str],
 ) -> None:
-    """Kubernetes advertises warm capacity before the server claims a task."""
+    """Kubernetes polls with available capacity, including when none is ready."""
     task = Task(task_id=123, type=TaskType.AGENT_APP, fab_hash="ready-fab")
     client = Mock()
-    client.AcquireTask.return_value = AcquireTaskResponse(task=task, token="task-token")
+    client.AcquireTask.return_value = (
+        AcquireTaskResponse(task=task, token="task-token")
+        if ready_fabs
+        else AcquireTaskResponse()
+    )
     client_class = Mock()
     client_class.from_server_address.return_value = client
     executor = Mock()
-    executor.wait_for_eligible_capacity.return_value = (set(), {"ready-fab"})
+    executor.get_eligible_capacity.return_value = (set(), ready_fabs)
     executor.launch.return_value = LaunchResult.accepted()
     order = Mock()
-    order.attach_mock(executor.wait_for_eligible_capacity, "capacity")
+    order.attach_mock(executor.get_eligible_capacity, "capacity")
     order.attach_mock(client.AcquireTask, "acquire")
     monkeypatch.setattr(
         run_superexec_module, "get_executor", Mock(return_value=executor)
@@ -116,10 +122,13 @@ def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
     assert [call[0] for call in order.mock_calls] == ["capacity", "acquire"]
     request = client.AcquireTask.call_args.args[0]
     assert not request.supported_task_types
-    assert list(request.agentapp_fab_hashes) == ["ready-fab"]
+    assert set(request.agentapp_fab_hashes) == ready_fabs
     client.PullPendingTasks.assert_not_called()
     client.ClaimTask.assert_not_called()
-    executor.launch.assert_called_once()
+    if ready_fabs:
+        executor.launch.assert_called_once()
+    else:
+        executor.launch.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -181,9 +190,7 @@ def test_run_superexec_passes_executor_config_to_factory(
         "image": "taskexecutor:dev",
     }
     get_executor = Mock(return_value=Mock())
-    get_executor.return_value.wait_for_eligible_capacity.side_effect = (
-        KeyboardInterrupt()
-    )
+    get_executor.return_value.get_eligible_capacity.side_effect = KeyboardInterrupt()
 
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
     monkeypatch.setattr(run_superexec_module, "get_executor", get_executor)
@@ -250,7 +257,7 @@ def test_run_superexec_preserves_accepted_launch_behavior(
     stub.PullPendingTasks.assert_not_called()
     stub.ClaimTask.assert_not_called()
     plugin.launch_task.assert_called_once()
-    executor.wait_for_eligible_capacity.assert_called_once_with(
+    executor.get_eligible_capacity.assert_called_once_with(
         set(AutoExecPlugin.supported_task_types),
         insecure=True,
         root_certificates_path=None,
