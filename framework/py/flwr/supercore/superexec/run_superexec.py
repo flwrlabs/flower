@@ -44,7 +44,7 @@ from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 from .executor import LaunchResult, LaunchResultStatus, get_executor
 from .executor.config import ExecutorConfig
-from .plugin import ExecPlugin
+from .plugin import AutoExecPlugin
 
 _TASK_POLL_INTERVAL_ENV = "FLWR_SUPEREXEC_TASK_POLL_INTERVAL"
 _MIN_TASK_POLL_INTERVAL_SECONDS = 0.01
@@ -130,8 +130,6 @@ def _handle_launch_result(result: LaunchResult, task: Task) -> None:
 
 
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
-    plugin_class: type[ExecPlugin],
-    client_class: type[RuntimeHttpClient],
     runtime_api_address: str,
     insecure: bool,
     root_certificates_path: str | None = None,
@@ -147,10 +145,6 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
     Parameters
     ----------
-    plugin_class : type[ExecPlugin]
-        The class of the SuperExec plugin to use.
-    client_class : type[RuntimeHttpClient]
-        The HTTP client class for the Runtime API.
     runtime_api_address : str
         The address of the Runtime API.
     insecure : bool
@@ -210,7 +204,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             health_server = run_health_server_grpc_no_tls(health_server_address)
             grpc_servers.append(health_server)
 
-        client = client_class.from_server_address(
+        client = RuntimeHttpClient.from_server_address(
             server_address=runtime_api_address,
             insecure=insecure,
             root_certificates=validate_and_resolve_root_certificates(
@@ -232,18 +226,13 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     )
 
     # Create the SuperExec plugin instance
-    try:
-        plugin = plugin_class(
-            runtime_api_address=runtime_api_address,
-            insecure=insecure,
-            root_certificates_path=root_certificates_path,
-            runtime_dependency_install=runtime_dependency_install,
-            executor=executor,
-        )
-    except Exception:  # pylint: disable=broad-exception-caught
-        client.close()
-        executor.close()
-        raise
+    plugin = AutoExecPlugin(
+        runtime_api_address=runtime_api_address,
+        insecure=insecure,
+        root_certificates_path=root_certificates_path,
+        runtime_dependency_install=runtime_dependency_install,
+        executor=executor,
+    )
 
     # Load plugin configuration from file if provided
     try:

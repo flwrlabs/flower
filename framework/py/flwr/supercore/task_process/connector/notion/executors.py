@@ -127,6 +127,16 @@ def get_page_property(
     )
 
 
+def get_database(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """Retrieve one Notion database container."""
+    database_id = require_string(arguments.get("database_id"), "Notion", "database_id")
+    return _call_notion_api(
+        "GET", f"/databases/{quote(database_id, safe='')}", context.credentials
+    )
+
+
 def get_block(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
     """Retrieve one Notion block."""
     block_id = require_string(arguments.get("block_id"), "Notion", "block_id")
@@ -192,6 +202,7 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
     "search": search,
     "get_page": get_page,
     "get_page_property": get_page_property,
+    "get_database": get_database,
     "get_block": get_block,
     "get_block_children": get_block_children,
     "list_users": list_users,

@@ -100,13 +100,17 @@ def create_task(
 
     connector_ref = request.connector_ref or None
 
-    _validate_create_task_request(request, task, connector_ref, state)
+    _validate_create_task_request(request, task, connector_ref)
+    connector_id = None
+    if request.type == TaskType.CONNECTOR and connector_ref:
+        connector_id = _resolve_connector_id(task, connector_ref, state)
     created_task_id = state.create_task(
         task_type=request.type,
         run_id=run_id,
         fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
         model_ref=request.model_ref if request.HasField("model_ref") else None,
         connector_ref=connector_ref,
+        connector_id=connector_id,
         requesting_task_id=task.task_id,
     )
     if created_task_id is None:
@@ -219,7 +223,6 @@ def _validate_create_task_request(
     request: CreateTaskRequest,
     requesting_task: Task,
     connector_ref: str | None,
-    state: CoreState,
 ) -> None:
     """Validate the task creation request."""
     if requesting_task.type not in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
@@ -252,9 +255,8 @@ def _validate_create_task_request(
             f"Task type '{request.type}' requires connector_ref.",
         )
 
-    # Check if the connector ref is valid
+    # Check if the connector ref is valid.
     if request.type == TaskType.CONNECTOR and connector_ref:
-
         if connector_registry.has_builtin_connector(connector_ref):
             return
 
@@ -263,9 +265,25 @@ def _validate_create_task_request(
         except ValueError as err:
             raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, str(err)) from err
 
-        available_refs = state.get_run_connector_refs(run_id=requesting_task.run_id)
-        if connector_ref not in available_refs:
-            raise FlowerError(
-                ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE,
-                "Connector is not available to this run.",
-            )
+
+def _resolve_connector_id(
+    requesting_task: Task,
+    connector_ref: str,
+    state: CoreState,
+) -> int | None:
+    """Resolve the connector ID for a connector task."""
+    if connector_registry.has_builtin_connector(connector_ref):
+        return None
+
+    matching_ids = [
+        connector_id
+        for connector_id in state.get_run_connector_ids(requesting_task.run_id)
+        if (connector := state.get_connector_by_id(connector_id)) is not None
+        and connector.connector_ref == connector_ref
+    ]
+    if len(matching_ids) != 1:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE,
+            "Connector is not available to this run.",
+        )
+    return matching_ids[0]

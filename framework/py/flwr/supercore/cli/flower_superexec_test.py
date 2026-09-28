@@ -24,7 +24,6 @@ import pytest
 
 from flwr.common.constant import ExecPluginType
 from flwr.supercore.constant import ExecutorType
-from flwr.supercore.superexec.plugin import AutoExecPlugin
 from flwr.supercore.version import package_version
 
 from .flower_superexec import _parse_args
@@ -139,46 +138,6 @@ def test_flower_superexec_checks_for_update(
         flower_superexec_module.flower_superexec()
 
     assert captured == ["update", "flower-superexec"]
-
-
-def test_flower_superexec_ignores_plugin_type(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The deprecated plugin type should not override automatic execution."""
-    args = SimpleNamespace(
-        insecure=True,
-        plugin_type=ExecPluginType.CLIENT_APP,
-        plugin_config=None,
-        root_certificates=None,
-        superexec_auth_secret_file=None,
-        runtime_api_address="127.0.0.1:9091",
-        parent_pid=None,
-        health_server_address=None,
-        runtime_dependency_install=False,
-        executor=ExecutorType.SUBPROCESS,
-    )
-    captured: dict[str, object] = {}
-
-    class _Parser:
-        def parse_args(self) -> SimpleNamespace:
-            """Return parsed arguments for the test path."""
-            return args
-
-    def _run_superexec(**kwargs: object) -> None:
-        captured.update(kwargs)
-
-    monkeypatch.setattr(
-        flower_superexec_module,
-        "warn_if_flwr_update_available",
-        lambda **_: None,
-    )
-    monkeypatch.setattr(flower_superexec_module, "_parse_args", _Parser)
-    monkeypatch.setattr(flower_superexec_module, "run_superexec", _run_superexec)
-
-    flower_superexec_module.flower_superexec()
-
-    assert captured["superexec_auth_secret"] is None
-    assert captured["plugin_class"] is AutoExecPlugin
 
 
 def test_flower_superexec_passes_executor_to_run_superexec(
