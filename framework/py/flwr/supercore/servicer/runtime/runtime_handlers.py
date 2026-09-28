@@ -82,7 +82,7 @@ def acquire_task(request: AcquireTaskRequest, state: CoreState) -> AcquireTaskRe
     if agentapp_fab_hashes:
         task_types.add(TaskType.AGENT_APP)
     tasks = state.get_tasks(
-        task_types=sorted(task_types),
+        task_types=list(task_types),
         statuses=[Status.PENDING],
         order_by="pending_at",
         ascending=True,
