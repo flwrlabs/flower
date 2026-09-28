@@ -136,7 +136,7 @@ def _handle_launch_result(result: LaunchResult, task: Task) -> None:
 
 
 def _wait_for_claim_expiry(executor: Executor) -> None:
-    """Avoid another acquisition until an unknown claim has expired."""
+    """Avoid another acquisition until the current claim has expired."""
     remaining = float(_UNCERTAIN_CLAIM_BACKOFF_SECONDS)
     while remaining > 0:
         interval = min(_TASK_WAIT_TIMEOUT_MS / 1_000, remaining)
@@ -333,6 +333,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                     token=combined_res.token, task=combined_res.task
                 )
                 _handle_launch_result(launch_result, combined_res.task)
+                if launch_result.status != LaunchResultStatus.ACCEPTED:
+                    _wait_for_claim_expiry(executor)
             else:
                 if has_capacity:
                     _backoff_after_empty_poll(poll_started_at, task_poll_interval)

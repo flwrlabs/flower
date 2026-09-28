@@ -306,7 +306,9 @@ def test_run_superexec_logs_non_accepted_launch_result(
     expected_message: str,
 ) -> None:
     """SuperExec should log non-accepted launch results and keep loop behavior."""
-    log, plugin, stub, _, _ = _run_superexec_one_launch(monkeypatch, launch_result)
+    log, plugin, stub, _, sleep_mock = _run_superexec_one_launch(
+        monkeypatch, launch_result
+    )
 
     stub.AcquireTask.assert_called_once()
     plugin.launch_task.assert_called_once()
@@ -314,6 +316,7 @@ def test_run_superexec_logs_non_accepted_launch_result(
     assert log.call_args.args[0] == expected_level
     assert expected_message in log.call_args.args[1]
     assert log.call_args.args[2] == 123
+    assert sum(call.args[0] for call in sleep_mock.call_args_list) == 30.0
 
 
 def test_run_superexec_uses_configured_task_poll_interval(
