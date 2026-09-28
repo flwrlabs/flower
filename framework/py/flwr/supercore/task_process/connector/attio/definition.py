@@ -29,21 +29,10 @@ def _attio_display_name(payload: JSONObject) -> str:
     data = payload.get("data")
     workspace = data.get("workspace") if isinstance(data, dict) else None
     if isinstance(workspace, dict):
-        payload = workspace
-
-    for field in (
-        "name",
-        "workspace_name",
-        "slug",
-        "workspace_slug",
-        "id",
-        "workspace_id",
-        "sub",
-    ):
-        value = payload.get(field)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    return ""
+        name = workspace.get("name") or workspace.get("id")
+    else:
+        name = payload.get("workspace_name") or payload.get("sub")
+    return name.strip() if isinstance(name, str) else ""
 
 
 PROVIDER = ProviderDefinition(
