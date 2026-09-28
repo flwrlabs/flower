@@ -174,7 +174,7 @@ erDiagram
   }
 
   run_connector {
-    VARCHAR connector_ref PK
+    INTEGER connector_id PK
     BIGINT run_id PK
   }
 
@@ -205,6 +205,7 @@ erDiagram
 
   task {
     TIMESTAMP active_until "nullable"
+    INTEGER connector_id "nullable"
     VARCHAR connector_ref "nullable"
     VARCHAR details
     VARCHAR fab_hash "nullable"
