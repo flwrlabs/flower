@@ -176,8 +176,8 @@ def _grid_tools() -> list[JSONObject]:
         function_tool(
             "push_reply_message",
             (
-                "Send one reply to the last instruction message received for this "
-                "task. Do not resend a reply already sent."
+                "Send a reply to the latest instruction message. "
+                "Call this tool exactly once per instruction message."
             ),
             properties={
                 "payload": string_property("Reply payload to send."),
