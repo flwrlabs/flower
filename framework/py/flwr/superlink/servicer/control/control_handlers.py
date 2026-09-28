@@ -236,7 +236,9 @@ def list_connectors(
             Connector(
                 connector_id=stored_connector.connector_id,
                 connector_ref=connector_ref,
-                display_name=flow.display_name,
+                display_name=_connector_display_name(
+                    stored_connector.config_json, flow.display_name
+                ),
                 description=flow.description,
                 connected=True,
             )
@@ -251,6 +253,19 @@ def list_connectors(
             )
         )
     return ListConnectorsResponse(connectors=connectors)
+
+
+def _connector_display_name(config_json: str, fallback: str) -> str:
+    """Return the stored connection name, falling back to the provider name."""
+    try:
+        config = json.loads(config_json)
+    except (TypeError, ValueError):
+        return fallback
+    if isinstance(config, dict):
+        name = config.get("display_name")
+        if isinstance(name, str) and name.strip():
+            return name.strip()
+    return fallback
 
 
 def disconnect_connector(

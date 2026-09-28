@@ -42,28 +42,34 @@ def complete_connectors(
     query: str, connectors: list[Connector]
 ) -> Iterable[Completion]:
     """Yield connected connectors matching a completion query."""
-    ref_width = max(
+    display_names = {
+        connector.connector_ref: connector.display_name or connector.connector_ref
+        for connector in connectors
+    }
+    name_width = max(
         len(CHAT_CONNECTOR_CLEAR),
-        *(len(connector.connector_ref) for connector in connectors),
+        *(len(display_name) for display_name in display_names.values()),
     )
     if CHAT_CONNECTOR_CLEAR.startswith(query.lower()):
         yield Completion(
             CHAT_CONNECTOR_CLEAR,
             start_position=-len(query),
             display=(
-                f"{CHAT_CONNECTOR_CLEAR:<{ref_width}}        "
+                f"{CHAT_CONNECTOR_CLEAR:<{name_width}}        "
                 "Clear selected connectors"
             ),
             selected_style="#ffffff bg:#dc8400 noreverse",
         )
     for connector in connectors:
-        if connector.connector_ref.lower().startswith(query.lower()):
+        display_name = display_names[connector.connector_ref]
+        if connector.connector_ref.lower().startswith(
+            query.lower()
+        ) or display_name.lower().startswith(query.lower()):
             yield Completion(
                 connector.connector_ref,
                 start_position=-len(query),
                 display=(
-                    f"{connector.connector_ref:<{ref_width}}        "
-                    f"{connector.description}"
+                    f"{display_name:<{name_width}}        {connector.description}"
                 ),
                 selected_style="#ffffff bg:#dc8400 noreverse",
             )
