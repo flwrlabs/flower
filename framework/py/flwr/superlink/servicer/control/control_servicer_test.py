@@ -307,25 +307,37 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     def test_list_and_disconnect_connectors_are_federation_scoped(self) -> None:
         """List and disconnect only the requested federation's connector."""
-        for federation_id in (
-            CONNECTOR_FEDERATION_ID,
-            OTHER_CONNECTOR_FEDERATION_ID,
-        ):
-            self.assertTrue(
-                self.state.upsert_connector(
-                    federation_id=federation_id,
-                    connector_ref="slack",
-                    credentials_json="{}",
-                    config_json="{}",
-                    created_by=self.aid,
-                )
-            )
+        first_id = self.state.create_connector(
+            federation_id=CONNECTOR_FEDERATION_ID,
+            connector_ref="slack",
+            credentials_json='{"account":"first"}',
+            config_json='{"display_name":"Slack · Flower / alice"}',
+            created_by=self.aid,
+        )
+        second_id = self.state.create_connector(
+            federation_id=CONNECTOR_FEDERATION_ID,
+            connector_ref="slack",
+            credentials_json='{"account":"second"}',
+            config_json='{"display_name":"Slack · Flower / bob"}',
+            created_by=self.aid,
+        )
+        assert first_id is not None
+        assert second_id is not None
 
         response = self.servicer.ListConnectors(
             ListConnectorsRequest(federation=CONNECTOR_FEDERATION_ID), Mock()
         )
-        self.assertEqual(len(response.connectors), 1)
-        self.assertTrue(response.connectors[0].connected)
+        connected = [
+            connector for connector in response.connectors if connector.connected
+        ]
+        self.assertEqual(
+            [connector.connector_id for connector in connected],
+            [first_id, second_id],
+        )
+        self.assertEqual(
+            [connector.display_name for connector in connected],
+            ["Slack · Flower / alice", "Slack · Flower / bob"],
+        )
 
         self.servicer.DisconnectConnector(
             DisconnectConnectorRequest(
@@ -337,6 +349,48 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertIsNone(self.state.get_connector(CONNECTOR_FEDERATION_ID, "slack"))
         self.assertIsNotNone(
             self.state.get_connector(OTHER_CONNECTOR_FEDERATION_ID, "slack")
+        )
+
+    def test_list_connectors_disambiguates_repeated_names(self) -> None:
+        """Use connector IDs when two connections have the same name."""
+        ids = [
+            self.state.create_connector(
+                federation_id=CONNECTOR_FEDERATION_ID,
+                connector_ref="slack",
+                credentials_json="{}",
+                config_json='{"display_name":"Slack · Flower / alice"}',
+                created_by=self.aid,
+            )
+            for _ in range(2)
+        ]
+        response = self.servicer.ListConnectors(
+            ListConnectorsRequest(federation=CONNECTOR_FEDERATION_ID), Mock()
+        )
+        connected = [item for item in response.connectors if item.connected]
+        self.assertEqual(
+            [item.display_name for item in connected],
+            [f"Slack · Flower / alice #{connector_id}" for connector_id in ids],
+        )
+
+    def test_list_connectors_disambiguates_connections_without_names(self) -> None:
+        """Distinguish older connections that have no stored display name."""
+        ids = [
+            self.state.create_connector(
+                federation_id=CONNECTOR_FEDERATION_ID,
+                connector_ref="slack",
+                credentials_json="{}",
+                config_json="{}",
+                created_by=self.aid,
+            )
+            for _ in range(2)
+        ]
+        response = self.servicer.ListConnectors(
+            ListConnectorsRequest(federation=CONNECTOR_FEDERATION_ID), Mock()
+        )
+        connected = [item for item in response.connectors if item.connected]
+        self.assertEqual(
+            [item.display_name for item in connected],
+            [f"Slack #{connector_id}" for connector_id in ids],
         )
 
     def test_list_connectors_without_federation_returns_empty(self) -> None:

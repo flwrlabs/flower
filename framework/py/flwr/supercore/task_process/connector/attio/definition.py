@@ -33,6 +33,8 @@ PROVIDER = ProviderDefinition(
         client_secret_env="FLWR_ATTIO_CLIENT_SECRET",
         redirect_uri_env="FLWR_ATTIO_REDIRECT_URI",
         token_auth_method="client_secret_post",
+        display_name_fields=("workspace_name",),
+        display_name_url="https://api.attio.com/v2/self",
     ),
 )
 

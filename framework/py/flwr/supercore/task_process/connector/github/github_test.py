@@ -18,6 +18,7 @@ from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+import requests
 
 from .. import registry
 from ..oauth import OAuthFlow
@@ -26,6 +27,7 @@ from .executors import GitHubApiError
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
 _TOKEN_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
+_IDENTITY_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.request"
 
 
 def _response(payload: object, status_code: int = 200) -> Mock:
@@ -148,14 +150,32 @@ def test_github_oauth_requests_no_scope() -> None:
     token_response = _response(
         {"access_token": "token", "token_type": "bearer", "scope": ""}
     )
-    with patch(_TOKEN_REQUEST, return_value=token_response):
+    with (
+        patch(_TOKEN_REQUEST, return_value=token_response),
+        patch(
+            _IDENTITY_REQUEST, return_value=_response({"login": "octocat"})
+        ) as identity,
+    ):
         credentials, config = flow.exchange_code(
             code="code",
             redirect_uri="https://example.com/callback",
             pkce_verifier="verifier",
         )
     assert credentials == {"access_token": "token", "token_type": "bearer"}
-    assert not config
+    assert config == {"display_name": "GitHub · octocat"}
+    assert identity.call_args.args == ("GET", "https://api.github.com/user")
+    assert identity.call_args.kwargs["headers"]["Authorization"] == "Bearer token"
+
+    with (
+        patch(_TOKEN_REQUEST, return_value=token_response),
+        patch(_IDENTITY_REQUEST, side_effect=requests.Timeout),
+    ):
+        _, config = flow.exchange_code(
+            code="code",
+            redirect_uri="https://example.com/callback",
+            pkce_verifier="verifier",
+        )
+    assert config == {}
 
     token_response.json.return_value["scope"] = "repo"
     with (

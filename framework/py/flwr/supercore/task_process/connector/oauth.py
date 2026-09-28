@@ -141,7 +141,46 @@ class OAuthFlow:
             raise self._error("returned an invalid response") from None
         if not isinstance(response_payload, dict):
             raise self._error("returned an invalid response")
-        return self._parse_token_response(cast(JSONObject, response_payload))
+        payload = cast(JSONObject, response_payload)
+        credentials, config = self._parse_token_response(payload)
+        if name := self._connection_name(
+            payload, cast(str, credentials["access_token"])
+        ):
+            config["display_name"] = f"{self.display_name} · {name}"
+        return credentials, config
+
+    def _connection_name(self, token_payload: JSONObject, access_token: str) -> str:
+        """Resolve a readable name without failing OAuth if lookup is unavailable."""
+        fields = self._oauth.display_name_fields
+        if not fields:
+            return ""
+        payload = token_payload
+        if url := self._oauth.display_name_url:
+            try:
+                response = requests.request(
+                    self._oauth.display_name_method,
+                    url,
+                    headers={
+                        **self._oauth.display_name_headers,
+                        "Authorization": f"Bearer {access_token}",
+                    },
+                    timeout=30.0,
+                )
+                if response.status_code >= 400:
+                    return ""
+                result = response.json()
+            except (requests.RequestException, ValueError):
+                return ""
+            if not isinstance(result, dict):
+                return ""
+            payload = cast(JSONObject, result)
+        if payload.get("ok") is False or payload.get("active") is False:
+            return ""
+        return " / ".join(
+            value.strip()
+            for field in fields
+            if isinstance((value := payload.get(field)), str) and value.strip()
+        )
 
     def _parse_token_response(
         self, payload: JSONObject

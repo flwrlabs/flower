@@ -86,6 +86,10 @@ class OAuth2Definition:
     config_fields: tuple[str, ...] = ()
     allow_additional_scopes: bool = True
     expected_token_type: str | None = None
+    display_name_fields: tuple[str, ...] = ()
+    display_name_url: str | None = None
+    display_name_method: Literal["GET", "POST"] = "GET"
+    display_name_headers: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

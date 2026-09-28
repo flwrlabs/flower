@@ -31,6 +31,7 @@ from .executors import AttioApiError
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
 _TOKEN_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
+_IDENTITY_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.request"
 _CREDENTIALS: JSONObject = {"access_token": "attio-secret"}
 _REDIRECT_URI = "https://client.example/oauth/attio"
 
@@ -180,7 +181,13 @@ def test_oauth_builds_url_and_exchanges_code() -> None:
         _flow().resolve_redirect_uri("https://attacker.example/callback")
 
     response = _response({"access_token": "attio-access"})
-    with patch(_TOKEN_REQUEST, return_value=response) as post:
+    with (
+        patch(_TOKEN_REQUEST, return_value=response) as post,
+        patch(
+            _IDENTITY_REQUEST,
+            return_value=_response({"active": True, "workspace_name": "Salarya"}),
+        ) as identity,
+    ):
         credentials, config = _flow().exchange_code(
             code="authorization-code",
             redirect_uri=_REDIRECT_URI,
@@ -188,7 +195,8 @@ def test_oauth_builds_url_and_exchanges_code() -> None:
         )
 
     assert credentials == {"access_token": "attio-access"}
-    assert not config
+    assert config == {"display_name": "Attio · Salarya"}
+    assert identity.call_args.args == ("GET", "https://api.attio.com/v2/self")
     assert post.call_args.kwargs["data"] == {
         "client_id": "client-id",
         "client_secret": "client-secret",
