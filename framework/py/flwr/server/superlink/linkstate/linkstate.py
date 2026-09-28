@@ -305,7 +305,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         primary_task_type: str,
         series_id: int | None = None,
         series_description: str | None = None,
-        connector_refs: Sequence[str] = (),
+        connector_ids: Sequence[int] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
     ) -> int:
@@ -337,8 +337,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Optional description for a newly created run series. Ignored when
             `series_id` refers to an existing run series. `None` means no
             description was provided; an empty string is an explicit description.
-        connector_refs : Sequence[str] (default: ())
-            Connector references the run is allowed to invoke.
+        connector_ids : Sequence[int] (default: ())
+            Connector IDs the run is allowed to invoke.
         initial_task_event : TaskEvent | None (default: None)
             Event to store atomically before the pending primary task is visible.
         user_prompt : str | None (default: None)
