@@ -47,7 +47,6 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
-from flwr.supercore.typing import ConnectorRecord
 
 from . import CoreState
 from .utils_test import create_task_message
@@ -224,52 +223,44 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertIsNotNone(state.get_fab(updated_hash))
 
-    def test_connector_upsert_get_and_delete(self) -> None:
-        """A connector can be created, updated, retrieved, and deleted."""
+    def test_connector_create_list_and_delete(self) -> None:
+        """Multiple connectors of one provider can be created and deleted by ID."""
         state = self.state_factory()
+        federation_id = "@bob/fed-a"
 
         self.assertTrue(
-            state.upsert_connector(
-                federation_id="@bob/fed-a",
+            state.create_connector(
+                federation_id=federation_id,
                 connector_ref="calendar",
                 credentials_json='{"token":"first"}',
                 config_json='{"calendar":"primary"}',
                 created_by="account-a",
             )
         )
-        self.assertEqual(
-            state.get_connector(federation_id="@bob/fed-a", connector_ref="calendar"),
-            ConnectorRecord(
-                federation_id="@bob/fed-a",
-                connector_ref="calendar",
-                credentials_json='{"token":"first"}',
-                config_json='{"calendar":"primary"}',
-            ),
-        )
         self.assertTrue(
-            state.upsert_connector(
-                federation_id="@bob/fed-a",
+            state.create_connector(
+                federation_id=federation_id,
                 connector_ref="calendar",
-                credentials_json='{"token":"updated"}',
+                credentials_json='{"token":"second"}',
                 config_json='{"calendar":"work"}',
                 created_by="account-a",
             )
         )
-        updated = state.get_connector(
-            federation_id="@bob/fed-a", connector_ref="calendar"
+        connectors = list(state.get_connectors_by_ref(federation_id, "calendar"))
+        first_id, second_id = [connector.connector_id for connector in connectors]
+        self.assertGreater(second_id, first_id)
+        self.assertEqual(
+            [item.connector_id for item in connectors], [first_id, second_id]
         )
-        assert updated is not None
-        self.assertEqual(updated.credentials_json, '{"token":"updated"}')
-        self.assertEqual(updated.config_json, '{"calendar":"work"}')
+        self.assertEqual(state.get_connector_by_id(second_id), connectors[1])
 
-        self.assertTrue(
-            state.delete_connector(federation_id="@bob/fed-a", connector_ref="calendar")
-        )
-        self.assertIsNone(
-            state.get_connector(federation_id="@bob/fed-a", connector_ref="calendar")
-        )
-        self.assertFalse(
-            state.delete_connector(federation_id="@bob/fed-a", connector_ref="calendar")
+        self.assertTrue(state.delete_connector(federation_id, second_id))
+        self.assertEqual(
+            [
+                connector.connector_id
+                for connector in state.get_connectors_by_ref(federation_id, "calendar")
+            ],
+            [first_id],
         )
 
     def test_bind_and_get_run_connectors(self) -> None:
@@ -278,19 +269,19 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         state.bind_connectors_to_run(
             run_id=42,
-            connector_refs=["notion", "calendar", "notion"],
+            connector_ids=[2, 1, 2],
         )
-        state.bind_connectors_to_run(run_id=42, connector_refs=["notion"])
+        state.bind_connectors_to_run(run_id=42, connector_ids=[2])
 
         self.assertEqual(
-            list(state.get_run_connector_refs(run_id=42)),
-            ["calendar", "notion"],
+            list(state.get_run_connector_ids(run_id=42)),
+            [1, 2],
         )
 
         self.assertFalse(
-            state.bind_connectors_to_run(run_id=43, connector_refs="notion")
+            state.bind_connectors_to_run(run_id=43, connector_ids="notion")  # type: ignore
         )
-        self.assertEqual(list(state.get_run_connector_refs(run_id=43)), [])
+        self.assertEqual(list(state.get_run_connector_ids(run_id=43)), [])
 
     def test_run_series_context_roundtrip(self) -> None:
         """A run series context can be stored and retrieved."""
@@ -1076,6 +1067,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(task.model_ref, "model://test")
         self.assertFalse(task.HasField("fab_hash"))
         self.assertFalse(task.HasField("connector_ref"))
+        self.assertFalse(task.HasField("connector_id"))
         self.assertTrue(task.pending_at)
         self.assertEqual(task.starting_at, "")
         self.assertEqual(task.running_at, "")
