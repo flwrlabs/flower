@@ -26,7 +26,6 @@ _PAGE_SIZE = integer_property(
     minimum=1,
     maximum=100,
 )
-
 ACTIONS = (
     ActionDefinition(
         name="search",
@@ -162,6 +161,61 @@ ACTIONS = (
                 "start_cursor": _CURSOR,
             },
             "required": ["page_id", "property_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_database",
+        description=(
+            "Retrieve a Notion database container, including its metadata and "
+            "data source IDs and names. This does not return database rows."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "database_id": string_property("The database ID to retrieve."),
+            },
+            "required": ["database_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_block",
+        description=(
+            "Retrieve a single Notion block. If has_children is true, use "
+            "notion_get_block_children with the block ID to retrieve its direct "
+            "children."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "block_id": string_property("The block ID to retrieve."),
+            },
+            "required": ["block_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_block_children",
+        description=(
+            "Retrieve one page of direct children for a Notion block or page. This "
+            "does not retrieve nested descendants. Continue with next_cursor only "
+            "when has_more is true. For a returned block with has_children set to "
+            "true, call this action again with that block's ID."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "block_id": string_property(
+                    "The block or page ID whose direct children should be retrieved."
+                ),
+                "page_size": _PAGE_SIZE,
+                "start_cursor": _CURSOR,
+            },
+            "required": ["block_id"],
             "additionalProperties": False,
         },
     ),

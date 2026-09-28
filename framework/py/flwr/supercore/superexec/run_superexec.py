@@ -21,9 +21,7 @@ import time
 from logging import ERROR, WARNING
 from typing import Any
 
-from google.protobuf.message import DecodeError
-
-from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL, RUNTIME_DEPENDENCY_INSTALL
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.proto.runtime_pb2 import AcquireTaskRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
@@ -259,8 +257,6 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     try:
         while True:
             executor.reconcile()
-            task = None
-            token = None
             supported_task_types, agentapp_fab_hashes = (
                 executor.wait_for_eligible_capacity(
                     set(plugin.supported_task_types),
@@ -268,26 +264,17 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                     root_certificates_path=root_certificates_path,
                 )
             )
-            try:
-                combined_res = client.AcquireTask(
-                    AcquireTaskRequest(
-                        supported_task_types=sorted(supported_task_types),
-                        agentapp_fab_hashes=sorted(agentapp_fab_hashes),
-                    )
+            combined_res = client.AcquireTask(
+                AcquireTaskRequest(
+                    supported_task_types=supported_task_types,
+                    agentapp_fab_hashes=agentapp_fab_hashes,
                 )
-            except ValueError as exc:
-                if not isinstance(exc.__cause__, DecodeError):
-                    raise
-                log(WARNING, "Task acquisition outcome unknown: %s", exc)
-                time.sleep(HEARTBEAT_DEFAULT_INTERVAL)
-                continue
+            )
             if combined_res.HasField("task") and combined_res.token:
-                task, token = combined_res.task, combined_res.token
-
-            # Launch only when the atomic claim granted a token.
-            if task is not None and token:
-                launch_result = plugin.launch_task(token=token, task=task)
-                _handle_launch_result(launch_result, task)
+                launch_result = plugin.launch_task(
+                    token=combined_res.token, task=combined_res.task
+                )
+                _handle_launch_result(launch_result, combined_res.task)
 
             # Sleep for a while before checking again
             time.sleep(task_poll_interval)
