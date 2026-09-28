@@ -1479,21 +1479,33 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             federation_name="@me/fed", icon_key="unknown"
         )
 
-        with self.assertRaises(FlowerError) as error:
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "set_icon_key",
+            ) as set_icon_key,
+            self.assertRaises(FlowerError) as error,
+        ):
             self.servicer.SetFederationIcon(request, Mock())
 
         self.assertEqual(error.exception.code, ApiErrorCode.INVALID_FEDERATION_ICON_KEY)
-        self.state.federation_manager.set_icon_key.assert_not_called()
+        set_icon_key.assert_not_called()
 
     def test_set_federation_icon_requires_federation_name(self) -> None:
         """Test requiring a federation name when setting an icon."""
-        with self.assertRaises(FlowerError) as error:
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "set_icon_key",
+            ) as set_icon_key,
+            self.assertRaises(FlowerError) as error,
+        ):
             self.servicer.SetFederationIcon(
                 SetFederationIconRequest(icon_key="rocket"), Mock()
             )
 
         self.assertEqual(error.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
-        self.state.federation_manager.set_icon_key.assert_not_called()
+        set_icon_key.assert_not_called()
 
     def test_set_federation_icon_propagates_manager_error(self) -> None:
         """Test propagating federation manager authorization failures."""
