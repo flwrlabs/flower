@@ -23,7 +23,7 @@ from logging import DEBUG
 from typing import cast
 
 from flwr.agentapp import AgentEvents, AgentGrid
-from flwr.app import ConfigRecord, Message, RecordDict
+from flwr.app import ConfigRecord, Message, Metadata, RecordDict
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.serverapp import Grid
 from flwr.supercore import log
@@ -176,21 +176,13 @@ def _grid_tools() -> list[JSONObject]:
         function_tool(
             "push_reply_message",
             (
-                "Send one reply to the current message. Copy its message_id into "
-                "reply_to_message_id exactly and its src_node_id into dst_node_id. "
-                "Do not resend a reply already sent."
+                "Send one reply to the last instruction message received for this "
+                "task. Do not resend a reply already sent."
             ),
             properties={
-                "dst_node_id": string_property(
-                    "Source node ID of the message being replied to, as a decimal "
-                    "uint64 string."
-                ),
                 "payload": string_property("Reply payload to send."),
-                "reply_to_message_id": string_property(
-                    "Message ID of the message being replied to."
-                ),
             },
-            required=["dst_node_id", "payload", "reply_to_message_id"],
+            required=["payload"],
             output_schema={
                 "type": "object",
                 "properties": {
@@ -286,13 +278,20 @@ def _grid_tools() -> list[JSONObject]:
 class RuntimeAgentGrid(AgentGrid):
     """Expose selected Grid operations as model tools."""
 
-    def __init__(self, grid: Grid, events: AgentEvents, node_id: int) -> None:
+    def __init__(
+        self,
+        grid: Grid,
+        events: AgentEvents,
+        node_id: int,
+        instruction_metadata: Metadata | None = None,
+    ) -> None:
         self._grid = grid
         self._events = events
         self._is_superlink = node_id == SUPERLINK_NODE_ID
         self._tool_names = (
             _GRID_TOOL_NAMES if self._is_superlink else _SUPERNODE_GRID_TOOL_NAMES
         )
+        self._instruction_metadata = instruction_metadata
 
     def tools(self) -> list[JSONObject]:
         """Return model-facing Grid tool schemas."""
@@ -354,17 +353,15 @@ class RuntimeAgentGrid(AgentGrid):
     def _push_messages(self, messages: list[JSONObject]) -> JSONObject:
         return {"results": self._send_messages(messages)}
 
-    def _push_reply_message(
-        self, dst_node_id: str, payload: str, reply_to_message_id: str
-    ) -> JSONObject:
-        if not reply_to_message_id:
-            raise ValueError("A reply_to_message_id is required.")
+    def _push_reply_message(self, payload: str) -> JSONObject:
+        if self._instruction_metadata is None:
+            return {"message_id": None, "error": "No message metadata available."}
         return self._send_messages(
             [
                 {
-                    "dst_node_id": dst_node_id,
+                    "dst_node_id": str(self._instruction_metadata.src_node_id),
                     "payload": payload,
-                    "reply_to_message_id": reply_to_message_id,
+                    "reply_to_message_id": self._instruction_metadata.message_id,
                 }
             ]
         )[0]

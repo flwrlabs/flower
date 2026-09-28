@@ -30,7 +30,7 @@ from types import FrameType
 from typing import Any, cast
 
 from flwr.agentapp import AgentApp, LoadAgentAppError
-from flwr.app import Context, Message
+from flwr.app import Context, Message, Metadata
 from flwr.app.exception import AppExitException
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
@@ -187,12 +187,13 @@ def message_to_prompt(message: Message) -> str:
     return strict_json_dumps(prompt, compact=True)
 
 
-def pull_prompt(grid: HttpGrid) -> str:
-    """Pull and serialize the initial AgentApp instruction."""
+def pull_prompt(grid: HttpGrid) -> tuple[str, Metadata]:
+    """Pull and serialize the initial AgentApp instruction and retain its metadata."""
     instructions = list(grid.pull_messages([]))
     if len(instructions) != 1:
         raise RuntimeError("Expected exactly one initial AgentApp instruction.")
-    return message_to_prompt(instructions[0])
+    instruction = instructions[0]
+    return message_to_prompt(instruction), instruction.metadata
 
 
 class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,protected-access
@@ -271,8 +272,11 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             )
 
             # Initialize the AgentApp session
-            prompt = pull_prompt(grid)
+            prompt, instruction_metadata = pull_prompt(grid)
             self._agent_events = RuntimeAgentEvents(grid._runtime_client)
+            agent_grid = RuntimeAgentGrid(
+                grid, self._agent_events, self._context.node_id, instruction_metadata
+            )
             self._agent_events.emit(
                 {"type": "message", "role": "user", "content": prompt}
             )
@@ -293,7 +297,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 prompt=prompt,
                 connectors=RuntimeAgentConnectors(agent_runtime),
                 events=self._agent_events,
-                grid=RuntimeAgentGrid(grid, self._agent_events, self._context.node_id),
+                grid=agent_grid,
             )
 
             app_path, agent_app, agent_app_attr = self._prepare_task_app(fab, run)
