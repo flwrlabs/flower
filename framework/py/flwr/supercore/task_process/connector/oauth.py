@@ -166,10 +166,13 @@ class OAuthFlow:
                     timeout=30.0,
                 )
                 response.raise_for_status()
-                payload = cast(JSONObject, response.json())
+                identity_payload = response.json()
             except (requests.RequestException, ValueError):
                 # A name lookup failure should not invalidate the OAuth connection.
                 return ""
+            if not isinstance(identity_payload, dict):
+                return ""
+            payload = cast(JSONObject, identity_payload)
 
         if self._oauth.display_name_resolver is not None:
             return self._oauth.display_name_resolver(payload)
