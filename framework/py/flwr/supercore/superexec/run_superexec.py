@@ -257,12 +257,10 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     try:
         while True:
             executor.reconcile()
-            supported_task_types, agentapp_fab_hashes = (
-                executor.wait_for_eligible_capacity(
-                    set(plugin.supported_task_types),
-                    insecure=insecure,
-                    root_certificates_path=root_certificates_path,
-                )
+            supported_task_types, agentapp_fab_hashes = executor.get_eligible_capacity(
+                set(plugin.supported_task_types),
+                insecure=insecure,
+                root_certificates_path=root_certificates_path,
             )
             combined_res = client.AcquireTask(
                 AcquireTaskRequest(

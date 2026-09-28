@@ -435,6 +435,15 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         )
         self.assertEqual(active, [])
 
+    def test_acquire_task_processes_due_automations_without_capacity(self) -> None:
+        """An empty acquisition still triggers scheduled automations."""
+        with patch.object(runtime_handlers, "process_due_automations") as process_due:
+            response = runtime_handlers.acquire_task(AcquireTaskRequest(), self.state)
+
+        process_due.assert_called_once()
+        self.assertFalse(response.HasField("task"))
+        self.assertFalse(response.token)
+
     def _create_dummy_run(self, running: bool = True, *, fab_hash: str = "") -> int:
         run_id = self.state.create_run(
             "",

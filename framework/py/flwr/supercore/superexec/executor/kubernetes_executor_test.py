@@ -1781,15 +1781,29 @@ def test_combined_acquisition_filters_to_ready_warm_pools_at_budget() -> None:
     executor = KubernetesExecutor(client=client, config=config)
     supported = {TaskType.AGENT_APP, TaskType.MODEL, TaskType.SERVER_APP}
 
-    assert executor.wait_for_eligible_capacity(supported, insecure=True) == (
+    assert executor.get_eligible_capacity(supported, insecure=True) == (
         {TaskType.MODEL},
         {_FAB_HASH},
     )
     active_pod_count = 2
-    assert executor.wait_for_eligible_capacity(supported, insecure=True) == (
+    assert executor.get_eligible_capacity(supported, insecure=True) == (
         supported,
         set(),
     )
+
+
+def test_combined_acquisition_returns_no_eligibility_at_budget() -> None:
+    """A full Pod budget must not block the next Runtime acquisition poll."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": [_pod("Running")]}
+    sleep = Mock()
+    executor = KubernetesExecutor(
+        client=client,
+        config=_executor_config(active_pod_budget=1, sleep=sleep),
+    )
+
+    assert executor.get_eligible_capacity({TaskType.MODEL}) == (set(), set())
+    sleep.assert_not_called()
 
 
 @pytest.mark.parametrize("budget", [None, 1])

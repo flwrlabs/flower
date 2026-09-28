@@ -93,7 +93,7 @@ class Executor(Protocol):
     the responsibility of the Runtime API.
     """
 
-    def wait_for_eligible_capacity(
+    def get_eligible_capacity(
         self,
         supported_task_types: set[TaskType],
         *,
