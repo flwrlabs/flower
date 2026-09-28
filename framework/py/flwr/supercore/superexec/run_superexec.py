@@ -52,6 +52,7 @@ _MIN_TASK_POLL_INTERVAL_SECONDS = 0.01
 _MAX_TASK_POLL_INTERVAL_SECONDS = 60.0
 _DEFAULT_TASK_POLL_INTERVAL_SECONDS = 1.0
 _TASK_WAIT_TIMEOUT_MS = 5_000
+_PARTIAL_CAPACITY_WAIT_TIMEOUT_MS = 1_000
 _UNCERTAIN_CLAIM_BACKOFF_SECONDS = HEARTBEAT_DEFAULT_INTERVAL
 _SAFE_CONNECTION_ERRORS = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
 _SUPEREXEC_AUTH_METHODS = frozenset(
@@ -148,7 +149,7 @@ def _backoff_after_fast_empty_poll(
     started_at: float, task_poll_interval: float
 ) -> None:
     """Limit request rate when an older Runtime ignores the long-poll field."""
-    if monotonic() - started_at < 1.0:
+    if monotonic() - started_at < 0.5:
         time.sleep(max(task_poll_interval, 1.0))
 
 
@@ -277,13 +278,20 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                 root_certificates_path=root_certificates_path,
             )
             has_capacity = bool(supported_task_types or agentapp_fab_hashes)
+            full_capacity = supported_task_types == set(plugin.supported_task_types)
+            # Recheck Kubernetes capacity sooner when only warm slots are eligible.
+            wait_timeout_ms = (
+                _TASK_WAIT_TIMEOUT_MS
+                if full_capacity
+                else _PARTIAL_CAPACITY_WAIT_TIMEOUT_MS if has_capacity else 0
+            )
             poll_started_at = monotonic()
             try:
                 combined_res = client.AcquireTask(
                     AcquireTaskRequest(
                         supported_task_types=supported_task_types,
                         agentapp_fab_hashes=agentapp_fab_hashes,
-                        wait_timeout_ms=_TASK_WAIT_TIMEOUT_MS if has_capacity else 0,
+                        wait_timeout_ms=wait_timeout_ms,
                     )
                 )
             except _SAFE_CONNECTION_ERRORS as exc:

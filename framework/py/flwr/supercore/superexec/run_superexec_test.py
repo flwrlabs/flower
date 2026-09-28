@@ -131,7 +131,7 @@ def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
     request = client.AcquireTask.call_args.args[0]
     assert not request.supported_task_types
     assert set(request.agentapp_fab_hashes) == ready_fabs
-    assert request.wait_timeout_ms == (5_000 if ready_fabs else 0)
+    assert request.wait_timeout_ms == (1_000 if ready_fabs else 0)
     client.PullPendingTasks.assert_not_called()
     client.ClaimTask.assert_not_called()
     if ready_fabs:
@@ -349,16 +349,25 @@ def test_run_superexec_uses_configured_task_poll_interval(
     sleep_mock.assert_called_once_with(0.25)
 
 
-@pytest.mark.parametrize("elapsed", [0.1, 5.0])
+@pytest.mark.parametrize(
+    ("elapsed", "partial_capacity", "expected_wait_ms"),
+    [(0.1, False, 5_000), (5.0, False, 5_000), (1.0, True, 1_000)],
+)
 def test_run_superexec_sleeps_only_after_fast_empty_acquisition(
-    monkeypatch: pytest.MonkeyPatch, elapsed: float
+    monkeypatch: pytest.MonkeyPatch,
+    elapsed: float,
+    partial_capacity: bool,
+    expected_wait_ms: int,
 ) -> None:
     """A completed long poll is immediately followed by another capacity check."""
     client = Mock()
     client.AcquireTask.return_value = AcquireTaskResponse()
     executor = Mock()
     executor.get_eligible_capacity.side_effect = [
-        (set(AutoExecPlugin.supported_task_types), set()),
+        (
+            set() if partial_capacity else set(AutoExecPlugin.supported_task_types),
+            {"ready-fab"} if partial_capacity else set(),
+        ),
         KeyboardInterrupt(),
     ]
     plugin = Mock()
@@ -384,8 +393,8 @@ def test_run_superexec_sleeps_only_after_fast_empty_acquisition(
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec("127.0.0.1:9091", insecure=True)
 
-    assert client.AcquireTask.call_args.args[0].wait_timeout_ms == 5_000
-    if elapsed < 1:
+    assert client.AcquireTask.call_args.args[0].wait_timeout_ms == expected_wait_ms
+    if elapsed < 0.5:
         sleep_mock.assert_called_once_with(1.0)
     else:
         sleep_mock.assert_not_called()
