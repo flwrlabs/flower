@@ -143,9 +143,9 @@ class OAuthFlow:
             raise self._error("returned an invalid response")
         payload = cast(JSONObject, response_payload)
         credentials, config = self._parse_token_response(payload)
-        if name := self._connection_name(
-            payload, cast(str, credentials["access_token"])
-        ):
+        access_token = cast(str, credentials["access_token"])
+        name = self._connection_name(payload, access_token)
+        if name:
             config["display_name"] = f"{self.display_name} · {name}"
         return credentials, config
 
@@ -155,32 +155,45 @@ class OAuthFlow:
         if not fields:
             return ""
         payload = token_payload
-        if url := self._oauth.display_name_url:
-            try:
-                response = requests.request(
-                    self._oauth.display_name_method,
-                    url,
-                    headers={
-                        **self._oauth.display_name_headers,
-                        "Authorization": f"Bearer {access_token}",
-                    },
-                    timeout=30.0,
-                )
-                if response.status_code >= 400:
-                    return ""
-                result = response.json()
-            except (requests.RequestException, ValueError):
+        url = self._oauth.display_name_url
+        if url:
+            identity = self._fetch_identity(url, access_token)
+            if identity is None:
                 return ""
-            if not isinstance(result, dict):
-                return ""
-            payload = cast(JSONObject, result)
+            payload = identity
         if payload.get("ok") is False or payload.get("active") is False:
             return ""
-        return " / ".join(
-            value.strip()
-            for field in fields
-            if isinstance((value := payload.get(field)), str) and value.strip()
-        )
+
+        names: list[str] = []
+        for field in fields:
+            value = payload.get(field)
+            if not isinstance(value, str):
+                continue
+            name = value.strip()
+            if name:
+                names.append(name)
+        return " / ".join(names)
+
+    def _fetch_identity(self, url: str, access_token: str) -> JSONObject | None:
+        """Fetch the optional provider identity used for the connection name."""
+        try:
+            response = requests.request(
+                self._oauth.display_name_method,
+                url,
+                headers={
+                    **self._oauth.display_name_headers,
+                    "Authorization": f"Bearer {access_token}",
+                },
+                timeout=30.0,
+            )
+            if response.status_code >= 400:
+                return None
+            result = response.json()
+        except (requests.RequestException, ValueError):
+            return None
+        if not isinstance(result, dict):
+            return None
+        return cast(JSONObject, result)
 
     def _parse_token_response(
         self, payload: JSONObject
