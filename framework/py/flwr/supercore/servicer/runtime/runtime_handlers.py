@@ -73,17 +73,12 @@ def pull_pending_tasks(
 def acquire_task(request: AcquireTaskRequest, state: CoreState) -> AcquireTaskResponse:
     """Claim the oldest pending task matching the executor's available capacity."""
     log(DEBUG, "Runtime.AcquireTask")
-    supported_types = set(request.supported_task_types)
-    agentapp_fab_hashes = set(request.agentapp_fab_hashes)
-    if not supported_types and not agentapp_fab_hashes:
-        return AcquireTaskResponse()
 
     tasks = state.get_tasks(
         statuses=[Status.PENDING], order_by="pending_at", ascending=True
     )
     for task in tasks:
-        eligible = task.type in supported_types or task.fab_hash in agentapp_fab_hashes
-        if eligible and (token := state.claim_task(task.task_id)):
+        if token := state.claim_task(task.task_id):
             return AcquireTaskResponse(task=task, token=token)
     return AcquireTaskResponse()
 
