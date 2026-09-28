@@ -257,8 +257,6 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     try:
         while True:
             executor.reconcile()
-            task = None
-            token = None
             supported_task_types, agentapp_fab_hashes = (
                 executor.wait_for_eligible_capacity(
                     set(plugin.supported_task_types),
@@ -273,12 +271,10 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                 )
             )
             if combined_res.HasField("task") and combined_res.token:
-                task, token = combined_res.task, combined_res.token
-
-            # Launch only when the atomic claim granted a token.
-            if task is not None and token:
-                launch_result = plugin.launch_task(token=token, task=task)
-                _handle_launch_result(launch_result, task)
+                launch_result = plugin.launch_task(
+                    token=combined_res.token, task=combined_res.task
+                )
+                _handle_launch_result(launch_result, combined_res.task)
 
             # Sleep for a while before checking again
             time.sleep(task_poll_interval)
