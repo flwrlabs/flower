@@ -439,7 +439,6 @@ def test_connector_tools_include_agent_handled_automation() -> None:
         "notion_get_page_property",
         "notion_get_block",
         "notion_get_block_children",
-        "notion_query_meeting_notes",
         "notion_list_users",
         "notion_get_user",
         "notion_get_self",

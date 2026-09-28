@@ -28,14 +28,6 @@ from ..json_utils import optional_string, require_int_range, require_string
 
 _NOTION_API_BASE_URL = "https://api.notion.com/v1"
 NOTION_API_VERSION = "2026-03-11"
-_MEETING_NOTE_PROPERTIES = {
-    "title",
-    "attendees",
-    "created_time",
-    "created_by",
-    "last_edited_time",
-    "last_edited_by",
-}
 
 
 class NotionApiError(ConnectorApiError):
@@ -167,50 +159,6 @@ def get_block_children(
     )
 
 
-def query_meeting_notes(
-    arguments: JSONObject, context: ConnectorExecutionContext
-) -> JSONObject:
-    """Query meeting notes available to the Notion connection."""
-    body: JSONObject = {}
-    if "filter" in arguments:
-        body["filter"] = _meeting_notes_filter(arguments["filter"])
-    if "sort" in arguments:
-        body["sort"] = _meeting_notes_sort(arguments["sort"])
-    if "limit" in arguments:
-        body["limit"] = require_int_range(
-            arguments["limit"], "Notion", "limit", maximum=50
-        )
-    return _call_notion_api(
-        "POST", "/blocks/meeting_notes/query", context.credentials, body=body
-    )
-
-
-def _meeting_notes_filter(value: object) -> JSONObject:
-    """Require a meeting-notes filter object and let Notion validate its DSL."""
-    if not isinstance(value, dict):
-        raise ValueError("Notion meeting-notes filter must be an object.")
-    return cast(JSONObject, value)
-
-
-def _meeting_notes_sort(value: object) -> list[JSONObject]:
-    """Validate meeting-notes sort entries."""
-    if not isinstance(value, list) or len(value) > 100:
-        raise ValueError("Notion meeting-notes sort must have at most 100 entries.")
-    for item in value:
-        if not isinstance(item, dict) or set(item) != {"property", "direction"}:
-            raise ValueError("Notion meeting-notes sort is invalid.")
-        property_ = item["property"]
-        direction = item["direction"]
-        if (
-            not isinstance(property_, str)
-            or property_ not in _MEETING_NOTE_PROPERTIES
-            or not isinstance(direction, str)
-            or direction not in {"ascending", "descending"}
-        ):
-            raise ValueError("Notion meeting-notes sort is invalid.")
-    return cast(list[JSONObject], value)
-
-
 def list_users(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
     """List workspace users."""
     params: dict[str, str] = {}
@@ -246,7 +194,6 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
     "get_page_property": get_page_property,
     "get_block": get_block,
     "get_block_children": get_block_children,
-    "query_meeting_notes": query_meeting_notes,
     "list_users": list_users,
     "get_user": get_user,
     "get_self": get_self,
