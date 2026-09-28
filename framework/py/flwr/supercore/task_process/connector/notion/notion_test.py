@@ -382,13 +382,18 @@ def test_notion_oauth_flow() -> None:
     response.json.return_value = {
         "access_token": "token",
         "workspace_id": "workspace-1",
+        "workspace_name": "Flower",
     }
     with patch(_OAUTH_REQUEST, return_value=response):
         credentials, config = flow.exchange_code(
             code="code", redirect_uri=redirect_uri, pkce_verifier=None
         )
     assert credentials == {"access_token": "token"}
-    assert config == {"workspace_id": "workspace-1"}
+    assert config == {
+        "workspace_id": "workspace-1",
+        "workspace_name": "Flower",
+        "display_name": "Notion · Flower",
+    }
 
     response.json.return_value = {"error": "secret"}
     with patch(_OAUTH_REQUEST, return_value=response), pytest.raises(RuntimeError):

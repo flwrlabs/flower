@@ -355,16 +355,20 @@ class RuntimeAgentGrid(AgentGrid):
 
     def _push_reply_message(self, payload: str) -> JSONObject:
         if self._instruction_metadata is None:
-            return {"message_id": None, "error": "No message metadata available."}
-        return self._send_messages(
-            [
-                {
-                    "dst_node_id": str(self._instruction_metadata.src_node_id),
-                    "payload": payload,
-                    "reply_to_message_id": self._instruction_metadata.message_id,
-                }
-            ]
-        )[0]
+            return {
+                "message_id": None,
+                "error": (
+                    "No instruction message to reply to. "
+                    "You may have already replied to it once."
+                ),
+            }
+        message: JSONObject = {
+            "dst_node_id": str(self._instruction_metadata.src_node_id),
+            "payload": payload,
+            "reply_to_message_id": self._instruction_metadata.message_id,
+        }
+        self._instruction_metadata = None
+        return self._send_messages([message])[0]
 
     def _send_messages(self, messages: list[JSONObject]) -> list[JSONObject]:
         if not messages:

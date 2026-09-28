@@ -36,6 +36,7 @@ PROVIDER = ProviderDefinition(
         token_request_format="json",
         token_headers={"Notion-Version": NOTION_API_VERSION},
         config_fields=("workspace_id", "workspace_name", "bot_id"),
+        display_name_fields=("workspace_name",),
     ),
 )
 

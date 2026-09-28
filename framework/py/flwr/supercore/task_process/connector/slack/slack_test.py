@@ -30,6 +30,7 @@ from .executors import SlackApiError
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
 _OAUTH_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
+_IDENTITY_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.request"
 
 
 def test_slack_actions_are_registered_and_executable() -> None:
@@ -176,11 +177,25 @@ def test_slack_oauth_flow() -> None:
             "scope": ", ".join(SLACK_USER_SCOPES),
         },
     }
-    with patch(_OAUTH_REQUEST, return_value=response) as post:
-        assert flow.exchange_code(
+    with (
+        patch(_OAUTH_REQUEST, return_value=response) as post,
+        patch(
+            _IDENTITY_REQUEST,
+            return_value=Mock(
+                status_code=200,
+                **{
+                    "json.return_value": {"ok": True, "team": "Flower", "user": "alice"}
+                },
+            ),
+        ) as identity,
+    ):
+        credentials, config = flow.exchange_code(
             code="code", redirect_uri=redirect_uri, pkce_verifier="ignored"
-        )[0] == {"access_token": "token"}
+        )
+    assert credentials == {"access_token": "token"}
+    assert config == {"display_name": "Slack · Flower / alice"}
     assert post.call_args.kwargs["data"]["grant_type"] == "authorization_code"
+    assert identity.call_args.args == ("POST", "https://slack.com/api/auth.test")
 
     response.json.return_value["authed_user"]["scope"] = "search:read"
     with patch(_OAUTH_REQUEST, return_value=response), pytest.raises(RuntimeError):
@@ -191,7 +206,10 @@ def test_slack_oauth_flow() -> None:
     response.json.return_value["authed_user"][
         "scope"
     ] = f"{','.join(SLACK_USER_SCOPES)},chat:write"
-    with patch(_OAUTH_REQUEST, return_value=response):
+    with (
+        patch(_OAUTH_REQUEST, return_value=response),
+        patch(_IDENTITY_REQUEST, return_value=Mock(status_code=500)),
+    ):
         flow.exchange_code(
             code="code", redirect_uri=redirect_uri, pkce_verifier="ignored"
         )
