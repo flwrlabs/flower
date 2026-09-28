@@ -82,9 +82,7 @@ def acquire_task(request: AcquireTaskRequest, state: CoreState) -> AcquireTaskRe
         statuses=[Status.PENDING], order_by="pending_at", ascending=True
     )
     for task in tasks:
-        eligible = task.type in supported_types or (
-            task.type == TaskType.AGENT_APP and task.fab_hash in agentapp_fab_hashes
-        )
+        eligible = task.type in supported_types or task.fab_hash in agentapp_fab_hashes
         if eligible and (token := state.claim_task(task.task_id)):
             return AcquireTaskResponse(task=task, token=token)
     return AcquireTaskResponse()
