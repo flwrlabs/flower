@@ -128,7 +128,8 @@ def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
     )
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
     monkeypatch.setattr(
-        run_superexec_module.time, "sleep", Mock(side_effect=KeyboardInterrupt())
+        "flwr.supercore.superexec.run_superexec.time.sleep",
+        Mock(side_effect=KeyboardInterrupt()),
     )
 
     with pytest.raises(KeyboardInterrupt):
