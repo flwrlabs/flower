@@ -42,7 +42,6 @@ from flwr.common.constant import (
     TRANSPORT_TYPE_GRPC_RERE,
     TRANSPORT_TYPES,
     ErrorCode,
-    SubStatus,
 )
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore import log
@@ -408,6 +407,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             if run_info.primary_task_type == TaskType.AGENT_APP
             else TaskType.CLIENT_APP
         )
+        failure_stage = "Pulling message objects failed"
         try:
             # Pull and store objects of the message in the ObjectStore
             obj_contents = pull_objects(
@@ -416,6 +416,8 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             )
             for obj_id in list(obj_contents.keys()):
                 object_store.put(obj_id, obj_contents.pop(obj_id))
+            failure_stage = "Confirming message receipt failed"
+            confirm_message_received(run_id, message.metadata.message_id)
         except Exception as err:  # pylint: disable=broad-except
             log(
                 ERROR,
@@ -430,11 +432,11 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                 task_type=task_type,
                 run_id=run_id,
                 fab_hash=run_info.fab_hash,
-                failure_details=f"Pulling message objects failed: {err}",
+                failure_details=f"{failure_stage}: {err}",
             )
             return None
 
-        # A pending task becomes visible only after its message objects are ready.
+        # Publish a pending task only after its objects and confirmation are ready.
         task_id = state.create_task(
             task_type=task_type, run_id=run_id, fab_hash=run_info.fab_hash
         )
@@ -450,25 +452,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             object_store.delete(message.metadata.message_id)
             return None
 
-        try:
-            # Confirm that the message was received
-            confirm_message_received(run_id, message.metadata.message_id)
-            log(INFO, "Received successfully")
-        except Exception as err:  # pylint: disable=broad-except
-            log(
-                ERROR,
-                "Failed to receive message %s: %s",
-                message.metadata.message_id,
-                err,
-            )
-            state.delete_messages(message_ids=[message.metadata.message_id])
-            object_store.delete(message.metadata.message_id)
-            state.finish_task(
-                task_id,
-                sub_status=SubStatus.FAILED,
-                details=f"Pulling message objects failed: {err}",
-            )
-            return None
+        log(INFO, "Received successfully")
 
     except RunNotRunningException:
         if message is None:
