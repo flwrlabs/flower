@@ -49,8 +49,6 @@ def _run_superexec_one_launch(
     client = Mock()
     client.PullPendingTasks.return_value = Mock(tasks=[task])
     client.ClaimTask.return_value = Mock(token="token-123")
-    client_class = Mock()
-    client_class.from_server_address.return_value = client
     plugin = Mock()
     plugin.select_task.return_value = task
     plugin.launch_task.return_value = launch_result
@@ -62,13 +60,19 @@ def _run_superexec_one_launch(
         run_superexec_module, "get_executor", Mock(return_value=executor)
     )
     monkeypatch.setattr(run_superexec_module, "log", log)
+    monkeypatch.setattr(
+        run_superexec_module,
+        "RuntimeHttpClient",
+        Mock(from_server_address=Mock(return_value=client)),
+    )
+    monkeypatch.setattr(
+        run_superexec_module, "AutoExecPlugin", Mock(return_value=plugin)
+    )
     sleep_mock = Mock(side_effect=KeyboardInterrupt())
     monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep_mock)
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
-            plugin_class=Mock(return_value=plugin),
-            client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
         )
@@ -94,20 +98,22 @@ def test_run_superexec_adds_runtime_version_interceptor(
     """SuperExec should attach runtime version metadata to Runtime API calls."""
     client = Mock()
     client.PullPendingTasks.side_effect = KeyboardInterrupt()
-    client_class = Mock()
     captured: dict[str, Any] = {}
 
     def _from_server_address(**kwargs: Any) -> Mock:
         captured.update(kwargs)
         return client
 
-    client_class.from_server_address.side_effect = _from_server_address
+    monkeypatch.setattr(
+        run_superexec_module,
+        "RuntimeHttpClient",
+        Mock(from_server_address=_from_server_address),
+    )
+    monkeypatch.setattr(run_superexec_module, "AutoExecPlugin", Mock())
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
-            plugin_class=Mock(),
-            client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
             superexec_auth_secret=superexec_auth_secret,
@@ -129,8 +135,6 @@ def test_run_superexec_passes_executor_config_to_factory(
     """SuperExec should pass executor config and Runtime transport to the factory."""
     client = Mock()
     client.PullPendingTasks.side_effect = KeyboardInterrupt()
-    client_class = Mock()
-    client_class.from_server_address.return_value = client
     executor_config: dict[str, object] = {
         "namespace": "flower-system",
         "image": "taskexecutor:dev",
@@ -138,6 +142,12 @@ def test_run_superexec_passes_executor_config_to_factory(
     get_executor = Mock(return_value=Mock())
 
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
+    monkeypatch.setattr(
+        run_superexec_module,
+        "RuntimeHttpClient",
+        Mock(from_server_address=Mock(return_value=client)),
+    )
+    monkeypatch.setattr(run_superexec_module, "AutoExecPlugin", Mock())
     monkeypatch.setattr(run_superexec_module, "get_executor", get_executor)
     monkeypatch.setattr(
         run_superexec_module, "validate_and_resolve_root_certificates", Mock()
@@ -145,8 +155,6 @@ def test_run_superexec_passes_executor_config_to_factory(
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
-            plugin_class=Mock(),
-            client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=insecure,
             root_certificates_path=root_certificates_path,
@@ -169,16 +177,17 @@ def test_run_superexec_closes_executor_when_runtime_client_setup_fails(
 ) -> None:
     """Warm Pods are cleaned up when startup fails before handlers are installed."""
     executor = Mock()
-    client_class = Mock()
-    client_class.from_server_address.side_effect = RuntimeError("Runtime unavailable")
+    monkeypatch.setattr(
+        run_superexec_module,
+        "RuntimeHttpClient",
+        Mock(from_server_address=Mock(side_effect=RuntimeError("Runtime unavailable"))),
+    )
     monkeypatch.setattr(
         run_superexec_module, "get_executor", Mock(return_value=executor)
     )
 
     with pytest.raises(RuntimeError, match="Runtime unavailable"):
         run_superexec_module.run_superexec(
-            plugin_class=Mock(),
-            client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
         )
@@ -265,8 +274,6 @@ def test_run_superexec_rejects_invalid_task_poll_interval(
 
     with pytest.raises(ValueError, match="FLWR_SUPEREXEC_TASK_POLL_INTERVAL"):
         run_superexec_module.run_superexec(
-            plugin_class=Mock(),
-            client_class=Mock(),
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
         )
