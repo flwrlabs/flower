@@ -309,6 +309,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_name = CHAT_AGENT_NAME
         self.local_agent: LocalAgent | None = None
         self.connector_refs: list[str] = []
+        self.connector_display_names: dict[str, str] = {}
         self.completer = _ChatCompleter(stub, self.federation, federations)
         self.input_buffer = Buffer(
             completer=ThreadedCompleter(self.completer),
@@ -548,6 +549,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         """Show the connector selector or apply its selection."""
         if prompt.lower() == f"{CHAT_CONNECTOR_COMMAND} {CHAT_CONNECTOR_CLEAR}":
             self.connector_refs.clear()
+            self.connector_display_names.clear()
             event.app.invalidate()
             return True
 
@@ -590,7 +592,10 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
         if connector.connector_ref not in self.connector_refs:
             self.connector_refs.append(connector.connector_ref)
-            event.app.invalidate()
+        self.connector_display_names[connector.connector_ref] = (
+            connector.display_name or connector.connector_ref
+        )
+        event.app.invalidate()
         return True
 
     def _handle_load_command(self, event: KeyPressEvent, prompt: str) -> bool:
@@ -671,6 +676,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_name = CHAT_AGENT_NAME
         self.local_agent = None
         self.connector_refs.clear()
+        self.connector_display_names.clear()
         self.series_id = None
         self._clear_transcript()
         return True
@@ -1005,7 +1011,11 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
     def _render_agent_name(self) -> StyleAndTextTuples:
         """Return the selected agent label with the active federation."""
         connectors = (
-            f" · connectors: {', '.join(self.connector_refs)}"
+            " · connectors: "
+            + ", ".join(
+                self.connector_display_names.get(connector_ref, connector_ref)
+                for connector_ref in self.connector_refs
+            )
             if self.connector_refs
             else ""
         )

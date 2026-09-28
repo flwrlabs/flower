@@ -141,7 +141,48 @@ class OAuthFlow:
             raise self._error("returned an invalid response") from None
         if not isinstance(response_payload, dict):
             raise self._error("returned an invalid response")
-        return self._parse_token_response(cast(JSONObject, response_payload))
+        payload = cast(JSONObject, response_payload)
+        credentials, config = self._parse_token_response(payload)
+        access_token = cast(str, credentials["access_token"])
+        name = self._connection_name(payload, access_token)
+        if name:
+            config["display_name"] = f"{self.display_name} · {name}"
+        return credentials, config
+
+    def _connection_name(self, token_payload: JSONObject, access_token: str) -> str:
+        """Read the connection name from the token or provider identity."""
+        # Names can come from the token response or a separate lookup.
+        payload = token_payload
+        url = self._oauth.display_name_url
+        if url:
+            try:
+                response = requests.request(
+                    self._oauth.display_name_method,
+                    url,
+                    headers={
+                        **self._oauth.display_name_headers,
+                        "Authorization": f"Bearer {access_token}",
+                    },
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                identity_payload = response.json()
+            except (requests.RequestException, ValueError):
+                # A name lookup failure should not invalidate the OAuth connection.
+                return ""
+            if not isinstance(identity_payload, dict):
+                return ""
+            payload = cast(JSONObject, identity_payload)
+
+        if self._oauth.display_name_resolver is not None:
+            return self._oauth.display_name_resolver(payload)
+
+        names: list[str] = []
+        for field in self._oauth.display_name_fields:
+            value = payload.get(field)
+            if isinstance(value, str) and value.strip():
+                names.append(value.strip())
+        return " / ".join(names)
 
     def _parse_token_response(
         self, payload: JSONObject
