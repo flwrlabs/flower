@@ -31,6 +31,8 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    AcquireTaskResponse,
     ClaimTaskRequest,
     ClaimTaskResponse,
     CreateTaskRequest,
@@ -41,8 +43,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
-    PullAndClaimTaskRequest,
-    PullAndClaimTaskResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -72,15 +72,13 @@ from flwr.supercore.protobuf.client import ProtobufClient
 class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-methods
     """Protobuf-over-HTTP client for the Runtime API."""
 
-    def PullAndClaimTask(
-        self, request: PullAndClaimTaskRequest
-    ) -> PullAndClaimTaskResponse:
-        """Claim the oldest pending task with a supported type."""
+    def AcquireTask(self, request: AcquireTaskRequest) -> AcquireTaskResponse:
+        """Acquire the oldest eligible pending task."""
         return self._unary_unary(
-            path="/v1/runtime/pull-and-claim-task",
-            rpc_method="/flwr.proto.Runtime/PullAndClaimTask",
+            path="/v1/runtime/acquire-task",
+            rpc_method="/flwr.proto.Runtime/AcquireTask",
             request=request,
-            response_type=PullAndClaimTaskResponse,
+            response_type=AcquireTaskResponse,
         )
 
     def PullPendingTasks(

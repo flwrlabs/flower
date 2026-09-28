@@ -25,12 +25,12 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    AcquireTaskResponse,
     ClaimTaskRequest,
     ClaimTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
-    PullAndClaimTaskRequest,
-    PullAndClaimTaskResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
     PullTaskMessageRequest,
@@ -70,22 +70,24 @@ def pull_pending_tasks(
     return PullPendingTasksResponse(tasks=tasks)
 
 
-def pull_and_claim_task(
-    request: PullAndClaimTaskRequest, state: CoreState
-) -> PullAndClaimTaskResponse:
-    """Claim the oldest pending task with a supported type."""
-    log(DEBUG, "Runtime.PullAndClaimTask")
+def acquire_task(request: AcquireTaskRequest, state: CoreState) -> AcquireTaskResponse:
+    """Claim the oldest pending task matching the executor's available capacity."""
+    log(DEBUG, "Runtime.AcquireTask")
     supported_types = set(request.supported_task_types)
-    if not supported_types:
-        return PullAndClaimTaskResponse()
+    agentapp_fab_hashes = set(request.agentapp_fab_hashes)
+    if not supported_types and not agentapp_fab_hashes:
+        return AcquireTaskResponse()
 
     tasks = state.get_tasks(
         statuses=[Status.PENDING], order_by="pending_at", ascending=True
     )
     for task in tasks:
-        if task.type in supported_types and (token := state.claim_task(task.task_id)):
-            return PullAndClaimTaskResponse(task=task, token=token)
-    return PullAndClaimTaskResponse()
+        eligible = task.type in supported_types or (
+            task.type == TaskType.AGENT_APP and task.fab_hash in agentapp_fab_hashes
+        )
+        if eligible and (token := state.claim_task(task.task_id)):
+            return AcquireTaskResponse(task=task, token=token)
+    return AcquireTaskResponse()
 
 
 def claim_task(request: ClaimTaskRequest, state: CoreState) -> ClaimTaskResponse:

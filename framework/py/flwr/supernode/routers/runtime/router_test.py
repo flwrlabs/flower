@@ -51,7 +51,7 @@ from flwr.supernode.servicer.runtime import runtime_handlers
 
 _SUPEREXEC_PATHS = {
     "/v1/runtime/pull-pending-tasks",
-    "/v1/runtime/pull-and-claim-task",
+    "/v1/runtime/acquire-task",
     "/v1/runtime/claim-task",
 }
 

@@ -25,8 +25,8 @@ from google.protobuf.message import DecodeError
 
 from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL, RUNTIME_DEPENDENCY_INSTALL
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
     ClaimTaskRequest,
-    PullAndClaimTaskRequest,
     PullPendingTasksRequest,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
@@ -45,7 +45,7 @@ from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
-from .executor import LaunchResult, LaunchResultStatus, get_executor
+from .executor import KubernetesExecutor, LaunchResult, LaunchResultStatus, get_executor
 from .executor.config import ExecutorConfig
 from .plugin import AutoExecPlugin, ClientAppExecPlugin, ExecPlugin, ServerAppExecPlugin
 from .plugin.base_exec_plugin import BaseExecPlugin
@@ -56,7 +56,7 @@ _MAX_TASK_POLL_INTERVAL_SECONDS = 60.0
 _DEFAULT_TASK_POLL_INTERVAL_SECONDS = 1.0
 _SUPEREXEC_AUTH_METHODS = frozenset(
     {
-        "/flwr.proto.Runtime/PullAndClaimTask",
+        "/flwr.proto.Runtime/AcquireTask",
         "/flwr.proto.Runtime/PullPendingTasks",
         "/flwr.proto.Runtime/ClaimTask",
     }
@@ -260,16 +260,11 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             message=f"Invalid plugin config: {e!r}",
         )
 
-    # Custom selection and Kubernetes capacity depend on seeing a candidate first.
-    use_combined_acquisition = (
-        executor_type == ExecutorType.SUBPROCESS
-        and plugin_class
-        in (
-            AutoExecPlugin,
-            ClientAppExecPlugin,
-            ServerAppExecPlugin,
-        )
-    )
+    # Custom plugins may need to inspect the pending tasks before choosing one.
+    use_combined_acquisition = executor_type in (
+        ExecutorType.SUBPROCESS,
+        ExecutorType.KUBERNETES,
+    ) and plugin_class in (AutoExecPlugin, ClientAppExecPlugin, ServerAppExecPlugin)
 
     # Start the main loop
     try:
@@ -278,16 +273,28 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             task = None
             token = None
             if use_combined_acquisition:
-                executor.wait_for_capacity(
-                    insecure=insecure,
-                    root_certificates_path=root_certificates_path,
+                supported_task_types = set(
+                    cast(BaseExecPlugin, plugin).supported_task_types
                 )
+                agentapp_fab_hashes: set[str] = set()
+                if executor_type == ExecutorType.KUBERNETES:
+                    supported_task_types, agentapp_fab_hashes = cast(
+                        KubernetesExecutor, executor
+                    ).wait_for_eligible_capacity(
+                        supported_task_types,
+                        insecure=insecure,
+                        root_certificates_path=root_certificates_path,
+                    )
+                else:
+                    executor.wait_for_capacity(
+                        insecure=insecure,
+                        root_certificates_path=root_certificates_path,
+                    )
                 try:
-                    combined_res = client.PullAndClaimTask(
-                        PullAndClaimTaskRequest(
-                            supported_task_types=sorted(
-                                cast(BaseExecPlugin, plugin).supported_task_types
-                            )
+                    combined_res = client.AcquireTask(
+                        AcquireTaskRequest(
+                            supported_task_types=sorted(supported_task_types),
+                            agentapp_fab_hashes=sorted(agentapp_fab_hashes),
                         )
                     )
                 except ValueError as exc:

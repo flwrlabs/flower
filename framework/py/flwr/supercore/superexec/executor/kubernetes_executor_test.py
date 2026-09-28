@@ -1745,6 +1745,53 @@ def test_wait_for_capacity_reserves_cold_capacity_for_task_specific_ca() -> None
     sleep.assert_called_once_with(1.0)
 
 
+def test_combined_acquisition_filters_to_ready_warm_pools_at_budget() -> None:
+    """At the Pod budget, only ready generic types and exact FABs are claimable."""
+    client = Mock()
+    generic_key = _warm_executor_pool_key(
+        task_type=TaskType.MODEL,
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev",
+    )
+    exact_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev",
+        fab_hash=_FAB_HASH,
+        fab_path="/opt/flwr/apps/agent.fab",
+    )
+    config = _executor_config(
+        active_pod_budget=3,
+        warm_executor_owner="superexec-a",
+        warm_executor_pools=(
+            WarmExecutorPoolConfig(key=generic_key, size=1),
+            WarmExecutorPoolConfig(key=exact_key, size=1),
+        ),
+    )
+    warm_pods = [
+        _ready_warm_pod(generic_key, config, name="model"),
+        _ready_warm_pod(exact_key, config, name="agent"),
+    ]
+    active_pod_count = 3
+
+    def _list_pods(_namespace: str, label_selector: str) -> dict[str, Any]:
+        if "warm-executor-owner" in label_selector:
+            return {"items": warm_pods}
+        return {"items": [*warm_pods, _pod("Running")][:active_pod_count]}
+
+    client.list_namespaced_pod.side_effect = _list_pods
+    client.list_namespaced_secret.return_value = {"items": []}
+    executor = KubernetesExecutor(client=client, config=config)
+    supported = {TaskType.AGENT_APP, TaskType.MODEL, TaskType.SERVER_APP}
+
+    assert executor.wait_for_eligible_capacity(supported, insecure=True) == (
+        {TaskType.MODEL},
+        {_FAB_HASH},
+    )
+    active_pod_count = 2
+    assert executor.wait_for_eligible_capacity(supported, insecure=True) == (
+        supported,
+        set(),
+    )
+
+
 @pytest.mark.parametrize("budget", [None, 1])
 def test_cold_fallback_retries_retirement_while_waiting_for_capacity(
     budget: int | None,

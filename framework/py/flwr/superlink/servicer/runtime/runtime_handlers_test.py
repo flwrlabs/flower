@@ -44,6 +44,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.node_pb2 import Node, NodeInfo  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
     ClaimTaskRequest,
     CreateTaskRequest,
     GetConnectorRequest,
@@ -52,7 +53,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
-    PullAndClaimTaskRequest,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -383,7 +383,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         if num_transitions > 2:
             assert self.state.finish_task(task_id, "", "")
 
-    def test_pull_and_claim_task_processes_due_automations(self) -> None:
+    def test_acquire_task_processes_due_automations(self) -> None:
         """A SuperExec poll should create and claim a due automation's task."""
         series_id = self.state.get_run_info(run_ids=[self._auth_run_id])[0].series_id
         automation = self.state.store_automation(
@@ -414,8 +414,8 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
                 return_value=("flwr/demo", "0.1.0"),
             ),
         ):
-            response = runtime_handlers.pull_and_claim_task(
-                PullAndClaimTaskRequest(supported_task_types=[TaskType.SERVER_APP]),
+            response = runtime_handlers.acquire_task(
+                AcquireTaskRequest(supported_task_types=[TaskType.SERVER_APP]),
                 self.state,
             )
 

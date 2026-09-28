@@ -42,14 +42,14 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    AcquireTaskResponse,
     GetConnectorRequest,
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
-    PullAndClaimTaskRequest,
-    PullAndClaimTaskResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -107,12 +107,10 @@ def pull_pending_tasks(
     return PullPendingTasksResponse(tasks=tasks)
 
 
-def pull_and_claim_task(
-    request: PullAndClaimTaskRequest, state: LinkState
-) -> PullAndClaimTaskResponse:
-    """Process due automations, then claim a supported pending task."""
+def acquire_task(request: AcquireTaskRequest, state: LinkState) -> AcquireTaskResponse:
+    """Process due automations, then acquire an eligible pending task."""
     process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
-    return core_runtime_handlers.pull_and_claim_task(request, state)
+    return core_runtime_handlers.acquire_task(request, state)
 
 
 def get_nodes(

@@ -26,10 +26,10 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
     ClaimTaskRequest,
     CreateTaskRequest,
     CreateTaskResponse,
-    PullAndClaimTaskRequest,
     PullPendingTasksRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
@@ -93,10 +93,10 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(response.tasks), 1)
         self.assertEqual(response.tasks[0].task_id, 123)
 
-    def test_pull_and_claim_task_returns_empty_when_queue_is_empty(self) -> None:
+    def test_acquire_task_returns_empty_when_queue_is_empty(self) -> None:
         """An empty queue must not claim a task."""
-        response = runtime_handlers.pull_and_claim_task(
-            PullAndClaimTaskRequest(supported_task_types=[TaskType.MODEL]),
+        response = runtime_handlers.acquire_task(
+            AcquireTaskRequest(supported_task_types=[TaskType.MODEL]),
             self.state,
         )
 
@@ -104,7 +104,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(response.token)
         self.state.claim_task.assert_not_called()
 
-    def test_pull_and_claim_task_retries_after_lost_claim_race(self) -> None:
+    def test_acquire_task_retries_after_lost_claim_race(self) -> None:
         """A contender should try the next eligible task after losing a claim."""
         tasks = [
             Task(task_id=1, type=TaskType.MODEL),
@@ -114,8 +114,8 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.state.get_tasks.return_value = tasks
         self.state.claim_task.side_effect = [None, "task-token"]
 
-        response = runtime_handlers.pull_and_claim_task(
-            PullAndClaimTaskRequest(supported_task_types=[TaskType.MODEL]), self.state
+        response = runtime_handlers.acquire_task(
+            AcquireTaskRequest(supported_task_types=[TaskType.MODEL]), self.state
         )
 
         self.assertEqual(response.task, tasks[2])
@@ -124,6 +124,23 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [call.args[0] for call in self.state.claim_task.call_args_list], [1, 3]
         )
+
+    def test_acquire_task_matches_only_eligible_agentapp_fab(self) -> None:
+        """A FAB-specific warm slot must not claim an unrelated AgentApp."""
+        tasks = [
+            Task(task_id=1, type=TaskType.AGENT_APP, fab_hash="other"),
+            Task(task_id=2, type=TaskType.MODEL),
+            Task(task_id=3, type=TaskType.AGENT_APP, fab_hash="ready"),
+        ]
+        self.state.get_tasks.return_value = tasks
+        self.state.claim_task.return_value = "task-token"
+
+        response = runtime_handlers.acquire_task(
+            AcquireTaskRequest(agentapp_fab_hashes=["ready"]), self.state
+        )
+
+        self.assertEqual(response.task, tasks[2])
+        self.state.claim_task.assert_called_once_with(3)
 
     def test_claim_task_returns_token_when_claim_succeeds(self) -> None:
         """ClaimTask should return the token from state."""
