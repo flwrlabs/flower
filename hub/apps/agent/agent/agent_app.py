@@ -9,7 +9,7 @@ from flwr.agentapp import AgentApp, AgentSession
 from flwr.app import Context
 from openai import OpenAI
 
-MODEL = "dedicated/flowerai/Kimi-K2.7-Code-1OUHWL"
+MODEL = "openai/gpt-5.6-sol"
 
 app = AgentApp()
 
