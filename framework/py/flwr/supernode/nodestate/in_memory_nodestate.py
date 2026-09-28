@@ -21,7 +21,7 @@ from logging import ERROR
 from threading import Lock, RLock
 
 from flwr.app import Error, Message
-from flwr.common.constant import ErrorCode
+from flwr.common.constant import ErrorCode, SubStatus
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
@@ -36,6 +36,7 @@ from .nodestate import NodeState
 CLIENT_APP_CRASHED_ERROR = Error(
     ErrorCode.CLIENT_APP_CRASHED, "ClientApp stopped responding."
 )
+AGENT_APP_FAILED_ERROR = Error(ErrorCode.UNKNOWN, "AgentApp failed before replying.")
 
 
 @dataclass
@@ -181,18 +182,37 @@ class InMemoryNodeState(
         with self.lock_run_store:
             return self.run_store.get(run_id)
 
-    def _store_error_replies(self, run_ids: set[int]) -> None:
+    def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
+        """Finish a task and reply if its AgentApp failed."""
+        finished = super().finish_task(task_id, sub_status, details)
+        if finished and sub_status == SubStatus.FAILED:
+            tasks = self.get_tasks(task_ids=[task_id])
+            if tasks and tasks[0].type == TaskType.AGENT_APP:
+                self._store_error_replies({tasks[0].run_id}, AGENT_APP_FAILED_ERROR)
+        return finished
+
+    def _store_error_replies(self, run_ids: set[int], error: Error) -> None:
         """Insert error replies for retrieved messages associated with run IDs."""
         with self.lock_msg_store:
+            replied_ids = {
+                entry.message.metadata.reply_to_message_id
+                for entry in self.msg_store.values()
+                if entry.message.metadata.reply_to_message_id
+            }
             messages_to_reply: list[Message] = []
             for entry in self.msg_store.values():
                 msg = entry.message
-                if msg.metadata.run_id in run_ids and entry.is_retrieved:
+                if (
+                    msg.metadata.run_id in run_ids
+                    and entry.is_retrieved
+                    and not msg.metadata.reply_to_message_id
+                    and msg.metadata.message_id not in replied_ids
+                ):
                     messages_to_reply.append(msg)
 
             # Create and store error replies for each message
             for msg in messages_to_reply:
-                error_reply = Message(CLIENT_APP_CRASHED_ERROR, reply_to=msg)
+                error_reply = Message(error, reply_to=msg)
 
                 # Insert objects of the error reply into the object store
                 error_reply.metadata.__dict__["_message_id"] = error_reply.object_id
@@ -204,10 +224,16 @@ class InMemoryNodeState(
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Insert error replies for messages associated with expired task tokens."""
-        run_ids = {task.run_id for task in tasks if task.type == TaskType.CLIENT_APP}
-        if not run_ids:
-            return
-        self._store_error_replies(run_ids)
+        client_run_ids = {
+            task.run_id for task in tasks if task.type == TaskType.CLIENT_APP
+        }
+        agent_run_ids = {
+            task.run_id for task in tasks if task.type == TaskType.AGENT_APP
+        }
+        if client_run_ids:
+            self._store_error_replies(client_run_ids, CLIENT_APP_CRASHED_ERROR)
+        if agent_run_ids:
+            self._store_error_replies(agent_run_ids, AGENT_APP_FAILED_ERROR)
 
     def record_message_processing_start(self, message_id: str) -> None:
         """Record the start time of message processing based on the message ID."""

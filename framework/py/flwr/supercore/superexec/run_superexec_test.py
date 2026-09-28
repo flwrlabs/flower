@@ -19,11 +19,9 @@ from logging import ERROR, WARNING
 from typing import Any
 from unittest.mock import Mock
 
-import httpx
 import pytest
-from google.protobuf.message import DecodeError
 
-from flwr.proto.runtime_pb2 import PullAndClaimTaskResponse  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import AcquireTaskResponse  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import ExecutorType, TaskType
 from flwr.supercore.interceptors import (
@@ -39,35 +37,45 @@ from . import run_superexec as run_superexec_module
 def _run_superexec_one_launch(
     monkeypatch: pytest.MonkeyPatch,
     launch_result: LaunchResult,
+    task_poll_interval: str | None = None,
 ) -> tuple[Mock, Mock, Mock, Mock, Mock]:
-    """Run one SuperExec launch loop and stop at the next acquisition."""
-    task = Mock()
-    task.task_id = 123
-    task.type = TaskType.AGENT_APP.value
-    task.fab_hash = "fab-hash"
+    """Run one SuperExec launch loop and stop at the next capacity check."""
+    if task_poll_interval is None:
+        monkeypatch.delenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", raising=False)
+    else:
+        monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", task_poll_interval)
+
+    task = Task(task_id=123, type=TaskType.AGENT_APP, fab_hash="fab-hash")
     client = Mock()
-    client.PullPendingTasks.side_effect = [Mock(tasks=[task]), KeyboardInterrupt()]
-    client.ClaimTask.return_value = Mock(token="token-123")
-    client_class = Mock()
-    client_class.from_server_address.return_value = client
+    client.AcquireTask.return_value = AcquireTaskResponse(task=task, token="token-123")
     plugin = Mock()
-    plugin.select_task.return_value = task
+    plugin.supported_task_types = AutoExecPlugin.supported_task_types
     plugin.launch_task.return_value = launch_result
     log = Mock()
 
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
     executor = Mock()
+    executor.get_eligible_capacity.side_effect = [
+        (set(AutoExecPlugin.supported_task_types), set()),
+        KeyboardInterrupt(),
+    ]
     monkeypatch.setattr(
         run_superexec_module, "get_executor", Mock(return_value=executor)
     )
     monkeypatch.setattr(run_superexec_module, "log", log)
+    monkeypatch.setattr(
+        run_superexec_module,
+        "RuntimeHttpClient",
+        Mock(from_server_address=Mock(return_value=client)),
+    )
+    monkeypatch.setattr(
+        run_superexec_module, "AutoExecPlugin", Mock(return_value=plugin)
+    )
     sleep_mock = Mock()
     monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep_mock)
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
-            plugin_class=Mock(return_value=plugin),
-            client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
         )
@@ -75,144 +83,61 @@ def _run_superexec_one_launch(
     return log, plugin, client, executor, sleep_mock
 
 
-def test_builtin_subprocess_uses_combined_acquisition(
+@pytest.mark.parametrize("ready_fabs", [{"ready-fab"}, set()])
+def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
     monkeypatch: pytest.MonkeyPatch,
+    ready_fabs: set[str],
 ) -> None:
-    """Connection and response failures back off before task acquisition."""
-    monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", "0.25")
-    monkeypatch.setattr(
-        run_superexec_module, "monotonic", Mock(side_effect=[0, 0, 0, 5, 5, 5])
-    )
-    task = Task(task_id=123, type=TaskType.MODEL)
-    invalid_response = ValueError("Invalid protobuf response payload")
-    invalid_response.__cause__ = DecodeError("malformed response")
+    """Kubernetes polls with available capacity, including when none is ready."""
+    task = Task(task_id=123, type=TaskType.AGENT_APP, fab_hash="ready-fab")
     client = Mock()
-    client.PullAndClaimTask.side_effect = [
-        httpx.ConnectError("unavailable"),
-        invalid_response,
-        PullAndClaimTaskResponse(),
-        PullAndClaimTaskResponse(task=task, token="task-token"),
+    client.AcquireTask.return_value = (
+        AcquireTaskResponse(task=task, token="task-token")
+        if ready_fabs
+        else AcquireTaskResponse()
+    )
+    executor = Mock()
+    executor.get_eligible_capacity.side_effect = [
+        (set(), ready_fabs),
         KeyboardInterrupt(),
     ]
-    client_class = Mock()
-    client_class.from_server_address.return_value = client
-    executor = Mock()
     executor.launch.return_value = LaunchResult.accepted()
     order = Mock()
-    order.attach_mock(executor.wait_for_capacity, "capacity")
-    order.attach_mock(client.PullAndClaimTask, "acquire")
+    order.attach_mock(executor.get_eligible_capacity, "capacity")
+    order.attach_mock(client.AcquireTask, "acquire")
     monkeypatch.setattr(
         run_superexec_module, "get_executor", Mock(return_value=executor)
     )
-    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
-    sleep = Mock()
-    monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep)
-
-    with pytest.raises(KeyboardInterrupt):
-        run_superexec_module.run_superexec(
-            plugin_class=AutoExecPlugin,
-            client_class=client_class,
-            runtime_api_address="127.0.0.1:9091",
-            insecure=True,
-        )
-
-    assert [call[0] for call in order.mock_calls] == ["capacity", "acquire"] * 5
-    assert set(client.PullAndClaimTask.call_args.args[0].supported_task_types) == set(
-        AutoExecPlugin.supported_task_types
-    )
-    assert client.PullAndClaimTask.call_args.args[0].wait_timeout_ms == 5_000
-    client.PullPendingTasks.assert_not_called()
-    client.ClaimTask.assert_not_called()
-    executor.launch.assert_called_once()
-    assert executor.launch.call_args.args[0].task_id == task.task_id
-    assert executor.launch.call_args.args[0].token == "task-token"
-    assert sleep.call_args_list[0].args == (1.0,)
-    assert [call.args for call in sleep.call_args_list[1:7]] == [(5.0,)] * 6
-    assert sleep.call_count == 7
-    assert client.PullAndClaimTask.call_count == 5
-
-
-def test_combined_acquisition_stops_after_lost_response(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """An ambiguous claim waits for lease expiry before another acquisition."""
-    client = Mock()
-    client.PullAndClaimTask.side_effect = [
-        httpx.ReadError("response lost"),
-        KeyboardInterrupt(),
-    ]
-    client_class = Mock()
-    client_class.from_server_address.return_value = client
-    executor = Mock()
     monkeypatch.setattr(
-        run_superexec_module, "get_executor", Mock(return_value=executor)
+        run_superexec_module,
+        "RuntimeHttpClient",
+        Mock(from_server_address=Mock(return_value=client)),
     )
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
-    sleep = Mock()
-    monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep)
-
-    with pytest.raises(KeyboardInterrupt):
-        run_superexec_module.run_superexec(
-            plugin_class=AutoExecPlugin,
-            client_class=client_class,
-            runtime_api_address="127.0.0.1:9091",
-            insecure=True,
-        )
-
-    assert client.PullAndClaimTask.call_count == 2
-    assert sleep.call_count == 6
-    assert all(call.args == (5.0,) for call in sleep.call_args_list)
-    assert executor.reconcile.call_count == 8
-    client.close.assert_called_once()
-
-
-def test_kubernetes_keeps_task_specific_capacity_before_claim(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Kubernetes waits with the selected task type before claiming."""
-    task = Task(task_id=123, type=TaskType.MODEL)
-    client = Mock()
-    client.PullPendingTasks.side_effect = [
-        Mock(tasks=[]),
-        Mock(tasks=[task]),
-        KeyboardInterrupt(),
-    ]
-    client.ClaimTask.return_value = Mock(token="task-token")
-    client_class = Mock()
-    client_class.from_server_address.return_value = client
-    executor = Mock()
-    executor.launch.return_value = LaunchResult.accepted()
-    order = Mock()
-    order.attach_mock(client.PullPendingTasks, "pull")
-    order.attach_mock(executor.wait_for_capacity, "capacity")
-    order.attach_mock(client.ClaimTask, "claim")
     monkeypatch.setattr(
-        run_superexec_module, "get_executor", Mock(return_value=executor)
+        "flwr.supercore.superexec.run_superexec.time.sleep",
+        Mock(side_effect=KeyboardInterrupt()),
     )
-    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
-    sleep = Mock()
-    monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep)
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
-            plugin_class=AutoExecPlugin,
-            client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
             executor_type=ExecutorType.KUBERNETES,
+            executor_config={},
         )
 
-    assert [call[0] for call in order.mock_calls[:4]] == [
-        "pull",
-        "pull",
-        "capacity",
-        "claim",
-    ]
-    assert client.PullPendingTasks.call_args.kwargs["request"].wait_timeout_ms == 5_000
-    assert executor.wait_for_capacity.call_args.kwargs["task_type"] == TaskType.MODEL
-    assert executor.reconcile.call_count == 3
-    client.PullAndClaimTask.assert_not_called()
-    sleep.assert_called_once_with(1.0)
+    assert [call[0] for call in order.mock_calls][:2] == ["capacity", "acquire"]
+    request = client.AcquireTask.call_args.args[0]
+    assert not request.supported_task_types
+    assert set(request.agentapp_fab_hashes) == ready_fabs
+    assert request.wait_timeout_ms == (5_000 if ready_fabs else 0)
+    client.PullPendingTasks.assert_not_called()
+    client.ClaimTask.assert_not_called()
+    if ready_fabs:
+        executor.launch.assert_called_once()
+    else:
+        executor.launch.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -232,21 +157,22 @@ def test_run_superexec_adds_runtime_version_interceptor(
 ) -> None:
     """SuperExec should attach runtime version metadata to Runtime API calls."""
     client = Mock()
-    client.PullPendingTasks.side_effect = KeyboardInterrupt()
-    client_class = Mock()
+    client.AcquireTask.side_effect = KeyboardInterrupt()
     captured: dict[str, Any] = {}
 
     def _from_server_address(**kwargs: Any) -> Mock:
         captured.update(kwargs)
         return client
 
-    client_class.from_server_address.side_effect = _from_server_address
+    monkeypatch.setattr(
+        run_superexec_module,
+        "RuntimeHttpClient",
+        Mock(from_server_address=_from_server_address),
+    )
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
-            plugin_class=Mock(),
-            client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
             superexec_auth_secret=superexec_auth_secret,
@@ -267,16 +193,19 @@ def test_run_superexec_passes_executor_config_to_factory(
 ) -> None:
     """SuperExec should pass executor config and Runtime transport to the factory."""
     client = Mock()
-    client.PullPendingTasks.side_effect = KeyboardInterrupt()
-    client_class = Mock()
-    client_class.from_server_address.return_value = client
     executor_config: dict[str, object] = {
         "namespace": "flower-system",
         "image": "taskexecutor:dev",
     }
     get_executor = Mock(return_value=Mock())
+    get_executor.return_value.get_eligible_capacity.side_effect = KeyboardInterrupt()
 
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
+    monkeypatch.setattr(
+        run_superexec_module,
+        "RuntimeHttpClient",
+        Mock(from_server_address=Mock(return_value=client)),
+    )
     monkeypatch.setattr(run_superexec_module, "get_executor", get_executor)
     monkeypatch.setattr(
         run_superexec_module, "validate_and_resolve_root_certificates", Mock()
@@ -284,8 +213,6 @@ def test_run_superexec_passes_executor_config_to_factory(
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
-            plugin_class=Mock(),
-            client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=insecure,
             root_certificates_path=root_certificates_path,
@@ -299,7 +226,7 @@ def test_run_superexec_passes_executor_config_to_factory(
         insecure=insecure,
         root_certificates_path=root_certificates_path,
     )
-    client.PullAndClaimTask.assert_not_called()
+    client.AcquireTask.assert_not_called()
     get_executor.return_value.reconcile.assert_called_once_with()
     get_executor.return_value.close.assert_called_once_with()
 
@@ -309,16 +236,17 @@ def test_run_superexec_closes_executor_when_runtime_client_setup_fails(
 ) -> None:
     """Warm Pods are cleaned up when startup fails before handlers are installed."""
     executor = Mock()
-    client_class = Mock()
-    client_class.from_server_address.side_effect = RuntimeError("Runtime unavailable")
+    monkeypatch.setattr(
+        run_superexec_module,
+        "RuntimeHttpClient",
+        Mock(from_server_address=Mock(side_effect=RuntimeError("Runtime unavailable"))),
+    )
     monkeypatch.setattr(
         run_superexec_module, "get_executor", Mock(return_value=executor)
     )
 
     with pytest.raises(RuntimeError, match="Runtime unavailable"):
         run_superexec_module.run_superexec(
-            plugin_class=Mock(),
-            client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
         )
@@ -334,17 +262,20 @@ def test_run_superexec_preserves_accepted_launch_behavior(
         monkeypatch, LaunchResult.accepted()
     )
 
-    stub.ClaimTask.assert_called_once()
-    plugin.select_task.assert_called_once()
-    stub.PullAndClaimTask.assert_not_called()
+    stub.AcquireTask.assert_called_once()
+    assert set(stub.AcquireTask.call_args.args[0].supported_task_types) == set(
+        AutoExecPlugin.supported_task_types
+    )
+    stub.PullPendingTasks.assert_not_called()
+    stub.ClaimTask.assert_not_called()
     plugin.launch_task.assert_called_once()
-    executor.wait_for_capacity.assert_called_once_with(
-        task_type=TaskType.AGENT_APP,
-        fab_hash="fab-hash",
+    executor.get_eligible_capacity.assert_any_call(
+        set(AutoExecPlugin.supported_task_types),
         insecure=True,
         root_certificates_path=None,
     )
     log.assert_not_called()
+    assert stub.AcquireTask.call_args.args[0].wait_timeout_ms == 5_000
     sleep_mock.assert_not_called()
 
 
@@ -377,12 +308,87 @@ def test_run_superexec_logs_non_accepted_launch_result(
     """SuperExec should log non-accepted launch results and keep loop behavior."""
     log, plugin, stub, _, _ = _run_superexec_one_launch(monkeypatch, launch_result)
 
-    stub.ClaimTask.assert_called_once()
+    stub.AcquireTask.assert_called_once()
     plugin.launch_task.assert_called_once()
     log.assert_called_once()
     assert log.call_args.args[0] == expected_level
     assert expected_message in log.call_args.args[1]
     assert log.call_args.args[2] == 123
+
+
+def test_run_superexec_uses_configured_task_poll_interval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperExec uses the configured interval when it has no capacity."""
+    monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", "0.25")
+    client = Mock()
+    client.AcquireTask.return_value = AcquireTaskResponse()
+    executor = Mock()
+    executor.get_eligible_capacity.return_value = (set(), set())
+    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
+    monkeypatch.setattr(
+        run_superexec_module, "get_executor", Mock(return_value=executor)
+    )
+    monkeypatch.setattr(
+        run_superexec_module,
+        "RuntimeHttpClient",
+        Mock(from_server_address=Mock(return_value=client)),
+    )
+    plugin = Mock()
+    plugin.supported_task_types = AutoExecPlugin.supported_task_types
+    monkeypatch.setattr(
+        run_superexec_module, "AutoExecPlugin", Mock(return_value=plugin)
+    )
+    sleep_mock = Mock(side_effect=KeyboardInterrupt())
+    monkeypatch.setattr(run_superexec_module.time, "sleep", sleep_mock)
+
+    with pytest.raises(KeyboardInterrupt):
+        run_superexec_module.run_superexec("127.0.0.1:9091", insecure=True)
+
+    assert client.AcquireTask.call_args.args[0].wait_timeout_ms == 0
+    sleep_mock.assert_called_once_with(0.25)
+
+
+@pytest.mark.parametrize("elapsed", [0.1, 5.0])
+def test_run_superexec_sleeps_only_after_fast_empty_acquisition(
+    monkeypatch: pytest.MonkeyPatch, elapsed: float
+) -> None:
+    """A completed long poll is immediately followed by another capacity check."""
+    client = Mock()
+    client.AcquireTask.return_value = AcquireTaskResponse()
+    executor = Mock()
+    executor.get_eligible_capacity.side_effect = [
+        (set(AutoExecPlugin.supported_task_types), set()),
+        KeyboardInterrupt(),
+    ]
+    plugin = Mock()
+    plugin.supported_task_types = AutoExecPlugin.supported_task_types
+    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
+    monkeypatch.setattr(
+        run_superexec_module, "get_executor", Mock(return_value=executor)
+    )
+    monkeypatch.setattr(
+        run_superexec_module,
+        "RuntimeHttpClient",
+        Mock(from_server_address=Mock(return_value=client)),
+    )
+    monkeypatch.setattr(
+        run_superexec_module, "AutoExecPlugin", Mock(return_value=plugin)
+    )
+    monkeypatch.setattr(
+        run_superexec_module, "monotonic", Mock(side_effect=[0, elapsed])
+    )
+    sleep_mock = Mock()
+    monkeypatch.setattr(run_superexec_module.time, "sleep", sleep_mock)
+
+    with pytest.raises(KeyboardInterrupt):
+        run_superexec_module.run_superexec("127.0.0.1:9091", insecure=True)
+
+    assert client.AcquireTask.call_args.args[0].wait_timeout_ms == 5_000
+    if elapsed < 1:
+        sleep_mock.assert_called_once_with(1.0)
+    else:
+        sleep_mock.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -396,8 +402,6 @@ def test_run_superexec_rejects_invalid_task_poll_interval(
 
     with pytest.raises(ValueError, match="FLWR_SUPEREXEC_TASK_POLL_INTERVAL"):
         run_superexec_module.run_superexec(
-            plugin_class=Mock(),
-            client_class=Mock(),
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
         )

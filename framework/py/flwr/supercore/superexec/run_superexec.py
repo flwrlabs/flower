@@ -20,21 +20,17 @@ import os
 import time
 from logging import ERROR, WARNING
 from time import monotonic
-from typing import Any, cast
+from typing import Any
 
 import httpx
 from google.protobuf.message import DecodeError
 
 from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL, RUNTIME_DEPENDENCY_INSTALL
-from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    ClaimTaskRequest,
-    PullAndClaimTaskRequest,
-    PullPendingTasksRequest,
-)
+from flwr.proto.runtime_pb2 import AcquireTaskRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import ExecutorType, TaskType
+from flwr.supercore.constant import ExecutorType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import (
@@ -49,8 +45,7 @@ from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 from .executor import Executor, LaunchResult, LaunchResultStatus, get_executor
 from .executor.config import ExecutorConfig
-from .plugin import AutoExecPlugin, ClientAppExecPlugin, ExecPlugin, ServerAppExecPlugin
-from .plugin.base_exec_plugin import BaseExecPlugin
+from .plugin import AutoExecPlugin
 
 _TASK_POLL_INTERVAL_ENV = "FLWR_SUPEREXEC_TASK_POLL_INTERVAL"
 _MIN_TASK_POLL_INTERVAL_SECONDS = 0.01
@@ -61,7 +56,7 @@ _UNCERTAIN_CLAIM_BACKOFF_SECONDS = HEARTBEAT_DEFAULT_INTERVAL
 _SAFE_CONNECTION_ERRORS = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
 _SUPEREXEC_AUTH_METHODS = frozenset(
     {
-        "/flwr.proto.Runtime/PullAndClaimTask",
+        "/flwr.proto.Runtime/AcquireTask",
         "/flwr.proto.Runtime/PullPendingTasks",
         "/flwr.proto.Runtime/ClaimTask",
     }
@@ -140,7 +135,7 @@ def _handle_launch_result(result: LaunchResult, task: Task) -> None:
 
 
 def _wait_for_claim_expiry(executor: Executor) -> None:
-    """Avoid a second claim until an unknown first claim has expired."""
+    """Avoid another acquisition until an unknown claim has expired."""
     remaining = float(_UNCERTAIN_CLAIM_BACKOFF_SECONDS)
     while remaining > 0:
         interval = min(_TASK_WAIT_TIMEOUT_MS / 1_000, remaining)
@@ -158,8 +153,6 @@ def _backoff_after_fast_empty_poll(
 
 
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
-    plugin_class: type[ExecPlugin],
-    client_class: type[RuntimeHttpClient],
     runtime_api_address: str,
     insecure: bool,
     root_certificates_path: str | None = None,
@@ -175,10 +168,6 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
     Parameters
     ----------
-    plugin_class : type[ExecPlugin]
-        The class of the SuperExec plugin to use.
-    client_class : type[RuntimeHttpClient]
-        The HTTP client class for the Runtime API.
     runtime_api_address : str
         The address of the Runtime API.
     insecure : bool
@@ -238,7 +227,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             health_server = run_health_server_grpc_no_tls(health_server_address)
             grpc_servers.append(health_server)
 
-        client = client_class.from_server_address(
+        client = RuntimeHttpClient.from_server_address(
             server_address=runtime_api_address,
             insecure=insecure,
             root_certificates=validate_and_resolve_root_certificates(
@@ -260,18 +249,13 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     )
 
     # Create the SuperExec plugin instance
-    try:
-        plugin = plugin_class(
-            runtime_api_address=runtime_api_address,
-            insecure=insecure,
-            root_certificates_path=root_certificates_path,
-            runtime_dependency_install=runtime_dependency_install,
-            executor=executor,
-        )
-    except Exception:  # pylint: disable=broad-exception-caught
-        client.close()
-        executor.close()
-        raise
+    plugin = AutoExecPlugin(
+        runtime_api_address=runtime_api_address,
+        insecure=insecure,
+        root_certificates_path=root_certificates_path,
+        runtime_dependency_install=runtime_dependency_install,
+        executor=executor,
+    )
 
     # Load plugin configuration from file if provided
     try:
@@ -283,139 +267,67 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             message=f"Invalid plugin config: {e!r}",
         )
 
-    # Custom selection and Kubernetes capacity depend on seeing a candidate first.
-    use_combined_acquisition = (
-        executor_type == ExecutorType.SUBPROCESS
-        and plugin_class
-        in (
-            AutoExecPlugin,
-            ClientAppExecPlugin,
-            ServerAppExecPlugin,
-        )
-    )
-
     # Start the main loop
     try:
         while True:
             executor.reconcile()
-            task = None
-            token = None
-            sleep_after_poll = True
-            if use_combined_acquisition:
-                executor.wait_for_capacity(
-                    insecure=insecure,
-                    root_certificates_path=root_certificates_path,
+            supported_task_types, agentapp_fab_hashes = executor.get_eligible_capacity(
+                set(plugin.supported_task_types),
+                insecure=insecure,
+                root_certificates_path=root_certificates_path,
+            )
+            has_capacity = bool(supported_task_types or agentapp_fab_hashes)
+            poll_started_at = monotonic()
+            try:
+                combined_res = client.AcquireTask(
+                    AcquireTaskRequest(
+                        supported_task_types=supported_task_types,
+                        agentapp_fab_hashes=agentapp_fab_hashes,
+                        wait_timeout_ms=_TASK_WAIT_TIMEOUT_MS if has_capacity else 0,
+                    )
                 )
-                poll_started_at = monotonic()
-                try:
-                    combined_res = client.PullAndClaimTask(
-                        PullAndClaimTaskRequest(
-                            supported_task_types=sorted(
-                                cast(BaseExecPlugin, plugin).supported_task_types
-                            ),
-                            wait_timeout_ms=_TASK_WAIT_TIMEOUT_MS,
-                        )
-                    )
-                except _SAFE_CONNECTION_ERRORS as exc:
-                    if any(
-                        term in str(exc).lower()
-                        for term in ("certificate", "ssl", "tls")
+            except _SAFE_CONNECTION_ERRORS as exc:
+                if any(
+                    term in str(exc).lower() for term in ("certificate", "ssl", "tls")
+                ):
+                    raise
+                log(WARNING, "Runtime API connection failed: %s", exc)
+                time.sleep(max(task_poll_interval, 1.0))
+                continue
+            except (
+                httpx.NetworkError,
+                httpx.TimeoutException,
+                httpx.RemoteProtocolError,
+                httpx.HTTPStatusError,
+                ValueError,
+            ) as exc:
+                if isinstance(exc, httpx.HTTPStatusError):
+                    if exc.response.status_code not in (
+                        httpx.codes.SERVICE_UNAVAILABLE,
+                        httpx.codes.GATEWAY_TIMEOUT,
                     ):
                         raise
-                    log(WARNING, "Runtime API connection failed: %s", exc)
-                    time.sleep(max(task_poll_interval, 1.0))
-                    continue
-                except (
-                    httpx.NetworkError,
-                    httpx.TimeoutException,
-                    httpx.RemoteProtocolError,
-                    httpx.HTTPStatusError,
-                    ValueError,
-                ) as exc:
-                    if isinstance(exc, httpx.HTTPStatusError):
-                        if exc.response.status_code not in (
-                            httpx.codes.SERVICE_UNAVAILABLE,
-                            httpx.codes.GATEWAY_TIMEOUT,
-                        ):
-                            raise
-                    if isinstance(exc, ValueError) and not isinstance(
-                        exc.__cause__, DecodeError
-                    ):
-                        raise
-                    log(
-                        WARNING,
-                        "Acquisition outcome unknown (%s); waiting for claim expiry",
-                        type(exc).__name__,
-                    )
-                    _wait_for_claim_expiry(executor)
-                    continue
-                if combined_res.HasField("task") and combined_res.token:
-                    task, token = combined_res.task, combined_res.token
-                else:
-                    _backoff_after_fast_empty_poll(poll_started_at, task_poll_interval)
-                    sleep_after_poll = False
+                if isinstance(exc, ValueError) and not isinstance(
+                    exc.__cause__, DecodeError
+                ):
+                    raise
+                log(
+                    WARNING,
+                    "Acquisition outcome unknown (%s); waiting for claim expiry",
+                    type(exc).__name__,
+                )
+                _wait_for_claim_expiry(executor)
+                continue
+            if combined_res.HasField("task") and combined_res.token:
+                launch_result = plugin.launch_task(
+                    token=combined_res.token, task=combined_res.task
+                )
+                _handle_launch_result(launch_result, combined_res.task)
             else:
-                # Preserve custom selection and task-specific capacity checks.
-                poll_started_at = monotonic()
-                tasks_res = client.PullPendingTasks(
-                    request=PullPendingTasksRequest(
-                        wait_timeout_ms=_TASK_WAIT_TIMEOUT_MS
-                    )
-                )
-                if tasks_res.tasks:
-                    task = plugin.select_task(tasks_res.tasks)
-                else:
+                if has_capacity:
                     _backoff_after_fast_empty_poll(poll_started_at, task_poll_interval)
-                    sleep_after_poll = False
-
-            if task is not None and not use_combined_acquisition:
-                try:
-                    task_type = TaskType(task.type)
-                except ValueError:
-                    task_type = None
-                executor.wait_for_capacity(
-                    task_type=task_type,
-                    fab_hash=(
-                        task.fab_hash
-                        if isinstance(getattr(task, "fab_hash", None), str)
-                        and task.fab_hash
-                        else None
-                    ),
-                    insecure=insecure,
-                    root_certificates_path=root_certificates_path,
-                )
-
-                claim_req = ClaimTaskRequest(task_id=task.task_id)
-                try:
-                    claim_res = client.ClaimTask(claim_req)
-                except _SAFE_CONNECTION_ERRORS:
-                    log(WARNING, "Runtime connection unavailable during task claim")
+                else:
                     time.sleep(task_poll_interval)
-                    continue
-                except (httpx.TransportError, httpx.HTTPStatusError, ValueError) as err:
-                    if (
-                        isinstance(err, httpx.HTTPStatusError)
-                        and err.response.status_code < 500
-                    ):
-                        raise
-                    log(
-                        WARNING,
-                        "Task claim outcome unknown (%s); waiting for claim expiry",
-                        type(err).__name__,
-                    )
-                    _wait_for_claim_expiry(executor)
-                    continue
-                token = claim_res.token
-
-            # Launch only when the atomic claim granted a token.
-            if task is not None and token:
-                launch_result = plugin.launch_task(token=token, task=task)
-                _handle_launch_result(launch_result, task)
-                sleep_after_poll = False
-
-            # A completed long poll or launch needs no extra delay.
-            if sleep_after_poll:
-                time.sleep(task_poll_interval)
     finally:
         client.close()
         executor.close()

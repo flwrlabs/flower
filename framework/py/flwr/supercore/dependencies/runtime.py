@@ -31,14 +31,14 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    AcquireTaskResponse,
     GetConnectorRequest,
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
-    PullAndClaimTaskRequest,
-    PullAndClaimTaskResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -71,9 +71,9 @@ StateT_contra = TypeVar("StateT_contra", bound=CoreState, contravariant=True)
 class RuntimeHandlers(Protocol[StateT_contra]):
     """Component-specific handlers used by the shared Runtime API router."""
 
-    def pull_and_claim_task(
-        self, request: PullAndClaimTaskRequest, state: StateT_contra
-    ) -> PullAndClaimTaskResponse:
+    def acquire_task(
+        self, request: AcquireTaskRequest, state: StateT_contra
+    ) -> AcquireTaskResponse:
         """Claim the oldest supported pending task."""
 
     def pull_pending_tasks(

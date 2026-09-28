@@ -15,9 +15,8 @@
 """Shared Runtime API router."""
 
 import asyncio
-from collections.abc import Callable
 from time import monotonic
-from typing import Annotated, TypeVar
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from starlette.concurrency import run_in_threadpool
@@ -39,6 +38,8 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    AcquireTaskResponse,
     ClaimTaskRequest,
     ClaimTaskResponse,
     CreateTaskRequest,
@@ -49,8 +50,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
-    PullAndClaimTaskRequest,
-    PullAndClaimTaskResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
@@ -93,9 +92,9 @@ PullPendingTasksAuthDependency = Annotated[
     None,
     Depends(SuperExecAuthDependency("/flwr.proto.Runtime/PullPendingTasks")),
 ]
-PullAndClaimTaskAuthDependency = Annotated[
+AcquireTaskAuthDependency = Annotated[
     None,
-    Depends(SuperExecAuthDependency("/flwr.proto.Runtime/PullAndClaimTask")),
+    Depends(SuperExecAuthDependency("/flwr.proto.Runtime/AcquireTask")),
 ]
 ClaimTaskAuthDependency = Annotated[
     None,
@@ -104,27 +103,26 @@ ClaimTaskAuthDependency = Annotated[
 
 _MAX_TASK_WAIT_MS = 5_000
 _TASK_RECHECK_SECONDS = 0.2
-ResponseT = TypeVar("ResponseT")
 
 
 async def _wait_for_task(
-    wait_timeout_ms: int,
-    pull: Callable[[], ResponseT],
-    has_task: Callable[[ResponseT], bool],
-) -> ResponseT:
-    """Recheck shared state until work appears or the bounded wait expires.
+    request: AcquireTaskRequest,
+    state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
+) -> AcquireTaskResponse:
+    """Recheck shared state until eligible work appears or the bounded wait expires."""
+    if request.wait_timeout_ms <= 0 or not (
+        request.supported_task_types or request.agentapp_fab_hashes
+    ):
+        return await run_in_threadpool(handlers.acquire_task, request, state)
 
-    Local notifications wake the request promptly. Periodic reads also see tasks
-    created by other processes and dispatch due SuperLink automations. No database
-    transaction is held between reads.
-    """
-    deadline = monotonic() + min(wait_timeout_ms, _MAX_TASK_WAIT_MS) / 1_000
+    deadline = monotonic() + min(request.wait_timeout_ms, _MAX_TASK_WAIT_MS) / 1_000
     with subscribe_to_task_notifications() as task_event:
         while True:
             task_event.clear()
-            response = await run_in_threadpool(pull)
+            response = await run_in_threadpool(handlers.acquire_task, request, state)
             remaining = deadline - monotonic()
-            if has_task(response) or remaining <= 0:
+            if (response.HasField("task") and response.token) or remaining <= 0:
                 return response
             try:
                 await asyncio.wait_for(
@@ -135,33 +133,25 @@ async def _wait_for_task(
 
 
 @router.post("/pull-pending-tasks")
-async def pull_pending_tasks(
+def pull_pending_tasks(
     request: Annotated[PullPendingTasksRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
     handlers: RuntimeHandlersDependency,
     _auth: PullPendingTasksAuthDependency,
 ) -> PullPendingTasksResponse:
     """Pull pending tasks."""
-    return await _wait_for_task(
-        request.wait_timeout_ms,
-        lambda: handlers.pull_pending_tasks(request, state),
-        lambda response: bool(response.tasks),
-    )
+    return handlers.pull_pending_tasks(request, state)
 
 
-@router.post("/pull-and-claim-task")
-async def pull_and_claim_task(
-    request: Annotated[PullAndClaimTaskRequest, PROTOBUF_REQUEST_DEPENDENCY],
+@router.post("/acquire-task")
+async def acquire_task(
+    request: Annotated[AcquireTaskRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
     handlers: RuntimeHandlersDependency,
-    _auth: PullAndClaimTaskAuthDependency,
-) -> PullAndClaimTaskResponse:
-    """Pull and claim the oldest supported pending task."""
-    return await _wait_for_task(
-        request.wait_timeout_ms if request.supported_task_types else 0,
-        lambda: handlers.pull_and_claim_task(request, state),
-        lambda response: response.HasField("task") and bool(response.token),
-    )
+    _auth: AcquireTaskAuthDependency,
+) -> AcquireTaskResponse:
+    """Acquire the oldest eligible pending task."""
+    return await _wait_for_task(request, state, handlers)
 
 
 @router.post("/claim-task")

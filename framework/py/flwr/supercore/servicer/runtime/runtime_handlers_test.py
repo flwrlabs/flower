@@ -17,6 +17,7 @@
 
 import unittest
 from logging import ERROR
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
@@ -26,10 +27,10 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
     ClaimTaskRequest,
     CreateTaskRequest,
     CreateTaskResponse,
-    PullAndClaimTaskRequest,
     PullPendingTasksRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
@@ -62,11 +63,12 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
 
     def _create_connector_task(self, connector_ref: str) -> CreateTaskResponse:
         """Create a connector task as an authenticated AgentApp task."""
+        request = CreateTaskRequest(
+            type=TaskType.CONNECTOR,
+            connector_ref=connector_ref,
+        )
         return runtime_handlers.create_task(
-            CreateTaskRequest(
-                type=TaskType.CONNECTOR,
-                connector_ref=connector_ref,
-            ),
+            request,
             self.state,
             Mock(task_id=789, run_id=123, type=TaskType.AGENT_APP),
         )
@@ -93,10 +95,10 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(response.tasks), 1)
         self.assertEqual(response.tasks[0].task_id, 123)
 
-    def test_pull_and_claim_task_returns_empty_when_queue_is_empty(self) -> None:
+    def test_acquire_task_returns_empty_when_queue_is_empty(self) -> None:
         """An empty queue must not claim a task."""
-        response = runtime_handlers.pull_and_claim_task(
-            PullAndClaimTaskRequest(supported_task_types=[TaskType.MODEL]),
+        response = runtime_handlers.acquire_task(
+            AcquireTaskRequest(supported_task_types=[TaskType.MODEL]),
             self.state,
         )
 
@@ -104,7 +106,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(response.token)
         self.state.claim_task.assert_not_called()
 
-    def test_pull_and_claim_task_retries_after_lost_claim_race(self) -> None:
+    def test_acquire_task_retries_after_lost_claim_race(self) -> None:
         """A contender should try the next eligible task after losing a claim."""
         tasks = [
             Task(task_id=1, type=TaskType.MODEL),
@@ -114,8 +116,8 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.state.get_tasks.return_value = tasks
         self.state.claim_task.side_effect = [None, "task-token"]
 
-        response = runtime_handlers.pull_and_claim_task(
-            PullAndClaimTaskRequest(supported_task_types=[TaskType.MODEL]), self.state
+        response = runtime_handlers.acquire_task(
+            AcquireTaskRequest(supported_task_types=[TaskType.MODEL]), self.state
         )
 
         self.assertEqual(response.task, tasks[2])
@@ -124,6 +126,23 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [call.args[0] for call in self.state.claim_task.call_args_list], [1, 3]
         )
+
+    def test_acquire_task_matches_only_eligible_agentapp_fab(self) -> None:
+        """A FAB-specific warm slot must not claim an unrelated AgentApp."""
+        tasks = [
+            Task(task_id=1, type=TaskType.AGENT_APP, fab_hash="other"),
+            Task(task_id=2, type=TaskType.MODEL),
+            Task(task_id=3, type=TaskType.AGENT_APP, fab_hash="ready"),
+        ]
+        self.state.get_tasks.return_value = tasks
+        self.state.claim_task.return_value = "task-token"
+
+        response = runtime_handlers.acquire_task(
+            AcquireTaskRequest(agentapp_fab_hashes=["ready"]), self.state
+        )
+
+        self.assertEqual(response.task, tasks[2])
+        self.state.claim_task.assert_called_once_with(3)
 
     def test_claim_task_returns_token_when_claim_succeeds(self) -> None:
         """ClaimTask should return the token from state."""
@@ -193,6 +212,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             fab_hash=None,
             model_ref="models/abc",
             connector_ref=None,
+            connector_id=None,
             requesting_task_id=789,
         )
         self.assertEqual(response.task_id, 456)
@@ -221,13 +241,17 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                     fab_hash=None,
                     model_ref="model",
                     connector_ref=None,
+                    connector_id=None,
                     requesting_task_id=789,
                 )
                 self.assertEqual(response.task_id, 456)
 
-    def test_create_task_allows_bound_oauth_connector(self) -> None:
-        """CreateTask should allow an OAuth connector bound to the run."""
-        self.state.get_run_connector_refs.return_value = ["notion"]
+    def test_create_task_resolves_single_bound_oauth_connector(self) -> None:
+        """CreateTask should resolve the run-bound connector reference to its ID."""
+        self.state.get_run_connector_ids.return_value = [42]
+        self.state.get_connector_by_id.return_value = SimpleNamespace(
+            connector_ref="notion"
+        )
         self.state.create_task.return_value = 456
 
         with patch.object(
@@ -237,15 +261,16 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         ):
             response = self._create_connector_task("notion")
 
-        self.state.get_run_connector_refs.assert_called_once_with(run_id=123)
+        self.state.get_run_connector_ids.assert_called_once_with(123)
         self.assertEqual(
             self.state.create_task.call_args.kwargs["connector_ref"], "notion"
         )
+        self.assertEqual(self.state.create_task.call_args.kwargs["connector_id"], 42)
         self.assertEqual(response.task_id, 456)
 
     def test_create_task_rejects_unbound_oauth_connector(self) -> None:
         """CreateTask should reject OAuth credentials unavailable to the run."""
-        self.state.get_run_connector_refs.return_value = []
+        self.state.get_run_connector_ids.return_value = []
 
         with (
             patch.object(
@@ -269,7 +294,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             self._create_connector_task("unknown")
 
         self.assertEqual(error.exception.code, ApiErrorCode.CONNECTOR_NOT_FOUND)
-        self.state.get_run_connector_refs.assert_not_called()
+        self.state.get_run_connector_ids.assert_not_called()
         self.state.create_task.assert_not_called()
 
     def test_create_task_preserves_builtin_connector_access(self) -> None:
@@ -279,9 +304,9 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         for connector_ref in ("web_search", "filesystem"):
             with self.subTest(connector_ref=connector_ref):
                 response = self._create_connector_task(connector_ref)
-
-                self.state.get_run_connector_refs.assert_not_called()
                 self.assertEqual(response.task_id, 456)
+
+        self.state.get_run_connector_ids.assert_not_called()
 
     def test_create_task_propagates_state_error(self) -> None:
         """CreateTask should let state-layer run validation errors propagate."""
@@ -309,6 +334,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             fab_hash=None,
             model_ref="model",
             connector_ref=None,
+            connector_id=None,
             requesting_task_id=789,
         )
 
