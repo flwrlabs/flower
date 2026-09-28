@@ -354,15 +354,14 @@ def test_run_superexec_uses_configured_task_poll_interval(
         "elapsed",
         "partial_capacity",
         "task_poll_interval",
-        "expected_wait_ms",
         "expected_sleep",
     ),
     [
-        (0.1, False, None, 5_000, 1.0),
-        (5.0, False, None, 5_000, None),
-        (1.0, True, None, 1_000, None),
-        (5.0, False, "60", 5_000, 55.0),
-        (1.0, True, "60", 1_000, 59.0),
+        (0.1, False, None, 1.0),
+        (5.0, False, None, None),
+        (1.0, True, None, None),
+        (5.0, False, "60", 55.0),
+        (1.0, True, "60", 59.0),
     ],
 )
 def test_run_superexec_respects_interval_after_empty_acquisition(
@@ -370,7 +369,6 @@ def test_run_superexec_respects_interval_after_empty_acquisition(
     elapsed: float,
     partial_capacity: bool,
     task_poll_interval: str | None,
-    expected_wait_ms: int,
     expected_sleep: float | None,
 ) -> None:
     """The configured interval applies when a bounded long poll ends empty."""
@@ -411,7 +409,9 @@ def test_run_superexec_respects_interval_after_empty_acquisition(
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec("127.0.0.1:9091", insecure=True)
 
-    assert client.AcquireTask.call_args.args[0].wait_timeout_ms == expected_wait_ms
+    assert client.AcquireTask.call_args.args[0].wait_timeout_ms == (
+        1_000 if partial_capacity else 5_000
+    )
     if expected_sleep is None:
         sleep_mock.assert_not_called()
     else:
