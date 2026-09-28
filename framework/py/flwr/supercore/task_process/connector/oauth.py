@@ -150,50 +150,31 @@ class OAuthFlow:
         return credentials, config
 
     def _connection_name(self, token_payload: JSONObject, access_token: str) -> str:
-        """Resolve a readable name without failing OAuth if lookup is unavailable."""
-        fields = self._oauth.display_name_fields
-        if not fields:
-            return ""
+        """Read the connection name from the token or provider identity."""
         payload = token_payload
         url = self._oauth.display_name_url
         if url:
-            identity = self._fetch_identity(url, access_token)
-            if identity is None:
+            try:
+                response = requests.request(
+                    self._oauth.display_name_method,
+                    url,
+                    headers={
+                        **self._oauth.display_name_headers,
+                        "Authorization": f"Bearer {access_token}",
+                    },
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                payload = cast(JSONObject, response.json())
+            except (requests.RequestException, ValueError):
                 return ""
-            payload = identity
-        if payload.get("ok") is False or payload.get("active") is False:
-            return ""
 
         names: list[str] = []
-        for field in fields:
+        for field in self._oauth.display_name_fields:
             value = payload.get(field)
-            if not isinstance(value, str):
-                continue
-            name = value.strip()
-            if name:
-                names.append(name)
+            if isinstance(value, str) and value.strip():
+                names.append(value.strip())
         return " / ".join(names)
-
-    def _fetch_identity(self, url: str, access_token: str) -> JSONObject | None:
-        """Fetch the optional provider identity used for the connection name."""
-        try:
-            response = requests.request(
-                self._oauth.display_name_method,
-                url,
-                headers={
-                    **self._oauth.display_name_headers,
-                    "Authorization": f"Bearer {access_token}",
-                },
-                timeout=30.0,
-            )
-            if response.status_code >= 400:
-                return None
-            result = response.json()
-        except (requests.RequestException, ValueError):
-            return None
-        if not isinstance(result, dict):
-            return None
-        return cast(JSONObject, result)
 
     def _parse_token_response(
         self, payload: JSONObject
