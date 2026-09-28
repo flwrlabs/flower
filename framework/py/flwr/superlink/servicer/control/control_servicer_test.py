@@ -127,6 +127,7 @@ from .control_handlers import (
 from .control_servicer import ControlServicer
 
 CONNECTOR_FEDERATION_ID = "@bob/fed-a"
+OTHER_CONNECTOR_FEDERATION_ID = "@bob/fed-b"
 
 
 class _OAuthFlow:
@@ -310,18 +311,26 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             federation_id=CONNECTOR_FEDERATION_ID,
             connector_ref="slack",
             credentials_json='{"account":"first"}',
-            config_json="{}",
+            config_json='{"display_name":"Slack · First"}',
             created_by=self.aid,
         )
         second_id = self.state.create_connector(
             federation_id=CONNECTOR_FEDERATION_ID,
             connector_ref="slack",
             credentials_json='{"account":"second"}',
-            config_json="{}",
+            config_json='{"display_name":"Slack · Second"}',
+            created_by=self.aid,
+        )
+        other_id = self.state.create_connector(
+            federation_id=OTHER_CONNECTOR_FEDERATION_ID,
+            connector_ref="slack",
+            credentials_json='{"account":"other"}',
+            config_json='{"display_name":"Slack · Other"}',
             created_by=self.aid,
         )
         assert first_id is not None
         assert second_id is not None
+        assert other_id is not None
 
         response = self.servicer.ListConnectors(
             ListConnectorsRequest(federation=CONNECTOR_FEDERATION_ID), Mock()
@@ -332,6 +341,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [connector.connector_id for connector in connected],
             [first_id, second_id],
+        )
+        self.assertEqual(
+            [connector.display_name for connector in connected],
+            ["Slack · First", "Slack · Second"],
         )
 
         with self.assertRaises(FlowerError) as error:
@@ -365,6 +378,22 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             Mock(),
         )
         self.assertIsNone(self.state.get_connector_by_id(second_id))
+        self.assertIsNotNone(self.state.get_connector_by_id(other_id))
+
+    def test_list_connectors_falls_back_for_connections_without_names(self) -> None:
+        """Show the provider name for older connections without a saved name."""
+        connector_id = self.state.create_connector(
+            federation_id=CONNECTOR_FEDERATION_ID,
+            connector_ref="slack",
+            credentials_json="{}",
+            config_json="{}",
+            created_by=self.aid,
+        )
+        assert connector_id is not None
+        response = self.servicer.ListConnectors(
+            ListConnectorsRequest(federation=CONNECTOR_FEDERATION_ID), Mock()
+        )
+        self.assertEqual(response.connectors[0].display_name, "Slack")
 
     def test_list_connectors_without_federation_returns_empty(self) -> None:
         """ListConnectors should return no connectors without a federation."""

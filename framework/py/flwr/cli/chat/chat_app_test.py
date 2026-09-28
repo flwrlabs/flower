@@ -209,7 +209,7 @@ def test_chat_selects_connector_from_dropdown() -> None:
         connectors=[
             Connector(
                 connector_ref="github",
-                display_name="GitHub",
+                display_name="GitHub · octocat",
                 description="Search GitHub",
                 connected=True,
             ),
@@ -242,6 +242,7 @@ def test_chat_selects_connector_from_dropdown() -> None:
         chat.completer.get_completions(Document("/connector git"), CompleteEvent())
     )
     assert [completion.text for completion in completions] == ["github"]
+    assert completions[0].display_text == ("GitHub · octocat        Search GitHub")
 
     assert chat._handle_command(  # pylint: disable=protected-access
         event, "/connector github"
@@ -257,16 +258,15 @@ def test_chat_selects_connector_from_dropdown() -> None:
     assert chat._render_agent_name() == [  # pylint: disable=protected-access
         (
             "class:agent.name",
-            f" ✿ {CHAT_AGENT_NAME} · {_CHAT_FED_ID} · connectors: github, attio ",
+            f" ✿ {CHAT_AGENT_NAME} · {_CHAT_FED_ID} · "
+            "connectors: GitHub · octocat, Attio ",
         )
     ]
     clear_completions = list(
         chat.completer.get_completions(Document("/connector cl"), CompleteEvent())
     )
     assert [completion.text for completion in clear_completions] == ["clear"]
-    assert clear_completions[0].display_text == (
-        "clear         Clear selected connectors"
-    )
+    assert clear_completions[0].display_text.endswith("Clear selected connectors")
 
     assert chat._handle_command(  # pylint: disable=protected-access
         event, "/connector clear"
