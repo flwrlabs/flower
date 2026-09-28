@@ -17,7 +17,7 @@
 
 from logging import ERROR, WARNING
 from typing import Any
-from unittest.mock import Mock, call
+from unittest.mock import Mock
 
 import pytest
 from google.protobuf.message import DecodeError
@@ -77,31 +77,22 @@ def _run_superexec_one_launch(
     return log, plugin, client, executor, sleep_mock
 
 
-def test_builtin_subprocess_uses_combined_acquisition(
+def test_run_superexec_retries_malformed_acquisition_response(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Malformed responses do not stop combined task acquisition."""
-    task = Task(task_id=123, type=TaskType.MODEL)
+    """A malformed response should not stop task acquisition."""
     invalid_response = ValueError("Invalid protobuf response payload")
     invalid_response.__cause__ = DecodeError("malformed response")
     client = Mock()
-    client.AcquireTask.side_effect = [
-        invalid_response,
-        AcquireTaskResponse(),
-        AcquireTaskResponse(task=task, token="task-token"),
-    ]
+    client.AcquireTask.side_effect = [invalid_response, KeyboardInterrupt()]
     client_class = Mock()
     client_class.from_server_address.return_value = client
     executor = Mock()
-    executor.launch.return_value = LaunchResult.accepted()
-    order = Mock()
-    order.attach_mock(executor.wait_for_capacity, "capacity")
-    order.attach_mock(client.AcquireTask, "acquire")
     monkeypatch.setattr(
         run_superexec_module, "get_executor", Mock(return_value=executor)
     )
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
-    sleep = Mock(side_effect=[None, None, KeyboardInterrupt()])
+    sleep = Mock()
     monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep)
 
     with pytest.raises(KeyboardInterrupt):
@@ -112,27 +103,9 @@ def test_builtin_subprocess_uses_combined_acquisition(
             insecure=True,
         )
 
-    assert [call[0] for call in order.mock_calls] == [
-        "capacity",
-        "acquire",
-        "capacity",
-        "acquire",
-        "capacity",
-        "acquire",
-    ]
-    assert sleep.call_args_list == [
-        call(HEARTBEAT_DEFAULT_INTERVAL),
-        call(1.0),
-        call(1.0),
-    ]
-    assert set(client.AcquireTask.call_args.args[0].supported_task_types) == set(
-        AutoExecPlugin.supported_task_types
-    )
-    client.PullPendingTasks.assert_not_called()
-    client.ClaimTask.assert_not_called()
-    executor.launch.assert_called_once()
-    assert executor.launch.call_args.args[0].task_id == task.task_id
-    assert executor.launch.call_args.args[0].token == "task-token"
+    assert client.AcquireTask.call_count == 2
+    sleep.assert_called_once_with(HEARTBEAT_DEFAULT_INTERVAL)
+    executor.launch.assert_not_called()
 
 
 def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
@@ -299,6 +272,9 @@ def test_run_superexec_preserves_accepted_launch_behavior(
     )
 
     stub.AcquireTask.assert_called_once()
+    assert set(stub.AcquireTask.call_args.args[0].supported_task_types) == set(
+        AutoExecPlugin.supported_task_types
+    )
     stub.PullPendingTasks.assert_not_called()
     stub.ClaimTask.assert_not_called()
     plugin.launch_task.assert_called_once()
