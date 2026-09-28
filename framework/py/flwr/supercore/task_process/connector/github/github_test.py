@@ -175,7 +175,7 @@ def test_github_oauth_requests_no_scope() -> None:
             redirect_uri="https://example.com/callback",
             pkce_verifier="verifier",
         )
-    assert config == {}
+    assert not config
 
     token_response.json.return_value["scope"] = "repo"
     with (
