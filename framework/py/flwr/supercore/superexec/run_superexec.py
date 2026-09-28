@@ -145,12 +145,14 @@ def _wait_for_claim_expiry(executor: Executor) -> None:
         remaining -= interval
 
 
-def _backoff_after_fast_empty_poll(
-    started_at: float, task_poll_interval: float
-) -> None:
-    """Limit request rate when an older Runtime ignores the long-poll field."""
-    if monotonic() - started_at < 0.5:
+def _backoff_after_empty_poll(started_at: float, task_poll_interval: float) -> None:
+    """Honor the configured interval after an empty acquisition."""
+    elapsed = monotonic() - started_at
+    if elapsed < 0.5:
+        # An older Runtime may ignore the long-poll field and return immediately.
         time.sleep(max(task_poll_interval, 1.0))
+    elif elapsed < task_poll_interval:
+        time.sleep(task_poll_interval - elapsed)
 
 
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
@@ -333,7 +335,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                 _handle_launch_result(launch_result, combined_res.task)
             else:
                 if has_capacity:
-                    _backoff_after_fast_empty_poll(poll_started_at, task_poll_interval)
+                    _backoff_after_empty_poll(poll_started_at, task_poll_interval)
                 else:
                     time.sleep(task_poll_interval)
     finally:

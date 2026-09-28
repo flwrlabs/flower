@@ -350,16 +350,34 @@ def test_run_superexec_uses_configured_task_poll_interval(
 
 
 @pytest.mark.parametrize(
-    ("elapsed", "partial_capacity", "expected_wait_ms"),
-    [(0.1, False, 5_000), (5.0, False, 5_000), (1.0, True, 1_000)],
+    (
+        "elapsed",
+        "partial_capacity",
+        "task_poll_interval",
+        "expected_wait_ms",
+        "expected_sleep",
+    ),
+    [
+        (0.1, False, None, 5_000, 1.0),
+        (5.0, False, None, 5_000, None),
+        (1.0, True, None, 1_000, None),
+        (5.0, False, "60", 5_000, 55.0),
+        (1.0, True, "60", 1_000, 59.0),
+    ],
 )
-def test_run_superexec_sleeps_only_after_fast_empty_acquisition(
+def test_run_superexec_respects_interval_after_empty_acquisition(
     monkeypatch: pytest.MonkeyPatch,
     elapsed: float,
     partial_capacity: bool,
+    task_poll_interval: str | None,
     expected_wait_ms: int,
+    expected_sleep: float | None,
 ) -> None:
-    """A completed long poll is immediately followed by another capacity check."""
+    """The configured interval applies when a bounded long poll ends empty."""
+    if task_poll_interval is None:
+        monkeypatch.delenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", raising=False)
+    else:
+        monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", task_poll_interval)
     client = Mock()
     client.AcquireTask.return_value = AcquireTaskResponse()
     executor = Mock()
@@ -394,10 +412,10 @@ def test_run_superexec_sleeps_only_after_fast_empty_acquisition(
         run_superexec_module.run_superexec("127.0.0.1:9091", insecure=True)
 
     assert client.AcquireTask.call_args.args[0].wait_timeout_ms == expected_wait_ms
-    if elapsed < 0.5:
-        sleep_mock.assert_called_once_with(1.0)
-    else:
+    if expected_sleep is None:
         sleep_mock.assert_not_called()
+    else:
+        sleep_mock.assert_called_once_with(expected_sleep)
 
 
 @pytest.mark.parametrize(
