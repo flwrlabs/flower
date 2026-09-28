@@ -229,7 +229,10 @@ message StreamLogsResponse {
 }
 message ListRunsRequest {
   optional uint64 run_id = 1;
+  // Control HTTP defaults to 20 when listing runs and this field is absent.
   optional uint64 limit = 2;
+  // Skip this many newer runs when listing runs. Ignored when run_id is set.
+  optional uint64 skip = 3;
 }
 message ListRunsResponse {
   map<uint64, Run> run_dict = 1;

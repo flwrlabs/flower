@@ -1226,11 +1226,13 @@ def list_runs(
         # If no `run_id` is specified and account auth is enabled,
         # return run IDs for the authenticated account
         limit = request.limit if request.HasField("limit") else None
+        skip = request.skip if request.HasField("skip") else 0
         runs = state.get_run_info(
             flwr_aids=[flwr_aid],
             order_by="pending_at",
             ascending=False,
             limit=limit,
+            skip=skip,
         )
     # Build a set of run IDs for `flwr ls --run-id <run_id>`
     else:

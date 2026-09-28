@@ -156,6 +156,8 @@ def list_runs(
     account: AccountDependency,
 ) -> ListRunsResponse:
     """List runs."""
+    if not request.HasField("run_id") and not request.HasField("limit"):
+        request.limit = 20
     return control_handlers.list_runs(request, account, linkstate)
 
 

@@ -568,11 +568,15 @@ class StateTest(CoreStateTest):
         limited_runs = state.get_run_info(
             order_by="pending_at", ascending=True, limit=2
         )
+        second_page = state.get_run_info(
+            order_by="pending_at", ascending=False, limit=2, skip=1
+        )
 
         # Assert
         self.assertEqual([run.run_id for run in ascending_runs], run_ids)
         self.assertEqual([run.run_id for run in descending_runs], run_ids[::-1])
         self.assertEqual([run.run_id for run in limited_runs], run_ids[:2])
+        self.assertEqual([run.run_id for run in second_page], run_ids[1::-1])
 
     @parameterized.expand([(1,), (2,), (9999,)])  # type: ignore
     def test_get_run_info_limit_without_order_by(self, limit: int) -> None:

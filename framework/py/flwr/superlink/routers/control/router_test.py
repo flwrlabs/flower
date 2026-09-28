@@ -672,8 +672,18 @@ def test_non_protobuf_request_in_state_returns_internal_error() -> None:
     }
 
 
-def test_list_runs_returns_runs_from_linkstate() -> None:
-    """ListRuns serializes the runs returned by LinkState."""
+@pytest.mark.parametrize(
+    ("proto_request", "expected_limit", "expected_skip"),
+    [
+        (ListRunsRequest(), 20, 0),
+        (ListRunsRequest(limit=1), 1, 0),
+        (ListRunsRequest(limit=1, skip=2), 1, 2),
+    ],
+)
+def test_list_runs_returns_runs_from_linkstate(
+    proto_request: ListRunsRequest, expected_limit: int, expected_skip: int
+) -> None:
+    """ListRuns applies the default and requested pagination in Control HTTP."""
     linkstate = Mock(spec=LinkState)
     run = Run.create_empty(7)
     run.flwr_aid = _ACCOUNT.flwr_aid
@@ -684,7 +694,7 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
 
     response = client.post(
         "/v1/control/list-runs",
-        content=ListRunsRequest(limit=1).SerializeToString(),
+        content=proto_request.SerializeToString(),
         headers={
             "authorization": "Bearer access-token",
             "content-type": PROTOBUF_MEDIA_TYPE,
@@ -701,7 +711,8 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
         flwr_aids=[_ACCOUNT.flwr_aid],
         order_by="pending_at",
         ascending=False,
-        limit=1,
+        limit=expected_limit,
+        skip=expected_skip,
     )
 
 

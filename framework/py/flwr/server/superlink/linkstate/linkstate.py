@@ -367,6 +367,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
+        skip: int = 0,
     ) -> Sequence[Run]:
         """Retrieve information about runs based on the specified filters.
 
@@ -390,6 +391,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Whether sorting should be in ascending order.
         limit : Optional[int] (default: None)
             Maximum number of runs to return. If `None`, no limit is applied.
+        skip : int (default: 0)
+            Number of matching runs to skip before applying the limit.
 
         Returns
         -------
