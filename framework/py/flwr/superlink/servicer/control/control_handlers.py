@@ -21,7 +21,6 @@ import hashlib
 import json
 import secrets
 import time
-from collections import Counter
 from collections.abc import Callable, Generator, Sequence
 from datetime import UTC, datetime, timedelta
 from logging import ERROR, INFO, WARNING
@@ -229,45 +228,37 @@ def list_connectors(
         key=lambda item: item.connector_ref,
     ):
         connector_ref = flow.connector_ref
-        stored_connectors = state.get_connectors_by_ref(
-            request.federation, connector_ref
-        )
-        names = []
-        for stored_connector in stored_connectors:
-            try:
-                config = json.loads(stored_connector.config_json)
-            except (TypeError, ValueError):
-                config = {}
-            name = config.get("display_name") if isinstance(config, dict) else None
-            names.append(
-                name.strip()
-                if isinstance(name, str) and name.strip()
-                else flow.display_name
-            )
-        name_counts = Counter(names)
-        connectors.extend(
-            Connector(
-                connector_id=stored_connector.connector_id,
-                connector_ref=connector_ref,
-                display_name=(
-                    name
-                    if name_counts[name] == 1
-                    else f"{name} #{stored_connector.connector_id}"
-                ),
-                description=flow.description,
-                connected=True,
-            )
-            for stored_connector, name in zip(stored_connectors, names, strict=True)
+        stored_connector = state.get_connector(
+            federation_id=request.federation, connector_ref=connector_ref
         )
         connectors.append(
             Connector(
                 connector_ref=connector_ref,
-                display_name=flow.display_name,
+                display_name=(
+                    _connector_display_name(
+                        stored_connector.config_json, flow.display_name
+                    )
+                    if stored_connector is not None
+                    else flow.display_name
+                ),
                 description=flow.description,
-                connected=connected,
+                connected=stored_connector is not None,
             )
         )
     return ListConnectorsResponse(connectors=connectors)
+
+
+def _connector_display_name(config_json: str, fallback: str) -> str:
+    """Return the stored connection name, falling back to the provider name."""
+    try:
+        config = json.loads(config_json)
+    except (TypeError, ValueError):
+        return fallback
+    if isinstance(config, dict):
+        name = config.get("display_name")
+        if isinstance(name, str) and name.strip():
+            return name.strip()
+    return fallback
 
 
 def disconnect_connector(
