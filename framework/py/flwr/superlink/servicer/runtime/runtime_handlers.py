@@ -220,7 +220,11 @@ def get_connector(
 ) -> GetConnectorResponse:
     """Return credentials authorized for the authenticated connector task."""
     log(DEBUG, "Runtime.GetConnector")
-    if task.type != TaskType.CONNECTOR or not task.connector_ref:
+    if (
+        task.type != TaskType.CONNECTOR
+        or not task.connector_ref
+        or not task.connector_id
+    ):
         raise FlowerError(
             ApiErrorCode.RUNTIME_CONNECTOR_CREDENTIALS_NOT_AVAILABLE,
             "Connector credentials are not available to this task.",
@@ -232,14 +236,19 @@ def get_connector(
     if run is None or not run.federation_id:
         raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
 
-    connector = state.get_connector(
-        federation_id=run.federation_id,
-        connector_ref=connector_ref,
-    )
+    if task.connector_id not in state.get_run_connector_ids(task.run_id):
+        raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
+    connector = state.get_connector_by_id(task.connector_id)
     if connector is None:
+        raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
+    if (
+        connector.federation_id != run.federation_id
+        or connector.connector_ref != connector_ref
+    ):
         raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
 
     return GetConnectorResponse(
+        connector_id=connector.connector_id,
         connector_ref=connector.connector_ref,
         credentials_json=connector.credentials_json,
         config_json=connector.config_json,
@@ -269,6 +278,7 @@ def pull_task_input(
             fab=fab_to_proto(fab),
             federation_config=state.get_federation_config(run_id),
             task_id=task.task_id,
+            connector_ids=state.get_run_connector_ids(run_id),
         )
 
     raise FlowerError(
@@ -320,8 +330,9 @@ def start_automation(
 
     run = state.get_run_info(run_ids=[task.run_id])[0]
     del request.start_run_request.connector_refs[:]
-    request.start_run_request.connector_refs.extend(
-        state.get_run_connector_refs(run_id=run.run_id)
+    del request.start_run_request.connector_ids[:]
+    request.start_run_request.connector_ids.extend(
+        state.get_run_connector_ids(run_id=run.run_id)
     )
     return start_control_automation(
         request,
