@@ -1123,6 +1123,19 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertNotIn(task_id_2, task_ids)
         self.assertTrue(all(task.run_id == run_id_1 for task in tasks))
 
+    def test_get_tasks_filters_task_types(self) -> None:
+        """Task type filtering should exclude other types in every state backend."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        model_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        server_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
+        assert model_id and server_id
+
+        tasks = state.get_tasks(task_types=[TaskType.MODEL])
+
+        self.assertEqual([task.task_id for task in tasks], [model_id])
+        self.assertEqual(state.get_tasks(task_types=[]), [])
+
     def test_get_tasks_single_status_matches(self) -> None:
         """A single-item status sequence should match pending tasks."""
         state = self.state_factory()

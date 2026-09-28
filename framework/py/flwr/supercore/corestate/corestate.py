@@ -773,6 +773,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         *,
         task_ids: Sequence[int] | None = None,
         run_ids: Sequence[int] | None = None,
+        task_types: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
@@ -790,6 +791,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Sequence of task IDs to filter by.
         run_ids : Optional[Sequence[int]] (default: None)
             Sequence of run IDs to filter by.
+        task_types : Optional[Sequence[str]] (default: None)
+            Sequence of task types to filter by.
         statuses : Optional[Sequence[str]] (default: None)
             Sequence of task status values to filter by.
         order_by : Optional[Literal["pending_at"]] (default: None)

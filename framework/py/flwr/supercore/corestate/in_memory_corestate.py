@@ -1024,11 +1024,12 @@ class InMemoryCoreState(
             self.task_store[task_id] = task
             return task_id
 
-    def get_tasks(  # pylint: disable=too-many-arguments
+    def get_tasks(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches
         self,
         *,
         task_ids: Sequence[int] | None = None,
         run_ids: Sequence[int] | None = None,
+        task_types: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
@@ -1043,6 +1044,8 @@ class InMemoryCoreState(
 
         if isinstance(statuses, str):
             raise ValueError("`statuses` must be a sequence of strings")
+        if isinstance(task_types, str):
+            raise ValueError("`task_types` must be a sequence of strings")
 
         with self.lock_task_store:
             # Expire non-responsive tasks before getting tasks
@@ -1063,6 +1066,16 @@ class InMemoryCoreState(
                     task_id
                     for task_id in matched_task_ids
                     if self.task_store[task_id].run_id in run_id_set
+                }
+
+            if task_types is not None:
+                if not task_types:
+                    return []
+                task_type_set = set(task_types)
+                matched_task_ids &= {
+                    task_id
+                    for task_id in matched_task_ids
+                    if self.task_store[task_id].type in task_type_set
                 }
 
             if statuses is not None:

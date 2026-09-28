@@ -1340,6 +1340,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         *,
         task_ids: Sequence[int] | None = None,
         run_ids: Sequence[int] | None = None,
+        task_types: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
@@ -1354,6 +1355,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         if isinstance(statuses, str):
             raise ValueError("`statuses` must be a sequence of strings")
+        if isinstance(task_types, str):
+            raise ValueError("`task_types` must be a sequence of strings")
 
         query = select(TaskModel)
 
@@ -1370,6 +1373,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 uint64_to_int64(series_run_id) for series_run_id in run_ids
             ]
             query = query.where(TaskModel.run_id.in_(sint64_run_ids))
+
+        if task_types is not None:
+            if not task_types:
+                return []
+            query = query.where(TaskModel.type.in_(task_types))
 
         if statuses is not None:
             if not statuses:

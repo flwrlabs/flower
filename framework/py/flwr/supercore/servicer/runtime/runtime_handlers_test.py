@@ -121,6 +121,12 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(response.task, tasks[2])
         self.assertEqual(response.token, "task-token")
         self.assertEqual(self.state.claim_task.call_count, 2)
+        self.state.get_tasks.assert_called_once_with(
+            task_types=[TaskType.MODEL],
+            statuses=[Status.PENDING],
+            order_by="pending_at",
+            ascending=True,
+        )
         self.assertEqual(
             [call.args[0] for call in self.state.claim_task.call_args_list], [1, 3]
         )
@@ -140,6 +146,12 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
 
         self.assertEqual(response.task, tasks[2])
+        self.state.get_tasks.assert_called_once_with(
+            task_types=[TaskType.AGENT_APP],
+            statuses=[Status.PENDING],
+            order_by="pending_at",
+            ascending=True,
+        )
         self.state.claim_task.assert_called_once_with(3)
 
     def test_claim_task_returns_token_when_claim_succeeds(self) -> None:
