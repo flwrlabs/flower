@@ -308,7 +308,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_fab_hash: str | None = None
         self.agent_name = CHAT_AGENT_NAME
         self.local_agent: LocalAgent | None = None
-        self.selected_connectors: dict[str, Connector] = {}
+        self.selected_connector_by_ref: dict[str, Connector] = {}
         self.completer = _ChatCompleter(stub, self.federation, federations)
         self.input_buffer = Buffer(
             completer=ThreadedCompleter(self.completer),
@@ -547,7 +547,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
     def _handle_connector_command(self, event: KeyPressEvent, prompt: str) -> bool:
         """Show the connector selector or apply its selection."""
         if prompt.lower() == f"{CHAT_CONNECTOR_COMMAND} {CHAT_CONNECTOR_CLEAR}":
-            self.selected_connectors.clear()
+            self.selected_connector_by_ref.clear()
             event.app.invalidate()
             return True
 
@@ -581,7 +581,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             self._append_transcript("class:error", f"{exc.format_message()}\n\n")
             return True
 
-        self.selected_connectors[connector.connector_ref] = connector
+        self.selected_connector_by_ref[connector.connector_ref] = connector
         event.app.invalidate()
         return True
 
@@ -662,7 +662,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_fab_hash = None
         self.agent_name = CHAT_AGENT_NAME
         self.local_agent = None
-        self.selected_connectors.clear()
+        self.selected_connector_by_ref.clear()
         self.series_id = None
         self._clear_transcript()
         return True
@@ -822,7 +822,10 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             app_spec,
             fab_hash,
             fab_content,
-            [connector.connector_id for connector in self.selected_connectors.values()],
+            [
+                connector.connector_id
+                for connector in self.selected_connector_by_ref.values()
+            ],
         )
         if fab_content is not None:
             self.completer.invalidate_agents()
@@ -1000,9 +1003,9 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             " · connectors: "
             + ", ".join(
                 connector.display_name or connector.connector_ref
-                for connector in self.selected_connectors.values()
+                for connector in self.selected_connector_by_ref.values()
             )
-            if self.selected_connectors
+            if self.selected_connector_by_ref
             else ""
         )
         return [

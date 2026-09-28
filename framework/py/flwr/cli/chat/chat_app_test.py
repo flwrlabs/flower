@@ -256,7 +256,7 @@ def test_chat_selects_connector_from_dropdown() -> None:
     assert chat._handle_command(  # pylint: disable=protected-access
         event, "/connector 101"
     )
-    assert chat.selected_connectors["github"].connector_id == 101
+    assert chat.selected_connector_by_ref["github"].connector_id == 101
     assert chat._handle_command(  # pylint: disable=protected-access
         event, "/connector 201"
     )
@@ -264,7 +264,7 @@ def test_chat_selects_connector_from_dropdown() -> None:
         event, "/connector 102"
     )
     assert [
-        connector.connector_id for connector in chat.selected_connectors.values()
+        connector.connector_id for connector in chat.selected_connector_by_ref.values()
     ] == [102, 201]
     assert chat._render_agent_name() == [  # pylint: disable=protected-access
         (
@@ -282,7 +282,7 @@ def test_chat_selects_connector_from_dropdown() -> None:
     assert chat._handle_command(  # pylint: disable=protected-access
         event, "/connector clear"
     )
-    assert not chat.selected_connectors
+    assert not chat.selected_connector_by_ref
     assert chat._render_agent_name() == [  # pylint: disable=protected-access
         ("class:agent.name", f" ✿ {CHAT_AGENT_NAME} · {_CHAT_FED_ID} ")
     ]
@@ -333,14 +333,14 @@ def test_chat_queries_connectors_in_non_personal_federation() -> None:
     ]
     with patch.object(ChatApplication, "_create_application", return_value=application):
         chat = ChatApplication(stub, federations)
-    chat.selected_connectors["github"] = Connector(
+    chat.selected_connector_by_ref["github"] = Connector(
         connector_id=202, connector_ref="github"
     )
 
     assert chat._handle_command(  # pylint: disable=protected-access
         Mock(app=application), "/federation @flower/other"
     )
-    assert not chat.selected_connectors
+    assert not chat.selected_connector_by_ref
 
     assert chat._handle_command(  # pylint: disable=protected-access
         Mock(app=application), "/connector"
