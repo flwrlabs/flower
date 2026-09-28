@@ -119,6 +119,10 @@ service Control {
   // Show Federation
   rpc ShowFederation(ShowFederationRequest) returns (ShowFederationResponse) {}
 
+  // Set Federation icon
+  rpc SetFederationIcon(SetFederationIconRequest)
+      returns (SetFederationIconResponse) {}
+
   // Create Federation
   rpc CreateFederation(CreateFederationRequest)
       returns (CreateFederationResponse) {}
@@ -376,6 +380,12 @@ message ShowFederationResponse {
   Federation federation = 1;
   string now = 2;
 }
+
+message SetFederationIconRequest {
+  string federation_name = 1;
+  optional string icon_key = 2;
+}
+message SetFederationIconResponse {}
 
 message CreateFederationRequest {
   string federation_name = 1;

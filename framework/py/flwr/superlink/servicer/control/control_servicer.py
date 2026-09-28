@@ -80,6 +80,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SetFederationIconRequest,
+    SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
     StartAutomationRequest,
@@ -371,6 +373,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     ) -> ShowFederationResponse:
         """Show details of a specific Federation."""
         return control_handlers.show_federation(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def SetFederationIcon(
+        self, request: SetFederationIconRequest, context: grpc.ServicerContext
+    ) -> SetFederationIconResponse:
+        """Set or clear a federation icon."""
+        return control_handlers.set_federation_icon(
             request, _get_account(), self.linkstate_factory.state()
         )
 
