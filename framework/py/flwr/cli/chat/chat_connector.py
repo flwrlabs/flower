@@ -42,13 +42,12 @@ def complete_connectors(
     query: str, connectors: list[Connector]
 ) -> Iterable[Completion]:
     """Yield connected connectors matching a completion query."""
-    display_names = {
-        connector.connector_ref: connector.display_name or connector.connector_ref
-        for connector in connectors
-    }
     name_width = max(
         len(CHAT_CONNECTOR_CLEAR),
-        *(len(display_name) for display_name in display_names.values()),
+        *(
+            len(connector.display_name or connector.connector_ref)
+            for connector in connectors
+        ),
     )
     if CHAT_CONNECTOR_CLEAR.startswith(query.lower()):
         yield Completion(
@@ -60,13 +59,16 @@ def complete_connectors(
             ),
             selected_style="#ffffff bg:#dc8400 noreverse",
         )
+    normalized_query = query.lower()
     for connector in connectors:
-        display_name = display_names[connector.connector_ref]
-        if connector.connector_ref.lower().startswith(
-            query.lower()
-        ) or display_name.lower().startswith(query.lower()):
+        display_name = connector.display_name or connector.connector_ref
+        if (
+            connector.connector_ref.lower().startswith(normalized_query)
+            or display_name.lower().startswith(normalized_query)
+            or str(connector.connector_id).startswith(normalized_query)
+        ):
             yield Completion(
-                connector.connector_ref,
+                str(connector.connector_id),
                 start_position=-len(query),
                 display=(
                     f"{display_name:<{name_width}}        {connector.description}"
@@ -77,8 +79,8 @@ def complete_connectors(
 
 def select_connector(prompt: str, connectors: list[Connector]) -> Connector:
     """Return the connector selected by a command prompt."""
-    connector_ref = prompt[len(CHAT_CONNECTOR_COMMAND) :].strip()
+    connector_id = prompt[len(CHAT_CONNECTOR_COMMAND) :].strip()
     for connector in connectors:
-        if connector.connector_ref == connector_ref:
+        if str(connector.connector_id) == connector_id:
             return connector
-    raise click.ClickException(f"Unknown connector: {connector_ref}")
+    raise click.ClickException(f"Unknown connector: {connector_id}")
