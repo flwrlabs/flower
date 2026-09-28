@@ -127,6 +127,38 @@ def get_page_property(
     )
 
 
+def get_block(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """Retrieve one Notion block."""
+    block_id = require_string(arguments.get("block_id"), "Notion", "block_id")
+    return _call_notion_api(
+        "GET", f"/blocks/{quote(block_id, safe='')}", context.credentials
+    )
+
+
+def get_block_children(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """Retrieve one page of direct children for a Notion block or page."""
+    block_id = require_string(arguments.get("block_id"), "Notion", "block_id")
+    params: dict[str, str] = {}
+    if "page_size" in arguments:
+        params["page_size"] = str(
+            require_int_range(
+                arguments["page_size"], "Notion", "page_size", maximum=100
+            )
+        )
+    if cursor := optional_string(
+        arguments.get("start_cursor"), "Notion", "start_cursor"
+    ):
+        params["start_cursor"] = cursor
+    return _call_notion_api(
+        "GET",
+        f"/blocks/{quote(block_id, safe='')}/children",
+        context.credentials,
+        params=params,
+    )
+
+
 def list_users(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
     """List workspace users."""
     params: dict[str, str] = {}
@@ -160,6 +192,8 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
     "search": search,
     "get_page": get_page,
     "get_page_property": get_page_property,
+    "get_block": get_block,
+    "get_block_children": get_block_children,
     "list_users": list_users,
     "get_user": get_user,
     "get_self": get_self,
