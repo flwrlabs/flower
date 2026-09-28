@@ -47,17 +47,13 @@ def _run_superexec_one_launch(
     else:
         monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", task_poll_interval)
 
-    task = Mock()
-    task.task_id = 123
-    task.type = TaskType.AGENT_APP.value
-    task.fab_hash = "fab-hash"
+    task = Task(task_id=123, type=TaskType.AGENT_APP, fab_hash="fab-hash")
     client = Mock()
-    client.PullPendingTasks.return_value = Mock(tasks=[task])
-    client.ClaimTask.return_value = Mock(token="token-123")
+    client.AcquireTask.return_value = AcquireTaskResponse(task=task, token="token-123")
     client_class = Mock()
     client_class.from_server_address.return_value = client
     plugin = Mock()
-    plugin.select_task.return_value = task
+    plugin.supported_task_types = AutoExecPlugin.supported_task_types
     plugin.launch_task.return_value = launch_result
     log = Mock()
 
@@ -198,7 +194,7 @@ def test_run_superexec_adds_runtime_version_interceptor(
 ) -> None:
     """SuperExec should attach runtime version metadata to Runtime API calls."""
     client = Mock()
-    client.PullPendingTasks.side_effect = KeyboardInterrupt()
+    client.AcquireTask.side_effect = KeyboardInterrupt()
     client_class = Mock()
     captured: dict[str, Any] = {}
 
@@ -211,7 +207,7 @@ def test_run_superexec_adds_runtime_version_interceptor(
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
-            plugin_class=Mock(),
+            plugin_class=AutoExecPlugin,
             client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
@@ -233,7 +229,6 @@ def test_run_superexec_passes_executor_config_to_factory(
 ) -> None:
     """SuperExec should pass executor config and Runtime transport to the factory."""
     client = Mock()
-    client.PullPendingTasks.side_effect = KeyboardInterrupt()
     client_class = Mock()
     client_class.from_server_address.return_value = client
     executor_config: dict[str, object] = {
@@ -241,6 +236,9 @@ def test_run_superexec_passes_executor_config_to_factory(
         "image": "taskexecutor:dev",
     }
     get_executor = Mock(return_value=Mock())
+    get_executor.return_value.wait_for_eligible_capacity.side_effect = (
+        KeyboardInterrupt()
+    )
 
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
     monkeypatch.setattr(run_superexec_module, "get_executor", get_executor)
@@ -250,7 +248,7 @@ def test_run_superexec_passes_executor_config_to_factory(
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
-            plugin_class=Mock(),
+            plugin_class=AutoExecPlugin,
             client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=insecure,
@@ -283,7 +281,7 @@ def test_run_superexec_closes_executor_when_runtime_client_setup_fails(
 
     with pytest.raises(RuntimeError, match="Runtime unavailable"):
         run_superexec_module.run_superexec(
-            plugin_class=Mock(),
+            plugin_class=AutoExecPlugin,
             client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
@@ -300,13 +298,11 @@ def test_run_superexec_preserves_accepted_launch_behavior(
         monkeypatch, LaunchResult.accepted()
     )
 
-    stub.ClaimTask.assert_called_once()
-    plugin.select_task.assert_called_once()
-    stub.AcquireTask.assert_not_called()
+    stub.AcquireTask.assert_called_once()
+    stub.PullPendingTasks.assert_not_called()
+    stub.ClaimTask.assert_not_called()
     plugin.launch_task.assert_called_once()
     executor.wait_for_capacity.assert_called_once_with(
-        task_type=TaskType.AGENT_APP,
-        fab_hash="fab-hash",
         insecure=True,
         root_certificates_path=None,
     )
@@ -343,7 +339,7 @@ def test_run_superexec_logs_non_accepted_launch_result(
     """SuperExec should log non-accepted launch results and keep loop behavior."""
     log, plugin, stub, _, _ = _run_superexec_one_launch(monkeypatch, launch_result)
 
-    stub.ClaimTask.assert_called_once()
+    stub.AcquireTask.assert_called_once()
     plugin.launch_task.assert_called_once()
     log.assert_called_once()
     assert log.call_args.args[0] == expected_level
@@ -373,7 +369,7 @@ def test_run_superexec_rejects_invalid_task_poll_interval(
 
     with pytest.raises(ValueError, match="FLWR_SUPEREXEC_TASK_POLL_INTERVAL"):
         run_superexec_module.run_superexec(
-            plugin_class=Mock(),
+            plugin_class=AutoExecPlugin,
             client_class=Mock(),
             runtime_api_address="127.0.0.1:9091",
             insecure=True,

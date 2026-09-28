@@ -24,15 +24,11 @@ from typing import Any, cast
 from google.protobuf.message import DecodeError
 
 from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL, RUNTIME_DEPENDENCY_INSTALL
-from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    AcquireTaskRequest,
-    ClaimTaskRequest,
-    PullPendingTasksRequest,
-)
+from flwr.proto.runtime_pb2 import AcquireTaskRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import ExecutorType, TaskType
+from flwr.supercore.constant import ExecutorType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import (
@@ -47,7 +43,6 @@ from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 from .executor import KubernetesExecutor, LaunchResult, LaunchResultStatus, get_executor
 from .executor.config import ExecutorConfig
-from .plugin import AutoExecPlugin, ClientAppExecPlugin, ExecPlugin, ServerAppExecPlugin
 from .plugin.base_exec_plugin import BaseExecPlugin
 
 _TASK_POLL_INTERVAL_ENV = "FLWR_SUPEREXEC_TASK_POLL_INTERVAL"
@@ -135,7 +130,7 @@ def _handle_launch_result(result: LaunchResult, task: Task) -> None:
 
 
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
-    plugin_class: type[ExecPlugin],
+    plugin_class: type[BaseExecPlugin],
     client_class: type[RuntimeHttpClient],
     runtime_api_address: str,
     insecure: bool,
@@ -152,8 +147,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
     Parameters
     ----------
-    plugin_class : type[ExecPlugin]
-        The class of the SuperExec plugin to use.
+    plugin_class : type[BaseExecPlugin]
+        The task-type-aware SuperExec plugin to use.
     client_class : type[RuntimeHttpClient]
         The HTTP client class for the Runtime API.
     runtime_api_address : str
@@ -260,77 +255,42 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             message=f"Invalid plugin config: {e!r}",
         )
 
-    # Custom plugins may need to inspect the pending tasks before choosing one.
-    use_combined_acquisition = executor_type in (
-        ExecutorType.SUBPROCESS,
-        ExecutorType.KUBERNETES,
-    ) and plugin_class in (AutoExecPlugin, ClientAppExecPlugin, ServerAppExecPlugin)
-
     # Start the main loop
     try:
         while True:
             executor.reconcile()
             task = None
             token = None
-            if use_combined_acquisition:
-                supported_task_types = set(
-                    cast(BaseExecPlugin, plugin).supported_task_types
-                )
-                agentapp_fab_hashes: set[str] = set()
-                if executor_type == ExecutorType.KUBERNETES:
-                    supported_task_types, agentapp_fab_hashes = cast(
-                        KubernetesExecutor, executor
-                    ).wait_for_eligible_capacity(
-                        supported_task_types,
-                        insecure=insecure,
-                        root_certificates_path=root_certificates_path,
-                    )
-                else:
-                    executor.wait_for_capacity(
-                        insecure=insecure,
-                        root_certificates_path=root_certificates_path,
-                    )
-                try:
-                    combined_res = client.AcquireTask(
-                        AcquireTaskRequest(
-                            supported_task_types=sorted(supported_task_types),
-                            agentapp_fab_hashes=sorted(agentapp_fab_hashes),
-                        )
-                    )
-                except ValueError as exc:
-                    if not isinstance(exc.__cause__, DecodeError):
-                        raise
-                    log(WARNING, "Task acquisition outcome unknown: %s", exc)
-                    time.sleep(HEARTBEAT_DEFAULT_INTERVAL)
-                    continue
-                if combined_res.HasField("task") and combined_res.token:
-                    task, token = combined_res.task, combined_res.token
-            else:
-                # Preserve custom selection and task-specific capacity checks.
-                tasks_res = client.PullPendingTasks(request=PullPendingTasksRequest())
-                if tasks_res.tasks:
-                    task = plugin.select_task(tasks_res.tasks)
-
-            if task is not None and not use_combined_acquisition:
-                try:
-                    task_type = TaskType(task.type)
-                except ValueError:
-                    task_type = None
-                executor.wait_for_capacity(
-                    task_type=task_type,
-                    fab_hash=(
-                        task.fab_hash
-                        if isinstance(getattr(task, "fab_hash", None), str)
-                        and task.fab_hash
-                        else None
-                    ),
+            supported_task_types = set(plugin.supported_task_types)
+            agentapp_fab_hashes: set[str] = set()
+            if executor_type == ExecutorType.KUBERNETES:
+                supported_task_types, agentapp_fab_hashes = cast(
+                    KubernetesExecutor, executor
+                ).wait_for_eligible_capacity(
+                    supported_task_types,
                     insecure=insecure,
                     root_certificates_path=root_certificates_path,
                 )
-
-                claim_req = ClaimTaskRequest(task_id=task.task_id)
-                claim_res = client.ClaimTask(claim_req)
-                token = claim_res.token
+            else:
+                executor.wait_for_capacity(
+                    insecure=insecure,
+                    root_certificates_path=root_certificates_path,
+                )
+            try:
+                combined_res = client.AcquireTask(
+                    AcquireTaskRequest(
+                        supported_task_types=sorted(supported_task_types),
+                        agentapp_fab_hashes=sorted(agentapp_fab_hashes),
+                    )
+                )
+            except ValueError as exc:
+                if not isinstance(exc.__cause__, DecodeError):
+                    raise
+                log(WARNING, "Task acquisition outcome unknown: %s", exc)
+                time.sleep(HEARTBEAT_DEFAULT_INTERVAL)
+                continue
+            if combined_res.HasField("task") and combined_res.token:
+                task, token = combined_res.task, combined_res.token
 
             # Launch only when the atomic claim granted a token.
             if task is not None and token:

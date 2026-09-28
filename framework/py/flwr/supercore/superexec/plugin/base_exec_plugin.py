@@ -29,10 +29,7 @@ from .exec_plugin import ExecPlugin
 
 
 class BaseExecPlugin(ExecPlugin):
-    """Simple Flower SuperExec plugin for app processes.
-
-    The plugin always selects the first candidate task.
-    """
+    """Simple Flower SuperExec plugin for app processes."""
 
     # Placeholders to be defined in subclasses
     supported_task_types: ClassVar[frozenset[TaskType]]
@@ -62,12 +59,6 @@ class BaseExecPlugin(ExecPlugin):
         if not candidate_run_ids:
             return None
         return candidate_run_ids[0]
-
-    def select_task(self, candidate_tasks: Sequence[Task]) -> Task | None:
-        """Select a Task to execute from a sequence of candidates."""
-        if not candidate_tasks:
-            return None
-        return candidate_tasks[0]
 
     def launch_task(self, token: str, task: Task) -> LaunchResult:
         """Launch the process to execute the given task using the given token."""
