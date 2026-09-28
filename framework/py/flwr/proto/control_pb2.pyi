@@ -336,7 +336,9 @@ class ListRunsRequest(google.protobuf.message.Message):
     SKIP_FIELD_NUMBER: builtins.int
     run_id: builtins.int
     limit: builtins.int
+    """Control HTTP defaults to 20 when listing runs and this field is absent."""
     skip: builtins.int
+    """Skip this many newer runs when listing runs. Ignored when run_id is set."""
     def __init__(
         self,
         *,
