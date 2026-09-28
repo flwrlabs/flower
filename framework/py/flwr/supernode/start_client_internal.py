@@ -42,6 +42,7 @@ from flwr.common.constant import (
     TRANSPORT_TYPE_GRPC_RERE,
     TRANSPORT_TYPES,
     ErrorCode,
+    SubStatus,
 )
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore import log
@@ -408,6 +409,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             else TaskType.CLIENT_APP
         )
         failure_stage = "Pulling message objects failed"
+        reserved_task_id = None
         try:
             # Pull and store objects of the message in the ObjectStore
             obj_contents = pull_objects(
@@ -416,6 +418,14 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             )
             for obj_id in list(obj_contents.keys()):
                 object_store.put(obj_id, obj_contents.pop(obj_id))
+            reserved_task_id = state.reserve_task(
+                task_type=task_type, run_id=run_id, fab_hash=run_info.fab_hash
+            )
+            if reserved_task_id is None:
+                log(ERROR, "Failed to reserve task for run ID %s.", run_id)
+                state.delete_messages(message_ids=[message.metadata.message_id])
+                object_store.delete(message.metadata.message_id)
+                return None
             failure_stage = "Confirming message receipt failed"
             confirm_message_received(run_id, message.metadata.message_id)
         except Exception as err:  # pylint: disable=broad-except
@@ -427,29 +437,21 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             )
             state.delete_messages(message_ids=[message.metadata.message_id])
             object_store.delete(message.metadata.message_id)
-            # Record the failure without publishing a pending task to executors.
-            state.create_task(
-                task_type=task_type,
-                run_id=run_id,
-                fab_hash=run_info.fab_hash,
-                failure_details=f"{failure_stage}: {err}",
-            )
+            details = f"{failure_stage}: {err}"
+            if reserved_task_id is None:
+                state.create_task(
+                    task_type=task_type,
+                    run_id=run_id,
+                    fab_hash=run_info.fab_hash,
+                    failure_details=details,
+                )
+            else:
+                state.finish_task(reserved_task_id, SubStatus.FAILED, details)
             return None
 
-        # Publish a pending task only after its objects and confirmation are ready.
-        task_id = state.create_task(
-            task_type=task_type, run_id=run_id, fab_hash=run_info.fab_hash
-        )
-        if task_id is None:
-            # Task creation can fail if the generated uint64 task ID collides
-            log(
-                ERROR,
-                "Failed to create task for run ID %s. The message will not be "
-                "processed.",
-                run_id,
-            )
-            state.delete_messages(message_ids=[message.metadata.message_id])
-            object_store.delete(message.metadata.message_id)
+        # Publish only after the message and its objects are ready.
+        if not state.publish_task(reserved_task_id):
+            log(ERROR, "Failed to publish reserved task for run ID %s.", run_id)
             return None
 
         log(INFO, "Received successfully")

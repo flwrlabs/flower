@@ -58,6 +58,30 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         assert self.state.claim_task(task_id) is not None
         return task_id
 
+    def test_reserved_task_is_hidden_until_published(self) -> None:
+        """A reserved task cannot be acquired before message confirmation."""
+        with patch(
+            "flwr.supercore.corestate.in_memory_corestate.notify_task_available"
+        ) as notify:
+            task_id = self.state.reserve_task(TaskType.CLIENT_APP, run_id=42)
+            assert task_id is not None
+            self.assertFalse(self.state.get_tasks(task_ids=[task_id]))
+            self.assertIsNone(self.state.claim_task(task_id))
+            notify.assert_not_called()
+
+            self.assertTrue(self.state.publish_task(task_id))
+            notify.assert_called_once()
+            self.assertEqual(len(self.state.get_tasks(task_ids=[task_id])), 1)
+            self.assertIsNotNone(self.state.claim_task(task_id))
+
+            failed_task_id = self.state.reserve_task(TaskType.CLIENT_APP, run_id=42)
+            assert failed_task_id is not None
+            self.assertTrue(
+                self.state.finish_task(failed_task_id, SubStatus.FAILED, "")
+            )
+            self.assertFalse(self.state.publish_task(failed_task_id))
+            notify.assert_called_once()
+
     def test_get_set_node_id(self) -> None:
         """Test set_node_id."""
         # Prepare

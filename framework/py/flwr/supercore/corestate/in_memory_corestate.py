@@ -153,6 +153,7 @@ class InMemoryCoreState(
         self.lock_automation_store = RLock()
         self._next_automation_id = 1
         self.task_store: dict[int, Task] = {}
+        self._unpublished_task_ids: set[int] = set()
         # Store task ID to token mapping
         self.task_token_store: dict[int, TokenRecord] = {}
         # Store token to task ID mapping
@@ -1016,6 +1017,7 @@ class InMemoryCoreState(
         connector_id: int | None = None,
         requesting_task_id: int | None = None,
         failure_details: str | None = None,
+        publish: bool = True,
     ) -> int | None:
         """Create a task and return its ID."""
         with self.lock_task_store:
@@ -1028,6 +1030,8 @@ class InMemoryCoreState(
                     return None
 
             task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
+            if task_id in self.task_store:
+                return None
             created_at = now().isoformat()
             failed = failure_details is not None
 
@@ -1049,10 +1053,27 @@ class InMemoryCoreState(
             )
 
             self.task_store[task_id] = task
+            if not publish and not failed:
+                self._unpublished_task_ids.add(task_id)
 
-        if not failed:
+        if not failed and publish:
             notify_task_available()
         return task_id
+
+    def publish_task(self, task_id: int) -> bool:
+        """Make a reserved pending task visible to acquisition requests."""
+        with self.lock_task_store:
+            task = self.task_store.get(task_id)
+            if (
+                task_id not in self._unpublished_task_ids
+                or task is None
+                or task.status.status != Status.PENDING
+            ):
+                return False
+            task.pending_at = now().isoformat()
+            self._unpublished_task_ids.remove(task_id)
+        notify_task_available()
+        return True
 
     def get_tasks(  # pylint: disable=too-many-arguments
         self,
@@ -1078,7 +1099,7 @@ class InMemoryCoreState(
             # Expire non-responsive tasks before getting tasks
             self._cleanup_expired_task_tokens_locked()
 
-            matched_task_ids = set(self.task_store.keys())
+            matched_task_ids = set(self.task_store.keys()) - self._unpublished_task_ids
 
             if task_ids is not None:
                 if not task_ids:
@@ -1171,7 +1192,11 @@ class InMemoryCoreState(
         token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
         with self.lock_task_store:
             task = self.task_store.get(task_id)
-            if task is None or task_id in self.task_token_store:
+            if (
+                task is None
+                or task_id in self.task_token_store
+                or task_id in self._unpublished_task_ids
+            ):
                 return None
             if task.status.status != Status.PENDING:
                 return None
@@ -1234,6 +1259,7 @@ class InMemoryCoreState(
                     return False
 
             task.finished_at = now().isoformat()
+            self._unpublished_task_ids.discard(task_id)
             task.status.CopyFrom(
                 TaskStatus(
                     status=Status.FINISHED, sub_status=sub_status, details=details

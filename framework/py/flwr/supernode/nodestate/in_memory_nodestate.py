@@ -74,6 +74,18 @@ class InMemoryNodeState(
         self.time_store: dict[str, TimeEntry] = {}
         self.lock_time_store = Lock()
 
+    def reserve_task(
+        self, task_type: str, run_id: int, fab_hash: str | None = None
+    ) -> int | None:
+        """Create a task without exposing it to a SuperExec."""
+        return InMemoryCoreState.create_task(
+            self, task_type=task_type, run_id=run_id, fab_hash=fab_hash, publish=False
+        )
+
+    def publish_task(self, task_id: int) -> bool:
+        """Make a reserved task eligible for acquisition."""
+        return InMemoryCoreState.publish_task(self, task_id)
+
     def set_node_id(self, node_id: int | None) -> None:
         """Set the node ID."""
         self.node_id = node_id
