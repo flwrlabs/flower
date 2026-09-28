@@ -400,6 +400,7 @@ class KubernetesExecutor:
         self._config = config
         self._completed_pod_sweeper = CompletedPodSweeper(client=client, config=config)
         self._last_completed_pod_sweep_at: float | None = None
+        self._last_capacity_log_at: float | None = None
         self._warm_executor_pool_manager = (
             _WarmExecutorPoolManager(
                 client, config, self._active_pod_count, exec_client
@@ -425,6 +426,72 @@ class KubernetesExecutor:
             ),
             reconcile_warm_pools=True,
         )
+
+    def get_eligible_capacity(
+        self,
+        supported_task_types: set[TaskType],
+        *,
+        insecure: bool = False,
+        root_certificates_path: str | None = None,
+    ) -> tuple[set[TaskType], set[str]]:
+        """Return task types and FABs with a cold slot or ready warm Pod."""
+        self._sweep_completed_pods_if_due()
+        manager = self._warm_executor_pool_manager
+        if manager is not None:
+            manager.ensure_capacity(reserved_pod_capacity=1)
+        if manager is not None:
+            manager.retry_retiring_pods()
+        if self._config.active_pod_budget is None:
+            return supported_task_types, set()
+        try:
+            active_pod_count = self._active_pod_count()
+        except Exception:  # pylint: disable=broad-exception-caught
+            log(
+                WARNING,
+                "Kubernetes capacity check failed; proceeding without waiting. "
+                "selector=%s",
+                _capacity_label_selector(self._config),
+                exc_info=True,
+            )
+            return supported_task_types, set()
+        if active_pod_count < self._config.active_pod_budget:
+            return supported_task_types, set()
+        if manager is not None and self._can_dispatch_warm(
+            insecure, root_certificates_path
+        ):
+            ready_keys = manager.ready_pool_keys()
+            ready_types = {
+                key.task_type
+                for key in ready_keys
+                if key.fab_hash is None and key.task_type in supported_task_types
+            }
+            ready_fabs = {
+                key.fab_hash
+                for key in ready_keys
+                if key.fab_hash is not None
+                and key.task_type == TaskType.AGENT_APP
+                and key.task_type in supported_task_types
+            }
+            if ready_types or ready_fabs:
+                return ready_types, ready_fabs
+
+        if self._config.capacity_log_interval is not None:
+            now = self._config.monotonic()
+            if (
+                self._last_capacity_log_at is None
+                or now - self._last_capacity_log_at
+                >= self._config.capacity_log_interval
+            ):
+                log(
+                    INFO,
+                    "Waiting for Kubernetes TaskExecutor capacity: "
+                    "%s active Pods, budget %s, selector %s",
+                    active_pod_count,
+                    self._config.active_pod_budget,
+                    _capacity_label_selector(self._config),
+                )
+                self._last_capacity_log_at = now
+        return set(), set()
 
     def reconcile(self) -> None:
         """Maintain warm capacity even when there are no pending tasks."""

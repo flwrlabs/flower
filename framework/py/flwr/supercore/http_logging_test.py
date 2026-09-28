@@ -47,6 +47,7 @@ def _access_record(path: str, status_code: object) -> logging.LogRecord:
         ("/health", 200, False),
         ("/health?probe=readiness", "200", False),
         ("/v1/runtime/pull-pending-tasks", 200, False),
+        ("/v1/runtime/acquire-task", 200, False),
         ("/v1/runtime/pull-pending-tasks?timeout=1", "200", False),
         ("/v1/runtime/get-nodes", 200, False),
         ("/v1/runtime/get-nodes?node_id=1", "200", False),

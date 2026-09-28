@@ -14,12 +14,26 @@
 # ===============================================================================
 """Attio connector definition."""
 
+from flwr.supercore.typing import JSONObject
+
 from ..definition import ConnectorDefinition, OAuth2Definition, ProviderDefinition
 from ..oauth import load_oauth_flow
 from .actions import ACTIONS
 from .executors import EXECUTORS
 
 ATTIO_CONNECTOR_REF = "attio"
+
+
+def _attio_display_name(payload: JSONObject) -> str:
+    """Prefer workspace names, falling back to the token's workspace ID."""
+    data = payload.get("data")
+    workspace = data.get("workspace") if isinstance(data, dict) else None
+    if isinstance(workspace, dict):
+        name = workspace.get("name") or workspace.get("id")
+    else:
+        name = payload.get("workspace_name") or payload.get("sub")
+    return name.strip() if isinstance(name, str) else ""
+
 
 PROVIDER = ProviderDefinition(
     ref=ATTIO_CONNECTOR_REF,
@@ -33,6 +47,8 @@ PROVIDER = ProviderDefinition(
         client_secret_env="FLWR_ATTIO_CLIENT_SECRET",
         redirect_uri_env="FLWR_ATTIO_REDIRECT_URI",
         token_auth_method="client_secret_post",
+        display_name_url="https://api.attio.com/v2/self",
+        display_name_resolver=_attio_display_name,
     ),
 )
 

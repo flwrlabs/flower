@@ -199,3 +199,16 @@ def test_supernode_agent_grid_only_pushes_one_reply() -> None:
         sent[0].content[AGENT_MESSAGE_CONTENT_RECORD_KEY][AGENT_MESSAGE_TEXT_KEY]
         == "done"
     )
+
+    repeated = agent_grid.call(
+        {
+            "name": "push_reply_message",
+            "call_id": "call-2",
+            "arguments": {"payload": "again"},
+        }
+    )
+    assert repeated["output"] == (
+        '{"message_id":null,"error":"No instruction message to reply to. '
+        'You may have already replied to it once."}'
+    )
+    grid.push_messages.assert_called_once()

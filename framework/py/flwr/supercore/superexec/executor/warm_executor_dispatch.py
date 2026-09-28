@@ -538,6 +538,21 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
                 for pod in pods
             )
 
+    def ready_pool_keys(self) -> set[WarmExecutorPoolKey]:
+        """Return compatible pool keys with a Pod ready for dispatch."""
+        with self._lock:
+            if self._closed:
+                return set()
+            pods = self._owned_warm_pods()
+            if pods is None:
+                return set()
+            return {
+                pool.key
+                for pool in self._pools.values()
+                if pool.key.runtime_image == self._config.image
+                and any(self._is_dispatchable(pod, pool.key) for pod in pods)
+            }
+
     def close(self) -> None:
         """Stop dispatch and delete only idle Pods owned by this SuperExec."""
         with self._lock:

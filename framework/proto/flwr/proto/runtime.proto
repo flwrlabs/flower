@@ -120,3 +120,15 @@ message CreateTaskRequest {
   optional uint64 connector_id = 5;
 }
 message CreateTaskResponse { optional uint64 task_id = 1; }
+
+// AcquireTask messages
+message AcquireTaskRequest {
+  // Task types that can be launched regardless of FAB.
+  repeated string supported_task_types = 1;
+  // AgentApp FABs that can be launched by a ready prestarted executor.
+  repeated string agentapp_fab_hashes = 2;
+}
+message AcquireTaskResponse {
+  Task task = 1;
+  string token = 2;
+}

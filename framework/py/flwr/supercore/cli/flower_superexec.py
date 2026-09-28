@@ -32,13 +32,11 @@ from flwr.supercore.auth import (
 from flwr.supercore.constant import EXEC_PLUGIN_SECTION, ExecutorType
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
-from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.superexec.executor.config import (
     ExecutorConfig,
     ExecutorConfigError,
     load_executor_config,
 )
-from flwr.supercore.superexec.plugin import AutoExecPlugin
 from flwr.supercore.superexec.run_superexec import run_superexec
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.update_check import warn_if_flwr_update_available
@@ -106,8 +104,6 @@ def flower_superexec() -> None:
             )
 
     run_superexec(
-        plugin_class=AutoExecPlugin,
-        client_class=RuntimeHttpClient,
         runtime_api_address=args.runtime_api_address,
         insecure=args.insecure,
         root_certificates_path=args.root_certificates,

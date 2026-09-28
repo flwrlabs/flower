@@ -39,6 +39,8 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    AcquireTaskResponse,
     GetConnectorRequest,
     GetConnectorResponse,
     GetNodesRequest,
@@ -69,6 +71,11 @@ def pull_pending_tasks(
 ) -> PullPendingTasksResponse:
     """Pull pending tasks."""
     return core_runtime_handlers.pull_pending_tasks(request, state)
+
+
+def acquire_task(request: AcquireTaskRequest, state: NodeState) -> AcquireTaskResponse:
+    """Acquire an eligible pending task."""
+    return core_runtime_handlers.acquire_task(request, state)
 
 
 def pull_task_input(

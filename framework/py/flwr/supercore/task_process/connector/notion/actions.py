@@ -165,6 +165,22 @@ ACTIONS = (
         },
     ),
     ActionDefinition(
+        name="get_database",
+        description=(
+            "Retrieve a Notion database container, including its metadata and "
+            "data source IDs and names. This does not return database rows."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "database_id": string_property("The database ID to retrieve."),
+            },
+            "required": ["database_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
         name="get_block",
         description=(
             "Retrieve a single Notion block. If has_children is true, use "
