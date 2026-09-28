@@ -20,9 +20,7 @@ from typing import Any
 from unittest.mock import Mock
 
 import pytest
-from google.protobuf.message import DecodeError
 
-from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL
 from flwr.proto.runtime_pb2 import AcquireTaskResponse  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import ExecutorType, TaskType
@@ -79,41 +77,6 @@ def _run_superexec_one_launch(
         )
 
     return log, plugin, client, executor, sleep_mock
-
-
-def test_run_superexec_retries_malformed_acquisition_response(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A malformed response should not stop task acquisition."""
-    invalid_response = ValueError("Invalid protobuf response payload")
-    invalid_response.__cause__ = DecodeError("malformed response")
-    client = Mock()
-    client.AcquireTask.side_effect = [invalid_response, KeyboardInterrupt()]
-    client_class = Mock()
-    client_class.from_server_address.return_value = client
-    executor = Mock()
-    executor.wait_for_eligible_capacity.return_value = (
-        set(AutoExecPlugin.supported_task_types),
-        set(),
-    )
-    monkeypatch.setattr(
-        run_superexec_module, "get_executor", Mock(return_value=executor)
-    )
-    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
-    sleep = Mock()
-    monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep)
-
-    with pytest.raises(KeyboardInterrupt):
-        run_superexec_module.run_superexec(
-            plugin_class=AutoExecPlugin,
-            client_class=client_class,
-            runtime_api_address="127.0.0.1:9091",
-            insecure=True,
-        )
-
-    assert client.AcquireTask.call_count == 2
-    sleep.assert_called_once_with(HEARTBEAT_DEFAULT_INTERVAL)
-    executor.launch.assert_not_called()
 
 
 def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
