@@ -19,7 +19,7 @@ import math
 import os
 import time
 from logging import ERROR, WARNING
-from typing import Any, cast
+from typing import Any
 
 from google.protobuf.message import DecodeError
 
@@ -41,7 +41,7 @@ from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
-from .executor import KubernetesExecutor, LaunchResult, LaunchResultStatus, get_executor
+from .executor import LaunchResult, LaunchResultStatus, get_executor
 from .executor.config import ExecutorConfig
 from .plugin.base_exec_plugin import BaseExecPlugin
 
@@ -261,21 +261,13 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             executor.reconcile()
             task = None
             token = None
-            supported_task_types = set(plugin.supported_task_types)
-            agentapp_fab_hashes: set[str] = set()
-            if executor_type == ExecutorType.KUBERNETES:
-                supported_task_types, agentapp_fab_hashes = cast(
-                    KubernetesExecutor, executor
-                ).wait_for_eligible_capacity(
-                    supported_task_types,
+            supported_task_types, agentapp_fab_hashes = (
+                executor.wait_for_eligible_capacity(
+                    set(plugin.supported_task_types),
                     insecure=insecure,
                     root_certificates_path=root_certificates_path,
                 )
-            else:
-                executor.wait_for_capacity(
-                    insecure=insecure,
-                    root_certificates_path=root_certificates_path,
-                )
+            )
             try:
                 combined_res = client.AcquireTask(
                     AcquireTaskRequest(

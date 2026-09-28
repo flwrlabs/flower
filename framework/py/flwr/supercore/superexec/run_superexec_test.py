@@ -59,6 +59,10 @@ def _run_superexec_one_launch(
 
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
     executor = Mock()
+    executor.wait_for_eligible_capacity.return_value = (
+        set(AutoExecPlugin.supported_task_types),
+        set(),
+    )
     monkeypatch.setattr(
         run_superexec_module, "get_executor", Mock(return_value=executor)
     )
@@ -88,6 +92,10 @@ def test_run_superexec_retries_malformed_acquisition_response(
     client_class = Mock()
     client_class.from_server_address.return_value = client
     executor = Mock()
+    executor.wait_for_eligible_capacity.return_value = (
+        set(AutoExecPlugin.supported_task_types),
+        set(),
+    )
     monkeypatch.setattr(
         run_superexec_module, "get_executor", Mock(return_value=executor)
     )
@@ -279,7 +287,8 @@ def test_run_superexec_preserves_accepted_launch_behavior(
     stub.PullPendingTasks.assert_not_called()
     stub.ClaimTask.assert_not_called()
     plugin.launch_task.assert_called_once()
-    executor.wait_for_capacity.assert_called_once_with(
+    executor.wait_for_eligible_capacity.assert_called_once_with(
+        set(AutoExecPlugin.supported_task_types),
         insecure=True,
         root_certificates_path=None,
     )
