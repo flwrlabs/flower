@@ -90,6 +90,7 @@ class OAuth2Definition:
     display_name_url: str | None = None
     display_name_method: Literal["GET", "POST"] = "GET"
     display_name_headers: Mapping[str, str] = field(default_factory=dict)
+    display_name_resolver: Callable[[JSONObject], str] | None = None
 
 
 @dataclass(frozen=True)

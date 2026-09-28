@@ -151,6 +151,7 @@ class OAuthFlow:
 
     def _connection_name(self, token_payload: JSONObject, access_token: str) -> str:
         """Read the connection name from the token or provider identity."""
+        # Names can come from the token response or a separate lookup.
         payload = token_payload
         url = self._oauth.display_name_url
         if url:
@@ -167,7 +168,11 @@ class OAuthFlow:
                 response.raise_for_status()
                 payload = cast(JSONObject, response.json())
             except (requests.RequestException, ValueError):
+                # A name lookup failure should not invalidate the OAuth connection.
                 return ""
+
+        if self._oauth.display_name_resolver is not None:
+            return self._oauth.display_name_resolver(payload)
 
         names: list[str] = []
         for field in self._oauth.display_name_fields:
