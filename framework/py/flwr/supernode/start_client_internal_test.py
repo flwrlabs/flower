@@ -23,7 +23,7 @@ import pytest
 
 from flwr.app import ArrayRecord, ConfigRecord, Context, Message, Metadata, RecordDict
 from flwr.app.message import make_message, remove_content_from_message
-from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE, SubStatus
+from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE
 from flwr.supercore.constant import TaskType
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
@@ -242,16 +242,13 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             task_type=TaskType.CLIENT_APP,
             run_id=self.run_id,
             fab_hash=fab_hash,
+            failure_details="Pulling message objects failed: error",
         )
         self.mock_state.delete_messages.assert_called_once_with(
             message_ids=[message_id]
         )
         self.mock_object_store.delete.assert_called_once_with(message_id)
-        self.mock_state.finish_task.assert_called_once_with(
-            task_id,
-            sub_status=SubStatus.FAILED,
-            details="Pulling message objects failed: error",
-        )
+        self.mock_state.finish_task.assert_not_called()
         self.mock_confirm_message_received.assert_not_called()
 
     def test_pull_and_store_message_with_unknown_run_id(self) -> None:

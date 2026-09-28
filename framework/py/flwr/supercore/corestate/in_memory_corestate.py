@@ -1015,6 +1015,7 @@ class InMemoryCoreState(
         connector_ref: str | None = None,
         connector_id: int | None = None,
         requesting_task_id: int | None = None,
+        failure_details: str | None = None,
     ) -> int | None:
         """Create a task and return its ID."""
         with self.lock_task_store:
@@ -1027,13 +1028,20 @@ class InMemoryCoreState(
                     return None
 
             task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
+            created_at = now().isoformat()
+            failed = failure_details is not None
 
             task = Task(
                 task_id=task_id,
                 type=task_type,
                 run_id=run_id,
-                status=TaskStatus(status=Status.PENDING, sub_status="", details=""),
-                pending_at=now().isoformat(),
+                status=TaskStatus(
+                    status=Status.FINISHED if failed else Status.PENDING,
+                    sub_status=SubStatus.FAILED if failed else "",
+                    details=failure_details or "",
+                ),
+                pending_at=created_at,
+                finished_at=created_at if failed else "",
                 fab_hash=fab_hash,
                 model_ref=model_ref,
                 connector_ref=connector_ref,
@@ -1042,7 +1050,8 @@ class InMemoryCoreState(
 
             self.task_store[task_id] = task
 
-        notify_task_available()
+        if not failed:
+            notify_task_available()
         return task_id
 
     def get_tasks(  # pylint: disable=too-many-arguments

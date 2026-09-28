@@ -340,7 +340,7 @@ def test_run_superexec_uses_configured_task_poll_interval(
         run_superexec_module, "AutoExecPlugin", Mock(return_value=plugin)
     )
     sleep_mock = Mock(side_effect=KeyboardInterrupt())
-    monkeypatch.setattr(run_superexec_module.time, "sleep", sleep_mock)
+    monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep_mock)
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec("127.0.0.1:9091", insecure=True)
@@ -379,7 +379,7 @@ def test_run_superexec_sleeps_only_after_fast_empty_acquisition(
         run_superexec_module, "monotonic", Mock(side_effect=[0, elapsed])
     )
     sleep_mock = Mock()
-    monkeypatch.setattr(run_superexec_module.time, "sleep", sleep_mock)
+    monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep_mock)
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec("127.0.0.1:9091", insecure=True)

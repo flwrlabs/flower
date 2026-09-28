@@ -425,17 +425,13 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             )
             state.delete_messages(message_ids=[message.metadata.message_id])
             object_store.delete(message.metadata.message_id)
-            # Preserve the failed-task record without exposing incomplete input
-            # to a task executor during the object transfer.
-            failed_task_id = state.create_task(
-                task_type=task_type, run_id=run_id, fab_hash=run_info.fab_hash
+            # Record the failure without publishing a pending task to executors.
+            state.create_task(
+                task_type=task_type,
+                run_id=run_id,
+                fab_hash=run_info.fab_hash,
+                failure_details=f"Pulling message objects failed: {err}",
             )
-            if failed_task_id is not None:
-                state.finish_task(
-                    failed_task_id,
-                    sub_status=SubStatus.FAILED,
-                    details=f"Pulling message objects failed: {err}",
-                )
             return None
 
         # A pending task becomes visible only after its message objects are ready.
