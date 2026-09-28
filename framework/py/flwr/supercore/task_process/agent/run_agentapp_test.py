@@ -143,11 +143,15 @@ def test_pull_prompt_requires_instruction() -> None:
 
 
 def test_pull_prompt_serializes_instruction() -> None:
-    """Pull and serialize the run's initial instruction."""
+    """Return the prompt and the received instruction's reply metadata."""
     grid = Mock()
-    grid.pull_messages.return_value = [_payload_message(789, SYSTEM_MESSAGE_TYPE)]
+    instruction = _payload_message(11, SYSTEM_MESSAGE_TYPE)
+    grid.pull_messages.return_value = [instruction]
 
-    assert pull_prompt(grid) == "hello world!"
+    prompt, metadata = pull_prompt(grid)
+    assert prompt == "hello world!"
+    assert metadata.src_node_id == 11
+    assert metadata.message_id == "message-1"
 
 
 def test_pull_prompt_rejects_multiple_instructions() -> None:
