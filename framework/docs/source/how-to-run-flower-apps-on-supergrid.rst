@@ -56,8 +56,8 @@ Open the ``Logs`` tab to inspect the app logs.
     :align: center
     :target: ./_static/run_logs_dashboard.png
 
-If you visit the `All runs page <https://flower.ai/runs>`__, the run appears in the
-list of your runs.
+If you visit the `All runs page <https://flower.ai/runs>`__, the run appears in the list
+of your runs.
 
 .. image:: ./_static/all_runs_page.png
     :alt: All runs page showing the run that was launched
