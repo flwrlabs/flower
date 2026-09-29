@@ -70,8 +70,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
-    SetFederationIconRequest,
-    SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
     StartRunRequest,
@@ -1337,7 +1335,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request = ShowFederationRequest(federation_name=NOOP_FEDERATION_ID)
         details = self.state.federation_manager.get_details(NOOP_FEDERATION_ID)
         details.member_count = 7
-        details.icon_key = "research"
 
         # Execute
         with patch.object(
@@ -1355,7 +1352,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(response.federation.can_invite_members)
         self.assertFalse(response.federation.can_add_supernodes)
         self.assertEqual(response.federation.member_count, 7)
-        self.assertEqual(response.federation.icon_key, "research")
 
     def test_show_federation_falls_back_to_preview_size(self) -> None:
         """Test ShowFederation derives a count when the manager omits one."""
@@ -1370,30 +1366,23 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             )
 
         self.assertEqual(response.federation.member_count, len(details.members))
-        self.assertFalse(response.federation.HasField("icon_key"))
 
     def test_list_federations_includes_summary_fields(self) -> None:
         """Test ListFederations surfaces federation summary fields."""
         objectstore_factory = Mock(store=Mock(return_value=self.store))
-        federation_manager = NoOpFederationManager(simulation=True)
-        federation = federation_manager.get_federations(NOOP_FLWR_AID)[0]
-        federation.icon_key = "hub"
         servicer = ControlServicer(
             linkstate_factory=LinkStateFactory(
                 FLWR_IN_MEMORY_DB_NAME,
-                federation_manager,
+                NoOpFederationManager(simulation=True),
                 objectstore_factory,
             ),
             objectstore_factory=objectstore_factory,
             authn_plugin=NoOpControlAuthnPlugin(),
         )
 
-        with patch.object(
-            federation_manager, "get_federations", return_value=[federation]
-        ):
-            response: ListFederationsResponse = servicer.ListFederations(
-                ListFederationsRequest(), Mock()
-            )
+        response: ListFederationsResponse = servicer.ListFederations(
+            ListFederationsRequest(), Mock()
+        )
 
         self.assertEqual(len(response.federations), 1)
         self.assertEqual(len(response.federations[0].members), 1)
@@ -1406,7 +1395,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(response.federations[0].simulation)
         self.assertFalse(response.federations[0].can_invite_members)
         self.assertFalse(response.federations[0].can_add_supernodes)
-        self.assertEqual(response.federations[0].icon_key, "hub")
 
     def test_federation_member_count_wire_round_trip(self) -> None:
         """Test member count presence and value survive protobuf serialization."""
@@ -1423,110 +1411,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(round_tripped.federations[0].HasField("member_count"))
         self.assertTrue(round_tripped.federations[1].HasField("member_count"))
         self.assertEqual(round_tripped.federations[1].member_count, 300)
-
-    def test_federation_icon_key_wire_round_trip(self) -> None:
-        """Test icon key presence and field number survive protobuf serialization."""
-        response = ListFederationsResponse()
-        response.federations.add()
-        federation_with_icon = response.federations.add(icon_key="hub")
-
-        serialized_federation = federation_with_icon.SerializeToString(
-            deterministic=True
-        )
-        round_tripped = ListFederationsResponse.FromString(response.SerializeToString())
-
-        self.assertEqual(serialized_federation, b"\x62\x03hub")
-        self.assertFalse(round_tripped.federations[0].HasField("icon_key"))
-        self.assertTrue(round_tripped.federations[1].HasField("icon_key"))
-        self.assertEqual(round_tripped.federations[1].icon_key, "hub")
-
-    def test_set_federation_icon(self) -> None:
-        """Test setting an accepted federation icon."""
-        request = SetFederationIconRequest(federation_name="@me/fed", icon_key="rocket")
-
-        with patch.object(
-            self.state.federation_manager, "set_icon_key", return_value=None
-        ) as set_icon_key:
-            response: SetFederationIconResponse = self.servicer.SetFederationIcon(
-                request, Mock()
-            )
-
-        self.assertEqual(response, SetFederationIconResponse())
-        set_icon_key.assert_called_once_with(
-            flwr_aid=self.aid,
-            federation_id="@me/fed",
-            icon_key="rocket",
-        )
-
-    def test_clear_federation_icon(self) -> None:
-        """Test clearing a federation icon by omitting the icon key."""
-        request = SetFederationIconRequest(federation_name="@me/fed")
-
-        with patch.object(
-            self.state.federation_manager, "set_icon_key", return_value=None
-        ) as set_icon_key:
-            self.servicer.SetFederationIcon(request, Mock())
-
-        set_icon_key.assert_called_once_with(
-            flwr_aid=self.aid,
-            federation_id="@me/fed",
-            icon_key=None,
-        )
-
-    def test_set_federation_icon_accepts_arbitrary_key(self) -> None:
-        """Test passing an arbitrary icon key to the federation manager."""
-        request = SetFederationIconRequest(
-            federation_name="@me/fed", icon_key="future-icon"
-        )
-
-        with patch.object(
-            self.state.federation_manager, "set_icon_key", return_value=None
-        ) as set_icon_key:
-            self.servicer.SetFederationIcon(request, Mock())
-
-        set_icon_key.assert_called_once_with(
-            flwr_aid=self.aid,
-            federation_id="@me/fed",
-            icon_key="future-icon",
-        )
-
-    def test_set_federation_icon_requires_federation_name(self) -> None:
-        """Test requiring a federation name when setting an icon."""
-        with (
-            patch.object(
-                self.state.federation_manager,
-                "set_icon_key",
-            ) as set_icon_key,
-            self.assertRaises(FlowerError) as error,
-        ):
-            self.servicer.SetFederationIcon(
-                SetFederationIconRequest(icon_key="rocket"), Mock()
-            )
-
-        self.assertEqual(error.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
-        set_icon_key.assert_not_called()
-
-    def test_set_federation_icon_propagates_manager_error(self) -> None:
-        """Test propagating federation manager authorization failures."""
-        manager_error = FlowerError(
-            ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
-            "The caller is not the federation owner.",
-        )
-
-        with (
-            patch.object(
-                self.state.federation_manager,
-                "set_icon_key",
-                side_effect=manager_error,
-            ),
-            self.assertRaises(FlowerError) as error,
-        ):
-            self.servicer.SetFederationIcon(
-                SetFederationIconRequest(federation_name="@me/fed", icon_key="rocket"),
-                Mock(),
-            )
-
-        self.assertIs(error.exception, manager_error)
 
     def test_create_federation_success(self) -> None:
         """Test CreateFederation succeeds when federation_manager.create_federation
