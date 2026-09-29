@@ -1009,8 +1009,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             StartRunContext(federation_id=NOOP_FEDERATION_ID, runtime=expected_runtime),
         )
 
-    @parameterized.expand([(None,), (1,), (2,), (3,), (9,)])  # type: ignore
-    def test_list_runs(self, limit: int | None) -> None:
+    @parameterized.expand(  # type: ignore
+        [(None, 0), (1, 0), (2, 0), (2, 1), (2, 3), (3, 0), (9, 0)]
+    )
+    def test_list_runs(self, limit: int | None, skip: int) -> None:
         """Test List method of ControlServicer with --runs option."""
         # Prepare
         run_ids: list[int] = []
@@ -1019,14 +1021,19 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             time.sleep(1e-6)  # Ensure different timestamps for sorting
 
         # Execute
-        response = self.servicer.ListRuns(ListRunsRequest(limit=limit), Mock())
+        response = self.servicer.ListRuns(
+            ListRunsRequest(limit=limit, skip=skip), Mock()
+        )
         retrieved_timestamp = datetime.fromisoformat(response.now).timestamp()
 
         # Assert
         if limit is None:
             limit = 999
         self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
-        self.assertEqual(set(response.run_dict.keys()), set(run_ids[-limit:]))
+        self.assertEqual(
+            set(response.run_dict.keys()),
+            set(run_ids[::-1][skip : skip + limit]),
+        )
         self.assertTrue(
             all(
                 run.account_name == self.account_info.account_name
