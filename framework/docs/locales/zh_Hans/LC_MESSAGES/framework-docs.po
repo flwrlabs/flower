@@ -51,7 +51,7 @@ msgstr "更新日志"
 #: ../../source/changelog/v1.39.0.md:2
 #, fuzzy
 msgid "v1.39.0 (2026-09-28)"
-msgstr "v1.3.0 (2023-02-06)"
+msgstr ""
 
 #: ../../source/changelog/v1.0.0.md:11 ../../source/changelog/v1.1.0.md:4
 #: ../../source/changelog/v1.10.0.md:4 ../../source/changelog/v1.11.0.md:4
@@ -112,11 +112,6 @@ msgid ""
 "`Charles Beauville`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Dimitris"
 " Stripelis`, `Heng Pan`, `Javier`, `Riyasat Ohib`, `Taner Topal`"
 msgstr ""
-"`Adam Narozniak`, `Anass Anhari`, `Charles Beauville`, `Dana-Farber`, "
-"`Daniel J. Beutel`, `Daniel Nata Nugraha`, `Edoardo Gabrielli`, `Gustavo "
-"Bertoli`, `Heng Pan`, `Javier`, `Mahdi`, `Steven Hé (Sīchàng)`, `Taner "
-"Topal`, `achiverram28`, `danielnugraha`, `eunchung`, `ruthgal` <!---"
-"TOKEN_v1.5.0-->"
 
 #: ../../source/changelog/v0.13.0.md:4 ../../source/changelog/v0.14.0.md:4
 #: ../../source/changelog/v0.15.0.md:4 ../../source/changelog/v0.16.0.md:4
@@ -156,11 +151,6 @@ msgid ""
 "[#8255](https://github.com/flwrlabs/flower/pull/8255), "
 "[#8266](https://github.com/flwrlabs/flower/pull/8266))"
 msgstr ""
-"**引入新的 Flower Baseline： FedProx MNIST** "
-"（[#1513](https://github.com/adap/flower/pull/1513), "
-"[#1680](https://github.com/adap/flower/pull/1680), "
-"[#1681](https://github.com/adap/flower/pull/1681), "
-"[#1679](https://github.com/adap/flower/pull/1679)"
 
 #: ../../source/changelog/v1.39.0.md:14
 msgid ""
@@ -182,12 +172,6 @@ msgid ""
 "[#8240](https://github.com/flwrlabs/flower/pull/8240), "
 "[#8265](https://github.com/flwrlabs/flower/pull/8265))"
 msgstr ""
-"**改进教程** ([#1468](https://github.com/adap/flower/pull/1468), "
-"[#1470](https://github.com/adap/flower/pull/1470), "
-"[#1472](https://github.com/adap/flower/pull/1472), "
-"[#1473](https://github.com/adap/flower/pull/1473), "
-"[#1474](https://github.com/adap/flower/pull/1474), "
-"[#1475](https://github.com/adap/flower/pull/1475)))"
 
 #: ../../source/changelog/v1.39.0.md:18
 msgid ""
@@ -204,8 +188,6 @@ msgid ""
 "**Run sparse federated learning experiments with SSFL** "
 "([#7900](https://github.com/flwrlabs/flower/pull/7900))"
 msgstr ""
-"** 添加使用 fastai 和 Flower 进行联邦学习的新示例** "
-"([#1598](https://github.com/adap/flower/pull/1598))"
 
 #: ../../source/changelog/v1.39.0.md:22
 msgid ""
@@ -228,12 +210,6 @@ msgid ""
 "[#8233](https://github.com/flwrlabs/flower/pull/8233), "
 "[#8238](https://github.com/flwrlabs/flower/pull/8238))"
 msgstr ""
-"**普通改进**（[#1872](https://github.com/adap/flower/pull/1872), "
-"[#1866](https://github.com/adap/flower/pull/1866), "
-"[#1884](https://github.com/adap/flower/pull/1884), "
-"[#1837](https://github.com/adap/flower/pull/1837), "
-"[#1477](https://github.com/adap/flower/pull/1477), "
-"[#2171](https://github.com/adap/flower/pull/2171))"
 
 #: ../../source/changelog/v1.39.0.md:26
 #, fuzzy
@@ -258,15 +234,6 @@ msgid ""
 "[#8268](https://github.com/flwrlabs/flower/pull/8268), "
 "[#8270](https://github.com/flwrlabs/flower/pull/8270))"
 msgstr ""
-"**改进（试验性）驱动程序应用程序接口** ([#1663](https://github.com/adap/flower/pull/1663),"
-" [#1666](https://github.com/adap/flower/pull/1666), "
-"[#1667](https://github.com/adap/flower/pull/1667), "
-"[#1664](https://github.com/adap/flower/pull/1664), "
-"[#1675](https://github.com/adap/flower/pull/1675), "
-"[#1676](https://github.com/adap/flower/pull/1676), "
-"[#1693](https://github.com/adap/flower/pull/1693), "
-"[#1662](https://github.com/adap/flower/pull/1662), "
-"[#1794](https://github.com/adap/flower/pull/1794))"
 
 #: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
 #: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
