@@ -33,6 +33,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsResponse,
 )
 from flwr.supercore.control import ControlHttpClient
+from flwr.supercore.run import Run
 from flwr.supercore.utils import humanize_bytes, humanize_duration
 
 from .run_utils import RunRow, format_runs
@@ -325,23 +326,42 @@ def _to_json(run_list: list[RunRow]) -> str:
 
 
 def _list_runs(stub: ControlHttpClient, limit: int | None = None) -> list[RunRow]:
-    """List all runs.
+    """List runs, fetching every page when no limit is specified.
 
     Parameters
     ----------
     stub : ControlHttpClient
         The HTTP client for Control API communication.
+    limit : int | None
+        Maximum number of runs to list, or None to fetch all pages.
 
     Returns
     -------
     list[RunRow]
-        List of formatted run information for all runs.
+        List of formatted run information for the selected runs.
     """
+    page_size = 20
+    skip = 0
+    runs: dict[int, Run] = {}
     with flwr_cli_exc_handler():
-        res: ListRunsResponse = stub.ListRuns(ListRunsRequest(limit=limit))
-    runs = [run_from_proto(proto) for proto in res.run_dict.values()]
+        while True:
+            request = (
+                ListRunsRequest(limit=limit)
+                if limit is not None
+                else ListRunsRequest(skip=skip)
+            )
+            res: ListRunsResponse = stub.ListRuns(request)
+            page = {
+                run_id: run_from_proto(proto) for run_id, proto in res.run_dict.items()
+            }
+            new_run_ids = page.keys() - runs.keys()
+            runs.update(page)
+            # Older servers can return all runs or repeat a page when `skip` is ignored.
+            if limit is not None or len(page) != page_size or not new_run_ids:
+                break
+            skip += page_size
 
-    return format_runs(runs, res.now)
+    return format_runs(list(runs.values()), res.now)
 
 
 def _display_one_run(stub: ControlHttpClient, run_id: int) -> list[RunRow]:
