@@ -1473,23 +1473,22 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             icon_key=None,
         )
 
-    def test_set_federation_icon_rejects_unknown_key(self) -> None:
-        """Test rejecting an unknown federation icon key."""
+    def test_set_federation_icon_accepts_arbitrary_key(self) -> None:
+        """Test passing an arbitrary icon key to the federation manager."""
         request = SetFederationIconRequest(
-            federation_name="@me/fed", icon_key="unknown"
+            federation_name="@me/fed", icon_key="future-icon"
         )
 
-        with (
-            patch.object(
-                self.state.federation_manager,
-                "set_icon_key",
-            ) as set_icon_key,
-            self.assertRaises(FlowerError) as error,
-        ):
+        with patch.object(
+            self.state.federation_manager, "set_icon_key", return_value=None
+        ) as set_icon_key:
             self.servicer.SetFederationIcon(request, Mock())
 
-        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_FEDERATION_ICON_KEY)
-        set_icon_key.assert_not_called()
+        set_icon_key.assert_called_once_with(
+            flwr_aid=self.aid,
+            federation_id="@me/fed",
+            icon_key="future-icon",
+        )
 
     def test_set_federation_icon_requires_federation_name(self) -> None:
         """Test requiring a federation name when setting an icon."""

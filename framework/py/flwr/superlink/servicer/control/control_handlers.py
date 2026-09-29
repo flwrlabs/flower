@@ -25,7 +25,7 @@ from collections.abc import Callable, Generator, Sequence
 from datetime import UTC, datetime, timedelta
 from logging import ERROR, INFO, WARNING
 from threading import Thread
-from typing import Any, Final, cast
+from typing import Any, cast
 
 import requests
 
@@ -189,32 +189,6 @@ from flwr.superlink.federation.typing import Federation as FederationInfo
 from flwr.superlink.run_source import RunSource
 
 from .conversation_title import start_title_generation
-
-_FEDERATION_ICON_KEYS: Final[frozenset[str]] = frozenset(
-    {
-        "apartment",
-        "bank",
-        "briefcase",
-        "code",
-        "collections",
-        "dataset",
-        "energy",
-        "folder",
-        "hub",
-        "insights",
-        "location",
-        "person",
-        "public",
-        "research",
-        "rocket",
-        "school",
-        "security",
-        "sparkles",
-        "support",
-        "terminal",
-        "verified",
-    }
-)
 
 
 class InvalidConnectorRequestError(FlowerError):
@@ -1871,12 +1845,6 @@ def set_federation_icon(
         raise FederationNotSpecified()
 
     icon_key = request.icon_key if request.HasField("icon_key") else None
-    if icon_key is not None and icon_key not in _FEDERATION_ICON_KEYS:
-        raise FlowerError(
-            ApiErrorCode.INVALID_FEDERATION_ICON_KEY,
-            f"Invalid federation icon key: {icon_key}.",
-        )
-
     state.federation_manager.set_icon_key(
         flwr_aid=account.flwr_aid,
         federation_id=request.federation_name,
