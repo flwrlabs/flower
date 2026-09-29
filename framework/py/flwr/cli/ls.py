@@ -356,9 +356,18 @@ def _list_runs(stub: ControlHttpClient, limit: int | None = None) -> list[RunRow
             }
             new_run_ids = page.keys() - runs.keys()
             runs.update(page)
-            # Older servers can return all runs or repeat a page when `skip` is ignored.
-            if limit is not None or len(page) != page_size or not new_run_ids:
+            if limit is not None or len(page) != page_size:
                 break
+            if skip == page_size and not new_run_ids:
+                # An older server with exactly 20 runs ignores `skip`. A larger
+                # explicit limit distinguishes it from a page shifted by new runs.
+                probe = stub.ListRuns(ListRunsRequest(limit=page_size + 1))
+                runs.update(
+                    (run_id, run_from_proto(proto))
+                    for run_id, proto in probe.run_dict.items()
+                )
+                if len(probe.run_dict) <= page_size:
+                    break
             skip += page_size
 
     return format_runs(list(runs.values()), res.now)

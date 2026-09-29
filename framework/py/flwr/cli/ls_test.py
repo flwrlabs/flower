@@ -77,6 +77,37 @@ def test_list_runs_stops_when_legacy_server_repeats_page() -> None:
     assert stub.ListRuns.call_args_list == [
         call(ListRunsRequest(skip=0)),
         call(ListRunsRequest(skip=20)),
+        call(ListRunsRequest(limit=21)),
+    ]
+
+
+def test_list_runs_continues_after_overlapping_page() -> None:
+    """New runs shifting an offset page do not hide older runs."""
+    stub = Mock(spec=ControlHttpClient)
+    stub.ListRuns.side_effect = [
+        ListRunsResponse(
+            run_dict={run_id: ProtoRun(run_id=run_id) for run_id in range(21, 41)},
+            now=_NOW,
+        ),
+        ListRunsResponse(
+            run_dict={run_id: ProtoRun(run_id=run_id) for run_id in range(21, 41)},
+            now=_NOW,
+        ),
+        ListRunsResponse(
+            run_dict={run_id: ProtoRun(run_id=run_id) for run_id in range(40, 61)},
+            now=_NOW,
+        ),
+        ListRunsResponse(run_dict={1: ProtoRun(run_id=1)}, now=_NOW),
+    ]
+
+    rows = _list_runs(stub)
+
+    assert {row.run_id for row in rows} == set(range(21, 61)) | {1}
+    assert stub.ListRuns.call_args_list == [
+        call(ListRunsRequest(skip=0)),
+        call(ListRunsRequest(skip=20)),
+        call(ListRunsRequest(limit=21)),
+        call(ListRunsRequest(skip=40)),
     ]
 
 
