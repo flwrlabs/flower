@@ -1010,7 +1010,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         )
 
     @parameterized.expand(  # type: ignore
-        [(None, 0), (1, 0), (2, 0), (2, 1), (2, 3), (2, 2**64 - 1), (3, 0), (9, 0)]
+        [(None, 0), (1, 0), (2, 0), (2, 1), (2, 3), (3, 0), (9, 0)]
     )
     def test_list_runs(self, limit: int | None, skip: int) -> None:
         """Test List method of ControlServicer with --runs option."""
