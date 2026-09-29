@@ -99,14 +99,13 @@ Once you are logged in, run the following command to run the app on SuperGrid:
     # Run the app on SuperGrid
     $ flwr run . supergrid
 
-Then, if you navigate to the `SuperGrid dashboard <https://flower.ai/federations/>`__,
-you should see a new run in ``@<your-account>/workspace``. Click on it to see the run
-details and logs.
+Then, visit the `All runs page <https://flower.ai/runs>`__. You should see the new run
+in the list. Click it to see the run details and logs.
 
-.. image:: ./_static/second_run_started_dashboard.png
-    :alt: SuperGrid dashboard showing the newly started run in the federation
+.. image:: ./_static/second_run_all_runs_page.png
+    :alt: All runs page showing the newly started run
     :align: center
-    :target: ./_static/second_run_started_dashboard.png
+    :target: ./_static/second_run_all_runs_page.png
 
 If you inspect the logs, you should see the same output as when you ran the app directly
 from the Flower Hub in the previous tutorial. This is because you are running the exact
@@ -157,12 +156,12 @@ SuperGrid:
     # Run your app
     $ flwr run . supergrid
 
-Then, if you navigate to the `SuperGrid dashboard <https://flower.ai/federations/>`__,
-and open the logs of the new run, you should see the new printed messages from the
-``ServerApp`` at the beginning and end of the logs.
+Then, visit the `All runs page <https://flower.ai/runs>`__, open the new run, and
+inspect its logs. You should see the new messages printed by the ``ServerApp`` at the
+beginning and end of the logs.
 
 .. image:: ./_static/run_with_custom_app_logs.png
-    :alt: SuperGrid run logs showing the custom ServerApp print statements
+    :alt: Run logs highlighting the custom ServerApp goodbye message
     :align: center
     :target: ./_static/run_with_custom_app_logs.png
 
