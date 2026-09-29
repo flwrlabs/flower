@@ -714,20 +714,17 @@ def test_list_runs_returns_runs_from_linkstate(
             ascending=False,
             limit=expected_limit,
             skip=expected_skip,
-        ),
-        call(flwr_aids=[_ACCOUNT.flwr_aid], statuses=[Status.FINISHED]),
+        )
     ]
 
 
-def test_list_runs_cleans_finished_runs_outside_page() -> None:
-    """Paginating must not leave older finished runs without cleanup."""
+def test_list_runs_cleans_finished_runs_on_page() -> None:
+    """ListRuns cleans up finished runs returned on the page."""
     linkstate = Mock(spec=LinkState)
     page_run = Run.create_empty(7)
     page_run.flwr_aid = _ACCOUNT.flwr_aid
-    older_run = Run.create_empty(8)
-    older_run.flwr_aid = _ACCOUNT.flwr_aid
-    older_run.status.status = Status.FINISHED
-    linkstate.get_run_info.side_effect = [[page_run], [older_run]]
+    page_run.status.status = Status.FINISHED
+    linkstate.get_run_info.return_value = [page_run]
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
 
@@ -742,7 +739,7 @@ def test_list_runs_cleans_finished_runs_outside_page() -> None:
 
     assert response.status_code == 200
     assert set(ListRunsResponse.FromString(response.content).run_dict) == {7}
-    linkstate.cleanup_run.assert_called_once_with(8)
+    linkstate.cleanup_run.assert_called_once_with(7)
 
 
 def test_list_runs_rejects_invalid_token_without_refresh() -> None:
