@@ -156,9 +156,13 @@ def list_runs(
     account: AccountDependency,
 ) -> ListRunsResponse:
     """List runs."""
-    if not request.HasField("run_id") and not request.HasField("limit"):
-        request.limit = 20
-    return control_handlers.list_runs(request, account, linkstate)
+    paginated_request = ListRunsRequest()
+    paginated_request.CopyFrom(request)
+    if not paginated_request.HasField("run_id") and not paginated_request.HasField(
+        "limit"
+    ):
+        paginated_request.limit = 20
+    return control_handlers.list_runs(paginated_request, account, linkstate)
 
 
 @router.post("/list-run-series")

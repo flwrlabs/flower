@@ -1221,18 +1221,23 @@ def list_runs(
 
     flwr_aid = account.flwr_aid
     account_name = account.account_name
+    is_list_request = not request.HasField("run_id")
+    limit = request.limit if request.HasField("limit") else None
+    skip = request.skip if request.HasField("skip") else 0
     # Build a set of run IDs for `flwr ls --runs`
-    if not request.HasField("run_id"):
+    if is_list_request:
         # If no `run_id` is specified and account auth is enabled,
         # return run IDs for the authenticated account
-        limit = request.limit if request.HasField("limit") else None
-        skip = request.skip if request.HasField("skip") else 0
-        runs = state.get_run_info(
-            flwr_aids=[flwr_aid],
-            order_by="pending_at",
-            ascending=False,
-            limit=limit,
-            skip=skip,
+        runs = (
+            state.get_run_info(
+                flwr_aids=[flwr_aid],
+                order_by="pending_at",
+                ascending=False,
+                limit=limit,
+                skip=skip,
+            )
+            if skip <= INT64_MAX_VALUE
+            else []
         )
     # Build a set of run IDs for `flwr ls --run-id <run_id>`
     else:
@@ -1259,10 +1264,18 @@ def list_runs(
         {run.flwr_aid for run in runs if run.flwr_aid != flwr_aid}
     )
     account_names[flwr_aid] = account_name
-    for run in runs:
-        run.account_name = account_names[run.flwr_aid]
+    # An unbounded list previously cleaned every finished run for this account.
+    # Keep that cleanup independent of the requested page.
+    cleanup_runs = (
+        state.get_run_info(flwr_aids=[flwr_aid], statuses=[Status.FINISHED])
+        if is_list_request and (limit is not None or skip)
+        else runs
+    )
+    for run in cleanup_runs:
         if run.status.status == Status.FINISHED:
             state.cleanup_run(run.run_id)
+    for run in runs:
+        run.account_name = account_names[run.flwr_aid]
 
     # Construct and return response
     return ListRunsResponse(

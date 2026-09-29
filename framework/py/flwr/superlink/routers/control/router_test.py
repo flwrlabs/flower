@@ -18,7 +18,7 @@
 from collections import Counter
 from collections.abc import Callable
 from datetime import datetime
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import pytest
 from fastapi import FastAPI, HTTPException, Request, Response, status
@@ -707,13 +707,42 @@ def test_list_runs_returns_runs_from_linkstate(
     assert set(proto_response.run_dict) == {7}
     assert proto_response.run_dict[7].account_name == _ACCOUNT.account_name
     assert datetime.fromisoformat(proto_response.now)
-    linkstate.get_run_info.assert_called_once_with(
-        flwr_aids=[_ACCOUNT.flwr_aid],
-        order_by="pending_at",
-        ascending=False,
-        limit=expected_limit,
-        skip=expected_skip,
+    assert linkstate.get_run_info.call_args_list == [
+        call(
+            flwr_aids=[_ACCOUNT.flwr_aid],
+            order_by="pending_at",
+            ascending=False,
+            limit=expected_limit,
+            skip=expected_skip,
+        ),
+        call(flwr_aids=[_ACCOUNT.flwr_aid], statuses=[Status.FINISHED]),
+    ]
+
+
+def test_list_runs_cleans_finished_runs_outside_page() -> None:
+    """Paginating must not leave older finished runs without cleanup."""
+    linkstate = Mock(spec=LinkState)
+    page_run = Run.create_empty(7)
+    page_run.flwr_aid = _ACCOUNT.flwr_aid
+    older_run = Run.create_empty(8)
+    older_run.flwr_aid = _ACCOUNT.flwr_aid
+    older_run.status.status = Status.FINISHED
+    linkstate.get_run_info.side_effect = [[page_run], [older_run]]
+    app = _create_app()
+    app.dependency_overrides[get_linkstate] = lambda: linkstate
+
+    response = TestClient(app).post(
+        "/v1/control/list-runs",
+        content=ListRunsRequest(limit=1).SerializeToString(),
+        headers={
+            "authorization": "Bearer access-token",
+            "content-type": PROTOBUF_MEDIA_TYPE,
+        },
     )
+
+    assert response.status_code == 200
+    assert set(ListRunsResponse.FromString(response.content).run_dict) == {7}
+    linkstate.cleanup_run.assert_called_once_with(8)
 
 
 def test_list_runs_rejects_invalid_token_without_refresh() -> None:
