@@ -14,9 +14,14 @@
 # ==============================================================================
 """Tests for the Runtime API router."""
 
-from typing import cast
-from unittest.mock import Mock
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from threading import Event
+from time import monotonic
+from typing import Any, cast
+from unittest.mock import Mock, patch
 
+import pytest
 from fastapi import Depends, FastAPI
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
@@ -26,6 +31,7 @@ from pytest import MonkeyPatch
 
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
+    AcquireTaskResponse,
     ClaimTaskRequest,
     ClaimTaskResponse,
     GetNodesRequest,
@@ -35,14 +41,17 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
+from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
 from flwr.supercore.constant import (
     FLWR_COMPONENT_NAME_METADATA_KEY,
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
+    TaskType,
 )
 from flwr.supercore.dependencies.runtime import get_runtime_state, get_task
 from flwr.supercore.dependencies.runtime_version import RuntimeVersionDependency
 from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import (
     PROTOBUF_REQUEST_TYPES,
@@ -50,6 +59,7 @@ from flwr.supercore.protobuf.translation import (
 )
 from flwr.supercore.routers.runtime import router
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
+from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.runtime import runtime_handlers
 
 _SUPEREXEC_PATHS = {
@@ -163,6 +173,90 @@ def test_claim_task_delegates_to_shared_handler(monkeypatch: MonkeyPatch) -> Non
     assert response.status_code == 200
     assert ClaimTaskResponse.FromString(response.content) == expected
     handler.assert_called_once_with(request, state)
+
+
+@pytest.mark.parametrize("notification", [True, False])
+def test_acquire_task_waits_for_committed_work(
+    tmp_path: Path, monkeypatch: MonkeyPatch, notification: bool
+) -> None:
+    """A wait wakes on a local commit and finds work without a local signal."""
+    # pylint: disable=too-many-locals
+    database_path = str(tmp_path / "runtime.db")
+    states = [
+        SqlLinkState(
+            database_path, NoOpFederationManager(), ObjectStoreFactory().store()
+        )
+        for _ in range(2)
+    ]
+    for state in states:
+        state.initialize()
+    first_empty_read = Event()
+    original_get_tasks = states[0].get_tasks
+
+    def observe_get_tasks(**kwargs: Any) -> object:
+        tasks = original_get_tasks(**kwargs)
+        if not tasks:
+            first_empty_read.set()
+        return tasks
+
+    monkeypatch.setattr(states[0], "get_tasks", observe_get_tasks)
+    if not notification:
+        monkeypatch.setattr("flwr.supercore.sql_mixin.notify_task_available", Mock())
+    client = TestClient(_create_app(states[0]))
+    request = AcquireTaskRequest(
+        supported_task_types=[TaskType.MODEL], wait_timeout_ms=3_000
+    )
+    recheck_seconds = 5.0 if notification else 0.2
+
+    with patch(
+        "flwr.supercore.routers.runtime.router._TASK_RECHECK_SECONDS",
+        recheck_seconds,
+    ):
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(_post, client, "/v1/runtime/acquire-task", request)
+            assert first_empty_read.wait(timeout=2)
+            task_id = states[1].create_task(task_type=TaskType.MODEL, run_id=42)
+            assert task_id is not None
+            response = future.result(timeout=2)
+
+    assert response.status_code == 200
+    acquired = AcquireTaskResponse.FromString(response.content)
+    assert acquired.task.task_id == task_id
+    assert acquired.token
+
+
+def test_acquire_task_wait_is_bounded_and_skips_wait_without_capacity(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """An oversized wait is capped and an empty capacity returns immediately."""
+    state = Mock(spec=LinkState)
+    state.get_tasks.return_value = []
+    monkeypatch.setattr(runtime_handlers, "process_due_automations", Mock())
+    client = TestClient(_create_app(state))
+
+    with patch("flwr.supercore.routers.runtime.router._MAX_TASK_WAIT_MS", 40):
+        started = monotonic()
+        response = _post(
+            client,
+            "/v1/runtime/acquire-task",
+            AcquireTaskRequest(
+                supported_task_types=[TaskType.MODEL], wait_timeout_ms=1_000
+            ),
+        )
+    assert response.status_code == 200
+    assert monotonic() - started < 0.5
+    assert state.get_tasks.call_count >= 2
+
+    state.get_tasks.reset_mock()
+    started = monotonic()
+    response = _post(
+        client,
+        "/v1/runtime/acquire-task",
+        AcquireTaskRequest(wait_timeout_ms=1_000),
+    )
+    assert response.status_code == 200
+    assert monotonic() - started < 0.5
+    state.get_tasks.assert_not_called()
 
 
 def test_get_nodes_delegates_with_authenticated_task(

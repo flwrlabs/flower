@@ -26,6 +26,16 @@ from flwr.supercore.run import Run
 class NodeState(CoreState):
     """Abstract base class for node state."""
 
+    @abstractmethod
+    def reserve_task(
+        self, task_type: str, run_id: int, fab_hash: str | None = None
+    ) -> int | None:
+        """Create a task that cannot be acquired until it is published."""
+
+    @abstractmethod
+    def publish_task(self, task_id: int) -> bool:
+        """Make a reserved task eligible for acquisition."""
+
     def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
         """Delete Messages belonging to an expired push session."""
         self.delete_messages(message_ids=list(message_object_ids))

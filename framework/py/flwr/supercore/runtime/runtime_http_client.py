@@ -73,12 +73,13 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
     """Protobuf-over-HTTP client for the Runtime API."""
 
     def AcquireTask(self, request: AcquireTaskRequest) -> AcquireTaskResponse:
-        """Acquire the oldest eligible pending task."""
+        """Acquire one task without retrying an ambiguous claim."""
         return self._unary_unary(
             path="/v1/runtime/acquire-task",
             rpc_method="/flwr.proto.Runtime/AcquireTask",
             request=request,
             response_type=AcquireTaskResponse,
+            retry=False,
         )
 
     def PullPendingTasks(

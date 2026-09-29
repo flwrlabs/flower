@@ -48,6 +48,7 @@ from flwr.supercore.corestate.utils import validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.task_notification import notify_task_available
 from flwr.superlink.federation import FederationManager
 
 from .utils import (
@@ -772,7 +773,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 connector_ids=connector_ids,
             )
 
-            return run_id
+        notify_task_available()
+        return run_id
 
     def get_run_info(
         self,

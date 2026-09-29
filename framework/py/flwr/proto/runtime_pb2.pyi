@@ -576,6 +576,9 @@ class AcquireTaskRequest(google.protobuf.message.Message):
 
     SUPPORTED_TASK_TYPES_FIELD_NUMBER: builtins.int
     AGENTAPP_FAB_HASHES_FIELD_NUMBER: builtins.int
+    WAIT_TIMEOUT_MS_FIELD_NUMBER: builtins.int
+    wait_timeout_ms: builtins.int
+    """Maximum time to wait for an eligible task, in milliseconds."""
     @property
     def supported_task_types(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """Task types that can be launched regardless of FAB."""
@@ -589,8 +592,9 @@ class AcquireTaskRequest(google.protobuf.message.Message):
         *,
         supported_task_types: collections.abc.Iterable[builtins.str] | None = ...,
         agentapp_fab_hashes: collections.abc.Iterable[builtins.str] | None = ...,
+        wait_timeout_ms: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["agentapp_fab_hashes", b"agentapp_fab_hashes", "supported_task_types", b"supported_task_types"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agentapp_fab_hashes", b"agentapp_fab_hashes", "supported_task_types", b"supported_task_types", "wait_timeout_ms", b"wait_timeout_ms"]) -> None: ...
 
 global___AcquireTaskRequest = AcquireTaskRequest
 

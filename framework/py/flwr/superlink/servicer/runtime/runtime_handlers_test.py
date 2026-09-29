@@ -17,12 +17,13 @@
 # pylint: disable=too-many-lines
 
 
+import asyncio
 import hashlib
 import os
 import tempfile
 import threading
 import unittest
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock, patch
 
 from parameterized import parameterized
@@ -81,6 +82,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     iterate_object_tree,
 )
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.routers.runtime.router import _wait_for_task
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.runtime import runtime_handlers
@@ -382,7 +384,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             assert self.state.finish_task(task_id, "", "")
 
     def test_acquire_task_processes_due_automations(self) -> None:
-        """A SuperExec poll should create and claim a due automation's task."""
+        """A waiting SuperExec poll claims an automation when it becomes due."""
         series_id = self.state.get_run_info(run_ids=[self._auth_run_id])[0].series_id
         automation = self.state.store_automation(
             federation_id=NOOP_FEDERATION_ID,
@@ -393,7 +395,9 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
                 series_id=series_id,
             ),
             series_id=series_id,
-            next_run_at=datetime.now(tz=UTC).isoformat(),
+            next_run_at=(
+                datetime.now(tz=UTC) + timedelta(milliseconds=200)
+            ).isoformat(),
             max_runs=1,
         )
 
@@ -412,9 +416,15 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
                 return_value=("flwr/demo", "0.1.0"),
             ),
         ):
-            response = runtime_handlers.acquire_task(
-                AcquireTaskRequest(supported_task_types=[TaskType.SERVER_APP]),
-                self.state,
+            response = asyncio.run(
+                _wait_for_task(
+                    AcquireTaskRequest(
+                        supported_task_types=[TaskType.SERVER_APP],
+                        wait_timeout_ms=2_000,
+                    ),
+                    self.state,
+                    runtime_handlers,
+                )
             )
 
         self.assertTrue(response.token)
