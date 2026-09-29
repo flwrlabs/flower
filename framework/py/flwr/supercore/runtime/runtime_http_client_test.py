@@ -16,9 +16,12 @@
 
 from unittest.mock import Mock, patch
 
+import httpx
 import pytest
 
+from flwr.proto.runtime_pb2 import AcquireTaskRequest  # pylint: disable=E0611
 from flwr.supercore.protobuf.client import ProtobufClient
+from flwr.supercore.retry import make_simple_http_retry_invoker
 from flwr.supercore.runtime import RuntimeHttpClient
 
 _UNARY_UNARY_PATHS = (
@@ -73,3 +76,22 @@ def test_runtime_method(endpoint: str) -> None:
         endpoint, f"{method_name}Response"
     )
     assert call.call_args.kwargs["response_type"].__name__ == expected_response_name
+
+
+def test_acquire_task_does_not_retry_lost_response() -> None:
+    """Surface a lost claim response to SuperExec without claiming another task."""
+    retry_invoker = make_simple_http_retry_invoker()
+    retry_invoker.max_tries = 2
+    retry_invoker.wait_function = lambda _: None
+    client = RuntimeHttpClient("http://runtime.example", retry_invoker=retry_invoker)
+
+    with (
+        patch(
+            "flwr.supercore.protobuf.client.httpx.Client.send",
+            side_effect=httpx.ReadError("response lost"),
+        ) as send,
+        pytest.raises(httpx.ReadError, match="response lost"),
+    ):
+        client.AcquireTask(AcquireTaskRequest(supported_task_types=["agent"]))
+
+    send.assert_called_once()
