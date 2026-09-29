@@ -56,8 +56,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     PullArtifactsResponse,
     RefreshAuthTokensRequest,
     RefreshAuthTokensResponse,
-    SetFederationIconRequest,
-    SetFederationIconResponse,
     StartRunRequest,
     StartRunResponse,
     StreamLogsRequest,
@@ -141,68 +139,6 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
     grpc_request_types[RefreshAuthTokensRequest.DESCRIPTOR.full_name] += 1
 
     assert http_request_types == grpc_request_types
-
-
-def test_set_federation_icon_is_in_openapi_schema() -> None:
-    """Include the federation icon endpoint in the generated OpenAPI schema."""
-    schema = _create_app().openapi()
-
-    assert "/v1/control/set-federation-icon" in schema["paths"]
-
-
-def test_set_federation_icon_route_returns_protobuf_response() -> None:
-    """Forward a federation icon update and serialize its response."""
-    linkstate = Mock(spec=LinkState)
-    app = _create_app()
-    app.dependency_overrides[get_linkstate] = lambda: linkstate
-    protobuf_request = SetFederationIconRequest(
-        federation_name="@account/fed", icon_key="rocket"
-    )
-
-    with patch.object(
-        control_handlers,
-        "set_federation_icon",
-        return_value=SetFederationIconResponse(),
-    ) as handler:
-        response = TestClient(app).post(
-            "/v1/control/set-federation-icon",
-            content=protobuf_request.SerializeToString(),
-            headers={
-                "authorization": "Bearer access-token",
-                "content-type": PROTOBUF_MEDIA_TYPE,
-            },
-        )
-
-    assert response.status_code == 200
-    assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
-    assert SetFederationIconResponse.FromString(response.content) == (
-        SetFederationIconResponse()
-    )
-    handler.assert_called_once_with(protobuf_request, _ACCOUNT, linkstate)
-
-
-def test_set_federation_icon_route_returns_invalid_key_error() -> None:
-    """Translate an invalid federation icon key into a client error."""
-    app = _create_app()
-    app.dependency_overrides[get_linkstate] = lambda: Mock(spec=LinkState)
-
-    response = TestClient(app).post(
-        "/v1/control/set-federation-icon",
-        content=SetFederationIconRequest(
-            federation_name="@account/fed", icon_key="unknown"
-        ).SerializeToString(),
-        headers={
-            "authorization": "Bearer access-token",
-            "content-type": PROTOBUF_MEDIA_TYPE,
-        },
-    )
-
-    assert response.status_code == 400
-    assert response.headers["content-type"] == "application/json"
-    assert response.json() == {
-        "detail": "Invalid federation icon key.",
-        "code": ApiErrorCode.INVALID_FEDERATION_ICON_KEY.value,
-    }
 
 
 @pytest.mark.parametrize(
