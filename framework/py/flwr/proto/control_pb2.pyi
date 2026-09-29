@@ -1166,6 +1166,36 @@ class ShowFederationResponse(google.protobuf.message.Message):
 global___ShowFederationResponse = ShowFederationResponse
 
 @typing.final
+class SetFederationIconRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_NAME_FIELD_NUMBER: builtins.int
+    ICON_KEY_FIELD_NUMBER: builtins.int
+    federation_name: builtins.str
+    icon_key: builtins.str
+    def __init__(
+        self,
+        *,
+        federation_name: builtins.str = ...,
+        icon_key: builtins.str | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_icon_key", b"_icon_key", "icon_key", b"icon_key"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_icon_key", b"_icon_key", "federation_name", b"federation_name", "icon_key", b"icon_key"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_icon_key", b"_icon_key"]) -> typing.Literal["icon_key"] | None: ...
+
+global___SetFederationIconRequest = SetFederationIconRequest
+
+@typing.final
+class SetFederationIconResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___SetFederationIconResponse = SetFederationIconResponse
+
+@typing.final
 class CreateFederationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
