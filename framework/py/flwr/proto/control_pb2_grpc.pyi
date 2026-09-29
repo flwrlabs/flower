@@ -195,6 +195,12 @@ class ControlStub:
     ]
     """Show Federation"""
 
+    SetFederationIcon: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.SetFederationIconRequest,
+        flwr.proto.control_pb2.SetFederationIconResponse,
+    ]
+    """Set Federation icon"""
+
     CreateFederation: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.CreateFederationRequest,
         flwr.proto.control_pb2.CreateFederationResponse,
@@ -434,6 +440,12 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.ShowFederationResponse,
     ]
     """Show Federation"""
+
+    SetFederationIcon: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.SetFederationIconRequest,
+        flwr.proto.control_pb2.SetFederationIconResponse,
+    ]
+    """Set Federation icon"""
 
     CreateFederation: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.CreateFederationRequest,
@@ -728,6 +740,14 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.ShowFederationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ShowFederationResponse]]:
         """Show Federation"""
+
+    @abc.abstractmethod
+    def SetFederationIcon(
+        self,
+        request: flwr.proto.control_pb2.SetFederationIconRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.SetFederationIconResponse, collections.abc.Awaitable[flwr.proto.control_pb2.SetFederationIconResponse]]:
+        """Set Federation icon"""
 
     @abc.abstractmethod
     def CreateFederation(

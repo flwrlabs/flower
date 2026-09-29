@@ -119,6 +119,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SetFederationIconRequest,
+    SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
     StartAutomationRequest,
@@ -1687,21 +1689,23 @@ def list_federations(
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     federations = state.federation_manager.get_federations(flwr_aid)
 
-    return ListFederationsResponse(
-        federations=[
-            Federation(
-                name=fed.id,
-                description=fed.description,
-                members=fed.members,
-                member_count=_get_federation_member_count(fed),
-                archived=fed.archived,
-                simulation=fed.simulation,
-                can_invite_members=fed.can_invite_members,
-                can_add_supernodes=fed.can_add_supernodes,
-            )
-            for fed in federations
-        ]
-    )
+    federation_protos = []
+    for fed in federations:
+        federation_proto = Federation(
+            name=fed.id,
+            description=fed.description,
+            members=fed.members,
+            member_count=_get_federation_member_count(fed),
+            archived=fed.archived,
+            simulation=fed.simulation,
+            can_invite_members=fed.can_invite_members,
+            can_add_supernodes=fed.can_add_supernodes,
+        )
+        if fed.icon_key is not None:
+            federation_proto.icon_key = fed.icon_key
+        federation_protos.append(federation_proto)
+
+    return ListFederationsResponse(federations=federation_protos)
 
 
 def list_apps(
@@ -1826,7 +1830,27 @@ def show_federation(
         can_invite_members=details.can_invite_members,
         can_add_supernodes=details.can_add_supernodes,
     )
+    if details.icon_key is not None:
+        federation_proto.icon_key = details.icon_key
     return ShowFederationResponse(federation=federation_proto, now=now().isoformat())
+
+
+def set_federation_icon(
+    request: SetFederationIconRequest, account: AccountInfo, state: LinkState
+) -> SetFederationIconResponse:
+    """Set or clear a federation icon."""
+    log(INFO, "ControlServicer.SetFederationIcon")
+
+    if not request.federation_name:
+        raise FederationNotSpecified()
+
+    icon_key = request.icon_key if request.HasField("icon_key") else None
+    state.federation_manager.set_icon_key(
+        flwr_aid=account.flwr_aid,
+        federation_id=request.federation_name,
+        icon_key=icon_key,
+    )
+    return SetFederationIconResponse()
 
 
 def create_federation(

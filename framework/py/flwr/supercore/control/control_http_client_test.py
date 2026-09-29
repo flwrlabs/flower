@@ -49,6 +49,7 @@ _UNARY_UNARY_ENDPOINTS = (
     "add-app",
     "remove-app",
     "show-federation",
+    "set-federation-icon",
     "create-federation",
     "archive-federation",
     "add-node-to-federation",
