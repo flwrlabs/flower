@@ -14,7 +14,6 @@
 # ==============================================================================
 """Mixin providing common SQL connection and initialization logic via SQLAlchemy."""
 
-
 import re
 from abc import ABC
 from collections.abc import Iterator, Sequence
@@ -219,7 +218,13 @@ class SqlMixin(ABC):
         """
         return None
 
-    def initialize(self, log_queries: bool = False) -> list[str]:
+    def initialize(
+        self,
+        log_queries: bool = False,
+        *,
+        pool_size: int | None = None,
+        max_overflow: int | None = None,
+    ) -> list[str]:
         """Connect to the DB and create tables if needed.
 
         This method creates the SQLAlchemy engine and session factory,
@@ -229,6 +234,10 @@ class SqlMixin(ABC):
         ----------
         log_queries : bool
             Log each query which is executed.
+        pool_size : int | None
+            PostgreSQL pool size. None keeps the SQLAlchemy default.
+        max_overflow : int | None
+            Extra PostgreSQL connections. None keeps the SQLAlchemy default.
 
         Returns
         -------
@@ -237,6 +246,11 @@ class SqlMixin(ABC):
         """
         # Create engine with dialect-specific settings
         engine_kwargs: dict[str, Any] = {}
+        if self.database_backend == "postgresql":
+            if pool_size is not None:
+                engine_kwargs["pool_size"] = pool_size
+            if max_overflow is not None:
+                engine_kwargs["max_overflow"] = max_overflow
         if self.database_backend == "sqlite":
             # SQLite needs check_same_thread=False for multi-threaded access
             engine_kwargs["connect_args"] = {"check_same_thread": False}

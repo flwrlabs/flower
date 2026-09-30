@@ -17,6 +17,7 @@
 # pylint: disable=too-many-lines
 import hashlib
 import json
+import os
 import secrets
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
@@ -138,12 +139,37 @@ STATUS_CONDITIONS = {
 }
 
 
+def _optional_pool_limit(name: str, minimum: int) -> int | None:
+    """Read an optional PostgreSQL connection pool limit."""
+    raw = os.getenv(name)
+    if raw is None:
+        return None
+    try:
+        value = int(raw)
+    except ValueError as err:
+        raise ValueError(f"{name} must be an integer of at least {minimum}.") from err
+    if value < minimum:
+        raise ValueError(f"{name} must be an integer of at least {minimum}.")
+    return value
+
+
 class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     """SQLAlchemy-based CoreState implementation."""
 
     def __init__(self, database_path: str, object_store: ObjectStore) -> None:
         super().__init__(database_path)
         self._object_store = object_store
+
+    def initialize(self, log_queries: bool = False) -> list[str]:
+        """Initialize CoreState with optional PostgreSQL connection pool limits."""
+        if self.database_backend != "postgresql":
+            return super().initialize(log_queries)
+
+        pool_size = _optional_pool_limit("FLWR_CORESTATE_POOL_SIZE", minimum=1)
+        max_overflow = _optional_pool_limit("FLWR_CORESTATE_MAX_OVERFLOW", minimum=0)
+        return super().initialize(
+            log_queries, pool_size=pool_size, max_overflow=max_overflow
+        )
 
     def dialect_insert(self, table: Any) -> SQLiteInsert | PostgresInsert:
         """Return a dialect-specific insert statement for CoreState upserts."""
