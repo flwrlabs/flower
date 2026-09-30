@@ -1,0 +1,4 @@
+---
+_target_: flwr.server.strategy.FedAvg
+fraction_fit: 0.02 # this will result in 10 clients sampled per round (as in the paper)
+fraction_evaluate: 0.0
