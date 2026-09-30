@@ -82,6 +82,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SetFederationIconRequest,
+    SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
     StartAutomationRequest,
@@ -445,6 +447,16 @@ def show_federation(
 ) -> ShowFederationResponse:
     """Show a federation."""
     return control_handlers.show_federation(request, account, linkstate)
+
+
+@router.post("/set-federation-icon")
+def set_federation_icon(
+    request: Annotated[SetFederationIconRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> SetFederationIconResponse:
+    """Set or clear a federation icon."""
+    return control_handlers.set_federation_icon(request, account, linkstate)
 
 
 @router.post("/create-federation")
