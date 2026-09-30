@@ -14,9 +14,9 @@
 # ==============================================================================
 """Tests for SqlMixin."""
 
-
 import unittest
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from sqlalchemy import Column, Integer, MetaData, Table
 from sqlalchemy.exc import IntegrityError
@@ -71,6 +71,21 @@ class TestSqlMixin(unittest.TestCase):
         """Set up test database for each test."""
         self.db = DummyDbSqlAlchemy(":memory:")
         self.db.initialize()
+
+    def test_postgresql_pool_limits_are_passed_to_engine(self) -> None:
+        """Apply explicit limits to the PostgreSQL engine only."""
+        db = DummyDbSqlAlchemy("postgresql://localhost/flwr")
+        with (
+            patch("flwr.supercore.sql_mixin.create_engine") as mock_create_engine,
+            patch("flwr.supercore.sql_mixin.sessionmaker"),
+            patch("flwr.supercore.sql_mixin.run_migrations"),
+            patch("flwr.supercore.sql_mixin.inspect") as mock_inspect,
+        ):
+            db.initialize(pool_size=20, max_overflow=50)
+            mock_create_engine.assert_called_once_with(
+                db.database_url, pool_size=20, max_overflow=50
+            )
+            mock_inspect.return_value.get_table_names.assert_called_once_with()
 
     def test_session_commits_all_queries_atomitcally(self) -> None:
         """Test that all queries in a session are committed as a single transaction."""
