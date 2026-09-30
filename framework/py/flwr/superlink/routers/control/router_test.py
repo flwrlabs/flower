@@ -683,7 +683,7 @@ def test_non_protobuf_request_in_state_returns_internal_error() -> None:
 def test_list_runs_returns_runs_from_linkstate(
     proto_request: ListRunsRequest, expected_limit: int, expected_skip: int
 ) -> None:
-    """ListRuns applies the default and requested pagination in Control HTTP."""
+    """ListRuns applies the default and requested pagination."""
     linkstate = Mock(spec=LinkState)
     run = Run.create_empty(7)
     run.flwr_aid = _ACCOUNT.flwr_aid
