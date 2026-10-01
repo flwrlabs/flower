@@ -1,4 +1,58 @@
 #include "simple_client.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
+#include <stdexcept>
+
+namespace {
+
+bool is_little_endian() {
+  const uint16_t value = 1;
+  return *reinterpret_cast<const uint8_t *>(&value) == 1;
+}
+
+std::string double_to_little_endian_bytes(double value) {
+  std::string bytes(sizeof(double), '\0');
+  std::memcpy(bytes.data(), &value, sizeof(double));
+  if (!is_little_endian()) {
+    std::reverse(bytes.begin(), bytes.end());
+  }
+  return bytes;
+}
+
+double double_from_little_endian_bytes(const char *data) {
+  std::string bytes(data, sizeof(double));
+  if (!is_little_endian()) {
+    std::reverse(bytes.begin(), bytes.end());
+  }
+  double value = 0.0;
+  std::memcpy(&value, bytes.data(), sizeof(double));
+  return value;
+}
+
+std::string vector_to_little_endian_bytes(const std::vector<double> &values) {
+  std::string bytes;
+  bytes.reserve(values.size() * sizeof(double));
+  for (double value : values) {
+    bytes += double_to_little_endian_bytes(value);
+  }
+  return bytes;
+}
+
+std::vector<double> vector_from_little_endian_bytes(const std::string &bytes) {
+  if (bytes.size() % sizeof(double) != 0) {
+    throw std::runtime_error("C++ tensor byte length must be divisible by 8");
+  }
+  std::vector<double> values;
+  values.reserve(bytes.size() / sizeof(double));
+  for (size_t offset = 0; offset < bytes.size(); offset += sizeof(double)) {
+    values.push_back(double_from_little_endian_bytes(bytes.data() + offset));
+  }
+  return values;
+}
+
+} // namespace
 /**
  * Initializer
  */
@@ -22,13 +76,8 @@ flwr_local::ParametersRes SimpleFlwrClient::get_parameters() {
   double pred_b = this->model.get_bias();
   std::list<std::string> tensors;
 
-  std::ostringstream oss1, oss2; // Possibly unnecessary
-  oss1.write(reinterpret_cast<const char *>(pred_weights.data()),
-             pred_weights.size() * sizeof(double));
-  tensors.push_back(oss1.str());
-
-  oss2.write(reinterpret_cast<const char *>(&pred_b), sizeof(double));
-  tensors.push_back(oss2.str());
+  tensors.push_back(vector_to_little_endian_bytes(pred_weights));
+  tensors.push_back(double_to_little_endian_bytes(pred_b));
 
   std::string tensor_str = "cpp_double";
   return flwr_local::ParametersRes(flwr_local::Parameters(tensors, tensor_str));
@@ -42,12 +91,7 @@ void SimpleFlwrClient::set_parameters(flwr_local::Parameters params) {
   if (s.empty() == 0) {
     // Layer 1
     auto layer = s.begin();
-    size_t num_bytes = (*layer).size();
-    const char *weights_char = (*layer).c_str();
-    const double *weights_double =
-        reinterpret_cast<const double *>(weights_char);
-    std::vector<double> weights(weights_double,
-                                weights_double + num_bytes / sizeof(double));
+    std::vector<double> weights = vector_from_little_endian_bytes(*layer);
     this->model.set_pred_weights(weights);
     for (auto x : this->model.get_pred_weights())
       for (size_t j = 0; j < this->model.get_pred_weights().size(); j++)
@@ -56,10 +100,10 @@ void SimpleFlwrClient::set_parameters(flwr_local::Parameters params) {
 
     // Layer 2 = Bias
     auto layer_2 = std::next(layer, 1);
-    num_bytes = (*layer_2).size();
-    const char *bias_char = (*layer_2).c_str();
-    const double *bias_double = reinterpret_cast<const double *>(bias_char);
-    this->model.set_bias(bias_double[0]);
+    if (layer_2->size() != sizeof(double)) {
+      throw std::runtime_error("Bias tensor must contain exactly one double");
+    }
+    this->model.set_bias(double_from_little_endian_bytes(layer_2->data()));
     std::cout << "  b_server = " << std::fixed << this->model.get_bias()
               << std::endl;
   }
