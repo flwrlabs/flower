@@ -17,7 +17,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import PurePosixPath
 from uuid import uuid4
 
 from flwr.supercore.constant import TaskType
@@ -25,6 +26,8 @@ from flwr.supercore.constant import TaskType
 WARM_EXECUTOR_LABEL = "flower.ai/warm-executor"
 WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION = "flower.ai/warm-executor-runtime-image"
 WARM_EXECUTOR_CONFIGURATION_ANNOTATION = "flower.ai/warm-executor-config-sha256"
+WARM_EXECUTOR_FAB_HASH_ANNOTATION = "flower.ai/warm-executor-fab-hash"
+WARM_EXECUTOR_FAB_PATH_ANNOTATION = "flower.ai/warm-executor-fab-path"
 _TASK_ID_LABEL = "flower.ai/superexec-task-id"
 _TASK_TYPE_LABEL = "flower.ai/task-type"
 WARM_EXECUTOR_TASK_TYPES = frozenset(
@@ -38,6 +41,9 @@ class WarmExecutorPoolKey:
 
     task_type: TaskType
     runtime_image: str
+    fab_hash: str | None = None
+    # The deployment path changes Pod compatibility, but not routed identity.
+    fab_path: str | None = field(default=None, compare=False, hash=False)
 
     def __post_init__(self) -> None:
         """Validate values persisted on a warm TaskExecutor Pod."""
@@ -47,6 +53,29 @@ class WarmExecutorPoolKey:
             raise ValueError(
                 "Warm executor pool key requires a non-empty runtime_image."
             )
+        fab_fields = (self.fab_hash, self.fab_path)
+        if any(value is not None for value in fab_fields):
+            if self.task_type != TaskType.AGENT_APP:
+                raise ValueError("Only AgentApp warm executor pools can preload a FAB.")
+            if not all(
+                isinstance(value, str) and value.strip() for value in fab_fields
+            ):
+                raise ValueError(
+                    "Prestarted AgentApp pools require non-empty fab_hash and "
+                    "fab_path values."
+                )
+            assert isinstance(self.fab_hash, str)
+            if len(self.fab_hash) != 64 or any(
+                char not in "0123456789abcdef" for char in self.fab_hash
+            ):
+                raise ValueError(
+                    "Prestarted AgentApp pools require a full SHA-256 fab_hash."
+                )
+            assert isinstance(self.fab_path, str)
+            if not PurePosixPath(self.fab_path).is_absolute():
+                raise ValueError(
+                    "Prestarted AgentApp pools require an absolute fab_path."
+                )
 
 
 @dataclass(frozen=True)
@@ -111,6 +140,14 @@ def is_compatible_warm_executor(pod: object, pool_key: WarmExecutorPoolKey) -> b
         (
             _object_field(annotations, WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION),
             pool_key.runtime_image,
+        ),
+        (
+            _object_field(annotations, WARM_EXECUTOR_FAB_HASH_ANNOTATION),
+            pool_key.fab_hash,
+        ),
+        (
+            _object_field(annotations, WARM_EXECUTOR_FAB_PATH_ANNOTATION),
+            pool_key.fab_path,
         ),
     )
     if any(actual != expected for actual, expected in expected_fields):

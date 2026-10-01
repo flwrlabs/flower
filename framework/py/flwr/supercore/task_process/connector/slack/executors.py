@@ -16,6 +16,8 @@
 
 from typing import cast
 
+import requests
+
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
@@ -26,7 +28,12 @@ from ..json_utils import (
     require_int_range,
     require_string,
 )
-from .actions import SLACK_CONVERSATION_TYPES
+from .actions import (
+    SLACK_CONVERSATION_TYPES,
+    SLACK_LIST_CONVERSATIONS_MAX_LIMIT,
+    SLACK_MESSAGE_MAX_LIMIT,
+    SLACK_SEARCH_MAXIMUM,
+)
 
 _SLACK_API_BASE_URL = "https://slack.com/api"
 
@@ -41,13 +48,32 @@ def search_messages(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
     """Search messages visible to the connected Slack user."""
+    params: dict[str, str | None] = {
+        "query": require_string(arguments.get("query"), "Slack", "query"),
+        "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
+        "sort": optional_string(arguments.get("sort"), "Slack", "sort"),
+        "sort_dir": optional_string(arguments.get("sort_dir"), "Slack", "sort_dir"),
+        "team_id": optional_string(arguments.get("team_id"), "Slack", "team_id"),
+    }
+    for name in ("count", "page"):
+        if name in arguments:
+            params[name] = str(
+                require_int_range(
+                    arguments[name],
+                    "Slack",
+                    name,
+                    minimum=1,
+                    maximum=SLACK_SEARCH_MAXIMUM,
+                )
+            )
+    if "highlight" in arguments:
+        params["highlight"] = str(
+            require_bool(arguments["highlight"], "Slack", "highlight")
+        ).lower()
     return _call_slack_api(
         "search.messages",
         context.credentials,
-        {
-            "query": require_string(arguments.get("query"), "Slack", "query"),
-            "count": _limit(arguments, default=5, maximum=15),
-        },
+        params,
     )
 
 
@@ -67,49 +93,85 @@ def list_conversations(
         item not in SLACK_CONVERSATION_TYPES for item in selected_types
     ):
         raise ValueError("Slack conversation types are invalid.")
+    params: dict[str, str | None] = {
+        "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
+        "types": ",".join(dict.fromkeys(selected_types)),
+        "team_id": optional_string(arguments.get("team_id"), "Slack", "team_id"),
+    }
+    if "limit" in arguments:
+        params["limit"] = str(
+            require_int_range(
+                arguments["limit"],
+                "Slack",
+                "limit",
+                maximum=SLACK_LIST_CONVERSATIONS_MAX_LIMIT,
+            )
+        )
+    if "exclude_archived" in arguments:
+        params["exclude_archived"] = str(
+            require_bool(arguments["exclude_archived"], "Slack", "exclude_archived")
+        ).lower()
     return _call_slack_api(
         "conversations.list",
         context.credentials,
-        {
-            "limit": _limit(arguments, default=10, maximum=50),
-            "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
-            "types": ",".join(dict.fromkeys(selected_types)),
-            "exclude_archived": str(
-                require_bool(
-                    arguments.get("exclude_archived", True),
-                    "Slack",
-                    "exclude_archived",
-                )
-            ).lower(),
-        },
+        params,
     )
 
 
 def get_conversation_history(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
-    """Read one page of a Slack conversation's message history."""
+    """Get recent messages from a Slack conversation."""
+    params: dict[str, str | None] = {
+        "channel": require_string(arguments.get("channel_id"), "Slack", "channel_id"),
+        "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
+    }
+    if "limit" in arguments:
+        params["limit"] = str(
+            require_int_range(
+                arguments["limit"],
+                "Slack",
+                "limit",
+                maximum=SLACK_MESSAGE_MAX_LIMIT,
+            )
+        )
     return _call_slack_api(
         "conversations.history",
         context.credentials,
-        _conversation_params(arguments),
+        params,
     )
 
 
-def get_thread_replies(
+def get_conversation_replies(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
-    """Read one page of replies from a Slack thread."""
-    params = _conversation_params(arguments)
-    params["ts"] = require_string(arguments.get("thread_ts"), "Slack", "thread_ts")
-    return _call_slack_api("conversations.replies", context.credentials, params)
+    """Get messages in a Slack thread."""
+    params: dict[str, str | None] = {
+        "channel": require_string(arguments.get("channel_id"), "Slack", "channel_id"),
+        "ts": require_string(arguments.get("thread_ts"), "Slack", "thread_ts"),
+        "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
+    }
+    if "limit" in arguments:
+        params["limit"] = str(
+            require_int_range(
+                arguments["limit"],
+                "Slack",
+                "limit",
+                maximum=SLACK_MESSAGE_MAX_LIMIT,
+            )
+        )
+    return _call_slack_api(
+        "conversations.replies",
+        context.credentials,
+        params,
+    )
 
 
 EXECUTORS: dict[str, ConnectorExecutor] = {
     "search_messages": search_messages,
     "list_conversations": list_conversations,
     "get_conversation_history": get_conversation_history,
-    "get_thread_replies": get_thread_replies,
+    "get_conversation_replies": get_conversation_replies,
 }
 
 
@@ -126,38 +188,39 @@ def _call_slack_api(
         error=SlackApiError,
         headers={"Authorization": f"Bearer {token}"},
         params={key: value for key, value in params.items() if value is not None},
-        http_error_code=lambda response: (
-            "rate_limited" if response.status_code == 429 else "http_error"
-        ),
+        http_error_details=_response_error_details,
     )
     if payload.get("ok") is not True:
-        error = payload.get("error")
-        code = (
-            error
-            if isinstance(error, str)
-            and error.replace("_", "").isalnum()
-            and error.islower()
-            else "api_error"
-        )
-        raise SlackApiError(code)
+        code, message = _payload_error_details(payload, "api_error")
+        raise SlackApiError(code, message=message)
     return payload
 
 
-def _conversation_params(arguments: JSONObject) -> dict[str, str | None]:
-    """Build validated parameters for a Slack conversation read."""
-    return {
-        "channel": require_string(
-            arguments.get("conversation_id"), "Slack", "conversation_id"
-        ),
-        "limit": _limit(arguments, default=10, maximum=15),
-        "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
-    }
+def _response_error_details(response: requests.Response) -> tuple[str, str | None]:
+    """Return Slack's documented error code and message."""
+    fallback_code = "rate_limited" if response.status_code == 429 else "http_error"
+    try:
+        payload = response.json()
+    except ValueError:
+        return fallback_code, None
+    if not isinstance(payload, dict):
+        return fallback_code, None
+    return _payload_error_details(cast(JSONObject, payload), fallback_code)
 
 
-def _limit(arguments: JSONObject, *, default: int, maximum: int) -> str:
-    """Return one validated Slack page limit."""
-    return str(
-        require_int_range(
-            arguments.get("limit", default), "Slack", "limit", maximum=maximum
-        )
-    )
+def _payload_error_details(
+    payload: JSONObject, fallback_code: str
+) -> tuple[str, str | None]:
+    """Return Slack error details from either response envelope shape."""
+    error = payload.get("error")
+    code = error if isinstance(error, str) and error else fallback_code
+    message = payload.get("message")
+    if isinstance(message, str) and message:
+        return code, message
+    metadata = payload.get("response_metadata")
+    messages = metadata.get("messages") if isinstance(metadata, dict) else None
+    if isinstance(messages, list):
+        diagnostics = [item for item in messages if isinstance(item, str) and item]
+        if diagnostics:
+            return code, "; ".join(diagnostics)
+    return code, None

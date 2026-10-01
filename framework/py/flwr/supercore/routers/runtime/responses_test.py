@@ -24,12 +24,18 @@ from fastapi.testclient import TestClient
 from starlette.responses import StreamingResponse
 from starlette.types import Message, Scope
 
+from flwr.app.constants import DEFAULT_TTL
+from flwr.app.message_type import MessageType
+from flwr.app.metadata import Metadata
 from flwr.common.constant import Status, SubStatus
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
-from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.constant import TaskType
-from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
-from flwr.superlink.dependencies.linkstate import get_linkstate
+from flwr.supercore.corestate import CoreState
+from flwr.supercore.date import now
+from flwr.supercore.dependencies.runtime import get_runtime_state
+from flwr.supercore.json_message.base import make_json_message
+from flwr.supercore.json_message.model_message import ModelResponse
+from flwr.supercore.typing import JSONObject
 
 from .responses import (
     _Exchange,
@@ -44,12 +50,12 @@ from .responses import (
 def _client(state: Mock) -> TestClient:
     app = FastAPI()
     app.include_router(router)
-    app.dependency_overrides[get_linkstate] = lambda: state
+    app.dependency_overrides[get_runtime_state] = lambda: state
     return TestClient(app)
 
 
 def _state() -> Mock:
-    state = Mock(spec=LinkState)
+    state = Mock(spec=CoreState)
     state.get_node_id.return_value = 789
     state.get_task_by_token.return_value = Task(
         task_id=123, run_id=789, type=TaskType.AGENT_APP
@@ -60,15 +66,28 @@ def _state() -> Mock:
 
 
 def _reply(request_message_id: str) -> ModelResponse:
-    return ModelResponse(
+    metadata = Metadata(
+        run_id=789,
+        message_id="response-message-id",
+        src_node_id=789,
+        dst_node_id=789,
+        reply_to_message_id=request_message_id,
+        group_id="",
+        created_at=now().timestamp(),
+        ttl=DEFAULT_TTL,
+        message_type=MessageType.QUERY,
+        src_task_id=456,
         dst_task_id=123,
-        response={
+    )
+    return make_json_message(
+        ModelResponse,
+        metadata=metadata,
+        payload={
             "object": "response",
             "id": "resp_1",
             "status": "completed",
             "output": [],
         },
-        reply_to_message_id=request_message_id,
     )
 
 
@@ -83,12 +102,9 @@ def _event(event_id: int, event: str, data: str | None = None) -> TaskEvent:
     )
 
 
-def _stream_request() -> ModelRequest:
-    """Create one streaming model request."""
-    return ModelRequest.from_payload(
-        dst_task_id=0,
-        payload={"model": "model", "input": "hello", "stream": True},
-    )
+def _stream_request() -> JSONObject:
+    """Create one normalized streaming model request payload."""
+    return {"model": "model", "input": "hello", "stream": True}
 
 
 @pytest.mark.parametrize("authorization", [None, "Basic task-token"])
@@ -259,7 +275,7 @@ def test_responses_reports_missing_terminal_event() -> None:
 def test_responses_maps_unexpected_errors() -> None:
     """Return an OpenAI-style error envelope for unexpected failures."""
     with patch(
-        "flwr.superlink.routers.runtime.responses._authenticate",
+        "flwr.supercore.routers.runtime.responses._authenticate",
         side_effect=RuntimeError("unexpected"),
     ):
         response = _client(_state()).post(
@@ -294,7 +310,7 @@ def test_responses_stops_and_drains_when_response_wait_is_cancelled() -> None:
             agent_task_id=123,
             model_task_id=456,
         )
-        with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=10):
+        with patch("flwr.supercore.routers.runtime.responses._POLL_INTERVAL", new=10):
             response_wait = asyncio.create_task(
                 _wait_for_response(request, state, exchange)
             )
@@ -359,7 +375,7 @@ def test_responses_times_out_if_model_task_is_not_launched() -> None:
             model_task_id=456,
         )
         with patch(
-            "flwr.superlink.routers.runtime.responses._model_task_launch_timeout",
+            "flwr.supercore.routers.runtime.responses._model_task_launch_timeout",
             return_value=0.0,
         ):
             with pytest.raises(_ResponsesError) as exc_info:
@@ -393,7 +409,7 @@ def test_responses_times_out_if_running_model_task_does_not_respond() -> None:
             model_task_id=456,
         )
         with patch(
-            "flwr.superlink.routers.runtime.responses._DEFAULT_MODEL_RESPONSE_TIMEOUT",
+            "flwr.supercore.routers.runtime.responses._DEFAULT_MODEL_RESPONSE_TIMEOUT",
             new=0.0,
         ):
             with pytest.raises(_ResponsesError) as exc_info:
@@ -431,7 +447,7 @@ def test_responses_stops_and_drains_when_stream_task_group_is_cancelled() -> Non
         async def consume_stream() -> None:
             await anext(stream)
 
-        with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=10):
+        with patch("flwr.supercore.routers.runtime.responses._POLL_INTERVAL", new=10):
             async with anyio.create_task_group() as task_group:
                 task_group.start_soon(consume_stream)
                 await asyncio.wait_for(wait_until_polled(), timeout=1)

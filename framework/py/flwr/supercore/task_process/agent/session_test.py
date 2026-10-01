@@ -14,7 +14,6 @@
 # ==============================================================================
 """Runtime AgentApp session tests."""
 
-
 from unittest.mock import Mock, call, patch
 
 import pytest
@@ -40,11 +39,25 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
+from flwr.supercore.task_identity import TaskIdentity
+from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
-from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject
 
-from .session import AgentRuntime, RuntimeAgentConnectors, RuntimeAgentEvents
+from .session import (
+    AgentRuntime,
+    RuntimeAgentConnectors,
+    RuntimeAgentEvents,
+    RuntimeAgentSession,
+)
+
+
+@pytest.fixture(autouse=True)
+def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the task identity used by Agent task messages."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 789)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 123)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 456)
 
 
 def test_emit_event_pushes_task_event() -> None:
@@ -69,6 +82,18 @@ def test_emit_event_pushes_task_event() -> None:
     stub.PushTaskEvents.assert_called_once_with(
         PushTaskEventsRequest(events=[expected_event])
     )
+
+
+def test_runtime_agent_session_exposes_prompt() -> None:
+    """Expose the initial prompt without additional runtime calls."""
+    session = RuntimeAgentSession(
+        prompt="Initial prompt",
+        connectors=Mock(),
+        events=Mock(),
+        grid=Mock(),
+    )
+
+    assert session.prompt == "Initial prompt"
 
 
 def test_close_drains_events_before_worker_stops() -> None:
@@ -198,7 +223,9 @@ def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
     expected_properties = {"input", "start_at", "fixed_interval", "max_runs"}
 
     # Execute
-    parameters = get_builtin_connector_tool(START_AUTOMATION_TOOL_NAME)["parameters"]
+    parameters = connector_registry.get_connector_tools(START_AUTOMATION_TOOL_NAME)[0][
+        "parameters"
+    ]
 
     # Assert
     assert isinstance(parameters, dict)
@@ -262,11 +289,10 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         max_runs=3,
         start_run_request=StartRunRequest(
             app_spec="example/app",
-            override_config=user_config_to_proto(
-                {"existing": "value", "agent.input": "Do work"}
-            ),
+            override_config=user_config_to_proto({"existing": "value"}),
             federation="@account/federation",
             series_id=2,
+            user_prompt="Do work",
         ),
     )
     items = [item.args[0][0] for item in push_run_events.call_args_list]
@@ -361,3 +387,60 @@ def test_create_connector_response_resolves_canonical_name() -> None:
     assert isinstance(request, ConnectorRequest)
     assert request.payload["name"] == "notion_search"
     assert output == "done"
+
+
+def test_create_connector_response_uses_connector_task_for_filesystem() -> None:
+    """Filesystem calls should execute through a Connector task."""
+    stub = Mock()
+    stub.CreateTask.return_value = CreateTaskResponse(task_id=456)
+    agent_runtime = AgentRuntime(
+        stub=stub,
+        run_id=123,
+        task_id=789,
+        start_run_request=StartRunRequest(),
+        events=Mock(),
+    )
+    reply = ConnectorResponse(
+        dst_task_id=789,
+        name="filesystem_list_directory",
+        call_id="call-1",
+        output={"entries": []},
+        error=None,
+        reply_to_message_id="request-message-id",
+    )
+
+    with patch.object(agent_runtime, "_send_and_receive", return_value=reply):
+        output = agent_runtime.create_connector_response(
+            name="filesystem_list_directory",
+            call_id="call-1",
+            arguments={"path": "/allowed"},
+        )
+
+    assert output == {"entries": []}
+    stub.CreateTask.assert_called_once_with(
+        CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref="filesystem")
+    )
+
+
+def test_connector_tools_include_agent_handled_automation() -> None:
+    """Automation and connector schemas should remain available in request order."""
+    connectors = RuntimeAgentConnectors(Mock())
+
+    assert [
+        tool["name"]
+        for tool in connectors.tools(
+            ["web_search", START_AUTOMATION_TOOL_NAME, "notion"]
+        )
+    ] == [
+        "web_search",
+        "start_automation",
+        "notion_search",
+        "notion_get_page",
+        "notion_get_page_property",
+        "notion_get_database",
+        "notion_get_block",
+        "notion_get_block_children",
+        "notion_list_users",
+        "notion_get_user",
+        "notion_get_self",
+    ]

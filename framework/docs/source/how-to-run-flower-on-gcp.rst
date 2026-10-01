@@ -481,8 +481,6 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                   - "--insecure"
                   - "--runtime-api-address"
                   - "superlink-service:8000"
-                  - "--plugin-type"
-                  - "serverapp"
 
 .. dropdown:: superexec-clientapp-1-deployment.yaml
 
@@ -510,8 +508,6 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                   - "--insecure"
                   - "--runtime-api-address"
                   - "supernode-1-service:9094"
-                  - "--plugin-type"
-                  - "clientapp"
 
 .. dropdown:: superexec-clientapp-2-deployment.yaml
 
@@ -539,8 +535,6 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                   - "--insecure"
                   - "--runtime-api-address"
                   - "supernode-2-service:9094"
-                  - "--plugin-type"
-                  - "clientapp"
 
 Once you have created the required files, you can use the following ``k8s-deploy.sh``
 helper script to deploy all the ``Pods``.

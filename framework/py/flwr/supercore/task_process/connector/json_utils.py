@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Validation helpers shared by account-scoped connectors."""
+"""Validation helpers shared by federation-scoped connectors."""
 
 
 from collections.abc import Callable

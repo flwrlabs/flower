@@ -17,7 +17,7 @@
 
 from typing import Any
 
-from flwr.app import Error, Message, Metadata
+from flwr.app import DEFAULT_TTL, ConfigRecord, Error, Message, Metadata, RecordDict
 from flwr.app.message import make_message
 from flwr.common.constant import HEARTBEAT_PATIENCE, SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
@@ -26,7 +26,11 @@ from flwr.common.serde_utils import error_from_proto, error_to_proto
 # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
-from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
+from flwr.supercore.constant import (
+    AGENT_MESSAGE_CONTENT_RECORD_KEY,
+    AGENT_MESSAGE_TEXT_KEY,
+    SYSTEM_MESSAGE_TYPE,
+)
 from flwr.supercore.corestate.utils import (
     generate_rand_int_from_bytes as corestate_generate_rand_int_from_bytes,
 )
@@ -46,6 +50,26 @@ NODE_UNAVAILABLE_ERROR_REASON = (
     "Error: Node Unavailable — The destination node failed to report a heartbeat "
     f"within {HEARTBEAT_PATIENCE} × its expected interval."
 )
+
+
+def create_user_prompt_message(run_id: int, user_prompt: str) -> Message:
+    """Create a SuperLink instruction Message carrying an AgentApp user prompt."""
+    metadata = Metadata(
+        run_id=run_id,
+        message_id="",
+        src_node_id=SUPERLINK_NODE_ID,
+        dst_node_id=SUPERLINK_NODE_ID,
+        reply_to_message_id="",
+        group_id="",
+        message_type=SYSTEM_MESSAGE_TYPE,
+        created_at=now().timestamp(),
+        ttl=DEFAULT_TTL,
+    )
+    agent_record = ConfigRecord({AGENT_MESSAGE_TEXT_KEY: user_prompt})
+    content = RecordDict({AGENT_MESSAGE_CONTENT_RECORD_KEY: agent_record})
+    message = make_message(metadata=metadata, content=content)
+    message.metadata.__dict__["_message_id"] = message.object_id
+    return message
 
 
 def generate_rand_int_from_bytes(
@@ -129,11 +153,13 @@ def create_message_error_unavailable_res_message(
     return msg
 
 
-def create_message_error_unavailable_ins_message(reply_to_message_id: str) -> Message:
+def create_message_error_unavailable_ins_message(
+    reply_to_message_id: str, run_id: int
+) -> Message:
     """Error to indicate that the enquired Message had expired before reply arrived or
     that it isn't found."""
     metadata = Metadata(
-        run_id=0,  # Unknown
+        run_id=run_id,
         message_id="",
         src_node_id=SUPERLINK_NODE_ID,
         dst_node_id=SUPERLINK_NODE_ID,
@@ -163,6 +189,7 @@ def message_ttl_has_expired(message_metadata: Metadata, current_time: float) -> 
 def verify_message_ids(
     inquired_message_ids: set[str],
     found_message_ins_dict: dict[str, Message],
+    run_id: int,
     current_time: float | None = None,
     update_set: bool = True,
 ) -> dict[str, Message]:
@@ -174,6 +201,8 @@ def verify_message_ids(
         Set of Message IDs for which to generate error Message if invalid.
     found_message_ins_dict : dict[str, Message]
         Dictionary containing all found Message indexed by their IDs.
+    run_id : int
+        The run ID to use for generated error Messages.
     current_time : Optional[float] (default: None)
         The current time to check for expiration. If set to `None`, the current time
         will automatically be set to the current timestamp using `now().timestamp()`.
@@ -197,7 +226,9 @@ def verify_message_ids(
         ):
             if update_set:
                 inquired_message_ids.remove(message_id)
-            message_res = create_message_error_unavailable_ins_message(message_id)
+            message_res = create_message_error_unavailable_ins_message(
+                message_id, run_id
+            )
             ret_dict[message_id] = message_res
     return ret_dict
 

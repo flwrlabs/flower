@@ -22,7 +22,7 @@ import os
 import tempfile
 import threading
 import unittest
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
 from parameterized import parameterized
@@ -42,8 +42,9 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectRequest,
     PushObjectRequest,
 )
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.node_pb2 import Node, NodeInfo  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
     ClaimTaskRequest,
     CreateTaskRequest,
     GetConnectorRequest,
@@ -54,7 +55,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetRunSeriesEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
-    PullPendingTasksRequest,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushAppMessagesRequest,
@@ -72,7 +72,6 @@ from flwr.supercore.constant import (
     AutomationStatus,
     TaskType,
 )
-from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
@@ -87,6 +86,25 @@ from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.runtime import runtime_handlers
 
 # pylint: disable=broad-except,too-many-lines
+
+
+def test_get_nodes_returns_metadata() -> None:
+    """Return names and locations for available nodes."""
+    state = Mock(spec=LinkState)
+    state.get_nodes.return_value = {11, 22}
+    state.get_node_info.return_value = [
+        NodeInfo(node_id=11, name="London", location="51.5072,-0.1276"),
+        NodeInfo(node_id=22),
+    ]
+
+    response = runtime_handlers.get_nodes(GetNodesRequest(), state, Task(run_id=123))
+
+    assert response == GetNodesResponse(
+        nodes=[
+            NodeInfo(node_id=11, name="London", location="51.5072,-0.1276"),
+            NodeInfo(node_id=22),
+        ]
+    )
 
 
 def test_raise_if_false() -> None:
@@ -260,9 +278,17 @@ class TestGetConnector(unittest.TestCase):
 
     def test_returns_authenticated_task_credentials(self) -> None:
         """GetConnector should return the run owner's matching credentials."""
-        task = Mock(type=TaskType.CONNECTOR, connector_ref="notion", run_id=123)
-        self.state.get_run_info.return_value = [Mock(flwr_aid="account-a")]
-        self.state.get_connector.return_value = Mock(
+        task = Mock(
+            type=TaskType.CONNECTOR,
+            connector_ref="",
+            connector_id=42,
+            run_id=123,
+        )
+        self.state.get_run_info.return_value = [Mock(federation_id="@bob/fed-a")]
+        self.state.get_run_connector_ids.return_value = [42]
+        self.state.get_connector_by_id.return_value = Mock(
+            connector_id=42,
+            federation_id="@bob/fed-a",
             connector_ref="notion",
             credentials_json='{"token":"secret"}',
             config_json='{"workspace":"primary"}',
@@ -275,30 +301,34 @@ class TestGetConnector(unittest.TestCase):
         self.assertEqual(
             response,
             GetConnectorResponse(
+                connector_id=42,
                 connector_ref="notion",
                 credentials_json='{"token":"secret"}',
                 config_json='{"workspace":"primary"}',
             ),
         )
-        self.state.get_connector.assert_called_once_with(
-            flwr_aid="account-a",
-            connector_ref="notion",
-        )
+        self.state.get_run_connector_ids.assert_called_once_with(123)
+        self.state.get_connector_by_id.assert_called_once_with(42)
 
     @parameterized.expand(  # type: ignore
         [
-            ("wrong_task_type", TaskType.AGENT_APP, "notion"),
-            ("missing_ref", TaskType.CONNECTOR, ""),
+            ("wrong_task_type", TaskType.AGENT_APP, 42),
+            ("missing_id", TaskType.CONNECTOR, 0),
         ]
     )
     def test_rejects_wrong_task_identity(
         self,
         _name: str,
         task_type: str,
-        connector_ref: str,
+        connector_id: int,
     ) -> None:
         """GetConnector should reject tasks without a connector identity."""
-        task = Mock(type=task_type, connector_ref=connector_ref, run_id=123)
+        task = Mock(
+            type=task_type,
+            connector_ref="notion",
+            connector_id=connector_id,
+            run_id=123,
+        )
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.get_connector(GetConnectorRequest(), self.state, task)
 
@@ -306,22 +336,8 @@ class TestGetConnector(unittest.TestCase):
             error.exception.code,
             ApiErrorCode.RUNTIME_CONNECTOR_CREDENTIALS_NOT_AVAILABLE,
         )
-        self.state.get_connector.assert_not_called()
-
-    def test_hides_other_account_credentials(self) -> None:
-        """GetConnector should not fall back to another account's credentials."""
-        task = Mock(type=TaskType.CONNECTOR, connector_ref="notion", run_id=123)
-        self.state.get_run_info.return_value = [Mock(flwr_aid="account-b")]
-        self.state.get_connector.return_value = None
-
-        with self.assertRaises(FlowerError) as error:
-            runtime_handlers.get_connector(GetConnectorRequest(), self.state, task)
-
-        self.state.get_connector.assert_called_once_with(
-            flwr_aid="account-b",
-            connector_ref="notion",
-        )
-        self.assertEqual(error.exception.code, ApiErrorCode.CONNECTOR_NOT_FOUND)
+        self.state.get_run_connector_ids.assert_not_called()
+        self.state.get_connector_by_id.assert_not_called()
 
 
 class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902, R0904
@@ -365,8 +381,8 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         if num_transitions > 2:
             assert self.state.finish_task(task_id, "", "")
 
-    def test_pull_pending_tasks_processes_due_automations(self) -> None:
-        """A SuperExec poll should create and return a due automation's task."""
+    def test_acquire_task_processes_due_automations(self) -> None:
+        """A SuperExec poll should create and claim a due automation's task."""
         series_id = self.state.get_run_info(run_ids=[self._auth_run_id])[0].series_id
         automation = self.state.store_automation(
             federation_id=NOOP_FEDERATION_ID,
@@ -396,12 +412,13 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
                 return_value=("flwr/demo", "0.1.0"),
             ),
         ):
-            response = runtime_handlers.pull_pending_tasks(
-                PullPendingTasksRequest(), self.state
+            response = runtime_handlers.acquire_task(
+                AcquireTaskRequest(supported_task_types=[TaskType.SERVER_APP]),
+                self.state,
             )
 
-        self.assertEqual(len(response.tasks), 1)
-        run = self.state.get_run_info(run_ids=[response.tasks[0].run_id])[0]
+        self.assertTrue(response.token)
+        run = self.state.get_run_info(run_ids=[response.task.run_id])[0]
         self.assertEqual(run.series_id, automation.series_id)
         completed = self.state.list_automations(
             automation_ids=[automation.automation_id],
@@ -415,6 +432,15 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             order_by="updated_at",
         )
         self.assertEqual(active, [])
+
+    def test_acquire_task_processes_due_automations_without_capacity(self) -> None:
+        """An empty acquisition still triggers scheduled automations."""
+        with patch.object(runtime_handlers, "process_due_automations") as process_due:
+            response = runtime_handlers.acquire_task(AcquireTaskRequest(), self.state)
+
+        process_due.assert_called_once()
+        self.assertFalse(response.HasField("task"))
+        self.assertFalse(response.token)
 
     def _create_dummy_run(self, running: bool = True, *, fab_hash: str = "") -> int:
         run_id = self.state.create_run(
@@ -445,11 +471,13 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         assert task.type == TaskType.MODEL
         assert task.model_ref == "models/abc"
 
-    def test_start_automation_enriches_connector_refs(self) -> None:
-        """Enrich connector refs and delegate automation creation."""
+    def test_start_automation_enriches_connector_ids(self) -> None:
+        """Enrich connector IDs and delegate automation creation."""
         # Prepare
         request = StartAutomationRequest(
-            start_run_request=StartRunRequest(connector_refs=["untrusted"])
+            start_run_request=StartRunRequest(
+                connector_ids=[999], connector_refs=["legacy"]
+            )
         )
         expected = StartAutomationResponse(automation_id=1)
 
@@ -460,9 +488,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
                 "start_control_automation",
                 return_value=expected,
             ) as start_automation_mock,
-            patch.object(
-                self.state, "get_run_connector_refs", return_value=["calendar"]
-            ),
+            patch.object(self.state, "get_run_connector_ids", return_value=[42]),
         ):
             response = runtime_handlers.start_automation(
                 request,
@@ -472,7 +498,8 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
 
         # Assert
         assert response is expected
-        assert list(request.start_run_request.connector_refs) == ["calendar"]
+        assert list(request.start_run_request.connector_ids) == [42]
+        assert not request.start_run_request.connector_refs
         assert start_automation_mock.call_args.args[0] is request
 
     def test_start_automation_rejects_clientapp_task(self) -> None:
@@ -735,46 +762,6 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         assert isinstance(response, PullAppMessagesResponse)
         assert self.state.num_message_ins() == 0
         assert self.state.num_message_res() == 0
-
-    def test_pull_message_from_expired_message_error(self) -> None:
-        """Test that the servicer correctly handles the registration in the ObjectStore
-        of an Error message created by the LinkState due to an expired TTL."""
-        # Prepare
-        run_id = self._auth_run_id
-
-        # Push Messages and reply
-        message_ins = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
-            )
-        )
-        message_ins.metadata.ttl = 1  # set short TTL for testing
-        msg_id = self.state.store_message_ins(message=message_ins)
-
-        # Simulate situation where the message has expired in the LinkState
-        # This will trigger the creation of an Error message
-        future_dt = now() + timedelta(seconds=message_ins.metadata.ttl + 0.1)
-        with patch("datetime.datetime") as mock_dt:
-            mock_dt.now.return_value = future_dt  # over TTL limit
-
-            # Execute
-            request = PullAppMessagesRequest(message_ids=[str(msg_id)])
-            response = runtime_handlers.pull_messages(
-                request, self.state, self._auth_task
-            )
-
-            # Assert
-            assert isinstance(response, PullAppMessagesResponse)
-
-            # Assert that objects to pull points to a message carrying an error
-            msg_res = message_from_proto(response.messages_list[0])
-            assert msg_res.has_error()
-            object_tree = response.message_object_trees[0]
-            object_ids_in_response = [
-                tree.object_id for tree in iterate_object_tree(object_tree)
-            ]
-            # expected a single object id (that of the error message)
-            assert list(object_ids_in_response) == [msg_res.object_id]
 
     def test_push_object_successful(self) -> None:
         """Test `PushObject`."""

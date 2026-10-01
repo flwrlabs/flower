@@ -22,14 +22,11 @@ from logging import ERROR, WARNING
 from typing import Any
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
-from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    ClaimTaskRequest,
-    PullPendingTasksRequest,
-)
+from flwr.proto.runtime_pb2 import AcquireTaskRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import ExecutorType, TaskType
+from flwr.supercore.constant import ExecutorType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import (
@@ -44,8 +41,7 @@ from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 from .executor import LaunchResult, LaunchResultStatus, get_executor
 from .executor.config import ExecutorConfig
-from .plugin import ExecPlugin
-from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
+from .plugin import AutoExecPlugin
 
 _TASK_POLL_INTERVAL_ENV = "FLWR_SUPEREXEC_TASK_POLL_INTERVAL"
 _MIN_TASK_POLL_INTERVAL_SECONDS = 0.01
@@ -53,6 +49,7 @@ _MAX_TASK_POLL_INTERVAL_SECONDS = 60.0
 _DEFAULT_TASK_POLL_INTERVAL_SECONDS = 1.0
 _SUPEREXEC_AUTH_METHODS = frozenset(
     {
+        "/flwr.proto.Runtime/AcquireTask",
         "/flwr.proto.Runtime/PullPendingTasks",
         "/flwr.proto.Runtime/ClaimTask",
     }
@@ -88,13 +85,8 @@ def _get_task_poll_interval() -> float:
     return interval
 
 
-def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
+def _handle_launch_result(result: LaunchResult, task: Task) -> None:
     """Handle the immediate outcome of a TaskExecutor launch attempt."""
-    # Temporary: ephemeral plugins may not return a LaunchResult.
-    # Remove this once ephemeral plugins are removed.
-    if result is None:
-        return
-
     if result.status == LaunchResultStatus.ACCEPTED:
         return
 
@@ -136,8 +128,6 @@ def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
 
 
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
-    plugin_class: type[ExecPlugin],
-    client_class: type[RuntimeHttpClient],
     runtime_api_address: str,
     insecure: bool,
     root_certificates_path: str | None = None,
@@ -153,10 +143,6 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
     Parameters
     ----------
-    plugin_class : type[ExecPlugin]
-        The class of the SuperExec plugin to use.
-    client_class : type[RuntimeHttpClient]
-        The HTTP client class for the Runtime API.
     runtime_api_address : str
         The address of the Runtime API.
     insecure : bool
@@ -178,7 +164,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     runtime_dependency_install : bool (default: False)
         Whether runtime dependency installation is allowed.
     executor_type : ExecutorType (default: ExecutorType.SUBPROCESS)
-        The executor to use for non-ephemeral app processes.
+        The executor to use for task processes.
     executor_config : Optional[ExecutorConfig] (default: None)
         Parsed executor configuration.
     """
@@ -197,13 +183,13 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     interceptors: list[ProtobufClientInterceptor] = [
         RuntimeVersionHttpInterceptor(component_name="SuperExec")
     ]
-    auth_interceptor: SuperExecAuthHttpInterceptor | None = None
     if superexec_auth_secret:
-        auth_interceptor = SuperExecAuthHttpInterceptor(
-            master_secret=superexec_auth_secret,
-            protected_methods=_SUPEREXEC_AUTH_METHODS,
+        interceptors.append(
+            SuperExecAuthHttpInterceptor(
+                master_secret=superexec_auth_secret,
+                protected_methods=_SUPEREXEC_AUTH_METHODS,
+            )
         )
-        interceptors.append(auth_interceptor)
 
     # Start monitoring the parent process if a PID is provided
     if parent_pid is not None:
@@ -216,7 +202,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             health_server = run_health_server_grpc_no_tls(health_server_address)
             grpc_servers.append(health_server)
 
-        client = client_class.from_server_address(
+        client = RuntimeHttpClient.from_server_address(
             server_address=runtime_api_address,
             insecure=insecure,
             root_certificates=validate_and_resolve_root_certificates(
@@ -238,18 +224,13 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     )
 
     # Create the SuperExec plugin instance
-    try:
-        plugin = plugin_class(
-            runtime_api_address=runtime_api_address,
-            insecure=insecure,
-            root_certificates_path=root_certificates_path,
-            runtime_dependency_install=runtime_dependency_install,
-            executor=executor,
-        )
-    except Exception:  # pylint: disable=broad-exception-caught
-        client.close()
-        executor.close()
-        raise
+    plugin = AutoExecPlugin(
+        runtime_api_address=runtime_api_address,
+        insecure=insecure,
+        root_certificates_path=root_certificates_path,
+        runtime_dependency_install=runtime_dependency_install,
+        executor=executor,
+    )
 
     # Load plugin configuration from file if provided
     try:
@@ -265,48 +246,22 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     try:
         while True:
             executor.reconcile()
-            # Fetch pending tasks
-            tasks_res = client.PullPendingTasks(request=PullPendingTasksRequest())
-
-            # Select a task to execute using the plugin's selection logic
-            task = None
-            if tasks_res.tasks:
-                task = plugin.select_task(tasks_res.tasks)
-
-            # If a task was selected, claim it
-            if task is not None:
-                try:
-                    task_type = TaskType(task.type)
-                except ValueError:
-                    task_type = None
-                executor.wait_for_capacity(
-                    task_type=task_type,
-                    insecure=insecure,
-                    root_certificates_path=root_certificates_path,
+            supported_task_types, agentapp_fab_hashes = executor.get_eligible_capacity(
+                set(plugin.supported_task_types),
+                insecure=insecure,
+                root_certificates_path=root_certificates_path,
+            )
+            combined_res = client.AcquireTask(
+                AcquireTaskRequest(
+                    supported_task_types=supported_task_types,
+                    agentapp_fab_hashes=agentapp_fab_hashes,
                 )
-
-                claim_req = ClaimTaskRequest(task_id=task.task_id)
-                claim_res = client.ClaimTask(claim_req)
-
-                # Launch the app if a token was granted; do nothing if not
-                if claim_res.token:
-
-                    # Destroy the auth secret before launching the app
-                    # for ephemeral plugins
-                    if isinstance(plugin, BaseEphemeralExecPlugin):
-
-                        def cleanup_auth_secret() -> None:
-                            nonlocal superexec_auth_secret
-                            if superexec_auth_secret is not None:
-                                superexec_auth_secret = None
-                            if auth_interceptor is not None:
-                                # pylint: disable-next=protected-access
-                                auth_interceptor._auth_secret = b"\x00" * 32
-
-                        plugin.cleanup_before_launch = cleanup_auth_secret
-
-                    launch_result = plugin.launch_task(token=claim_res.token, task=task)
-                    _handle_launch_result(launch_result, task)
+            )
+            if combined_res.HasField("task") and combined_res.token:
+                launch_result = plugin.launch_task(
+                    token=combined_res.token, task=combined_res.task
+                )
+                _handle_launch_result(launch_result, combined_res.task)
 
             # Sleep for a while before checking again
             time.sleep(task_poll_interval)

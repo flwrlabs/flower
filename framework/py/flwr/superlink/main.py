@@ -37,6 +37,7 @@ from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.http_logging import configure_uvicorn_logging
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health
+from flwr.supercore.routers.runtime import responses_router
 from flwr.supercore.routers.runtime import router as runtime_router
 from flwr.supercore.version import package_version
 from flwr.superlink import extensions
@@ -55,7 +56,6 @@ from flwr.superlink.routers.control.middlewares import (
     ControlLicenseMiddleware,
     ControlSensitiveResponseMiddleware,
 )
-from flwr.superlink.routers.runtime import responses_router
 from flwr.superlink.servicer.runtime import runtime_handlers
 
 try:

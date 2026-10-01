@@ -37,10 +37,16 @@ PROVIDER = ProviderDefinition(
         use_pkce=True,
         allow_additional_scopes=False,
         expected_token_type="bearer",
+        display_name_fields=("login",),
+        display_name_url="https://api.github.com/user",
+        display_name_headers={
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2026-03-10",
+        },
     ),
 )
 
-CONNECTOR = ConnectorDefinition(
+CONNECTOR = ConnectorDefinition.from_provider(
     provider=PROVIDER,
     executors=EXECUTORS,
     oauth_flow=load_oauth_flow(PROVIDER),

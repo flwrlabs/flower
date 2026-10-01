@@ -46,6 +46,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAppAssociationsRequest,
+    ListAppAssociationsResponse,
     ListAppsRequest,
     ListAppsResponse,
     ListAutomationsRequest,
@@ -78,6 +80,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SetFederationIconRequest,
+    SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
     StartAutomationRequest,
@@ -337,6 +341,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             request, _get_account(), self.linkstate_factory.state()
         )
 
+    def ListAppAssociations(
+        self, request: ListAppAssociationsRequest, context: grpc.ServicerContext
+    ) -> ListAppAssociationsResponse:
+        """List federations associated with an app."""
+        return control_handlers.list_app_associations(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
     def AddApp(
         self, request: AddAppRequest, context: grpc.ServicerContext
     ) -> AddAppResponse:
@@ -361,6 +373,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     ) -> ShowFederationResponse:
         """Show details of a specific Federation."""
         return control_handlers.show_federation(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def SetFederationIcon(
+        self, request: SetFederationIconRequest, context: grpc.ServicerContext
+    ) -> SetFederationIconResponse:
+        """Set or clear a federation icon."""
+        return control_handlers.set_federation_icon(
             request, _get_account(), self.linkstate_factory.state()
         )
 

@@ -26,6 +26,8 @@ from . import factory as factory_module
 from .factory import get_executor
 from .kubernetes_executor import KubernetesExecutor
 
+FAB_HASH = "a" * 64
+
 
 def test_get_executor_requires_kubernetes_config() -> None:
     """Test Kubernetes selection requires executor config."""
@@ -104,6 +106,55 @@ def test_get_executor_rejects_non_boolean_warm_output_logging() -> None:
                 "namespace": "flower-system",
                 "image": "ghcr.io/flwrlabs/taskexecutor:dev",
                 "log-warm-executor-output": "true",
+            }
+        )
+
+
+def test_get_executor_configures_fab_specific_agentapp_pool() -> None:
+    """Preserve exact FAB identity and its deployment-provisioned path."""
+    config = factory_module._kubernetes_executor_config_from_mapping(  # pylint: disable=protected-access
+        {
+            "namespace": "flower-system",
+            "image": "ghcr.io/flwrlabs/taskexecutor:dev",
+            "warm-executor-owner": "superexec-a",
+            "warm-executor-pools": [
+                {
+                    "task-type": TaskType.AGENT_APP.value,
+                    "size": 1,
+                    "fab-hash": FAB_HASH,
+                    "fab-path": "/opt/flwr/apps/gpt-agent.fab",
+                }
+            ],
+        }
+    )
+
+    pool_key = config.warm_executor_pools[0].key
+    assert pool_key.fab_hash == FAB_HASH
+    assert pool_key.fab_path == "/opt/flwr/apps/gpt-agent.fab"
+
+
+def test_get_executor_rejects_ambiguous_agentapp_pool_paths() -> None:
+    """One task FAB hash must route to only one configured warm pool."""
+    with pytest.raises(ValueError, match="must not repeat a routed identity"):
+        factory_module._kubernetes_executor_config_from_mapping(  # pylint: disable=protected-access
+            {
+                "namespace": "flower-system",
+                "image": "ghcr.io/flwrlabs/taskexecutor:dev",
+                "warm-executor-owner": "superexec-a",
+                "warm-executor-pools": [
+                    {
+                        "task-type": TaskType.AGENT_APP.value,
+                        "size": 1,
+                        "fab-hash": FAB_HASH,
+                        "fab-path": "/opt/flwr/apps/one.fab",
+                    },
+                    {
+                        "task-type": TaskType.AGENT_APP.value,
+                        "size": 1,
+                        "fab-hash": FAB_HASH,
+                        "fab-path": "/opt/flwr/apps/two.fab",
+                    },
+                ],
             }
         )
 

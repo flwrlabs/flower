@@ -25,10 +25,10 @@ from .definition import ConnectorDefinition, ProviderDefinition
 _PACKAGE = "flwr.supercore.task_process.connector.example"
 
 
-def test_load_connectors(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_oauth_connectors(monkeypatch: pytest.MonkeyPatch) -> None:
     """Registered definition modules should provide connector definitions."""
     module = ModuleType(f"{_PACKAGE}.definition")
-    connector = ConnectorDefinition(
+    connector = ConnectorDefinition.from_provider(
         provider=ProviderDefinition(
             ref="example",
             display_name="Example",
@@ -41,15 +41,15 @@ def test_load_connectors(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(loader, "CONNECTOR_PACKAGES", (_PACKAGE,))
     monkeypatch.setitem(sys.modules, f"{_PACKAGE}.definition", module)
 
-    assert loader.load_connectors() == (connector,)
+    assert loader.load_oauth_connectors() == (connector,)
 
 
-def test_load_connectors_rejects_package_mismatch(
+def test_load_oauth_connectors_rejects_package_mismatch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A connector reference should match its package name."""
     module = ModuleType(f"{_PACKAGE}.definition")
-    module.__dict__["CONNECTOR"] = ConnectorDefinition(
+    module.__dict__["CONNECTOR"] = ConnectorDefinition.from_provider(
         provider=ProviderDefinition(
             ref="other",
             display_name="Other",
@@ -62,4 +62,4 @@ def test_load_connectors_rejects_package_mismatch(
     monkeypatch.setitem(sys.modules, f"{_PACKAGE}.definition", module)
 
     with pytest.raises(ValueError, match="must match reference"):
-        loader.load_connectors()
+        loader.load_oauth_connectors()

@@ -26,21 +26,22 @@ from typing import cast
 
 from google.protobuf.json_format import ParseDict
 
-from flwr.agentapp import AgentConnectors, AgentEvents, AgentSession
+from flwr.agentapp import AgentConnectors, AgentEvents, AgentGrid, AgentSession
 from flwr.app import Message
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    StartAutomationRequest,
-    StartRunRequest,
-)
-from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+
+# pylint: disable=E0611
+from flwr.proto.control_pb2 import StartAutomationRequest, StartRunRequest
+from flwr.proto.runtime_pb2 import (
     CreateTaskRequest,
     GetRunSeriesEventsRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskMessageRequest,
 )
-from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent
+
+# pylint: enable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
@@ -171,11 +172,20 @@ class RuntimeAgentSession(AgentSession):
 
     def __init__(
         self,
+        prompt: str,
         connectors: AgentConnectors,
         events: AgentEvents,
+        grid: AgentGrid,
     ) -> None:
+        self._prompt = prompt
         self._connectors = connectors
         self._events = events
+        self._grid = grid
+
+    @property
+    def prompt(self) -> str:
+        """Return the initial prompt for this AgentApp run."""
+        return self._prompt
 
     @property
     def connectors(self) -> AgentConnectors:
@@ -186,6 +196,11 @@ class RuntimeAgentSession(AgentSession):
     def events(self) -> AgentEvents:
         """Frontend-visible structured run event API."""
         return self._events
+
+    @property
+    def grid(self) -> AgentGrid:
+        """Model-facing federation Grid API."""
+        return self._grid
 
 
 class RuntimeAgentConnectors(AgentConnectors):
@@ -241,12 +256,11 @@ class AgentRuntime:
     def create_connector_response(
         self, *, name: str, call_id: str, arguments: JSONObject
     ) -> JSONValue:
-        """Create one connector response through a child connector task."""
+        """Create one connector response."""
         name = name.strip().lower()
+        connector_ref = get_connector_ref(name)
         create_res = self._stub.CreateTask(
-            CreateTaskRequest(
-                type=TaskType.CONNECTOR, connector_ref=get_connector_ref(name)
-            )
+            CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=connector_ref)
         )
         if not create_res.HasField("task_id"):
             raise RuntimeError("Connector task could not be created.")
@@ -341,9 +355,7 @@ class AgentRuntime:
                     start_run_request=self._start_run_request,
                 ),
             )
-            request.start_run_request.override_config["agent.input"].string = (
-                input_value.strip()
-            )
+            request.start_run_request.user_prompt = input_value.strip()
             response = self._stub.StartAutomation(request)
             output: JSONObject = {
                 "automation_id": response.automation_id,
@@ -383,8 +395,6 @@ class AgentRuntime:
 
     def _push_task_message(self, message: Message) -> None:
         """Push one task message and return its message ID."""
-        message.metadata.__dict__["_run_id"] = self._run_id
-        message.metadata.src_task_id = self._task_id
         message.metadata.__dict__["_message_id"] = message.object_id
         self._stub.PushTaskMessage(
             PushTaskMessageRequest(message=message_to_proto(message))

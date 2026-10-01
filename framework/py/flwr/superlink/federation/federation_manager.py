@@ -130,6 +130,27 @@ class FederationManager(ABC):
         """
 
     @abstractmethod
+    def set_icon_key(
+        self, flwr_aid: str, federation_id: str, icon_key: str | None
+    ) -> None:
+        """Set or clear the custom icon for a federation.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            The ID of the account setting the icon.
+        federation_id : str
+            The federation ID.
+        icon_key : str | None
+            The icon key to store, or ``None`` to clear the custom icon.
+
+        Raises
+        ------
+        FlowerError
+            If the federation does not exist or the caller is not its owner.
+        """
+
+    @abstractmethod
     def create_federation(
         self,
         flwr_aid: str,

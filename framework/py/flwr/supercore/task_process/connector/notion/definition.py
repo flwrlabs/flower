@@ -24,7 +24,7 @@ NOTION_CONNECTOR_REF = "notion"
 PROVIDER = ProviderDefinition(
     ref=NOTION_CONNECTOR_REF,
     display_name="Notion",
-    description="Search and read pages and data sources.",
+    description="Search and read Notion content and workspace users.",
     actions=ACTIONS,
     oauth=OAuth2Definition(
         authorization_url="https://api.notion.com/v1/oauth/authorize",
@@ -36,10 +36,11 @@ PROVIDER = ProviderDefinition(
         token_request_format="json",
         token_headers={"Notion-Version": NOTION_API_VERSION},
         config_fields=("workspace_id", "workspace_name", "bot_id"),
+        display_name_fields=("workspace_name",),
     ),
 )
 
-CONNECTOR = ConnectorDefinition(
+CONNECTOR = ConnectorDefinition.from_provider(
     provider=PROVIDER,
     executors=EXECUTORS,
     oauth_flow=load_oauth_flow(PROVIDER),

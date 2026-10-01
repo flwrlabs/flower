@@ -17,40 +17,244 @@
 from ..definition import ActionAccess, ActionDefinition
 from ..tool_schema import integer_property, string_property
 
-_CURSOR = string_property("Cursor returned by the previous response.")
-
+_CURSOR = string_property(
+    "Opaque cursor returned in next_cursor by the previous response for the same "
+    "request parameters. Omit to retrieve the first page."
+)
+_PAGE_SIZE = integer_property(
+    "Number of results per page. Omit to use Notion's default.",
+    minimum=1,
+    maximum=100,
+)
 ACTIONS = (
     ActionDefinition(
         name="search",
-        description="Search pages and data sources shared with Notion.",
+        description=(
+            "Search Notion pages and data sources with optional filter, sort, and "
+            "pagination controls."
+        ),
         access=ActionAccess.READ,
         input_schema={
             "type": "object",
             "properties": {
-                "query": string_property("Text contained in the Notion title."),
-                "limit": integer_property(
-                    "Maximum number of results to return.", minimum=1, maximum=100
+                "query": string_property(
+                    "Text to match against page and data-source titles. Omit to "
+                    "return all content shared with the connection."
                 ),
-                "cursor": _CURSOR,
+                "filter": {
+                    "anyOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "property": {
+                                    "type": "string",
+                                    "enum": ["object"],
+                                    "description": "Property being filtered.",
+                                },
+                                "value": {
+                                    "type": "string",
+                                    "enum": ["page", "data_source"],
+                                    "description": "Type of Notion object to return.",
+                                },
+                                "in_trash": {
+                                    "type": "boolean",
+                                    "description": (
+                                        "Whether to return content in the trash."
+                                    ),
+                                },
+                            },
+                            "required": ["property", "value"],
+                            "additionalProperties": False,
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "in_trash": {
+                                    "type": "boolean",
+                                    "description": (
+                                        "Whether to return content in the trash."
+                                    ),
+                                },
+                            },
+                            "required": ["in_trash"],
+                            "additionalProperties": False,
+                        },
+                    ],
+                    "description": (
+                        "Use either {property: 'object', value: 'page' or "
+                        "'data_source'}, optionally with in_trash, or use "
+                        "{in_trash: boolean} by itself."
+                    ),
+                },
+                "sort": {
+                    "type": "object",
+                    "properties": {
+                        "timestamp": {
+                            "type": "string",
+                            "enum": ["last_edited_time"],
+                            "description": "Timestamp used to sort results.",
+                        },
+                        "direction": {
+                            "type": "string",
+                            "enum": ["ascending", "descending"],
+                            "description": "Sort direction.",
+                        },
+                    },
+                    "required": ["timestamp", "direction"],
+                    "additionalProperties": False,
+                    "description": "Sort results by their last-edited time.",
+                },
+                "page_size": _PAGE_SIZE,
+                "start_cursor": _CURSOR,
             },
-            "required": ["query"],
             "additionalProperties": False,
         },
     ),
     ActionDefinition(
-        name="get_page_content",
-        description="Read one page of a Notion page's block content.",
+        name="get_page",
+        description=(
+            "Retrieve a Notion page and its property values. This does not retrieve "
+            "page content or child blocks. Some properties can be truncated; use "
+            "notion_get_page_property with the property's returned ID when you need "
+            "its complete value."
+        ),
         access=ActionAccess.READ,
         input_schema={
             "type": "object",
             "properties": {
-                "page_id": string_property("Notion page ID returned by search."),
-                "max_blocks": integer_property(
-                    "Maximum number of blocks to return.", minimum=1, maximum=100
-                ),
-                "cursor": _CURSOR,
+                "page_id": string_property("The page ID to retrieve."),
+                "filter_properties": {
+                    "type": "array",
+                    "items": string_property("A property ID to include."),
+                    "maxItems": 100,
+                    "description": (
+                        "Property IDs to include in the response. Omit to return all "
+                        "available properties."
+                    ),
+                },
             },
             "required": ["page_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_page_property",
+        description=(
+            "Retrieve one property from a Notion page. Title, rich text, people, "
+            "relation, and rollup properties can return paginated lists. Pagination "
+            "is optional; only continue with next_cursor when has_more is true. A "
+            "rollup's calculation is final only on the last page."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "page_id": string_property(
+                    "The ID of the page containing the property."
+                ),
+                "property_id": string_property(
+                    "The stable property ID found at properties.<property name>.id "
+                    "in the notion_get_page response. This is not the property name, "
+                    "type, or value."
+                ),
+                "page_size": _PAGE_SIZE,
+                "start_cursor": _CURSOR,
+            },
+            "required": ["page_id", "property_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_database",
+        description=(
+            "Retrieve a Notion database container, including its metadata and "
+            "data source IDs and names. This does not return database rows."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "database_id": string_property("The database ID to retrieve."),
+            },
+            "required": ["database_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_block",
+        description=(
+            "Retrieve a single Notion block. If has_children is true, use "
+            "notion_get_block_children with the block ID to retrieve its direct "
+            "children."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "block_id": string_property("The block ID to retrieve."),
+            },
+            "required": ["block_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_block_children",
+        description=(
+            "Retrieve one page of direct children for a Notion block or page. This "
+            "does not retrieve nested descendants. Continue with next_cursor only "
+            "when has_more is true. For a returned block with has_children set to "
+            "true, call this action again with that block's ID."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "block_id": string_property(
+                    "The block or page ID whose direct children should be retrieved."
+                ),
+                "page_size": _PAGE_SIZE,
+                "start_cursor": _CURSOR,
+            },
+            "required": ["block_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="list_users",
+        description=(
+            "List workspace users with optional pagination. Personal access tokens "
+            "cannot use this action."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "page_size": _PAGE_SIZE,
+                "start_cursor": _CURSOR,
+            },
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_user",
+        description="Retrieve a workspace user by ID.",
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "user_id": string_property("The user ID to retrieve."),
+            },
+            "required": ["user_id"],
+            "additionalProperties": False,
+        },
+    ),
+    ActionDefinition(
+        name="get_self",
+        description="Retrieve the user associated with the current access token.",
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {},
             "additionalProperties": False,
         },
     ),

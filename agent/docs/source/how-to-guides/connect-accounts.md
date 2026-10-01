@@ -57,8 +57,8 @@ authorization.
 The selected connector references are bound to the new run. The AgentApp still
 decides whether to expose the corresponding tools to its model.
 
-The CLI does not currently provide connector selection inside `flwr chat` or a
-`flwr run` connector flag. Use the SuperGrid browser for account-backed runs.
+The CLI does not currently provide connector selection inside `flwr chat`. Use
+the SuperGrid browser for account-backed runs.
 
 ## Know what each connector can read
 

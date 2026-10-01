@@ -31,7 +31,8 @@ JSONObject: TypeAlias = dict[str, JSONValue]
 class ConnectorRecord:
     """Persisted connector configuration and credentials."""
 
-    flwr_aid: str
+    connector_id: int
+    federation_id: str
     connector_ref: str
     credentials_json: str
     config_json: str
@@ -43,6 +44,7 @@ class ConnectorOAuthSessionRecord:  # pylint: disable=too-many-instance-attribut
 
     oauth_session_id: str
     flwr_aid: str
+    federation_id: str
     connector_ref: str
     state: str
     redirect_uri: str

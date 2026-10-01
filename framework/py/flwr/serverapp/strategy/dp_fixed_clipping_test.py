@@ -28,6 +28,7 @@ from flwr.supercore.privacy_accounting import (
     PrivacySpent,
     SamplingMethod,
 )
+from flwr.supercore.task_identity import TaskIdentity
 
 from ..exception import PrivacyBudgetExhausted
 from ..grid import Grid
@@ -37,6 +38,14 @@ from .dp_fixed_clipping import (
     DifferentialPrivacyServerSideFixedClipping,
 )
 from .fedavg import FedAvg
+
+
+@pytest.fixture(autouse=True)
+def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the task identity used by strategy message tests."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 123)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 456)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 789)
 
 
 def _accountant(*, would_exceed: bool = False) -> Mock:

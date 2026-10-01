@@ -18,7 +18,7 @@
 from collections import Counter
 from collections.abc import Callable
 from datetime import datetime
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import pytest
 from fastapi import FastAPI, HTTPException, Request, Response, status
@@ -92,6 +92,7 @@ from flwr.superlink.routers.control.router import start_run as start_run_route
 from flwr.superlink.servicer.control import control_handlers
 
 _ACCOUNT = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
+CONNECTOR_FEDERATION_ID = "@bob/fed-a"
 
 
 def _create_app(authn_plugin: Mock | None = None) -> FastAPI:
@@ -145,7 +146,7 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
     [
         (
             "/v1/control/list-connectors",
-            ListConnectorsRequest(federation="agent"),
+            ListConnectorsRequest(federation=CONNECTOR_FEDERATION_ID),
             ListConnectorsResponse.FromString,
             ListConnectorsResponse(
                 connectors=[
@@ -161,7 +162,9 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
         ),
         (
             "/v1/control/disconnect-connector",
-            DisconnectConnectorRequest(connector_ref="google-drive"),
+            DisconnectConnectorRequest(
+                connector_ref="google-drive", federation=CONNECTOR_FEDERATION_ID
+            ),
             DisconnectConnectorResponse.FromString,
             DisconnectConnectorResponse(),
             "disconnect_connector",
@@ -171,6 +174,7 @@ def test_control_http_routes_cover_all_grpc_methods() -> None:
             BeginConnectorOAuthRequest(
                 connector_ref="google-drive",
                 redirect_uri="https://example.test/oauth/callback",
+                federation=CONNECTOR_FEDERATION_ID,
             ),
             BeginConnectorOAuthResponse.FromString,
             BeginConnectorOAuthResponse(
@@ -234,7 +238,9 @@ def test_connector_route_returns_existing_structured_error() -> None:
 
     response = TestClient(app).post(
         "/v1/control/begin-connector-oauth",
-        content=BeginConnectorOAuthRequest().SerializeToString(),
+        content=BeginConnectorOAuthRequest(
+            federation=CONNECTOR_FEDERATION_ID
+        ).SerializeToString(),
         headers={
             "authorization": "Bearer access-token",
             "content-type": PROTOBUF_MEDIA_TYPE,
@@ -666,8 +672,18 @@ def test_non_protobuf_request_in_state_returns_internal_error() -> None:
     }
 
 
-def test_list_runs_returns_runs_from_linkstate() -> None:
-    """ListRuns serializes the runs returned by LinkState."""
+@pytest.mark.parametrize(
+    ("proto_request", "expected_limit", "expected_skip"),
+    [
+        (ListRunsRequest(), 20, 0),
+        (ListRunsRequest(limit=1), 1, 0),
+        (ListRunsRequest(limit=1, skip=2), 1, 2),
+    ],
+)
+def test_list_runs_returns_runs_from_linkstate(
+    proto_request: ListRunsRequest, expected_limit: int, expected_skip: int
+) -> None:
+    """ListRuns applies the default and requested pagination."""
     linkstate = Mock(spec=LinkState)
     run = Run.create_empty(7)
     run.flwr_aid = _ACCOUNT.flwr_aid
@@ -678,7 +694,7 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
 
     response = client.post(
         "/v1/control/list-runs",
-        content=ListRunsRequest(limit=1).SerializeToString(),
+        content=proto_request.SerializeToString(),
         headers={
             "authorization": "Bearer access-token",
             "content-type": PROTOBUF_MEDIA_TYPE,
@@ -691,12 +707,39 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
     assert set(proto_response.run_dict) == {7}
     assert proto_response.run_dict[7].account_name == _ACCOUNT.account_name
     assert datetime.fromisoformat(proto_response.now)
-    linkstate.get_run_info.assert_called_once_with(
-        flwr_aids=[_ACCOUNT.flwr_aid],
-        order_by="pending_at",
-        ascending=False,
-        limit=1,
+    assert linkstate.get_run_info.call_args_list == [
+        call(
+            flwr_aids=[_ACCOUNT.flwr_aid],
+            order_by="pending_at",
+            ascending=False,
+            limit=expected_limit,
+            skip=expected_skip,
+        )
+    ]
+
+
+def test_list_runs_cleans_finished_runs_on_page() -> None:
+    """ListRuns cleans up finished runs returned on the page."""
+    linkstate = Mock(spec=LinkState)
+    page_run = Run.create_empty(7)
+    page_run.flwr_aid = _ACCOUNT.flwr_aid
+    page_run.status.status = Status.FINISHED
+    linkstate.get_run_info.return_value = [page_run]
+    app = _create_app()
+    app.dependency_overrides[get_linkstate] = lambda: linkstate
+
+    response = TestClient(app).post(
+        "/v1/control/list-runs",
+        content=ListRunsRequest(limit=1).SerializeToString(),
+        headers={
+            "authorization": "Bearer access-token",
+            "content-type": PROTOBUF_MEDIA_TYPE,
+        },
     )
+
+    assert response.status_code == 200
+    assert set(ListRunsResponse.FromString(response.content).run_dict) == {7}
+    linkstate.cleanup_run.assert_called_once_with(7)
 
 
 def test_list_runs_rejects_invalid_token_without_refresh() -> None:

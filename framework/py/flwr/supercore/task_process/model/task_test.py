@@ -23,9 +23,18 @@ from unittest.mock import Mock
 import pytest
 
 from flwr.supercore.json_message.model_message import ModelRequest
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.typing import JSONObject
 
 from . import task
+
+
+@pytest.fixture(autouse=True)
+def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the task identity used by Model task messages."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 22)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 7)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 1)
 
 
 def _model_request() -> ModelRequest:
@@ -81,7 +90,7 @@ def test_handle_task_flushes_first_text_event_eagerly(
 
     monkeypatch.setattr(task, "invoke_model_provider", invoke_provider)
 
-    task.handle_task(client=stub, task_id=22, run_id=7)
+    task.handle_task(client=stub)
 
     batches = [call.args[0].events for call in stub.PushTaskEvents.call_args_list]
     assert [len(batch) for batch in batches] == [2, 16]

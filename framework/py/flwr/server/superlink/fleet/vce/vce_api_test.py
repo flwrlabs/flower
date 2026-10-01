@@ -47,6 +47,7 @@ from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID, 
 from flwr.supercore.date import now
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.superlink.federation import NoOpFederationManager
 
 
@@ -78,9 +79,13 @@ dummy_client_app = ClientApp(
 
 def _make_vce_test_message(run_id: int = 1234, node_id: int = 1) -> Message:
     """Create a Message with metadata populated like an InMemoryGrid message."""
-    message = Message(RecordDict(), node_id, "query")
-    message.metadata.__dict__["_run_id"] = run_id
-    message.metadata.__dict__["_src_node_id"] = SUPERLINK_NODE_ID
+    with patch.multiple(
+        TaskIdentity,
+        _task_id=123,
+        _run_id=run_id,
+        _node_id=SUPERLINK_NODE_ID,
+    ):
+        message = Message(RecordDict(), node_id, "query")
     message.metadata.__dict__["_message_id"] = "test-message-id"
     return message
 

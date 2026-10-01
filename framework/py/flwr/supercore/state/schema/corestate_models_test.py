@@ -53,6 +53,18 @@ def test_task_mapper_uses_task_id_as_identity_key() -> None:
     assert [column.name for column in Task.__mapper__.primary_key] == ["task_id"]
 
 
+def test_connector_uses_incrementing_id_and_allows_multiple_provider_accounts() -> None:
+    """Ensure connectors use an ID without provider-level uniqueness."""
+    table = FlwrBase.metadata.tables["connector"]
+
+    assert [column.name for column in table.primary_key.columns] == ["connector_id"]
+    assert table.c.connector_id.autoincrement is True
+    for column_name in ("federation_id", "created_at", "created_by"):
+        assert table.c[column_name].nullable is False
+    for column_name in ("deleted_at", "deleted_by"):
+        assert table.c[column_name].nullable is True
+
+
 def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:
     """Ensure keyless task_logs stays a table, not an ORM mapper."""
     assert "task_logs" in create_corestate_metadata().tables

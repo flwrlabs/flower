@@ -136,6 +136,11 @@ class FederationApp(FlwrBase):
             "federation_id",
             "added_at",
         ),
+        Index(
+            "idx_federation_app_app_id_federation_id",
+            "app_id",
+            "federation_id",
+        ),
     )
 
     federation_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
@@ -143,20 +148,31 @@ class FederationApp(FlwrBase):
     fab_hash: Mapped[str] = mapped_column(String, nullable=False)
     app_type: Mapped[str] = mapped_column(String, nullable=False)
     is_hub_app: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    color: Mapped[str | None] = mapped_column(String, nullable=True)
     added_by: Mapped[str] = mapped_column(String, nullable=False)
     added_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
 class Connector(FlwrBase):
-    """Represent connector configuration for an account."""
+    """Represent connector configuration for a federation."""
 
     __tablename__ = "connector"
+    __table_args__ = ({"sqlite_autoincrement": True},)
 
-    flwr_aid: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
-    connector_ref: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    connector_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True, nullable=False
+    )
+    federation_id: Mapped[str] = mapped_column(String, nullable=False)
+    connector_ref: Mapped[str] = mapped_column(String, nullable=False)
     credentials_json: Mapped[str] = mapped_column(String, nullable=False)
     config_json: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    created_by: Mapped[str] = mapped_column(String, nullable=False)
+    deleted_by: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class ConnectorOAuthSession(FlwrBase):
@@ -168,6 +184,7 @@ class ConnectorOAuthSession(FlwrBase):
         String, primary_key=True, nullable=False
     )
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    federation_id: Mapped[str] = mapped_column(String, nullable=False)
     connector_ref: Mapped[str] = mapped_column(String, nullable=False)
     state: Mapped[str] = mapped_column(String, nullable=False)
     redirect_uri: Mapped[str] = mapped_column(String, nullable=False)
@@ -183,7 +200,7 @@ class RunConnector(FlwrBase):
     __tablename__ = "run_connector"
 
     run_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
-    connector_ref: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    connector_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
 
 
 class Task(FlwrBase):
@@ -202,6 +219,7 @@ class Task(FlwrBase):
     fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     model_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     connector_ref: Mapped[str | None] = mapped_column(String, nullable=True)
+    connector_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     token: Mapped[str | None] = mapped_column(String, nullable=True)
     active_until: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     pending_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)

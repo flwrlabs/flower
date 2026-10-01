@@ -48,10 +48,13 @@ PROVIDER = ProviderDefinition(
         scope_separator=",",
         token_response_path=("authed_user",),
         success_field="ok",
+        display_name_fields=("team", "user"),
+        display_name_url="https://slack.com/api/auth.test",
+        display_name_method="POST",
     ),
 )
 
-CONNECTOR = ConnectorDefinition(
+CONNECTOR = ConnectorDefinition.from_provider(
     provider=PROVIDER,
     executors=EXECUTORS,
     oauth_flow=load_oauth_flow(PROVIDER),

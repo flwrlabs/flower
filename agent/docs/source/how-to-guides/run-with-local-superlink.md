@@ -56,6 +56,8 @@ to start a SuperNode for an AgentApp run.
 
 Leave this terminal open while you run the app.
 
+(add-a-local-superlink-connection)=
+
 ## Add a local connection
 
 In another terminal, add a connection for the local Control API to
@@ -70,30 +72,26 @@ insecure = true
 The connection name is `local-agent`. It doesn't require `flwr login` because
 the local SuperLink has no account authentication configured.
 
-## Run the AgentApp
+## Chat with the AgentApp
 
-From the AgentApp project directory, submit the app through the new connection:
+From the AgentApp project directory, select the local connection and start
+Flower Chat:
 
 ```console
-$ uv run flwr run . local-agent --stream
+$ export FLWR_CHAT_SUPERLINK=local-agent
+$ uv run flwr chat
 ```
 
-Flower builds the app, submits it to the local SuperLink, and streams the
-AgentApp process logs. Override the configured prompt in the same way as a
-SuperGrid run:
-
-```console
-$ uv run flwr run . local-agent \
-    --run-config 'agent.input="Explain Flower Agent in one sentence."' \
-    --stream
+```{tip}
+To load the app and start chatting, see {ref}`load-an-agentapp-in-flower-chat`.
 ```
 
 ## Inspect and stop the run
 
-Use the same CLI commands as you would for a remote run:
+Press {kbd}`Ctrl+C` during a Flower Chat response to stop that run. For a known
+run ID, inspect or stop it from the CLI:
 
 ```console
-$ uv run flwr list local-agent
 $ uv run flwr list --run-id <run-id> local-agent
 $ uv run flwr log <run-id> local-agent --show
 $ uv run flwr stop <run-id> local-agent
@@ -102,13 +100,6 @@ $ uv run flwr stop <run-id> local-agent
 Press {kbd}`Ctrl+C` in the SuperLink terminal when you're finished.
 
 ## Troubleshoot the local runtime
-
-If a run fails, start with its details and logs:
-
-```console
-$ uv run flwr list --run-id <run-id> local-agent
-$ uv run flwr log <run-id> local-agent --show
-```
 
 Common problems include:
 

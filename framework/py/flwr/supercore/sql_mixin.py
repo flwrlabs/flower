@@ -219,7 +219,7 @@ class SqlMixin(ABC):
         """
         return None
 
-    def initialize(self, log_queries: bool = False) -> list[str]:
+    def initialize(self, log_queries: bool = False, **engine_kwargs: Any) -> list[str]:
         """Connect to the DB and create tables if needed.
 
         This method creates the SQLAlchemy engine and session factory,
@@ -229,6 +229,9 @@ class SqlMixin(ABC):
         ----------
         log_queries : bool
             Log each query which is executed.
+        **engine_kwargs : Any
+            Keyword arguments passed to SQLAlchemy's `create_engine`, overriding
+            dialect-specific defaults.
 
         Returns
         -------
@@ -236,14 +239,13 @@ class SqlMixin(ABC):
             The list of all tables in the DB.
         """
         # Create engine with dialect-specific settings
-        engine_kwargs: dict[str, Any] = {}
         if self.database_backend == "sqlite":
             # SQLite needs check_same_thread=False for multi-threaded access
-            engine_kwargs["connect_args"] = {"check_same_thread": False}
+            engine_kwargs.setdefault("connect_args", {"check_same_thread": False})
         # In-memory SQLite databases are per-connection; use StaticPool to ensure
         # all threads share the same database instance.
         if self._is_in_memory_sqlite:
-            engine_kwargs["poolclass"] = StaticPool
+            engine_kwargs.setdefault("poolclass", StaticPool)
         self._engine = create_engine(self.database_url, **engine_kwargs)
 
         # Set SQLite pragmas via event listener for optimal performance and correctness

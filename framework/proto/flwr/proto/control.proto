@@ -106,6 +106,10 @@ service Control {
   // List Apps in a Federation
   rpc ListApps(ListAppsRequest) returns (ListAppsResponse) {}
 
+  // List Federations associated with an App
+  rpc ListAppAssociations(ListAppAssociationsRequest)
+      returns (ListAppAssociationsResponse) {}
+
   // Add App to a Federation
   rpc AddApp(AddAppRequest) returns (AddAppResponse) {}
 
@@ -114,6 +118,10 @@ service Control {
 
   // Show Federation
   rpc ShowFederation(ShowFederationRequest) returns (ShowFederationResponse) {}
+
+  // Set Federation icon
+  rpc SetFederationIcon(SetFederationIconRequest)
+      returns (SetFederationIconResponse) {}
 
   // Create Federation
   rpc CreateFederation(CreateFederationRequest)
@@ -176,6 +184,8 @@ message StartRunRequest {
   string federation = 5;
   optional uint64 series_id = 6;
   repeated string connector_refs = 7;
+  string user_prompt = 8;
+  repeated uint64 connector_ids = 9;
 }
 message StartRunResponse {
   optional uint64 run_id = 1;
@@ -224,6 +234,8 @@ message StreamLogsResponse {
 message ListRunsRequest {
   optional uint64 run_id = 1;
   optional uint64 limit = 2;
+  // Skip this many newer runs when listing runs. Ignored when run_id is set.
+  optional uint64 skip = 3;
 }
 message ListRunsResponse {
   map<uint64, Run> run_dict = 1;
@@ -275,15 +287,21 @@ message Connector {
   string display_name = 2;
   string description = 3;
   bool connected = 4;
+  uint64 connector_id = 5;
 }
 message ListConnectorsResponse { repeated Connector connectors = 1; }
 
-message DisconnectConnectorRequest { string connector_ref = 1; }
+message DisconnectConnectorRequest {
+  string connector_ref = 1;
+  uint64 connector_id = 2;
+  string federation = 3;
+}
 message DisconnectConnectorResponse {}
 
 message BeginConnectorOAuthRequest {
   string connector_ref = 1;
   string redirect_uri = 2;
+  string federation = 3;
 }
 message BeginConnectorOAuthResponse {
   string oauth_session_id = 1;
@@ -297,7 +315,10 @@ message CompleteConnectorOAuthRequest {
   string code = 2;
   string state = 3;
 }
-message CompleteConnectorOAuthResponse { string connector_ref = 1; }
+message CompleteConnectorOAuthResponse {
+  string connector_ref = 1;
+  uint64 connector_id = 2;
+}
 
 message StopRunRequest { uint64 run_id = 1; }
 message StopRunResponse { bool success = 1; }
@@ -305,7 +326,11 @@ message StopRunResponse { bool success = 1; }
 message PullArtifactsRequest { uint64 run_id = 1; }
 message PullArtifactsResponse { optional string url = 1; }
 
-message RegisterNodeRequest { bytes public_key = 1; }
+message RegisterNodeRequest {
+  bytes public_key = 1;
+  optional string location = 2;
+  optional string name = 3;
+}
 message RegisterNodeResponse { optional uint64 node_id = 1; }
 
 message UnregisterNodeRequest { uint64 node_id = 1; }
@@ -327,12 +352,18 @@ message AppInfo {
   // True for Hub apps, false for local/custom apps, and absent for legacy apps
   // whose provenance is unknown.
   optional bool is_hub_app = 4;
+  string display_name = 5;
+  string description = 6;
+  string color = 7;
 }
 message ListAppsRequest {
   string federation_id = 1;
   optional uint64 limit = 2;
 }
 message ListAppsResponse { repeated AppInfo apps = 1; }
+
+message ListAppAssociationsRequest { string app_id = 1; }
+message ListAppAssociationsResponse { repeated string federation_ids = 1; }
 
 message AddAppRequest {
   string federation_id = 1;
@@ -351,6 +382,12 @@ message ShowFederationResponse {
   Federation federation = 1;
   string now = 2;
 }
+
+message SetFederationIconRequest {
+  string federation_name = 1;
+  optional string icon_key = 2;
+}
+message SetFederationIconResponse {}
 
 message CreateFederationRequest {
   string federation_name = 1;

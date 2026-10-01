@@ -56,7 +56,7 @@ message PullAppMessagesResponse {
 
 // GetNodes messages
 message GetNodesRequest {}
-message GetNodesResponse { repeated Node nodes = 1; }
+message GetNodesResponse { repeated NodeInfo nodes = 1; }
 
 // PushTaskMessage messages
 message PushTaskMessageRequest { Message message = 1; }
@@ -88,6 +88,7 @@ message GetConnectorResponse {
   string connector_ref = 1;
   string credentials_json = 2;
   string config_json = 3;
+  uint64 connector_id = 4;
 }
 
 // PullTaskInput messages
@@ -116,5 +117,18 @@ message CreateTaskRequest {
   optional string fab_hash = 2;
   optional string model_ref = 3;
   optional string connector_ref = 4;
+  optional uint64 connector_id = 5;
 }
 message CreateTaskResponse { optional uint64 task_id = 1; }
+
+// AcquireTask messages
+message AcquireTaskRequest {
+  // Task types that can be launched regardless of FAB.
+  repeated string supported_task_types = 1;
+  // AgentApp FABs that can be launched by a ready prestarted executor.
+  repeated string agentapp_fab_hashes = 2;
+}
+message AcquireTaskResponse {
+  Task task = 1;
+  string token = 2;
+}

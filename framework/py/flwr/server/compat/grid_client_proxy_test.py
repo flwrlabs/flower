@@ -42,6 +42,7 @@ from flwr.common import (
 )
 from flwr.compat.common import recorddict_compat as compat
 from flwr.server.compat.grid_client_proxy import GridClientProxy
+from flwr.supercore.task_identity import TaskIdentity
 
 MESSAGE_PARAMETERS = Parameters(tensors=[b"abc"], tensor_type="np")
 
@@ -52,6 +53,7 @@ ERROR_REPLY = Error(code=0, reason="mock error")
 
 RUN_ID = 61016
 NODE_ID = 1
+TASK_ID = 123
 
 
 class GridClientProxyTestCase(unittest.TestCase):
@@ -59,6 +61,11 @@ class GridClientProxyTestCase(unittest.TestCase):
 
     def setUp(self) -> None:
         """Set up mocks for tests."""
+        identity_patcher = patch.multiple(
+            TaskIdentity, _task_id=TASK_ID, _run_id=RUN_ID, _node_id=NODE_ID
+        )
+        identity_patcher.start()
+        self.addCleanup(identity_patcher.stop)
         grid = Mock()
         grid.get_node_ids.return_value = [1]
         client = GridClientProxy(node_id=NODE_ID, grid=grid, run_id=61016)

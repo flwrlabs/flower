@@ -30,6 +30,7 @@ from flwr.supercore.dependencies.runtime_version import RuntimeVersionDependency
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health
+from flwr.supercore.routers.runtime import responses_router
 from flwr.supercore.routers.runtime import router as runtime_router
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 from flwr.supernode.servicer.runtime import runtime_handlers
@@ -77,6 +78,7 @@ def create_app(
     fastapi_app.include_router(
         runtime_router, dependencies=[_RUNTIME_VERSION_DEPENDENCY]
     )
+    fastapi_app.include_router(responses_router)
 
     fastapi_app.add_middleware(ProtobufTranslationMiddleware)
 

@@ -48,8 +48,25 @@ class AgentEvents(ABC):
         """Emit one structured run event."""
 
 
+class AgentGrid(ABC):
+    """Model-facing access to the federation Grid."""
+
+    @abstractmethod
+    def tools(self) -> list[JSONObject]:
+        """Return model-facing Grid tool schemas."""
+
+    @abstractmethod
+    def call(self, tool_call: JSONObject) -> JSONObject:
+        """Execute one Grid function_call and return a function_call_output item."""
+
+
 class AgentSession(ABC):
     """Abstract base class for AgentApp runtime capabilities."""
+
+    @property
+    @abstractmethod
+    def prompt(self) -> str:
+        """Return the initial prompt for this AgentApp run."""
 
     @property
     @abstractmethod
@@ -60,6 +77,11 @@ class AgentSession(ABC):
     @abstractmethod
     def events(self) -> AgentEvents:
         """Frontend-visible structured run event API."""
+
+    @property
+    @abstractmethod
+    def grid(self) -> AgentGrid:
+        """Model-facing federation Grid API."""
 
 
 AgentAppCallable = Callable[[AgentSession, Context], None]

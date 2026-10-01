@@ -14,6 +14,10 @@
 # ==============================================================================
 """Notion action executors."""
 
+from collections.abc import Mapping
+from typing import cast
+from urllib.parse import quote, unquote
+
 import requests
 
 from flwr.supercore.typing import JSONObject
@@ -34,42 +38,176 @@ class NotionApiError(ConnectorApiError):
 
 def search(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
     """Search pages and data sources shared with the Notion connection."""
-    body: JSONObject = {
-        "query": require_string(arguments.get("query"), "Notion", "query"),
-        "page_size": require_int_range(
-            arguments.get("limit", 10), "Notion", "limit", maximum=100
-        ),
-    }
-    if cursor := optional_string(arguments.get("cursor"), "Notion", "cursor"):
+    body: JSONObject = {}
+    if "query" in arguments:
+        body["query"] = require_string(arguments["query"], "Notion", "query")
+    if "filter" in arguments:
+        body["filter"] = _search_filter(arguments["filter"])
+    if "sort" in arguments:
+        body["sort"] = arguments["sort"]
+    if "page_size" in arguments:
+        body["page_size"] = require_int_range(
+            arguments["page_size"], "Notion", "page_size", maximum=100
+        )
+    if cursor := optional_string(
+        arguments.get("start_cursor"), "Notion", "start_cursor"
+    ):
         body["start_cursor"] = cursor
     return _call_notion_api("POST", "/search", context.credentials, body=body)
 
 
-def get_page_content(
+def _search_filter(value: object) -> JSONObject:
+    """Validate a Notion search filter without changing it."""
+    if not isinstance(value, dict):
+        raise ValueError("Notion filter must be an object.")
+    keys = set(value)
+    trash_only = keys == {"in_trash"} and isinstance(value["in_trash"], bool)
+    object_filter = (
+        {"property", "value"} <= keys <= {"property", "value", "in_trash"}
+        and value["property"] == "object"
+        and isinstance(value["value"], str)
+        and value["value"] in {"page", "data_source"}
+        and ("in_trash" not in value or isinstance(value["in_trash"], bool))
+    )
+    if not trash_only and not object_filter:
+        raise ValueError("Notion filter is invalid.")
+    return cast(JSONObject, value)
+
+
+def get_page(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """Retrieve one Notion page and its property values."""
+    page_id = require_string(arguments.get("page_id"), "Notion", "page_id")
+    params: dict[str, str | list[str]] = {}
+    if "filter_properties" in arguments:
+        params["filter_properties"] = _property_ids(arguments["filter_properties"])
+    return _call_notion_api(
+        "GET",
+        f"/pages/{quote(page_id, safe='')}",
+        context.credentials,
+        params=params,
+    )
+
+
+def _property_ids(value: object) -> list[str]:
+    """Validate property IDs used to filter a Notion page response."""
+    if not isinstance(value, list) or len(value) > 100:
+        raise ValueError(
+            "Notion filter_properties must be an array of at most 100 IDs."
+        )
+    return [
+        unquote(require_string(item, "Notion", "filter_properties item"))
+        for item in value
+    ]
+
+
+def get_page_property(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
-    """Read one page of a Notion page's block content."""
-    params = {
-        "page_size": str(
+    """Retrieve one property value from a Notion page."""
+    page_id = require_string(arguments.get("page_id"), "Notion", "page_id")
+    property_id = require_string(arguments.get("property_id"), "Notion", "property_id")
+    params: dict[str, str] = {}
+    if "page_size" in arguments:
+        params["page_size"] = str(
             require_int_range(
-                arguments.get("max_blocks", 100),
-                "Notion",
-                "max_blocks",
-                maximum=100,
+                arguments["page_size"], "Notion", "page_size", maximum=100
             )
         )
-    }
-    if cursor := optional_string(arguments.get("cursor"), "Notion", "cursor"):
+    if cursor := optional_string(
+        arguments.get("start_cursor"), "Notion", "start_cursor"
+    ):
         params["start_cursor"] = cursor
-    page_id = require_string(arguments.get("page_id"), "Notion", "page_id")
     return _call_notion_api(
-        "GET", f"/blocks/{page_id}/children", context.credentials, params=params
+        "GET",
+        "/pages/"
+        f"{quote(page_id, safe='')}/properties/"
+        f"{quote(unquote(property_id), safe='')}",
+        context.credentials,
+        params=params,
     )
+
+
+def get_database(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """Retrieve one Notion database container."""
+    database_id = require_string(arguments.get("database_id"), "Notion", "database_id")
+    return _call_notion_api(
+        "GET", f"/databases/{quote(database_id, safe='')}", context.credentials
+    )
+
+
+def get_block(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """Retrieve one Notion block."""
+    block_id = require_string(arguments.get("block_id"), "Notion", "block_id")
+    return _call_notion_api(
+        "GET", f"/blocks/{quote(block_id, safe='')}", context.credentials
+    )
+
+
+def get_block_children(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """Retrieve one page of direct children for a Notion block or page."""
+    block_id = require_string(arguments.get("block_id"), "Notion", "block_id")
+    params: dict[str, str] = {}
+    if "page_size" in arguments:
+        params["page_size"] = str(
+            require_int_range(
+                arguments["page_size"], "Notion", "page_size", maximum=100
+            )
+        )
+    if cursor := optional_string(
+        arguments.get("start_cursor"), "Notion", "start_cursor"
+    ):
+        params["start_cursor"] = cursor
+    return _call_notion_api(
+        "GET",
+        f"/blocks/{quote(block_id, safe='')}/children",
+        context.credentials,
+        params=params,
+    )
+
+
+def list_users(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """List workspace users."""
+    params: dict[str, str] = {}
+    if "page_size" in arguments:
+        params["page_size"] = str(
+            require_int_range(
+                arguments["page_size"], "Notion", "page_size", maximum=100
+            )
+        )
+    if cursor := optional_string(
+        arguments.get("start_cursor"), "Notion", "start_cursor"
+    ):
+        params["start_cursor"] = cursor
+    return _call_notion_api("GET", "/users", context.credentials, params=params)
+
+
+def get_user(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """Retrieve one workspace user by ID."""
+    user_id = require_string(arguments.get("user_id"), "Notion", "user_id")
+    return _call_notion_api(
+        "GET", f"/users/{quote(user_id, safe='')}", context.credentials
+    )
+
+
+def get_self(_arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """Retrieve the user associated with the access token."""
+    return _call_notion_api("GET", "/users/me", context.credentials)
 
 
 EXECUTORS: dict[str, ConnectorExecutor] = {
     "search": search,
-    "get_page_content": get_page_content,
+    "get_page": get_page,
+    "get_page_property": get_page_property,
+    "get_database": get_database,
+    "get_block": get_block,
+    "get_block_children": get_block_children,
+    "list_users": list_users,
+    "get_user": get_user,
+    "get_self": get_self,
 }
 
 
@@ -79,7 +217,7 @@ def _call_notion_api(
     credentials: JSONObject,
     *,
     body: JSONObject | None = None,
-    params: dict[str, str] | None = None,
+    params: Mapping[str, str | list[str]] | None = None,
 ) -> JSONObject:
     """Call one Notion API endpoint and return its JSON response."""
     token = credentials.get("access_token")
@@ -95,18 +233,21 @@ def _call_notion_api(
         },
         params=params,
         json=body,
-        http_error_code=_response_error_code,
+        http_error_details=_response_error_details,
     )
 
 
-def _response_error_code(response: requests.Response) -> str:
-    """Return a documented Notion error code without response details."""
-    if response.status_code == 429:
-        return "rate_limited"
+def _response_error_details(response: requests.Response) -> tuple[str, str | None]:
+    """Return Notion's documented error code and message."""
     try:
-        code = response.json().get("code")
-    except (AttributeError, ValueError):
-        return "http_error"
-    if isinstance(code, str) and code.replace("_", "").isalnum() and code.islower():
-        return code
-    return "http_error"
+        payload = response.json()
+    except ValueError:
+        return "http_error", None
+    if not isinstance(payload, dict):
+        return "http_error", None
+    code = payload.get("code")
+    message = payload.get("message")
+    return (
+        code if isinstance(code, str) and code else "http_error",
+        message if isinstance(message, str) and message else None,
+    )

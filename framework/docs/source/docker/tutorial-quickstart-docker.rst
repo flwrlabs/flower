@@ -172,12 +172,11 @@ Start two SuperNode containers.
 ***************************************************
 
 The **SuperExec** Docker image comes with a pre-installed version of Flower and serves
-as a base for building your own image. Use a **single** image and select the desired
-behavior (ServerApps vs ClientApps) at runtime via the ``--plugin-type`` flag. SuperExec
-spawns the corresponding processes on demand.
+as a base for building your own image. SuperExec spawns the appropriate processes on
+demand based on the tasks it receives.
 
-When using SuperExec with the *serverapp* plugin, pass ``--runtime-api-address``
-pointing to the SuperLink's **Runtime API** endpoint.
+To execute ServerApps, pass ``--runtime-api-address`` pointing to the SuperLink's
+**Runtime API** endpoint.
 
 1. Create a Dockerfile called ``superexec.Dockerfile`` and paste the following:
 
@@ -238,7 +237,6 @@ pointing to the SuperLink's **Runtime API** endpoint.
            --detach \
            flwr_superexec:0.0.1 \
            --insecure \
-           --plugin-type serverapp \
            --runtime-api-address superlink:8000
 
    .. dropdown:: Understand the command
@@ -252,8 +250,6 @@ pointing to the SuperLink's **Runtime API** endpoint.
          of the image.
        * ``--insecure``: This flag tells the container to operate in an insecure mode, allowing
          unencrypted communication. Secure connections will be added in future releases.
-       * ``--plugin-type serverapp``: Load the *serverapp* plugin. SuperExec will spawn
-         ServerApp processes as needed.
        * ``--runtime-api-address superlink:8000``: Connect to the SuperLink's Runtime API
          at the address ``superlink:8000``.
 
@@ -261,9 +257,8 @@ pointing to the SuperLink's **Runtime API** endpoint.
  Step 5: Start the SuperExec to execute ClientApps
 ***************************************************
 
-For ClientApps, reuse the **same** image and change the plugin and API address. When
-using the *clientapp* plugin, pass ``--runtime-api-address`` pointing to the SuperNode's
-**Runtime API** endpoint.
+For ClientApps, reuse the **same** image and pass ``--runtime-api-address`` pointing to
+the SuperNode's **Runtime API** endpoint.
 
 1. (No new Dockerfile is needed; reuse ``flwr_superexec:0.0.1``.)
 2. Start the first **SuperExec for ClientApps** container:
@@ -276,7 +271,6 @@ using the *clientapp* plugin, pass ``--runtime-api-address`` pointing to the Sup
            --detach \
            flwr_superexec:0.0.1 \
            --insecure \
-           --plugin-type clientapp \
            --runtime-api-address supernode-1:9094
 
    .. dropdown:: Understand the command
@@ -290,8 +284,6 @@ using the *clientapp* plugin, pass ``--runtime-api-address`` pointing to the Sup
          of the image.
        * ``--insecure``: This flag tells the container to operate in an insecure mode, allowing
          unencrypted communication. Secure connections will be added in future releases.
-       * ``--plugin-type clientapp``: Load the *clientapp* plugin. SuperExec will spawn
-         ClientApp processes as needed.
        * ``--runtime-api-address supernode-1:9094``: Connect to the SuperNode's Runtime API
          at the address ``supernode-1:9094``.
 
@@ -305,7 +297,6 @@ using the *clientapp* plugin, pass ``--runtime-api-address`` pointing to the Sup
            --detach \
            flwr_superexec:0.0.1 \
            --insecure \
-           --plugin-type clientapp \
            --runtime-api-address supernode-2:9095
 
 ************************************
@@ -386,7 +377,6 @@ using the *clientapp* plugin, pass ``--runtime-api-address`` pointing to the Sup
            --detach \
            flwr_superexec:0.0.1 \
            --insecure \
-           --plugin-type serverapp \
            --runtime-api-address superlink:8000
        $ docker run --rm \
            --network flwr-network \
@@ -394,7 +384,6 @@ using the *clientapp* plugin, pass ``--runtime-api-address`` pointing to the Sup
            --detach \
            flwr_superexec:0.0.1 \
            --insecure \
-           --plugin-type clientapp \
            --runtime-api-address supernode-1:9094
        $ docker run --rm \
            --network flwr-network \
@@ -402,7 +391,6 @@ using the *clientapp* plugin, pass ``--runtime-api-address`` pointing to the Sup
            --detach \
            flwr_superexec:0.0.1 \
            --insecure \
-           --plugin-type clientapp \
            --runtime-api-address supernode-2:9095
 
 5. Run the updated project:

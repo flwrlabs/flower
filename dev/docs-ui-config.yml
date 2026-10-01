@@ -23,8 +23,11 @@ announcement:
         .flwr-event-banner__headline { white-space: nowrap; }
         .flwr-event-banner__details::before { display: none; }
       }
+      @media (max-width: 22rem) {
+        .flwr-event-banner__headline { flex-wrap: wrap; justify-content: center; row-gap: 0; white-space: normal; }
+      }
     </style>
-    <a class='flwr-event-banner' href='https://luma.com/flwrlabs-uygg'>
+    <a class='flwr-event-banner' href='https://luma.com/flwrlabs-uygg?utm_source=docs'>
       <span class='flwr-event-banner__headline'><span class='flwr-event-banner__title'>Flower AI Day 2026</span><span>—</span><span>Collaborative Superintelligence</span></span>
       <span class='flwr-event-banner__details'>San Francisco · September 30</span>
     </a>

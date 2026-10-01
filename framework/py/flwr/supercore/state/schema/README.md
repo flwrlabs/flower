@@ -26,10 +26,15 @@ erDiagram
   }
 
   connector {
-    VARCHAR connector_ref PK
-    VARCHAR flwr_aid PK
+    INTEGER connector_id PK
     VARCHAR config_json
+    VARCHAR connector_ref
+    TIMESTAMP created_at
+    VARCHAR created_by
     VARCHAR credentials_json
+    TIMESTAMP deleted_at "nullable"
+    VARCHAR deleted_by "nullable"
+    VARCHAR federation_id
   }
 
   connector_oauth_session {
@@ -38,6 +43,7 @@ erDiagram
     VARCHAR connector_ref
     TIMESTAMP created_at
     TIMESTAMP expires_at
+    VARCHAR federation_id
     VARCHAR flwr_aid
     VARCHAR pkce_verifier "nullable"
     VARCHAR redirect_uri
@@ -56,6 +62,9 @@ erDiagram
     TIMESTAMP added_at
     VARCHAR added_by
     VARCHAR app_type
+    VARCHAR color "nullable"
+    VARCHAR description "nullable"
+    VARCHAR display_name "nullable"
     VARCHAR fab_hash
     BOOLEAN is_hub_app "nullable"
     TIMESTAMP updated_at
@@ -95,6 +104,8 @@ erDiagram
     FLOAT heartbeat_interval "nullable"
     VARCHAR last_activated_at "nullable"
     VARCHAR last_deactivated_at "nullable"
+    VARCHAR location "nullable"
+    VARCHAR name "nullable"
     BIGINT node_id UK "nullable"
     FLOAT online_until "nullable"
     VARCHAR owner_aid "nullable"
@@ -163,7 +174,7 @@ erDiagram
   }
 
   run_connector {
-    VARCHAR connector_ref PK
+    INTEGER connector_id PK
     BIGINT run_id PK
   }
 
@@ -194,6 +205,7 @@ erDiagram
 
   task {
     TIMESTAMP active_until "nullable"
+    INTEGER connector_id "nullable"
     VARCHAR connector_ref "nullable"
     VARCHAR details
     VARCHAR fab_hash "nullable"

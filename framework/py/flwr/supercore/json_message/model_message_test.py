@@ -23,10 +23,18 @@ import pytest
 
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.app.message_type import MessageType
-from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.typing import JSONObject
+
+
+@pytest.fixture(autouse=True)
+def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the task identity used by JSON message constructors."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 123)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 456)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 789)
 
 
 def _message_with_payload(
@@ -69,10 +77,10 @@ def test_model_messages_create_payloads() -> None:
 
     assert isinstance(request, Message)
     assert request.metadata.message_type == "query"
-    assert request.metadata.run_id == 0
-    assert request.metadata.src_node_id == SUPERLINK_NODE_ID
-    assert request.metadata.dst_node_id == SUPERLINK_NODE_ID
-    assert request.metadata.src_task_id is None
+    assert request.metadata.run_id == 456
+    assert request.metadata.src_node_id == 789
+    assert request.metadata.dst_node_id == 789
+    assert request.metadata.src_task_id == 123
     assert request.metadata.dst_task_id == 123
     assert request.metadata.reply_to_message_id == ""
     assert request.metadata.ttl == 10.0
@@ -107,8 +115,8 @@ def test_model_messages_create_payloads() -> None:
 
     assert isinstance(response, Message)
     assert response.metadata.message_type == "query"
-    assert response.metadata.src_node_id == SUPERLINK_NODE_ID
-    assert response.metadata.dst_node_id == SUPERLINK_NODE_ID
+    assert response.metadata.src_node_id == 789
+    assert response.metadata.dst_node_id == 789
     assert response.metadata.dst_task_id == 456
     assert response.metadata.reply_to_message_id == "request-message-id"
     assert response.payload == response_payload

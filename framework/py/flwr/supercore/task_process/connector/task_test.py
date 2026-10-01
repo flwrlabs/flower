@@ -27,9 +27,10 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
+from flwr.supercore.task_identity import TaskIdentity
 
 from . import registry
-from .definition import ConnectorExecutionContext
+from .definition import ConnectorDefinition, ConnectorExecutionContext
 from .http import ConnectorApiError
 from .task import handle_task
 
@@ -65,6 +66,11 @@ class TestHandleTask(unittest.TestCase):
 
     def setUp(self) -> None:
         """Set up the common connector task mocks and registry patches."""
+        identity_patcher = patch.multiple(
+            TaskIdentity, _task_id=22, _run_id=7, _node_id=1
+        )
+        identity_patcher.start()
+        self.addCleanup(identity_patcher.stop)
         self.stub = Mock()
         self.stub.GetConnector.return_value = GetConnectorResponse(
             connector_ref="notion",
@@ -75,21 +81,20 @@ class TestHandleTask(unittest.TestCase):
         self.pull_connector_request = self.enterContext(
             patch("flwr.supercore.task_process.connector.task._pull_connector_request")
         )
-        self.credential_handlers = (
-            registry._CREDENTIAL_CONNECTOR_HANDLERS  # pylint: disable=protected-access
+        self.connectors_by_tool = (
+            registry._CONNECTORS_BY_TOOL  # pylint: disable=protected-access
         )
-        self.connector_refs = (
-            registry._CREDENTIAL_CONNECTOR_REFS  # pylint: disable=protected-access
-        )
-        self.enterContext(patch.dict(self.credential_handlers, clear=True))
-        self.enterContext(patch.dict(self.connector_refs, clear=True))
+        self.enterContext(patch.dict(self.connectors_by_tool, clear=True))
 
     def _configure_connector(self, name: str, connector_ref: str | None = None) -> None:
         """Configure the request and registry entry for one connector tool."""
         self.pull_connector_request.return_value = _connector_request(name)
-        self.credential_handlers[name] = self.provider
-        if connector_ref is not None:
-            self.connector_refs[name] = connector_ref
+        self.connectors_by_tool[name] = ConnectorDefinition(
+            ref=connector_ref or name,
+            tools=(),
+            executors={name: self.provider},
+            requires_credentials=True,
+        )
 
     def test_passes_credentials_to_matching_provider(self) -> None:
         """Credential-backed providers should receive credentials and config."""
@@ -102,7 +107,7 @@ class TestHandleTask(unittest.TestCase):
         )
         self.provider.return_value = {"pages": 3}
 
-        handle_task(client=self.stub, task_id=22, run_id=7)
+        handle_task(client=self.stub)
 
         self.stub.GetConnector.assert_called_once_with(GetConnectorRequest())
         arguments, context = self.provider.call_args.args
@@ -126,7 +131,7 @@ class TestHandleTask(unittest.TestCase):
         with self.assertRaisesRegex(
             RuntimeError, "Credential-backed connector execution failed."
         ):
-            handle_task(client=self.stub, task_id=22, run_id=7)
+            handle_task(client=self.stub)
 
         self.provider.assert_not_called()
 
@@ -142,7 +147,7 @@ class TestHandleTask(unittest.TestCase):
         self.provider.side_effect = RuntimeError(f"Provider rejected {secret}")
 
         with self.assertRaises(RuntimeError) as error:
-            handle_task(client=self.stub, task_id=22, run_id=7)
+            handle_task(client=self.stub)
 
         response = _pushed_response(self.stub)
         self.provider.assert_called_once()
@@ -168,7 +173,7 @@ class TestHandleTask(unittest.TestCase):
             r"Notion API request failed: validation_error \(400\): "
             r"Participants must be email addresses\.",
         ):
-            handle_task(client=self.stub, task_id=22, run_id=7)
+            handle_task(client=self.stub)
 
         assert _pushed_response(self.stub).payload["error"] == {
             "code": "connector_error",

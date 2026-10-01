@@ -17,7 +17,10 @@
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ActionAccess, ActionDefinition
-from ..tool_schema import integer_property, string_property
+from ..tool_schema import string_property
+
+GITHUB_PAGINATION_MINIMUM = 1
+GITHUB_PER_PAGE_MAXIMUM = 100
 
 _REPOSITORY: JSONObject = {
     "owner": string_property("GitHub organization or repository owner."),
@@ -27,31 +30,51 @@ _REPOSITORY: JSONObject = {
 ACTIONS = (
     ActionDefinition(
         name="search_code",
-        description="Search code in one public GitHub repository.",
+        description="Search GitHub code with GitHub search syntax.",
         access=ActionAccess.READ,
         input_schema={
             "type": "object",
             "properties": {
-                **_REPOSITORY,
-                "query": string_property("Code search query without repo qualifier."),
-                "limit": integer_property(
-                    "Maximum number of matches to return.", minimum=1, maximum=10
-                ),
+                "query": string_property("GitHub code search query."),
+                "sort": {
+                    "type": "string",
+                    "enum": ["indexed"],
+                    "description": "Field used to sort results.",
+                },
+                "order": {
+                    "type": "string",
+                    "enum": ["asc", "desc"],
+                    "description": "Sort direction.",
+                },
+                "per_page": {
+                    "type": "integer",
+                    "minimum": GITHUB_PAGINATION_MINIMUM,
+                    "maximum": GITHUB_PER_PAGE_MAXIMUM,
+                    "description": "Number of results to return per page.",
+                },
+                "page": {
+                    "type": "integer",
+                    "minimum": GITHUB_PAGINATION_MINIMUM,
+                    "description": "Page number to return.",
+                },
             },
-            "required": ["owner", "repo", "query"],
+            "required": ["query"],
             "additionalProperties": False,
         },
     ),
     ActionDefinition(
-        name="get_file_content",
-        description="Read one UTF-8 text file from a public GitHub repository.",
+        name="get_file_contents",
+        description="Read a repository file.",
         access=ActionAccess.READ,
         input_schema={
             "type": "object",
             "properties": {
                 **_REPOSITORY,
                 "path": string_property("Repository-relative path to the file."),
-                "ref": string_property("Optional branch, tag, or commit."),
+                "ref": {
+                    "type": "string",
+                    "description": "Optional branch, tag, or commit.",
+                },
             },
             "required": ["owner", "repo", "path"],
             "additionalProperties": False,

@@ -31,6 +31,11 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
+from flwr.supercore.inflatable.inflatable_object import (
+    get_all_nested_objects,
+    get_object_tree,
+    no_object_id_recompute,
+)
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..constant import AutomationStatus
@@ -48,6 +53,15 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def object_store(self) -> ObjectStore:
         """Return the ObjectStore instance used by this CoreState."""
+
+    def _store_generated_message(self, message: Message) -> None:
+        """Store a generated Message in the object store."""
+        with no_object_id_recompute():
+            self.object_store.preregister(
+                message.metadata.run_id, get_object_tree(message)
+            )
+            for object_id, obj in get_all_nested_objects(message).items():
+                self.object_store.put(object_id, obj.deflate())
 
     @abstractmethod
     def start_session(self, run_id: int) -> str:
@@ -131,6 +145,9 @@ class CoreState(ABC):  # pylint: disable=R0904
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
+        display_name: str | None = None,
+        description: str | None = None,
+        color: str | None = None,
     ) -> str:
         """Store a FAB and associate its app with a federation.
 
@@ -150,9 +167,15 @@ class CoreState(ABC):  # pylint: disable=R0904
             Type of the app.
         added_by : str
             ID of the account adding the app to the federation.
-        is_hub_app : bool, default=False
+        is_hub_app : bool, (default: False)
             Whether the app was fetched from Flower Hub. Hub app associations do
             not retain a FAB hash so future runs resolve the latest version.
+        display_name : str | None, (default: None)
+            Human-readable app name from the FAB configuration.
+        description : str | None, (default: None)
+            App description from the FAB project metadata.
+        color : str | None, (default: None)
+            App color theme from the FAB configuration.
 
         Returns
         -------
@@ -192,65 +215,81 @@ class CoreState(ABC):  # pylint: disable=R0904
         """List apps associated with a federation, newest first."""
 
     @abstractmethod
+    def list_app_associations(
+        self, app_id: str, federation_ids: Sequence[str]
+    ) -> Sequence[str]:
+        """List candidate federation IDs associated with an app.
+
+        The built-in Flower Agent is associated with every candidate federation.
+        """
+
+    @abstractmethod
     def delete_app(self, federation_id: str, app_id: str) -> bool:
         """Delete one federation-app association; its FAB remains in state."""
 
     @abstractmethod
-    def upsert_connector(
+    def create_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        flwr_aid: str,
+        federation_id: str,
         connector_ref: str,
         credentials_json: str,
         config_json: str,
-    ) -> bool:
-        """Create or update a connector for an account.
+        created_by: str,
+    ) -> int | None:
+        """Create a connector for a federation.
 
         Parameters
         ----------
-        flwr_aid : str
-            Account ID owning the connector.
+        federation_id : str
+            Federation ID owning the connector.
         connector_ref : str
-            Connector reference unique within the account.
+            Connector reference.
         credentials_json : str
             Serialized connector credentials.
         config_json : str
             Serialized connector configuration.
+        created_by : str
+            Account ID creating the connector.
 
         Returns
         -------
-        bool
-            ``True`` if the connector was stored, otherwise ``False``.
+        int | None
+            The connector ID if the connector is created, otherwise ``None``.
         """
 
     @abstractmethod
-    def get_connector(
-        self, flwr_aid: str, connector_ref: str
-    ) -> ConnectorRecord | None:
-        """Return an account's connector, if present.
+    def get_connectors_by_ref(
+        self, federation_id: str, connector_ref: str
+    ) -> Sequence[ConnectorRecord]:
+        """Return a federation's connectors for one provider.
 
         Parameters
         ----------
-        flwr_aid : str
-            Account ID owning the connector.
+        federation_id : str
+            Federation ID owning the connector.
         connector_ref : str
-            Connector reference unique within the account.
+            Connector reference.
 
         Returns
         -------
-        ConnectorRecord | None
-            The stored connector, or `None` if it does not exist.
+        Sequence[ConnectorRecord]
+            The stored connectors.
         """
 
     @abstractmethod
-    def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
-        """Delete an account's connector if it exists.
+    def get_connector_by_id(self, connector_id: int) -> ConnectorRecord | None:
+        """Return a connector by ID, if present."""
+
+    @abstractmethod
+    def delete_connector(self, federation_id: str, connector_id: int) -> bool:
+        """Delete a federation's connector if it exists.
 
         Parameters
         ----------
-        flwr_aid : str
-            Account ID owning the connector.
-        connector_ref : str
-            Connector reference unique within the account.
+        federation_id : str
+            Federation ID owning the connector.
+        connector_id : int
+            ID of the connector to delete.
 
         Returns
         -------
@@ -259,20 +298,19 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def bind_connectors_to_run(
-        self, run_id: int, connector_refs: Sequence[str]
-    ) -> bool:
-        """Associate connector references with a run."""
+    def bind_connectors_to_run(self, run_id: int, connector_ids: Sequence[int]) -> bool:
+        """Associate connector IDs with a run."""
 
     @abstractmethod
-    def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
-        """Return connector references associated with a run."""
+    def get_run_connector_ids(self, run_id: int) -> Sequence[int]:
+        """Return connector IDs associated with a run."""
 
     @abstractmethod
     def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         oauth_session_id: str,
         flwr_aid: str,
+        federation_id: str,
         connector_ref: str,
         state: str,
         redirect_uri: str,
@@ -287,6 +325,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Unique ID of the OAuth session.
         flwr_aid : str
             Account ID owning the OAuth session.
+        federation_id : str
+            Federation receiving the connector.
         connector_ref : str
             Reference of the connector being authorized.
         state : str
@@ -696,6 +736,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        connector_id: int | None = None,
         requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a new task.
@@ -712,6 +753,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Model reference associated with the task, if applicable.
         connector_ref : Optional[str] (default: None)
             Connector reference associated with the task, if applicable.
+        connector_id : Optional[int] (default: None)
+            Connector ID associated with the task, if applicable.
         requesting_task_id : Optional[int] (default: None)
             Task requesting creation of the new task. If set, task creation fails
             when the requesting task does not exist or is already finished.

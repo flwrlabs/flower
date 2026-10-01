@@ -11,9 +11,9 @@ Use Endeavor with ChatGPT/Codex
     the `Endeavor 1.0 access form <https://flowerlabs.typeform.com/to/jlniHsuy>`_.
 
 This guide connects Codex CLI and local Codex tasks in the ChatGPT/Codex
-desktop app to ``flower-endeavor`` at ``https://api.flower.ai/v1``. The commands
-below use macOS and its default shell, zsh. Before continuing, install your
-preferred client using the `Codex CLI installation guide
+desktop app to ``flwrlabs/endeavor-1.0`` at ``https://api.flower.ai/v1``. The
+commands below use macOS and its default shell, zsh. Before continuing, install
+your preferred client using the `Codex CLI installation guide
 <https://learn.chatgpt.com/docs/codex/cli>`_ or the `desktop app setup guide
 <https://learn.chatgpt.com/docs/quickstart>`_.
 
@@ -26,6 +26,14 @@ For model details, see :doc:`endeavor`. To use OpenCode instead, see
 Download :download:`flower-models.json <_static/flower-models.json>` to your
 ``Downloads`` folder, keeping that filename. This catalog makes **Endeavor**
 available in the model selector and defines its capabilities.
+
+.. note::
+
+    The supplied catalog configures a 128,000-token context window and a
+    96,000-token automatic compaction threshold for this client. These are
+    client configuration values, not a universal limit on Endeavor API
+    requests. See :ref:`Context window and limits <endeavor-context-limits>`
+    for details.
 
 In your terminal, copy the file to the Codex configuration directory:
 
@@ -57,7 +65,7 @@ save the file. Update existing keys and sections rather than adding duplicates.
 
 .. code-block:: toml
 
-   model = "flower-endeavor"
+   model = "flwrlabs/endeavor-1.0"
    model_provider = "flower"
    model_reasoning_effort = "low"
    model_catalog_json = "/Users/YOUR_USERNAME/.codex/flower-models.json"

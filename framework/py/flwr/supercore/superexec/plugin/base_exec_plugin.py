@@ -29,10 +29,7 @@ from .exec_plugin import ExecPlugin
 
 
 class BaseExecPlugin(ExecPlugin):
-    """Simple Flower SuperExec plugin for app processes.
-
-    The plugin always selects the first candidate task.
-    """
+    """Simple Flower SuperExec plugin for app processes."""
 
     # Placeholders to be defined in subclasses
     supported_task_types: ClassVar[frozenset[TaskType]]
@@ -63,12 +60,6 @@ class BaseExecPlugin(ExecPlugin):
             return None
         return candidate_run_ids[0]
 
-    def select_task(self, candidate_tasks: Sequence[Task]) -> Task | None:
-        """Select a Task to execute from a sequence of candidates."""
-        if not candidate_tasks:
-            return None
-        return candidate_tasks[0]
-
     def launch_task(self, token: str, task: Task) -> LaunchResult:
         """Launch the process to execute the given task using the given token."""
         task_type = self._get_supported_task_type(task)
@@ -81,11 +72,21 @@ class BaseExecPlugin(ExecPlugin):
                 token=token,
                 task_type=task_type,
                 task_id=task.task_id,
+                fab_hash=(
+                    task.fab_hash
+                    if isinstance(getattr(task, "fab_hash", None), str)
+                    and task.fab_hash
+                    else None
+                ),
             )
         )
 
     def _build_execution_spec(
-        self, token: str, task_type: TaskType, task_id: int
+        self,
+        token: str,
+        task_type: TaskType,
+        task_id: int,
+        fab_hash: str | None = None,
     ) -> ExecutionSpec:
         """Build the execution spec for the selected task."""
         return ExecutionSpec(
@@ -100,6 +101,7 @@ class BaseExecPlugin(ExecPlugin):
                 self.suppress_output and task_type not in self.visible_output_task_types
             ),
             task_id=task_id,
+            fab_hash=fab_hash,
         )
 
     def _get_supported_task_type(self, task: Task) -> TaskType | None:
@@ -119,3 +121,13 @@ class BaseExecPlugin(ExecPlugin):
             return None
 
         return task_type
+
+
+class AutoExecPlugin(BaseExecPlugin):
+    """Task-driven Flower SuperExec plugin."""
+
+    suppress_output = True
+    visible_output_task_types = frozenset(
+        {TaskType.AGENT_APP, TaskType.CLIENT_APP, TaskType.CONNECTOR, TaskType.MODEL}
+    )
+    supported_task_types = frozenset(TaskType)

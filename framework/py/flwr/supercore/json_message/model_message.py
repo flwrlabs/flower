@@ -85,7 +85,7 @@ class ModelRequest(JSONMessage):
         )
 
     @classmethod
-    def _validate_payload(cls, payload: JSONObject) -> None:
+    def validate_payload(cls, payload: JSONObject) -> None:
         """Validate the minimal Responses create-request shape."""
         cls._validate_non_empty_string(payload, "model")
         if "input" not in payload:
@@ -133,7 +133,7 @@ class ModelResponse(JSONMessage):
         )
 
     @classmethod
-    def _validate_payload(cls, payload: JSONObject) -> None:
+    def validate_payload(cls, payload: JSONObject) -> None:
         """Validate the minimal Open Responses object shape."""
         if payload.get("object") != "response":
             raise ValueError(

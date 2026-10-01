@@ -42,7 +42,6 @@ from flwr.common.constant import (
     TRANSPORT_TYPE_GRPC_RERE,
     TRANSPORT_TYPES,
     ErrorCode,
-    ExecPluginType,
     SubStatus,
 )
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -228,7 +227,6 @@ def start_client_internal(
             "--runtime-api-address",
             runtime_address,
         ]
-        command += ["--plugin-type", ExecPluginType.CLIENT_APP]
         command += ["--parent-pid", str(os.getpid())]
         if runtime_dependency_install:
             command += ["--allow-runtime-dependency-installation"]
@@ -401,7 +399,13 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
 
         # Create task
         task_id = state.create_task(
-            task_type=TaskType.CLIENT_APP, run_id=run_id, fab_hash=run_info.fab_hash
+            task_type=(
+                TaskType.AGENT_APP
+                if run_info.primary_task_type == TaskType.AGENT_APP
+                else TaskType.CLIENT_APP
+            ),
+            run_id=run_id,
+            fab_hash=run_info.fab_hash,
         )
         if task_id is None:
             # Task creation can fail if the generated uint64 task ID collides

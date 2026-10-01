@@ -25,6 +25,7 @@ from httpx import Response
 from pytest import MonkeyPatch
 
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
     ClaimTaskRequest,
     ClaimTaskResponse,
     GetNodesRequest,
@@ -53,6 +54,7 @@ from flwr.superlink.servicer.runtime import runtime_handlers
 
 _SUPEREXEC_PATHS = {
     "/v1/runtime/pull-pending-tasks",
+    "/v1/runtime/acquire-task",
     "/v1/runtime/claim-task",
 }
 
@@ -131,7 +133,7 @@ def test_all_runtime_routes_have_protobuf_request_types() -> None:
         if route_key[1].startswith("/v1/runtime/")
     }
 
-    assert len(route_keys) == 20
+    assert len(route_keys) == 21
     assert route_keys == runtime_request_types
 
 
@@ -206,7 +208,7 @@ def test_superexec_route_rejects_unsigned_request_when_auth_is_enabled() -> None
     state = Mock(spec=LinkState)
     client = TestClient(_create_app(state, superexec_auth_secret=b"superexec-secret"))
 
-    response = _post(client, "/v1/runtime/claim-task", ClaimTaskRequest(task_id=123))
+    response = _post(client, "/v1/runtime/acquire-task", AcquireTaskRequest())
 
     assert response.status_code == 401
     assert response.json() == {

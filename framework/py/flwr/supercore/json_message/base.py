@@ -18,18 +18,20 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Self
+from typing import Self, TypeVar
 
 from flwr.app.constants import DEFAULT_TTL
-from flwr.app.message import ConfigRecord, Message, RecordDict
+from flwr.app.message import ConfigRecord, Message, RecordDict, make_message
 from flwr.app.message_type import MessageType
 from flwr.app.metadata import Metadata
-from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.supercore.date import now
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
 from .constant import TASK_MESSAGE_PAYLOAD_JSON_KEY, TASK_MESSAGE_PAYLOAD_RECORD_KEY
+
+JSONMessageT = TypeVar("JSONMessageT", bound="JSONMessage")
 
 
 class JSONMessage(Message, ABC):
@@ -43,7 +45,7 @@ class JSONMessage(Message, ABC):
         reply_to_message_id: str = "",
         ttl: float = DEFAULT_TTL,
     ) -> None:
-        type(self)._validate_payload(payload)
+        type(self).validate_payload(payload)
         metadata, content = _build_metadata_and_content(
             dst_task_id,
             payload,
@@ -69,14 +71,14 @@ class JSONMessage(Message, ABC):
             raise ValueError("Expected a message with content.")
 
         payload = _payload_from_content(message.content)
-        cls._validate_payload(payload)
+        cls.validate_payload(payload)
         typed_message = cls.__new__(cls)
         typed_message.__dict__.update(message.__dict__)
         return typed_message
 
     @classmethod
     @abstractmethod
-    def _validate_payload(cls, payload: JSONObject) -> None:
+    def validate_payload(cls, payload: JSONObject) -> None:
         """Validate this task message type's payload."""
 
     @staticmethod
@@ -152,18 +154,28 @@ def _build_metadata_and_content(
 ) -> tuple[Metadata, RecordDict]:
     """Build task message metadata and content from a JSON object payload."""
     metadata = Metadata(
-        run_id=0,
+        run_id=TaskIdentity.run_id,
         message_id="",
-        src_node_id=SUPERLINK_NODE_ID,
-        dst_node_id=SUPERLINK_NODE_ID,
+        src_node_id=TaskIdentity.node_id,
+        dst_node_id=TaskIdentity.node_id,
         reply_to_message_id=reply_to_message_id,
         group_id="",
         created_at=now().timestamp(),
         ttl=ttl,
         message_type=MessageType.QUERY,
+        src_task_id=TaskIdentity.task_id,
         dst_task_id=dst_task_id,
     )
     return metadata, _payload_to_content(payload)
+
+
+def make_json_message(
+    message_type: type[JSONMessageT], *, metadata: Metadata, payload: JSONObject
+) -> JSONMessageT:
+    """Create a typed JSON message with explicit metadata."""
+    message_type.validate_payload(payload)
+    message = make_message(metadata=metadata, content=_payload_to_content(payload))
+    return message_type.from_message(message)
 
 
 def _payload_to_content(payload: JSONObject) -> RecordDict:

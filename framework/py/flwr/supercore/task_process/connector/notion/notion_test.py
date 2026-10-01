@@ -34,43 +34,323 @@ _CREDENTIALS: JSONObject = {"access_token": "ntn-secret"}
 
 
 def test_notion_definition_is_registered() -> None:
-    """Notion schemas and handlers should form one account-scoped connector."""
-    assert len(ACTIONS) == 2
+    """Notion schemas and executors should form one federation-scoped connector."""
+    assert len(ACTIONS) == 9
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
-    assert len(registry.get_connector_tools(NOTION_CONNECTOR_REF)) == len(ACTIONS)
+    assert [
+        tool["name"] for tool in registry.get_connector_tools(NOTION_CONNECTOR_REF)
+    ] == [
+        "notion_search",
+        "notion_get_page",
+        "notion_get_page_property",
+        "notion_get_database",
+        "notion_get_block",
+        "notion_get_block_children",
+        "notion_list_users",
+        "notion_get_user",
+        "notion_get_self",
+    ]
 
 
-@pytest.mark.parametrize(
-    ("name", "arguments", "method", "path"),
-    [
-        ("notion_search", {"query": "release"}, "POST", "/search"),
-        (
-            "notion_get_page_content",
-            {"page_id": "page-1"},
-            "GET",
-            "/blocks/page-1/children",
-        ),
-    ],
-)
-def test_notion_tools_call_read_endpoints(
-    name: str, arguments: JSONObject, method: str, path: str
-) -> None:
-    """Notion tools should call their read-only API endpoints."""
+def test_notion_search_forwards_api_inputs() -> None:
+    """Notion search should forward inputs using the API field names."""
     response = Mock(status_code=200)
     response.json.return_value = {"results": [], "has_more": False}
     with patch(_HTTP_REQUEST, return_value=response) as request:
         result = registry.invoke_connector(
-            name, arguments, Mock(), credentials=_CREDENTIALS, config={}
+            "notion_search",
+            {
+                "query": "release",
+                "filter": {
+                    "property": "object",
+                    "value": "page",
+                    "in_trash": False,
+                },
+                "sort": {
+                    "timestamp": "last_edited_time",
+                    "direction": "descending",
+                },
+                "page_size": 100,
+                "start_cursor": "cursor-1",
+            },
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
         )
     assert result == response.json.return_value
-    assert request.call_args.args == (method, f"https://api.notion.com/v1{path}")
+    assert request.call_args.args == ("POST", "https://api.notion.com/v1/search")
     assert request.call_args.kwargs["headers"]["Notion-Version"] == "2026-03-11"
+    assert request.call_args.kwargs["json"] == {
+        "query": "release",
+        "filter": {
+            "property": "object",
+            "value": "page",
+            "in_trash": False,
+        },
+        "sort": {
+            "timestamp": "last_edited_time",
+            "direction": "descending",
+        },
+        "page_size": 100,
+        "start_cursor": "cursor-1",
+    }
+
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        registry.invoke_connector(
+            "notion_search", {}, Mock(), credentials=_CREDENTIALS, config={}
+        )
+    assert request.call_args.kwargs["json"] == {}
+
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        registry.invoke_connector(
+            "notion_search",
+            {"filter": {"in_trash": True}},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert request.call_args.kwargs["json"] == {"filter": {"in_trash": True}}
 
 
-def test_notion_api_errors_are_secret_safe() -> None:
-    """Notion failures should expose stable codes without credentials."""
-    response = Mock(status_code=401)
-    response.json.return_value = {"code": "unauthorized", "message": "ntn-secret"}
+@pytest.mark.parametrize(
+    "filter_",
+    [
+        {},
+        {"property": "object"},
+        {"value": "page"},
+        {"value": "page", "in_trash": True},
+    ],
+)
+def test_notion_search_rejects_invalid_filter(filter_: JSONObject) -> None:
+    """Notion search should reject incomplete and mixed filter shapes."""
+    with patch(_HTTP_REQUEST) as request, pytest.raises(ValueError):
+        registry.invoke_connector(
+            "notion_search",
+            {"filter": filter_},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    request.assert_not_called()
+
+
+def test_notion_get_page_forwards_property_filter() -> None:
+    """Get page should call only its endpoint and forward property filters."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"object": "page", "id": "page-1"}
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_page",
+            {"page_id": "page/1", "filter_properties": ["title", "f%5C%3Ap"]},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == (
+        "GET",
+        "https://api.notion.com/v1/pages/page%2F1",
+    )
+    assert request.call_args.kwargs["params"] == {
+        "filter_properties": ["title", "f\\:p"]
+    }
+
+
+def test_notion_get_page_property_forwards_pagination() -> None:
+    """Get page property should preserve encoded IDs and forward pagination."""
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "object": "list",
+        "type": "property_item",
+        "results": [],
+        "has_more": True,
+        "next_cursor": "cursor-2",
+    }
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_page_property",
+            {
+                "page_id": "page/1",
+                "property_id": "f%5C%5C%3Ap",
+                "page_size": 50,
+                "start_cursor": "cursor-1",
+            },
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == (
+        "GET",
+        "https://api.notion.com/v1/pages/page%2F1/properties/f%5C%5C%3Ap",
+    )
+    assert request.call_args.kwargs["params"] == {
+        "page_size": "50",
+        "start_cursor": "cursor-1",
+    }
+
+
+def test_notion_get_page_property_returns_single_item() -> None:
+    """Get page property should also pass through single-item responses."""
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "object": "property_item",
+        "id": "status",
+        "type": "status",
+        "status": None,
+    }
+    with patch(_HTTP_REQUEST, return_value=response):
+        result = registry.invoke_connector(
+            "notion_get_page_property",
+            {"page_id": "page-1", "property_id": "status"},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+
+
+def test_notion_get_database_encodes_id() -> None:
+    """Get database should retrieve exactly one safely encoded database ID."""
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "object": "database",
+        "id": "database-1",
+        "data_sources": [{"id": "source-1", "name": "Tasks"}],
+    }
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_database",
+            {"database_id": "database/1"},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == (
+        "GET",
+        "https://api.notion.com/v1/databases/database%2F1",
+    )
+
+
+def test_notion_get_block_encodes_id() -> None:
+    """Get block should retrieve exactly one safely encoded block ID."""
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "object": "block",
+        "id": "block-1",
+        "type": "paragraph",
+    }
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_block",
+            {"block_id": "block/1"},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == (
+        "GET",
+        "https://api.notion.com/v1/blocks/block%2F1",
+    )
+
+
+def test_notion_get_block_children_forwards_pagination() -> None:
+    """Get block children should forward Notion's pagination parameters."""
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "object": "list",
+        "type": "block",
+        "results": [],
+        "has_more": False,
+        "next_cursor": None,
+    }
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_block_children",
+            {
+                "block_id": "block/1",
+                "page_size": 50,
+                "start_cursor": "cursor-1",
+            },
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == (
+        "GET",
+        "https://api.notion.com/v1/blocks/block%2F1/children",
+    )
+    assert request.call_args.kwargs["params"] == {
+        "page_size": "50",
+        "start_cursor": "cursor-1",
+    }
+
+
+def test_notion_list_users_forwards_pagination() -> None:
+    """List users should forward Notion's pagination parameters."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"object": "list", "results": []}
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_list_users",
+            {"page_size": 50, "start_cursor": "cursor-1"},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == ("GET", "https://api.notion.com/v1/users")
+    assert request.call_args.kwargs["params"] == {
+        "page_size": "50",
+        "start_cursor": "cursor-1",
+    }
+
+
+def test_notion_get_user_encodes_id() -> None:
+    """Get user should retrieve exactly one safely encoded user ID."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"object": "user", "id": "user-1"}
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_user",
+            {"user_id": "user/1"},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == (
+        "GET",
+        "https://api.notion.com/v1/users/user%2F1",
+    )
+
+
+def test_notion_get_self_retrieves_token_user() -> None:
+    """Get self should retrieve the user associated with the access token."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"object": "user", "id": "user-1"}
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_self",
+            {},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == ("GET", "https://api.notion.com/v1/users/me")
+
+
+def test_notion_api_errors_include_code_and_message() -> None:
+    """Notion's documented error fields should remain readable to callers."""
+    response = Mock(status_code=400)
+    response.json.return_value = {
+        "code": "validation_error",
+        "message": "Invalid start_cursor value",
+    }
     with (
         patch(_HTTP_REQUEST, return_value=response),
         pytest.raises(NotionApiError) as error,
@@ -78,7 +358,10 @@ def test_notion_api_errors_are_secret_safe() -> None:
         registry.invoke_connector(
             "notion_search", {"query": "release"}, Mock(), _CREDENTIALS, {}
         )
-    assert error.value.code == "unauthorized"
+    assert error.value.code == "validation_error"
+    assert str(error.value) == (
+        "Notion API request failed: validation_error (400): Invalid start_cursor value."
+    )
     assert "ntn-secret" not in str(error.value)
 
 
@@ -99,13 +382,18 @@ def test_notion_oauth_flow() -> None:
     response.json.return_value = {
         "access_token": "token",
         "workspace_id": "workspace-1",
+        "workspace_name": "Flower",
     }
     with patch(_OAUTH_REQUEST, return_value=response):
         credentials, config = flow.exchange_code(
             code="code", redirect_uri=redirect_uri, pkce_verifier=None
         )
     assert credentials == {"access_token": "token"}
-    assert config == {"workspace_id": "workspace-1"}
+    assert config == {
+        "workspace_id": "workspace-1",
+        "workspace_name": "Flower",
+        "display_name": "Notion · Flower",
+    }
 
     response.json.return_value = {"error": "secret"}
     with patch(_OAUTH_REQUEST, return_value=response), pytest.raises(RuntimeError):

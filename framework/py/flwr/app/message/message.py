@@ -43,6 +43,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_children_ids_from_object_content,
 )
 from flwr.supercore.logger import warn_deprecated_feature
+from flwr.supercore.task_identity import TaskIdentity
 
 from .recorddict import RecordDict
 
@@ -196,9 +197,9 @@ class Message(InflatableObject):
 
             # Set metadata
             metadata = Metadata(
-                run_id=0,  # Will be set before pushed
+                run_id=TaskIdentity.run_id,
                 message_id="",  # Will be set by the SuperLink
-                src_node_id=0,  # Will be set before pushed
+                src_node_id=TaskIdentity.node_id,
                 dst_node_id=dst_node_id,
                 # Instruction messages do not reply to any message
                 reply_to_message_id="",
@@ -206,6 +207,7 @@ class Message(InflatableObject):
                 created_at=now().timestamp(),
                 ttl=ttl or DEFAULT_TTL,
                 message_type=message_type,
+                src_task_id=TaskIdentity.task_id,
                 dst_task_id=dst_task_id,
             )
 

@@ -31,10 +31,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddAppRequest,
     AddAppResponse,
     AppInfo,
+    ListAppAssociationsRequest,
     ListAppsRequest,
     ListAppsResponse,
     ListAutomationsRequest,
     ListRunSeriesEventsRequest,
+    ListRunsRequest,
     RefreshAuthTokensRequest,
     RemoveAppRequest,
     RemoveAppResponse,
@@ -48,6 +50,8 @@ from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
+    AGENT_MESSAGE_CONTENT_RECORD_KEY,
+    AGENT_MESSAGE_TEXT_KEY,
     FLOWER_AGENT_APP_ID,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
@@ -62,9 +66,11 @@ from flwr.superlink.federation import NoOpFederationManager
 
 from .control_handlers import (
     add_app,
+    list_app_associations,
     list_apps,
     list_automations,
     list_run_series_events,
+    list_runs,
     refresh_auth_tokens,
     remove_app,
     start_automation,
@@ -100,6 +106,21 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             None,
             self.account.flwr_aid,
             TaskType.SERVER_APP,
+        )
+
+    def test_list_runs_defaults_to_twenty(self) -> None:
+        """Apply the default page size in the shared Control handler."""
+        state = Mock(spec=LinkState)
+        state.get_run_info.return_value = []
+
+        list_runs(ListRunsRequest(), self.account, state)
+
+        state.get_run_info.assert_called_once_with(
+            flwr_aids=[self.account.flwr_aid],
+            order_by="pending_at",
+            ascending=False,
+            limit=20,
+            skip=0,
         )
 
     def _create_dummy_run_series(
@@ -419,17 +440,26 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         self.assertEqual(run.fab_hash, fab_hash)
 
-    def test_start_run_persists_agent_input_event(self) -> None:
-        """Persist agent input as a primary-task message item."""
+    def test_start_run_persists_user_prompt_instruction(self) -> None:
+        """Persist the user prompt as an AgentApp instruction."""
         request = StartRunRequest(federation=NOOP_FEDERATION_ID)
         request.fab.content = b"AgentApp FAB"
-        request.override_config["agent.input"].string = "Hello"
+        request.user_prompt = "Hello"
 
         with (
             patch(
                 "flwr.superlink.servicer.control.control_handlers.get_fab_config",
                 return_value={
-                    "tool": {"flwr": {"app": {"config": {"agent": {"input": ""}}}}}
+                    "project": {"description": "Local agent"},
+                    "tool": {
+                        "flwr": {
+                            "app": {
+                                "config": {"agent": {"input": ""}},
+                                "display-name": "Local Agent",
+                                "color": "rose",
+                            }
+                        }
+                    },
                 },
             ),
             patch(
@@ -449,20 +479,50 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             response = start_run(request, self.account, self.state, None)
 
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
-        event = self.state.get_task_events(run_ids=[response.run_id])[0]
-        self.assertEqual(
-            (event.task_id, event.event, event.data),
-            (
-                run.primary_task_id,
-                "message",
-                '{"type":"message","role":"user","content":"Hello"}',
-            ),
-        )
+        app = self.state.list_apps(NOOP_FEDERATION_ID)[0]
+        self.assertEqual(app.display_name, "Local Agent")
+        self.assertEqual(app.description, "Local agent")
+        self.assertEqual(app.color, "rose")
+        self.assertEqual(self.state.get_task_events(run_ids=[response.run_id]), [])
         start_title.assert_called_once_with(
             self.state,
             run.series_id,
             "Hello",
         )
+        messages = self.state.get_message_ins(
+            self.state.get_node_id(), limit=None, run_id=response.run_id
+        )
+        agent_record = messages[0].content[AGENT_MESSAGE_CONTENT_RECORD_KEY]
+        prompt = agent_record[AGENT_MESSAGE_TEXT_KEY]
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(prompt, "Hello")
+
+    def test_start_run_requires_user_prompt_for_agentapp(self) -> None:
+        """Reject an AgentApp run without a user prompt."""
+        for user_prompt in ("", " \n\t "):
+            request = StartRunRequest(
+                federation=NOOP_FEDERATION_ID, user_prompt=user_prompt
+            )
+            request.fab.content = b"AgentApp FAB"
+
+            with (
+                patch(
+                    "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                    return_value={"tool": {"flwr": {"app": {"config": {}}}}},
+                ),
+                patch(
+                    "flwr.superlink.servicer.control.control_handlers._get_app_type",
+                    return_value=TaskType.AGENT_APP,
+                ),
+                self.assertRaises(FlowerError) as error,
+            ):
+                start_run(request, self.account, self.state, None)
+
+            self.assertEqual(
+                error.exception.code,
+                ApiErrorCode.AGENTAPP_USER_PROMPT_REQUIRED,
+            )
+        self.assertEqual(self.state.get_run_info(), [])
 
     def test_start_run_notifies_extension_after_persisting_run(self) -> None:
         """Notify the optional extension with the persisted run snapshot."""
@@ -558,6 +618,69 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 (FLOWER_AGENT_APP_ID, "", TaskType.AGENT_APP),
             ],
         )
+        flower_agent = response.apps[1]
+        self.assertEqual(flower_agent.display_name, "Flower Agent")
+        self.assertEqual(flower_agent.description, "Chat with Flower Agent")
+        self.assertEqual(flower_agent.color, "yellow")
+
+    def test_list_app_associations_only_returns_accessible_federations(self) -> None:
+        """Exclude non-member and archived federations from app associations."""
+        for federation_id in (
+            NOOP_FEDERATION_ID,
+            "@me/archived",
+            "@other/private",
+        ):
+            self.state.store_app(
+                fab=Fab("", federation_id.encode(), {}),
+                federation_id=federation_id,
+                app_id="@flwr/demo",
+                app_type=TaskType.SERVER_APP,
+                added_by=self.account.flwr_aid,
+            )
+
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "get_federations",
+                return_value=[
+                    Mock(id=NOOP_FEDERATION_ID, archived=False),
+                    Mock(id="@me/archived", archived=True),
+                ],
+            ),
+            patch.object(
+                self.state,
+                "list_app_associations",
+                wraps=self.state.list_app_associations,
+            ) as state_list_app_associations,
+        ):
+            response = list_app_associations(
+                ListAppAssociationsRequest(app_id="@flwr/demo"),
+                self.account,
+                self.state,
+            )
+
+        self.assertEqual(list(response.federation_ids), [NOOP_FEDERATION_ID])
+        state_list_app_associations.assert_called_once_with(
+            "@flwr/demo", [NOOP_FEDERATION_ID]
+        )
+
+    def test_list_app_associations_includes_default_flower_agent(self) -> None:
+        """List active member federations for the default Flower Agent."""
+        with patch.object(
+            self.state.federation_manager,
+            "get_federations",
+            return_value=[
+                Mock(id=NOOP_FEDERATION_ID, archived=False),
+                Mock(id="@me/archived", archived=True),
+            ],
+        ):
+            response = list_app_associations(
+                ListAppAssociationsRequest(app_id=FLOWER_AGENT_APP_ID),
+                self.account,
+                self.state,
+            )
+
+        self.assertEqual(list(response.federation_ids), [NOOP_FEDERATION_ID])
 
     def test_list_apps_does_not_duplicate_stored_flower_agent(self) -> None:
         """List apps uses the stored Flower Agent entry when available."""
@@ -631,9 +754,16 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             patch(
                 "flwr.superlink.servicer.control.control_handlers.get_fab_config",
                 return_value={
+                    "project": {"description": "Demo agent"},
                     "tool": {
-                        "flwr": {"app": {"components": {"agentapp": "module:app"}}}
-                    }
+                        "flwr": {
+                            "app": {
+                                "components": {"agentapp": "module:app"},
+                                "display-name": "Demo Agent",
+                                "color": "sky",
+                            }
+                        }
+                    },
                 },
             ),
         ):
@@ -656,6 +786,9 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             [("@flwr/demo", fab_hash, TaskType.AGENT_APP)],
         )
         self.assertTrue(apps[0].is_hub_app)
+        self.assertEqual(apps[0].display_name, "Demo Agent")
+        self.assertEqual(apps[0].description, "Demo agent")
+        self.assertEqual(apps[0].color, "sky")
         self.assertEqual(
             self.state.get_app(NOOP_FEDERATION_ID, "@flwr/demo", fab_hash),
             Fab(fab_hash, fab_content, verification_dict),

@@ -30,7 +30,7 @@ from flwr.common.serde import message_to_proto
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
 )
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.node_pb2 import Node, NodeInfo  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
@@ -193,11 +193,7 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
 
     def _check_message(self, message: Message) -> None:
         # Check if the message is valid
-        if not (
-            message.metadata.message_id != ""
-            and message.metadata.reply_to_message_id == ""
-            and message.metadata.ttl > 0
-        ):
+        if not (message.metadata.message_id != "" and message.metadata.ttl > 0):
             raise ValueError(f"Invalid message: {message}")
 
     def create_message(  # pylint: disable=too-many-arguments,R0917
@@ -223,9 +219,13 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
 
     def get_node_ids(self) -> Iterable[int]:
         """Get node IDs."""
+        return [node.node_id for node in self.get_nodes()]
+
+    def get_nodes(self) -> Iterable[NodeInfo]:
+        """Get nodes."""
         # Call the Runtime API client
         res: GetNodesResponse = self._runtime_client.GetNodes(GetNodesRequest())
-        return [node.node_id for node in res.nodes]
+        return res.nodes
 
     def _try_push_messages(self, run_id: int, messages: Iterable[Message]) -> list[str]:
         """Push all messages and its associated objects."""
@@ -274,9 +274,7 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
         try:
             with no_object_id_recompute():
                 for msg in messages:
-                    # Populate metadata
-                    msg.metadata.__dict__["_run_id"] = run_id
-                    msg.metadata.__dict__["_src_node_id"] = self.node.node_id
+                    # Populate message ID
                     msg.metadata.__dict__["_message_id"] = msg.object_id
                     # Check message
                     self._check_message(msg)

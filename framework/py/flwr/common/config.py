@@ -17,6 +17,7 @@
 
 import re
 import zipfile
+from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 from typing import IO, Any, TypeVar, cast, get_args
@@ -38,6 +39,15 @@ from flwr.supercore.run import Run
 from flwr.supercore.utils import get_flwr_home
 
 T_dict = TypeVar("T_dict", bound=dict[str, Any])  # pylint: disable=invalid-name
+
+
+@dataclass
+class AppMetadata:
+    """App presentation metadata."""
+
+    display_name: str | None
+    description: str | None
+    color: str | None
 
 
 def get_project_dir(
@@ -237,6 +247,21 @@ def get_metadata_from_config(config: dict[str, Any]) -> tuple[str, str]:
     return (
         f"{config['tool']['flwr']['app']['publisher']}/{config['project']['name']}",
         config["project"]["version"],
+    )
+
+
+def get_app_presentation_metadata(config: dict[str, Any]) -> AppMetadata:
+    """Extract app presentation metadata from a project config."""
+    app_config: dict[str, Any] = config["tool"]["flwr"]["app"]
+    project_config: dict[str, Any] = config.get("project", {})
+
+    def optional_string(value: Any) -> str | None:
+        return value if isinstance(value, str) and value else None
+
+    return AppMetadata(
+        display_name=optional_string(app_config.get("display-name")),
+        description=optional_string(project_config.get("description")),
+        color=optional_string(app_config.get("color")),
     )
 
 

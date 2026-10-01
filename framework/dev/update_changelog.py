@@ -74,6 +74,7 @@ IGNORED_CONTRIBUTOR_LOGINS = {
 }
 CONTRIBUTOR_NAME_ALIASES = {
     "William Lindskog-Munzing": "William Lindskog",
+    "jafermarq": "Javier",
 }
 PR_NUMBER_PATTERN = re.compile(r"\(#(\d+)\)$")
 COAUTHOR_PATTERN = re.compile(

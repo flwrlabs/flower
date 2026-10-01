@@ -31,6 +31,8 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    AcquireTaskResponse,
     ClaimTaskRequest,
     ClaimTaskResponse,
     CreateTaskRequest,
@@ -67,8 +69,17 @@ from flwr.supercore.protobuf.client import ProtobufClient
 
 # Match the method names defined by the Runtime protobuf service.
 # pylint: disable=invalid-name
-class RuntimeHttpClient(ProtobufClient):
+class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-methods
     """Protobuf-over-HTTP client for the Runtime API."""
+
+    def AcquireTask(self, request: AcquireTaskRequest) -> AcquireTaskResponse:
+        """Acquire the oldest eligible pending task."""
+        return self._unary_unary(
+            path="/v1/runtime/acquire-task",
+            rpc_method="/flwr.proto.Runtime/AcquireTask",
+            request=request,
+            response_type=AcquireTaskResponse,
+        )
 
     def PullPendingTasks(
         self, request: PullPendingTasksRequest

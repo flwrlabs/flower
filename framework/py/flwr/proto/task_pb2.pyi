@@ -39,6 +39,7 @@ class Task(google.protobuf.message.Message):
     FAB_HASH_FIELD_NUMBER: builtins.int
     MODEL_REF_FIELD_NUMBER: builtins.int
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
+    CONNECTOR_ID_FIELD_NUMBER: builtins.int
     task_id: builtins.int
     type: builtins.str
     run_id: builtins.int
@@ -49,6 +50,7 @@ class Task(google.protobuf.message.Message):
     fab_hash: builtins.str
     model_ref: builtins.str
     connector_ref: builtins.str
+    connector_id: builtins.int
     @property
     def status(self) -> global___TaskStatus: ...
     def __init__(
@@ -65,9 +67,12 @@ class Task(google.protobuf.message.Message):
         fab_hash: builtins.str | None = ...,
         model_ref: builtins.str | None = ...,
         connector_ref: builtins.str | None = ...,
+        connector_id: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref", "status", b"status"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "finished_at", b"finished_at", "model_ref", b"model_ref", "pending_at", b"pending_at", "run_id", b"run_id", "running_at", b"running_at", "starting_at", b"starting_at", "status", b"status", "task_id", b"task_id", "type", b"type"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_connector_id", b"_connector_id", "_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_id", b"connector_id", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref", "status", b"status"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_connector_id", b"_connector_id", "_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_id", b"connector_id", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "finished_at", b"finished_at", "model_ref", b"model_ref", "pending_at", b"pending_at", "run_id", b"run_id", "running_at", b"running_at", "starting_at", b"starting_at", "status", b"status", "task_id", b"task_id", "type", b"type"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_connector_id", b"_connector_id"]) -> typing.Literal["connector_id"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_connector_ref", b"_connector_ref"]) -> typing.Literal["connector_ref"] | None: ...
     @typing.overload

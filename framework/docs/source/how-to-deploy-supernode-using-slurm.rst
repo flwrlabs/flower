@@ -144,7 +144,6 @@ Create ``superexec-clientapp.sbatch``:
         if bash -c '</dev/tcp/127.0.0.1/9094' 2>/dev/null; then
             exec flower-superexec \
                 --insecure \
-                --plugin-type clientapp \
                 --runtime-api-address 127.0.0.1:9094
         fi
         sleep 2
@@ -213,7 +212,6 @@ Create ``superexec-clientapp-gpu.sbatch``:
         if bash -c '</dev/tcp/127.0.0.1/9094' 2>/dev/null; then
             exec flower-superexec \
                 --insecure \
-                --plugin-type clientapp \
                 --runtime-api-address 127.0.0.1:9094
         fi
         sleep 2
@@ -322,7 +320,6 @@ directive:
         if bash -c "</dev/tcp/${runtime_host}/${runtime_port}" 2>/dev/null; then
             exec flower-superexec \
                 --insecure \
-                --plugin-type clientapp \
                 --runtime-api-address "${runtime_api_address}"
         fi
         sleep 2

@@ -17,6 +17,7 @@
 
 from math import pi
 from random import shuffle
+from unittest.mock import patch
 
 import ray
 
@@ -41,6 +42,7 @@ from flwr.simulation.ray_transport.ray_actor import (
     VirtualClientEngineActorPool,
 )
 from flwr.simulation.ray_transport.ray_client_proxy import RayActorClientProxy
+from flwr.supercore.task_identity import TaskIdentity
 
 
 class DummyClient(NumPyClient):
@@ -205,22 +207,24 @@ def test_cid_consistency_without_proxies() -> None:
     # submit all jobs (collect later)
     shuffle(node_ids)
     run_id = 0
-    for node_id in node_ids:
-        message = Message(
-            content=recorddict,
-            dst_node_id=node_id,
-            message_type=MessageTypeLegacy.GET_PROPERTIES,
-            group_id=str(0),
-        )
-        message.metadata.__dict__["_run_id"] = run_id
-        # register and retrieve context
-        node_info_stores[node_id].register_context(run_id=run_id)
-        context = node_info_stores[node_id].retrieve_context(run_id=run_id)
-        partition_id_str = str(context.node_config[PARTITION_ID_KEY])
-        pool.submit_client_job(
-            lambda a, c_fn, j_fn, nid_, state: a.run.remote(c_fn, j_fn, nid_, state),
-            (_load_app, message, partition_id_str, context),
-        )
+    with patch.multiple(TaskIdentity, _task_id=123, _run_id=run_id, _node_id=0):
+        for node_id in node_ids:
+            message = Message(
+                content=recorddict,
+                dst_node_id=node_id,
+                message_type=MessageTypeLegacy.GET_PROPERTIES,
+                group_id=str(0),
+            )
+            # register and retrieve context
+            node_info_stores[node_id].register_context(run_id=run_id)
+            context = node_info_stores[node_id].retrieve_context(run_id=run_id)
+            partition_id_str = str(context.node_config[PARTITION_ID_KEY])
+            pool.submit_client_job(
+                lambda a, c_fn, j_fn, nid_, state: a.run.remote(
+                    c_fn, j_fn, nid_, state
+                ),
+                (_load_app, message, partition_id_str, context),
+            )
 
     # fetch results one at a time
     shuffle(node_ids)

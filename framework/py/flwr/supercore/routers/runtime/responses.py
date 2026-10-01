@@ -23,29 +23,32 @@ import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from logging import ERROR
-from typing import Annotated, cast
+from typing import cast
 
 from anyio import CancelScope
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
+from flwr.app.constants import DEFAULT_TTL
+from flwr.app.message_type import MessageType
+from flwr.app.metadata import Metadata
 from flwr.common.constant import Status, SubStatus
 from flwr.proto.runtime_pb2 import CreateTaskRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
-from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.constant import TaskType
+from flwr.supercore.corestate import CoreState
+from flwr.supercore.date import now
+from flwr.supercore.dependencies.runtime import RuntimeStateDependency
 from flwr.supercore.error import FlowerError
+from flwr.supercore.json_message.base import make_json_message
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.servicer.runtime import runtime_handlers
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
-from flwr.superlink.dependencies.linkstate import get_linkstate
 
 router = APIRouter(prefix="/v1/runtime", tags=["Runtime"])
-
-LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 
 _SUPPORTED_FIELDS = frozenset(
     {
@@ -92,20 +95,20 @@ class _ResponsesError(Exception):
 @router.post("/responses")
 async def create_runtime_response(
     request: Request,
-    state: LinkStateDependency,
+    state: RuntimeStateDependency,
 ) -> Response:
     """Create a model response through a child model task."""
     try:
         task = await run_in_threadpool(_authenticate, request, state)
         payload = await _read_request_payload(request)
-        model_request = _model_request_from_payload(payload)
-        if model_request.payload.get("stream") is True:
+        model_payload = _normalize_model_request_payload(payload)
+        if model_payload.get("stream") is True:
             return StreamingResponse(
-                _stream_response(state, task, model_request),
+                _stream_response(state, task, model_payload),
                 media_type="text/event-stream",
                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
             )
-        exchange = await run_in_threadpool(_start_exchange, state, task, model_request)
+        exchange = await run_in_threadpool(_start_exchange, state, task, model_payload)
         response = await _wait_for_response(request, state, exchange)
     except _ResponsesError as err:
         return _error_response(err)
@@ -117,7 +120,7 @@ async def create_runtime_response(
     return JSONResponse(content=response)
 
 
-def _authenticate(request: Request, state: LinkState) -> Task:
+def _authenticate(request: Request, state: CoreState) -> Task:
     """Authenticate exactly one AgentApp Bearer token."""
     authorization = request.headers.getlist("authorization")
     if len(authorization) != 1:
@@ -163,21 +166,24 @@ async def _read_request_payload(request: Request) -> JSONObject:
     return cast(JSONObject, payload)
 
 
-def _model_request_from_payload(payload: JSONObject) -> ModelRequest:
-    """Build and validate the task-routed model request."""
+def _normalize_model_request_payload(payload: JSONObject) -> JSONObject:
+    """Normalize and validate a model request payload."""
+    payload = {key: value for key, value in payload.items() if value is not None}
+    payload.setdefault("stream", False)
     try:
-        return ModelRequest.from_payload(dst_task_id=0, payload=payload)
+        ModelRequest.validate_payload(payload)
     except (TypeError, ValueError) as err:
         raise _ResponsesError(400, str(err), "invalid_request") from err
+    return payload
 
 
 def _start_exchange(
-    state: LinkState,
+    state: CoreState,
     task: Task,
-    request: ModelRequest,
+    payload: JSONObject,
 ) -> _Exchange:
     """Create a child model task and send its request message."""
-    model = cast(str, request.payload["model"])
+    model = cast(str, payload["model"])
     try:
         response = runtime_handlers.create_task(
             CreateTaskRequest(type=TaskType.MODEL, model_ref=model), state, task
@@ -192,12 +198,21 @@ def _start_exchange(
         )
 
     model_task_id = response.task_id
-    request.metadata.dst_task_id = model_task_id
-    request.metadata.__dict__["_run_id"] = task.run_id
     node_id = state.get_node_id()
-    request.metadata.__dict__["_src_node_id"] = node_id
-    request.metadata.dst_node_id = node_id
-    request.metadata.src_task_id = task.task_id
+    metadata = Metadata(
+        run_id=task.run_id,
+        message_id="",
+        src_node_id=node_id,
+        dst_node_id=node_id,
+        reply_to_message_id="",
+        group_id="",
+        created_at=now().timestamp(),
+        ttl=DEFAULT_TTL,
+        message_type=MessageType.QUERY,
+        src_task_id=task.task_id,
+        dst_task_id=model_task_id,
+    )
+    request = make_json_message(ModelRequest, metadata=metadata, payload=payload)
     request.metadata.__dict__["_message_id"] = request.object_id
     if not state.store_task_message(request):
         state.finish_task(
@@ -214,7 +229,7 @@ def _start_exchange(
 
 
 async def _wait_for_response(
-    request: Request, state: LinkState, exchange: _Exchange
+    request: Request, state: CoreState, exchange: _Exchange
 ) -> JSONObject:
     """Wait for and return one correlated model response."""
     started_at = time.monotonic()
@@ -249,7 +264,7 @@ async def _wait_for_response(
 
 
 async def _stream_response(
-    state: LinkState, task: Task, model_request: ModelRequest
+    state: CoreState, task: Task, model_payload: JSONObject
 ) -> AsyncIterator[str]:
     """Create an exchange and relay its events as Server-Sent Events."""
     cursor: int | None = None
@@ -257,7 +272,7 @@ async def _stream_response(
     sequence_number = 0
     exchange: _Exchange | None = None
     try:
-        exchange = await run_in_threadpool(_start_exchange, state, task, model_request)
+        exchange = await run_in_threadpool(_start_exchange, state, task, model_payload)
         started_at = time.monotonic()
         launch_deadline = started_at + _model_task_launch_timeout()
         response_deadline = started_at + _DEFAULT_MODEL_RESPONSE_TIMEOUT
@@ -319,7 +334,7 @@ async def _stream_response(
 
 
 async def _wait_for_terminal_reply(
-    state: LinkState,
+    state: CoreState,
     exchange: _Exchange,
     launch_deadline: float,
     response_deadline: float,
@@ -338,7 +353,7 @@ async def _wait_for_terminal_reply(
         await asyncio.sleep(_POLL_INTERVAL)
 
 
-def _claim_response(state: LinkState, exchange: _Exchange) -> JSONObject | None:
+def _claim_response(state: CoreState, exchange: _Exchange) -> JSONObject | None:
     """Atomically claim the reply belonging to this exchange."""
     messages = state.get_task_message(
         dst_task_ids=[exchange.agent_task_id],
@@ -357,7 +372,7 @@ def _claim_response(state: LinkState, exchange: _Exchange) -> JSONObject | None:
 
 
 def _claim_response_or_raise_for_model_task_state(
-    state: LinkState,
+    state: CoreState,
     exchange: _Exchange,
     launch_deadline: float | None = None,
     response_deadline: float | None = None,
@@ -428,7 +443,7 @@ def _response_error_message(response: JSONObject) -> str:
     return "Model request failed."
 
 
-def _stop_model_task(state: LinkState, exchange: _Exchange, details: str) -> None:
+def _stop_model_task(state: CoreState, exchange: _Exchange, details: str) -> None:
     """Stop an unfinished model task and drain an already-arrived reply."""
     state.finish_task(exchange.model_task_id, SubStatus.STOPPED, details)
     try:

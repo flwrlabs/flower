@@ -171,6 +171,12 @@ class ControlStub:
     ]
     """List Apps in a Federation"""
 
+    ListAppAssociations: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppAssociationsRequest,
+        flwr.proto.control_pb2.ListAppAssociationsResponse,
+    ]
+    """List Federations associated with an App"""
+
     AddApp: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.AddAppRequest,
         flwr.proto.control_pb2.AddAppResponse,
@@ -188,6 +194,12 @@ class ControlStub:
         flwr.proto.control_pb2.ShowFederationResponse,
     ]
     """Show Federation"""
+
+    SetFederationIcon: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.SetFederationIconRequest,
+        flwr.proto.control_pb2.SetFederationIconResponse,
+    ]
+    """Set Federation icon"""
 
     CreateFederation: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.CreateFederationRequest,
@@ -405,6 +417,12 @@ class ControlAsyncStub:
     ]
     """List Apps in a Federation"""
 
+    ListAppAssociations: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppAssociationsRequest,
+        flwr.proto.control_pb2.ListAppAssociationsResponse,
+    ]
+    """List Federations associated with an App"""
+
     AddApp: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.AddAppRequest,
         flwr.proto.control_pb2.AddAppResponse,
@@ -422,6 +440,12 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.ShowFederationResponse,
     ]
     """Show Federation"""
+
+    SetFederationIcon: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.SetFederationIconRequest,
+        flwr.proto.control_pb2.SetFederationIconResponse,
+    ]
+    """Set Federation icon"""
 
     CreateFederation: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.CreateFederationRequest,
@@ -686,6 +710,14 @@ class ControlServicer(metaclass=abc.ABCMeta):
         """List Apps in a Federation"""
 
     @abc.abstractmethod
+    def ListAppAssociations(
+        self,
+        request: flwr.proto.control_pb2.ListAppAssociationsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListAppAssociationsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAppAssociationsResponse]]:
+        """List Federations associated with an App"""
+
+    @abc.abstractmethod
     def AddApp(
         self,
         request: flwr.proto.control_pb2.AddAppRequest,
@@ -708,6 +740,14 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.ShowFederationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ShowFederationResponse]]:
         """Show Federation"""
+
+    @abc.abstractmethod
+    def SetFederationIcon(
+        self,
+        request: flwr.proto.control_pb2.SetFederationIconRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.SetFederationIconResponse, collections.abc.Awaitable[flwr.proto.control_pb2.SetFederationIconResponse]]:
+        """Set Federation icon"""
 
     @abc.abstractmethod
     def CreateFederation(

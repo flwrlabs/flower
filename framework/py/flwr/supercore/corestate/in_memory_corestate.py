@@ -50,7 +50,11 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskUsage,
 )
 from flwr.supercore import log
-from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
+from flwr.supercore.constant import (
+    FLOWER_AGENT_APP_ID,
+    OBJECT_PUSH_SESSION_TTL_SECONDS,
+    AutomationStatus,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
@@ -101,6 +105,9 @@ class FederationAppRecord:  # pylint: disable=too-many-instance-attributes
     fab_hash: str
     app_type: str
     is_hub_app: bool
+    display_name: str | None
+    description: str | None
+    color: str | None
     added_by: str
     added_at: datetime
     updated_at: datetime
@@ -127,9 +134,10 @@ class InMemoryCoreState(
         self.lock_fab_store = Lock()
         self.federation_app_store: dict[tuple[str, str], FederationAppRecord] = {}
         self.lock_federation_app_store = Lock()
-        self.connector_store: dict[tuple[str, str], ConnectorRecord] = {}
+        self.connector_store: dict[int, ConnectorRecord] = {}
+        self.connector_id_counter = 0
         self.lock_connector_store = Lock()
-        self.run_connector_store: dict[int, set[str]] = {}
+        self.run_connector_store: dict[int, set[int]] = {}
         self.lock_run_connector_store = Lock()
         self.connector_oauth_session_store: dict[str, ConnectorOAuthSessionRecord] = {}
         self.lock_connector_oauth_session_store = Lock()
@@ -338,6 +346,9 @@ class InMemoryCoreState(
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
+        display_name: str | None = None,
+        description: str | None = None,
+        color: str | None = None,
     ) -> str:
         """Store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
@@ -366,6 +377,9 @@ class InMemoryCoreState(
                 fab_hash=fab_hash,
                 app_type=app_type,
                 is_hub_app=is_hub_app,
+                display_name=display_name,
+                description=description,
+                color=color,
                 added_by=existing.added_by if existing else added_by,
                 added_at=existing.added_at if existing else current_time,
                 updated_at=current_time,
@@ -463,8 +477,27 @@ class InMemoryCoreState(
                     fab_hash=record.fab_hash,
                     app_type=record.app_type,
                     is_hub_app=record.is_hub_app,
+                    display_name=record.display_name or "",
+                    description=record.description or "",
+                    color=record.color or "",
                 )
                 for record in records
+            ]
+
+    def list_app_associations(
+        self, app_id: str, federation_ids: Sequence[str]
+    ) -> Sequence[str]:
+        """List the provided federation IDs associated with an app."""
+        if not app_id or not federation_ids:
+            return []
+        if app_id == FLOWER_AGENT_APP_ID:
+            return list(federation_ids)
+        federation_id_set = set(federation_ids)
+        with self.lock_federation_app_store:
+            return [
+                record.federation_id
+                for record in self.federation_app_store.values()
+                if record.app_id == app_id and record.federation_id in federation_id_set
             ]
 
     def delete_app(self, federation_id: str, app_id: str) -> bool:
@@ -476,54 +509,73 @@ class InMemoryCoreState(
                 self.federation_app_store.pop((federation_id, app_id), None) is not None
             )
 
-    def upsert_connector(
+    def create_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        flwr_aid: str,
+        federation_id: str,
         connector_ref: str,
         credentials_json: str,
         config_json: str,
-    ) -> bool:
-        """Create or update a connector for an account."""
-        if not flwr_aid or not connector_ref:
-            return False
-        connector = ConnectorRecord(
-            flwr_aid=flwr_aid,
-            connector_ref=connector_ref,
-            credentials_json=credentials_json,
-            config_json=config_json,
-        )
-        with self.lock_connector_store:
-            self.connector_store[(flwr_aid, connector_ref)] = connector
-        return True
-
-    def get_connector(
-        self, flwr_aid: str, connector_ref: str
-    ) -> ConnectorRecord | None:
-        """Return an account's connector, if present."""
-        if not flwr_aid or not connector_ref:
+        created_by: str,
+    ) -> int | None:
+        """Create a connector for a federation."""
+        if not federation_id or not connector_ref or not created_by:
             return None
         with self.lock_connector_store:
-            return self.connector_store.get((flwr_aid, connector_ref))
+            self.connector_id_counter += 1
+            connector_id = self.connector_id_counter
+            connector = ConnectorRecord(
+                connector_id=connector_id,
+                federation_id=federation_id,
+                connector_ref=connector_ref,
+                credentials_json=credentials_json,
+                config_json=config_json,
+            )
+            self.connector_store[connector_id] = connector
+        return connector_id
 
-    def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
-        """Delete an account's connector if it exists."""
-        if not flwr_aid or not connector_ref:
+    def get_connectors_by_ref(
+        self, federation_id: str, connector_ref: str
+    ) -> Sequence[ConnectorRecord]:
+        """Return a federation's connectors for one provider."""
+        if not federation_id or not connector_ref:
+            return []
+        with self.lock_connector_store:
+            return sorted(
+                (
+                    connector
+                    for connector in self.connector_store.values()
+                    if connector.federation_id == federation_id
+                    and connector.connector_ref == connector_ref
+                ),
+                key=lambda connector: connector.connector_id,
+            )
+
+    def get_connector_by_id(self, connector_id: int) -> ConnectorRecord | None:
+        """Return a connector by ID, if present."""
+        with self.lock_connector_store:
+            return self.connector_store.get(connector_id)
+
+    def delete_connector(self, federation_id: str, connector_id: int) -> bool:
+        """Delete a federation's connector if it exists."""
+        if not federation_id or connector_id <= 0:
             return False
         with self.lock_connector_store:
-            return self.connector_store.pop((flwr_aid, connector_ref), None) is not None
+            connector = self.connector_store.get(connector_id)
+            if connector is None or connector.federation_id != federation_id:
+                return False
+            del self.connector_store[connector_id]
+            return True
 
-    def bind_connectors_to_run(
-        self, run_id: int, connector_refs: Sequence[str]
-    ) -> bool:
-        """Associate connector references with a run."""
-        if isinstance(connector_refs, str):
+    def bind_connectors_to_run(self, run_id: int, connector_ids: Sequence[int]) -> bool:
+        """Associate connector IDs with a run."""
+        if isinstance(connector_ids, (str, bytes)):
             return False
         with self.lock_run_connector_store:
-            self.run_connector_store.setdefault(run_id, set()).update(connector_refs)
+            self.run_connector_store.setdefault(run_id, set()).update(connector_ids)
         return True
 
-    def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
-        """Return connector references associated with a run."""
+    def get_run_connector_ids(self, run_id: int) -> Sequence[int]:
+        """Return connector IDs associated with a run."""
         with self.lock_run_connector_store:
             return sorted(self.run_connector_store.get(run_id, set()))
 
@@ -531,6 +583,7 @@ class InMemoryCoreState(
         self,
         oauth_session_id: str,
         flwr_aid: str,
+        federation_id: str,
         connector_ref: str,
         state: str,
         redirect_uri: str,
@@ -541,6 +594,7 @@ class InMemoryCoreState(
         if (
             not oauth_session_id
             or not flwr_aid
+            or not federation_id
             or not connector_ref
             or expires_at.utcoffset() is None
         ):
@@ -549,6 +603,7 @@ class InMemoryCoreState(
         session = ConnectorOAuthSessionRecord(
             oauth_session_id=oauth_session_id,
             flwr_aid=flwr_aid,
+            federation_id=federation_id,
             connector_ref=connector_ref,
             state=state,
             redirect_uri=redirect_uri,
@@ -957,6 +1012,7 @@ class InMemoryCoreState(
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        connector_id: int | None = None,
         requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a task and return its ID."""
@@ -980,6 +1036,7 @@ class InMemoryCoreState(
                 fab_hash=fab_hash,
                 model_ref=model_ref,
                 connector_ref=connector_ref,
+                connector_id=connector_id,
             )
 
             self.task_store[task_id] = task

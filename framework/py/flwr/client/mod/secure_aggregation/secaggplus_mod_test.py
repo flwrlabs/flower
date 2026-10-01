@@ -18,6 +18,7 @@
 import unittest
 from collections.abc import Callable
 from itertools import product
+from unittest.mock import patch
 
 from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.app.message_type import MessageType
@@ -29,6 +30,7 @@ from flwr.common.secure_aggregation.secaggplus_constants import (
     Key,
     Stage,
 )
+from flwr.supercore.task_identity import TaskIdentity
 
 from .secaggplus_mod import SecAggPlusState, check_configs, secaggplus_mod
 
@@ -80,6 +82,14 @@ def _make_set_state_fn(
 
 class TestSecAggPlusHandler(unittest.TestCase):
     """Test the SecAgg+ protocol handler."""
+
+    def setUp(self) -> None:
+        """Set the task identity used by instruction message tests."""
+        identity_patcher = patch.multiple(
+            TaskIdentity, _task_id=123, _run_id=234, _node_id=0
+        )
+        identity_patcher.start()
+        self.addCleanup(identity_patcher.stop)
 
     def test_stage_transition(self) -> None:
         """Test stage transition."""

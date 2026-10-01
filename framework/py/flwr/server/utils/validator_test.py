@@ -79,7 +79,7 @@ class ValidatorTest(unittest.TestCase):
             # `dst_node_id` is not set
             (create_message(dst_node_id=0), False, True),
             # `dst_node_id` is SUPERLINK
-            (create_message(dst_node_id=SUPERLINK_NODE_ID), False, True),
+            (create_message(dst_node_id=SUPERLINK_NODE_ID), False, False),
             # `message_type` is not set
             (create_message(msg_type=""), False, True),
             # Both `content` and `error` are not set

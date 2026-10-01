@@ -27,11 +27,17 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    AcquireTaskResponse,
     CreateTaskRequest,
     GetNodesRequest,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
+    PushTaskEventsRequest,
 )
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.auth import create_superexec_auth_metadata, derive_auth_secret
 from flwr.supercore.constant import TASK_TOKEN_HEADER, TaskType
 from flwr.supercore.dependencies.runtime import get_runtime_state
@@ -40,11 +46,12 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers.runtime import router
+from flwr.supercore.run import Run
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 from flwr.supernode.servicer.runtime import runtime_handlers
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
-_PULL_PENDING_TASKS_METHOD = "/flwr.proto.Runtime/PullPendingTasks"
+_ACQUIRE_TASK_METHOD = "/flwr.proto.Runtime/AcquireTask"
 
 
 @pytest.fixture(name="state")
@@ -162,23 +169,27 @@ def test_pull_pending_tasks_denied_without_superexec_metadata(
     assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
 
 
-def test_pull_pending_tasks_allows_with_superexec_metadata(
-    client: TestClient,
+def test_acquire_task_allows_with_superexec_metadata(
+    client: TestClient, state: NodeState
 ) -> None:
-    """SuperExec routes should allow requests with valid signed metadata."""
-    proto_request = PullPendingTasksRequest()
+    """Signed acquisition returns a task and its claim token."""
+    task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
+    assert task_id is not None
+    proto_request = AcquireTaskRequest(supported_task_types=[TaskType.CLIENT_APP])
     headers = create_superexec_auth_metadata(
         auth_secret=derive_auth_secret(_SUPEREXEC_SECRET),
-        method=_PULL_PENDING_TASKS_METHOD,
+        method=_ACQUIRE_TASK_METHOD,
         request=proto_request,
     )
 
-    response = _post(client, "pull-pending-tasks", proto_request, auth_headers=headers)
+    response = _post(client, "acquire-task", proto_request, auth_headers=headers)
 
     assert response.status_code == 200
-    assert isinstance(
-        PullPendingTasksResponse.FromString(response.content), PullPendingTasksResponse
-    )
+    claimed = AcquireTaskResponse.FromString(response.content)
+    assert claimed.task.task_id == task_id
+    assert claimed.token
+    claimed_task = state.get_task_by_token(claimed.token)
+    assert claimed_task is not None and claimed_task.task_id == task_id
 
 
 def test_get_nodes_allows_auth_then_returns_permission_denied(
@@ -189,6 +200,43 @@ def test_get_nodes_allows_auth_then_returns_permission_denied(
 
     assert response.status_code == 403
     assert response.json()["code"] == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+
+
+def test_agent_events_round_trip(client: TestClient, state: NodeState) -> None:
+    """AgentApp events should be readable through the SuperNode Runtime API."""
+    run = Run.create_empty(run_id=99)
+    run.series_id = 7
+    state.store_run(run)
+    task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run.run_id)
+    assert task_id is not None
+    token = state.claim_task(task_id)
+    assert token is not None
+    task_event = TaskEvent(
+        event="response.completed",
+        data='{"type":"response.completed"}',
+    )
+
+    push_response = _post(
+        client,
+        "push-task-events",
+        PushTaskEventsRequest(events=[task_event]),
+        token=token,
+    )
+    get_response = _post(
+        client,
+        "get-run-series-events",
+        GetRunSeriesEventsRequest(),
+        token=token,
+    )
+
+    assert push_response.status_code == 200
+    assert get_response.status_code == 200
+    events = GetRunSeriesEventsResponse.FromString(get_response.content).events
+    assert len(events) == 1
+    assert events[0].run_id == run.run_id
+    assert events[0].task_id == task_id
+    assert events[0].event == task_event.event
+    assert events[0].data == task_event.data
 
 
 def test_pull_pending_tasks_allows_without_superexec_metadata(state: NodeState) -> None:
