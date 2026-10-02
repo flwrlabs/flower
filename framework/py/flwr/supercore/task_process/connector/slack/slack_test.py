@@ -29,7 +29,6 @@ from .definition import PROVIDER, SLACK_CONNECTOR_REF, SLACK_USER_SCOPES
 from .executors import SlackApiError
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
-_FILE_REQUEST = "flwr.supercore.task_process.connector.slack.executors.requests.get"
 _OAUTH_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
 _IDENTITY_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.request"
 _CREDENTIALS: JSONObject = {"access_token": "xoxp-secret"}
@@ -76,6 +75,7 @@ def test_slack_search_public_uses_web_api() -> None:
         "content_types": ["messages"],
         "channel_types": ["public_channel"],
         "limit": 5,
+        "include_bots": False,
         "include_context_messages": True,
     }
 
@@ -91,6 +91,13 @@ def test_slack_private_search_maps_mcp_options() -> None:
                 "channel_types": "private_channel,im",
                 "content_types": "messages,files",
                 "after": "1700000000",
+                "before": "1700003599",
+                "cursor": "next",
+                "context_channel_id": "C1",
+                "sort": "timestamp",
+                "sort_dir": "asc",
+                "limit": 8,
+                "include_bots": True,
                 "include_context": False,
             },
             Mock(),
@@ -102,6 +109,13 @@ def test_slack_private_search_maps_mcp_options() -> None:
         "content_types": ["messages", "files"],
         "channel_types": ["private_channel", "im"],
         "after": 1700000000,
+        "before": 1700003599,
+        "cursor": "next",
+        "context_channel_id": "C1",
+        "sort": "timestamp",
+        "sort_dir": "asc",
+        "limit": 8,
+        "include_bots": True,
         "include_context_messages": False,
     }
 
@@ -125,13 +139,171 @@ def test_slack_search_accepts_keywords_and_filters_without_query() -> None:
     body = request.call_args.kwargs["json"]
     assert body["query"] == "Where is the release plan? in:<#C1>"
     assert body["term_clauses"] == ["project", '"release plan"']
+    assert body["modifiers"] == "in:<#C1>"
 
 
+def test_slack_search_preserves_all_search_terms_when_slack_rejects_them() -> None:
+    """Surface API limits without dropping lexical or natural-language input."""
+    keywords = ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"]
+    with (
+        patch(
+            _HTTP_REQUEST,
+            return_value=_response({"ok": False, "error": "invalid_arguments"}),
+        ) as request,
+        pytest.raises(SlackApiError, match="invalid_arguments"),
+    ):
+        registry.invoke_connector(
+            "slack_search_public",
+            {
+                "query": "has:link",
+                "keywords": keywords,
+                "filters": "in:<#C1>",
+                "natural_language_query": "Where is the release plan?",
+            },
+            Mock(),
+            _CREDENTIALS,
+            {},
+        )
+    request.assert_called_once()
+    body = request.call_args.kwargs["json"]
+    assert body["query"] == "Where is the release plan? has:link in:<#C1>"
+    assert body["term_clauses"] == keywords
+    assert body["modifiers"] == "in:<#C1>"
+
+
+def test_slack_search_only_my_channels_keeps_shared_files() -> None:
+    """Check file shares instead of dropping files with no search channel ID."""
+    message = {"channel_id": "C1", "message_ts": "1", "content": "joined"}
+    file = {"file_id": "F1", "title": "joined file"}
+    responses = [
+        _response(
+            {
+                "ok": True,
+                "results": {
+                    "messages": [message, {"channel_id": "C2"}],
+                    "files": [file, {"file_id": "F2"}],
+                },
+                "response_metadata": {"next_cursor": "search-next"},
+            }
+        ),
+        _response(
+            {
+                "ok": True,
+                "channels": [{"id": "C1"}],
+                "response_metadata": {"next_cursor": "membership-next"},
+            }
+        ),
+        _response({"ok": True, "channels": [{"id": "C3"}]}),
+        _response({"ok": True, "file": {"channels": ["C1"]}}),
+        _response({"ok": True, "file": {"channels": ["C2"]}}),
+    ]
+    with patch(_HTTP_REQUEST, side_effect=responses) as request:
+        result = registry.invoke_connector(
+            "slack_search_public",
+            {"query": "release", "only_my_channels": True},
+            Mock(),
+            _CREDENTIALS,
+            {},
+        )
+    assert result == {
+        "ok": True,
+        "results": {"messages": [message], "files": [file]},
+        "response_metadata": {"next_cursor": "search-next"},
+    }
+    assert request.call_args_list[1].kwargs["params"] == {
+        "types": "public_channel",
+        "limit": "200",
+    }
+    assert request.call_args_list[2].kwargs["params"]["cursor"] == "membership-next"
+    assert [call.kwargs["params"] for call in request.call_args_list[3:]] == [
+        {"file": "F1"},
+        {"file": "F2"},
+    ]
+
+
+@pytest.mark.parametrize("maximum", (0, 4, 100_001))
+def test_slack_search_truncates_context_to_requested_length(maximum: int) -> None:
+    """Apply the captured context limit without inventing an upper bound."""
+    response = _response(
+        {
+            "ok": True,
+            "results": {
+                "messages": [
+                    {
+                        "content": "main result",
+                        "context_messages": {
+                            "before": [{"text": "before text"}],
+                            "after": [{"text": "after text"}],
+                        },
+                    }
+                ]
+            },
+        }
+    )
+    with patch(_HTTP_REQUEST, return_value=response):
+        result = registry.invoke_connector(
+            "slack_search_public",
+            {"query": "release", "max_context_length": maximum},
+            Mock(),
+            _CREDENTIALS,
+            {},
+        )
+    assert result == {
+        "ok": True,
+        "results": {
+            "messages": [
+                {
+                    "content": "main result",
+                    "context_messages": {
+                        "before": [{"text": "before text"[:maximum]}],
+                        "after": [{"text": "after text"[:maximum]}],
+                    },
+                }
+            ]
+        },
+    }
+
+
+def test_slack_search_concise_response_keeps_result_identifiers() -> None:
+    """Honor concise formatting without removing the search pagination cursor."""
+    response = _response(
+        {
+            "ok": True,
+            "results": {
+                "messages": [{"message_ts": "1", "content": "message", "blocks": []}],
+                "files": [{"file_id": "F1", "title": "file", "file_type": "pdf"}],
+            },
+            "response_metadata": {"next_cursor": "next"},
+        }
+    )
+    with patch(_HTTP_REQUEST, return_value=response):
+        result = registry.invoke_connector(
+            "slack_search_public",
+            {"query": "release", "response_format": "concise"},
+            Mock(),
+            _CREDENTIALS,
+            {},
+        )
+    assert result == {
+        "ok": True,
+        "results": {
+            "messages": [{"message_ts": "1", "content": "message"}],
+            "files": [{"file_id": "F1", "title": "file"}],
+        },
+        "response_metadata": {"next_cursor": "next"},
+    }
+
+
+@pytest.mark.parametrize(
+    "tool_name", ("slack_search_public", "slack_search_public_and_private")
+)
 @pytest.mark.parametrize(
     "code",
     ("feature_not_enabled", "assistant_search_context_disabled", "missing_scope"),
 )
-def test_slack_search_fails_when_real_time_search_is_unavailable(code: str) -> None:
+def test_slack_search_fails_when_real_time_search_is_unavailable(
+    tool_name: str, code: str
+) -> None:
     """Return Slack's search error without calling a different search API."""
     with (
         patch(
@@ -141,7 +313,7 @@ def test_slack_search_fails_when_real_time_search_is_unavailable(code: str) -> N
         pytest.raises(SlackApiError, match=code) as error,
     ):
         registry.invoke_connector(
-            "slack_search_public", {"query": "release"}, Mock(), _CREDENTIALS, {}
+            tool_name, {"query": "release"}, Mock(), _CREDENTIALS, {}
         )
     request.assert_called_once()
     assert request.call_args.args == (
@@ -165,6 +337,7 @@ def test_slack_oauth_flow_uses_web_api_user_token() -> None:
     assert parsed.path == "/oauth/v2/authorize"
     assert query["user_scope"] == [",".join(SLACK_USER_SCOPES)]
     assert "search:read" not in SLACK_USER_SCOPES
+    assert "files:read" in SLACK_USER_SCOPES
     assert "resource" not in query
     assert "code_challenge" not in query
 
