@@ -209,8 +209,6 @@ class _ChatCompleter(Completer):
         connector_prefix = f"{CHAT_CONNECTOR_COMMAND} "
         if text.lower().startswith(connector_prefix):
             query = text[len(connector_prefix) :]
-            if any(char.isspace() for char in query):
-                return
             try:
                 connectors = self.load_connectors()
             except click.ClickException:

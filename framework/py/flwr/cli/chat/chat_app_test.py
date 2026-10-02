@@ -250,18 +250,27 @@ def test_chat_selects_connector_from_dropdown() -> None:
     completions = list(
         chat.completer.get_completions(Document("/connector git"), CompleteEvent())
     )
-    assert [completion.text for completion in completions] == ["101", "102"]
+    assert [completion.text for completion in completions] == [
+        "GitHub · octocat",
+        "GitHub · flower",
+    ]
     assert completions[0].display_text == ("GitHub · octocat        Search GitHub")
+    assert [
+        completion.text
+        for completion in chat.completer.get_completions(
+            Document("/connector GitHub · f"), CompleteEvent()
+        )
+    ] == ["GitHub · flower"]
 
     assert chat._handle_command(  # pylint: disable=protected-access
-        event, "/connector 101"
+        event, "/connector GitHub · octocat"
     )
     assert chat.selected_connector_by_ref["github"].connector_id == 101
     assert chat._handle_command(  # pylint: disable=protected-access
-        event, "/connector 201"
+        event, "/connector Attio"
     )
     assert chat._handle_command(  # pylint: disable=protected-access
-        event, "/connector 102"
+        event, "/connector GitHub · flower"
     )
     assert [
         connector.connector_id for connector in chat.selected_connector_by_ref.values()

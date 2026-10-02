@@ -14,6 +14,7 @@
 # ==============================================================================
 """Connector selection helpers for Flower Chat."""
 
+from collections import Counter
 from collections.abc import Iterable
 
 import click
@@ -31,6 +32,22 @@ from ..utils import flwr_cli_exc_handler
 CHAT_CONNECTOR_CLEAR = "clear"
 
 
+def _connector_selection_labels(connectors: list[Connector]) -> list[str]:
+    """Return human-readable labels that uniquely identify connections."""
+    display_names = [
+        connector.display_name or connector.connector_ref for connector in connectors
+    ]
+    counts = Counter(display_name.casefold() for display_name in display_names)
+    return [
+        (
+            f"{display_name} ({connector.connector_id})"
+            if counts[display_name.casefold()] > 1
+            else display_name
+        )
+        for connector, display_name in zip(connectors, display_names, strict=True)
+    ]
+
+
 def fetch_chat_connectors(stub: ControlHttpClient, federation: str) -> list[Connector]:
     """Return connected connectors available in a federation."""
     with flwr_cli_exc_handler():
@@ -42,12 +59,10 @@ def complete_connectors(
     query: str, connectors: list[Connector]
 ) -> Iterable[Completion]:
     """Yield connected connectors matching a completion query."""
+    selection_labels = _connector_selection_labels(connectors)
     name_width = max(
         len(CHAT_CONNECTOR_CLEAR),
-        *(
-            len(connector.display_name or connector.connector_ref)
-            for connector in connectors
-        ),
+        *(len(selection_label) for selection_label in selection_labels),
     )
     if CHAT_CONNECTOR_CLEAR.startswith(query.lower()):
         yield Completion(
@@ -60,18 +75,17 @@ def complete_connectors(
             selected_style="#ffffff bg:#dc8400 noreverse",
         )
     normalized_query = query.lower()
-    for connector in connectors:
-        display_name = connector.display_name or connector.connector_ref
+    for connector, selection_label in zip(connectors, selection_labels, strict=True):
         if (
             connector.connector_ref.lower().startswith(normalized_query)
-            or display_name.lower().startswith(normalized_query)
+            or selection_label.lower().startswith(normalized_query)
             or str(connector.connector_id).startswith(normalized_query)
         ):
             yield Completion(
-                str(connector.connector_id),
+                selection_label,
                 start_position=-len(query),
                 display=(
-                    f"{display_name:<{name_width}}        {connector.description}"
+                    f"{selection_label:<{name_width}}        {connector.description}"
                 ),
                 selected_style="#ffffff bg:#dc8400 noreverse",
             )
@@ -79,8 +93,10 @@ def complete_connectors(
 
 def select_connector(prompt: str, connectors: list[Connector]) -> Connector:
     """Return the connector selected by a command prompt."""
-    connector_id = prompt[len(CHAT_CONNECTOR_COMMAND) :].strip()
-    for connector in connectors:
-        if str(connector.connector_id) == connector_id:
+    selected_label = prompt[len(CHAT_CONNECTOR_COMMAND) :].strip()
+    for connector, selection_label in zip(
+        connectors, _connector_selection_labels(connectors), strict=True
+    ):
+        if selection_label.casefold() == selected_label.casefold():
             return connector
-    raise click.ClickException(f"Unknown connector: {connector_id}")
+    raise click.ClickException(f"Unknown connector: {selected_label}")
