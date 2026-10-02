@@ -22,16 +22,20 @@ from .executors import EXECUTORS
 SLACK_CONNECTOR_REF = "slack"
 SLACK_USER_SCOPES = (
     "search:read",
+    "search:read.public",
+    "search:read.private",
+    "search:read.mpim",
+    "search:read.im",
+    "search:read.files",
+    "channels:history",
+    "groups:history",
+    "mpim:history",
+    "im:history",
     "channels:read",
     "groups:read",
     "im:read",
     "mpim:read",
-    "channels:history",
-    "groups:history",
-    "im:history",
-    "mpim:history",
 )
-
 PROVIDER = ProviderDefinition(
     ref=SLACK_CONNECTOR_REF,
     display_name="Slack",
