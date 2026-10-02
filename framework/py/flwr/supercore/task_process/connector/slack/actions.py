@@ -12,27 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Slack action definitions."""
-
-from flwr.supercore.typing import JSONObject
+"""Model-facing Slack read actions grounded in Slack MCP tool definitions."""
 
 from ..definition import ActionAccess, ActionDefinition
-from ..tool_schema import integer_property, string_property
 
-SLACK_CONVERSATION_TYPES = ("public_channel", "private_channel", "mpim", "im")
-SLACK_LIST_CONVERSATIONS_MAX_LIMIT = 999
-SLACK_MESSAGE_MAX_LIMIT = 15
-SLACK_SEARCH_MAXIMUM = 100
-_CURSOR: JSONObject = {
-    "type": "string",
-    "description": "The Slack pagination cursor.",
-}
-_MESSAGE_LIMIT = integer_property(
-    "The maximum number of messages to return.",
-    minimum=1,
-    maximum=SLACK_MESSAGE_MAX_LIMIT,
-)
-
+# Captured Slack MCP descriptions and input schemas, excluding user-specific lines.
 ACTIONS = (
     ActionDefinition(
         name="search_public",
@@ -618,72 +602,298 @@ ACTIONS = (
         },
     ),
     ActionDefinition(
-        name="list_conversations",
-        description="List Slack channels and direct-message conversations.",
+        name="read_channel",
+        description=(
+            "Reads messages from a Slack channel in reverse chronological "
+            "order (newest first). To read DM history, use a user_id as "
+            "channel_id. Read-only.\n"
+            "\n"
+            "Use slack_read_thread with message_ts to read thread replies. "
+            "Use slack_search_channels to find a channel ID by name. Use "
+            "slack_search_public to search across channels. If "
+            "'channel_not_found', try slack_search_channels first.\n"
+        ),
         access=ActionAccess.READ,
         input_schema={
             "type": "object",
             "properties": {
-                "limit": integer_property(
-                    "Maximum number of conversations to return. Omit to use "
-                    "Slack's default of 100.",
-                    minimum=1,
-                    maximum=SLACK_LIST_CONVERSATIONS_MAX_LIMIT,
-                ),
-                "cursor": _CURSOR,
+                "channel_id": {
+                    "type": "string",
+                    "description": (
+                        "ID of the Channel, private group, or IM channel to fetch "
+                        "history for. Can also be a user_id to read DM history."
+                    ),
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": (
+                        "Number of messages to return, between 1 and 100. Default "
+                        "value is 100."
+                    ),
+                },
+                "cursor": {
+                    "type": "string",
+                    "description": (
+                        "Paginate through collections of data by setting the cursor "
+                        "parameter to a next_cursor attribute returned by a previous "
+                        "request"
+                    ),
+                },
+                "latest": {
+                    "type": "string",
+                    "description": (
+                        "End of time range of messages to include in results "
+                        "(timestamp)"
+                    ),
+                },
+                "oldest": {
+                    "type": "string",
+                    "description": (
+                        "Start of time range of messages to include in results "
+                        "(timestamp)"
+                    ),
+                },
+                "response_format": {
+                    "type": "string",
+                    "description": (
+                        "Level of detail: 'detailed' (default, includes reactions + "
+                        "thread info) or 'concise'."
+                    ),
+                },
+            },
+            "required": ["channel_id"],
+        },
+    ),
+    ActionDefinition(
+        name="read_thread",
+        description=(
+            "Reads messages from a specific Slack thread (parent message + "
+            "all replies). Read-only.\n"
+            "\n"
+            "Requires channel_id and message_ts of the parent message. Use "
+            "slack_search_public or slack_read_channel to find these values. "
+            'Use slack_search_public with "is:thread" to find threads by '
+            "content. Use slack_send_message with thread_ts to reply to a "
+            "thread.\n"
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "channel_id": {
+                    "type": "string",
+                    "description": (
+                        "Channel, private group, or IM channel to fetch thread replies "
+                        "for"
+                    ),
+                },
+                "message_ts": {
+                    "type": "string",
+                    "description": (
+                        'Timestamp of the parent message (e.g. "1234567890.123456"). '
+                        "Must be a string in Slack ts format with a decimal point."
+                    ),
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": (
+                        "Number of messages to return, between 1 and 1000. Default "
+                        "value is 100."
+                    ),
+                },
+                "cursor": {
+                    "type": "string",
+                    "description": (
+                        "Paginate through collections of data by setting the cursor "
+                        "parameter to a next_cursor attribute returned by a previous "
+                        "request"
+                    ),
+                },
+                "latest": {
+                    "type": "string",
+                    "description": (
+                        "End of time range of messages to include in results. Slack ts "
+                        'format string (e.g. "1234567890.123456").'
+                    ),
+                },
+                "oldest": {
+                    "type": "string",
+                    "description": (
+                        "Start of time range of messages to include in results. Slack "
+                        'ts format string (e.g. "1234567890.123456").'
+                    ),
+                },
+                "response_format": {
+                    "type": "string",
+                    "description": (
+                        "Level of detail: 'detailed' (default, includes reactions + "
+                        "thread info) or 'concise'."
+                    ),
+                },
+            },
+            "required": ["channel_id", "message_ts"],
+        },
+    ),
+    ActionDefinition(
+        name="list_channel_members",
+        description=(
+            "Lists members of a Slack channel, group, or group DM (MPIM). "
+            "Returns profile details or just user IDs.  Does not support "
+            "DMs.\n"
+            "\n"
+            "Formats: 'detailed' (default) = full profile, 'concise' = "
+            "@username + display name, 'ids_only' = user IDs only (fastest, "
+            "skip profile fetch).\n"
+            "Filters out deleted users and bots by default (use "
+            "include_deleted/include_bots to include) for 'detailed' and "
+            "'concise' formats. 'ids_only' returns all member IDs without "
+            "filtering (no profile data is fetched). Returns up to 30 members "
+            "per page (limit is capped at 30). Use cursor from "
+            "pagination_info to fetch next page.\n"
+            "\n"
+            "Use slack_search_channels to find a channel ID first. Use "
+            "slack_search_users to find users across the workspace. Use "
+            "slack_read_user_profile for detailed info on a specific user.\n"
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "channel_id": {
+                    "type": "string",
+                    "description": "ID of the channel to list members from",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": (
+                        "Number of members to return per page (default: 30, max: 30)"
+                    ),
+                },
+                "cursor": {
+                    "type": "string",
+                    "description": "Pagination cursor from previous response",
+                },
+                "response_format": {
+                    "type": "string",
+                    "description": (
+                        "Level of detail (default: 'detailed'). Options: 'detailed', "
+                        "'concise', 'ids_only'"
+                    ),
+                    "enum": ["detailed", "concise", "ids_only"],
+                },
+                "include_deleted": {
+                    "type": "boolean",
+                    "description": (
+                        "Include deleted/deactivated users in the member list "
+                        "(default: false)"
+                    ),
+                },
+                "include_bots": {
+                    "type": "boolean",
+                    "description": (
+                        "Include bots and apps in the member list (default: false)"
+                    ),
+                },
+            },
+            "required": ["channel_id"],
+        },
+    ),
+    ActionDefinition(
+        name="list_user_channels",
+        description=(
+            "Lists channels the user is a member of. Supports public "
+            "channels, private channels, DMs (im = 1-on-1 direct messages), "
+            "and Group DMs (mpim = multi-party direct messages).\n"
+            "\n"
+            "types accepts a comma-separated list: public_channel, "
+            "private_channel, im (DM), mpim (Group DM). Default: "
+            '"public_channel,private_channel". To include DMs or Group DMs, '
+            "add them explicitly (e.g., "
+            'types="public_channel,private_channel,im,mpim" for all).\n'
+            "\n"
+            "Archived channels are included by default. Pass "
+            "exclude_archived=true to hide them.\n"
+            "\n"
+            "DMs and Group DMs lack user-set names/topics. DMs show the other "
+            "participant's display name; Group DMs show members.\n"
+            "\n"
+            "name_prefix is case-insensitive. cursor is ignored when "
+            "name_prefix is set (prefix filtering scans pages internally).\n"
+            "\n"
+            "team_id restricts the results to a single workspace. On a "
+            "multi-workspace (Grid) org, channel memberships are "
+            "per-workspace, so pass team_id (an encoded workspace ID like "
+            '"T012AB3C4") to list channels in a specific workspace; without '
+            "it, results come from the user's default workspace only.\n"
+            "\n"
+            "Related: slack_search_channels (channels you're not in), "
+            "slack_read_channel (read messages).\n"
+            "\n"
+            "Examples:\n"
+            '\t- DMs only: slack_list_user_channels(types="im")\n'
+            '\t- Group DMs only: slack_list_user_channels(types="mpim")\n'
+            "\t- Private + DMs: "
+            'slack_list_user_channels(types="private_channel,im")\n'
+            "\t- All types: "
+            'slack_list_user_channels(types="public_channel,private_channel,im,mpim")\n'
+            '\t- Prefix filter: slack_list_user_channels(name_prefix="eng-")\n'
+            '\t- IDs only: slack_list_user_channels(format="ids_only")\n'
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
                 "types": {
-                    "type": "array",
-                    "items": {
-                        "type": "string",
-                        "enum": list(SLACK_CONVERSATION_TYPES),
-                    },
-                    "minItems": 1,
-                    "description": "Conversation types to include.",
+                    "type": "string",
+                    "description": (
+                        "Comma-separated list of channel types to include. Valid "
+                        "values: public_channel, private_channel, mpim, im. Default: "
+                        '"public_channel,private_channel" (DMs and Group DMs are '
+                        "excluded unless explicitly listed)."
+                    ),
+                },
+                "name_prefix": {
+                    "type": "string",
+                    "description": (
+                        "Filter channels whose name starts with this string "
+                        "(case-insensitive)"
+                    ),
                 },
                 "exclude_archived": {
                     "type": "boolean",
-                    "description": "Whether to exclude archived conversations.",
+                    "description": "Exclude archived channels (default: false)",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max channels to return (default: 50, max: 200)",
+                },
+                "cursor": {
+                    "type": "string",
+                    "description": (
+                        "Pagination cursor from previous response. Ignored when "
+                        "name_prefix is provided, because prefix filtering scans "
+                        "multiple internal pages and cannot resume from a single "
+                        "cursor."
+                    ),
+                },
+                "format": {
+                    "type": "string",
+                    "description": (
+                        "Output format: 'full' (default, all details), 'ids_only' "
+                        "(just channel IDs), or 'names_only' (just channel names)"
+                    ),
                 },
                 "team_id": {
                     "type": "string",
                     "description": (
-                        "The encoded team ID to list. Required when using an "
-                        "org-level token; omit when using a workspace-level token."
+                        'Encoded workspace ID (e.g. "T012AB3C4") to list channels '
+                        "from. On a multi-workspace org, channel memberships are "
+                        "per-workspace; without this, results come from the user's "
+                        "default workspace only."
                     ),
                 },
             },
-            "additionalProperties": False,
-        },
-    ),
-    ActionDefinition(
-        name="get_conversation_history",
-        description="Get recent messages from a Slack conversation.",
-        access=ActionAccess.READ,
-        input_schema={
-            "type": "object",
-            "properties": {
-                "channel_id": string_property("The Slack conversation or channel ID."),
-                "limit": _MESSAGE_LIMIT,
-                "cursor": _CURSOR,
-            },
-            "required": ["channel_id"],
-            "additionalProperties": False,
-        },
-    ),
-    ActionDefinition(
-        name="get_conversation_replies",
-        description="Get messages in a Slack thread.",
-        access=ActionAccess.READ,
-        input_schema={
-            "type": "object",
-            "properties": {
-                "channel_id": string_property("The Slack conversation or channel ID."),
-                "thread_ts": string_property("The timestamp of the parent message."),
-                "limit": _MESSAGE_LIMIT,
-                "cursor": _CURSOR,
-            },
-            "required": ["channel_id", "thread_ts"],
-            "additionalProperties": False,
+            "required": [],
         },
     ),
 )

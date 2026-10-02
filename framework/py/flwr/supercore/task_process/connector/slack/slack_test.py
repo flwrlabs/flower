@@ -51,9 +51,10 @@ def test_slack_read_tool_definitions() -> None:
         "slack_search_public_and_private",
         "slack_search_channels",
         "slack_search_users",
-        "slack_list_conversations",
-        "slack_get_conversation_history",
-        "slack_get_conversation_replies",
+        "slack_read_channel",
+        "slack_read_thread",
+        "slack_list_channel_members",
+        "slack_list_user_channels",
     ]
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
 
@@ -249,6 +250,112 @@ def test_slack_entity_searches(
     assert body.get("channel_types") == channel_types
 
 
+@pytest.mark.parametrize(
+    ("tool", "arguments", "method", "params"),
+    [
+        (
+            "slack_read_channel",
+            {"channel_id": "C1", "cursor": "next", "limit": 15, "oldest": "1.0"},
+            "conversations.history",
+            {"channel": "C1", "cursor": "next", "limit": "15", "oldest": "1.0"},
+        ),
+        (
+            "slack_read_thread",
+            {"channel_id": "C1", "message_ts": "1.0", "limit": 100},
+            "conversations.replies",
+            {"channel": "C1", "ts": "1.0", "limit": "100"},
+        ),
+    ],
+)
+def test_slack_history_tools(
+    tool: str, arguments: JSONObject, method: str, params: dict[str, str]
+) -> None:
+    """Read channel and thread messages with their Web API parameter names."""
+    with patch(
+        _HTTP_REQUEST, return_value=_response({"ok": True, "messages": []})
+    ) as request:
+        registry.invoke_connector(tool, arguments, Mock(), _CREDENTIALS, {})
+    assert request.call_args.args == ("GET", f"https://slack.com/api/{method}")
+    assert request.call_args.kwargs["params"] == params
+
+
+def test_slack_list_members_fetches_profiles_and_filters_bots() -> None:
+    """Detailed member results should include profiles and omit bots by default."""
+    responses = [
+        _response({"ok": True, "members": ["U1", "U2"], "response_metadata": {}}),
+        _response({"ok": True, "user": {"id": "U1", "name": "alice"}}),
+        _response({"ok": True, "user": {"id": "U2", "is_bot": True}}),
+    ]
+    with patch(_HTTP_REQUEST, side_effect=responses) as request:
+        result = cast(
+            JSONObject,
+            registry.invoke_connector(
+                "slack_list_channel_members",
+                {"channel_id": "C1"},
+                Mock(),
+                _CREDENTIALS,
+                {},
+            ),
+        )
+    assert result["members"] == [{"id": "U1", "name": "alice"}]
+    assert request.call_count == 3
+    assert request.call_args_list[0].args[1].endswith("/conversations.members")
+
+
+def test_slack_list_members_count_only() -> None:
+    """Count members without fetching or paginating profiles."""
+    with patch(
+        _HTTP_REQUEST,
+        return_value=_response({"ok": True, "channel": {"num_members": 42}}),
+    ) as request:
+        result = registry.invoke_connector(
+            "slack_list_channel_members",
+            {"channel_id": "C1", "response_format": "count_only"},
+            Mock(),
+            _CREDENTIALS,
+            {},
+        )
+    assert result == {"ok": True, "channel_id": "C1", "num_members": 42}
+    assert request.call_args.args[1].endswith("/conversations.info")
+    assert request.call_args.kwargs["params"] == {
+        "channel": "C1",
+        "include_num_members": "true",
+    }
+
+
+def test_slack_list_user_channels_uses_web_api() -> None:
+    """Filter and format joined channels without invoking Slack MCP."""
+    response = _response(
+        {
+            "ok": True,
+            "channels": [
+                {"id": "C1", "name": "engineering"},
+                {"id": "C2", "name": "sales"},
+            ],
+            "response_metadata": {"next_cursor": ""},
+        }
+    )
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = cast(
+            JSONObject,
+            registry.invoke_connector(
+                "slack_list_user_channels",
+                {"name_prefix": "eng", "format": "ids_only"},
+                Mock(),
+                _CREDENTIALS,
+                {},
+            ),
+        )
+    assert result["channels"] == ["C1"]
+    assert request.call_args.args == (
+        "GET",
+        "https://slack.com/api/users.conversations",
+    )
+    assert request.call_args.kwargs["params"]["types"] == (
+        "public_channel,private_channel"
+    )
+
+
 def test_slack_api_errors_include_code() -> None:
     """Slack's API errors should remain readable without exposing tokens."""
     with (
@@ -303,55 +410,3 @@ def test_slack_oauth_flow_uses_web_api_user_token() -> None:
     assert credentials == {"access_token": "xoxp-secret", "token_type": "user"}
     assert config == {"display_name": "Slack · Flower / alice"}
     assert post.call_args.args == ("https://slack.com/api/oauth.v2.access",)
-
-
-def test_slack_history_actions_forward_cursor() -> None:
-    """Slack history actions should expose cursor pagination."""
-    cases: tuple[tuple[str, JSONObject, dict[str, str]], ...] = (
-        (
-            "slack_get_conversation_history",
-            {"channel_id": "C1", "cursor": "next", "limit": 15},
-            {"channel": "C1", "cursor": "next", "limit": "15"},
-        ),
-        (
-            "slack_get_conversation_replies",
-            {
-                "channel_id": "C1",
-                "thread_ts": "1.0",
-                "cursor": "next",
-                "limit": 15,
-            },
-            {"channel": "C1", "ts": "1.0", "cursor": "next", "limit": "15"},
-        ),
-    )
-    response = Mock(status_code=200)
-    response.json.return_value = {"ok": True, "response_metadata": {}}
-    for name, arguments, params in cases:
-        with patch(_HTTP_REQUEST, return_value=response) as request:
-            assert (
-                registry.invoke_connector(
-                    name, arguments, Mock(), {"access_token": "xoxp-secret"}, {}
-                )
-                == response.json.return_value
-            )
-        assert request.call_args.kwargs["params"] == params
-
-
-def test_slack_list_conversations_limit() -> None:
-    """Slack should apply its default when limit is omitted and accept up to 999."""
-    response = Mock(status_code=200)
-    response.json.return_value = {"ok": True, "channels": []}
-    cases: tuple[tuple[JSONObject, str | None], ...] = (
-        ({}, None),
-        ({"limit": 999}, "999"),
-    )
-    for arguments, expected_limit in cases:
-        with patch(_HTTP_REQUEST, return_value=response) as request:
-            registry.invoke_connector(
-                "slack_list_conversations",
-                arguments,
-                Mock(),
-                {"access_token": "xoxp-secret"},
-                {},
-            )
-        assert request.call_args.kwargs["params"].get("limit") == expected_limit

@@ -26,16 +26,12 @@ from flwr.supercore.typing import JSONObject
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
 from ..http import ConnectorApiError, request_json_object
 from ..json_utils import (
+    object_field,
     optional_string,
     require_bool,
     require_int_range,
     require_string,
     string_field,
-)
-from .actions import (
-    SLACK_CONVERSATION_TYPES,
-    SLACK_LIST_CONVERSATIONS_MAX_LIMIT,
-    SLACK_MESSAGE_MAX_LIMIT,
 )
 
 _SLACK_API_BASE_URL = "https://slack.com/api"
@@ -580,94 +576,229 @@ def _concise_search_result(result: JSONObject) -> None:
             ]
 
 
-def list_conversations(
-    arguments: JSONObject, context: ConnectorExecutionContext
+def _conversation_id(channel_id: str, credentials: JSONObject) -> str:
+    """Resolve a user ID to an existing DM conversation without opening one."""
+    if not channel_id.startswith("U"):
+        return channel_id
+    cursor = ""
+    while True:
+        params = {"types": "im", "limit": "200"}
+        if cursor:
+            params["cursor"] = cursor
+        page = _call_slack_api("conversations.list", credentials, params=params)
+        channels = page.get("channels")
+        if not isinstance(channels, list):
+            raise SlackApiError("invalid_response")
+        for channel in channels:
+            if isinstance(channel, dict) and channel.get("user") == channel_id:
+                return require_string(channel.get("id"), "Slack", "channel_id")
+        metadata = page.get("response_metadata")
+        cursor = (
+            string_field(metadata, "next_cursor") if isinstance(metadata, dict) else ""
+        )
+        if not cursor:
+            raise SlackApiError("channel_not_found")
+
+
+def _history(
+    method: str, arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
-    """List conversations visible to the connected Slack user."""
-    types = arguments.get("types")
-    if types is not None and (
-        not isinstance(types, list) or not all(isinstance(item, str) for item in types)
-    ):
-        raise ValueError("Slack conversation types are invalid.")
-    selected_types = (
-        list(SLACK_CONVERSATION_TYPES) if types is None else cast(list[str], types)
-    )
-    if not selected_types or any(
-        item not in SLACK_CONVERSATION_TYPES for item in selected_types
-    ):
-        raise ValueError("Slack conversation types are invalid.")
-    params: dict[str, str | None] = {
-        "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
-        "types": ",".join(dict.fromkeys(selected_types)),
-        "team_id": optional_string(arguments.get("team_id"), "Slack", "team_id"),
-    }
+    """Read a conversation or thread with the shared paging options."""
+    channel_id = require_string(arguments.get("channel_id"), "Slack", "channel_id")
+    params = {"channel": _conversation_id(channel_id, context.credentials)}
+    if method == "conversations.replies":
+        params["ts"] = require_string(
+            arguments.get("message_ts"), "Slack", "message_ts"
+        )
+    for name in ("cursor", "latest", "oldest"):
+        value = optional_string(arguments.get(name), "Slack", name)
+        if value is not None:
+            params[name] = value
     if "limit" in arguments:
         params["limit"] = str(
             require_int_range(
                 arguments["limit"],
                 "Slack",
                 "limit",
-                maximum=SLACK_LIST_CONVERSATIONS_MAX_LIMIT,
+                maximum=1000 if method == "conversations.replies" else 100,
             )
         )
-    if "exclude_archived" in arguments:
-        params["exclude_archived"] = str(
-            require_bool(arguments["exclude_archived"], "Slack", "exclude_archived")
-        ).lower()
-    return _call_slack_api(
-        "conversations.list",
-        context.credentials,
-        params={key: value for key, value in params.items() if value is not None},
-    )
+    result = _call_slack_api(method, context.credentials, params=params)
+    if arguments.get("response_format") == "concise":
+        messages = result.get("messages")
+        if isinstance(messages, list):
+            result["messages"] = [
+                {
+                    key: message[key]
+                    for key in ("ts", "user", "text", "thread_ts")
+                    if key in message
+                }
+                for message in messages
+                if isinstance(message, dict)
+            ]
+    return result
 
 
-def get_conversation_history(
+def read_channel(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
-    """Get recent messages from a Slack conversation."""
-    params: dict[str, str | None] = {
-        "channel": require_string(arguments.get("channel_id"), "Slack", "channel_id"),
-        "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
-    }
-    if "limit" in arguments:
-        params["limit"] = str(
-            require_int_range(
-                arguments["limit"],
-                "Slack",
-                "limit",
-                maximum=SLACK_MESSAGE_MAX_LIMIT,
-            )
-        )
-    return _call_slack_api(
-        "conversations.history",
-        context.credentials,
-        params={key: value for key, value in params.items() if value is not None},
-    )
+    """Read channel or DM history."""
+    return _history("conversations.history", arguments, context)
 
 
-def get_conversation_replies(
+def read_thread(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
-    """Get messages in a Slack thread."""
-    params: dict[str, str | None] = {
-        "channel": require_string(arguments.get("channel_id"), "Slack", "channel_id"),
-        "ts": require_string(arguments.get("thread_ts"), "Slack", "thread_ts"),
-        "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
-    }
-    if "limit" in arguments:
-        params["limit"] = str(
-            require_int_range(
-                arguments["limit"],
-                "Slack",
-                "limit",
-                maximum=SLACK_MESSAGE_MAX_LIMIT,
-            )
+    """Read replies to a parent message."""
+    return _history("conversations.replies", arguments, context)
+
+
+def list_channel_members(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """List up to 30 channel members and optionally fetch their profiles."""
+    channel_id = require_string(arguments.get("channel_id"), "Slack", "channel_id")
+    if arguments.get("response_format") == "count_only":
+        info = _call_slack_api(
+            "conversations.info",
+            context.credentials,
+            params={"channel": channel_id, "include_num_members": "true"},
         )
-    return _call_slack_api(
-        "conversations.replies",
-        context.credentials,
-        params={key: value for key, value in params.items() if value is not None},
+        channel = object_field(info, "channel", error=SlackApiError)
+        count = channel.get("num_members")
+        if not isinstance(count, int) or isinstance(count, bool):
+            raise SlackApiError("invalid_response")
+        return {"ok": True, "channel_id": channel_id, "num_members": count}
+    params = {
+        "channel": channel_id,
+        "limit": str(
+            require_int_range(arguments.get("limit", 30), "Slack", "limit", maximum=30)
+        ),
+    }
+    cursor = optional_string(arguments.get("cursor"), "Slack", "cursor")
+    if cursor is not None:
+        params["cursor"] = cursor
+    result = _call_slack_api(
+        "conversations.members", context.credentials, params=params
     )
+    member_ids = result.get("members")
+    if not isinstance(member_ids, list):
+        raise SlackApiError("invalid_response")
+    format_name = arguments.get("response_format", "detailed")
+    if format_name == "ids_only":
+        return result
+    include_deleted = require_bool(
+        arguments.get("include_deleted", False), "Slack", "include_deleted"
+    )
+    include_bots = require_bool(
+        arguments.get("include_bots", False), "Slack", "include_bots"
+    )
+    members: list[JSONObject] = []
+    for member_id in member_ids:
+        if not isinstance(member_id, str):
+            raise SlackApiError("invalid_response")
+        response = _call_slack_api(
+            "users.info", context.credentials, params={"user": member_id}
+        )
+        user = object_field(response, "user", error=SlackApiError)
+        if not include_deleted and user.get("deleted") is True:
+            continue
+        if not include_bots and (
+            user.get("is_bot") is True or user.get("is_app_user") is True
+        ):
+            continue
+        if format_name == "concise":
+            profile = user.get("profile")
+            display_name = (
+                string_field(profile, "display_name")
+                if isinstance(profile, dict)
+                else ""
+            )
+            members.append(
+                {
+                    "id": member_id,
+                    "name": string_field(user, "name"),
+                    "display_name": display_name,
+                }
+            )
+        else:
+            members.append(user)
+    result["members"] = members
+    return result
+
+
+def list_user_channels(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """List conversations belonging to the connected user."""
+    types = _csv(
+        arguments,
+        "types",
+        ("public_channel", "private_channel"),
+        _SEARCH_CHANNEL_TYPES,
+    )
+    limit = require_int_range(arguments.get("limit", 50), "Slack", "limit", maximum=200)
+    format_name = arguments.get("format", "full")
+    if format_name not in ("full", "ids_only", "names_only"):
+        raise ValueError("Slack format must be full, ids_only, or names_only.")
+    prefix = optional_string(arguments.get("name_prefix"), "Slack", "name_prefix")
+    params = {
+        "types": ",".join(types),
+        "exclude_archived": str(
+            require_bool(
+                arguments.get("exclude_archived", False), "Slack", "exclude_archived"
+            )
+        ).lower(),
+        "limit": str(200 if prefix else limit),
+    }
+    team_id = optional_string(arguments.get("team_id"), "Slack", "team_id")
+    if team_id:
+        params["team_id"] = team_id
+    cursor = optional_string(arguments.get("cursor"), "Slack", "cursor")
+    if cursor and not prefix:
+        params["cursor"] = cursor
+    channels: list[JSONObject] = []
+    seen_cursors: set[str] = set()
+    next_cursor = ""
+    while True:
+        page = _call_slack_api(
+            "users.conversations", context.credentials, params=params
+        )
+        found = page.get("channels")
+        if not isinstance(found, list) or any(not isinstance(c, dict) for c in found):
+            raise SlackApiError("invalid_response")
+        channels.extend(
+            channel
+            for channel in found
+            if not prefix
+            or string_field(channel, "name").casefold().startswith(prefix.casefold())
+        )
+        metadata = page.get("response_metadata")
+        next_cursor = (
+            string_field(metadata, "next_cursor") if isinstance(metadata, dict) else ""
+        )
+        if not prefix or len(channels) >= limit or not next_cursor:
+            break
+        if next_cursor in seen_cursors:
+            raise SlackApiError("invalid_response")
+        seen_cursors.add(next_cursor)
+        params["cursor"] = next_cursor
+    channels = channels[:limit]
+    if prefix:
+        next_cursor = ""
+    if format_name == "ids_only":
+        selected: list[JSONObject] | list[str] = [
+            string_field(channel, "id") for channel in channels
+        ]
+    elif format_name == "names_only":
+        selected = [string_field(channel, "name") for channel in channels]
+    else:
+        selected = channels
+    return {
+        "ok": True,
+        "channels": selected,
+        "response_metadata": {"next_cursor": next_cursor},
+    }
 
 
 EXECUTORS: dict[str, ConnectorExecutor] = {
@@ -675,9 +806,10 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
     "search_public_and_private": search_public_and_private,
     "search_channels": search_channels,
     "search_users": search_users,
-    "list_conversations": list_conversations,
-    "get_conversation_history": get_conversation_history,
-    "get_conversation_replies": get_conversation_replies,
+    "read_channel": read_channel,
+    "read_thread": read_thread,
+    "list_channel_members": list_channel_members,
+    "list_user_channels": list_user_channels,
 }
 
 
