@@ -44,8 +44,9 @@ def _response(payload: object) -> Mock:
 
 
 def test_slack_read_tool_definitions() -> None:
-    """Expose only Slack actions with registered Web API executors."""
+    """Expose the supported Slack read tools with explicit input contracts."""
     tools = registry.get_connector_tools(SLACK_CONNECTOR_REF)
+
     assert [tool["name"] for tool in tools] == [
         "slack_search_public",
         "slack_search_public_and_private",
@@ -57,11 +58,23 @@ def test_slack_read_tool_definitions() -> None:
         "slack_read_user_profile",
         "slack_list_channel_members",
         "slack_read_file",
+        "slack_read_list",
         "slack_list_user_channels",
         "slack_search_emojis",
         "slack_get_reactions",
     ]
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
+    public_search = cast(JSONObject, tools[0]["parameters"])
+    search_properties = cast(JSONObject, public_search["properties"])
+    thread_read = cast(JSONObject, tools[5]["parameters"])
+    thread_properties = cast(JSONObject, thread_read["properties"])
+    assert public_search["required"] == []
+    assert {"query", "keywords", "filters", "natural_language_query"} <= set(
+        search_properties
+    )
+    assert cast(JSONObject, search_properties["limit"])["type"] == "integer"
+    assert thread_read["required"] == ["channel_id", "message_ts"]
+    assert cast(JSONObject, thread_properties["limit"])["type"] == "integer"
 
 
 def test_slack_search_public_uses_web_api() -> None:
@@ -449,6 +462,51 @@ def test_slack_get_reactions_includes_user_display_names() -> None:
         {"user_id": "U1", "display_name": "Ada"},
         {"user_id": "U2", "display_name": "grace"},
     ]
+
+
+def test_slack_read_list_uses_web_api() -> None:
+    """Read list columns and records using Slack Web API methods."""
+    responses = [
+        _response(
+            {
+                "ok": True,
+                "file": {
+                    "id": "F1",
+                    "list_metadata": {
+                        "schema": [{"id": "Col1", "name": "Task", "type": "text"}]
+                    },
+                },
+            }
+        ),
+        _response(
+            {
+                "ok": True,
+                "items": [
+                    {"id": "Rec1", "fields": [{"column_id": "Col1", "text": "Ship"}]}
+                ],
+                "response_metadata": {"next_cursor": "next"},
+            }
+        ),
+    ]
+    with patch(_HTTP_REQUEST, side_effect=responses) as request:
+        result = cast(
+            JSONObject,
+            registry.invoke_connector(
+                "slack_read_list",
+                {"list_id": "F1", "format": "csv", "limit": 10},
+                Mock(),
+                _CREDENTIALS,
+                {},
+            ),
+        )
+    assert result["content"] == "Record ID,Task\nRec1,Ship\n"
+    assert result["next_cursor"] == "next"
+    assert request.call_args_list[0].args == ("GET", "https://slack.com/api/files.info")
+    assert request.call_args_list[1].args == (
+        "POST",
+        "https://slack.com/api/slackLists.items.list",
+    )
+    assert request.call_args_list[1].kwargs["json"] == {"list_id": "F1", "limit": 10}
 
 
 def test_slack_list_user_channels_uses_web_api() -> None:

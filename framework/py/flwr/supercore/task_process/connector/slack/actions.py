@@ -902,6 +902,129 @@ ACTIONS = (
         },
     ),
     ActionDefinition(
+        name="read_list",
+        description=(
+            "Read the contents of a Slack list including its column schema "
+            "and records. Returns data as a markdown table (default) or CSV. "
+            "The column headers are always part of the output (the table "
+            "header in markdown, the first line in CSV). Each record row is "
+            'prefixed with a "Record ID" column (the Rec… id); pass that '
+            "value as record_id to slack_update_list_record to edit the row.\n"
+            "\n"
+            "Provide either list_id or list_title to identify the list. If "
+            "both are given, list_id is tried first (an exact ID is "
+            "unambiguous); if that ID does not resolve, the tool falls back "
+            "to the list_title search and notes in the output that the "
+            "provided ID was not used.\n"
+            "\n"
+            "Args:\n"
+            "\tlist_id (Optional[str]): The ID of the list to read (e.g., "
+            "'F0ABC123'). An exact, direct lookup — prefer this when known; "
+            "it's faster and unambiguous.\n"
+            "\tlist_title (Optional[str]): The title of the list to read. "
+            "Resolved via a fuzzy, relevance-ranked search (not an exact, "
+            "case-sensitive match) — so it can be slower and less precise "
+            "than list_id, may match several similarly-named lists, and may "
+            "return a related list rather than an exact title match; the best "
+            "match is used. Pass list_id to target a specific list among "
+            "several with similar titles. If nothing matches, returns "
+            "list_not_found.\n"
+            "\tformat (Optional[str]): Output format - 'markdown' (default) "
+            "or 'csv'\n"
+            "\tlimit (Optional[int]): Maximum number of records to return per "
+            "page. Capped at 100 — larger values are clamped to 100, so "
+            "reading more than 100 records requires paginating with cursor. "
+            "Default: 100\n"
+            "\tcursor (Optional[str]): Pagination cursor for fetching the "
+            "next page of a multi-page read. Pass back the exact next_cursor "
+            "string from a previous call's output — it is an opaque token, so "
+            "do not construct, parse, or modify it. Omit (or pass empty) to "
+            "read from the first record.\n"
+            "\tschema_only (Optional[bool]): When true, return only the "
+            "column schema (names and types) and skip fetching records. Use "
+            'this to answer "what columns does this list have?" without '
+            "reading any rows. Default: false\n"
+            "\n"
+            "Returns:\n"
+            "\tstr: List contents formatted as a markdown table or CSV data. "
+            "When more records remain, the output includes a next_cursor to "
+            "pass back in for the following page.\n"
+            "\n"
+            "Examples:\n"
+            "\t- \"Read a list\" -> slack_read_list(list_id='F0ABC123')\n"
+            '\t- "Read a list by name" -> '
+            "slack_read_list(list_title='Project Tracker')\n"
+            '\t- "What columns does this list have?" -> '
+            "slack_read_list(list_id='F0ABC123', schema_only=true)\n"
+            '\t- "Export list as CSV" -> '
+            "slack_read_list(list_id='F0ABC123', format='csv')\n"
+            "\t- \"Get first 10 rows\" -> slack_read_list(list_id='F0ABC123', "
+            "limit=10)\n"
+            "\t- \"Get the next page\" -> slack_read_list(list_id='F0ABC123', "
+            "cursor='<next_cursor from prior call>')\n"
+            "\n"
+            "Error Handling:\n"
+            "\t- Returns error if neither list_id nor list_title is provided, "
+            "or the list is not found\n"
+            "\t- Returns error if user lacks access to the list\n"
+            "\t- When list_title matches multiple lists, the best search "
+            "match is read (no error); pass list_id to disambiguate\n"
+            '\t- Returns "invalid_cursor" if the pagination cursor is '
+            "malformed\n"
+            '\t- Returns "rate_limit_exceeded" when too many reads are issued '
+            "in a short window — back off, then retry\n"
+            '\t- Returns "feature_not_enabled" if Slack lists are not '
+            "available to this account — do not retry\n"
+            '\t- Returns "failure_fetching_records" if the list could be read '
+            "but came back malformed — retrying once is reasonable; treat a "
+            "second occurrence as terminal\n"
+            "\t- Other errors from the underlying record read surface as-is, "
+            'e.g. "missing_scope" (the token lacks lists:read — do not retry) '
+            'or "internal_error". Treat an unfamiliar code as terminal unless '
+            "it names a rate limit."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "list_id": {
+                    "type": "string",
+                    "description": "The id of the list",
+                },
+                "list_title": {
+                    "type": "string",
+                    "description": "The title of the list",
+                },
+                "format": {
+                    "type": "string",
+                    "description": "Output format: 'markdown' (default) or 'csv'",
+                    "enum": ["markdown", "csv"],
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of records to return. Default: 100",
+                },
+                "cursor": {
+                    "type": "string",
+                    "description": (
+                        "Pagination cursor returned by a previous call as "
+                        "`next_cursor`. An opaque token — pass it back verbatim; do "
+                        "not construct or modify it. Omit to read from the first "
+                        "record."
+                    ),
+                },
+                "schema_only": {
+                    "type": "boolean",
+                    "description": (
+                        "When true, return only the column schema (names and types) "
+                        "without fetching any records. Default: false"
+                    ),
+                },
+            },
+            "required": [],
+        },
+    ),
+    ActionDefinition(
         name="list_user_channels",
         description=(
             "Lists channels the user is a member of. Supports public "

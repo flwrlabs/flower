@@ -42,11 +42,15 @@ SLACK_USER_SCOPES = (
     "im:read",
     "mpim:read",
     "reactions:read",
+    "lists:read",
 )
+
 PROVIDER = ProviderDefinition(
     ref=SLACK_CONNECTOR_REF,
     display_name="Slack",
-    description="Search and read messages, conversations, and threads.",
+    description=(
+        "Search and read Slack messages, channels, files, canvases, users, and lists."
+    ),
     actions=ACTIONS,
     oauth=OAuth2Definition(
         authorization_url="https://slack.com/oauth/v2/authorize",

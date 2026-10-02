@@ -17,6 +17,9 @@
 from __future__ import annotations
 
 import base64
+import csv
+import io
+import json
 from datetime import UTC, datetime
 from typing import cast
 from urllib.parse import urlsplit
@@ -842,6 +845,138 @@ def read_file(arguments: JSONObject, context: ConnectorExecutionContext) -> JSON
     }
 
 
+def _list_file(arguments: JSONObject, credentials: JSONObject) -> JSONObject:
+    """Resolve a list by exact ID or by Slack's ranked file search."""
+    list_id = optional_string(arguments.get("list_id"), "Slack", "list_id")
+    list_title = optional_string(arguments.get("list_title"), "Slack", "list_title")
+    if not list_id and not list_title:
+        raise ValueError("Slack read_list requires list_id or list_title.")
+    if list_id:
+        try:
+            info = _call_slack_api("files.info", credentials, params={"file": list_id})
+            file = object_field(info, "file", error=SlackApiError)
+            if isinstance(file.get("list_metadata"), dict):
+                return file
+        except SlackApiError as error:
+            if not list_title or error.code not in ("file_not_found", "list_not_found"):
+                raise
+        if not list_title:
+            raise SlackApiError("list_not_found")
+    if list_title is None:
+        raise SlackApiError("list_not_found")
+    search = _call_slack_api(
+        "search.files", credentials, params={"query": list_title, "count": "20"}
+    )
+    matches = object_field(search, "files", error=SlackApiError).get("matches")
+    if not isinstance(matches, list):
+        raise SlackApiError("invalid_response")
+    for match in matches:
+        if not isinstance(match, dict) or not isinstance(match.get("id"), str):
+            continue
+        info = _call_slack_api("files.info", credentials, params={"file": match["id"]})
+        file = object_field(info, "file", error=SlackApiError)
+        if isinstance(file.get("list_metadata"), dict):
+            return file
+    raise SlackApiError("list_not_found")
+
+
+def _list_cell(field: JSONObject) -> str:
+    """Use Slack's plain text cell value where available."""
+    value = field.get("text", field.get("value"))
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
+def _list_table(headers: list[str], rows: list[list[str]], format_name: str) -> str:
+    """Format a page of list data as markdown or CSV."""
+    if format_name == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output, lineterminator="\n")
+        writer.writerow(headers)
+        writer.writerows(rows)
+        return output.getvalue()
+
+    def escape(value: str) -> str:
+        return value.replace("|", "\\|").replace("\n", "<br>")
+
+    lines = [
+        "| " + " | ".join(escape(value) for value in headers) + " |",
+        "| " + " | ".join("---" for _ in headers) + " |",
+    ]
+    lines.extend(
+        "| " + " | ".join(escape(value) for value in row) + " |" for row in rows
+    )
+    return "\n".join(lines)
+
+
+def read_list(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """Read a Slack list's schema and one page of records through Web API."""
+    file = _list_file(arguments, context.credentials)
+    list_id = require_string(file.get("id"), "Slack", "list_id")
+    metadata = object_field(file, "list_metadata", error=SlackApiError)
+    schema = metadata.get("schema")
+    if not isinstance(schema, list) or any(not isinstance(c, dict) for c in schema):
+        raise SlackApiError("invalid_response")
+    columns = cast(list[JSONObject], schema)
+    format_name = arguments.get("format", "markdown")
+    if format_name not in ("markdown", "csv"):
+        raise ValueError("Slack format must be markdown or csv.")
+    schema_only = require_bool(
+        arguments.get("schema_only", False), "Slack", "schema_only"
+    )
+    if schema_only:
+        rows = [
+            [string_field(column, "name"), string_field(column, "type")]
+            for column in columns
+        ]
+        content = _list_table(["Column", "Type"], rows, format_name)
+        return {"ok": True, "list_id": list_id, "schema": columns, "content": content}
+    limit = require_int_range(
+        arguments.get("limit", 100), "Slack", "limit", maximum=100
+    )
+    body: JSONObject = {"list_id": list_id, "limit": limit}
+    cursor = optional_string(arguments.get("cursor"), "Slack", "cursor")
+    if cursor:
+        body["cursor"] = cursor
+    page = _call_slack_api("slackLists.items.list", context.credentials, body=body)
+    items = page.get("items")
+    if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
+        raise SlackApiError("invalid_response")
+    names = [string_field(column, "name") for column in columns]
+    keys = [
+        string_field(column, "id") or string_field(column, "key") for column in columns
+    ]
+    rows = []
+    for item in items:
+        fields = item.get("fields")
+        if not isinstance(fields, list):
+            raise SlackApiError("invalid_response")
+        values = {
+            str(field.get("column_id") or field.get("key")): _list_cell(field)
+            for field in fields
+            if isinstance(field, dict)
+        }
+        rows.append([string_field(item, "id")] + [values.get(key, "") for key in keys])
+    response_metadata = page.get("response_metadata")
+    next_cursor = (
+        string_field(response_metadata, "next_cursor")
+        if isinstance(response_metadata, dict)
+        else ""
+    )
+    return {
+        "ok": True,
+        "list_id": list_id,
+        "schema": columns,
+        "content": _list_table(["Record ID"] + names, rows, format_name),
+        "next_cursor": next_cursor,
+    }
+
+
 def list_user_channels(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
@@ -1007,6 +1142,7 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
     "read_user_profile": read_user_profile,
     "list_channel_members": list_channel_members,
     "read_file": read_file,
+    "read_list": read_list,
     "list_user_channels": list_user_channels,
     "search_emojis": search_emojis,
     "get_reactions": get_reactions,
