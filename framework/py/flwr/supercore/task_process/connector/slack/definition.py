@@ -29,6 +29,7 @@ SLACK_USER_SCOPES = (
     "search:read.files",
     "search:read.users",
     "files:read",
+    "emoji:read",
     "channels:history",
     "groups:history",
     "mpim:history",
@@ -40,6 +41,7 @@ SLACK_USER_SCOPES = (
     "groups:read",
     "im:read",
     "mpim:read",
+    "reactions:read",
 )
 PROVIDER = ProviderDefinition(
     ref=SLACK_CONNECTOR_REF,

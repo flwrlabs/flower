@@ -728,6 +728,33 @@ def read_canvas(
     }
 
 
+def read_user_profile(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """Read the current or requested user's profile."""
+    user_id = optional_string(arguments.get("user_id"), "Slack", "user_id")
+    if user_id is None:
+        identity = _call_slack_api("auth.test", context.credentials, params={})
+        user_id = require_string(identity.get("user_id"), "Slack", "user_id")
+    params = {"user": user_id}
+    if "include_locale" in arguments:
+        params["include_locale"] = str(
+            require_bool(arguments["include_locale"], "Slack", "include_locale")
+        ).lower()
+    result = _call_slack_api("users.info", context.credentials, params=params)
+    if arguments.get("response_format") == "concise":
+        user = object_field(result, "user", error=SlackApiError)
+        return {
+            "ok": True,
+            "user": {
+                key: user[key]
+                for key in ("id", "name", "real_name", "profile")
+                if key in user
+            },
+        }
+    return result
+
+
 def list_channel_members(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
@@ -898,6 +925,77 @@ def _safe_file_metadata(file: JSONObject) -> JSONObject:
     }
 
 
+def search_emojis(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """Find custom emoji names matching any query term."""
+    terms = [
+        term.strip().casefold()
+        for term in require_string(arguments.get("query"), "Slack", "query").split(",")
+        if term.strip()
+    ]
+    result = _call_slack_api("emoji.list", context.credentials, params={})
+    emoji = object_field(result, "emoji", error=SlackApiError)
+    matches = (
+        (name, value)
+        for name, value in emoji.items()
+        if any(term in name.casefold() for term in terms)
+    )
+    result["emoji"] = dict(list(matches)[:200])
+    return result
+
+
+def get_reactions(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """Read reactions on a message."""
+    result = _call_slack_api(
+        "reactions.get",
+        context.credentials,
+        params={
+            "channel": require_string(
+                arguments.get("channel_id"), "Slack", "channel_id"
+            ),
+            "timestamp": require_string(
+                arguments.get("message_ts"), "Slack", "message_ts"
+            ),
+        },
+    )
+    message = result.get("message")
+    reactions = message.get("reactions") if isinstance(message, dict) else None
+    if not isinstance(reactions, list):
+        return result
+    names: dict[str, str] = {}
+    for reaction in reactions:
+        if not isinstance(reaction, dict):
+            continue
+        user_ids = reaction.get("users")
+        if not isinstance(user_ids, list):
+            continue
+        users: list[JSONObject] = []
+        for user_id in user_ids[:50]:
+            if not isinstance(user_id, str):
+                continue
+            if user_id not in names:
+                profile = _call_slack_api(
+                    "users.info", context.credentials, params={"user": user_id}
+                )
+                user = object_field(profile, "user", error=SlackApiError)
+                details = user.get("profile")
+                names[user_id] = (
+                    (
+                        string_field(details, "display_name")
+                        if isinstance(details, dict)
+                        else ""
+                    )
+                    or string_field(user, "real_name")
+                    or string_field(user, "name")
+                )
+            users.append({"user_id": user_id, "display_name": names[user_id]})
+        reaction["users_with_display_names"] = users
+    return result
+
+
 EXECUTORS: dict[str, ConnectorExecutor] = {
     "search_public": search_public,
     "search_public_and_private": search_public_and_private,
@@ -906,9 +1004,12 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
     "read_channel": read_channel,
     "read_thread": read_thread,
     "read_canvas": read_canvas,
+    "read_user_profile": read_user_profile,
     "list_channel_members": list_channel_members,
     "read_file": read_file,
     "list_user_channels": list_user_channels,
+    "search_emojis": search_emojis,
+    "get_reactions": get_reactions,
 }
 
 

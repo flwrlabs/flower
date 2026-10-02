@@ -764,6 +764,42 @@ ACTIONS = (
         },
     ),
     ActionDefinition(
+        name="read_user_profile",
+        description=(
+            "Retrieves detailed profile information for a Slack user: contact "
+            "info, status, timezone, organization, and role. Read-only. "
+            "Defaults to current user if user_id not provided.\n"
+            "\n"
+            "Use slack_search_users to find a user ID by name or email.\n"
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "user_id": {
+                    "type": "string",
+                    "description": (
+                        "Slack user ID to look up (e.g., 'U0ABC12345'). Defaults to "
+                        "current user if not provided"
+                    ),
+                },
+                "include_locale": {
+                    "type": "boolean",
+                    "description": "Include user's locale information. Default: false",
+                },
+                "response_format": {
+                    "type": "string",
+                    "description": (
+                        "Level of detail in response. 'detailed' includes all fields, "
+                        "'concise' shows essential info. Default: detailed'"
+                    ),
+                    "enum": ["detailed", "concise"],
+                },
+            },
+            "required": [],
+        },
+    ),
+    ActionDefinition(
         name="list_channel_members",
         description=(
             "Lists members of a Slack channel, group, or group DM (MPIM). "
@@ -961,6 +997,69 @@ ACTIONS = (
                 },
             },
             "required": [],
+        },
+    ),
+    ActionDefinition(
+        name="search_emojis",
+        description=(
+            "Search custom emojis available in this workspace by name. Useful "
+            "for discovering workspace-specific emojis related to a topic, or "
+            "checking if a custom emoji exists when unsure. Standard Unicode "
+            "emojis (e.g., :thumbsup:, :heart:) are always available and "
+            "don't need to be searched.\n"
+            "\n"
+            "A query is required. Supports comma-separated terms to search "
+            'for multiple emojis at once (e.g., "partyblob,shipit,taco"). '
+            "Each term is matched as a case-insensitive substring against "
+            "emoji names. Returns up to 200 results. Alias emojis point to "
+            "another emoji (e.g., :shipit: is an alias for :squirrel:)."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "Search emoji names by case-insensitive substring match. "
+                        'Supports comma-separated terms (e.g., "party,wave,rocket").'
+                    ),
+                },
+            },
+            "required": ["query"],
+        },
+    ),
+    ActionDefinition(
+        name="get_reactions",
+        description=(
+            "Retrieves all reactions (emoji) on a specific Slack message. "
+            "Read-only.\n"
+            "\n"
+            "Requires channel_id and message_ts of the target message. "
+            "Returns each reaction's emoji name, count, and the users who "
+            "reacted (with display names and user IDs). Up to 50 users are "
+            "shown per reaction. The count is always accurate even if the "
+            "user list is truncated. Messages can have up to 50 unique emoji "
+            'reactions. If no reactions exist, returns a "no reactions" '
+            "message.\n"
+            "\n"
+            "Use slack_read_channel or slack_read_thread to find channel_id "
+            "and message_ts. Use slack_add_reaction to add a reaction."
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "channel_id": {
+                    "type": "string",
+                    "description": "The ID of the channel containing the message",
+                },
+                "message_ts": {
+                    "type": "string",
+                    "description": "Timestamp of the message to get reactions for",
+                },
+            },
+            "required": ["channel_id", "message_ts"],
         },
     ),
 )

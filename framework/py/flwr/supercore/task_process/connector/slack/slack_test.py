@@ -54,9 +54,12 @@ def test_slack_read_tool_definitions() -> None:
         "slack_read_channel",
         "slack_read_thread",
         "slack_read_canvas",
+        "slack_read_user_profile",
         "slack_list_channel_members",
         "slack_read_file",
         "slack_list_user_channels",
+        "slack_search_emojis",
+        "slack_get_reactions",
     ]
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
 
@@ -376,6 +379,76 @@ def test_slack_read_file_downloads_text() -> None:
     assert result["encoding"] == "utf-8"
     assert result["file"] == {"id": "F1", "mimetype": "text/plain"}
     assert get.call_args.kwargs["headers"] == {"Authorization": "Bearer xoxp-secret"}
+
+
+def test_slack_search_emojis_and_get_reactions() -> None:
+    """Use the documented emoji and reactions read endpoints."""
+    with patch(
+        _HTTP_REQUEST,
+        return_value=_response(
+            {"ok": True, "emoji": {"party_parrot": "url1", "wave": "url2"}}
+        ),
+    ) as request:
+        emoji = cast(
+            JSONObject,
+            registry.invoke_connector(
+                "slack_search_emojis", {"query": "party"}, Mock(), _CREDENTIALS, {}
+            ),
+        )
+    assert emoji["emoji"] == {"party_parrot": "url1"}
+    assert request.call_args.args[1].endswith("/emoji.list")
+
+    with patch(
+        _HTTP_REQUEST, return_value=_response({"ok": True, "message": {}})
+    ) as request:
+        registry.invoke_connector(
+            "slack_get_reactions",
+            {"channel_id": "C1", "message_ts": "1.0"},
+            Mock(),
+            _CREDENTIALS,
+            {},
+        )
+    assert request.call_args.args[1].endswith("/reactions.get")
+    assert request.call_args.kwargs["params"] == {
+        "channel": "C1",
+        "timestamp": "1.0",
+    }
+
+
+def test_slack_get_reactions_includes_user_display_names() -> None:
+    """Preserve counts and resolve the displayed reaction users."""
+    responses = [
+        _response(
+            {
+                "ok": True,
+                "message": {
+                    "reactions": [{"name": "wave", "count": 3, "users": ["U1", "U2"]}]
+                },
+            }
+        ),
+        _response(
+            {"ok": True, "user": {"id": "U1", "profile": {"display_name": "Ada"}}}
+        ),
+        _response({"ok": True, "user": {"id": "U2", "name": "grace"}}),
+    ]
+    with patch(_HTTP_REQUEST, side_effect=responses):
+        result = cast(
+            JSONObject,
+            registry.invoke_connector(
+                "slack_get_reactions",
+                {"channel_id": "C1", "message_ts": "1.0"},
+                Mock(),
+                _CREDENTIALS,
+                {},
+            ),
+        )
+    message = cast(JSONObject, result["message"])
+    reaction = cast(list[JSONObject], message["reactions"])[0]
+    assert reaction["count"] == 3
+    assert reaction["users_with_display_names"] == [
+        {"user_id": "U1", "display_name": "Ada"},
+        {"user_id": "U2", "display_name": "grace"},
+    ]
 
 
 def test_slack_list_user_channels_uses_web_api() -> None:
