@@ -49,6 +49,8 @@ def test_slack_read_tool_definitions() -> None:
     assert [tool["name"] for tool in tools] == [
         "slack_search_public",
         "slack_search_public_and_private",
+        "slack_search_channels",
+        "slack_search_users",
         "slack_list_conversations",
         "slack_get_conversation_history",
         "slack_get_conversation_replies",
@@ -194,6 +196,57 @@ def test_slack_search_falls_back_to_standard_web_api() -> None:
         "F1"
     ]
     assert request.call_args.args == ("GET", "https://slack.com/api/search.all")
+
+
+def test_slack_channel_search_falls_back_to_conversations_list() -> None:
+    """Channel search should work if the newer search endpoint is unavailable."""
+    responses = [
+        _response({"ok": False, "error": "feature_not_enabled"}),
+        _response(
+            {
+                "ok": True,
+                "channels": [
+                    {"id": "C1", "name": "engineering"},
+                    {"id": "C2", "name": "design"},
+                ],
+                "response_metadata": {"next_cursor": "next"},
+            }
+        ),
+    ]
+    with patch(_HTTP_REQUEST, side_effect=responses) as request:
+        result = cast(
+            JSONObject,
+            registry.invoke_connector(
+                "slack_search_channels",
+                {"query": "engineer"},
+                Mock(),
+                _CREDENTIALS,
+                {},
+            ),
+        )
+    results = cast(JSONObject, result["results"])
+    assert results["channels"] == [{"id": "C1", "name": "engineering"}]
+    assert request.call_args.args == ("GET", "https://slack.com/api/conversations.list")
+
+
+@pytest.mark.parametrize(
+    ("tool", "content_types", "channel_types"),
+    [
+        ("slack_search_channels", ["channels"], ["public_channel"]),
+        ("slack_search_users", ["users"], None),
+    ],
+)
+def test_slack_entity_searches(
+    tool: str, content_types: list[str], channel_types: list[str] | None
+) -> None:
+    """Search channels and users through the matching content types."""
+    with patch(
+        _HTTP_REQUEST, return_value=_response({"ok": True, "results": {}})
+    ) as request:
+        registry.invoke_connector(tool, {"query": "eng"}, Mock(), _CREDENTIALS, {})
+    body = request.call_args.kwargs["json"]
+    assert body["content_types"] == content_types
+    assert body.get("channel_types") == channel_types
 
 
 def test_slack_api_errors_include_code() -> None:
