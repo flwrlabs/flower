@@ -15,6 +15,10 @@
 """Utility functions for the SecAgg/SecAgg+ protocol."""
 
 
+import hashlib
+import hmac
+import struct
+
 import numpy as np
 
 from flwr.common import NDArrayInt
@@ -83,18 +87,58 @@ def share_keys_plaintext_separate(plaintext: bytes) -> tuple[int, int, bytes, by
 def pseudo_rand_gen(
     seed: bytes, num_range: int, dimensions_list: list[tuple[int, ...]]
 ) -> list[NDArrayInt]:
-    """Seeded pseudo-random number generator for noise generation with Numpy."""
-    assert len(seed) & 0x3 == 0
-    seed32 = 0
-    for i in range(0, len(seed), 4):
-        seed32 ^= int.from_bytes(seed[i : i + 4], "little")
-    # pylint: disable-next=no-member
-    gen = np.random.RandomState(seed32)
-    output = []
-    for dimension in dimensions_list:
-        if len(dimension) == 0:
-            arr = np.array(gen.randint(0, num_range - 1), dtype=np.int64)
+    """Seeded pseudo-random number generator for noise generation.
+
+    Uses HMAC-SHA256 in counter mode to generate a cryptographically strong,
+    deterministic byte stream from the seed, preserving full entropy.
+
+    Assumes `num_range` is a power of two and >= 2.
+    """
+    if num_range < 2 or (num_range & (num_range - 1)) != 0:
+        raise ValueError("num_range must be a power of two and >= 2.")
+    if num_range > (1 << 63):
+        raise ValueError("num_range must be <= 2**63 to fit into int64 masks.")
+
+    num_bytes = (num_range.bit_length() + 6) // 8
+    bitmask = num_range - 1
+
+    counter = 0
+    stream_buffer = bytearray()
+    masks = []
+
+    for shape in dimensions_list:
+        total_elements = int(np.prod(shape)) if shape else 1
+        tensor_bytes = total_elements * num_bytes
+
+        while len(stream_buffer) < tensor_bytes:
+            h = hmac.new(seed, struct.pack("<Q", counter), hashlib.sha256)
+            stream_buffer.extend(h.digest())
+            counter += 1
+
+        tensor_buffer = stream_buffer[:tensor_bytes]
+        stream_buffer = stream_buffer[tensor_bytes:]
+
+        if num_bytes == 1:
+            flat_vals = np.frombuffer(tensor_buffer, dtype=np.uint8).astype(np.int64)
+        elif num_bytes == 2:
+            flat_vals = np.frombuffer(tensor_buffer, dtype=">u2").astype(np.int64)
+        elif num_bytes == 4:
+            flat_vals = np.frombuffer(tensor_buffer, dtype=">u4").astype(np.int64)
+        elif num_bytes == 8:
+            flat_vals = np.frombuffer(tensor_buffer, dtype=">u8")
+            flat_vals = (flat_vals & bitmask).astype(np.int64)
         else:
-            arr = gen.randint(0, num_range - 1, dimension, dtype=np.int64)
-        output.append(arr)
-    return output
+            raw_bytes = np.frombuffer(tensor_buffer, dtype=np.uint8).reshape(-1, num_bytes)
+            flat_vals = np.zeros(total_elements, dtype=np.int64)
+            for i in range(num_bytes):
+                flat_vals = (flat_vals << 8) | raw_bytes[:, i]
+
+        if num_bytes != 8:
+            flat_vals = flat_vals & bitmask
+
+        if not shape:
+            masks.append(np.array(flat_vals[0], dtype=np.int64))
+        else:
+            masks.append(flat_vals.reshape(shape))
+
+    return masks
