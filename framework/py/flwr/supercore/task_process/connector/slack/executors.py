@@ -239,14 +239,119 @@ def search_public_and_private(
     return _search(arguments, context, content_types=_SEARCH_CONTENT_TYPES)
 
 
+def search_channels(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """Search public and private channels."""
+    return _search(
+        arguments,
+        context,
+        content_types=("channels",),
+    )
+
+
+def search_users(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """Search workspace users."""
+    return _search(arguments, context, content_types=("users",))
+
+
 def _search_web_api_fallback(
     arguments: JSONObject,
     credentials: JSONObject,
     content_types: tuple[str, ...],
     channel_types: tuple[str, ...],
 ) -> JSONObject:
-    """Search messages and files through the standard Web API fallback."""
+    """Search through standard Web API methods when Real-time Search is unavailable."""
+    if content_types == ("channels",):
+        return _search_channels_fallback(arguments, credentials)
+    if content_types == ("users",):
+        return _search_users_fallback(arguments, credentials)
     return _search_messages_files_fallback(arguments, credentials, channel_types)
+
+
+def _search_channels_fallback(
+    arguments: JSONObject, credentials: JSONObject
+) -> JSONObject:
+    """Find channel names and descriptions through conversations.list."""
+    query = _search_query(arguments)
+    limit = require_int_range(arguments.get("limit", 20), "Slack", "limit", maximum=20)
+    cursor = optional_string(arguments.get("cursor"), "Slack", "cursor")
+    types = _csv(
+        arguments,
+        "channel_types",
+        ("public_channel",),
+        ("public_channel", "private_channel"),
+    )
+    params = {
+        "types": ",".join(types),
+        "limit": str(limit),
+        "exclude_archived": str(
+            not require_bool(
+                arguments.get("include_archived", False),
+                "Slack",
+                "include_archived",
+            )
+        ).lower(),
+    }
+    if cursor:
+        params["cursor"] = cursor
+    page = _call_slack_api("conversations.list", credentials, params=params)
+    channels = page.get("channels")
+    if not isinstance(channels, list):
+        raise SlackApiError("invalid_response")
+    matches = [
+        channel
+        for channel in channels
+        if isinstance(channel, dict)
+        and query.casefold()
+        in " ".join(
+            str(channel.get(field, "")) for field in ("name", "topic", "purpose")
+        ).casefold()
+    ]
+    return {
+        "ok": True,
+        "results": {"channels": matches},
+        "response_metadata": page.get("response_metadata", {}),
+    }
+
+
+def _search_users_fallback(
+    arguments: JSONObject, credentials: JSONObject
+) -> JSONObject:
+    """Find users through users.list when Real-time Search is unavailable."""
+    query = _search_query(arguments)
+    limit = require_int_range(arguments.get("limit", 20), "Slack", "limit", maximum=20)
+    params = {"limit": str(limit)}
+    cursor = optional_string(arguments.get("cursor"), "Slack", "cursor")
+    if cursor:
+        params["cursor"] = cursor
+    page = _call_slack_api("users.list", credentials, params=params)
+    users = page.get("members")
+    if not isinstance(users, list):
+        raise SlackApiError("invalid_response")
+    terms = query.casefold().split()
+    matches = []
+    for user in users:
+        if not isinstance(user, dict):
+            continue
+        profile = user.get("profile")
+        searchable = " ".join(
+            str(user.get(field, "")) for field in ("name", "real_name")
+        )
+        if isinstance(profile, dict):
+            searchable += " " + " ".join(
+                str(profile.get(field, ""))
+                for field in ("display_name", "email", "title")
+            )
+        if all(term in searchable.casefold() for term in terms):
+            matches.append(user)
+    return {
+        "ok": True,
+        "results": {"users": matches},
+        "response_metadata": page.get("response_metadata", {}),
+    }
 
 
 def _search_messages_files_fallback(
@@ -568,6 +673,8 @@ def get_conversation_replies(
 EXECUTORS: dict[str, ConnectorExecutor] = {
     "search_public": search_public,
     "search_public_and_private": search_public_and_private,
+    "search_channels": search_channels,
+    "search_users": search_users,
     "list_conversations": list_conversations,
     "get_conversation_history": get_conversation_history,
     "get_conversation_replies": get_conversation_replies,

@@ -423,6 +423,201 @@ ACTIONS = (
         },
     ),
     ActionDefinition(
+        name="search_channels",
+        description=(
+            "Search for Slack channels by name or description. Returns "
+            "channel names, IDs, topics, purposes, and archive status.\n"
+            "\n"
+            "Query tips: use terms matching channel names/descriptions (e.g., "
+            '"engineering", "project alpha"). Names are typically lowercase '
+            "with hyphens.\n"
+            "\n"
+            "Use slack_read_channel to read messages from a known channel. "
+            "Use slack_search_public to search message content across "
+            "channels.\n"
+            "---\n"
+            "Split your search query into 2 fields:\n"
+            "\n"
+            "1. `keywords` — Lexical terms that must appear in the channel's "
+            "name or attributes. Each element should be a single word or "
+            '"quoted phrase". All AND\'d.\n'
+            "\n"
+            "2. `natural_language_query` — User's question in conversational "
+            "tone for semantic re-ranking. Preserve original phrasing; on "
+            "follow-ups incorporate prior context.\n"
+            "\n"
+            "Require `natural_language_query` + `keywords`.\n"
+            "\n"
+            "\n"
+            "Strategy: Use keywords for subject terms. If 0 results, broaden "
+            "by simplifying keywords.\n"
+            "---"
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search query for finding channels",
+                },
+                "channel_types": {
+                    "type": "string",
+                    "description": (
+                        "Comma-separated list of channel types to include in the "
+                        "search. Defaults to public_channel. Mix and match channel "
+                        "types by providing a comma-separated list of any combination "
+                        "of public_channel, private_channel. Example: "
+                        "public_channel,private_channel; Second Example: public_channel"
+                    ),
+                },
+                "cursor": {
+                    "type": "string",
+                    "description": (
+                        "The cursor returned by the API. Leave this blank for the "
+                        "first request, and use this to get the next page of results"
+                    ),
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": (
+                        "Number of results to return, up to a max of 20. Defaults to "
+                        "20."
+                    ),
+                },
+                "response_format": {
+                    "type": "string",
+                    "description": (
+                        "Level of detail (default: 'detailed'). Options: 'detailed', "
+                        "'concise'"
+                    ),
+                    "enum": ["detailed", "concise"],
+                },
+                "include_archived": {
+                    "type": "boolean",
+                    "description": "Include archived channels in the search results",
+                },
+                "keywords": {
+                    "type": "array",
+                    "description": (
+                        "Array of lexical search terms. Each element MUST be a single "
+                        "word (no spaces) OR an exact phrase in quotes. All elements "
+                        "are AND'd (every element must match). Use the author test: "
+                        "only include words the author would naturally write."
+                    ),
+                    "items": {
+                        "type": "string",
+                    },
+                },
+                "natural_language_query": {
+                    "type": "string",
+                    "description": (
+                        "The user's question restated in conversational tone. Used for "
+                        "semantic reranking. Do not include filter-like content "
+                        "(people, channels, dates) — those belong in filters. Pass an "
+                        "empty string when the query is purely structural (only "
+                        "filters, no semantic question)."
+                    ),
+                },
+            },
+            "required": [],
+        },
+    ),
+    ActionDefinition(
+        name="search_users",
+        description=(
+            "Search for Slack users by name, email, or profile attributes "
+            "(department, role, title).\n"
+            "\n"
+            'Query syntax: full names ("John Smith"), partial names ("John"), '
+            'emails ("john@company.com"), departments/roles ("engineering"), '
+            'combinations ("John engineering"), exclusions ("engineering '
+            '-intern"). Space-separated terms = AND.\n'
+            "\n"
+            "Use slack_read_user_profile for detailed info on a known user "
+            "ID. Use slack_search_public with from: filter to find messages "
+            "by a user.\n"
+            "---\n"
+            "Split your search query into 2 fields:\n"
+            "\n"
+            "1. `keywords` — Lexical terms that must appear in the user's "
+            "name or attributes. Each element should be a single word or "
+            '"quoted phrase". All AND\'d.\n'
+            "\n"
+            "2. `natural_language_query` — User's question in conversational "
+            "tone for semantic re-ranking. Preserve original phrasing; on "
+            "follow-ups incorporate prior context.\n"
+            "\n"
+            "Require `natural_language_query` + `keywords`.\n"
+            "\n"
+            "\n"
+            "Strategy: Use keywords for subject terms. If 0 results, broaden "
+            "by simplifying keywords.\n"
+            "---"
+        ),
+        access=ActionAccess.READ,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "Search query for finding users. Accepts names, email address, "
+                        'and other attributes in profile\n\nExamples:\n  - "John '
+                        'Smith" - exact name match\n  - john@company - find users '
+                        "with john@company in email\n  - engineering -intern - users "
+                        'with "engineering" but not "intern" in profile'
+                    ),
+                },
+                "cursor": {
+                    "type": "string",
+                    "description": (
+                        "The cursor returned by the API. Leave this blank for the "
+                        "first request, and use this to get the next page of results"
+                    ),
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": (
+                        "Number of results to return, up to a max of 20. Defaults to "
+                        "20."
+                    ),
+                },
+                "response_format": {
+                    "type": "string",
+                    "description": (
+                        "Level of detail (default: 'detailed'). Options: 'detailed', "
+                        "'concise'"
+                    ),
+                    "enum": ["detailed", "concise"],
+                },
+                "keywords": {
+                    "type": "array",
+                    "description": (
+                        "Array of lexical search terms. Each element MUST be a single "
+                        "word (no spaces) OR an exact phrase in quotes. All elements "
+                        "are AND'd (every element must match). Use the author test: "
+                        "only include words the author would naturally write."
+                    ),
+                    "items": {
+                        "type": "string",
+                    },
+                },
+                "natural_language_query": {
+                    "type": "string",
+                    "description": (
+                        "The user's question restated in conversational tone. Used for "
+                        "semantic reranking. Do not include filter-like content "
+                        "(people, channels, dates) — those belong in filters. Pass an "
+                        "empty string when the query is purely structural (only "
+                        "filters, no semantic question)."
+                    ),
+                },
+            },
+            "required": [],
+        },
+    ),
+    ActionDefinition(
         name="list_conversations",
         description="List Slack channels and direct-message conversations.",
         access=ActionAccess.READ,
