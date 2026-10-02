@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the Slack connector."""
+"""Tests for Slack read tools backed by the Web API."""
 
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
@@ -29,80 +29,168 @@ from .definition import PROVIDER, SLACK_CONNECTOR_REF, SLACK_USER_SCOPES
 from .executors import SlackApiError
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
+_FILE_REQUEST = "flwr.supercore.task_process.connector.slack.executors.requests.get"
 _OAUTH_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
 _IDENTITY_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.request"
+_CREDENTIALS: JSONObject = {"access_token": "xoxp-secret"}
 
 
-def test_slack_actions_are_registered_and_executable() -> None:
-    """Slack read actions should be registered and executable."""
-    assert len(ACTIONS) == 4
-    assert [action.name for action in ACTIONS] == [
-        "search_messages",
-        "list_conversations",
-        "get_conversation_history",
-        "get_conversation_replies",
+def _response(payload: object) -> Mock:
+    """Return a successful HTTP response carrying a JSON payload."""
+    response = Mock(status_code=200)
+    response.json.return_value = payload
+    return response
+
+
+def test_slack_read_tool_definitions() -> None:
+    """Expose only Slack actions with registered Web API executors."""
+    tools = registry.get_connector_tools(SLACK_CONNECTOR_REF)
+    assert [tool["name"] for tool in tools] == [
+        "slack_search_public",
+        "slack_search_public_and_private",
+        "slack_list_conversations",
+        "slack_get_conversation_history",
+        "slack_get_conversation_replies",
     ]
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
-    assert len(registry.get_connector_tools(SLACK_CONNECTOR_REF)) == len(ACTIONS)
-    response = Mock(status_code=200)
-    response.json.return_value = {"ok": True, "messages": {"matches": []}}
+
+
+def test_slack_search_public_uses_web_api() -> None:
+    """Public search should use the public channel filter."""
+    response = _response({"ok": True, "results": {"messages": []}})
     with patch(_HTTP_REQUEST, return_value=response) as request:
         result = registry.invoke_connector(
-            "slack_search_messages",
-            {"query": "release", "cursor": "*", "page": 1},
+            "slack_search_public",
+            {"query": "release", "content_types": "messages", "limit": 5},
             Mock(),
-            {"access_token": "xoxp-secret"},
+            _CREDENTIALS,
             {},
         )
     assert result == response.json.return_value
-    assert request.call_args.args == ("GET", "https://slack.com/api/search.messages")
-    assert request.call_args.kwargs["params"] == {
-        "query": "release",
-        "cursor": "*",
-        "page": "1",
-    }
-
-
-def test_slack_api_errors_include_code_and_message() -> None:
-    """Slack's documented error fields should remain readable to callers."""
-    response = Mock(status_code=200)
-    response.json.return_value = {
-        "ok": False,
-        "error": "invalid_cursor",
-        "response_metadata": {"messages": ["Invalid cursor"]},
-    }
-    with (
-        patch(_HTTP_REQUEST, return_value=response),
-        pytest.raises(SlackApiError) as error,
-    ):
-        registry.invoke_connector(
-            "slack_search_messages",
-            {"query": "release"},
-            Mock(),
-            {"access_token": "xoxp-secret"},
-            {},
-        )
-    assert str(error.value) == (
-        "Slack API request failed: invalid_cursor: Invalid cursor."
+    assert request.call_args.args == (
+        "POST",
+        "https://slack.com/api/assistant.search.context",
     )
+    assert request.call_args.kwargs["json"] == {
+        "query": "release",
+        "content_types": ["messages"],
+        "channel_types": ["public_channel"],
+        "limit": 5,
+        "include_context_messages": True,
+    }
 
 
-def test_slack_http_rate_limit_preserves_status() -> None:
-    """Slack HTTP rate-limit responses should retain their code and status."""
-    response = Mock(status_code=429)
-    response.json.return_value = {"ok": False, "error": "ratelimited"}
-    with (
-        patch(_HTTP_REQUEST, return_value=response),
-        pytest.raises(SlackApiError) as error,
-    ):
+def test_slack_private_search_maps_mcp_options() -> None:
+    """Translate the captured string options to Web API arrays and timestamps."""
+    response = _response({"ok": True, "results": {"messages": []}})
+    with patch(_HTTP_REQUEST, return_value=response) as request:
         registry.invoke_connector(
-            "slack_search_messages",
-            {"query": "release"},
+            "slack_search_public_and_private",
+            {
+                "query": "launch",
+                "channel_types": "private_channel,im",
+                "content_types": "messages,files",
+                "after": "1700000000",
+                "include_context": False,
+            },
             Mock(),
-            {"access_token": "xoxp-secret"},
+            _CREDENTIALS,
             {},
         )
-    assert str(error.value) == "Slack API request failed: ratelimited (429)."
+    assert request.call_args.kwargs["json"] == {
+        "query": "launch",
+        "content_types": ["messages", "files"],
+        "channel_types": ["private_channel", "im"],
+        "after": 1700000000,
+        "include_context_messages": False,
+    }
+
+
+def test_slack_search_accepts_keywords_and_filters_without_query() -> None:
+    """Pass lexical terms and filters to Real-time Search."""
+    with patch(
+        _HTTP_REQUEST, return_value=_response({"ok": True, "results": {}})
+    ) as request:
+        registry.invoke_connector(
+            "slack_search_public",
+            {
+                "keywords": ["project", '"release plan"'],
+                "filters": "in:<#C1>",
+                "natural_language_query": "Where is the release plan?",
+            },
+            Mock(),
+            _CREDENTIALS,
+            {},
+        )
+    body = request.call_args.kwargs["json"]
+    assert body["query"] == "Where is the release plan? in:<#C1>"
+    assert body["term_clauses"] == ["project", '"release plan"']
+
+
+@pytest.mark.parametrize(
+    "code",
+    ("feature_not_enabled", "assistant_search_context_disabled", "missing_scope"),
+)
+def test_slack_search_fails_when_real_time_search_is_unavailable(code: str) -> None:
+    """Return Slack's search error without calling a different search API."""
+    with (
+        patch(
+            _HTTP_REQUEST,
+            return_value=_response({"ok": False, "error": code}),
+        ) as request,
+        pytest.raises(SlackApiError, match=code) as error,
+    ):
+        registry.invoke_connector(
+            "slack_search_public", {"query": "release"}, Mock(), _CREDENTIALS, {}
+        )
+    request.assert_called_once()
+    assert request.call_args.args == (
+        "POST",
+        "https://slack.com/api/assistant.search.context",
+    )
+    assert "xoxp-secret" not in str(error.value)
+
+
+def test_slack_oauth_flow_uses_web_api_user_token() -> None:
+    """Request the Web API read scopes through Slack's user-token OAuth flow."""
+    redirect_uri = "https://example.com/callback"
+    flow = OAuthFlow(
+        PROVIDER, client_id="client", client_secret="secret", redirect_uri=redirect_uri
+    )
+    url = flow.build_authorization_url(
+        redirect_uri=redirect_uri, state="state", pkce_challenge="challenge"
+    )
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query)
+    assert parsed.path == "/oauth/v2/authorize"
+    assert query["user_scope"] == [",".join(SLACK_USER_SCOPES)]
+    assert "search:read" not in SLACK_USER_SCOPES
+    assert "resource" not in query
+    assert "code_challenge" not in query
+
+    response = _response(
+        {
+            "ok": True,
+            "authed_user": {
+                "id": "U1",
+                "access_token": "xoxp-secret",
+                "token_type": "user",
+            },
+        }
+    )
+    with (
+        patch(_OAUTH_REQUEST, return_value=response) as post,
+        patch(
+            _IDENTITY_REQUEST,
+            return_value=_response({"ok": True, "team": "Flower", "user": "alice"}),
+        ),
+    ):
+        credentials, config = flow.exchange_code(
+            code="code", redirect_uri=redirect_uri, pkce_verifier="verifier"
+        )
+    assert credentials == {"access_token": "xoxp-secret", "token_type": "user"}
+    assert config == {"display_name": "Slack · Flower / alice"}
+    assert post.call_args.args == ("https://slack.com/api/oauth.v2.access",)
 
 
 def test_slack_history_actions_forward_cursor() -> None:
@@ -155,61 +243,3 @@ def test_slack_list_conversations_limit() -> None:
                 {},
             )
         assert request.call_args.kwargs["params"].get("limit") == expected_limit
-
-
-def test_slack_oauth_flow() -> None:
-    """Slack OAuth should request read scopes and extract user credentials."""
-    redirect_uri = "https://example.com/callback"
-    flow = OAuthFlow(
-        PROVIDER, client_id="client", client_secret="secret", redirect_uri=redirect_uri
-    )
-    url = flow.build_authorization_url(
-        redirect_uri=redirect_uri, state="state", pkce_challenge="ignored"
-    )
-    query = parse_qs(urlparse(url).query)
-    assert query["response_type"] == ["code"]
-    assert query["user_scope"] == [",".join(SLACK_USER_SCOPES)]
-    response = Mock(status_code=200)
-    response.json.return_value = {
-        "ok": True,
-        "authed_user": {
-            "access_token": "token",
-            "scope": ", ".join(SLACK_USER_SCOPES),
-        },
-    }
-    with (
-        patch(_OAUTH_REQUEST, return_value=response) as post,
-        patch(
-            _IDENTITY_REQUEST,
-            return_value=Mock(
-                status_code=200,
-                **{
-                    "json.return_value": {"ok": True, "team": "Flower", "user": "alice"}
-                },
-            ),
-        ) as identity,
-    ):
-        credentials, config = flow.exchange_code(
-            code="code", redirect_uri=redirect_uri, pkce_verifier="ignored"
-        )
-    assert credentials == {"access_token": "token"}
-    assert config == {"display_name": "Slack · Flower / alice"}
-    assert post.call_args.kwargs["data"]["grant_type"] == "authorization_code"
-    assert identity.call_args.args == ("POST", "https://slack.com/api/auth.test")
-
-    response.json.return_value["authed_user"]["scope"] = "search:read"
-    with patch(_OAUTH_REQUEST, return_value=response), pytest.raises(RuntimeError):
-        flow.exchange_code(
-            code="code", redirect_uri=redirect_uri, pkce_verifier="ignored"
-        )
-
-    response.json.return_value["authed_user"][
-        "scope"
-    ] = f"{','.join(SLACK_USER_SCOPES)},chat:write"
-    with (
-        patch(_OAUTH_REQUEST, return_value=response),
-        patch(_IDENTITY_REQUEST, return_value=Mock(status_code=500)),
-    ):
-        flow.exchange_code(
-            code="code", redirect_uri=redirect_uri, pkce_verifier="ignored"
-        )
