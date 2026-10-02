@@ -26,6 +26,7 @@ SLACK_USER_SCOPES = (
     "search:read.mpim",
     "search:read.im",
     "search:read.files",
+    "files:read",
     "channels:history",
     "groups:history",
     "mpim:history",
