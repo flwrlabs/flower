@@ -484,6 +484,7 @@ def _to_path_files(files: dict[str, bytes], tmp_path: Path) -> dict[str, Path]:
     [
         # Included extensions pass through
         ({"app.py": b""}, {"app.py"}),
+        ({"script.m": b""}, {"script.m"}),
         ({"pyproject.toml": b""}, {"pyproject.toml"}),
         ({"README.md": b""}, {"README.md"}),
         ({"config.yaml": b""}, {"config.yaml"}),
