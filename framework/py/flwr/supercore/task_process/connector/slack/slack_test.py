@@ -15,7 +15,7 @@
 """Tests for Slack read tools backed by the Web API."""
 
 from typing import cast
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -53,7 +53,9 @@ def test_slack_read_tool_definitions() -> None:
         "slack_search_users",
         "slack_read_channel",
         "slack_read_thread",
+        "slack_read_canvas",
         "slack_list_channel_members",
+        "slack_read_file",
         "slack_list_user_channels",
     ]
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
@@ -321,6 +323,59 @@ def test_slack_list_members_count_only() -> None:
         "channel": "C1",
         "include_num_members": "true",
     }
+
+
+def test_slack_read_canvas_uses_canvas_content_and_sections() -> None:
+    """Read markdown and section IDs through canvas API methods."""
+    responses = [
+        _response({"ok": True, "content": "# Plan"}),
+        _response({"ok": True, "sections": [{"id": "section-1"}]}),
+    ]
+    with patch(_HTTP_REQUEST, side_effect=responses) as request:
+        result = registry.invoke_connector(
+            "slack_read_canvas", {"canvas_id": "F1"}, Mock(), _CREDENTIALS, {}
+        )
+    assert result == {
+        "ok": True,
+        "canvas_id": "F1",
+        "content": "# Plan",
+        "sections": [{"id": "section-1"}],
+    }
+    assert [call.args[1].split("/")[-1] for call in request.call_args_list] == [
+        "canvases.getContent",
+        "canvases.sections.lookup",
+    ]
+
+
+def test_slack_read_file_downloads_text() -> None:
+    """Read file metadata and content with the connected user's token."""
+    info = _response(
+        {
+            "ok": True,
+            "file": {
+                "id": "F1",
+                "mimetype": "text/plain",
+                "url_private_download": "https://files.slack.com/files-pri/F1",
+            },
+        }
+    )
+    download = MagicMock(status_code=200)
+    download.__enter__.return_value = download
+    download.iter_content.return_value = [b"hello"]
+    with (
+        patch(_HTTP_REQUEST, return_value=info),
+        patch(_FILE_REQUEST, return_value=download) as get,
+    ):
+        result = cast(
+            JSONObject,
+            registry.invoke_connector(
+                "slack_read_file", {"file_id": "F1"}, Mock(), _CREDENTIALS, {}
+            ),
+        )
+    assert result["content"] == "hello"
+    assert result["encoding"] == "utf-8"
+    assert result["file"] == {"id": "F1", "mimetype": "text/plain"}
+    assert get.call_args.kwargs["headers"] == {"Authorization": "Bearer xoxp-secret"}
 
 
 def test_slack_list_user_channels_uses_web_api() -> None:

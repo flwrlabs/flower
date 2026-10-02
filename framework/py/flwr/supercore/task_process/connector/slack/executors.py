@@ -16,8 +16,10 @@
 
 from __future__ import annotations
 
+import base64
 from datetime import UTC, datetime
 from typing import cast
+from urllib.parse import urlsplit
 
 import requests
 
@@ -653,6 +655,79 @@ def read_thread(
     return _history("conversations.replies", arguments, context)
 
 
+def _download_file(
+    file_id: str, credentials: JSONObject
+) -> tuple[JSONObject, str, str, str]:
+    """Read at most 10 MiB from a Slack private file URL."""
+    info = _call_slack_api("files.info", credentials, params={"file": file_id})
+    file = object_field(info, "file", error=SlackApiError)
+    url = file.get("url_private_download") or file.get("url_private")
+    if not isinstance(url, str):
+        raise SlackApiError("file_content_unavailable")
+    parsed = urlsplit(url)
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or not (
+            parsed.hostname == "slack.com" or parsed.hostname.endswith(".slack.com")
+        )
+    ):
+        raise SlackApiError("invalid_file_url")
+    token = credentials.get("access_token")
+    if not isinstance(token, str) or not token:
+        raise SlackApiError("invalid_credentials")
+    try:
+        with requests.get(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=30.0,
+            stream=True,
+        ) as response:
+            if response.status_code >= 400:
+                raise SlackApiError("download_failed", response.status_code)
+            chunks: list[bytes] = []
+            size = 0
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                size += len(chunk)
+                if size > _FILE_MAX_BYTES:
+                    raise SlackApiError("file_too_large")
+                chunks.append(chunk)
+            content = b"".join(chunks)
+            mime = file.get("mimetype")
+            if not isinstance(mime, str):
+                mime = response.headers.get("Content-Type", "application/octet-stream")
+    except requests.RequestException:
+        raise SlackApiError("download_failed") from None
+    if mime.startswith("text/") or mime in (
+        "application/json",
+        "application/markdown",
+        "application/vnd.slack-docs",
+    ):
+        return file, content.decode("utf-8", errors="replace"), mime, "utf-8"
+    return file, base64.b64encode(content).decode("ascii"), mime, "base64"
+
+
+def read_canvas(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """Read canvas markdown and section identifiers."""
+    canvas_id = require_string(arguments.get("canvas_id"), "Slack", "canvas_id")
+    content = _call_slack_api(
+        "canvases.getContent", context.credentials, body={"canvas_id": canvas_id}
+    )
+    sections = _call_slack_api(
+        "canvases.sections.lookup",
+        context.credentials,
+        body={"canvas_id": canvas_id, "criteria": {}},
+    )
+    return {
+        "ok": True,
+        "canvas_id": canvas_id,
+        "content": require_string(content.get("content"), "Slack", "content"),
+        "sections": sections.get("sections", []),
+    }
+
+
 def list_channel_members(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
@@ -725,6 +800,19 @@ def list_channel_members(
             members.append(user)
     result["members"] = members
     return result
+
+
+def read_file(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    """Read a Slack file as text or base64 with its metadata."""
+    file_id = require_string(arguments.get("file_id"), "Slack", "file_id")
+    file, content, mime, encoding = _download_file(file_id, context.credentials)
+    return {
+        "ok": True,
+        "file": _safe_file_metadata(file),
+        "content": content,
+        "mimeType": mime,
+        "encoding": encoding,
+    }
 
 
 def list_user_channels(
@@ -801,6 +889,15 @@ def list_user_channels(
     }
 
 
+def _safe_file_metadata(file: JSONObject) -> JSONObject:
+    """Remove private download links from model-facing file metadata."""
+    return {
+        key: value
+        for key, value in file.items()
+        if key not in ("url_private", "url_private_download")
+    }
+
+
 EXECUTORS: dict[str, ConnectorExecutor] = {
     "search_public": search_public,
     "search_public_and_private": search_public_and_private,
@@ -808,7 +905,9 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
     "search_users": search_users,
     "read_channel": read_channel,
     "read_thread": read_thread,
+    "read_canvas": read_canvas,
     "list_channel_members": list_channel_members,
+    "read_file": read_file,
     "list_user_channels": list_user_channels,
 }
 
