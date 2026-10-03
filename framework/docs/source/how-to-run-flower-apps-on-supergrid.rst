@@ -56,13 +56,13 @@ Open the ``Logs`` tab to inspect the app logs.
     :align: center
     :target: ./_static/run_logs_dashboard.png
 
-If you return to the federation page, the run appears in the list of runs for that
-federation.
+If you visit the `All runs page <https://flower.ai/runs>`__, the run appears in the list
+of your runs.
 
-.. image:: ./_static/federation_dashboard_shows_run.png
-    :alt: Federation details page showing the run that was launched
+.. image:: ./_static/all_runs_page.png
+    :alt: All runs page showing the run that was launched
     :align: center
-    :target: ./_static/federation_dashboard_shows_run.png
+    :target: ./_static/all_runs_page.png
 
 ***********************************
  Run Flower apps from your machine
@@ -102,12 +102,12 @@ authenticate with your SuperGrid account. Finally, run the app with ``flwr run``
     $ flwr run . --federation @<username>/<federation-name>
     🎊 Successfully started run 1859953118041441032 in federation @<username>/<federation-name>
 
-The run appears in the same SuperGrid federation dashboard.
+The run appears on the `All runs page <https://flower.ai/runs>`__.
 
-.. image:: ./_static/second_run_started_dashboard.png
-    :alt: SuperGrid dashboard showing the newly started run in the federation
+.. image:: ./_static/second_run_all_runs_page.png
+    :alt: All runs page showing the newly started run
     :align: center
-    :target: ./_static/second_run_started_dashboard.png
+    :target: ./_static/second_run_all_runs_page.png
 
 Customize the run configuration
 ===============================
