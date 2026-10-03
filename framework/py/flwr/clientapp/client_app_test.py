@@ -23,7 +23,11 @@ import pytest
 
 from flwr.app.message import Context, Message
 
-from .client_app import ClientApp
+from .client_app import (
+    ClientApp,
+    LoadClientAppError,
+    format_load_client_app_error_reason,
+)
 from .typing import ClientAppCallable
 
 
@@ -259,3 +263,17 @@ def test_register_repeated_func(category: str, action: str | None) -> None:
         @decorator(*args)  # type: ignore
         def func2(_msg: Message, _cxt: Context) -> Message:
             raise AssertionError("This function should not be called")
+
+
+def test_format_load_client_app_error_reason() -> None:
+    """Test formatting of LoadClientAppError reason."""
+    err_with_msg = LoadClientAppError("ModuleNotFoundError: foo")
+    assert format_load_client_app_error_reason(err_with_msg) == (
+        "An exception was raised when attempting to load `ClientApp`: "
+        "ModuleNotFoundError: foo"
+    )
+
+    err_empty = LoadClientAppError("")
+    assert format_load_client_app_error_reason(err_empty) == (
+        "An exception was raised when attempting to load `ClientApp`"
+    )
