@@ -184,6 +184,12 @@ def push_messages(
     state: LinkState,
 ) -> PushMessagesResponse:
     """Push Messages handler."""
+    # An empty messages_list is a legitimate no-op (see Fleet.PushMessages in
+    # fleet_servicer.py, which logs "No replies to push" for this case), so return
+    # an empty response instead of indexing into an empty list.
+    if not request.messages_list:
+        return PushMessagesResponse()
+
     # Convert Message from proto
     msg = message_from_proto(message_proto=request.messages_list[0])
     run_id = msg.metadata.run_id
