@@ -80,7 +80,6 @@ testpaths = [
 [tool.mypy]
 ignore_missing_imports = true
 strict = false
-plugins = "numpy.typing.mypy_plugin"
 
 [tool.pylint."MESSAGES CONTROL"]
 disable = "bad-continuation,duplicate-code,too-few-public-methods,useless-import-alias"
