@@ -111,7 +111,7 @@ jobs:
           cd framework
           uv run --no-sync ./dev/check-protos.sh
       - name: Check if migrations are up to date
-        if: ${{ matrix.task == 'quality' && matrix.python == '3.11' && needs.changes.outputs.framework == 'true' }}
+        if: ${{ matrix.task == 'quality' && matrix.python == '3.12' && needs.changes.outputs.framework == 'true' }}
         run: |
           cd framework
           uv run --no-sync ./dev/check-migrations.sh
@@ -186,13 +186,13 @@ jobs:
       - name: Bootstrap
         uses: ./.github/actions/bootstrap
         with:
-          python-version: '3.11'
+          python-version: '3.12'
       - name: Prepare framework
         run: ./framework/dev/prepare-framework.sh
       - name: Install dependencies
         run: |
           cd framework
-          uv sync --python=3.11 --locked --all-extras --all-groups
+          uv sync --python=3.12 --locked --all-extras --all-groups
       - name: Download coverage data
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
