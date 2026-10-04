@@ -238,6 +238,17 @@ for that, e.g.:
   iid_partitioner_for_cifar = IidPartitioner(num_partitions=10)
   iid_partitioner_for_cifar.dataset = cifar_dataset
 
+``IidPartitioner`` preserves contiguous dataset order by default for backwards
+compatibility. If your local dataset is sorted by label or another target column,
+enable shuffling before sharding:
+
+.. code-block:: python
+
+  from flwr_datasets.partitioner import IidPartitioner
+
+  iid_partitioner = IidPartitioner(num_partitions=10, shuffle=True, seed=42)
+  iid_partitioner.dataset = sorted_dataset
+
 
 More Resources
 --------------
