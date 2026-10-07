@@ -48,7 +48,8 @@ def test_fleet_method(endpoint: str) -> None:
     method_name = endpoint.title().replace("-", "")
     request = Mock()
     response = Mock()
-    client = FleetHttpClient("http://fleet.example")
+    with patch("flwr.supercore.protobuf.client.httpx.Client"):
+        client = FleetHttpClient("http://fleet.example")
 
     with patch.object(ProtobufClient, "_unary_unary", return_value=response) as call:
         result = getattr(client, method_name)(request)
