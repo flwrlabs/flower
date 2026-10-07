@@ -20,8 +20,12 @@ from unittest.mock import Mock
 import httpx
 import pytest
 
-from flwr.common.constant import PUBLIC_KEY_HEADER, SIGNATURE_HEADER, TIMESTAMP_HEADER
+from flwr.common.constant import TIMESTAMP_HEADER
 from flwr.proto.fleet_pb2 import ActivateNodeRequest  # pylint: disable=E0611
+from flwr.supercore.constant import (
+    FLEET_HTTP_PUBLIC_KEY_HEADER,
+    FLEET_HTTP_SIGNATURE_HEADER,
+)
 from flwr.supercore.primitives.asymmetric import (
     generate_key_pairs,
     public_key_to_bytes,
@@ -49,11 +53,13 @@ def test_signs_fleet_request() -> None:
     )
 
     headers = context.request.headers
-    assert b64decode(headers[PUBLIC_KEY_HEADER]) == public_key_to_bytes(public_key)
+    assert b64decode(headers[FLEET_HTTP_PUBLIC_KEY_HEADER]) == public_key_to_bytes(
+        public_key
+    )
     assert verify_signature(
         public_key,
         headers[TIMESTAMP_HEADER].encode("ascii"),
-        b64decode(headers[SIGNATURE_HEADER]),
+        b64decode(headers[FLEET_HTTP_SIGNATURE_HEADER]),
     )
     call_next.assert_called_once_with(context)
 
@@ -67,11 +73,11 @@ def test_rejects_duplicate_auth_headers() -> None:
         request=httpx.Request(
             "POST",
             "http://fleet.example/v1/fleet/activate-node",
-            headers={SIGNATURE_HEADER: "existing"},
+            headers={FLEET_HTTP_SIGNATURE_HEADER: "existing"},
         ),
     )
 
-    with pytest.raises(RuntimeError, match=SIGNATURE_HEADER):
+    with pytest.raises(RuntimeError, match=FLEET_HTTP_SIGNATURE_HEADER):
         NodeAuthHttpInterceptor(private_key, public_key).intercept(
             context, Mock(return_value=httpx.Response(200))
         )

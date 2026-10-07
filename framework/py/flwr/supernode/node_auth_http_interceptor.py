@@ -19,7 +19,11 @@ from base64 import b64encode
 import httpx
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from flwr.common.constant import PUBLIC_KEY_HEADER, SIGNATURE_HEADER, TIMESTAMP_HEADER
+from flwr.common.constant import TIMESTAMP_HEADER
+from flwr.supercore.constant import (
+    FLEET_HTTP_PUBLIC_KEY_HEADER,
+    FLEET_HTTP_SIGNATURE_HEADER,
+)
 from flwr.supercore.date import now
 from flwr.supercore.interceptors.http.utils import add_headers
 from flwr.supercore.primitives.asymmetric import public_key_to_bytes, sign_message
@@ -48,9 +52,11 @@ class NodeAuthHttpInterceptor:
         add_headers(
             context.request,
             {
-                PUBLIC_KEY_HEADER: b64encode(self._public_key_bytes).decode("ascii"),
+                FLEET_HTTP_PUBLIC_KEY_HEADER: b64encode(self._public_key_bytes).decode(
+                    "ascii"
+                ),
                 TIMESTAMP_HEADER: timestamp,
-                SIGNATURE_HEADER: b64encode(signature).decode("ascii"),
+                FLEET_HTTP_SIGNATURE_HEADER: b64encode(signature).decode("ascii"),
             },
         )
         return call_next(context)
