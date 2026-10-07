@@ -24,7 +24,10 @@ NOTION_CONNECTOR_REF = "notion"
 PROVIDER = ProviderDefinition(
     ref=NOTION_CONNECTOR_REF,
     display_name="Notion",
-    description="Search and read Notion content and workspace users.",
+    description=(
+        "Search shared Notion page and data-source titles; retrieve page "
+        "properties, database metadata, blocks, and workspace user information."
+    ),
     actions=ACTIONS,
     oauth=OAuth2Definition(
         authorization_url="https://api.notion.com/v1/oauth/authorize",
