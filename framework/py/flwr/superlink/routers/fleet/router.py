@@ -52,13 +52,13 @@ from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_DEPENDENCY
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.servicer.fleet import fleet_handlers
 
-from .node_auth import authenticate_fleet_node
+from .node_auth import authenticate_node
 
 router = APIRouter(
     prefix="/v1/fleet",
     tags=["Fleet"],
     route_class=ProtobufRoute,
-    dependencies=[Depends(authenticate_fleet_node)],
+    dependencies=[Depends(authenticate_node)],
 )
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 

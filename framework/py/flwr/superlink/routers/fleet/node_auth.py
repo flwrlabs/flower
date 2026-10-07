@@ -38,7 +38,7 @@ from flwr.supercore.primitives.asymmetric import bytes_to_public_key, verify_sig
 from flwr.superlink.dependencies.linkstate import get_linkstate
 
 
-def authenticate_fleet_node(
+def authenticate_node(
     request: Request,
     state: Annotated[LinkState, Depends(get_linkstate)],
 ) -> None:
