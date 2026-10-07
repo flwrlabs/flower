@@ -38,6 +38,7 @@ def _run_superexec_one_launch(
     monkeypatch: pytest.MonkeyPatch,
     launch_result: LaunchResult,
     task_poll_interval: str | None = None,
+    launch_elapsed: float = 0.0,
 ) -> tuple[Mock, Mock, Mock, Mock, Mock]:
     """Run one SuperExec launch loop and stop at the next capacity check."""
     if task_poll_interval is None:
@@ -70,6 +71,11 @@ def _run_superexec_one_launch(
     )
     monkeypatch.setattr(
         run_superexec_module, "AutoExecPlugin", Mock(return_value=plugin)
+    )
+    monkeypatch.setattr(
+        run_superexec_module,
+        "monotonic",
+        Mock(side_effect=[0.0, 0.0, launch_elapsed]),
     )
     sleep_mock = Mock()
     monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep_mock)
@@ -317,6 +323,20 @@ def test_run_superexec_logs_non_accepted_launch_result(
     assert expected_message in log.call_args.args[1]
     assert log.call_args.args[2] == 123
     assert sum(call.args[0] for call in sleep_mock.call_args_list) == 30.0
+
+
+@pytest.mark.parametrize(
+    ("launch_elapsed", "expected_sleep"), [(25.0, 5.0), (35.0, 0.0)]
+)
+def test_run_superexec_waits_only_for_remaining_claim_lease(
+    monkeypatch: pytest.MonkeyPatch, launch_elapsed: float, expected_sleep: float
+) -> None:
+    """A slow failed launch does not restart the initial claim lease wait."""
+    _, _, _, _, sleep_mock = _run_superexec_one_launch(
+        monkeypatch, LaunchResult.failed("launch failed"), launch_elapsed=launch_elapsed
+    )
+
+    assert sum(call.args[0] for call in sleep_mock.call_args_list) == expected_sleep
 
 
 def test_run_superexec_uses_configured_task_poll_interval(

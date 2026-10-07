@@ -135,9 +135,13 @@ def _handle_launch_result(result: LaunchResult, task: Task) -> None:
     )
 
 
-def _wait_for_claim_expiry(executor: Executor) -> None:
-    """Avoid another acquisition until the current claim has expired."""
+def _wait_for_claim_expiry(
+    executor: Executor, claim_response_at: float | None = None
+) -> None:
+    """Wait through the claim lease using the response time when known."""
     remaining = float(_UNCERTAIN_CLAIM_BACKOFF_SECONDS)
+    if claim_response_at is not None:
+        remaining = max(0.0, remaining - (monotonic() - claim_response_at))
     while remaining > 0:
         interval = min(_TASK_WAIT_TIMEOUT_MS / 1_000, remaining)
         time.sleep(interval)
@@ -326,15 +330,17 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                     "Acquisition outcome unknown (%s); waiting for claim expiry",
                     type(exc).__name__,
                 )
+                # Without a response, the server may have claimed just before the error.
                 _wait_for_claim_expiry(executor)
                 continue
             if combined_res.HasField("task") and combined_res.token:
+                claim_response_at = monotonic()
                 launch_result = plugin.launch_task(
                     token=combined_res.token, task=combined_res.task
                 )
                 _handle_launch_result(launch_result, combined_res.task)
                 if launch_result.status != LaunchResultStatus.ACCEPTED:
-                    _wait_for_claim_expiry(executor)
+                    _wait_for_claim_expiry(executor, claim_response_at)
             else:
                 if has_capacity:
                     _backoff_after_empty_poll(poll_started_at, task_poll_interval)
