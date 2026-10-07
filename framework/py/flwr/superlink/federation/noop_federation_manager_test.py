@@ -302,6 +302,16 @@ def test_simulation_runtime_flag_is_reflected() -> None:
     assert details.config == DEFAULT_SIMULATION_CONFIG
 
 
+def test_set_icon_key_is_unsupported() -> None:
+    """Test that setting an icon requires federation management support."""
+    manager = NoOpFederationManager()
+
+    with pytest.raises(FlowerError) as error:
+        manager.set_icon_key(NOOP_FLWR_AID, NOOP_FEDERATION_ID, "rocket")
+
+    assert error.value.code == ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT
+
+
 def test_get_simulation_config_returns_defaults_when_unset() -> None:
     """Test get_simulation_config returns shared defaults when unset."""
     manager = NoOpFederationManager(simulation=True)

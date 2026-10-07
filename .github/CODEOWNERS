@@ -32,6 +32,9 @@ README.md @jafermarq @tanertopal @danieljanes
 # Translations
 /framework/docs/locales @charlesbvll @panh99 @tanertopal @danieljanes
 
+# Docs UI configuration
+/dev/docs-ui-config.yml @panh99 @tanertopal @danieljanes
+
 # GitHub Actions and Workflows
 /.github/actions @tanertopal @danieljanes
 /.github/workflows @tanertopal @danieljanes

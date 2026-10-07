@@ -568,11 +568,43 @@ class StateTest(CoreStateTest):
         limited_runs = state.get_run_info(
             order_by="pending_at", ascending=True, limit=2
         )
+        second_page = state.get_run_info(
+            order_by="pending_at", ascending=False, limit=2, skip=1
+        )
 
         # Assert
         self.assertEqual([run.run_id for run in ascending_runs], run_ids)
         self.assertEqual([run.run_id for run in descending_runs], run_ids[::-1])
         self.assertEqual([run.run_id for run in limited_runs], run_ids[:2])
+        self.assertEqual([run.run_id for run in second_page], run_ids[1::-1])
+
+    def test_get_run_info_paging_with_equal_timestamps(self) -> None:
+        """Break equal timestamp ties consistently across storage backends."""
+        state = self.state_factory()
+        module = (
+            "flwr.server.superlink.linkstate.in_memory_linkstate"
+            if isinstance(state, InMemoryLinkState)
+            else "flwr.server.superlink.linkstate.sql_linkstate"
+        )
+        run_ids = [1, 1 << 63, (1 << 63) - 1]
+        generated_ids = [
+            value for pair in zip(run_ids, [11, 12, 13], strict=True) for value in pair
+        ]
+        fixed_time = datetime(2026, 1, 1, tzinfo=UTC)
+        with (
+            patch(f"{module}.generate_rand_int_from_bytes", side_effect=generated_ids),
+            patch(f"{module}.now", return_value=fixed_time),
+        ):
+            for _ in run_ids:
+                create_dummy_run(state)
+
+        first_page = state.get_run_info(order_by="pending_at", ascending=False, limit=2)
+        second_page = state.get_run_info(
+            order_by="pending_at", ascending=False, limit=2, skip=2
+        )
+
+        self.assertEqual([run.run_id for run in first_page], [run_ids[2], run_ids[0]])
+        self.assertEqual([run.run_id for run in second_page], [run_ids[1]])
 
     @parameterized.expand([(1,), (2,), (9999,)])  # type: ignore
     def test_get_run_info_limit_without_order_by(self, limit: int) -> None:

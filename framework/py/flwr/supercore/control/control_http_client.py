@@ -79,6 +79,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SetFederationIconRequest,
+    SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
     StartAutomationRequest,
@@ -380,6 +382,17 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/ShowFederation",
             request=request,
             response_type=ShowFederationResponse,
+        )
+
+    def SetFederationIcon(
+        self, request: SetFederationIconRequest
+    ) -> SetFederationIconResponse:
+        """Set or clear a federation icon."""
+        return self._unary_unary(
+            path="/v1/control/set-federation-icon",
+            rpc_method="/flwr.proto.Control/SetFederationIcon",
+            request=request,
+            response_type=SetFederationIconResponse,
         )
 
     def CreateFederation(

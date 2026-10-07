@@ -49,6 +49,7 @@ from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.task_notification import notify_task_available
+from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import FederationManager
 
 from .utils import (
@@ -786,6 +787,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
+        skip: int = 0,
     ) -> Sequence[Run]:
         """Retrieve information about runs based on the specified filters."""
         with self.lock_task_store:
@@ -837,12 +839,11 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             if order_by is not None:
                 runs = sorted(
                     runs,
-                    key=lambda run: run.pending_at,
+                    key=lambda run: (run.pending_at, uint64_to_int64(run.run_id)),
                     reverse=not ascending,
                 )
 
-            if limit is not None:
-                runs = runs[:limit]
+            runs = runs[skip : skip + limit if limit is not None else None]
 
             return runs
 

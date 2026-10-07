@@ -704,6 +704,7 @@ def test_event_log_middleware_writes_before_and_after_events(
     assert before_kwargs["account_info"].account_name == NOOP_ACCOUNT_NAME
     assert before_kwargs["method_name"] == "/v1/control/list-runs"
     after_kwargs = event_log_plugin.compose_log_after_event.call_args.kwargs
+    assert after_kwargs["request"] == ListRunsRequest()
     assert after_kwargs["response"] == expected_response
     assert event_log_plugin.write_log.call_count == 2
 
