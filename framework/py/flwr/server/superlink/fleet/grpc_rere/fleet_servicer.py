@@ -46,9 +46,9 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
-from flwr.server.superlink.fleet.message_handler import fleet_handlers
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.superlink.servicer.fleet import fleet_handlers
 
 
 class FleetServicer(fleet_pb2_grpc.FleetServicer):
