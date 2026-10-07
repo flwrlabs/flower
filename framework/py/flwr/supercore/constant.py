@@ -153,7 +153,7 @@ MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS = 3600
 # Runtime auth constants
 TASK_TOKEN_HEADER = "flwr-task-token"
 
-# Fleet HTTP auth constants
+# Fleet HTTP node auth constants
 FLEET_HTTP_PUBLIC_KEY_HEADER = "flwr-public-key"
 FLEET_HTTP_SIGNATURE_HEADER = "flwr-signature"
 
