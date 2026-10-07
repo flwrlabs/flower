@@ -22,8 +22,6 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request, status
 
 from flwr.common.constant import (
-    PUBLIC_KEY_HEADER,
-    SIGNATURE_HEADER,
     SYSTEM_TIME_TOLERANCE,
     TIMESTAMP_HEADER,
     TIMESTAMP_TOLERANCE,
@@ -33,6 +31,10 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     RegisterNodeFleetRequest,
 )
 from flwr.server.superlink.linkstate import LinkState
+from flwr.supercore.constant import (
+    FLEET_HTTP_PUBLIC_KEY_HEADER,
+    FLEET_HTTP_SIGNATURE_HEADER,
+)
 from flwr.supercore.date import now
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, verify_signature
 from flwr.superlink.dependencies.linkstate import get_linkstate
@@ -44,9 +46,12 @@ def authenticate_node(
 ) -> None:
     """Validate the signed timestamp and claimed node identity."""
     try:
-        # gRPC binary metadata is carried as base64 in HTTP header values.
-        public_key = b64decode(request.headers[PUBLIC_KEY_HEADER], validate=True)
-        signature = b64decode(request.headers[SIGNATURE_HEADER], validate=True)
+        public_key = b64decode(
+            request.headers[FLEET_HTTP_PUBLIC_KEY_HEADER], validate=True
+        )
+        signature = b64decode(
+            request.headers[FLEET_HTTP_SIGNATURE_HEADER], validate=True
+        )
         timestamp = request.headers[TIMESTAMP_HEADER]
         signed_at = datetime.datetime.fromisoformat(timestamp)
         age = (now() - signed_at).total_seconds()
