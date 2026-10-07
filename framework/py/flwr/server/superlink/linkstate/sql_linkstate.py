@@ -1061,6 +1061,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
+        skip: int = 0,
     ) -> Sequence[Run]:
         """Retrieve information about runs based on the specified filters."""
         self._cleanup_expired_task_tokens()
@@ -1110,8 +1111,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if order_by is not None:
             order_column = TaskModel.pending_at
             stmt = stmt.order_by(
-                order_column.asc() if ascending else order_column.desc()
+                order_column.asc() if ascending else order_column.desc(),
+                RunModel.run_id.asc() if ascending else RunModel.run_id.desc(),
             )
+        if skip:
+            stmt = stmt.offset(skip)
         if limit is not None:
             stmt = stmt.limit(limit)
 

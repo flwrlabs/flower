@@ -2,7 +2,7 @@
 
 # Announcement banner shown at the top of the docs.
 announcement:
-  enabled: true  # Set to false to hide the announcement banner.
+  enabled: false  # Set to true to show the announcement banner.
   html: >-
     <style>
       .announcement { background: #f2b705; color: #000000; }

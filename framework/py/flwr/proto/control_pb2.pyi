@@ -333,20 +333,26 @@ class ListRunsRequest(google.protobuf.message.Message):
 
     RUN_ID_FIELD_NUMBER: builtins.int
     LIMIT_FIELD_NUMBER: builtins.int
+    SKIP_FIELD_NUMBER: builtins.int
     run_id: builtins.int
     limit: builtins.int
+    skip: builtins.int
+    """Skip this many newer runs when listing runs. Ignored when run_id is set."""
     def __init__(
         self,
         *,
         run_id: builtins.int | None = ...,
         limit: builtins.int | None = ...,
+        skip: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_limit", b"_limit", "_run_id", b"_run_id", "limit", b"limit", "run_id", b"run_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_limit", b"_limit", "_run_id", b"_run_id", "limit", b"limit", "run_id", b"run_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_limit", b"_limit", "_run_id", b"_run_id", "_skip", b"_skip", "limit", b"limit", "run_id", b"run_id", "skip", b"skip"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_limit", b"_limit", "_run_id", b"_run_id", "_skip", b"_skip", "limit", b"limit", "run_id", b"run_id", "skip", b"skip"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_run_id", b"_run_id"]) -> typing.Literal["run_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_skip", b"_skip"]) -> typing.Literal["skip"] | None: ...
 
 global___ListRunsRequest = ListRunsRequest
 

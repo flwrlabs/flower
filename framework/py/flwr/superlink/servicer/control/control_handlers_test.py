@@ -36,6 +36,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAppsResponse,
     ListAutomationsRequest,
     ListRunSeriesEventsRequest,
+    ListRunsRequest,
     RefreshAuthTokensRequest,
     RemoveAppRequest,
     RemoveAppResponse,
@@ -69,6 +70,7 @@ from .control_handlers import (
     list_apps,
     list_automations,
     list_run_series_events,
+    list_runs,
     refresh_auth_tokens,
     remove_app,
     start_automation,
@@ -104,6 +106,21 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             None,
             self.account.flwr_aid,
             TaskType.SERVER_APP,
+        )
+
+    def test_list_runs_defaults_to_twenty(self) -> None:
+        """Apply the default page size in the shared Control handler."""
+        state = Mock(spec=LinkState)
+        state.get_run_info.return_value = []
+
+        list_runs(ListRunsRequest(), self.account, state)
+
+        state.get_run_info.assert_called_once_with(
+            flwr_aids=[self.account.flwr_aid],
+            order_by="pending_at",
+            ascending=False,
+            limit=20,
+            skip=0,
         )
 
     def _create_dummy_run_series(
