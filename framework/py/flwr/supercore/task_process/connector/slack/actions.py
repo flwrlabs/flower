@@ -135,8 +135,7 @@ ACTIONS = (
     ActionDefinition(
         name="search_public",
         description=(
-            "Searches for messages, files in public Slack channels ONLY. "
-            "Current logged in user's user_id is U054GF8HN1L.\n"
+            "Searches for messages, files in public Slack channels ONLY.\n"
             "\n"
             "`slack_search_public` does NOT generally require user consent "
             "for use, whereas you should request and wait for user consent to "
@@ -165,7 +164,6 @@ ACTIONS = (
             "filter-only queries with no semantic content.\n"
             "\n"
             "Require at least one of `keywords` or `filters`.\n"
-            "❌ Semantic search is not available for this user.\n"
             "\n"
             "<examples>\n"
             "User: What's the latest on Project Unicorn?\n"
@@ -226,8 +224,7 @@ ACTIONS = (
         name="search_public_and_private",
         description=(
             "Searches for messages, files in ALL Slack channels, including "
-            "public channels, private channels, DMs, and group DMs. "
-            "Current logged in user's user_id is U054GF8HN1L.\n"
+            "public channels, private channels, DMs, and group DMs.\n"
             "\n"
             "---\n"
             "Split your search query into 3 fields:\n"
@@ -252,7 +249,6 @@ ACTIONS = (
             "filter-only queries with no semantic content.\n"
             "\n"
             "Require at least one of `keywords` or `filters`.\n"
-            "❌ Semantic search is not available for this user.\n"
             "\n"
             "<examples>\n"
             "User: What's the latest on Project Unicorn?\n"
