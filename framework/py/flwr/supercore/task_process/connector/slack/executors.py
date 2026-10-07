@@ -76,13 +76,11 @@ def _call_slack_api(
     return payload
 
 
-def _csv(
-    arguments: JSONObject, name: str, default: tuple[str, ...], allowed: tuple[str, ...]
-) -> list[str]:
+def _csv(arguments: JSONObject, name: str, choices: tuple[str, ...]) -> list[str]:
     """Parse one comma-separated MCP-style option for a Web API request."""
     raw = optional_string(arguments.get(name), "Slack", name)
-    values = list(default) if raw is None else [part.strip() for part in raw.split(",")]
-    if not values or any(value not in allowed for value in values):
+    values = list(choices) if raw is None else [part.strip() for part in raw.split(",")]
+    if not values or any(value not in choices for value in values):
         raise ValueError(f"Slack {name} contains an unsupported value.")
     return list(dict.fromkeys(values))
 
@@ -116,10 +114,8 @@ def _search(
             context.credentials,
             cast(list[str], payload["channel_types"]),
         )
-    if maximum is not None:
-        _truncate_search_context(result, maximum)
-    if response_format == "concise":
-        _concise_search_result(result)
+    if maximum is not None or response_format == "concise":
+        _format_search_result(result, maximum, concise=response_format == "concise")
     return result
 
 
@@ -148,44 +144,27 @@ def _search_payload(
     )
     payload: JSONObject = {
         "query": " ".join(part for part in query_parts if part),
-        "content_types": _csv(
-            arguments, "content_types", _SEARCH_CONTENT_TYPES, _SEARCH_CONTENT_TYPES
-        ),
+        "content_types": _csv(arguments, "content_types", _SEARCH_CONTENT_TYPES),
         "channel_types": (
             ["public_channel"]
             if channel_types == ("public_channel",)
-            else _csv(
-                arguments, "channel_types", channel_types, SLACK_CONVERSATION_TYPES
-            )
+            else _csv(arguments, "channel_types", channel_types)
         ),
     }
     if terms:
-        # Space-separated terms are AND'd; quotes preserve exact phrases.
-        # One clause keeps every keyword within Slack's five-clause limit.
+        # One AND clause preserves quoted phrases within Slack's clause limit.
         payload["term_clauses"] = [" ".join(terms)]
         if filters:
             payload["modifiers"] = filters
-    for name in ("context_channel_id", "cursor", "sort", "sort_dir"):
-        value = optional_string(arguments.get(name), "Slack", name)
-        if value is not None:
-            payload[name] = value
-    if "limit" in arguments:
-        payload["limit"] = require_int_range(
-            arguments["limit"], "Slack", "limit", maximum=20
-        )
+    for name in ("context_channel_id", "cursor", "sort", "sort_dir", "limit"):
+        if name in arguments:
+            payload[name] = arguments[name]
     for name in ("after", "before"):
         value = optional_string(arguments.get(name), "Slack", name)
         if value is not None:
-            try:
-                payload[name] = int(value)
-            except ValueError:
-                raise ValueError(f"Slack {name} must be a Unix timestamp.") from None
-    payload["include_bots"] = require_bool(
-        arguments.get("include_bots", False), "Slack", "include_bots"
-    )
-    payload["include_context_messages"] = require_bool(
-        arguments.get("include_context", True), "Slack", "include_context"
-    )
+            payload[name] = int(value)
+    payload["include_bots"] = arguments.get("include_bots", False)
+    payload["include_context_messages"] = arguments.get("include_context", True)
     return payload
 
 
@@ -264,36 +243,29 @@ def _filter_joined_channels(
         results["files"] = files
 
 
-def _truncate_search_context(result: JSONObject, maximum: int) -> None:
+def _truncate_search_context(messages: list[JSONObject], maximum: int) -> None:
     """Truncate surrounding message text to the requested length."""
-    results = result.get("results")
-    messages = results.get("messages") if isinstance(results, dict) else None
-    if not isinstance(messages, list):
-        return
     for message in messages:
-        context = message.get("context_messages") if isinstance(message, dict) else None
-        if isinstance(context, dict):
-            _truncate_context_entries(context, maximum)
-
-
-def _truncate_context_entries(context: JSONObject, maximum: int) -> None:
-    """Shorten text in the messages surrounding one search result."""
-    for direction in ("before", "after"):
-        surrounding = context.get(direction)
-        if not isinstance(surrounding, list):
+        context = message.get("context_messages")
+        if not isinstance(context, dict):
             continue
-        for item in surrounding:
-            if not isinstance(item, dict):
+        for direction in ("before", "after"):
+            if direction not in context:
                 continue
-            value = item.get("text")
-            if isinstance(value, str):
-                item["text"] = value[:maximum]
+            for item in object_list_field(context, direction, error=SlackApiError):
+                item["text"] = string_field(item, "text")[:maximum]
 
 
-def _concise_search_result(result: JSONObject) -> None:
-    """Reduce search entries to identifiers, content, and links."""
-    results = result.get("results")
-    if not isinstance(results, dict):
+def _format_search_result(
+    result: JSONObject, maximum: int | None, *, concise: bool
+) -> None:
+    """Apply context truncation and concise formatting to search results."""
+    results = object_field(result, "results", error=SlackApiError)
+    if maximum is not None and "messages" in results:
+        _truncate_search_context(
+            object_list_field(results, "messages", error=SlackApiError), maximum
+        )
+    if not concise:
         return
     fields = {
         "messages": (
@@ -306,12 +278,10 @@ def _concise_search_result(result: JSONObject) -> None:
         "files": ("file_id", "title", "content", "permalink"),
     }
     for kind, names in fields.items():
-        items = results.get(kind)
-        if isinstance(items, list):
+        if kind in results:
             results[kind] = [
                 {key: item[key] for key in names if key in item}
-                for item in items
-                if isinstance(item, dict)
+                for item in object_list_field(results, kind, error=SlackApiError)
             ]
 
 

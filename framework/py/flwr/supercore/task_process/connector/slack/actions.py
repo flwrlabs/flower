@@ -22,7 +22,6 @@ from ..tool_schema import integer_property, string_property
 SLACK_CONVERSATION_TYPES = ("public_channel", "private_channel", "mpim", "im")
 SLACK_LIST_CONVERSATIONS_MAX_LIMIT = 999
 SLACK_MESSAGE_MAX_LIMIT = 15
-SLACK_SEARCH_MAXIMUM = 100
 _CURSOR: JSONObject = {
     "type": "string",
     "description": "The Slack pagination cursor.",
@@ -136,7 +135,9 @@ ACTIONS = (
     ActionDefinition(
         name="search_public",
         description=(
-            "Searches for messages, files in public Slack channels ONLY. \n"
+            "Searches for messages, files in public Slack channels ONLY. "
+            "Current logged in user's user_id is U054GF8HN1L.\n"
+            "\n"
             "`slack_search_public` does NOT generally require user consent "
             "for use, whereas you should request and wait for user consent to "
             "use `slack_search_public_and_private`.\n"
@@ -164,6 +165,7 @@ ACTIONS = (
             "filter-only queries with no semantic content.\n"
             "\n"
             "Require at least one of `keywords` or `filters`.\n"
+            "❌ Semantic search is not available for this user.\n"
             "\n"
             "<examples>\n"
             "User: What's the latest on Project Unicorn?\n"
@@ -218,14 +220,15 @@ ACTIONS = (
                 },
             },
             "required": [],
-            "additionalProperties": False,
         },
     ),
     ActionDefinition(
         name="search_public_and_private",
         description=(
             "Searches for messages, files in ALL Slack channels, including "
-            "public channels, private channels, DMs, and group DMs. \n"
+            "public channels, private channels, DMs, and group DMs. "
+            "Current logged in user's user_id is U054GF8HN1L.\n"
+            "\n"
             "---\n"
             "Split your search query into 3 fields:\n"
             "\n"
@@ -249,6 +252,7 @@ ACTIONS = (
             "filter-only queries with no semantic content.\n"
             "\n"
             "Require at least one of `keywords` or `filters`.\n"
+            "❌ Semantic search is not available for this user.\n"
             "\n"
             "<examples>\n"
             "User: What's the latest on Project Unicorn?\n"
@@ -314,7 +318,6 @@ ACTIONS = (
                 },
             },
             "required": [],
-            "additionalProperties": False,
         },
     ),
     ActionDefinition(

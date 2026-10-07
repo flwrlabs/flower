@@ -34,12 +34,18 @@ class ExampleApiError(ConnectorApiError):
     provider = "Example"
 
 
-def test_connector_input_schemas_are_strict() -> None:
-    """Connector schemas should reject unknown arguments."""
+def test_connector_input_schema_argument_policies() -> None:
+    """Preserve captured schemas and reject unknown arguments in other tools."""
     for connector in CONNECTORS:
         for tool in connector.tools:
             parameters = tool["parameters"]
             assert isinstance(parameters, dict)
+            if tool["name"] in (
+                "slack_search_public",
+                "slack_search_public_and_private",
+            ):
+                assert "additionalProperties" not in parameters
+                continue
             assert parameters.get("additionalProperties") is False, (
                 f"Connector tool '{tool['name']}' input schema must set "
                 "additionalProperties to false."
