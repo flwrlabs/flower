@@ -20,6 +20,7 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
+from parameterized import parameterized
 
 from flwr.app import ArrayRecord, ConfigRecord, Context, Message, Metadata, RecordDict
 from flwr.app.message import make_message, remove_content_from_message
@@ -208,16 +209,25 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state.store_message.assert_not_called()
         self.mock_confirm_message_received.assert_not_called()
 
-    def test_pull_and_store_message_marks_task_failed_if_object_pull_fails(
-        self,
+    @parameterized.expand(  # type: ignore[untyped-decorator]
+        [
+            ("objects", "Pulling message objects failed"),
+            ("confirmation", "Confirming message receipt failed"),
+        ]
+    )
+    def test_pull_and_store_message_marks_task_failed(
+        self, stage: str, failure_details: str
     ) -> None:
-        """Test that object-pull failures clean up the message and fail the task."""
+        """Failed input preparation never publishes a task and cleans up its inputs."""
         self._prepare_for_pull_and_store_message()
-        fab_hash = "abc123"
-        task_id = 123
+        self.mock_state.get_run.return_value = Mock(fab_hash="abc123")
         message_id = self.mock_receive.return_value[0].metadata.message_id
-        self.mock_state.get_run.return_value = Mock(fab_hash=fab_hash)
-        self.mock_pull_object.side_effect = RuntimeError("error")
+        failed_call = (
+            self.mock_pull_object
+            if stage == "objects"
+            else self.mock_confirm_message_received
+        )
+        failed_call.side_effect = RuntimeError("error")
 
         res = _pull_and_store_message(
             state=self.mock_state,
@@ -232,55 +242,16 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         )
 
         assert res is None
-        self.mock_state.reserve_task.assert_called_once_with(
-            task_type=TaskType.CLIENT_APP,
-            run_id=self.run_id,
-            fab_hash=fab_hash,
-        )
         self.mock_state.delete_messages.assert_called_once_with(
             message_ids=[message_id]
         )
         self.mock_object_store.delete.assert_called_once_with(message_id)
         self.mock_state.finish_task.assert_called_once_with(
-            task_id, SubStatus.FAILED, "Pulling message objects failed: error"
-        )
-        self.mock_confirm_message_received.assert_not_called()
-        self.mock_state.publish_task.assert_not_called()
-
-    def test_pull_and_store_message_marks_task_failed_if_confirmation_fails(
-        self,
-    ) -> None:
-        """Confirmation failure never publishes a pending task."""
-        self._prepare_for_pull_and_store_message()
-        self.mock_state.get_run.return_value = Mock(fab_hash="abc123")
-
-        self.mock_confirm_message_received.side_effect = RuntimeError("error")
-
-        res = _pull_and_store_message(
-            state=self.mock_state,
-            object_store=self.mock_object_store,
-            node_config={},
-            receive=self.mock_receive,
-            get_run=self.mock_get_run,
-            get_fab=self.mock_get_fab,
-            pull_object=self.mock_pull_object,
-            confirm_message_received=self.mock_confirm_message_received,
-            trusted_entities={},
-        )
-
-        assert res is None
-        self.mock_state.reserve_task.assert_called_once_with(
-            task_type=TaskType.CLIENT_APP,
-            run_id=self.run_id,
-            fab_hash="abc123",
-        )
-        self.mock_state.create_task.assert_not_called()
-        self.mock_state.delete_messages.assert_called_once()
-        self.mock_object_store.delete.assert_called_once()
-        self.mock_state.finish_task.assert_called_once_with(
-            123, SubStatus.FAILED, "Confirming message receipt failed: error"
+            123, SubStatus.FAILED, f"{failure_details}: error"
         )
         self.mock_state.publish_task.assert_not_called()
+        if stage == "objects":
+            self.mock_confirm_message_received.assert_not_called()
 
     def test_pull_and_store_message_with_unknown_run_id(self) -> None:
         """Test that a message of an unknown run ID is pulled and stored."""

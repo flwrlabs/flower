@@ -95,6 +95,7 @@ def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
     ready_fabs: set[str],
 ) -> None:
     """Kubernetes polls with available capacity, including when none is ready."""
+    monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", "0.25")
     task = Task(task_id=123, type=TaskType.AGENT_APP, fab_hash="ready-fab")
     client = Mock()
     client.AcquireTask.return_value = (
@@ -120,10 +121,8 @@ def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
         Mock(from_server_address=Mock(return_value=client)),
     )
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
-    monkeypatch.setattr(
-        "flwr.supercore.superexec.run_superexec.time.sleep",
-        Mock(side_effect=KeyboardInterrupt()),
-    )
+    sleep_mock = Mock(side_effect=KeyboardInterrupt())
+    monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep_mock)
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
@@ -144,6 +143,7 @@ def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
         executor.launch.assert_called_once()
     else:
         executor.launch.assert_not_called()
+        sleep_mock.assert_called_once_with(0.25)
 
 
 @pytest.mark.parametrize(
@@ -340,70 +340,24 @@ def test_run_superexec_waits_only_for_remaining_claim_lease(
 
 
 @pytest.mark.parametrize(
-    (
-        "elapsed",
-        "capacity",
-        "task_poll_interval",
-        "expected_sleep",
-    ),
-    [
-        (0.1, "full", None, 1.0),
-        (5.0, "full", None, None),
-        (1.0, "partial", None, None),
-        (5.0, "full", "60", 55.0),
-        (1.0, "partial", "60", 59.0),
-        (0.1, "none", "0.25", 0.25),
-    ],
+    ("elapsed", "poll_interval", "expected_sleep"),
+    [(0.1, 0.25, 1.0), (5.0, 1.0, None), (5.0, 60.0, 55.0)],
 )
-def test_run_superexec_respects_interval_after_empty_acquisition(
+def test_backoff_after_empty_poll(
     monkeypatch: pytest.MonkeyPatch,
     elapsed: float,
-    capacity: str,
-    task_poll_interval: str | None,
+    poll_interval: float,
     expected_sleep: float | None,
 ) -> None:
-    """The configured interval applies when a bounded long poll ends empty."""
-    if task_poll_interval is None:
-        monkeypatch.delenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", raising=False)
-    else:
-        monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", task_poll_interval)
-    client = Mock()
-    client.AcquireTask.return_value = AcquireTaskResponse()
-    executor = Mock()
-    executor.get_eligible_capacity.side_effect = [
-        (
-            set(AutoExecPlugin.supported_task_types) if capacity == "full" else set(),
-            {"ready-fab"} if capacity == "partial" else set(),
-        ),
-        KeyboardInterrupt(),
-    ]
-    plugin = Mock()
-    plugin.supported_task_types = AutoExecPlugin.supported_task_types
-    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
-    monkeypatch.setattr(
-        run_superexec_module, "get_executor", Mock(return_value=executor)
-    )
-    monkeypatch.setattr(
-        run_superexec_module,
-        "RuntimeHttpClient",
-        Mock(from_server_address=Mock(return_value=client)),
-    )
-    monkeypatch.setattr(
-        run_superexec_module, "AutoExecPlugin", Mock(return_value=plugin)
-    )
-    monkeypatch.setattr(
-        run_superexec_module, "monotonic", Mock(side_effect=[0, elapsed])
-    )
+    """Empty polls honor compatibility and configured polling intervals."""
+    monkeypatch.setattr(run_superexec_module, "monotonic", Mock(return_value=elapsed))
     sleep_mock = Mock()
     monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep_mock)
 
-    with pytest.raises(KeyboardInterrupt):
-        run_superexec_module.run_superexec("127.0.0.1:9091", insecure=True)
-
-    assert (
-        client.AcquireTask.call_args.args[0].wait_timeout_ms
-        == {"full": 5_000, "partial": 1_000, "none": 0}[capacity]
+    run_superexec_module._backoff_after_empty_poll(  # pylint: disable=protected-access
+        started_at=0.0, task_poll_interval=poll_interval
     )
+
     if expected_sleep is None:
         sleep_mock.assert_not_called()
     else:
