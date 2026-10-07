@@ -33,6 +33,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     iterate_object_tree,
 )
+from flwr.supercore.run import RunNotRunningException
 
 from .start_client_internal import (
     FAB_VERIFICATION_ERROR,
@@ -211,12 +212,18 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
 
     @parameterized.expand(  # type: ignore[untyped-decorator]
         [
-            ("objects", "Pulling message objects failed"),
-            ("confirmation", "Confirming message receipt failed"),
+            ("objects", "Pulling message objects failed", RuntimeError),
+            ("confirmation", "Confirming message receipt failed", RuntimeError),
+            ("objects", "Pulling message objects failed", RunNotRunningException),
+            (
+                "confirmation",
+                "Confirming message receipt failed",
+                RunNotRunningException,
+            ),
         ]
     )
     def test_pull_and_store_message_marks_task_failed(
-        self, stage: str, failure_details: str
+        self, stage: str, failure_details: str, error_type: type[BaseException]
     ) -> None:
         """Failed input preparation never publishes a task and cleans up its inputs."""
         self._prepare_for_pull_and_store_message()
@@ -227,7 +234,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             if stage == "objects"
             else self.mock_confirm_message_received
         )
-        failed_call.side_effect = RuntimeError("error")
+        failed_call.side_effect = error_type("error")
 
         res = _pull_and_store_message(
             state=self.mock_state,

@@ -428,7 +428,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                 object_store.put(obj_id, obj_contents.pop(obj_id))
             failure_stage = "Confirming message receipt failed"
             confirm_message_received(run_id, message.metadata.message_id)
-        except Exception as err:  # pylint: disable=broad-except
+        except (Exception, RunNotRunningException) as err:  # pylint: disable=W0718
             log(
                 ERROR,
                 "Failed to receive message %s: %s",
