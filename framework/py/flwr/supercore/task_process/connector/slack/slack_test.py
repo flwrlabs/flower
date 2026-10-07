@@ -138,36 +138,47 @@ def test_slack_search_accepts_keywords_and_filters_without_query() -> None:
         )
     body = request.call_args.kwargs["json"]
     assert body["query"] == "Where is the release plan? in:<#C1>"
-    assert body["term_clauses"] == ["project", '"release plan"']
+    assert body["term_clauses"] == ['project "release plan"']
     assert body["modifiers"] == "in:<#C1>"
 
 
-def test_slack_search_preserves_all_search_terms_when_slack_rejects_them() -> None:
-    """Surface API limits without dropping lexical or natural-language input."""
-    keywords = ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"]
-    with (
-        patch(
-            _HTTP_REQUEST,
-            return_value=_response({"ok": False, "error": "invalid_arguments"}),
-        ) as request,
-        pytest.raises(SlackApiError, match="invalid_arguments"),
-    ):
-        registry.invoke_connector(
-            "slack_search_public",
+@pytest.mark.parametrize(
+    "action_name", ("slack_search_public", "slack_search_public_and_private")
+)
+@pytest.mark.parametrize("natural_language_query", ("", "Where is the release plan?"))
+def test_slack_search_preserves_keywords_within_clause_limit(
+    action_name: str,
+    natural_language_query: str,
+) -> None:
+    """Keep every lexical term and exact phrase without exceeding API limits."""
+    keywords = ["alpha", '"release plan"', "gamma", "delta", "epsilon", "zeta"]
+    expected_clause = 'alpha "release plan" gamma delta epsilon zeta'
+    response = _response({"ok": True, "results": {"messages": []}})
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            action_name,
             {
                 "query": "has:link",
                 "keywords": keywords,
                 "filters": "in:<#C1>",
-                "natural_language_query": "Where is the release plan?",
+                "natural_language_query": natural_language_query,
             },
             Mock(),
             _CREDENTIALS,
             {},
         )
+    assert result == response.json.return_value
     request.assert_called_once()
+    assert request.call_args.args == (
+        "POST",
+        "https://slack.com/api/assistant.search.context",
+    )
     body = request.call_args.kwargs["json"]
-    assert body["query"] == "Where is the release plan? has:link in:<#C1>"
-    assert body["term_clauses"] == keywords
+    if natural_language_query:
+        assert body["query"] == "Where is the release plan? has:link in:<#C1>"
+    else:
+        assert body["query"] == f"has:link {expected_clause} in:<#C1>"
+    assert body["term_clauses"] == [expected_clause]
     assert body["modifiers"] == "in:<#C1>"
 
 

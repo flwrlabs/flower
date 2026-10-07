@@ -160,8 +160,9 @@ def _search_payload(
         ),
     }
     if terms:
-        # Let Slack validate its term-clause limits instead of dropping inputs.
-        payload["term_clauses"] = terms
+        # Space-separated terms are AND'd; quotes preserve exact phrases.
+        # One clause keeps every keyword within Slack's five-clause limit.
+        payload["term_clauses"] = [" ".join(terms)]
         if filters:
             payload["modifiers"] = filters
     for name in ("context_channel_id", "cursor", "sort", "sort_dir"):
