@@ -53,9 +53,9 @@ from flwr.supercore.interceptors import (
 )
 from flwr.supercore.retry import RetryInvoker, make_simple_http_retry_invoker
 from flwr.supercore.runtime import RuntimeHttpClient
-from flwr.supercore.runtime_timing import RuntimeTiming
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
+from flwr.supercore.timing_probe import TimingProbe
 
 from .task import handle_task
 
@@ -86,7 +86,7 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
 
     def run(self) -> int:
         """Execute the task and return its Flower exit code."""
-        timing = RuntimeTiming(task_type="flwr-model")
+        timing = TimingProbe(task_type="flwr-model")
         timing.mark("model.task_enter")
         exit_code = ExitCode.SUCCESS
         try:

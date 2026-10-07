@@ -83,7 +83,6 @@ from flwr.supercore.logger import (
 )
 from flwr.supercore.object_ref import load_app
 from flwr.supercore.run import Run
-from flwr.supercore.runtime_timing import RuntimeTiming
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
@@ -91,6 +90,7 @@ from flwr.supercore.superexec.dependency_installer import (
 )
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
@@ -212,7 +212,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
         runtime_dependency_install: bool,
         preloaded: PreloadedAgentApp | None,
     ) -> None:
-        self._timing = RuntimeTiming(task_type=TaskType.AGENT_APP)
+        self._timing = TimingProbe(task_type=TaskType.AGENT_APP)
         self._runtime_api_address = runtime_api_address
         self._log_queue = log_queue
         self._token = token

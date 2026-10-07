@@ -29,8 +29,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.runtime import RuntimeHttpClient
-from flwr.supercore.runtime_timing import RuntimeTiming
 from flwr.supercore.task_process.usage import TaskUsageRecorder
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 
@@ -44,7 +44,7 @@ _TEXT_DELTA_EVENTS = frozenset(
 
 def handle_task(client: RuntimeHttpClient) -> None:
     """Run one model task request."""
-    timing = RuntimeTiming.for_task()
+    timing = TimingProbe.for_task()
     with timing.span("model.pull_request"):
         request_message = _pull_model_request(client)
         timing.parent_task_id = request_message.metadata.src_task_id

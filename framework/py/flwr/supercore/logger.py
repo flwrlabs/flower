@@ -72,7 +72,7 @@ log = FLOWER_LOGGER.log  # pylint: disable=invalid-name
 _timing_log_context = threading.local()
 
 
-def log_runtime_timing(message: str) -> None:
+def log_timing_probe(message: str) -> None:
     """Emit a DEBUG probe outside the user task-log upload queue."""
     previous = getattr(_timing_log_context, "active", False)
     _timing_log_context.active = True

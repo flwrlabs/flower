@@ -24,11 +24,11 @@ from typing import cast
 
 import requests
 
-from flwr.supercore.runtime_timing import RuntimeTiming
 from flwr.supercore.task_process.usage import (
     TaskUsageRecorder,
     task_usage_from_open_response,
 )
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.typing import JSONObject, JSONValue
 
 DEFAULT_MODEL_API_ENDPOINT = "https://api.flower.ai/v1/responses"
@@ -138,7 +138,7 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
        terminal success or failure event arrives.
     """
     stream = request.get("stream") is True
-    timing = RuntimeTiming.for_task()
+    timing = TimingProbe.for_task()
 
     # Send one HTTP request and let HTTP status represent transport failure.
     try:

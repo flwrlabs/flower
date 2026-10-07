@@ -69,8 +69,8 @@ from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
-from flwr.supercore.runtime_timing import RuntimeTiming
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.superlink.servicer.control.control_handlers import process_due_automations
 from flwr.superlink.servicer.control.control_handlers import (
     start_automation as start_control_automation,
@@ -271,7 +271,7 @@ def pull_task_input(
     if run and run.series_id:
         series_context = state.get_run_series_context(run.series_id)
     if run and fab and series_context and state.activate_task(task.task_id):
-        RuntimeTiming(
+        TimingProbe(
             run_id=run_id,
             task_id=task.task_id,
             task_type=task.type,
@@ -307,7 +307,7 @@ def push_task_output(
     if state.finish_task(
         task.task_id, sub_status=request.sub_status, details=request.details
     ):
-        RuntimeTiming(run_id=run_id, task_id=task.task_id, task_type=task.type).mark(
+        TimingProbe(run_id=run_id, task_id=task.task_id, task_type=task.type).mark(
             "runtime.task_finished"
         )
         log(INFO, "Finished task %d of run %d", task.task_id, run_id)

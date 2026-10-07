@@ -48,12 +48,12 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorResponse,
 )
 from flwr.supercore.runtime import RuntimeHttpClient
-from flwr.supercore.runtime_timing import RuntimeTiming
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
     get_connector_tools,
 )
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.typing import JSONObject, JSONValue
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
@@ -70,7 +70,7 @@ class RuntimeAgentEvents(AgentEvents):
 
     def __init__(self, stub: RuntimeHttpClient) -> None:
         self._stub = stub
-        self._timing = RuntimeTiming.for_task()
+        self._timing = TimingProbe.for_task()
         self._queue: Queue[TaskEvent | object] = Queue(
             maxsize=_EVENT_PUBLISH_QUEUE_SIZE
         )

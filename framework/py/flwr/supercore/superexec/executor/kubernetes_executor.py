@@ -35,7 +35,7 @@ from flwr.supercore.constant import (
     TASK_TYPE_TO_COMMAND,
     TaskType,
 )
-from flwr.supercore.runtime_timing import RuntimeTiming
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.warm_executor_constants import (
     WARM_AGENTAPP_EXECUTOR_MODULE,
@@ -640,7 +640,7 @@ class KubernetesExecutor:
             return _launch_result_from_exception(exc)
 
         try:
-            timing = RuntimeTiming(
+            timing = TimingProbe(
                 task_id=spec.task_id,
                 task_type=spec.task_type,
                 fab_hash=spec.fab_hash,

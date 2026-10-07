@@ -28,22 +28,22 @@ from dataclasses import dataclass, field
 from logging import DEBUG
 from uuid import uuid4
 
-from flwr.supercore.logger import console_handler, log_runtime_timing
+from flwr.supercore.logger import console_handler, log_timing_probe
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 
-RUNTIME_TIMING_ENV = "FLWR_RUNTIME_TIMING_LOGGING"
+TIMING_ENV = "FLWR_TIMING_LOGGING"
 _CLOCK_DOMAIN = uuid4().hex
 
 
 def timing_enabled() -> bool:
     """Require explicit opt-in and DEBUG console output."""
-    return os.getenv(RUNTIME_TIMING_ENV) == "1" and console_handler.level <= DEBUG
+    return os.getenv(TIMING_ENV) == "1" and console_handler.level <= DEBUG
 
 
 @dataclass
-class RuntimeTiming:  # pylint: disable=too-many-instance-attributes
+class TimingProbe:  # pylint: disable=too-many-instance-attributes
     """Record bounded stage boundaries with existing run and task identities."""
 
     run_id: int | None = None
@@ -57,7 +57,7 @@ class RuntimeTiming:  # pylint: disable=too-many-instance-attributes
     _seen: set[str] = field(default_factory=set, init=False, repr=False)
 
     @classmethod
-    def for_task(cls) -> RuntimeTiming:
+    def for_task(cls) -> TimingProbe:
         """Capture identity after PullTaskInput, including in publisher threads."""
         # Unset identity is valid in tests and before the first task input.
         return cls(
@@ -106,9 +106,7 @@ class RuntimeTiming:  # pylint: disable=too-many-instance-attributes
             "success": success,
         }
         try:
-            log_runtime_timing(
-                "runtime_timing " + strict_json_dumps(record, compact=True)
-            )
+            log_timing_probe("timing_probe " + strict_json_dumps(record, compact=True))
         except Exception:  # pylint: disable=broad-exception-caught
             # Observational output must not affect task or stream execution.
             pass

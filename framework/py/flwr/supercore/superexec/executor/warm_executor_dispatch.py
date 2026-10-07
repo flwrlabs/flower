@@ -34,7 +34,7 @@ from flwr.supercore.constant import (
     TASK_TYPE_TO_COMMAND,
     TaskType,
 )
-from flwr.supercore.runtime_timing import RuntimeTiming
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.warm_executor_constants import (
     WARM_AGENTAPP_EXECUTOR_MODULE,
     WARM_CONNECTOR_EXECUTOR_MODULE,
@@ -306,7 +306,7 @@ class KubernetesWarmExecutorDispatch:
         if output and not filtered_output:
             return
         log(
-            DEBUG if "runtime_timing {" in filtered_output else INFO,
+            DEBUG if "timing_probe {" in filtered_output else INFO,
             "Warm TaskExecutor output pod=%s task_id=%s stream=%s: %s",
             self._pod_name or "unknown",
             self._task_id if self._task_id is not None else "unknown",
@@ -445,7 +445,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             for candidate in candidates:
                 self._ensure_pool_capacity(candidate)
 
-        timing = RuntimeTiming(
+        timing = TimingProbe(
             task_id=spec.task_id,
             task_type=spec.task_type,
             fab_hash=spec.fab_hash,

@@ -95,7 +95,7 @@ from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import APP_ID_PATTERN, FLOWER_AGENT_APP_ID, TaskType
 from flwr.supercore.control import ControlHttpClient
-from flwr.supercore.runtime_timing import RuntimeTiming
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.typing import JSONObject
 
 from ..utils import flwr_cli_exc_handler
@@ -828,7 +828,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         fab_content: bytes | None = None,
     ) -> None:
         """Start and stream one Flower AgentApp run."""
-        timing = RuntimeTiming()
+        timing = TimingProbe()
         # Start a run in the current conversation series.
         self.run_id, self.series_id = start_chat_run(
             self.stub,
@@ -1192,7 +1192,7 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
     if series_id is not None:
         req.series_id = series_id
 
-    timing = RuntimeTiming()
+    timing = TimingProbe()
     with flwr_cli_exc_handler(), timing.span("client.start_run"):
         res = stub.StartRun(req)
         if res.HasField("run_id"):

@@ -44,8 +44,8 @@ from flwr.supercore.dependencies.runtime import RuntimeStateDependency
 from flwr.supercore.error import FlowerError
 from flwr.supercore.json_message.base import make_json_message
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
-from flwr.supercore.runtime_timing import RuntimeTiming
 from flwr.supercore.servicer.runtime import runtime_handlers
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 
@@ -99,7 +99,7 @@ async def create_runtime_response(
     state: RuntimeStateDependency,
 ) -> Response:
     """Create a model response through a child model task."""
-    timing = RuntimeTiming()
+    timing = TimingProbe()
     timing.mark("responses.request_enter")
     try:
         task = await run_in_threadpool(_authenticate, request, state)
@@ -189,7 +189,7 @@ def _start_exchange(
     payload: JSONObject,
 ) -> _Exchange:
     """Create a child model task and send its request message."""
-    timing = RuntimeTiming(
+    timing = TimingProbe(
         run_id=task.run_id, parent_task_id=task.task_id, task_type=TaskType.MODEL
     )
     timing.mark("responses.exchange_enter")
@@ -280,7 +280,7 @@ async def _stream_response(
     state: CoreState, task: Task, model_payload: JSONObject
 ) -> AsyncIterator[str]:
     """Create an exchange and relay its events as Server-Sent Events."""
-    timing = RuntimeTiming(run_id=task.run_id, parent_task_id=task.task_id)
+    timing = TimingProbe(run_id=task.run_id, parent_task_id=task.task_id)
     cursor: int | None = None
     complete = False
     sequence_number = 0

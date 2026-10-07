@@ -36,7 +36,7 @@ from flwr.proto.control_pb2 import StartRunResponse  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import AcquireTaskRequest  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState
-from flwr.supercore import runtime_timing
+from flwr.supercore import timing_probe
 from flwr.supercore.constant import NOOP_FEDERATION_ID, TaskType
 from flwr.supercore.corestate.corestate import CoreState
 from flwr.supercore.dependencies.runtime import get_runtime_state
@@ -44,7 +44,6 @@ from flwr.supercore.logger import console_handler, mirror_output_to_queue
 from flwr.supercore.object_store.in_memory_object_store import InMemoryObjectStore
 from flwr.supercore.routers.runtime.responses import router
 from flwr.supercore.runtime import RuntimeHttpClient
-from flwr.supercore.runtime_timing import RuntimeTiming
 from flwr.supercore.servicer.runtime import runtime_handlers
 from flwr.supercore.superexec.executor.warm_executor_dispatch import (
     KubernetesWarmExecutorDispatch,
@@ -53,6 +52,7 @@ from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.task_process.agent.session import RuntimeAgentEvents
 from flwr.supercore.task_process.model.task import handle_task
 from flwr.supercore.task_worker_protocol import relay_task_output
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.typing import JSONObject
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.control.control_handlers import _stream_run_events
@@ -62,14 +62,12 @@ from flwr.superlink.servicer.control.control_handlers import _stream_run_events
 def captured_records(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     """Capture only timing JSON while enabling the profiling flag and DEBUG."""
     captured: list[dict[str, Any]] = []
-    monkeypatch.setenv("FLWR_RUNTIME_TIMING_LOGGING", "1")
+    monkeypatch.setenv("FLWR_TIMING_LOGGING", "1")
     monkeypatch.setattr(console_handler, "level", DEBUG)
     monkeypatch.setattr(
-        runtime_timing,
-        "log_runtime_timing",
-        lambda value: captured.append(
-            json.loads(value.removeprefix("runtime_timing "))
-        ),
+        timing_probe,
+        "log_timing_probe",
+        lambda value: captured.append(json.loads(value.removeprefix("timing_probe "))),
     )
     return captured
 
@@ -80,15 +78,15 @@ def test_disabled_has_no_output_or_clocks(
 ) -> None:
     """Disabled probes do not read clocks or serialize metadata."""
     if flag is None:
-        monkeypatch.delenv("FLWR_RUNTIME_TIMING_LOGGING", raising=False)
+        monkeypatch.delenv("FLWR_TIMING_LOGGING", raising=False)
     else:
-        monkeypatch.setenv("FLWR_RUNTIME_TIMING_LOGGING", flag)
+        monkeypatch.setenv("FLWR_TIMING_LOGGING", flag)
     monkeypatch.setattr(console_handler, "level", level)
     clock = Mock(side_effect=AssertionError("disabled probe read a clock"))
     output = Mock()
-    monkeypatch.setattr("flwr.supercore.runtime_timing.time.monotonic_ns", clock)
-    monkeypatch.setattr(runtime_timing, "log_runtime_timing", output)
-    timing = RuntimeTiming(run_id=7, task_id=11)
+    monkeypatch.setattr("flwr.supercore.timing_probe.time.monotonic_ns", clock)
+    monkeypatch.setattr(timing_probe, "log_timing_probe", output)
+    timing = TimingProbe(run_id=7, task_id=11)
     with timing.span("agent.user_code"):
         timing.first_event("agent.events", "response.output_text.delta")
     output.assert_not_called()
@@ -99,7 +97,7 @@ def test_span_order_correlation_and_failure_redaction(
     records: list[dict[str, Any]],
 ) -> None:
     """Failed intervals retain correlation without exception text or authority."""
-    timing = RuntimeTiming(run_id=7, task_id=22, parent_task_id=11)
+    timing = TimingProbe(run_id=7, task_id=22, parent_task_id=11)
     with pytest.raises(ValueError):
         with timing.span("model.provider_post"):
             raise ValueError("secret prompt token response-body")
@@ -123,7 +121,7 @@ def test_first_events_are_bounded_and_separate_reasoning(
     records: list[dict[str, Any]],
 ) -> None:
     """A stream reports first output text independently of earlier reasoning."""
-    timing = RuntimeTiming(run_id=7, task_id=11)
+    timing = TimingProbe(run_id=7, task_id=11)
     for _ in range(100):
         timing.first_event(
             "client.received", "response.reasoning_summary_text.delta", 1
@@ -143,9 +141,9 @@ def test_probe_output_failure_does_not_fail_task(
     """Closed stdout or a failing handler must not change task execution."""
     del records
     monkeypatch.setattr(
-        runtime_timing, "log_runtime_timing", Mock(side_effect=OSError("closed"))
+        timing_probe, "log_timing_probe", Mock(side_effect=OSError("closed"))
     )
-    with RuntimeTiming(run_id=7).span("agent.user_code"):
+    with TimingProbe(run_id=7).span("agent.user_code"):
         pass
 
 
@@ -153,7 +151,7 @@ def test_markers_bypass_task_upload_and_survive_worker_relay(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Use standard DEBUG logging with the current resident worker output path."""
-    monkeypatch.setenv("FLWR_RUNTIME_TIMING_LOGGING", "1")
+    monkeypatch.setenv("FLWR_TIMING_LOGGING", "1")
     monkeypatch.setattr(console_handler, "level", DEBUG)
     stream = StringIO()
     monkeypatch.setattr(sys, "stdout", stream)
@@ -161,17 +159,17 @@ def test_markers_bypass_task_upload_and_survive_worker_relay(
     monkeypatch.setattr(console_handler, "stream", stream)
     queue: Queue[str | None] = Queue()
     mirror_output_to_queue(queue)
-    RuntimeTiming(run_id=7, task_id=11).mark("agent.input_ready")
-    assert "runtime_timing {" in stream.getvalue()
+    TimingProbe(run_id=7, task_id=11).mark("agent.input_ready")
+    assert "timing_probe {" in stream.getvalue()
     assert queue.empty()
     print("normal task output")
     assert queue.get() == "normal task output"
     assert queue.get() == "\n"
     sender = Mock()
     with relay_task_output(sender, "secret-token"):
-        RuntimeTiming(run_id=7, task_id=11).mark("agent.preloaded")
+        TimingProbe(run_id=7, task_id=11).mark("agent.preloaded")
     relayed = "".join(call.args[1] for call in sender.write.call_args_list)
-    assert "runtime_timing {" in relayed
+    assert "timing_probe {" in relayed
     assert "secret-token" not in relayed
     assert queue.empty()
 
@@ -183,7 +181,7 @@ def test_forwarded_markers_stay_at_debug(caplog: pytest.LogCaptureFixture) -> No
     )
     with caplog.at_level(DEBUG, logger="flwr"):
         dispatch._log_output_line(
-            "stdout", 'DEBUG: runtime_timing {"marker":"agent.preloaded"}'
+            "stdout", 'DEBUG: timing_probe {"marker":"agent.preloaded"}'
         )  # pylint: disable=protected-access
     assert len(caplog.records) == 1
     assert caplog.records[0].levelno == DEBUG
@@ -341,7 +339,7 @@ def test_in_process_model_to_chat_smoke(
 
 def test_invalid_fab_metadata_is_not_serialized(records: list[dict[str, Any]]) -> None:
     """Do not treat arbitrary task-supplied text as a FAB hash."""
-    RuntimeTiming(run_id=7, fab_hash="private credential disguised as hash").mark(
+    TimingProbe(run_id=7, fab_hash="private credential disguised as hash").mark(
         "runtime.child_created"
     )
     assert records[0]["fab_hash"] is None

@@ -36,8 +36,8 @@ from flwr.supercore.interceptors import (
 from flwr.supercore.protobuf.client import ProtobufClientInterceptor
 from flwr.supercore.retry import make_simple_http_retry_invoker
 from flwr.supercore.runtime import RuntimeHttpClient
-from flwr.supercore.runtime_timing import RuntimeTiming
 from flwr.supercore.telemetry import EventType
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 from .executor import LaunchResult, LaunchResultStatus, get_executor
@@ -246,7 +246,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     # Start the main loop
     try:
         while True:
-            timing = RuntimeTiming()
+            timing = TimingProbe()
             with timing.span("superexec.reconcile"):
                 executor.reconcile()
             with timing.span("superexec.capacity"):

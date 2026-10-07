@@ -165,8 +165,8 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.run import Run
-from flwr.supercore.runtime_timing import RuntimeTiming
 from flwr.supercore.task_process.connector import registry as connector_registry
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
@@ -610,7 +610,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 ) -> StartRunResponse:
     """Create run ID."""
     log(INFO, "ControlServicer.StartRun")
-    timing = RuntimeTiming()
+    timing = TimingProbe()
     timing.mark("control.start_run_enter")
 
     flwr_aid = account.flwr_aid
@@ -955,7 +955,7 @@ def _stream_run_events(
     """Yield task events until the run finishes or the stream is cancelled."""
     # LinkState creates every run with a primary task, so casting is safe
     primary_task_id = cast(int, run.primary_task_id)
-    timing = RuntimeTiming(run_id=run_id, task_id=primary_task_id)
+    timing = TimingProbe(run_id=run_id, task_id=primary_task_id)
     timing.mark("control.stream_enter")
     while is_active is None or is_active():
         should_break = run.status.status == Status.FINISHED
