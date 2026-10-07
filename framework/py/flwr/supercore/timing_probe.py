@@ -136,18 +136,19 @@ class TimingProbe:  # pylint: disable=too-many-instance-attributes
         self, stage: str, event_type: str, event_id: int | None = None
     ) -> None:
         """Separate first event, output text and reasoning without per-token logs."""
-        if not timing_enabled():
-            return
         markers = [f"{stage}.first_event"]
         if event_type == "response.output_text.delta":
             markers.append(f"{stage}.first_text")
         elif event_type == "response.reasoning_summary_text.delta":
             markers.append(f"{stage}.first_reasoning")
-        for marker in markers:
+        unseen_markers = [marker for marker in markers if marker not in self._seen]
+        if not unseen_markers or not timing_enabled():
+            return
+        for marker in unseen_markers:
             self.mark_once(marker, event_id=event_id)
 
     def mark_once(self, marker: str, *, event_id: int | None = None) -> None:
         """Emit one boundary per scope while profiling is enabled."""
-        if timing_enabled() and marker not in self._seen:
+        if marker not in self._seen and timing_enabled():
             self._seen.add(marker)
             self.mark(marker, event_id=event_id)

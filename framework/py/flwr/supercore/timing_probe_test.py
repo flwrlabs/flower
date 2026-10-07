@@ -91,6 +91,7 @@ def test_disabled_has_no_output_or_clocks(
         timing.first_event("agent.events", "response.output_text.delta")
     output.assert_not_called()
     clock.assert_not_called()
+    assert not timing._seen
 
 
 def test_span_order_correlation_and_failure_redaction(
@@ -118,15 +119,22 @@ def test_span_order_correlation_and_failure_redaction(
 
 
 def test_first_events_are_bounded_and_separate_reasoning(
+    monkeypatch: pytest.MonkeyPatch,
     records: list[dict[str, Any]],
 ) -> None:
-    """A stream reports first output text independently of earlier reasoning."""
+    """Report distinct first events, then skip enablement checks for repeated events."""
     timing = TimingProbe(run_id=7, task_id=11)
+    timing.first_event("client.received", "response.reasoning_summary_text.delta", 1)
+    timing.first_event("client.received", "response.output_text.delta", 2)
+    enabled = Mock(side_effect=AssertionError("already-seen marker checked enablement"))
+    monkeypatch.setattr(timing_probe, "timing_enabled", enabled)
     for _ in range(100):
         timing.first_event(
             "client.received", "response.reasoning_summary_text.delta", 1
         )
         timing.first_event("client.received", "response.output_text.delta", 2)
+        timing.mark_once("client.received.first_text")
+    enabled.assert_not_called()
     assert [record["marker"] for record in records] == [
         "client.received.first_event",
         "client.received.first_reasoning",
