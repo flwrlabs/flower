@@ -14,6 +14,7 @@
 # ==============================================================================
 """HTTP client for the Fleet API."""
 
+from flwr.common.constant import HEARTBEAT_CALL_TIMEOUT
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -99,6 +100,7 @@ class FleetHttpClient(ProtobufClient):  # pylint: disable=too-many-public-method
             rpc_method="/flwr.proto.Fleet/SendNodeHeartbeat",
             request=request,
             response_type=SendNodeHeartbeatResponse,
+            timeout=HEARTBEAT_CALL_TIMEOUT,
         )
 
     def PullMessages(self, request: PullMessagesRequest) -> PullMessagesResponse:
