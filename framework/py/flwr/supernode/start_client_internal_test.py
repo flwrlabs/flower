@@ -148,14 +148,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             fab_hash=fab_hash, primary_task_type=TaskType.SERVER_APP
         )
 
-        def reserve_task(**_kwargs: object) -> int:
-            self.mock_state.store_message.assert_called_once()
-            assert self.mock_object_store.put.call_count == len(self.simple_store)
-            self.mock_confirm_message_received.assert_not_called()
-            return 123
-
-        self.mock_state.reserve_task.side_effect = reserve_task
-
         # Execute
         res = _pull_and_store_message(
             state=self.mock_state,
@@ -212,10 +204,8 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             fab_hash=fab_hash,
         )
         self.mock_state.publish_task.assert_not_called()
-        self.mock_object_store.preregister.assert_called_once()
-        self.mock_state.store_message.assert_called_once()
-        self.mock_state.delete_messages.assert_called_once()
-        self.mock_object_store.delete.assert_called_once()
+        self.mock_object_store.preregister.assert_not_called()
+        self.mock_state.store_message.assert_not_called()
         self.mock_confirm_message_received.assert_not_called()
 
     def test_pull_and_store_message_marks_task_failed_if_object_pull_fails(
@@ -227,7 +217,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         task_id = 123
         message_id = self.mock_receive.return_value[0].metadata.message_id
         self.mock_state.get_run.return_value = Mock(fab_hash=fab_hash)
-        self.mock_state.create_task.return_value = task_id
         self.mock_pull_object.side_effect = RuntimeError("error")
 
         res = _pull_and_store_message(
@@ -243,19 +232,20 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         )
 
         assert res is None
-        self.mock_state.create_task.assert_called_once_with(
+        self.mock_state.reserve_task.assert_called_once_with(
             task_type=TaskType.CLIENT_APP,
             run_id=self.run_id,
             fab_hash=fab_hash,
-            failure_details="Pulling message objects failed: error",
         )
         self.mock_state.delete_messages.assert_called_once_with(
             message_ids=[message_id]
         )
         self.mock_object_store.delete.assert_called_once_with(message_id)
-        self.mock_state.finish_task.assert_not_called()
+        self.mock_state.finish_task.assert_called_once_with(
+            task_id, SubStatus.FAILED, "Pulling message objects failed: error"
+        )
         self.mock_confirm_message_received.assert_not_called()
-        self.mock_state.reserve_task.assert_not_called()
+        self.mock_state.publish_task.assert_not_called()
 
     def test_pull_and_store_message_marks_task_failed_if_confirmation_fails(
         self,
@@ -264,12 +254,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self._prepare_for_pull_and_store_message()
         self.mock_state.get_run.return_value = Mock(fab_hash="abc123")
 
-        def fail_confirmation(_run_id: int, _message_id: str) -> None:
-            self.mock_state.create_task.assert_not_called()
-            self.mock_state.publish_task.assert_not_called()
-            raise RuntimeError("error")
-
-        self.mock_confirm_message_received.side_effect = fail_confirmation
+        self.mock_confirm_message_received.side_effect = RuntimeError("error")
 
         res = _pull_and_store_message(
             state=self.mock_state,

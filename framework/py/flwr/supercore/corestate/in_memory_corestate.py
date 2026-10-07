@@ -1015,7 +1015,6 @@ class InMemoryCoreState(
         connector_ref: str | None = None,
         connector_id: int | None = None,
         requesting_task_id: int | None = None,
-        failure_details: str | None = None,
         publish: bool = True,
     ) -> int | None:
         """Create a task and return its ID."""
@@ -1031,20 +1030,13 @@ class InMemoryCoreState(
             task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
             if task_id in self.task_store:
                 return None
-            created_at = now().isoformat()
-            failed = failure_details is not None
 
             task = Task(
                 task_id=task_id,
                 type=task_type,
                 run_id=run_id,
-                status=TaskStatus(
-                    status=Status.FINISHED if failed else Status.PENDING,
-                    sub_status=SubStatus.FAILED if failed else "",
-                    details=failure_details or "",
-                ),
-                pending_at=created_at,
-                finished_at=created_at if failed else "",
+                status=TaskStatus(status=Status.PENDING, sub_status="", details=""),
+                pending_at=now().isoformat(),
                 fab_hash=fab_hash,
                 model_ref=model_ref,
                 connector_ref=connector_ref,
@@ -1052,10 +1044,9 @@ class InMemoryCoreState(
             )
 
             self.task_store[task_id] = task
-            if not publish and not failed:
+            if not publish:
                 self._unpublished_task_ids.add(task_id)
-
-        return task_id
+            return task_id
 
     def publish_task(self, task_id: int) -> bool:
         """Make a reserved pending task visible to acquisition requests."""

@@ -738,7 +738,6 @@ class CoreState(ABC):  # pylint: disable=R0904
         connector_ref: str | None = None,
         connector_id: int | None = None,
         requesting_task_id: int | None = None,
-        failure_details: str | None = None,
     ) -> int | None:
         """Create a new task.
 
@@ -759,8 +758,6 @@ class CoreState(ABC):  # pylint: disable=R0904
         requesting_task_id : Optional[int] (default: None)
             Task requesting creation of the new task. If set, task creation fails
             when the requesting task does not exist or is already finished.
-        failure_details : Optional[str] (default: None)
-            If set, create an already failed task with these details.
 
         Returns
         -------
@@ -770,7 +767,7 @@ class CoreState(ABC):  # pylint: disable=R0904
 
         Notes
         -----
-        Newly created tasks are pending unless `failure_details` is set.
+        Newly created tasks are in the pending status.
         This method only persists task data. It does not validate whether the
         provided fields are required for the given task type.
         """

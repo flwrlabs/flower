@@ -1271,7 +1271,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         latest_timestamp = rows[-1]["timestamp"] if rows else 0.0
         return "".join(row["log"] for row in rows), latest_timestamp
 
-    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         task_type: str,
         run_id: int,
@@ -1280,13 +1280,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         connector_ref: str | None = None,
         connector_id: int | None = None,
         requesting_task_id: int | None = None,
-        failure_details: str | None = None,
     ) -> int | None:
         """Create a task and return its ID."""
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
         sint64_task_id = uint64_to_int64(task_id)
-        created_at = now()
-        failed = failure_details is not None
 
         task_values = select(
             literal(sint64_task_id, type_=TaskModel.task_id.type),
@@ -1296,12 +1293,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             literal(model_ref, type_=TaskModel.model_ref.type),
             literal(connector_ref, type_=TaskModel.connector_ref.type),
             literal(connector_id, type_=TaskModel.connector_id.type),
-            literal(created_at, type_=TaskModel.pending_at.type),
-            literal(created_at if failed else None, type_=TaskModel.finished_at.type),
-            literal(
-                SubStatus.FAILED if failed else "", type_=TaskModel.sub_status.type
-            ),
-            literal(failure_details or "", type_=TaskModel.details.type),
+            literal(now(), type_=TaskModel.pending_at.type),
         )
         if requesting_task_id is not None:
             sint64_requesting_task_id = uint64_to_int64(requesting_task_id)
@@ -1326,9 +1318,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     TaskModel.connector_ref,
                     TaskModel.connector_id,
                     TaskModel.pending_at,
-                    TaskModel.finished_at,
-                    TaskModel.sub_status,
-                    TaskModel.details,
                 ],
                 task_values,
             )

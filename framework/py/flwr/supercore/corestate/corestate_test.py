@@ -1070,24 +1070,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(task.running_at, "")
         self.assertEqual(task.finished_at, "")
 
-    def test_create_failed_task_is_never_pending(self) -> None:
-        """A failed task is terminal at insertion and cannot be claimed."""
-        state = self.state_factory()
-        task_id = state.create_task(
-            task_type=TaskType.CLIENT_APP,
-            run_id=self.task_run_id(state),
-            failure_details="Object transfer failed",
-        )
-        assert task_id is not None
-
-        task = state.get_tasks(task_ids=[task_id])[0]
-        self.assertEqual(task.status.status, Status.FINISHED)
-        self.assertEqual(task.status.sub_status, SubStatus.FAILED)
-        self.assertEqual(task.status.details, "Object transfer failed")
-        self.assertTrue(task.finished_at)
-        self.assertFalse(state.get_tasks(task_ids=[task_id], statuses=[Status.PENDING]))
-        self.assertIsNone(state.claim_task(task_id))
-
     def test_create_task_rejects_finished_requesting_task(self) -> None:
         """Task creation should fail if the requesting task is already finished."""
         state = self.state_factory()
