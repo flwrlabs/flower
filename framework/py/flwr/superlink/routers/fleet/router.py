@@ -46,11 +46,11 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
-from flwr.server.superlink.fleet.message_handler import fleet_handlers
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_DEPENDENCY
 from flwr.superlink.dependencies.linkstate import get_linkstate
+from flwr.superlink.servicer.fleet import fleet_handlers
 
 from .node_auth import authenticate_fleet_node
 
