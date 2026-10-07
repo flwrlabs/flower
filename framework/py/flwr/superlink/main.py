@@ -32,7 +32,7 @@ from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE
 from flwr.supercore import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.dependencies.runtime import RuntimeHandlers
-from flwr.supercore.dependencies.runtime_version import RuntimeVersionDependency
+from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.http_logging import configure_uvicorn_logging
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
@@ -74,8 +74,15 @@ if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
 
 _RUNTIME_HANDLERS: RuntimeHandlers[LinkState] = runtime_handlers
+_CONTROL_VERSION_DEPENDENCY = Depends(
+    VersionDependency(
+        component_name="SuperLink",
+        connection_name="flwr CLI <-> SuperLink Control API",
+        reject_incompatible=False,
+    )
+)
 _RUNTIME_VERSION_DEPENDENCY = Depends(
-    RuntimeVersionDependency(
+    VersionDependency(
         component_name="SuperLink",
         connection_name="Caller <-> SuperLink Runtime API",
     )
@@ -213,7 +220,9 @@ def create_app(  # pylint: disable=too-many-statements
     fastapi_app.include_router(health.router)
 
     # SuperLink APIs
-    fastapi_app.include_router(control_router)
+    fastapi_app.include_router(
+        control_router, dependencies=[_CONTROL_VERSION_DEPENDENCY]
+    )
     fastapi_app.include_router(
         runtime_router, dependencies=[_RUNTIME_VERSION_DEPENDENCY]
     )

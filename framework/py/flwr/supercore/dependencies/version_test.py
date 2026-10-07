@@ -27,7 +27,7 @@ from flwr.supercore.constant import (
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 
-from .runtime_version import RuntimeVersionDependency
+from .version import VersionDependency
 
 
 def _make_request(headers: list[tuple[str, str]]) -> Request:
@@ -46,14 +46,14 @@ def _make_request(headers: list[tuple[str, str]]) -> Request:
     )
 
 
-def _dependency() -> RuntimeVersionDependency:
+def _dependency() -> VersionDependency:
     """Return a dependency with deterministic local metadata."""
     with patch.object(
         RuntimeVersionMetadata,
         "from_local_component",
         return_value=RuntimeVersionMetadata("flwr", "1.30.0", "SuperLink"),
     ):
-        return RuntimeVersionDependency(
+        return VersionDependency(
             component_name="SuperLink",
             connection_name="Caller <-> SuperLink Runtime API",
         )
@@ -103,3 +103,13 @@ def test_runtime_version_dependency_rejects_invalid_metadata(
 
     assert exc_info.value.code == ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
     assert expected_details in (exc_info.value.public_details or "")
+
+
+def test_runtime_version_dependency_accepts_mismatch_when_configured() -> None:
+    """Fleet HTTP matches the permissive Fleet gRPC version policy."""
+    dependency = VersionDependency(
+        component_name="SuperLink",
+        connection_name="SuperNode <-> SuperLink Fleet API",
+        reject_incompatible=False,
+    )
+    dependency(_make_request([(FLWR_PACKAGE_NAME_METADATA_KEY, "flwr")]))

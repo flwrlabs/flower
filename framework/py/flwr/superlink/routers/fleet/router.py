@@ -47,6 +47,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
+from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_DEPENDENCY
 from flwr.superlink.dependencies.linkstate import get_linkstate
@@ -58,7 +59,16 @@ router = APIRouter(
     prefix="/v1/fleet",
     tags=["Fleet"],
     route_class=ProtobufRoute,
-    dependencies=[Depends(authenticate_node)],
+    dependencies=[
+        Depends(authenticate_node),
+        Depends(
+            VersionDependency(
+                component_name="SuperLink",
+                connection_name="SuperNode <-> SuperLink Fleet API",
+                reject_incompatible=False,
+            )
+        ),
+    ],
 )
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 

@@ -20,23 +20,30 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 
 
-class RuntimeVersionDependency:
-    """Validate peer Runtime version metadata on HTTP requests."""
+class VersionDependency:
+    """Check peer Runtime version metadata on HTTP requests."""
 
-    def __init__(self, *, component_name: str, connection_name: str) -> None:
+    def __init__(
+        self,
+        *,
+        component_name: str,
+        connection_name: str,
+        reject_incompatible: bool = True,
+    ) -> None:
         self._connection_name = connection_name
         self._local_metadata = RuntimeVersionMetadata.from_local_component(
             component_name
         )
+        self._reject_incompatible = reject_incompatible
 
     def __call__(self, request: Request) -> None:
-        """Reject malformed or incompatible peer Runtime metadata."""
+        """Check peer metadata and reject incompatibility when configured."""
         peer_metadata, incompat_details = RuntimeVersionMetadata.from_metadata(
             tuple(request.headers.items())
         )
         if incompat_details is None:
             incompat_details = self._local_metadata.check_compatibility(peer_metadata)
-        if incompat_details is None:
+        if incompat_details is None or not self._reject_incompatible:
             return
 
         raise FlowerError(
