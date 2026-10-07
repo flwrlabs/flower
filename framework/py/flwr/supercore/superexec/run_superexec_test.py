@@ -39,6 +39,7 @@ def _run_superexec_one_launch(
     launch_result: LaunchResult,
     task_poll_interval: str | None = None,
     launch_elapsed: float = 0.0,
+    reconcile_elapsed: float = 0.0,
 ) -> tuple[Mock, Mock, Mock, Mock, Mock]:
     """Run one SuperExec launch loop and stop at the next capacity check."""
     if task_poll_interval is None:
@@ -46,16 +47,27 @@ def _run_superexec_one_launch(
     else:
         monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", task_poll_interval)
 
+    elapsed = 0.0
+
+    def advance_clock(seconds: float) -> None:
+        nonlocal elapsed
+        elapsed += seconds
+
+    def launch_task(**_kwargs: Any) -> LaunchResult:
+        advance_clock(launch_elapsed)
+        return launch_result
+
     task = Task(task_id=123, type=TaskType.AGENT_APP, fab_hash="fab-hash")
     client = Mock()
     client.AcquireTask.return_value = AcquireTaskResponse(task=task, token="token-123")
     plugin = Mock()
     plugin.supported_task_types = AutoExecPlugin.supported_task_types
-    plugin.launch_task.return_value = launch_result
+    plugin.launch_task.side_effect = launch_task
     log = Mock()
 
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
     executor = Mock()
+    executor.reconcile.side_effect = lambda: advance_clock(reconcile_elapsed)
     executor.get_eligible_capacity.side_effect = [
         (set(AutoExecPlugin.supported_task_types), set()),
         KeyboardInterrupt(),
@@ -75,9 +87,9 @@ def _run_superexec_one_launch(
     monkeypatch.setattr(
         run_superexec_module,
         "monotonic",
-        Mock(side_effect=[0.0, 0.0, launch_elapsed]),
+        lambda: elapsed,
     )
-    sleep_mock = Mock()
+    sleep_mock = Mock(side_effect=advance_clock)
     monkeypatch.setattr("flwr.supercore.superexec.run_superexec.time.sleep", sleep_mock)
 
     with pytest.raises(KeyboardInterrupt):
@@ -326,14 +338,21 @@ def test_run_superexec_logs_non_accepted_launch_result(
 
 
 @pytest.mark.parametrize(
-    ("launch_elapsed", "expected_sleep"), [(25.0, 5.0), (35.0, 0.0)]
+    ("launch_elapsed", "reconcile_elapsed", "expected_sleep"),
+    [(25.0, 0.0, 5.0), (35.0, 0.0, 0.0), (0.0, 5.0, 15.0)],
 )
 def test_run_superexec_waits_only_for_remaining_claim_lease(
-    monkeypatch: pytest.MonkeyPatch, launch_elapsed: float, expected_sleep: float
+    monkeypatch: pytest.MonkeyPatch,
+    launch_elapsed: float,
+    reconcile_elapsed: float,
+    expected_sleep: float,
 ) -> None:
-    """A slow failed launch does not restart the initial claim lease wait."""
+    """Launch and reconciliation time count toward the initial claim lease."""
     _, _, _, _, sleep_mock = _run_superexec_one_launch(
-        monkeypatch, LaunchResult.failed("launch failed"), launch_elapsed=launch_elapsed
+        monkeypatch,
+        LaunchResult.failed("launch failed"),
+        launch_elapsed=launch_elapsed,
+        reconcile_elapsed=reconcile_elapsed,
     )
 
     assert sum(call.args[0] for call in sleep_mock.call_args_list) == expected_sleep

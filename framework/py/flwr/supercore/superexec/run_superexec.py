@@ -139,14 +139,15 @@ def _wait_for_claim_expiry(
     executor: Executor, claim_response_at: float | None = None
 ) -> None:
     """Wait through the claim lease using the response time when known."""
-    remaining = float(_UNCERTAIN_CLAIM_BACKOFF_SECONDS)
-    if claim_response_at is not None:
-        remaining = max(0.0, remaining - (monotonic() - claim_response_at))
-    while remaining > 0:
-        interval = min(_TASK_WAIT_TIMEOUT_MS / 1_000, remaining)
-        time.sleep(interval)
+    deadline = (
+        claim_response_at if claim_response_at is not None else monotonic()
+    ) + _UNCERTAIN_CLAIM_BACKOFF_SECONDS
+    while True:
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            return
+        time.sleep(min(_TASK_WAIT_TIMEOUT_MS / 1_000, remaining))
         executor.reconcile()
-        remaining -= interval
 
 
 def _backoff_after_empty_poll(started_at: float, task_poll_interval: float) -> None:
