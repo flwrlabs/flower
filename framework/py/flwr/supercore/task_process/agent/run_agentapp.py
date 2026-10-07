@@ -64,6 +64,7 @@ from flwr.supercore.constant import (
     FORCE_EXIT_TIMEOUT_SECONDS,
     SYSTEM_MESSAGE_TYPE,
     TELEMETRY_TIMEOUT_SECONDS,
+    TaskType,
 )
 from flwr.supercore.exit import (
     ExitCode,
@@ -82,6 +83,7 @@ from flwr.supercore.logger import (
 )
 from flwr.supercore.object_ref import load_app
 from flwr.supercore.run import Run
+from flwr.supercore.runtime_timing import RuntimeTiming
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
@@ -210,6 +212,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
         runtime_dependency_install: bool,
         preloaded: PreloadedAgentApp | None,
     ) -> None:
+        self._timing = RuntimeTiming(task_type=TaskType.AGENT_APP)
         self._runtime_api_address = runtime_api_address
         self._log_queue = log_queue
         self._token = token
@@ -238,6 +241,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
 
     def run(self) -> int:  # pylint: disable=too-many-locals,too-many-statements
         """Execute the AgentApp task and return its Flower exit code."""
+        self._timing.mark("agent.task_enter")
         exit_code = ExitCode.SUCCESS
         try:
             grid = self._grid
@@ -248,14 +252,19 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             self._heartbeat_sender.start()
 
             log(DEBUG, "[flwr-agentapp] Pull task input")
-            res: PullTaskInputResponse = grid._runtime_client.PullTaskInput(
-                PullTaskInputRequest()
-            )
+            with self._timing.span("agent.pull_input"):
+                res: PullTaskInputResponse = grid._runtime_client.PullTaskInput(
+                    PullTaskInputRequest()
+                )
 
             self._context = context_from_proto(res.context)
             run = run_from_proto(res.run)
             fab = fab_from_proto(res.fab)
             task_id = res.task_id
+            self._timing.run_id = run.run_id
+            self._timing.task_id = task_id
+            self._timing.fab_hash = fab.hash_str
+            self._timing.mark("agent.input_ready")
             TaskIdentity.task_id = task_id
             TaskIdentity.run_id = run.run_id
             TaskIdentity.node_id = self._context.node_id
@@ -272,35 +281,41 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             )
 
             # Initialize the AgentApp session
-            prompt, instruction_metadata = pull_prompt(grid)
-            self._agent_events = RuntimeAgentEvents(grid._runtime_client)
-            agent_grid = RuntimeAgentGrid(
-                grid, self._agent_events, self._context.node_id, instruction_metadata
-            )
-            self._agent_events.emit(
-                {"type": "message", "role": "user", "content": prompt}
-            )
-            agent_runtime = AgentRuntime(
-                stub=grid._runtime_client,
-                run_id=self._context.run_id,
-                task_id=task_id,
-                start_run_request=StartRunRequest(
-                    fab=fab_to_proto(fab),
-                    override_config=user_config_to_proto(run.override_config),
-                    override_federation_config=res.federation_config,
-                    federation=run.federation_id,
-                    series_id=run.series_id,
-                ),
-                events=self._agent_events,
-            )
-            agent = RuntimeAgentSession(
-                prompt=prompt,
-                connectors=RuntimeAgentConnectors(agent_runtime),
-                events=self._agent_events,
-                grid=agent_grid,
-            )
+            with self._timing.span("agent.pull_prompt"):
+                prompt, instruction_metadata = pull_prompt(grid)
+            with self._timing.span("agent.session"):
+                self._agent_events = RuntimeAgentEvents(grid._runtime_client)
+                agent_grid = RuntimeAgentGrid(
+                    grid,
+                    self._agent_events,
+                    self._context.node_id,
+                    instruction_metadata,
+                )
+                self._agent_events.emit(
+                    {"type": "message", "role": "user", "content": prompt}
+                )
+                agent_runtime = AgentRuntime(
+                    stub=grid._runtime_client,
+                    run_id=self._context.run_id,
+                    task_id=task_id,
+                    start_run_request=StartRunRequest(
+                        fab=fab_to_proto(fab),
+                        override_config=user_config_to_proto(run.override_config),
+                        override_federation_config=res.federation_config,
+                        federation=run.federation_id,
+                        series_id=run.series_id,
+                    ),
+                    events=self._agent_events,
+                )
+                agent = RuntimeAgentSession(
+                    prompt=prompt,
+                    connectors=RuntimeAgentConnectors(agent_runtime),
+                    events=self._agent_events,
+                    grid=agent_grid,
+                )
 
-            app_path, agent_app, agent_app_attr = self._prepare_task_app(fab, run)
+            with self._timing.span("agent.prepare"):
+                app_path, agent_app, agent_app_attr = self._prepare_task_app(fab, run)
             self._context.run_config = get_fused_config_from_dir(
                 app_path, run.override_config
             )
@@ -319,9 +334,12 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
 
             if agent_app is None:
                 assert agent_app_attr is not None
-                agent_app = _load_agentapp_component(agent_app_attr, app_path)
-            agent_app(agent=agent, context=self._context)
-            self._agent_events.close()
+                with self._timing.span("agent.load"):
+                    agent_app = _load_agentapp_component(agent_app_attr, app_path)
+            with self._timing.span("agent.user_code"):
+                agent_app(agent=agent, context=self._context)
+            with self._timing.span("agent.events_drain"):
+                self._agent_events.close()
 
             # Set sub_status and details for successful completion
             with self._lock:
@@ -359,28 +377,31 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 or run.fab_version != self._preloaded.fab_version
             ):
                 raise RuntimeError("Task FAB does not match the preloaded AgentApp.")
+            self._timing.mark("agent.preloaded")
             return self._preloaded.app_path, self._preloaded.app, None
 
         log(DEBUG, "[flwr-agentapp] Start FAB installation.")
-        install_from_fab(fab.content, skip_prompt=True)
+        with self._timing.span("agent.fab_install"):
+            install_from_fab(fab.content, skip_prompt=True)
         fab_id, fab_version = get_fab_metadata(fab.content)
         app_path = get_project_dir(fab_id, fab_version, fab.hash_str)
         if self._runtime_dependency_install:
             log(DEBUG, "[flwr-agentapp] Installing app dependencies.")
-            self._runtime_env_dir = install_app_dependencies(
-                app_path,
-                launch_id=self._token,
-                run_id=run.run_id,
-                index_context={
-                    "component": "agentapp",
-                    "project_dir": str(app_path),
-                    "run_id": run.run_id,
-                    "launch_id": self._token,
-                    "fab_id": run.fab_id,
-                    "fab_version": run.fab_version,
-                    "fab_hash": fab.hash_str,
-                },
-            )
+            with self._timing.span("agent.dependencies"):
+                self._runtime_env_dir = install_app_dependencies(
+                    app_path,
+                    launch_id=self._token,
+                    run_id=run.run_id,
+                    index_context={
+                        "component": "agentapp",
+                        "project_dir": str(app_path),
+                        "run_id": run.run_id,
+                        "launch_id": self._token,
+                        "fab_id": run.fab_id,
+                        "fab_version": run.fab_version,
+                        "fab_hash": fab.hash_str,
+                    },
+                )
         else:
             log(DEBUG, "[flwr-agentapp] Runtime dependency installation is disabled.")
 

@@ -24,6 +24,7 @@ from typing import cast
 
 import requests
 
+from flwr.supercore.runtime_timing import RuntimeTiming
 from flwr.supercore.task_process.usage import (
     TaskUsageRecorder,
     task_usage_from_open_response,
@@ -137,16 +138,18 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
        terminal success or failure event arrives.
     """
     stream = request.get("stream") is True
+    timing = RuntimeTiming.for_task()
 
     # Send one HTTP request and let HTTP status represent transport failure.
     try:
-        response = requests.post(
-            responses_url,
-            headers=headers,
-            json=request,
-            timeout=timeout,
-            stream=stream,
-        )
+        with timing.span("model.provider_post"):
+            response = requests.post(
+                responses_url,
+                headers=headers,
+                json=request,
+                timeout=timeout,
+                stream=stream,
+            )
     except requests.RequestException as exc:
         raise ModelProviderError(detail=str(exc)) from exc
 
@@ -202,6 +205,7 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
             event = dict(event)
             event["type"] = event_name
 
+        timing.first_event("model.provider", str(event.get("type", "")))
         last_event = event
         if on_stream_event is not None:
             on_stream_event(event)

@@ -55,6 +55,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.runtime_timing import RuntimeTiming
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 
@@ -84,6 +85,12 @@ def acquire_task(request: AcquireTaskRequest, state: CoreState) -> AcquireTaskRe
     for task in tasks:
         eligible = task.type in supported_types or task.fab_hash in agentapp_fab_hashes
         if eligible and (token := state.claim_task(task.task_id)):
+            RuntimeTiming(
+                run_id=task.run_id,
+                task_id=task.task_id,
+                task_type=task.type,
+                fab_hash=task.fab_hash or None,
+            ).mark("runtime.task_claimed")
             return AcquireTaskResponse(task=task, token=token)
     return AcquireTaskResponse()
 
@@ -138,6 +145,13 @@ def create_task(
             ApiErrorCode.RUNTIME_TASK_CREATION_FAILED, "Failed to create task"
         )
 
+    RuntimeTiming(
+        run_id=run_id,
+        task_id=created_task_id,
+        parent_task_id=task.task_id,
+        task_type=request.type,
+        fab_hash=request.fab_hash or None,
+    ).mark("runtime.child_created")
     return CreateTaskResponse(task_id=created_task_id)
 
 
@@ -182,7 +196,20 @@ def push_task_events(
         event.run_id = task.run_id
         event.task_id = task.task_id
 
-    if not state.store_task_events(request.events):
+    timing = RuntimeTiming(
+        run_id=task.run_id, task_id=task.task_id, task_type=task.type
+    )
+    # Only text-bearing batches need delivery probes, not every stream event.
+    has_text = any(
+        event.event == "response.output_text.delta" for event in request.events
+    )
+    if has_text:
+        with timing.span("runtime.text_events_store"):
+            stored = state.store_task_events(request.events)
+        timing.mark("runtime.text_events_stored", success=stored)
+    else:
+        stored = state.store_task_events(request.events)
+    if not stored:
         log(
             ERROR,
             "Task events could not be stored for task %d of run %d.",

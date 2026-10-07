@@ -48,6 +48,7 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorResponse,
 )
 from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.runtime_timing import RuntimeTiming
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
@@ -69,6 +70,7 @@ class RuntimeAgentEvents(AgentEvents):
 
     def __init__(self, stub: RuntimeHttpClient) -> None:
         self._stub = stub
+        self._timing = RuntimeTiming.for_task()
         self._queue: Queue[TaskEvent | object] = Queue(
             maxsize=_EVENT_PUBLISH_QUEUE_SIZE
         )
@@ -109,6 +111,7 @@ class RuntimeAgentEvents(AgentEvents):
             event=event_type,
             data=strict_json_dumps(event, compact=True),
         )
+        self._timing.first_event("agent.events_enqueue", event_type)
         self._queue.put(task_event)
         self._raise_worker_error()
 
@@ -128,7 +131,10 @@ class RuntimeAgentEvents(AgentEvents):
     def _flush(self, batch: list[TaskEvent]) -> None:
         """Publish one batch of task events."""
         try:
-            self._stub.PushTaskEvents(PushTaskEventsRequest(events=batch))
+            with self._timing.span("agent.push_events"):
+                self._stub.PushTaskEvents(PushTaskEventsRequest(events=batch))
+            for event in batch:
+                self._timing.first_event("agent.events_push_returned", event.event)
         except Exception as err:  # pylint: disable=broad-exception-caught
             with self._error_lock:
                 if self._error is None:
