@@ -37,8 +37,7 @@ from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.http_logging import configure_uvicorn_logging
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health
-from flwr.supercore.routers.runtime import responses_router
-from flwr.supercore.routers.runtime import router as runtime_router
+from flwr.supercore.routers.runtime import create_runtime_router, responses_router
 from flwr.supercore.version import package_version
 from flwr.superlink import extensions
 from flwr.superlink.config_loader import (
@@ -84,12 +83,6 @@ _CONTROL_VERSION_DEPENDENCY = Depends(
         component_name="SuperLink",
         connection_name="flwr CLI <-> SuperLink Control API",
         reject_incompatible=False,
-    )
-)
-_RUNTIME_VERSION_DEPENDENCY = Depends(
-    VersionDependency(
-        component_name="SuperLink",
-        connection_name="Caller <-> SuperLink Runtime API",
     )
 )
 
@@ -235,9 +228,7 @@ def create_app(  # pylint: disable=too-many-statements
     fastapi_app.include_router(
         control_router, dependencies=[_CONTROL_VERSION_DEPENDENCY]
     )
-    fastapi_app.include_router(
-        runtime_router, dependencies=[_RUNTIME_VERSION_DEPENDENCY]
-    )
+    fastapi_app.include_router(create_runtime_router("SuperLink"))
     fastapi_app.include_router(responses_router)
 
     # Extension hooks
