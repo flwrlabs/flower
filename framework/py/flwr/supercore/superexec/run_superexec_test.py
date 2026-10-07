@@ -15,10 +15,13 @@
 """Tests for SuperExec runtime setup."""
 
 
+import os
+import signal
 from logging import ERROR, WARNING
 from typing import Any
 from unittest.mock import Mock
 
+import httpx
 import pytest
 
 from flwr.proto.runtime_pb2 import AcquireTaskResponse  # pylint: disable=E0611
@@ -36,7 +39,7 @@ from . import run_superexec as run_superexec_module
 
 def _run_superexec_one_launch(
     monkeypatch: pytest.MonkeyPatch,
-    launch_result: LaunchResult,
+    launch_result: LaunchResult | Exception,
     task_poll_interval: str | None = None,
     launch_elapsed: float = 0.0,
     reconcile_elapsed: float = 0.0,
@@ -55,11 +58,14 @@ def _run_superexec_one_launch(
 
     def launch_task(**_kwargs: Any) -> LaunchResult:
         advance_clock(launch_elapsed)
+        assert isinstance(launch_result, LaunchResult)
         return launch_result
 
     task = Task(task_id=123, type=TaskType.AGENT_APP, fab_hash="fab-hash")
     client = Mock()
     client.AcquireTask.return_value = AcquireTaskResponse(task=task, token="token-123")
+    if isinstance(launch_result, Exception):
+        client.AcquireTask.side_effect = launch_result
     plugin = Mock()
     plugin.supported_task_types = AutoExecPlugin.supported_task_types
     plugin.launch_task.side_effect = launch_task
@@ -295,6 +301,30 @@ def test_run_superexec_preserves_accepted_launch_behavior(
     log.assert_not_called()
     assert stub.AcquireTask.call_args.args[0].wait_timeout_ms == 5_000
     sleep_mock.assert_not_called()
+
+
+def test_run_superexec_shuts_down_on_unauthorized_acquisition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Authentication failure requests graceful shutdown without retrying."""
+    error = httpx.HTTPStatusError(
+        "Unauthorized",
+        request=httpx.Request("POST", "http://runtime.example/v1/runtime/acquire-task"),
+        response=httpx.Response(401),
+    )
+    kill = Mock(side_effect=KeyboardInterrupt())
+    monkeypatch.setattr("flwr.supercore.superexec.run_superexec.os.kill", kill)
+
+    _, plugin, client, executor, sleep_mock = _run_superexec_one_launch(
+        monkeypatch, error
+    )
+
+    kill.assert_called_once_with(os.getpid(), signal.SIGINT)
+    client.AcquireTask.assert_called_once()
+    plugin.launch_task.assert_not_called()
+    sleep_mock.assert_not_called()
+    client.close.assert_called_once_with()
+    executor.close.assert_called_once_with()
 
 
 @pytest.mark.parametrize(

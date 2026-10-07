@@ -17,6 +17,7 @@
 
 import math
 import os
+import signal
 import time
 from logging import ERROR, WARNING
 from time import monotonic
@@ -317,6 +318,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                 ValueError,
             ) as exc:
                 if isinstance(exc, httpx.HTTPStatusError):
+                    if exc.response.status_code == httpx.codes.UNAUTHORIZED:
+                        os.kill(os.getpid(), signal.SIGINT)
                     if exc.response.status_code not in (
                         httpx.codes.SERVICE_UNAVAILABLE,
                         httpx.codes.GATEWAY_TIMEOUT,
