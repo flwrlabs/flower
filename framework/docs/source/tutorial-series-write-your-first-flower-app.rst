@@ -156,7 +156,7 @@ SuperGrid:
     # Run your app
     $ flwr run . supergrid
 
-Then, visit the `All runs page <https://flower.ai/runs>`__, open the new run, and
+Then, visit the `All runs <https://flower.ai/runs>`__ page, open the new run, and
 inspect its logs. You should see the new messages printed by the ``ServerApp`` at the
 beginning and end of the logs.
 
