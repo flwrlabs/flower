@@ -17,9 +17,8 @@
 import binascii
 import datetime
 from base64 import b64decode
-from typing import Annotated
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import HTTPException, Request, status
 
 from flwr.common.constant import (
     PUBLIC_KEY_HEADER,
@@ -32,17 +31,16 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
     RegisterNodeFleetRequest,
 )
-from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.date import now
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, verify_signature
 from flwr.superlink.dependencies.linkstate import get_linkstate
 
 
-def authenticate_node(
-    request: Request,
-    state: Annotated[LinkState, Depends(get_linkstate)],
-) -> None:
+def authenticate_node(request: Request) -> None:
     """Validate the signed timestamp and claimed node identity."""
+    if getattr(request.state, "fleet_node_authenticated", False):
+        return
+
     try:
         # gRPC binary metadata is carried as base64 in HTTP header values.
         public_key = b64decode(request.headers[PUBLIC_KEY_HEADER], validate=True)
@@ -73,10 +71,12 @@ def authenticate_node(
                 if hasattr(protobuf_request, "node")
                 else protobuf_request.node_id
             )
-            if state.get_node_id_by_public_key(public_key) != node_id:
+            if get_linkstate(request).get_node_id_by_public_key(public_key) != node_id:
                 raise ValueError("Invalid node ID")
     except (KeyError, ValueError, TypeError, UnicodeError, binascii.Error) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid SuperNode authentication",
         ) from exc
+
+    request.state.fleet_node_authenticated = True

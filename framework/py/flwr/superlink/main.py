@@ -47,6 +47,7 @@ from flwr.superlink.config_loader import (
     get_objectstore_linkstate_factories,
     load_control_authn_plugin,
     load_control_event_log_plugin,
+    load_fleet_event_log_plugin,
 )
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.routers.control import router as control_router
@@ -55,6 +56,10 @@ from flwr.superlink.routers.control.middlewares import (
     ControlEventLogMiddleware,
     ControlLicenseMiddleware,
     ControlSensitiveResponseMiddleware,
+)
+from flwr.superlink.routers.fleet.middlewares import (
+    FleetEventLogMiddleware,
+    FleetNodeAuthMiddleware,
 )
 from flwr.superlink.servicer.runtime import runtime_handlers
 
@@ -120,6 +125,8 @@ def _get_middleware() -> list[Middleware]:
         Middleware(ControlLicenseMiddleware),
         Middleware(ProtobufTranslationMiddleware),
         Middleware(ControlEventLogMiddleware),
+        Middleware(FleetNodeAuthMiddleware),
+        Middleware(FleetEventLogMiddleware),
     ]
 
 
@@ -140,6 +147,9 @@ def create_app(  # pylint: disable=too-many-statements
             if os.getenv("FLWR_ENABLE_EVENT_LOG") == "1"
             else None
         )
+        fleet_log_plugin = (
+            load_fleet_event_log_plugin() if event_log_plugin is not None else None
+        )
     else:
         is_simulation = config.simulation
         database = config.database
@@ -148,6 +158,7 @@ def create_app(  # pylint: disable=too-many-statements
         fleet_api_type = config.fleet_api_type
         authn_plugin = config.authn_plugin
         event_log_plugin = config.event_log_plugin
+        fleet_log_plugin = config.fleet_event_log_plugin
 
     federation_manager = get_federation_manager(is_simulation=is_simulation)
     _, linkstate_factory = get_objectstore_linkstate_factories(
@@ -215,6 +226,7 @@ def create_app(  # pylint: disable=too-many-statements
     fastapi_app.state.fleet_api_type = fleet_api_type
     fastapi_app.state.account_access_dep = AccountAccessDependency(authn_plugin)
     fastapi_app.state.control_event_log_plugin = event_log_plugin
+    fastapi_app.state.fleet_event_log_plugin = fleet_log_plugin
 
     # Core APIs
     fastapi_app.include_router(health.router)

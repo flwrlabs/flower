@@ -43,7 +43,10 @@ from flwr.supercore.primitives.asymmetric import (
 )
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.superlink import extensions, main
+from flwr.superlink.servicer.fleet import fleet_handlers
 
+from . import middlewares
+from .node_auth import authenticate_node
 from .router import router as fleet_router
 
 
@@ -130,3 +133,62 @@ def test_fleet_http_handlers_and_authentication(
         headers=headers,
     )
     assert response.status_code == 401
+
+
+def test_fleet_http_event_log(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Log Fleet calls before and after the handler when event logging is enabled."""
+    monkeypatch.setattr(extensions, "get_middleware", lambda: ())
+    monkeypatch.setattr(extensions, "configure_app", lambda _: None)
+    monkeypatch.setattr(
+        main, "load_control_event_log_plugin", lambda: Mock(spec=EventLogWriterPlugin)
+    )
+    fleet_plugin = Mock(spec=EventLogWriterPlugin)
+    load_fleet_plugin = Mock(return_value=fleet_plugin)
+    monkeypatch.setattr(main, "load_fleet_event_log_plugin", load_fleet_plugin)
+
+    monkeypatch.delenv("FLWR_ENABLE_EVENT_LOG", raising=False)
+    main.create_app()
+    load_fleet_plugin.assert_not_called()
+
+    monkeypatch.setenv("FLWR_ENABLE_EVENT_LOG", "1")
+    expected = RegisterNodeFleetResponse(node_id=42)
+    monkeypatch.setattr(fleet_handlers, "register_node", lambda **_: expected)
+
+    app = main.create_app()
+    app.include_router(fleet_router)
+    app.dependency_overrides[authenticate_node] = lambda: None
+    monkeypatch.setattr(middlewares, "authenticate_node", lambda _: None)
+    client = TestClient(app, raise_server_exceptions=False)
+    load_fleet_plugin.assert_called_once_with()
+
+    response = client.post(
+        "/v1/fleet/register-node",
+        content=RegisterNodeFleetRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 200
+    assert fleet_plugin.write_log.call_count == 2
+    assert fleet_plugin.compose_log_before_event.call_args.kwargs["method_name"] == (
+        "/v1/fleet/register-node"
+    )
+    assert fleet_plugin.compose_log_after_event.call_args.kwargs["response"] == expected
+
+    client.get("/health")
+    assert fleet_plugin.write_log.call_count == 2
+
+    def fail(**_: object) -> RegisterNodeFleetResponse:
+        raise RuntimeError("handler failed")
+
+    monkeypatch.setattr(fleet_handlers, "register_node", fail)
+    response = client.post(
+        "/v1/fleet/register-node",
+        content=RegisterNodeFleetRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+    assert response.status_code == 500
+    assert isinstance(
+        fleet_plugin.compose_log_after_event.call_args.kwargs["response"],
+        RuntimeError,
+    )
+    assert fleet_plugin.write_log.call_count == 4

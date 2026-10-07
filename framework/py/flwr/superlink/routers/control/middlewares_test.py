@@ -671,6 +671,7 @@ def test_create_app_loads_event_log_with_enabled_env_var(
     expected_plugin = _create_event_log_plugin()
     load_plugin = Mock(return_value=expected_plugin)
     monkeypatch.setattr(superlink_main, "load_control_event_log_plugin", load_plugin)
+    monkeypatch.setattr(superlink_main, "load_fleet_event_log_plugin", Mock())
     monkeypatch.setenv("FLWR_ENABLE_EVENT_LOG", "1")
 
     app = superlink_main.create_app()
