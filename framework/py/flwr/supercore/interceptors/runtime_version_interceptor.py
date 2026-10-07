@@ -271,8 +271,8 @@ def create_control_runtime_version_server_interceptor(
         send_warning_metadata=send_warning_metadata,
         reject_incompatible=reject_incompatible,
         warning_message=(
-            "The SuperLink gRPC Control API endpoint is deprecated and may be "
-            "removed soon. Please upgrade to Flower 1.37.0 or newer to use "
-            "the HTTP Control API."
+            "The gRPC Control API is deprecated and may be removed soon. "
+            "Please upgrade to Flower 1.37.0 or newer to use the HTTP "
+            "Control API."
         ),
     )
