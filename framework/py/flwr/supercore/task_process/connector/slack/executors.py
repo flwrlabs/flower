@@ -76,10 +76,16 @@ def _call_slack_api(
     return payload
 
 
-def _csv(arguments: JSONObject, name: str, choices: tuple[str, ...]) -> list[str]:
+def _csv(
+    arguments: JSONObject,
+    name: str,
+    choices: tuple[str, ...],
+    *,
+    default: tuple[str, ...],
+) -> list[str]:
     """Parse one comma-separated MCP-style option for a Web API request."""
     raw = optional_string(arguments.get(name), "Slack", name)
-    values = list(choices) if raw is None else [part.strip() for part in raw.split(",")]
+    values = list(default) if raw is None else [part.strip() for part in raw.split(",")]
     if not values or any(value not in choices for value in values):
         raise ValueError(f"Slack {name} contains an unsupported value.")
     return list(dict.fromkeys(values))
@@ -144,11 +150,13 @@ def _search_payload(
     )
     payload: JSONObject = {
         "query": " ".join(part for part in query_parts if part),
-        "content_types": _csv(arguments, "content_types", _SEARCH_CONTENT_TYPES),
+        "content_types": _csv(
+            arguments, "content_types", _SEARCH_CONTENT_TYPES, default=("messages",)
+        ),
         "channel_types": (
             ["public_channel"]
             if channel_types == ("public_channel",)
-            else _csv(arguments, "channel_types", channel_types)
+            else _csv(arguments, "channel_types", channel_types, default=channel_types)
         ),
     }
     if terms:

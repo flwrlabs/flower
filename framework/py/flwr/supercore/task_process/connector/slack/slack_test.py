@@ -57,7 +57,7 @@ def test_slack_search_defaults() -> None:
     )
     assert request.call_args.kwargs["json"] == {
         "query": "release",
-        "content_types": ["messages", "files"],
+        "content_types": ["messages"],
         "channel_types": ["public_channel"],
         "include_bots": False,
         "include_context_messages": True,
@@ -173,7 +173,11 @@ def test_slack_search_only_my_channels_keeps_shared_files() -> None:
     ) as request:
         result = registry.invoke_connector(
             "slack_search_public",
-            {"query": "release", "only_my_channels": True},
+            {
+                "query": "release",
+                "only_my_channels": True,
+                "content_types": "messages,files",
+            },
             Mock(),
             _CREDENTIALS,
             {},
@@ -252,7 +256,11 @@ def test_slack_search_concise_response_keeps_result_identifiers() -> None:
     with patch(_HTTP_REQUEST, return_value=response):
         result = registry.invoke_connector(
             "slack_search_public",
-            {"query": "release", "response_format": "concise"},
+            {
+                "query": "release",
+                "response_format": "concise",
+                "content_types": "messages,files",
+            },
             Mock(),
             _CREDENTIALS,
             {},
