@@ -180,7 +180,6 @@ def test_create_app_exposes_configured_dependencies(
         authn_plugin=Mock(),
         event_log_plugin=None,
         fleet_event_log_plugin=fleet_event_log_plugin,
-        enable_event_log=False,
     )
     lifespan_class = Mock()
 

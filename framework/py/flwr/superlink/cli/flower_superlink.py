@@ -43,7 +43,9 @@ from flwr.common.constant import (
     ISOLATION_MODE_SUBPROCESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
+    EventLogWriterType,
 )
+from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
     add_FleetServicer_to_server,
 )
@@ -88,12 +90,15 @@ from flwr.superlink.config_loader import (
     SuperLinkLifespanConfig,
     load_control_authn_plugin,
     load_control_event_log_plugin,
-    load_fleet_event_log_plugin,
 )
 from flwr.superlink.servicer.control import run_control_api_grpc
 
 try:
-    from flwr.ee import add_ee_args_superlink, get_ee_artifact_provider
+    from flwr.ee import (
+        add_ee_args_superlink,
+        get_ee_artifact_provider,
+        get_fleet_event_log_writer_plugins,
+    )
 except ImportError:
 
     # pylint: disable-next=unused-argument
@@ -103,6 +108,12 @@ except ImportError:
     def get_ee_artifact_provider(config_path: str) -> ArtifactProvider:
         """Return the EE artifact provider."""
         raise NotImplementedError("No artifact provider is currently supported.")
+
+    def get_fleet_event_log_writer_plugins() -> dict[str, type[EventLogWriterPlugin]]:
+        """Return all Fleet API event log writer plugins."""
+        raise NotImplementedError(
+            "No event log writer plugins are currently supported."
+        )
 
 
 class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
@@ -218,7 +229,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         """Start the current Fleet gRPC request-response API."""
         interceptors = [NodeAuthServerInterceptor(self.state_factory)]
         if self.config.enable_event_log:
-            fleet_log_plugin = self.config.fleet_event_log_plugin
+            fleet_log_plugin = _try_obtain_fleet_event_log_writer_plugin()
             if fleet_log_plugin is not None:
                 interceptors.append(FleetEventLogInterceptor(fleet_log_plugin))
                 log(INFO, "Flower Fleet event logging enabled")
@@ -342,11 +353,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         if getattr(args, "enable_event_log", False)
         else None
     )
-    fleet_event_log_plugin = (
-        load_fleet_event_log_plugin()
-        if getattr(args, "enable_event_log", False)
-        else None
-    )
 
     # Load artifact provider if the args.artifact_provider_config is provided
     artifact_provider = None
@@ -420,7 +426,7 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         superexec_auth_secret=superexec_auth_secret,
         authn_plugin=authn_plugin,
         event_log_plugin=event_log_plugin,
-        fleet_event_log_plugin=fleet_event_log_plugin,
+        fleet_event_log_plugin=None,
         enable_event_log=getattr(args, "enable_event_log", False),
         artifact_provider=artifact_provider,
         enable_supernode_auth=enable_supernode_auth,
@@ -550,6 +556,20 @@ def _get_superexec_command(
 def _runtime_dependency_install_default() -> bool:
     """Return default runtime dependency installation setting."""
     return os.getenv(FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION) != "1"
+
+
+def _try_obtain_fleet_event_log_writer_plugin() -> EventLogWriterPlugin | None:
+    """Return an instance of the Fleet Servicer event log writer plugin."""
+    try:
+        all_plugins: dict[str, type[EventLogWriterPlugin]] = (
+            get_fleet_event_log_writer_plugins()
+        )
+        plugin_class = all_plugins[EventLogWriterType.STDOUT]
+        return plugin_class()
+    except KeyError:
+        sys.exit("No Fleet API event log writer plugin is provided.")
+    except NotImplementedError:
+        sys.exit("No Fleet API event log writer plugins are currently supported.")
 
 
 def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917

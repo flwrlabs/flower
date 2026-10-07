@@ -140,30 +140,19 @@ def test_fleet_http_handlers_and_authentication(
 
 
 def test_fleet_http_event_log(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Log Fleet calls before and after the handler when event logging is enabled."""
+    """Log Fleet calls before and after the handler when a writer is provided."""
     monkeypatch.setattr(extensions, "get_middleware", lambda: ())
     monkeypatch.setattr(extensions, "configure_app", lambda _: None)
-    monkeypatch.setattr(
-        main, "load_control_event_log_plugin", lambda: Mock(spec=EventLogWriterPlugin)
-    )
     fleet_plugin = Mock(spec=EventLogWriterPlugin)
-    load_fleet_plugin = Mock(return_value=fleet_plugin)
-    monkeypatch.setattr(main, "load_fleet_event_log_plugin", load_fleet_plugin)
-
-    monkeypatch.delenv("FLWR_ENABLE_EVENT_LOG", raising=False)
-    main.create_app()
-    load_fleet_plugin.assert_not_called()
-
-    monkeypatch.setenv("FLWR_ENABLE_EVENT_LOG", "1")
     expected = RegisterNodeFleetResponse(node_id=42)
     monkeypatch.setattr(fleet_handlers, "register_node", lambda **_: expected)
 
     app = main.create_app()
+    app.state.fleet_event_log_plugin = fleet_plugin
     app.include_router(fleet_router)
     app.dependency_overrides[authenticate_node] = lambda: None
     monkeypatch.setattr(middlewares, "authenticate_node", lambda _: None)
     client = TestClient(app, raise_server_exceptions=False)
-    load_fleet_plugin.assert_called_once_with()
 
     response = client.post(
         "/v1/fleet/register-node",
