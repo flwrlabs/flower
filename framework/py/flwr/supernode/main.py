@@ -26,7 +26,7 @@ from fastapi import Depends, FastAPI
 from flwr import __version__
 from flwr.supercore import log
 from flwr.supercore.dependencies.runtime import RuntimeHandlers
-from flwr.supercore.dependencies.runtime_version import RuntimeVersionDependency
+from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health
@@ -37,7 +37,7 @@ from flwr.supernode.servicer.runtime import runtime_handlers
 
 _RUNTIME_HANDLERS: RuntimeHandlers[NodeState] = runtime_handlers
 _RUNTIME_VERSION_DEPENDENCY = Depends(
-    RuntimeVersionDependency(
+    VersionDependency(
         component_name="SuperNode",
         connection_name="Caller <-> SuperNode Runtime API",
     )

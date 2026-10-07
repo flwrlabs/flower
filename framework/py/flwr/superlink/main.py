@@ -32,7 +32,7 @@ from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE
 from flwr.supercore import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.dependencies.runtime import RuntimeHandlers
-from flwr.supercore.dependencies.runtime_version import RuntimeVersionDependency
+from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.http_logging import configure_uvicorn_logging
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
@@ -75,7 +75,7 @@ if TYPE_CHECKING:
 
 _RUNTIME_HANDLERS: RuntimeHandlers[LinkState] = runtime_handlers
 _RUNTIME_VERSION_DEPENDENCY = Depends(
-    RuntimeVersionDependency(
+    VersionDependency(
         component_name="SuperLink",
         connection_name="Caller <-> SuperLink Runtime API",
     )
