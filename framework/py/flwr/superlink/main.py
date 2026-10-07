@@ -194,6 +194,9 @@ def create_app(  # pylint: disable=too-many-statements
     )
     fastapi_app.state.superlink_lifespan = superlink_lifespan
     fastapi_app.state.linkstate_factory = linkstate_factory
+    fastapi_app.state.enable_supernode_auth = (
+        config.enable_supernode_auth if config else False
+    )
     fastapi_app.state.runtime_state_factory = linkstate_factory
     fastapi_app.state.runtime_state_factory_error = (
         ApiErrorCode.LINKSTATE_NOT_INITIALIZED,
