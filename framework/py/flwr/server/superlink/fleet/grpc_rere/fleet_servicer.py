@@ -46,7 +46,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
-from flwr.server.superlink.fleet.message_handler import message_handler
+from flwr.server.superlink.fleet.message_handler import fleet_handlers
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.object_store import ObjectStoreFactory
 
@@ -68,7 +68,7 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         self, request: RegisterNodeFleetRequest, context: grpc.ServicerContext
     ) -> RegisterNodeFleetResponse:
         """Register a node."""
-        return message_handler.register_node(
+        return fleet_handlers.register_node(
             request=request,
             state=self.state_factory.state(),
             enable_supernode_auth=self.enable_supernode_auth,
@@ -78,7 +78,7 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         self, request: ActivateNodeRequest, context: grpc.ServicerContext
     ) -> ActivateNodeResponse:
         """Activate a node."""
-        return message_handler.activate_node(
+        return fleet_handlers.activate_node(
             request=request,
             state=self.state_factory.state(),
         )
@@ -87,7 +87,7 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         self, request: DeactivateNodeRequest, context: grpc.ServicerContext
     ) -> DeactivateNodeResponse:
         """Deactivate a node."""
-        return message_handler.deactivate_node(
+        return fleet_handlers.deactivate_node(
             request=request,
             state=self.state_factory.state(),
         )
@@ -96,7 +96,7 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         self, request: UnregisterNodeFleetRequest, context: grpc.ServicerContext
     ) -> UnregisterNodeFleetResponse:
         """Unregister a node."""
-        return message_handler.unregister_node(
+        return fleet_handlers.unregister_node(
             request=request,
             state=self.state_factory.state(),
             enable_supernode_auth=self.enable_supernode_auth,
@@ -106,7 +106,7 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         self, request: SendNodeHeartbeatRequest, context: grpc.ServicerContext
     ) -> SendNodeHeartbeatResponse:
         """."""
-        return message_handler.send_node_heartbeat(
+        return fleet_handlers.send_node_heartbeat(
             request=request,
             state=self.state_factory.state(),
         )
@@ -115,7 +115,7 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         self, request: PullMessagesRequest, context: grpc.ServicerContext
     ) -> PullMessagesResponse:
         """Pull Messages."""
-        return message_handler.pull_messages(
+        return fleet_handlers.pull_messages(
             request=request,
             state=self.state_factory.state(),
             store=self.objectstore_factory.store(),
@@ -125,7 +125,7 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         self, request: PushMessagesRequest, context: grpc.ServicerContext
     ) -> PushMessagesResponse:
         """Push Messages."""
-        return message_handler.push_messages(
+        return fleet_handlers.push_messages(
             request=request,
             state=self.state_factory.state(),
         )
@@ -134,7 +134,7 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         self, request: GetRunRequest, context: grpc.ServicerContext
     ) -> GetRunResponse:
         """Get run information."""
-        return message_handler.get_run(
+        return fleet_handlers.get_run(
             request=request,
             state=self.state_factory.state(),
         )
@@ -143,7 +143,7 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         self, request: GetFabRequest, context: grpc.ServicerContext
     ) -> GetFabResponse:
         """Get FAB."""
-        return message_handler.get_fab(
+        return fleet_handlers.get_fab(
             request=request,
             state=self.state_factory.state(),
         )
@@ -152,7 +152,7 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         self, request: PushObjectRequest, context: grpc.ServicerContext
     ) -> PushObjectResponse:
         """Push an object to the ObjectStore."""
-        return message_handler.push_object(
+        return fleet_handlers.push_object(
             request=request,
             state=self.state_factory.state(),
         )
@@ -161,7 +161,7 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         self, request: PullObjectRequest, context: grpc.ServicerContext
     ) -> PullObjectResponse:
         """Pull an object from the ObjectStore."""
-        return message_handler.pull_object(
+        return fleet_handlers.pull_object(
             request=request,
             state=self.state_factory.state(),
         )
@@ -170,7 +170,7 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         self, request: ConfirmMessageReceivedRequest, context: grpc.ServicerContext
     ) -> ConfirmMessageReceivedResponse:
         """Confirm message received."""
-        return message_handler.confirm_message_received(
+        return fleet_handlers.confirm_message_received(
             request=request,
             state=self.state_factory.state(),
             store=self.objectstore_factory.store(),
