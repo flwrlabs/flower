@@ -87,7 +87,7 @@ you used a federation with simulated SuperNodes and ran an existing Flower App a
 them. You also explored the SuperGrid dashboard to monitor your app's progress and view
 its logs.
 
-To find the run later, visit the `All runs page <https://flower.ai/runs>`__. Click the
+To find the run later, visit the `All runs <https://flower.ai/runs>`__ page. Click the
 run you launched to reopen its details page.
 
 .. image:: ./_static/all_runs_page.png

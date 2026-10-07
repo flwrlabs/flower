@@ -56,7 +56,7 @@ Open the ``Logs`` tab to inspect the app logs.
     :align: center
     :target: ./_static/run_logs_dashboard.png
 
-If you visit the `All runs page <https://flower.ai/runs>`__, the run appears in the list
+If you visit the `All runs <https://flower.ai/runs>`__ page, the run appears in the list
 of your runs.
 
 .. image:: ./_static/all_runs_page.png
@@ -102,7 +102,7 @@ authenticate with your SuperGrid account. Finally, run the app with ``flwr run``
     $ flwr run . --federation @<username>/<federation-name>
     🎊 Successfully started run 1859953118041441032 in federation @<username>/<federation-name>
 
-The run appears on the `All runs page <https://flower.ai/runs>`__.
+The run appears on the `All runs <https://flower.ai/runs>`__ page.
 
 .. image:: ./_static/second_run_all_runs_page.png
     :alt: All runs page showing the newly started run

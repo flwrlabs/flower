@@ -99,7 +99,7 @@ Once you are logged in, run the following command to run the app on SuperGrid:
     # Run the app on SuperGrid
     $ flwr run . supergrid
 
-Then, visit the `All runs page <https://flower.ai/runs>`__. You should see the new run
+Then, visit the `All runs <https://flower.ai/runs>`__ page. You should see the new run
 in the list. Click it to see the run details and logs.
 
 .. image:: ./_static/second_run_all_runs_page.png
