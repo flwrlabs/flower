@@ -20,7 +20,7 @@ from unittest.mock import Mock
 import pytest
 from fastapi.testclient import TestClient
 
-from flwr.common.constant import PUBLIC_KEY_HEADER, SIGNATURE_HEADER, TIMESTAMP_HEADER
+from flwr.common.constant import TIMESTAMP_HEADER
 from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -33,7 +33,11 @@ from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
     SendNodeHeartbeatResponse,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.supercore.constant import FLWR_PACKAGE_NAME_METADATA_KEY
+from flwr.supercore.constant import (
+    FLEET_HTTP_PUBLIC_KEY_HEADER,
+    FLEET_HTTP_SIGNATURE_HEADER,
+    FLWR_PACKAGE_NAME_METADATA_KEY,
+)
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode
 from flwr.supercore.primitives.asymmetric import (
@@ -67,8 +71,8 @@ def test_fleet_http_handlers_and_authentication(
     timestamp = now().isoformat()
     headers = {
         "content-type": PROTOBUF_MEDIA_TYPE,
-        PUBLIC_KEY_HEADER: b64encode(public_key_bytes).decode("ascii"),
-        SIGNATURE_HEADER: b64encode(
+        FLEET_HTTP_PUBLIC_KEY_HEADER: b64encode(public_key_bytes).decode("ascii"),
+        FLEET_HTTP_SIGNATURE_HEADER: b64encode(
             sign_message(private_key, timestamp.encode("ascii"))
         ).decode("ascii"),
         TIMESTAMP_HEADER: timestamp,
@@ -121,7 +125,7 @@ def test_fleet_http_handlers_and_authentication(
     response = client.post(
         "/v1/fleet/send-node-heartbeat",
         content=heartbeat.SerializeToString(),
-        headers={**headers, SIGNATURE_HEADER: "bad"},
+        headers={**headers, FLEET_HTTP_SIGNATURE_HEADER: "bad"},
     )
     assert response.status_code == 401
 

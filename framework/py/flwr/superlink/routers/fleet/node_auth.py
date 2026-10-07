@@ -21,8 +21,6 @@ from base64 import b64decode
 from fastapi import HTTPException, Request, status
 
 from flwr.common.constant import (
-    PUBLIC_KEY_HEADER,
-    SIGNATURE_HEADER,
     SYSTEM_TIME_TOLERANCE,
     TIMESTAMP_HEADER,
     TIMESTAMP_TOLERANCE,
@@ -30,6 +28,10 @@ from flwr.common.constant import (
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
     RegisterNodeFleetRequest,
+)
+from flwr.supercore.constant import (
+    FLEET_HTTP_PUBLIC_KEY_HEADER,
+    FLEET_HTTP_SIGNATURE_HEADER,
 )
 from flwr.supercore.date import now
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, verify_signature
@@ -42,9 +44,12 @@ def authenticate_node(request: Request) -> None:
         return
 
     try:
-        # gRPC binary metadata is carried as base64 in HTTP header values.
-        public_key = b64decode(request.headers[PUBLIC_KEY_HEADER], validate=True)
-        signature = b64decode(request.headers[SIGNATURE_HEADER], validate=True)
+        public_key = b64decode(
+            request.headers[FLEET_HTTP_PUBLIC_KEY_HEADER], validate=True
+        )
+        signature = b64decode(
+            request.headers[FLEET_HTTP_SIGNATURE_HEADER], validate=True
+        )
         timestamp = request.headers[TIMESTAMP_HEADER]
         signed_at = datetime.datetime.fromisoformat(timestamp)
         age = (now() - signed_at).total_seconds()

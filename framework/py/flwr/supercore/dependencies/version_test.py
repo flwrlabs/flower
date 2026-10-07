@@ -46,7 +46,7 @@ def _make_request(headers: list[tuple[str, str]]) -> Request:
     )
 
 
-def _dependency() -> VersionDependency:
+def _dependency(reject_incompatible: bool = True) -> VersionDependency:
     """Return a dependency with deterministic local metadata."""
     with patch.object(
         RuntimeVersionMetadata,
@@ -56,6 +56,7 @@ def _dependency() -> VersionDependency:
         return VersionDependency(
             component_name="SuperLink",
             connection_name="Caller <-> SuperLink Runtime API",
+            reject_incompatible=reject_incompatible,
         )
 
 
@@ -107,9 +108,12 @@ def test_runtime_version_dependency_rejects_invalid_metadata(
 
 def test_runtime_version_dependency_accepts_mismatch_when_configured() -> None:
     """Fleet HTTP matches the permissive Fleet gRPC version policy."""
-    dependency = VersionDependency(
-        component_name="SuperLink",
-        connection_name="SuperNode <-> SuperLink Fleet API",
-        reject_incompatible=False,
+    _dependency(reject_incompatible=False)(
+        _make_request(
+            [
+                (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
+                (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.0"),
+                (FLWR_COMPONENT_NAME_METADATA_KEY, "SuperNode"),
+            ]
+        )
     )
-    dependency(_make_request([(FLWR_PACKAGE_NAME_METADATA_KEY, "flwr")]))
