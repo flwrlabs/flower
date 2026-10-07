@@ -74,9 +74,9 @@ def test_slack_search_defaults() -> None:
 def test_slack_search_maps_captured_options(
     action_name: str, natural_language_query: str
 ) -> None:
-    """Translate captured options and retain six AND'd keywords in one clause."""
-    keywords = ["alpha", '"release plan"', "gamma", "delta", "epsilon", "zeta"]
-    expected_clause = 'alpha "release plan" gamma delta epsilon zeta'
+    """Translate captured options into separate keyword clauses."""
+    keywords = ["alpha", '"release plan"', "gamma", "delta", "epsilon"]
+    keyword_query = 'alpha "release plan" gamma delta epsilon'
     arguments: JSONObject = {
         "keywords": keywords,
         "filters": "in:<#C1>",
@@ -112,8 +112,8 @@ def test_slack_search_maps_captured_options(
         "https://slack.com/api/assistant.search.context",
     )
     assert request.call_args.kwargs["json"] == {
-        "query": f"{natural_language_query or expected_clause} in:<#C1>",
-        "term_clauses": [expected_clause],
+        "query": f"{natural_language_query or keyword_query} in:<#C1>",
+        "term_clauses": keywords,
         "modifiers": "in:<#C1>",
         "content_types": ["messages", "files"],
         "channel_types": channel_types,
@@ -127,6 +127,22 @@ def test_slack_search_maps_captured_options(
         "include_bots": True,
         "include_context_messages": False,
     }
+
+
+def test_slack_search_rejects_too_many_keywords() -> None:
+    """Reject more than five keyword clauses before making an API request."""
+    with (
+        patch(_HTTP_REQUEST) as request,
+        pytest.raises(ValueError, match="at most 5 keywords"),
+    ):
+        registry.invoke_connector(
+            "slack_search_public",
+            {"keywords": ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"]},
+            Mock(),
+            _CREDENTIALS,
+            {},
+        )
+    request.assert_not_called()
 
 
 @pytest.mark.parametrize("limit", (0, 21))

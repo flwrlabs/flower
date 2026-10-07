@@ -137,6 +137,10 @@ def _search_payload(
     ):
         raise ValueError("Slack keywords must be an array of nonempty strings.")
     terms = cast(list[str], keywords)
+    if len(terms) > 5:
+        raise ValueError(
+            "Slack search supports at most 5 keywords; reduce the keyword list."
+        )
     filters = optional_string(arguments.get("filters"), "Slack", "filters")
     natural_language_query = optional_string(
         arguments.get("natural_language_query"), "Slack", "natural_language_query"
@@ -160,8 +164,7 @@ def _search_payload(
         ),
     }
     if terms:
-        # One AND clause preserves quoted phrases within Slack's clause limit.
-        payload["term_clauses"] = [" ".join(terms)]
+        payload["term_clauses"] = terms
         if filters:
             payload["modifiers"] = filters
     if "limit" in arguments:
