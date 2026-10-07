@@ -36,6 +36,7 @@ from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.constant import (
     FLEET_HTTP_PUBLIC_KEY_HEADER,
     FLEET_HTTP_SIGNATURE_HEADER,
+    FLWR_PACKAGE_NAME_METADATA_KEY,
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode
@@ -72,6 +73,7 @@ def test_fleet_http_handlers_and_authentication(
             sign_message(private_key, timestamp.encode("ascii"))
         ).decode("ascii"),
         TIMESTAMP_HEADER: timestamp,
+        FLWR_PACKAGE_NAME_METADATA_KEY: "flwr",
     }
 
     response = client.post(

@@ -105,6 +105,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.streaming import (
     ProtobufStreamContext,
@@ -120,7 +121,20 @@ from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.dependencies.run_source import RunSourceDependency
 from flwr.superlink.servicer.control import control_handlers
 
-router = APIRouter(prefix="/v1/control", tags=["Control"], route_class=ProtobufRoute)
+router = APIRouter(
+    prefix="/v1/control",
+    tags=["Control"],
+    route_class=ProtobufRoute,
+    dependencies=[
+        Depends(
+            VersionDependency(
+                component_name="SuperLink",
+                connection_name="flwr CLI <-> SuperLink Control API",
+                reject_incompatible=False,
+            )
+        )
+    ],
+)
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]
