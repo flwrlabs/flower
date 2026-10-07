@@ -38,10 +38,6 @@ from flwr.supercore.constant import (
     SQLITE_PRAGMAS,
 )
 from flwr.supercore.state.alembic.utils import run_migrations
-from flwr.supercore.task_notification import (
-    TASK_AVAILABLE_SESSION_KEY,
-    notify_task_available,
-)
 
 _current_sessions: ContextVar[dict[object, Session] | None] = ContextVar(
     "current_sqlalchemy_sessions",
@@ -197,8 +193,6 @@ class SqlMixin(ABC):
         try:
             with session.begin():
                 yield session
-            if session.info.pop(TASK_AVAILABLE_SESSION_KEY, False):
-                notify_task_available()
         finally:
             _current_sessions.reset(token)
             session.close()

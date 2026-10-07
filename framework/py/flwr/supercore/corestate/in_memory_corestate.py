@@ -57,7 +57,6 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
-from flwr.supercore.task_notification import notify_task_available
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
@@ -1056,8 +1055,6 @@ class InMemoryCoreState(
             if not publish and not failed:
                 self._unpublished_task_ids.add(task_id)
 
-        if not failed and publish:
-            notify_task_available()
         return task_id
 
     def publish_task(self, task_id: int) -> bool:
@@ -1072,7 +1069,6 @@ class InMemoryCoreState(
                 return False
             task.pending_at = now().isoformat()
             self._unpublished_task_ids.remove(task_id)
-        notify_task_available()
         return True
 
     def get_tasks(  # pylint: disable=too-many-arguments

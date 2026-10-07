@@ -21,7 +21,6 @@ from time import monotonic
 from typing import Any, cast
 from unittest.mock import Mock, patch
 
-import pytest
 from fastapi import Depends, FastAPI
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
@@ -175,11 +174,10 @@ def test_claim_task_delegates_to_shared_handler(monkeypatch: MonkeyPatch) -> Non
     handler.assert_called_once_with(request, state)
 
 
-@pytest.mark.parametrize("notification", [True, False])
 def test_acquire_task_waits_for_committed_work(
-    tmp_path: Path, monkeypatch: MonkeyPatch, notification: bool
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
-    """A wait wakes on a local commit and finds work without a local signal."""
+    """A long poll finds work committed through a separate state instance."""
     # pylint: disable=too-many-locals
     database_path = str(tmp_path / "runtime.db")
     states = [
@@ -200,24 +198,17 @@ def test_acquire_task_waits_for_committed_work(
         return tasks
 
     monkeypatch.setattr(states[0], "get_tasks", observe_get_tasks)
-    if not notification:
-        monkeypatch.setattr("flwr.supercore.sql_mixin.notify_task_available", Mock())
     client = TestClient(_create_app(states[0]))
     request = AcquireTaskRequest(
         supported_task_types=[TaskType.MODEL], wait_timeout_ms=3_000
     )
-    recheck_seconds = 5.0 if notification else 0.2
 
-    with patch(
-        "flwr.supercore.routers.runtime.router._TASK_RECHECK_SECONDS",
-        recheck_seconds,
-    ):
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(_post, client, "/v1/runtime/acquire-task", request)
-            assert first_empty_read.wait(timeout=2)
-            task_id = states[1].create_task(task_type=TaskType.MODEL, run_id=42)
-            assert task_id is not None
-            response = future.result(timeout=2)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(_post, client, "/v1/runtime/acquire-task", request)
+        assert first_empty_read.wait(timeout=2)
+        task_id = states[1].create_task(task_type=TaskType.MODEL, run_id=42)
+        assert task_id is not None
+        response = future.result(timeout=2)
 
     assert response.status_code == 200
     acquired = AcquireTaskResponse.FromString(response.content)

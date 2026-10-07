@@ -114,7 +114,6 @@ from flwr.supercore.state.schema.corestate_models import TaskLogsTable
 from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
-from flwr.supercore.task_notification import TASK_AVAILABLE_SESSION_KEY
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
@@ -1338,11 +1337,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         with self.session() as session:
             try:
-                if session.scalar(insert_stmt) is None:
-                    return None
-                if not failed:
-                    session.info[TASK_AVAILABLE_SESSION_KEY] = True
-                return task_id
+                return task_id if session.scalar(insert_stmt) is not None else None
             except IntegrityError:
                 return None
 

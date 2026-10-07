@@ -80,7 +80,6 @@ from flwr.supercore.dependencies.runtime import (
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_DEPENDENCY
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
-from flwr.supercore.task_notification import subscribe_to_task_notifications
 
 router = APIRouter(
     prefix="/v1/runtime",
@@ -102,34 +101,7 @@ ClaimTaskAuthDependency = Annotated[
 ]
 
 _MAX_TASK_WAIT_MS = 5_000
-_TASK_RECHECK_SECONDS = 0.2
-
-
-async def _wait_for_task(
-    request: AcquireTaskRequest,
-    state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
-) -> AcquireTaskResponse:
-    """Recheck shared state until eligible work appears or the bounded wait expires."""
-    if request.wait_timeout_ms <= 0 or not (
-        request.supported_task_types or request.agentapp_fab_hashes
-    ):
-        return await run_in_threadpool(handlers.acquire_task, request, state)
-
-    deadline = monotonic() + min(request.wait_timeout_ms, _MAX_TASK_WAIT_MS) / 1_000
-    with subscribe_to_task_notifications() as task_event:
-        while True:
-            task_event.clear()
-            response = await run_in_threadpool(handlers.acquire_task, request, state)
-            remaining = deadline - monotonic()
-            if (response.HasField("task") and response.token) or remaining <= 0:
-                return response
-            try:
-                await asyncio.wait_for(
-                    task_event.wait(), min(_TASK_RECHECK_SECONDS, remaining)
-                )
-            except TimeoutError:
-                pass
+_TASK_RECHECK_SECONDS = 0.1
 
 
 @router.post("/pull-pending-tasks")
@@ -150,8 +122,19 @@ async def acquire_task(
     handlers: RuntimeHandlersDependency,
     _auth: AcquireTaskAuthDependency,
 ) -> AcquireTaskResponse:
-    """Acquire the oldest eligible pending task."""
-    return await _wait_for_task(request, state, handlers)
+    """Poll shared state for eligible work until the bounded wait expires."""
+    wait_ms = (
+        min(request.wait_timeout_ms, _MAX_TASK_WAIT_MS)
+        if request.supported_task_types or request.agentapp_fab_hashes
+        else 0
+    )
+    deadline = monotonic() + wait_ms / 1_000
+    while True:
+        response = await run_in_threadpool(handlers.acquire_task, request, state)
+        remaining = deadline - monotonic()
+        if (response.HasField("task") and response.token) or remaining <= 0:
+            return response
+        await asyncio.sleep(min(_TASK_RECHECK_SECONDS, remaining))
 
 
 @router.post("/claim-task")

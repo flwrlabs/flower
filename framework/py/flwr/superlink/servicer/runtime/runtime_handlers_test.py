@@ -82,7 +82,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     iterate_object_tree,
 )
 from flwr.supercore.object_store import ObjectStoreFactory
-from flwr.supercore.routers.runtime.router import _wait_for_task
+from flwr.supercore.routers.runtime.router import acquire_task
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.runtime import runtime_handlers
@@ -417,13 +417,14 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             ),
         ):
             response = asyncio.run(
-                _wait_for_task(
+                acquire_task(
                     AcquireTaskRequest(
                         supported_task_types=[TaskType.SERVER_APP],
                         wait_timeout_ms=2_000,
                     ),
                     self.state,
                     runtime_handlers,
+                    None,
                 )
             )
 
