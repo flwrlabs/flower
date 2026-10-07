@@ -88,7 +88,7 @@ def test_slack_search_maps_captured_options(
         "context_channel_id": "C1",
         "sort": "timestamp",
         "sort_dir": "asc",
-        "limit": 8,
+        "limit": 20,
         "include_bots": True,
         "include_context": False,
     }
@@ -123,10 +123,27 @@ def test_slack_search_maps_captured_options(
         "context_channel_id": "C1",
         "sort": "timestamp",
         "sort_dir": "asc",
-        "limit": 8,
+        "limit": 20,
         "include_bots": True,
         "include_context_messages": False,
     }
+
+
+@pytest.mark.parametrize("limit", (0, 21))
+def test_slack_search_rejects_invalid_limits(limit: int) -> None:
+    """Reject out-of-range limits before making an API request."""
+    with (
+        patch(_HTTP_REQUEST) as request,
+        pytest.raises(ValueError, match="must be between 1 and 20"),
+    ):
+        registry.invoke_connector(
+            "slack_search_public",
+            {"query": "release", "limit": limit},
+            Mock(),
+            _CREDENTIALS,
+            {},
+        )
+    request.assert_not_called()
 
 
 def test_slack_search_only_my_channels_keeps_shared_files() -> None:

@@ -156,7 +156,11 @@ def _search_payload(
         payload["term_clauses"] = [" ".join(terms)]
         if filters:
             payload["modifiers"] = filters
-    for name in ("context_channel_id", "cursor", "sort", "sort_dir", "limit"):
+    if "limit" in arguments:
+        payload["limit"] = require_int_range(
+            arguments["limit"], "Slack", "limit", maximum=20
+        )
+    for name in ("context_channel_id", "cursor", "sort", "sort_dir"):
         if name in arguments:
             payload[name] = arguments[name]
     for name in ("after", "before"):
