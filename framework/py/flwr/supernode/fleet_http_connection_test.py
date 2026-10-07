@@ -136,3 +136,25 @@ def test_http_connection_preserves_managed_identity(monkeypatch: MonkeyPatch) ->
 
     client.RegisterNode.assert_not_called()
     client.UnregisterNode.assert_not_called()
+
+
+def test_http_connection_unregisters_after_failed_deactivation(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Unregister a self-registered node even if it is already offline."""
+    client = Mock(spec=FleetHttpClient)
+    client.ActivateNode.return_value = ActivateNodeResponse(node_id=42)
+    client.DeactivateNode.side_effect = httpx.HTTPStatusError(
+        "already offline",
+        request=httpx.Request("POST", "https://fleet.example/v1/fleet/deactivate-node"),
+        response=httpx.Response(400),
+    )
+    monkeypatch.setattr(
+        FleetHttpClient, "from_server_address", Mock(return_value=nullcontext(client))
+    )
+    monkeypatch.setattr(connection, "HeartbeatSender", lambda _: Mock(is_running=False))
+
+    with connection.http_request_response("fleet.example:8080", insecure=True):
+        pass
+
+    client.UnregisterNode.assert_called_once()

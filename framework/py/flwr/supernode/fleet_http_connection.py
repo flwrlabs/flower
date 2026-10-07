@@ -262,9 +262,12 @@ def http_request_response(  # pylint: disable=R0913,R0917,R0914,R0912,R0915
                     heartbeat_sender.stop()
                 try:
                     client.DeactivateNode(DeactivateNodeRequest(node_id=node.node_id))
-                    if self_registered:
+                except (httpx.HTTPError, RuntimeError):
+                    pass
+                if self_registered:
+                    try:
                         client.UnregisterNode(
                             UnregisterNodeFleetRequest(node_id=node.node_id)
                         )
-                except (httpx.HTTPError, RuntimeError):
-                    pass
+                    except (httpx.HTTPError, RuntimeError):
+                        pass
