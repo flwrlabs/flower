@@ -74,13 +74,6 @@ if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
 
 _RUNTIME_HANDLERS: RuntimeHandlers[LinkState] = runtime_handlers
-_CONTROL_VERSION_DEPENDENCY = Depends(
-    VersionDependency(
-        component_name="SuperLink",
-        connection_name="flwr CLI <-> SuperLink Control API",
-        reject_incompatible=False,
-    )
-)
 _RUNTIME_VERSION_DEPENDENCY = Depends(
     VersionDependency(
         component_name="SuperLink",
@@ -220,9 +213,7 @@ def create_app(  # pylint: disable=too-many-statements
     fastapi_app.include_router(health.router)
 
     # SuperLink APIs
-    fastapi_app.include_router(
-        control_router, dependencies=[_CONTROL_VERSION_DEPENDENCY]
-    )
+    fastapi_app.include_router(control_router)
     fastapi_app.include_router(
         runtime_router, dependencies=[_RUNTIME_VERSION_DEPENDENCY]
     )
