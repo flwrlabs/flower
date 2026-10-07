@@ -67,12 +67,23 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UnregisterNodeRequest,
     UpdateRunSeriesDescriptionRequest,
 )
+from flwr.proto.fab_pb2 import GetFabRequest  # pylint: disable=E0611
+from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
+    ActivateNodeRequest,
+    DeactivateNodeRequest,
+    PullMessagesRequest,
+    PushMessagesRequest,
+    RegisterNodeFleetRequest,
+    UnregisterNodeFleetRequest,
+)
+from flwr.proto.heartbeat_pb2 import SendNodeHeartbeatRequest  # pylint: disable=E0611
 from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
     PullObjectRequest,
     PushObjectRequest,
 )
+from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     ClaimTaskRequest,
@@ -106,6 +117,18 @@ from flwr.supercore.protobuf.streaming import (
 RouteKey = tuple[str, str]
 
 PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
+    ("POST", "/v1/fleet/register-node"): RegisterNodeFleetRequest,
+    ("POST", "/v1/fleet/activate-node"): ActivateNodeRequest,
+    ("POST", "/v1/fleet/deactivate-node"): DeactivateNodeRequest,
+    ("POST", "/v1/fleet/unregister-node"): UnregisterNodeFleetRequest,
+    ("POST", "/v1/fleet/send-node-heartbeat"): SendNodeHeartbeatRequest,
+    ("POST", "/v1/fleet/pull-messages"): PullMessagesRequest,
+    ("POST", "/v1/fleet/push-messages"): PushMessagesRequest,
+    ("POST", "/v1/fleet/get-run"): GetRunRequest,
+    ("POST", "/v1/fleet/get-fab"): GetFabRequest,
+    ("POST", "/v1/fleet/push-object"): PushObjectRequest,
+    ("POST", "/v1/fleet/pull-object"): PullObjectRequest,
+    ("POST", "/v1/fleet/confirm-message-received"): ConfirmMessageReceivedRequest,
     ("POST", "/v1/control/start-run"): StartRunRequest,
     ("POST", "/v1/control/list-runs"): ListRunsRequest,
     ("POST", "/v1/control/list-run-series"): ListRunSeriesRequest,
