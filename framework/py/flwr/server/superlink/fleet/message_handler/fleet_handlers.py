@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Fleet API message handlers."""
+"""Fleet API handlers."""
 
 from logging import DEBUG, ERROR, INFO
 

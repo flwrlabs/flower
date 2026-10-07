@@ -33,7 +33,7 @@ from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 
-from .message_handler import activate_node, pull_messages, push_messages, register_node
+from .fleet_handlers import activate_node, pull_messages, push_messages, register_node
 
 
 def test_register_node_auth_error_is_transport_independent() -> None:
