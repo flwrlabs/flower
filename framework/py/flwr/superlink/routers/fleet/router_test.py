@@ -53,13 +53,18 @@ from flwr.superlink.servicer.fleet import fleet_handlers
 from . import node_auth
 
 
+@pytest.fixture(autouse=True)
+def isolate_control_license(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep Fleet route tests independent of optional license plugins."""
+    monkeypatch.setattr(control_middlewares, "get_license_plugin", lambda: None)
+
+
 def test_fleet_http_handlers_and_authentication(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Fleet HTTP uses shared handlers and rejects unsigned node calls."""
     monkeypatch.setattr(extensions, "get_middleware", lambda: ())
     monkeypatch.setattr(extensions, "configure_app", lambda _: None)
-    monkeypatch.setattr(control_middlewares, "get_license_plugin", lambda: None)
     app = main.create_app()
     control_plugin = Mock(spec=EventLogWriterPlugin)
     app.state.control_event_log_plugin = control_plugin
