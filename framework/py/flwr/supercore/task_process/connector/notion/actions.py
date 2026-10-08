@@ -450,7 +450,7 @@ def _meeting_note_date_range_filter_schema() -> JSONObject:
                                     },
                                     "start_date": _meeting_note_date_property(
                                         "The inclusive start date in YYYY-MM-DD "
-                                        "format. Required for an exact date range."
+                                        "format, if any. Omit for no start bound."
                                     ),
                                     "end_date": _meeting_note_date_property(
                                         "The inclusive end date in YYYY-MM-DD "
@@ -789,7 +789,7 @@ ACTIONS = (
         name="query_meeting_notes",
         description=(
             "Query AI meeting notes available to the integration's workspace user. "
-            "Filters, sorts, and a result limit are optional. Results are already "
+            "An optional filter can narrow the results. Results are already "
             "scoped to the integration's user; do not add a current-user filter "
             "for 'my meetings'. Resolve attendee IDs with notion_list_users or "
             "known IDs from other Notion responses.\n\n"
