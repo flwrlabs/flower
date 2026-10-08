@@ -242,8 +242,8 @@ that specifies the name of a workload (i.e. deployment) to associate with the co
 The ``<name>`` is the default routing key if the ``--routing-key`` option is not
 specified.
 
-In our deployment, SuperLink serves the Fleet API over HTTP on port ``8000``
-(for more details, read our reference on `Flower network communication
+In our deployment, SuperLink serves the Fleet API over HTTP on port ``8000`` (for more
+details, read our reference on `Flower network communication
 <ref-flower-network-communication.rst#flower-components-apis>`_). Since we have given
 the SuperLink deployment the name ``superlink``, we will use that as the workload name:
 

@@ -35,12 +35,3 @@ example, to launch your ``SuperLink`` with ``DEBUG`` logs, use:
     Flower commands to provision the different components in a Flower Federation (see
     :doc:`how-to-run-flower-with-deployment-engine`) or using the `flwr CLI
     <ref-api-cli.html>`_.
-
-************************
- Configure gRPC logging
-************************
-
-SuperNodes use HTTP for the Fleet API. Flower also supports gRPC-based compatibility
-connections and health checks (see :doc:`ref-flower-network-communication`). You can
-set the verbosity level of ``gRPC`` logs using `gRPC environment variables
-<https://github.com/grpc/grpc/blob/master/doc/environment_variables.md>`_.
