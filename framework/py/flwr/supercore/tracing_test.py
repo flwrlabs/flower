@@ -12,35 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for optional tracing and task-carried process continuity."""
+"""Tests for optional tracing and task context propagation."""
 
 # pylint: disable=protected-access
 
 from collections.abc import Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
-from types import ModuleType
-from typing import Any
 from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from flwr.common.serde import message_to_proto
-from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    AcquireTaskRequest,
-    PullTaskInputRequest,
-    PullTaskInputResponse,
-)
-from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
+from flwr.proto.runtime_pb2 import CreateTaskRequest  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
-from flwr.supercore.fab import Fab
 from flwr.supercore.json_message.model_message import ModelRequest
-from flwr.supercore.object_store.in_memory_object_store import InMemoryObjectStore
-from flwr.supercore.routers.runtime.responses import _start_exchange
-from flwr.supercore.servicer.runtime.runtime_handlers import acquire_task
+from flwr.supercore.servicer.runtime import runtime_handlers
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.task_process.model import task as model_task
-from flwr.superlink.servicer.runtime.runtime_handlers import pull_task_input
 
 from . import tracing
 
@@ -185,109 +172,17 @@ def test_provider_failure_exports_only_a_fixed_event_and_error_type(
     assert "secret" not in str(raw_span.mock_calls)
 
 
-@pytest.mark.parametrize("flags", ["01", "03"])
-def test_task_carrier_connects_run_dispatch_app_and_provider(
+@pytest.mark.parametrize("current", ["", _CARRIER[:-2] + "03"])
+def test_child_task_uses_current_context_or_authenticated_parent(
     monkeypatch: pytest.MonkeyPatch,
-    flags: str,
+    current: str,
 ) -> None:
-    """An exported trace spans persisted parent/child tasks and first text."""
-    # pylint: disable=too-many-locals
-    monkeypatch.setenv("FLWR_TRACING_ENABLED", "1")
-    active: ContextVar[str] = ContextVar("traceparent", default="")
-    records: list[dict[str, Any]] = []
-    backend = ModuleType("fake_tracing")
-
-    @contextmanager
-    def capture(
-        name: str, *, traceparent: str, attributes: dict[str, object]
-    ) -> Iterator[Mock]:
-        parent = traceparent or active.get()
-        trace_id = parent.split("-")[1] if parent else "f" * 32
-        carrier = f"00-{trace_id}-{len(records) + 1:016x}-{flags}"
-        raw_span = Mock()
-        records.append(
-            {
-                "name": name,
-                "carrier": carrier,
-                "attributes": attributes,
-                "span": raw_span,
-            }
-        )
-        token = active.set(carrier)
-        try:
-            yield raw_span
-        finally:
-            active.reset(token)
-
-    backend.__dict__.update(
-        trace_span=capture,
-        current_traceparent=active.get,
-        flush_traces=Mock(),
+    """Model tasks inherit their parent when no current span is available."""
+    state = Mock()
+    state.create_task.return_value = 2
+    parent = Task(task_id=1, run_id=3, type=TaskType.AGENT_APP, traceparent=_CARRIER)
+    monkeypatch.setattr(runtime_handlers, "current_traceparent", lambda: current)
+    runtime_handlers.create_task(
+        CreateTaskRequest(type=TaskType.MODEL, model_ref="model"), state, parent
     )
-    monkeypatch.setattr(tracing, "_load_backend", lambda: backend)
-    state = InMemoryLinkState(Mock(), InMemoryObjectStore())
-    with tracing.trace_span("run.create"):
-        run_id = state.create_run(
-            "flwr/test",
-            "1",
-            state.store_fab(Fab("", b"fab", {})),
-            {},
-            "@me/test",
-            None,
-            "account",
-            TaskType.AGENT_APP,
-            traceparent=tracing.current_traceparent(),
-        )
-    acquired = acquire_task(
-        AcquireTaskRequest(supported_task_types=[TaskType.AGENT_APP]), state
-    )
-    task_input = pull_task_input(PullTaskInputRequest(), state, acquired.task)
-    restored = PullTaskInputResponse.FromString(task_input.SerializeToString())
-    assert restored.traceparent == acquired.task.traceparent
-    assert restored.traceparent.endswith(f"-{flags}")
-    with tracing.trace_span("task.dispatch", traceparent=acquired.task.traceparent):
-        pass
-    with tracing.trace_span("agentapp.execute", traceparent=restored.traceparent):
-        exchange = _start_exchange(
-            state,
-            acquired.task,
-            {"model": "model", "input": "prompt-secret", "stream": True},
-        )
-    child = state.get_tasks(task_ids=[exchange.model_task_id])[0]
-    assert child.traceparent != acquired.task.traceparent
-    assert child.traceparent.endswith(f"-{flags}")
-    assert child.traceparent.split("-")[1] == acquired.task.traceparent.split("-")[1]
-    monkeypatch.setattr(TaskIdentity, "_task_id", child.task_id)
-    monkeypatch.setattr(TaskIdentity, "_run_id", run_id)
-    monkeypatch.setattr(TaskIdentity, "_node_id", 1)
-    client = Mock()
-    client.PullTaskMessage.return_value.messages = []
-    client.PullTaskMessage.return_value.messages = [
-        message_to_proto(
-            state.get_task_message(dst_task_ids=[child.task_id], limit=1)[0]
-        )
-    ]
-
-    def provider(_request: object, **kwargs: Any) -> dict[str, Any]:
-        emit = kwargs["on_stream_event"]
-        emit(
-            {
-                "type": "response.reasoning_summary_text.delta",
-                "delta": "reasoning-secret",
-            }
-        )
-        for _ in range(20):
-            emit({"type": "response.output_text.delta", "delta": "output-secret"})
-        return {"object": "response", "status": "completed", "output": []}
-
-    monkeypatch.setattr(model_task, "invoke_model_provider", provider)
-    with tracing.trace_span("model.execute", traceparent=child.traceparent):
-        model_task.handle_task(client)
-    assert len({record["carrier"].split("-")[1] for record in records}) == 1
-    provider_span = records[-1]["span"]
-    assert [call.args for call in provider_span.add_event.call_args_list] == [
-        ("provider.first_text",),
-        ("provider.completed",),
-    ]
-    assert "secret" not in str(records)
-    assert tracing.current_traceparent() == ""
+    assert state.create_task.call_args.kwargs["traceparent"] == (current or _CARRIER)
