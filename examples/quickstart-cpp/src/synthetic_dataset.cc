@@ -9,6 +9,10 @@
 #include <iostream>
 #include <random>
 
+SyntheticDataset::SyntheticDataset(
+    const std::vector<std::vector<double>> &data_points)
+    : data_points(data_points) {}
+
 SyntheticDataset::SyntheticDataset(std::vector<double> ms, double b,
                                    size_t size) {
   std::random_device rd;
