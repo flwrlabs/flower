@@ -162,6 +162,23 @@ def test_slack_search_rejects_invalid_limits(limit: int) -> None:
     request.assert_not_called()
 
 
+@pytest.mark.parametrize("name", ("include_bots", "include_context"))
+def test_slack_search_rejects_non_boolean_options(name: str) -> None:
+    """Reject malformed boolean options before making an API request."""
+    with (
+        patch(_HTTP_REQUEST) as request,
+        pytest.raises(ValueError, match=f"{name} must be a boolean"),
+    ):
+        registry.invoke_connector(
+            "slack_search_public",
+            {"query": "release", name: "false"},
+            Mock(),
+            _CREDENTIALS,
+            {},
+        )
+    request.assert_not_called()
+
+
 def test_slack_search_only_my_channels_keeps_shared_files() -> None:
     """Check file shares instead of dropping files with no search channel ID."""
     message = {"channel_id": "C1", "message_ts": "1", "content": "joined"}

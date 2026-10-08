@@ -178,8 +178,12 @@ def _search_payload(
         value = optional_string(arguments.get(name), "Slack", name)
         if value is not None:
             payload[name] = int(value)
-    payload["include_bots"] = arguments.get("include_bots", False)
-    payload["include_context_messages"] = arguments.get("include_context", True)
+    payload["include_bots"] = require_bool(
+        arguments.get("include_bots", False), "Slack", "include_bots"
+    )
+    payload["include_context_messages"] = require_bool(
+        arguments.get("include_context", True), "Slack", "include_context"
+    )
     return payload
 
 
