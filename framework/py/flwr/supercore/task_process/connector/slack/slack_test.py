@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for Slack request mapping and API errors."""
 
+from typing import cast
 from unittest.mock import Mock, patch
 
 import pytest
@@ -89,3 +90,78 @@ def test_slack_api_error() -> None:
             "slack_search_public", {"query": "release"}, Mock(), _CREDENTIALS, {}
         )
     request.assert_called_once()
+
+
+@pytest.mark.parametrize("response_format", ("detailed", "concise"))
+def test_search_options(response_format: str) -> None:
+    """Filter joined conversations and honor context length and concise output."""
+    pages = [
+        {
+            "ok": True,
+            "results": {
+                "messages": [
+                    {
+                        "channel_id": "C1",
+                        "content": "release",
+                        "blocks": [],
+                        "context_messages": {
+                            "before": [{"text": "before text"}],
+                            "after": [{"text": "after text"}],
+                        },
+                    },
+                    {"channel_id": "C2", "content": "not joined"},
+                ],
+                "files": [
+                    {"file_id": "F1", "title": "joined file", "file_type": "pdf"},
+                    {"file_id": "F2", "title": "not joined"},
+                ],
+            },
+            "response_metadata": {"next_cursor": "search-next"},
+        },
+        {
+            "ok": True,
+            "channels": [{"id": "C1"}],
+            "response_metadata": {"next_cursor": "membership-next"},
+        },
+        {"ok": True, "channels": [{"id": "C3"}]},
+        {"ok": True, "file": {"channels": ["C3"]}},
+        {"ok": True, "file": {"channels": ["C2"]}},
+    ]
+    with patch(
+        _HTTP_REQUEST,
+        side_effect=[
+            Mock(status_code=200, json=Mock(return_value=page)) for page in pages
+        ],
+    ) as request:
+        result = registry.invoke_connector(
+            "slack_search_public",
+            {
+                "query": "release",
+                "content_types": "messages,files",
+                "only_my_channels": True,
+                "max_context_length": 5,
+                "response_format": response_format,
+            },
+            Mock(),
+            _CREDENTIALS,
+            {},
+        )
+    assert request.call_count == 5
+    assert request.call_args_list[2].kwargs["params"]["cursor"] == "membership-next"
+    assert isinstance(result, dict)
+    assert result["response_metadata"] == {"next_cursor": "search-next"}
+    results = cast(dict[str, list[JSONObject]], result["results"])
+    message = results["messages"][0]
+    file = results["files"][0]
+    assert len(results["messages"]) == 1
+    assert len(results["files"]) == 1
+    assert message["channel_id"] == "C1"
+    assert file["file_id"] == "F1"
+    if response_format == "concise":
+        assert message == {"channel_id": "C1", "content": "release"}
+        assert file == {"file_id": "F1", "title": "joined file"}
+    else:
+        assert message["context_messages"] == {
+            "before": [{"text": "befor"}],
+            "after": [{"text": "after"}],
+        }

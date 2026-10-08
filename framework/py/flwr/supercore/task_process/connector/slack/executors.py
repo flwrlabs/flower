@@ -94,9 +94,86 @@ def _search(
     for name in ("after", "before"):
         if name in arguments:
             payload[name] = int(cast(str, arguments[name]))
-    return _call_slack_api(
+    result = _call_slack_api(
         "assistant.search.context", context.credentials, body=payload
     )
+    if arguments.get("only_my_channels"):
+        _filter_joined_channels(
+            result, context.credentials, cast(list[str], payload["channel_types"])
+        )
+    if (
+        "max_context_length" in arguments
+        or arguments.get("response_format") == "concise"
+    ):
+        _format_search_result(result, arguments)
+    return result
+
+
+def _filter_joined_channels(
+    result: JSONObject, credentials: JSONObject, channel_types: list[str]
+) -> None:
+    """Keep messages and files shared in conversations the user has joined."""
+    joined: set[str] = set()
+    params = {"types": ",".join(channel_types), "limit": "200"}
+    while True:
+        page = _call_slack_api("users.conversations", credentials, params=params)
+        joined.update(
+            cast(str, channel["id"])
+            for channel in cast(list[JSONObject], page["channels"])
+        )
+        cursor = cast(JSONObject, page.get("response_metadata", {})).get("next_cursor")
+        if not cursor:
+            break
+        params["cursor"] = cast(str, cursor)
+    results = cast(dict[str, list[JSONObject]], result["results"])
+    if "messages" in results:
+        results["messages"] = [
+            item for item in results["messages"] if item["channel_id"] in joined
+        ]
+    if "files" in results:
+        files = []
+        for item in results["files"]:
+            info = _call_slack_api(
+                "files.info", credentials, params={"file": cast(str, item["file_id"])}
+            )
+            file = cast(JSONObject, info["file"])
+            if any(
+                joined.intersection(cast(list[str], file.get(field, [])))
+                for field in ("channels", "groups", "ims")
+            ):
+                files.append(item)
+        results["files"] = files
+
+
+def _format_search_result(result: JSONObject, arguments: JSONObject) -> None:
+    """Apply the requested context length and concise result fields."""
+    results = cast(dict[str, list[JSONObject]], result["results"])
+    if "max_context_length" in arguments:
+        maximum = cast(int, arguments["max_context_length"])
+        for message in results.get("messages", []):
+            context = cast(
+                dict[str, list[JSONObject]], message.get("context_messages", {})
+            )
+            for direction in ("before", "after"):
+                for item in context.get(direction, []):
+                    item["text"] = cast(str, item["text"])[:maximum]
+    if arguments.get("response_format") == "concise":
+        fields = {
+            "messages": (
+                "channel_id",
+                "message_ts",
+                "author_user_id",
+                "content",
+                "permalink",
+            ),
+            "files": ("file_id", "title", "content", "permalink"),
+        }
+        for kind, names in fields.items():
+            if kind in results:
+                results[kind] = [
+                    {key: item[key] for key in names if key in item}
+                    for item in results[kind]
+                ]
 
 
 def search_public(
