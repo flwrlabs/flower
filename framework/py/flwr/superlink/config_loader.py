@@ -71,6 +71,7 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     superexec_auth_secret: bytes | None
     authn_plugin: ControlAuthnPlugin
     event_log_plugin: EventLogWriterPlugin | None
+    fleet_event_log_plugin: EventLogWriterPlugin | None
     enable_event_log: bool
     artifact_provider: ArtifactProvider | None
     enable_supernode_auth: bool
@@ -114,6 +115,22 @@ def load_control_event_log_plugin() -> EventLogWriterPlugin:
         sys.exit("No event log writer plugin is provided.")
     except NotImplementedError:
         sys.exit("No event log writer plugins are currently supported.")
+
+
+def load_fleet_event_log_plugin() -> EventLogWriterPlugin | None:
+    """Load the configured Fleet API event log writer plugin."""
+    try:
+        # pylint: disable-next=import-outside-toplevel
+        from flwr.ee import get_fleet_event_log_writer_plugins
+
+        plugins: dict[str, type[EventLogWriterPlugin]] = (
+            get_fleet_event_log_writer_plugins()
+        )
+        return plugins[EventLogWriterType.STDOUT]()
+    except KeyError:
+        sys.exit("No Fleet API event log writer plugin is provided.")
+    except (ImportError, NotImplementedError):
+        sys.exit("No Fleet API event log writer plugins are currently supported.")
 
 
 def get_federation_manager(is_simulation: bool = False) -> FederationManager:
