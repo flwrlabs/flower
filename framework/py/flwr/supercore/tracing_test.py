@@ -134,7 +134,9 @@ def test_backend_failures_preserve_application_exception(
         _CARRIER + "\n",
         _CARRIER.replace("1", "A", 1),
         _CARRIER.replace("00-", "01-", 1),
-        _CARRIER[:-2] + "02",
+        _CARRIER[:-2] + "0A",
+        _CARRIER[:-2] + "gg",
+        _CARRIER[:-2] + "001",
         "00-" + "0" * 32 + "-" + "2" * 16 + "-01",
         "00-" + "1" * 32 + "-" + "0" * 16 + "-01",
     ],
@@ -144,9 +146,9 @@ def test_invalid_traceparent_is_discarded(value: object) -> None:
     assert tracing.validate_traceparent(value) == ""
 
 
-@pytest.mark.parametrize("flags", ["00", "01"])
+@pytest.mark.parametrize("flags", ["00", "01", "02", "03", "80", "ff"])
 def test_valid_traceparent(flags: str) -> None:
-    """Sampled and unsampled version-00 contexts round trip unchanged."""
+    """The complete version-00 trace-flags byte round trips unchanged."""
     carrier = _CARRIER[:-2] + flags
     assert tracing.validate_traceparent(carrier) == carrier
 
@@ -183,10 +185,13 @@ def test_provider_failure_exports_only_a_fixed_event_and_error_type(
     assert "secret" not in str(raw_span.mock_calls)
 
 
+@pytest.mark.parametrize("flags", ["01", "03"])
 def test_task_carrier_connects_run_dispatch_app_and_provider(
     monkeypatch: pytest.MonkeyPatch,
+    flags: str,
 ) -> None:
     """An exported trace spans persisted parent/child tasks and first text."""
+    # pylint: disable=too-many-locals
     monkeypatch.setenv("FLWR_TRACING_ENABLED", "1")
     active: ContextVar[str] = ContextVar("traceparent", default="")
     records: list[dict[str, Any]] = []
@@ -198,7 +203,7 @@ def test_task_carrier_connects_run_dispatch_app_and_provider(
     ) -> Iterator[Mock]:
         parent = traceparent or active.get()
         trace_id = parent.split("-")[1] if parent else "f" * 32
-        carrier = f"00-{trace_id}-{len(records) + 1:016x}-01"
+        carrier = f"00-{trace_id}-{len(records) + 1:016x}-{flags}"
         raw_span = Mock()
         records.append(
             {
@@ -239,6 +244,7 @@ def test_task_carrier_connects_run_dispatch_app_and_provider(
     task_input = pull_task_input(PullTaskInputRequest(), state, acquired.task)
     restored = PullTaskInputResponse.FromString(task_input.SerializeToString())
     assert restored.traceparent == acquired.task.traceparent
+    assert restored.traceparent.endswith(f"-{flags}")
     with tracing.trace_span("task.dispatch", traceparent=acquired.task.traceparent):
         pass
     with tracing.trace_span("agentapp.execute", traceparent=restored.traceparent):
@@ -249,6 +255,7 @@ def test_task_carrier_connects_run_dispatch_app_and_provider(
         )
     child = state.get_tasks(task_ids=[exchange.model_task_id])[0]
     assert child.traceparent != acquired.task.traceparent
+    assert child.traceparent.endswith(f"-{flags}")
     assert child.traceparent.split("-")[1] == acquired.task.traceparent.split("-")[1]
     monkeypatch.setattr(TaskIdentity, "_task_id", child.task_id)
     monkeypatch.setattr(TaskIdentity, "_run_id", run_id)

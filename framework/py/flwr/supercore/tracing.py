@@ -45,7 +45,7 @@ from types import ModuleType
 from typing import Any
 
 TraceScalar = str | bool | int | float
-_TRACEPARENT = re.compile(r"00-([0-9a-f]{32})-([0-9a-f]{16})-(00|01)\Z")
+_TRACEPARENT = re.compile(r"00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})\Z")
 
 
 def validate_traceparent(value: object) -> str:

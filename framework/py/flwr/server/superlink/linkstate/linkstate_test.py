@@ -372,7 +372,7 @@ class StateTest(CoreStateTest):
 
     def test_create_run_persists_primary_task_traceparent(self) -> None:
         """Primary task creation preserves only validated trace carriers."""
-        carrier = "00-" + "1" * 32 + "-" + "2" * 16 + "-01"
+        carrier = "00-" + "1" * 32 + "-" + "2" * 16 + "-03"
         state = self.state_factory()
         for value, expected in [(carrier, carrier), ("", ""), ("invalid", "")]:
             with self.subTest(traceparent=value):
