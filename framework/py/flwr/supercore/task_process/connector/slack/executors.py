@@ -133,9 +133,16 @@ def _filter_joined_channels(
     if "files" in results:
         files = []
         for item in results["files"]:
-            info = _call_slack_api(
-                "files.info", credentials, params={"file": cast(str, item["file_id"])}
-            )
+            try:
+                info = _call_slack_api(
+                    "files.info",
+                    credentials,
+                    params={"file": cast(str, item["file_id"])},
+                )
+            except SlackApiError as error:
+                if error.code != "access_denied":
+                    raise
+                continue
             file = cast(JSONObject, info["file"])
             if any(
                 joined.intersection(cast(list[str], file.get(field, [])))

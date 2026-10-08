@@ -93,7 +93,8 @@ def test_slack_api_error() -> None:
 
 
 @pytest.mark.parametrize("response_format", ("detailed", "concise"))
-def test_search_options(response_format: str) -> None:
+@pytest.mark.parametrize("file_error", (None, "access_denied"))
+def test_search_options(response_format: str, file_error: str | None) -> None:
     """Filter joined conversations and honor context length and concise output."""
     pages = [
         {
@@ -125,7 +126,11 @@ def test_search_options(response_format: str) -> None:
         },
         {"ok": True, "channels": [{"id": "C3"}]},
         {"ok": True, "file": {"channels": ["C3"]}},
-        {"ok": True, "file": {"channels": ["C2"]}},
+        (
+            {"ok": False, "error": file_error}
+            if file_error
+            else {"ok": True, "file": {"channels": ["C2"]}}
+        ),
     ]
     with patch(
         _HTTP_REQUEST,
