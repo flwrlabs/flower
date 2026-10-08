@@ -351,6 +351,7 @@ def test_notion_query_meeting_notes_forwards_inputs() -> None:
 def test_notion_meeting_note_filter_schema_is_explicit() -> None:
     """Meeting-note tools should describe comparisons and one-level nesting."""
     action = next(action for action in ACTIONS if action.name == "query_meeting_notes")
+    assert action.input_schema["additionalProperties"] == {}
     properties = cast(JSONObject, action.input_schema["properties"])
     filter_schema = cast(JSONObject, properties["filter"])
     root_options = cast(list[JSONObject], filter_schema["anyOf"])
