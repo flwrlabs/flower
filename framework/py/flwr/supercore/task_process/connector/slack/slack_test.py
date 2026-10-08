@@ -101,7 +101,23 @@ def test_directory_search(
     response_format: str,
 ) -> None:
     """Map directory search options and honor the requested output format."""
-    item: JSONObject = {"id": "123", "name": "engineering", "extra": "details"}
+    if content_type == "channels":
+        concise_item: JSONObject = {
+            "name": "engineering",
+            "topic": "Engineering updates",
+            "purpose": "Discuss engineering",
+            "permalink": "https://slack.com/archives/C1",
+        }
+        item: JSONObject = {**concise_item, "date_created": 1746570052}
+    else:
+        concise_item = {
+            "user_id": "U1",
+            "full_name": "Jason Chen",
+            "title": "Engineer",
+            "email": "jason@example.com",
+            "permalink": "https://example.slack.com/team/U1",
+        }
+        item = {**concise_item, "timezone": "America/Los_Angeles"}
     payload: JSONObject = {"ok": True, "results": {content_type: [item]}}
     response = Mock(status_code=200, json=Mock(return_value=payload))
     with patch(_HTTP_REQUEST, return_value=response) as request:
@@ -134,11 +150,7 @@ def test_directory_search(
     assert body.get("include_archived_channels") == options.get("include_archived")
     assert result is payload
     assert payload["results"] == {
-        content_type: (
-            [{"id": "123", "name": "engineering"}]
-            if response_format == "concise"
-            else [item]
-        )
+        content_type: [concise_item if response_format == "concise" else item]
     }
 
 

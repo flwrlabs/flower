@@ -182,8 +182,15 @@ def _format_search_result(result: JSONObject, arguments: JSONObject) -> None:
                 "permalink",
             ),
             "files": ("file_id", "title", "content", "permalink"),
-            "channels": ("channel_id", "id", "name", "topic", "purpose"),
-            "users": ("user_id", "id", "name", "real_name", "email"),
+            "channels": (
+                "channel_id",
+                "id",
+                "name",
+                "topic",
+                "purpose",
+                "permalink",
+            ),
+            "users": ("user_id", "full_name", "title", "email", "permalink"),
         }
         for kind, names in fields.items():
             if kind in results:
