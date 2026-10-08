@@ -16,6 +16,7 @@
 
 
 import unittest
+from contextlib import nullcontext
 from unittest.mock import Mock, patch
 
 import numpy as np
@@ -23,7 +24,7 @@ import pytest
 
 from flwr.app import ArrayRecord, ConfigRecord, Context, Message, Metadata, RecordDict
 from flwr.app.message import make_message, remove_content_from_message
-from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE, SubStatus
+from flwr.common.constant import SubStatus
 from flwr.supercore.constant import TaskType
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
@@ -35,10 +36,24 @@ from flwr.supercore.inflatable.inflatable_object import (
 
 from .start_client_internal import (
     FAB_VERIFICATION_ERROR,
+    _init_connection,
     _pull_and_store_message,
     _push_messages,
     start_client_internal,
 )
+
+
+def test_init_connection_uses_http() -> None:
+    """The HTTP transport uses the Fleet HTTP connection."""
+    callbacks = Mock()
+    with patch(
+        "flwr.supernode.start_client_internal.http_request_response",
+        return_value=nullcontext(callbacks),
+    ) as connection:
+        with _init_connection("127.0.0.1:8000", True) as result:
+            assert result is callbacks
+
+    connection.assert_called_once_with("127.0.0.1:8000", True, None, None, None, None)
 
 
 class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
@@ -455,7 +470,6 @@ def _run_until_connection_start(
                 node_config={},
                 root_certificates=None,
                 insecure=True,
-                transport=TRANSPORT_TYPE_GRPC_RERE,
                 runtime_api_address=runtime_api_address,
                 runtime_certificates=runtime_certificates,
                 runtime_root_certificates_path=runtime_root_certificates_path,
