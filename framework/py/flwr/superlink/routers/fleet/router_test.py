@@ -47,9 +47,10 @@ from flwr.supercore.primitives.asymmetric import (
 )
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.superlink import extensions, main
+from flwr.superlink.routers.control import middlewares as control_middlewares
 from flwr.superlink.servicer.fleet import fleet_handlers
 
-from . import middlewares
+from . import middlewares as fleet_middlewares
 from .node_auth import authenticate_node
 from .router import router as fleet_router
 
@@ -60,6 +61,7 @@ def test_fleet_http_handlers_and_authentication(
     """Fleet HTTP uses shared handlers and rejects unsigned node calls."""
     monkeypatch.setattr(extensions, "get_middleware", lambda: ())
     monkeypatch.setattr(extensions, "configure_app", lambda _: None)
+    monkeypatch.setattr(control_middlewares, "get_license_plugin", lambda: None)
     app = main.create_app()
     app.include_router(fleet_router)
     control_plugin = Mock(spec=EventLogWriterPlugin)
@@ -151,7 +153,7 @@ def test_fleet_http_event_log(monkeypatch: pytest.MonkeyPatch) -> None:
     app.state.fleet_event_log_plugin = fleet_plugin
     app.include_router(fleet_router)
     app.dependency_overrides[authenticate_node] = lambda: None
-    monkeypatch.setattr(middlewares, "authenticate_node", lambda _: None)
+    monkeypatch.setattr(fleet_middlewares, "authenticate_node", lambda _: None)
     client = TestClient(app, raise_server_exceptions=False)
 
     response = client.post(
