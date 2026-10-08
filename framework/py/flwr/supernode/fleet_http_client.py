@@ -100,7 +100,8 @@ class FleetHttpClient(ProtobufClient):  # pylint: disable=too-many-public-method
             rpc_method="/flwr.proto.Fleet/SendNodeHeartbeat",
             request=request,
             response_type=SendNodeHeartbeatResponse,
-            # Before enabling HTTP/2, verify this timeout with other active streams.
+            # Before enabling HTTP/2, verify heartbeat read timeouts
+            # under multiplexing, since httpcore shares connection-level reads.
             timeout=HEARTBEAT_CALL_TIMEOUT,
         )
 
