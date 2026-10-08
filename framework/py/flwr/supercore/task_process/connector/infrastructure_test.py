@@ -35,11 +35,15 @@ class ExampleApiError(ConnectorApiError):
 
 
 def test_connector_input_schemas_are_strict() -> None:
-    """Connector schemas should reject unknown arguments."""
+    """Connector schemas should reject unknown arguments except for MCP parity."""
     for connector in CONNECTORS:
         for tool in connector.tools:
             parameters = tool["parameters"]
             assert isinstance(parameters, dict)
+            if tool["name"] == "notion_query_meeting_notes":
+                # Preserve the exported Notion MCP tool's open input schema.
+                assert parameters.get("additionalProperties") == {}
+                continue
             assert parameters.get("additionalProperties") is False, (
                 f"Connector tool '{tool['name']}' input schema must set "
                 "additionalProperties to false."

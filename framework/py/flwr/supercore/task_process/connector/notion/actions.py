@@ -129,34 +129,57 @@ def _meeting_note_person_filter_schema() -> JSONObject:
             "value": {
                 "type": "array",
                 "items": {
-                    "type": "object",
-                    "properties": {
-                        "type": {
-                            "type": "string",
-                            "enum": ["exact"],
-                            "description": "Use exact for a literal comparison value.",
-                        },
-                        "value": {
+                    "anyOf": [
+                        {
                             "type": "object",
                             "properties": {
-                                "table": {
+                                "type": {
                                     "type": "string",
-                                    "enum": ["notion_user"],
-                                    "description": "Always 'notion_user'.",
+                                    "enum": ["exact"],
+                                    "description": (
+                                        "Use exact for a literal comparison value."
+                                    ),
                                 },
-                                "id": string_property(
-                                    "A Notion user UUID or user://<uuid>. "
-                                    "Use IDs from notion_list_users or "
-                                    "another Notion response, not names "
-                                    "or email addresses."
-                                ),
+                                "value": {
+                                    "type": "object",
+                                    "properties": {
+                                        "table": {
+                                            "type": "string",
+                                            "enum": ["notion_user"],
+                                            "description": "Always 'notion_user'.",
+                                        },
+                                        "id": string_property(
+                                            "A Notion user UUID or user://<uuid>. "
+                                            "Use IDs from notion_list_users or "
+                                            "another Notion response, not names "
+                                            "or email addresses."
+                                        ),
+                                    },
+                                    "required": ["table", "id"],
+                                    "additionalProperties": False,
+                                },
                             },
-                            "required": ["table", "id"],
+                            "required": ["type", "value"],
                             "additionalProperties": False,
                         },
-                    },
-                    "required": ["type", "value"],
-                    "additionalProperties": False,
+                        {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["relative"],
+                                    "description": "Use 'relative' for 'me'.",
+                                },
+                                "value": {
+                                    "type": "string",
+                                    "enum": ["me"],
+                                    "description": "The connected workspace user.",
+                                },
+                            },
+                            "required": ["type", "value"],
+                            "additionalProperties": False,
+                        },
+                    ]
                 },
                 "maxItems": 100,
                 "description": "The people to compare against.",
@@ -434,7 +457,7 @@ def _meeting_note_date_range_filter_schema() -> JSONObject:
                                         "format, if any. Omit for no end bound."
                                     ),
                                 },
-                                "required": ["type", "start_date"],
+                                "required": ["type"],
                                 "additionalProperties": False,
                             },
                         },
@@ -457,73 +480,32 @@ def _meeting_note_date_range_filter_schema() -> JSONObject:
 
 
 def _meeting_note_property_filter_schema() -> JSONObject:
-    """Return schemas that pair each property with valid filter shapes."""
+    """Return all comparison schemas for every meeting-note property."""
     return {
-        "anyOf": [
-            {
-                "type": "object",
-                "properties": {
-                    "property": {
-                        "type": "string",
-                        "enum": ["title"],
-                        "description": "The meeting title, compared as text.",
-                    },
-                    "filter": {
-                        "anyOf": [
-                            _meeting_note_text_filter_schema(),
-                            _meeting_note_empty_filter_schema(),
-                        ]
-                    },
-                },
-                "required": ["property", "filter"],
-                "additionalProperties": False,
+        "type": "object",
+        "properties": {
+            "property": {
+                "type": "string",
+                "enum": [
+                    *_MEETING_NOTE_PROPERTIES,
+                    "notion://meeting_notes/attendees",
+                ],
+                "description": "The meeting-note property to filter on.",
             },
-            {
-                "type": "object",
-                "properties": {
-                    "property": {
-                        "type": "string",
-                        "enum": ["attendees", "created_by", "last_edited_by"],
-                        "description": (
-                            "Meeting attendees, the note's creator, or its "
-                            "last editor, compared as people."
-                        ),
-                    },
-                    "filter": {
-                        "anyOf": [
-                            _meeting_note_person_filter_schema(),
-                            _meeting_note_empty_filter_schema(),
-                        ]
-                    },
-                },
-                "required": ["property", "filter"],
-                "additionalProperties": False,
+            "filter": {
+                "anyOf": [
+                    _meeting_note_text_filter_schema(),
+                    _meeting_note_person_filter_schema(),
+                    _meeting_note_date_filter_schema(),
+                    _meeting_note_date_range_filter_schema(),
+                    _meeting_note_empty_filter_schema(),
+                ],
+                "description": "The comparison to apply to the selected property.",
             },
-            {
-                "type": "object",
-                "properties": {
-                    "property": {
-                        "type": "string",
-                        "enum": ["created_time", "last_edited_time"],
-                        "description": (
-                            "When the note was created or last edited, compared "
-                            "as a date. These are note timestamps, not scheduled "
-                            "meeting times."
-                        ),
-                    },
-                    "filter": {
-                        "anyOf": [
-                            _meeting_note_date_filter_schema(),
-                            _meeting_note_date_range_filter_schema(),
-                            _meeting_note_empty_filter_schema(),
-                        ]
-                    },
-                },
-                "required": ["property", "filter"],
-                "additionalProperties": False,
-            },
-        ],
-        "description": "One property-specific meeting-note filter.",
+        },
+        "required": ["property", "filter"],
+        "additionalProperties": False,
+        "description": "One meeting-note property filter.",
     }
 
 
@@ -547,7 +529,6 @@ def _meeting_note_combinator_schema(*, allow_nested: bool) -> JSONObject:
             },
             "filters": {
                 "type": "array",
-                "minItems": 1,
                 "maxItems": 100,
                 "items": items,
                 "description": (
@@ -877,37 +858,8 @@ ACTIONS = (
                         '"id":"<user-id>"}}]}}]}'
                     ),
                 },
-                "sort": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "property": {
-                                "type": "string",
-                                "enum": _MEETING_NOTE_PROPERTIES,
-                                "description": "Meeting-note property to sort by.",
-                            },
-                            "direction": {
-                                "type": "string",
-                                "enum": ["ascending", "descending"],
-                                "description": "Sort direction.",
-                            },
-                        },
-                        "required": ["property", "direction"],
-                        "additionalProperties": False,
-                    },
-                    "maxItems": 100,
-                    "description": (
-                        "Ordered meeting-note sorts. Earlier entries take precedence."
-                    ),
-                },
-                "limit": integer_property(
-                    "Maximum number of meeting notes to return. Omit to use 50.",
-                    minimum=1,
-                    maximum=50,
-                ),
             },
-            "additionalProperties": False,
+            "additionalProperties": {},
         },
     ),
     ActionDefinition(
