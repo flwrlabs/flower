@@ -54,13 +54,18 @@ from . import node_auth
 from .router import router as fleet_router
 
 
+@pytest.fixture(autouse=True)
+def isolate_control_license(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep Fleet route tests independent of optional license plugins."""
+    monkeypatch.setattr(control_middlewares, "get_license_plugin", lambda: None)
+
+
 def test_fleet_http_handlers_and_authentication(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Fleet HTTP uses shared handlers and rejects unsigned node calls."""
     monkeypatch.setattr(extensions, "get_middleware", lambda: ())
     monkeypatch.setattr(extensions, "configure_app", lambda _: None)
-    monkeypatch.setattr(control_middlewares, "get_license_plugin", lambda: None)
     app = main.create_app()
     app.include_router(fleet_router)
     control_plugin = Mock(spec=EventLogWriterPlugin)
@@ -144,7 +149,6 @@ def test_fleet_http_event_log(monkeypatch: pytest.MonkeyPatch) -> None:
     """Log Fleet calls before and after the handler when a writer is provided."""
     monkeypatch.setattr(extensions, "get_middleware", lambda: ())
     monkeypatch.setattr(extensions, "configure_app", lambda _: None)
-    monkeypatch.setattr(control_middlewares, "get_license_plugin", lambda: None)
     fleet_plugin = Mock(spec=EventLogWriterPlugin)
     expected = RegisterNodeFleetResponse(node_id=42)
     monkeypatch.setattr(fleet_handlers, "register_node", lambda **_: expected)
