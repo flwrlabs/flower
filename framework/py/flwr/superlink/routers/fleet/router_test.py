@@ -144,6 +144,7 @@ def test_fleet_http_event_log(monkeypatch: pytest.MonkeyPatch) -> None:
     """Log Fleet calls before and after the handler when a writer is provided."""
     monkeypatch.setattr(extensions, "get_middleware", lambda: ())
     monkeypatch.setattr(extensions, "configure_app", lambda _: None)
+    monkeypatch.setattr(control_middlewares, "get_license_plugin", lambda: None)
     fleet_plugin = Mock(spec=EventLogWriterPlugin)
     expected = RegisterNodeFleetResponse(node_id=42)
     monkeypatch.setattr(fleet_handlers, "register_node", lambda **_: expected)
