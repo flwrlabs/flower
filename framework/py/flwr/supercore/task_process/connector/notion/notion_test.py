@@ -20,7 +20,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from flwr.supercore.typing import JSONObject
+from flwr.supercore.typing import JSONObject, JSONValue
 
 from .. import registry
 from ..definition import ActionAccess
@@ -37,16 +37,17 @@ _CREDENTIALS: JSONObject = {"access_token": "ntn-secret"}
 def _meeting_note_operator_enums(property_filter: JSONObject) -> set[str]:
     """Collect comparison operators from a meeting-note property schema."""
     operator_enums: set[str] = set()
-    option_properties = cast(JSONObject, property_filter["properties"])
-    comparison_schema = cast(JSONObject, option_properties["filter"])
-    for comparison in cast(list[JSONObject], comparison_schema["anyOf"]):
-        comparison_properties = cast(JSONObject, comparison["properties"])
-        operator = cast(JSONObject, comparison_properties["operator"])
-        operator_enums.update(cast(list[str], operator["enum"]))
-        if operator["enum"] == ["is_empty", "is_not_empty"]:
-            assert "value" not in comparison_properties
-        else:
-            assert "value" in comparison_properties
+    for property_option in cast(list[JSONObject], property_filter["anyOf"]):
+        option_properties = cast(JSONObject, property_option["properties"])
+        comparison_schema = cast(JSONObject, option_properties["filter"])
+        for comparison in cast(list[JSONObject], comparison_schema["anyOf"]):
+            comparison_properties = cast(JSONObject, comparison["properties"])
+            operator = cast(JSONObject, comparison_properties["operator"])
+            operator_enums.update(cast(list[str], operator["enum"]))
+            if operator["enum"] == ["is_empty", "is_not_empty"]:
+                assert "value" not in comparison_properties
+            else:
+                assert "value" in comparison_properties
     return operator_enums
 
 
@@ -322,25 +323,23 @@ def test_notion_get_block_children_forwards_pagination() -> None:
 
 
 def test_notion_query_meeting_notes_forwards_inputs() -> None:
-    """Query meeting notes should forward the combinator filter."""
+    """Query meeting notes should forward filters, sorts, and the result limit."""
     response = Mock(status_code=200)
     response.json.return_value = {"results": [], "has_more": False}
     filter_: JSONObject = {
-        "operator": "and",
-        "filters": [
-            {
-                "property": "title",
-                "filter": {
-                    "operator": "string_contains",
-                    "value": {"type": "exact", "value": "standup"},
-                },
-            }
-        ],
+        "property": "title",
+        "filter": {
+            "operator": "string_contains",
+            "value": {"type": "exact", "value": "standup"},
+        },
     }
+    sort: list[JSONObject] = [
+        {"property": "last_edited_time", "direction": "descending"}
+    ]
     with patch(_HTTP_REQUEST, return_value=response) as request:
         result = registry.invoke_connector(
             "notion_query_meeting_notes",
-            {"filter": filter_},
+            {"filter": filter_, "sort": sort, "limit": 25},
             Mock(),
             credentials=_CREDENTIALS,
             config={},
@@ -350,7 +349,11 @@ def test_notion_query_meeting_notes_forwards_inputs() -> None:
         "POST",
         "https://api.notion.com/v1/blocks/meeting_notes/query",
     )
-    assert request.call_args.kwargs["json"] == {"filter": filter_}
+    assert request.call_args.kwargs["json"] == {
+        "filter": filter_,
+        "sort": sort,
+        "limit": 25,
+    }
 
 
 def test_notion_meeting_note_filter_schema_is_explicit() -> None:
@@ -358,10 +361,8 @@ def test_notion_meeting_note_filter_schema_is_explicit() -> None:
     action = next(action for action in ACTIONS if action.name == "query_meeting_notes")
     properties = cast(JSONObject, action.input_schema["properties"])
     filter_schema = cast(JSONObject, properties["filter"])
-    root_properties = cast(JSONObject, filter_schema["properties"])
-    root_filters = cast(JSONObject, root_properties["filters"])
-    root_items = cast(JSONObject, root_filters["items"])
-    property_filter = cast(list[JSONObject], root_items["anyOf"])[0]
+    root_options = cast(list[JSONObject], filter_schema["anyOf"])
+    property_filter, root_combinator = root_options
 
     assert _meeting_note_operator_enums(property_filter) == {
         "string_is",
@@ -383,9 +384,45 @@ def test_notion_meeting_note_filter_schema_is_explicit() -> None:
         "is_not_empty",
     }
     assert (
-        _nested_meeting_note_filter_items(filter_schema, property_filter)
+        _nested_meeting_note_filter_items(root_combinator, property_filter)
         == property_filter
     )
+
+
+@pytest.mark.parametrize(
+    "sort",
+    [
+        [{"property": [], "direction": "ascending"}],
+        [{"property": "title", "direction": {}}],
+    ],
+)
+def test_notion_query_meeting_notes_rejects_non_string_sort_values(
+    sort: list[JSONObject],
+) -> None:
+    """Meeting-note sorts should reject non-string values before the request."""
+    with patch(_HTTP_REQUEST) as request, pytest.raises(ValueError):
+        registry.invoke_connector(
+            "notion_query_meeting_notes",
+            {"sort": sort},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    request.assert_not_called()
+
+
+@pytest.mark.parametrize("limit", [0, 51, True, "25"])
+def test_notion_query_meeting_notes_rejects_invalid_limit(limit: JSONValue) -> None:
+    """Meeting-note limits should be integers between 1 and 50."""
+    with patch(_HTTP_REQUEST) as request, pytest.raises(ValueError):
+        registry.invoke_connector(
+            "notion_query_meeting_notes",
+            {"limit": limit},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    request.assert_not_called()
 
 
 def test_notion_list_users_forwards_pagination() -> None:
