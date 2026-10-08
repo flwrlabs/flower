@@ -17,9 +17,12 @@
 import binascii
 import datetime
 from base64 import b64decode
-from typing import Annotated
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import HTTPException, Request, status
+from fastapi.responses import Response
+from google.protobuf.message import Message
+from starlette.concurrency import run_in_threadpool
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from flwr.common.constant import (
     SYSTEM_TIME_TOLERANCE,
@@ -30,7 +33,6 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
     RegisterNodeFleetRequest,
 )
-from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.constant import (
     FLEET_HTTP_PUBLIC_KEY_HEADER,
     FLEET_HTTP_SIGNATURE_HEADER,
@@ -40,10 +42,7 @@ from flwr.supercore.primitives.asymmetric import bytes_to_public_key, verify_sig
 from flwr.superlink.dependencies.linkstate import get_linkstate
 
 
-def authenticate_node(
-    request: Request,
-    state: Annotated[LinkState, Depends(get_linkstate)],
-) -> None:
+def authenticate_node(request: Request) -> None:
     """Validate the signed timestamp and claimed node identity."""
     try:
         public_key = b64decode(
@@ -78,10 +77,24 @@ def authenticate_node(
                 if hasattr(protobuf_request, "node")
                 else protobuf_request.node_id
             )
-            if state.get_node_id_by_public_key(public_key) != node_id:
+            if get_linkstate(request).get_node_id_by_public_key(public_key) != node_id:
                 raise ValueError("Invalid node ID")
     except (KeyError, ValueError, TypeError, UnicodeError, binascii.Error) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid SuperNode authentication",
         ) from exc
+
+
+class NodeAuthMiddleware(BaseHTTPMiddleware):
+    """Authenticate Fleet HTTP calls before event logging."""
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        """Authenticate recognized Fleet requests."""
+        if request.url.path.startswith("/v1/fleet/") and isinstance(
+            getattr(request.state, "protobuf_request", None), Message
+        ):
+            await run_in_threadpool(authenticate_node, request)
+        return await call_next(request)
