@@ -3,7 +3,7 @@ services:
     image: flwr/supernode:${FLWR_VERSION:-1.40.0}
     command:
       - --superlink
-      - ${SUPERLINK_IP:-127.0.0.1}:9092
+      - ${SUPERLINK_IP:-127.0.0.1}:8000
       - --host
       - 0.0.0.0
       - --port
@@ -22,7 +22,7 @@ services:
     image: flwr/supernode:${FLWR_VERSION:-1.40.0}
     command:
       - --superlink
-      - ${SUPERLINK_IP:-127.0.0.1}:9092
+      - ${SUPERLINK_IP:-127.0.0.1}:8000
       - --host
       - 0.0.0.0
       - --port
@@ -43,7 +43,7 @@ services:
   #   image: flwr/supernode:${FLWR_VERSION:-1.40.0}
   #   command:
   #     - --superlink
-  #     - ${SUPERLINK_IP:-127.0.0.1}:9092
+  #     - ${SUPERLINK_IP:-127.0.0.1}:8000
   #     - --host
   #     - 0.0.0.0
   #     - --port
