@@ -670,13 +670,20 @@ def test_create_app_loads_event_log_with_enabled_env_var(
     """Direct FastAPI startup mirrors the CLI event-log flag when enabled."""
     expected_plugin = _create_event_log_plugin()
     load_plugin = Mock(return_value=expected_plugin)
+    fleet_plugin = _create_event_log_plugin()
+    load_fleet_plugin = Mock(return_value=fleet_plugin)
     monkeypatch.setattr(superlink_main, "load_control_event_log_plugin", load_plugin)
+    monkeypatch.setattr(
+        superlink_main, "load_fleet_event_log_plugin", load_fleet_plugin
+    )
     monkeypatch.setenv("FLWR_ENABLE_EVENT_LOG", "1")
 
     app = superlink_main.create_app()
 
     assert app.state.control_event_log_plugin is expected_plugin
+    assert app.state.fleet_event_log_plugin is fleet_plugin
     load_plugin.assert_called_once_with()
+    load_fleet_plugin.assert_called_once_with()
 
 
 def test_event_log_middleware_writes_before_and_after_events(
