@@ -57,6 +57,7 @@ from flwr.superlink.routers.control.middlewares import (
 )
 from flwr.superlink.routers.fleet.middlewares import FleetEventLogMiddleware
 from flwr.superlink.routers.fleet.node_auth import NodeAuthMiddleware
+from flwr.superlink.routers.fleet.router import router as fleet_router
 from flwr.superlink.servicer.runtime import runtime_handlers
 
 try:
@@ -216,6 +217,7 @@ def create_app(  # pylint: disable=too-many-statements
 
     # SuperLink APIs
     fastapi_app.include_router(control_router)
+    fastapi_app.include_router(fleet_router)
     fastapi_app.include_router(create_runtime_router("SuperLink"))
     fastapi_app.include_router(responses_router)
 
