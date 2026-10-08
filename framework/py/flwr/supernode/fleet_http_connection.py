@@ -14,6 +14,8 @@
 # ==============================================================================
 """Fleet HTTP connection for the SuperNode worker loop."""
 
+import os
+import signal
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from logging import ERROR
@@ -101,9 +103,6 @@ def http_request_response(  # pylint: disable=R0913,R0917,R0914,R0912,R0915
         retry_invoker.max_tries = max_retries + 1
     if max_wait_time is not None:
         retry_invoker.max_time = max_wait_time
-    heartbeat_retry_invoker = make_simple_http_retry_invoker()
-    heartbeat_retry_invoker.max_tries = 1
-
     with FleetHttpClient.from_server_address(
         server_address,
         insecure,
@@ -119,15 +118,16 @@ def http_request_response(  # pylint: disable=R0913,R0917,R0914,R0912,R0915
             if node is None:
                 return False
             try:
-                response = heartbeat_retry_invoker.invoke(
-                    client.SendNodeHeartbeat,
+                response = client.SendNodeHeartbeat(
                     SendNodeHeartbeatRequest(
                         node=node, heartbeat_interval=HEARTBEAT_DEFAULT_INTERVAL
-                    ),
+                    )
                 )
             except httpx.TransportError:
                 return False
             except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == httpx.codes.UNAUTHORIZED:
+                    os.kill(os.getpid(), signal.SIGINT)
                 if exc.response.status_code in (503, 504):
                     return False
                 raise

@@ -19,7 +19,7 @@ from contextlib import nullcontext
 from unittest.mock import Mock
 
 import httpx
-from pytest import MonkeyPatch
+from pytest import MonkeyPatch, raises
 
 from flwr.app.message import Message
 
@@ -105,6 +105,16 @@ def test_http_connection_provides_worker_callbacks(  # pylint: disable=R0914
         assert client.SendNodeHeartbeat.call_args.args[0].node.node_id == 42
         client.SendNodeHeartbeat.side_effect = httpx.ConnectError("unavailable")
         assert heartbeat_fns[0]() is False
+        client.SendNodeHeartbeat.side_effect = httpx.HTTPStatusError(
+            "unauthorized",
+            request=httpx.Request("POST", "https://fleet.example"),
+            response=httpx.Response(401),
+        )
+        kill = Mock(side_effect=SystemExit)
+        monkeypatch.setattr(connection.os, "kill", kill)
+        with raises(SystemExit):
+            heartbeat_fns[0]()
+        kill.assert_called_once_with(connection.os.getpid(), connection.signal.SIGINT)
 
     assert client.RegisterNode.call_count == 1
     assert client.ActivateNode.call_count == 1
