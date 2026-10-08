@@ -47,6 +47,7 @@ from flwr.supercore.primitives.asymmetric import (
 )
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.superlink import extensions, main
+from flwr.superlink.routers.control import middlewares
 
 from .router import router as fleet_router
 
@@ -57,6 +58,7 @@ def test_fleet_http_handlers_and_authentication(
     """Fleet HTTP uses shared handlers and rejects unsigned node calls."""
     monkeypatch.setattr(extensions, "get_middleware", lambda: ())
     monkeypatch.setattr(extensions, "configure_app", lambda _: None)
+    monkeypatch.setattr(middlewares, "get_license_plugin", lambda: None)
     app = main.create_app()
     app.include_router(fleet_router)
     control_plugin = Mock(spec=EventLogWriterPlugin)
