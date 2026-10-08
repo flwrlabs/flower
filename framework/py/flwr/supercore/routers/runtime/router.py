@@ -74,7 +74,6 @@ from flwr.supercore.dependencies.runtime import (
     SuperExecAuthDependency,
     TaskDependency,
 )
-from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_DEPENDENCY
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
@@ -84,23 +83,6 @@ router = APIRouter(
     tags=["Runtime"],
     route_class=ProtobufRoute,
 )
-
-
-def create_runtime_router(component_name: str) -> APIRouter:
-    """Return the Runtime router with version checks for its host component."""
-    versioned_router = APIRouter(
-        dependencies=[
-            Depends(
-                VersionDependency(
-                    component_name=component_name,
-                    connection_name=f"Caller <-> {component_name} Runtime API",
-                )
-            )
-        ]
-    )
-    versioned_router.include_router(router)
-    return versioned_router
-
 
 PullPendingTasksAuthDependency = Annotated[
     None,
