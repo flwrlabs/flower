@@ -421,20 +421,20 @@ def _meeting_note_date_range_filter_schema() -> JSONObject:
                                         "type": "string",
                                         "enum": ["daterange"],
                                         "description": (
-                                            "A date range with optional inclusive "
-                                            "boundaries."
+                                            "A date range with a required inclusive "
+                                            "start and an optional inclusive end."
                                         ),
                                     },
                                     "start_date": _meeting_note_date_property(
                                         "The inclusive start date in YYYY-MM-DD "
-                                        "format, if any. Omit for no start bound."
+                                        "format. Required for an exact date range."
                                     ),
                                     "end_date": _meeting_note_date_property(
                                         "The inclusive end date in YYYY-MM-DD "
                                         "format, if any. Omit for no end bound."
                                     ),
                                 },
-                                "required": ["type"],
+                                "required": ["type", "start_date"],
                                 "additionalProperties": False,
                             },
                         },
@@ -849,7 +849,8 @@ ACTIONS = (
                         "Prefer date_is_within for relative windows: this_week, "
                         "the_past_week, or a custom window with direction, unit, "
                         "and count. Exact date ranges use inclusive start_date "
-                        "and end_date boundaries, either of which may be omitted. "
+                        "and end_date boundaries. start_date is required; "
+                        "only end_date may be omitted. "
                         "Single-date comparisons support exact dates or relative "
                         "shortcuts such as today and yesterday.\n\n"
                         "Split multiword title searches into individual terms. "
