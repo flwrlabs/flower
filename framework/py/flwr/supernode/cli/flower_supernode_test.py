@@ -22,11 +22,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from flwr.common.constant import (
-    FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
-    ISOLATION_MODE_SUBPROCESS,
-    TRANSPORT_TYPE_GRPC_RERE,
-)
+from flwr.common.constant import ISOLATION_MODE_SUBPROCESS
+from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore.version import package_version
 
 from .flower_supernode import (
@@ -103,8 +100,7 @@ def test_parse_supernode_lifespan_config_returns_final_defaults(
 
     config = _parse_supernode_lifespan_config()
 
-    assert config.server_address == FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
-    assert config.transport == TRANSPORT_TYPE_GRPC_RERE
+    assert config.server_address == SUPERLINK_DEFAULT_CLIENT_ADDRESS
     assert config.root_certificates is None
     assert config.insecure is True
     assert config.authentication_keys is None
@@ -120,6 +116,13 @@ def test_parse_supernode_lifespan_config_returns_final_defaults(
     assert config.trusted_entities is None
     assert config.superexec_auth_secret is None
     assert config.runtime_dependency_install is False
+
+
+@pytest.mark.parametrize("flag", ["--grpc-rere", "--grpc-adapter"])
+def test_parse_supernode_rejects_grpc_transport_flags(flag: str) -> None:
+    """SuperNode no longer accepts gRPC Fleet transports."""
+    with pytest.raises(SystemExit):
+        _parse_args_run_supernode().parse_args([flag])
 
 
 def test_parse_supernode_lifespan_config_preserves_tls_args(

@@ -28,19 +28,13 @@ from typing import cast
 
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from cryptography.hazmat.primitives.serialization.ssh import load_ssh_public_key
-from grpc import RpcError
 
 from flwr.app import Context, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
-from flwr.client.grpc_adapter_client.connection import grpc_adapter
-from flwr.client.grpc_rere_client.connection import grpc_request_response
 from flwr.common.config import get_fused_config_from_fab
 from flwr.common.constant import (
     ISOLATION_MODE_SUBPROCESS,
     RUNTIME_DEPENDENCY_INSTALL,
-    TRANSPORT_TYPE_GRPC_ADAPTER,
-    TRANSPORT_TYPE_GRPC_RERE,
-    TRANSPORT_TYPES,
     ErrorCode,
     SubStatus,
 )
@@ -50,7 +44,6 @@ from flwr.supercore.address import parse_address, resolve_bind_address
 from flwr.supercore.constant import SUPERNODE_DEFAULT_SERVER_ADDRESS, TaskType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.fab import Fab
-from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -68,11 +61,11 @@ from flwr.supercore.primitives.asymmetric_ed25519 import (
     decode_base64url,
     verify_signature,
 )
-from flwr.supercore.retry import RetryInvoker, make_simple_grpc_retry_invoker
 from flwr.supercore.run import Run, RunNotRunningException
 from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import get_client_tls_args
 from flwr.supercore.version import package_version
+from flwr.supernode.fleet_http_connection import http_request_response
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 
 FAB_VERIFICATION_ERROR = Error(ErrorCode.INVALID_FAB, "The FAB could not be verified.")
@@ -90,7 +83,6 @@ def start_client_internal(
     node_config: UserConfig,
     root_certificates: bytes | str | None = None,
     insecure: bool | None = None,
-    transport: str,
     authentication_keys: (
         tuple[ec.EllipticCurvePrivateKey, ec.EllipticCurvePublicKey] | None
     ) = None,
@@ -122,12 +114,8 @@ def start_client_internal(
         If provided, a secure connection using the certificates will be
         established to an SSL-enabled Flower server.
     insecure : Optional[bool] (default: None)
-        Starts an insecure gRPC connection when True. Enables HTTPS connection
+        Starts an insecure connection when True. Enables TLS connection
         when False, using system certificates if `root_certificates` is None.
-    transport : str
-        Configure the transport layer. Allowed values:
-        - 'grpc-rere': gRPC, request-response
-        - 'grpc-adapter': gRPC via 3rd party adapter (experimental)
     authentication_keys : Optional[Tuple[PrivateKey, PublicKey]] (default: None)
         Tuple containing the elliptic curve private key and public key for
         authentication from the cryptography library.
@@ -234,7 +222,6 @@ def start_client_internal(
         subprocess.Popen(command)
 
     with _init_connection(
-        transport=transport,
         server_address=server_address,
         insecure=insecure,
         root_certificates=root_certificates,
@@ -574,7 +561,6 @@ def _push_messages(
 
 @contextmanager
 def _init_connection(  # pylint: disable=too-many-positional-arguments
-    transport: str,
     server_address: str,
     insecure: bool,
     root_certificates: bytes | str | None = None,
@@ -606,49 +592,15 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
     host, port, is_v6 = parsed_address
     address = f"[{host}]:{port}" if is_v6 else f"{host}:{port}"
 
-    # Use one of the supported gRPC transports
-    if transport == TRANSPORT_TYPE_GRPC_RERE:
-        connection, error_type = grpc_request_response, RpcError
-    elif transport == TRANSPORT_TYPE_GRPC_ADAPTER:
-        connection, error_type = grpc_adapter, RpcError  # type: ignore[assignment]
-    else:
-        raise ValueError(
-            f"Unknown transport type: {transport} (possible: {TRANSPORT_TYPES})"
-        )
-
-    # Create RetryInvoker
-    retry_invoker = _make_fleet_connection_retry_invoker(
-        max_retries=max_retries,
-        max_wait_time=max_wait_time,
-        connection_error_type=error_type,
-    )
-
-    # Establish connection
-    with connection(
+    with http_request_response(
         address,
         insecure,
-        retry_invoker,
-        GRPC_MAX_MESSAGE_LENGTH,
         root_certificates,
         authentication_keys,
+        max_retries,
+        max_wait_time,
     ) as conn:
         yield conn
-
-
-def _make_fleet_connection_retry_invoker(
-    max_retries: int | None = None,
-    max_wait_time: float | None = None,
-    connection_error_type: type[Exception] = RpcError,
-) -> RetryInvoker:
-    """Create a retry invoker for fleet connection."""
-    retry_invoker = make_simple_grpc_retry_invoker()
-    retry_invoker.recoverable_exceptions = connection_error_type
-    if max_retries is not None:
-        retry_invoker.max_tries = max_retries + 1
-    if max_wait_time is not None:
-        retry_invoker.max_time = max_wait_time
-
-    return retry_invoker
 
 
 def _verify_fab(fab: Fab, trusted_entities: dict[str, str]) -> bool:
