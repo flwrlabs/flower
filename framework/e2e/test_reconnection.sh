@@ -3,12 +3,12 @@ set -e
 
 case "$1" in
   sqlite)
-    server_address="127.0.0.1:9092"
+    server_address="127.0.0.1:8000"
     server_app_address="127.0.0.1:9091"
     db_arg="--database $(date +%s).db"
     ;;
   *)
-    server_address="127.0.0.1:9092"
+    server_address="127.0.0.1:8000"
     server_app_address="127.0.0.1:9091"
     db_arg="--database :flwr-in-memory:"
     ;;
