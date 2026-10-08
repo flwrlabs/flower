@@ -16,7 +16,6 @@
 
 
 import threading
-import time
 import unittest
 from contextlib import AbstractContextManager
 from typing import Any
@@ -229,7 +228,6 @@ class TestHttpGrid(unittest.TestCase):
         """Test send and receive messages but time out."""
         # Prepare
         msg = self._prep_message(Message(RecordDict(), 0, "query"))
-        sleep_fn = time.sleep
         mock_response = Mock(
             message_ids=[msg.object_id],
             objects_to_push=[msg.object_id, RecordDict().object_id],
@@ -241,12 +239,14 @@ class TestHttpGrid(unittest.TestCase):
         self.mock_client.PullMessages.return_value = mock_response
 
         # Execute
-        with patch("time.sleep", side_effect=lambda t: sleep_fn(t * 0.01)):
-            start_time = time.time()
+        with patch("flwr.superlink.grid.http_grid.time") as clock:
+            clock.time.side_effect = [100.0, 100.0, 100.1, 100.15]
             ret_msgs = list(self.grid.send_and_receive([msg], timeout=0.15))
 
         # Assert
-        self.assertLess(time.time() - start_time, 0.2)
+        self.assertEqual(self.mock_client.PullMessages.call_count, 2)
+        self.assertEqual(clock.sleep.call_count, 2)
+        clock.sleep.assert_called_with(3)
         self.assertEqual(len(ret_msgs), 0)
 
     def test_del_with_initialized_grid(self) -> None:
