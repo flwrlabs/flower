@@ -129,57 +129,34 @@ def _meeting_note_person_filter_schema() -> JSONObject:
             "value": {
                 "type": "array",
                 "items": {
-                    "anyOf": [
-                        {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "enum": ["exact"],
+                            "description": "Use exact for a literal comparison value.",
+                        },
+                        "value": {
                             "type": "object",
                             "properties": {
-                                "type": {
+                                "table": {
                                     "type": "string",
-                                    "enum": ["exact"],
-                                    "description": (
-                                        "Use exact for a literal comparison value."
-                                    ),
+                                    "enum": ["notion_user"],
+                                    "description": "Always 'notion_user'.",
                                 },
-                                "value": {
-                                    "type": "object",
-                                    "properties": {
-                                        "table": {
-                                            "type": "string",
-                                            "enum": ["notion_user"],
-                                            "description": "Always 'notion_user'.",
-                                        },
-                                        "id": string_property(
-                                            "A Notion user UUID or user://<uuid>. "
-                                            "Use IDs from notion_list_users or "
-                                            "another Notion response, not names "
-                                            "or email addresses."
-                                        ),
-                                    },
-                                    "required": ["table", "id"],
-                                    "additionalProperties": False,
-                                },
+                                "id": string_property(
+                                    "A Notion user UUID or user://<uuid>. "
+                                    "Use IDs from notion_list_users or "
+                                    "another Notion response, not names "
+                                    "or email addresses."
+                                ),
                             },
-                            "required": ["type", "value"],
+                            "required": ["table", "id"],
                             "additionalProperties": False,
                         },
-                        {
-                            "type": "object",
-                            "properties": {
-                                "type": {
-                                    "type": "string",
-                                    "enum": ["relative"],
-                                    "description": "Use 'relative' for 'me'.",
-                                },
-                                "value": {
-                                    "type": "string",
-                                    "enum": ["me"],
-                                    "description": "The connected workspace user.",
-                                },
-                            },
-                            "required": ["type", "value"],
-                            "additionalProperties": False,
-                        },
-                    ]
+                    },
+                    "required": ["type", "value"],
+                    "additionalProperties": False,
                 },
                 "maxItems": 100,
                 "description": "The people to compare against.",
