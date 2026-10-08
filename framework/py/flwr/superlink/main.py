@@ -57,10 +57,8 @@ from flwr.superlink.routers.control.middlewares import (
     ControlLicenseMiddleware,
     ControlSensitiveResponseMiddleware,
 )
-from flwr.superlink.routers.fleet.middlewares import (
-    FleetEventLogMiddleware,
-    FleetNodeAuthMiddleware,
-)
+from flwr.superlink.routers.fleet.middlewares import FleetEventLogMiddleware
+from flwr.superlink.routers.fleet.node_auth import NodeAuthMiddleware
 from flwr.superlink.servicer.runtime import runtime_handlers
 
 try:
@@ -118,7 +116,7 @@ def _get_middleware() -> list[Middleware]:
         Middleware(ControlLicenseMiddleware),
         Middleware(ProtobufTranslationMiddleware),
         Middleware(ControlEventLogMiddleware),
-        Middleware(FleetNodeAuthMiddleware),
+        Middleware(NodeAuthMiddleware),
         Middleware(FleetEventLogMiddleware),
     ]
 

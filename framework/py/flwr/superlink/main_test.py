@@ -35,10 +35,8 @@ from flwr.superlink.routers.control.middlewares import (
     ControlLicenseMiddleware,
     ControlSensitiveResponseMiddleware,
 )
-from flwr.superlink.routers.fleet.middlewares import (
-    FleetEventLogMiddleware,
-    FleetNodeAuthMiddleware,
-)
+from flwr.superlink.routers.fleet.middlewares import FleetEventLogMiddleware
+from flwr.superlink.routers.fleet.node_auth import NodeAuthMiddleware
 
 from . import extensions, main
 
@@ -72,7 +70,7 @@ def _control_middleware_classes() -> list[type[object]]:
         ControlLicenseMiddleware,
         ProtobufTranslationMiddleware,
         ControlEventLogMiddleware,
-        FleetNodeAuthMiddleware,
+        NodeAuthMiddleware,
         FleetEventLogMiddleware,
     ]
 

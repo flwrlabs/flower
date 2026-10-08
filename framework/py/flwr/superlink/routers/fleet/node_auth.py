@@ -19,6 +19,10 @@ import datetime
 from base64 import b64decode
 
 from fastapi import HTTPException, Request, status
+from fastapi.responses import Response
+from google.protobuf.message import Message
+from starlette.concurrency import run_in_threadpool
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from flwr.common.constant import (
     SYSTEM_TIME_TOLERANCE,
@@ -40,9 +44,6 @@ from flwr.superlink.dependencies.linkstate import get_linkstate
 
 def authenticate_node(request: Request) -> None:
     """Validate the signed timestamp and claimed node identity."""
-    if getattr(request.state, "fleet_node_authenticated", False):
-        return
-
     try:
         public_key = b64decode(
             request.headers[FLEET_HTTP_PUBLIC_KEY_HEADER], validate=True
@@ -84,4 +85,16 @@ def authenticate_node(request: Request) -> None:
             detail="Invalid SuperNode authentication",
         ) from exc
 
-    request.state.fleet_node_authenticated = True
+
+class NodeAuthMiddleware(BaseHTTPMiddleware):
+    """Authenticate Fleet HTTP calls before event logging."""
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        """Authenticate recognized Fleet requests."""
+        if request.url.path.startswith("/v1/fleet/") and isinstance(
+            getattr(request.state, "protobuf_request", None), Message
+        ):
+            await run_in_threadpool(authenticate_node, request)
+        return await call_next(request)

@@ -22,22 +22,6 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 
 from flwr.common.event_log_plugin import EventLogWriterPlugin
 
-from .node_auth import authenticate_node
-
-
-class FleetNodeAuthMiddleware(BaseHTTPMiddleware):
-    """Authenticate Fleet HTTP calls before event logging."""
-
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
-        """Authenticate recognized Fleet requests."""
-        if request.url.path.startswith("/v1/fleet/") and isinstance(
-            getattr(request.state, "protobuf_request", None), Message
-        ):
-            await run_in_threadpool(authenticate_node, request)
-        return await call_next(request)
-
 
 class FleetEventLogMiddleware(BaseHTTPMiddleware):
     """Write event logs around Fleet HTTP calls."""

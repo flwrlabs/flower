@@ -50,8 +50,7 @@ from flwr.superlink import extensions, main
 from flwr.superlink.routers.control import middlewares as control_middlewares
 from flwr.superlink.servicer.fleet import fleet_handlers
 
-from . import middlewares as fleet_middlewares
-from .node_auth import authenticate_node
+from . import node_auth
 from .router import router as fleet_router
 
 
@@ -152,8 +151,7 @@ def test_fleet_http_event_log(monkeypatch: pytest.MonkeyPatch) -> None:
     app = main.create_app()
     app.state.fleet_event_log_plugin = fleet_plugin
     app.include_router(fleet_router)
-    app.dependency_overrides[authenticate_node] = lambda: None
-    monkeypatch.setattr(fleet_middlewares, "authenticate_node", lambda _: None)
+    monkeypatch.setattr(node_auth, "authenticate_node", lambda _: None)
     client = TestClient(app, raise_server_exceptions=False)
 
     response = client.post(
