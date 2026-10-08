@@ -56,6 +56,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveAppRequest,
     RemoveNodeFromFederationRequest,
     RevokeInvitationRequest,
+    SetFederationIconRequest,
     ShowFederationRequest,
     StartAutomationRequest,
     StartRunRequest,
@@ -66,13 +67,25 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UnregisterNodeRequest,
     UpdateRunSeriesDescriptionRequest,
 )
+from flwr.proto.fab_pb2 import GetFabRequest  # pylint: disable=E0611
+from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
+    ActivateNodeRequest,
+    DeactivateNodeRequest,
+    PullMessagesRequest,
+    PushMessagesRequest,
+    RegisterNodeFleetRequest,
+    UnregisterNodeFleetRequest,
+)
+from flwr.proto.heartbeat_pb2 import SendNodeHeartbeatRequest  # pylint: disable=E0611
 from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
     PullObjectRequest,
     PushObjectRequest,
 )
+from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
     ClaimTaskRequest,
     CreateTaskRequest,
     GetConnectorRequest,
@@ -104,6 +117,18 @@ from flwr.supercore.protobuf.streaming import (
 RouteKey = tuple[str, str]
 
 PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
+    ("POST", "/v1/fleet/register-node"): RegisterNodeFleetRequest,
+    ("POST", "/v1/fleet/activate-node"): ActivateNodeRequest,
+    ("POST", "/v1/fleet/deactivate-node"): DeactivateNodeRequest,
+    ("POST", "/v1/fleet/unregister-node"): UnregisterNodeFleetRequest,
+    ("POST", "/v1/fleet/send-node-heartbeat"): SendNodeHeartbeatRequest,
+    ("POST", "/v1/fleet/pull-messages"): PullMessagesRequest,
+    ("POST", "/v1/fleet/push-messages"): PushMessagesRequest,
+    ("POST", "/v1/fleet/get-run"): GetRunRequest,
+    ("POST", "/v1/fleet/get-fab"): GetFabRequest,
+    ("POST", "/v1/fleet/push-object"): PushObjectRequest,
+    ("POST", "/v1/fleet/pull-object"): PullObjectRequest,
+    ("POST", "/v1/fleet/confirm-message-received"): ConfirmMessageReceivedRequest,
     ("POST", "/v1/control/start-run"): StartRunRequest,
     ("POST", "/v1/control/list-runs"): ListRunsRequest,
     ("POST", "/v1/control/list-run-series"): ListRunSeriesRequest,
@@ -136,6 +161,7 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/control/remove-app"): RemoveAppRequest,
     ("POST", "/v1/control/list-federations"): ListFederationsRequest,
     ("POST", "/v1/control/show-federation"): ShowFederationRequest,
+    ("POST", "/v1/control/set-federation-icon"): SetFederationIconRequest,
     ("POST", "/v1/control/create-federation"): CreateFederationRequest,
     ("POST", "/v1/control/archive-federation"): ArchiveFederationRequest,
     ("POST", "/v1/control/add-node-to-federation"): AddNodeToFederationRequest,
@@ -157,6 +183,7 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
         "/v1/control/configure-simulation-federation",
     ): ConfigureSimulationFederationRequest,
     ("POST", "/v1/runtime/pull-pending-tasks"): PullPendingTasksRequest,
+    ("POST", "/v1/runtime/acquire-task"): AcquireTaskRequest,
     ("POST", "/v1/runtime/claim-task"): ClaimTaskRequest,
     ("POST", "/v1/runtime/send-task-heartbeat"): SendTaskHeartbeatRequest,
     ("POST", "/v1/runtime/pull-task-input"): PullTaskInputRequest,

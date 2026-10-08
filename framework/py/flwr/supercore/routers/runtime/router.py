@@ -35,6 +35,8 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    AcquireTaskResponse,
     ClaimTaskRequest,
     ClaimTaskResponse,
     CreateTaskRequest,
@@ -86,6 +88,10 @@ PullPendingTasksAuthDependency = Annotated[
     None,
     Depends(SuperExecAuthDependency("/flwr.proto.Runtime/PullPendingTasks")),
 ]
+AcquireTaskAuthDependency = Annotated[
+    None,
+    Depends(SuperExecAuthDependency("/flwr.proto.Runtime/AcquireTask")),
+]
 ClaimTaskAuthDependency = Annotated[
     None,
     Depends(SuperExecAuthDependency("/flwr.proto.Runtime/ClaimTask")),
@@ -101,6 +107,17 @@ def pull_pending_tasks(
 ) -> PullPendingTasksResponse:
     """Pull pending tasks."""
     return handlers.pull_pending_tasks(request, state)
+
+
+@router.post("/acquire-task")
+def acquire_task(
+    request: Annotated[AcquireTaskRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
+    _auth: AcquireTaskAuthDependency,
+) -> AcquireTaskResponse:
+    """Acquire the oldest eligible pending task."""
+    return handlers.acquire_task(request, state)
 
 
 @router.post("/claim-task")

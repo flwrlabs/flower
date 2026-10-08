@@ -169,6 +169,11 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.ShowFederationRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.ShowFederationResponse.FromString,
                 _registered_method=True)
+        self.SetFederationIcon = channel.unary_unary(
+                '/flwr.proto.Control/SetFederationIcon',
+                request_serializer=flwr_dot_proto_dot_control__pb2.SetFederationIconRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.SetFederationIconResponse.FromString,
+                _registered_method=True)
         self.CreateFederation = channel.unary_unary(
                 '/flwr.proto.Control/CreateFederation',
                 request_serializer=flwr_dot_proto_dot_control__pb2.CreateFederationRequest.SerializeToString,
@@ -423,6 +428,13 @@ class ControlServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SetFederationIcon(self, request, context):
+        """Set Federation icon
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def CreateFederation(self, request, context):
         """Create Federation
         """
@@ -648,6 +660,11 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.ShowFederation,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.ShowFederationRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.ShowFederationResponse.SerializeToString,
+            ),
+            'SetFederationIcon': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetFederationIcon,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.SetFederationIconRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.SetFederationIconResponse.SerializeToString,
             ),
             'CreateFederation': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateFederation,
@@ -1439,6 +1456,33 @@ class Control(object):
             '/flwr.proto.Control/ShowFederation',
             flwr_dot_proto_dot_control__pb2.ShowFederationRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.ShowFederationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetFederationIcon(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/SetFederationIcon',
+            flwr_dot_proto_dot_control__pb2.SetFederationIconRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.SetFederationIconResponse.FromString,
             options,
             channel_credentials,
             insecure,

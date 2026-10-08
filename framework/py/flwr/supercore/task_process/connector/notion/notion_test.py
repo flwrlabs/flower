@@ -67,7 +67,7 @@ def _nested_meeting_note_filter_items(
 
 def test_notion_definition_is_registered() -> None:
     """Notion schemas and executors should form one federation-scoped connector."""
-    assert len(ACTIONS) == 9
+    assert len(ACTIONS) == 10
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     assert [
         tool["name"] for tool in registry.get_connector_tools(NOTION_CONNECTOR_REF)
@@ -75,6 +75,7 @@ def test_notion_definition_is_registered() -> None:
         "notion_search",
         "notion_get_page",
         "notion_get_page_property",
+        "notion_get_database",
         "notion_get_block",
         "notion_get_block_children",
         "notion_query_meeting_notes",
@@ -240,6 +241,29 @@ def test_notion_get_page_property_returns_single_item() -> None:
             config={},
         )
     assert result == response.json.return_value
+
+
+def test_notion_get_database_encodes_id() -> None:
+    """Get database should retrieve exactly one safely encoded database ID."""
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "object": "database",
+        "id": "database-1",
+        "data_sources": [{"id": "source-1", "name": "Tasks"}],
+    }
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_get_database",
+            {"database_id": "database/1"},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == (
+        "GET",
+        "https://api.notion.com/v1/databases/database%2F1",
+    )
 
 
 def test_notion_get_block_encodes_id() -> None:
@@ -494,13 +518,18 @@ def test_notion_oauth_flow() -> None:
     response.json.return_value = {
         "access_token": "token",
         "workspace_id": "workspace-1",
+        "workspace_name": "Flower",
     }
     with patch(_OAUTH_REQUEST, return_value=response):
         credentials, config = flow.exchange_code(
             code="code", redirect_uri=redirect_uri, pkce_verifier=None
         )
     assert credentials == {"access_token": "token"}
-    assert config == {"workspace_id": "workspace-1"}
+    assert config == {
+        "workspace_id": "workspace-1",
+        "workspace_name": "Flower",
+        "display_name": "Notion · Flower",
+    }
 
     response.json.return_value = {"error": "secret"}
     with patch(_OAUTH_REQUEST, return_value=response), pytest.raises(RuntimeError):

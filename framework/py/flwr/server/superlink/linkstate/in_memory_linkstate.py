@@ -48,6 +48,7 @@ from flwr.supercore.corestate.utils import validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import FederationManager
 
 from .utils import (
@@ -676,15 +677,11 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         primary_task_type: str,
         series_id: int | None = None,
         series_description: str | None = None,
-        connector_refs: Sequence[str] = (),
+        connector_ids: Sequence[int] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
     ) -> int:
         """Create a new run."""
-        if isinstance(connector_refs, str) or any(
-            not connector_ref for connector_ref in connector_refs
-        ):
-            return 0
         if initial_task_event is not None:
             try:
                 validate_task_event_data(initial_task_event.data)
@@ -773,7 +770,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 self._next_task_event_id += 1
             self.bind_connectors_to_run(
                 run_id=run_id,
-                connector_refs=connector_refs,
+                connector_ids=connector_ids,
             )
 
             return run_id
@@ -788,6 +785,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
+        skip: int = 0,
     ) -> Sequence[Run]:
         """Retrieve information about runs based on the specified filters."""
         with self.lock_task_store:
@@ -839,12 +837,11 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             if order_by is not None:
                 runs = sorted(
                     runs,
-                    key=lambda run: run.pending_at,
+                    key=lambda run: (run.pending_at, uint64_to_int64(run.run_id)),
                     reverse=not ascending,
                 )
 
-            if limit is not None:
-                runs = runs[:limit]
+            runs = runs[skip : skip + limit if limit is not None else None]
 
             return runs
 

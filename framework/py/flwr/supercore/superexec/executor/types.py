@@ -93,6 +93,15 @@ class Executor(Protocol):
     the responsibility of the Runtime API.
     """
 
+    def get_eligible_capacity(
+        self,
+        supported_task_types: set[TaskType],
+        *,
+        insecure: bool = False,
+        root_certificates_path: str | None = None,
+    ) -> tuple[set[TaskType], set[str]]:
+        """Return task types and FABs with capacity for acquisition."""
+
     def wait_for_capacity(
         self,
         task_type: TaskType | None = None,

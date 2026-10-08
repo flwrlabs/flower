@@ -27,6 +27,8 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    AcquireTaskResponse,
     CreateTaskRequest,
     GetNodesRequest,
     GetRunSeriesEventsRequest,
@@ -49,7 +51,7 @@ from flwr.supernode.nodestate import NodeState, NodeStateFactory
 from flwr.supernode.servicer.runtime import runtime_handlers
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
-_PULL_PENDING_TASKS_METHOD = "/flwr.proto.Runtime/PullPendingTasks"
+_ACQUIRE_TASK_METHOD = "/flwr.proto.Runtime/AcquireTask"
 
 
 @pytest.fixture(name="state")
@@ -167,23 +169,27 @@ def test_pull_pending_tasks_denied_without_superexec_metadata(
     assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
 
 
-def test_pull_pending_tasks_allows_with_superexec_metadata(
-    client: TestClient,
+def test_acquire_task_allows_with_superexec_metadata(
+    client: TestClient, state: NodeState
 ) -> None:
-    """SuperExec routes should allow requests with valid signed metadata."""
-    proto_request = PullPendingTasksRequest()
+    """Signed acquisition returns a task and its claim token."""
+    task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
+    assert task_id is not None
+    proto_request = AcquireTaskRequest(supported_task_types=[TaskType.CLIENT_APP])
     headers = create_superexec_auth_metadata(
         auth_secret=derive_auth_secret(_SUPEREXEC_SECRET),
-        method=_PULL_PENDING_TASKS_METHOD,
+        method=_ACQUIRE_TASK_METHOD,
         request=proto_request,
     )
 
-    response = _post(client, "pull-pending-tasks", proto_request, auth_headers=headers)
+    response = _post(client, "acquire-task", proto_request, auth_headers=headers)
 
     assert response.status_code == 200
-    assert isinstance(
-        PullPendingTasksResponse.FromString(response.content), PullPendingTasksResponse
-    )
+    claimed = AcquireTaskResponse.FromString(response.content)
+    assert claimed.task.task_id == task_id
+    assert claimed.token
+    claimed_task = state.get_task_by_token(claimed.token)
+    assert claimed_task is not None and claimed_task.task_id == task_id
 
 
 def test_get_nodes_allows_auth_then_returns_permission_denied(

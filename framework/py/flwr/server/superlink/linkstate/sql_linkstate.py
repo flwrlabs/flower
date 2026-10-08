@@ -949,15 +949,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         primary_task_type: str,
         series_id: int | None = None,
         series_description: str | None = None,
-        connector_refs: Sequence[str] = (),
+        connector_ids: Sequence[int] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
     ) -> int:
         """Create a new run."""
-        if isinstance(connector_refs, str) or any(
-            not connector_ref for connector_ref in connector_refs
-        ):
-            return 0
         if initial_task_event is not None:
             try:
                 validate_task_event_data(initial_task_event.data)
@@ -1048,7 +1044,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     )
                 self.bind_connectors_to_run(
                     run_id=run_id,
-                    connector_refs=connector_refs,
+                    connector_ids=connector_ids,
                 )
                 return run_id
 
@@ -1065,6 +1061,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
+        skip: int = 0,
     ) -> Sequence[Run]:
         """Retrieve information about runs based on the specified filters."""
         self._cleanup_expired_task_tokens()
@@ -1114,8 +1111,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if order_by is not None:
             order_column = TaskModel.pending_at
             stmt = stmt.order_by(
-                order_column.asc() if ascending else order_column.desc()
+                order_column.asc() if ascending else order_column.desc(),
+                RunModel.run_id.asc() if ascending else RunModel.run_id.desc(),
             )
+        if skip:
+            stmt = stmt.offset(skip)
         if limit is not None:
             stmt = stmt.limit(limit)
 

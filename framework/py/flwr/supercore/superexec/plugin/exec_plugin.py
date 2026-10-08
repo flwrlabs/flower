@@ -61,21 +61,6 @@ class ExecPlugin(ABC):
         """
 
     @abstractmethod
-    def select_task(self, candidate_tasks: Sequence[Task]) -> Task | None:
-        """Select a task to execute from a set of pending tasks.
-
-        Parameters
-        ----------
-        candidate_tasks : Sequence[Task]
-            A set of pending tasks to choose from.
-
-        Returns
-        -------
-        Optional[Task]
-            The selected task, or None if no suitable task is found.
-        """
-
-    @abstractmethod
     def launch_task(self, token: str, task: Task) -> LaunchResult:
         """Launch the process to execute the given task using the given token.
 

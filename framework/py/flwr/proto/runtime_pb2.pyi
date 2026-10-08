@@ -567,3 +567,49 @@ class CreateTaskResponse(google.protobuf.message.Message):
     def WhichOneof(self, oneof_group: typing.Literal["_task_id", b"_task_id"]) -> typing.Literal["task_id"] | None: ...
 
 global___CreateTaskResponse = CreateTaskResponse
+
+@typing.final
+class AcquireTaskRequest(google.protobuf.message.Message):
+    """AcquireTask messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SUPPORTED_TASK_TYPES_FIELD_NUMBER: builtins.int
+    AGENTAPP_FAB_HASHES_FIELD_NUMBER: builtins.int
+    @property
+    def supported_task_types(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Task types that can be launched regardless of FAB."""
+
+    @property
+    def agentapp_fab_hashes(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """AgentApp FABs that can be launched by a ready prestarted executor."""
+
+    def __init__(
+        self,
+        *,
+        supported_task_types: collections.abc.Iterable[builtins.str] | None = ...,
+        agentapp_fab_hashes: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agentapp_fab_hashes", b"agentapp_fab_hashes", "supported_task_types", b"supported_task_types"]) -> None: ...
+
+global___AcquireTaskRequest = AcquireTaskRequest
+
+@typing.final
+class AcquireTaskResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_FIELD_NUMBER: builtins.int
+    TOKEN_FIELD_NUMBER: builtins.int
+    token: builtins.str
+    @property
+    def task(self) -> flwr.proto.task_pb2.Task: ...
+    def __init__(
+        self,
+        *,
+        task: flwr.proto.task_pb2.Task | None = ...,
+        token: builtins.str = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["task", b"task"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["task", b"task", "token", b"token"]) -> None: ...
+
+global___AcquireTaskResponse = AcquireTaskResponse

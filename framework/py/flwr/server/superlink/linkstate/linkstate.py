@@ -305,7 +305,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         primary_task_type: str,
         series_id: int | None = None,
         series_description: str | None = None,
-        connector_refs: Sequence[str] = (),
+        connector_ids: Sequence[int] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
     ) -> int:
@@ -337,8 +337,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Optional description for a newly created run series. Ignored when
             `series_id` refers to an existing run series. `None` means no
             description was provided; an empty string is an explicit description.
-        connector_refs : Sequence[str] (default: ())
-            Connector references the run is allowed to invoke.
+        connector_ids : Sequence[int] (default: ())
+            Connector IDs the run is allowed to invoke.
         initial_task_event : TaskEvent | None (default: None)
             Event to store atomically before the pending primary task is visible.
         user_prompt : str | None (default: None)
@@ -367,6 +367,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
+        skip: int = 0,
     ) -> Sequence[Run]:
         """Retrieve information about runs based on the specified filters.
 
@@ -390,6 +391,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Whether sorting should be in ascending order.
         limit : Optional[int] (default: None)
             Maximum number of runs to return. If `None`, no limit is applied.
+        skip : int (default: 0)
+            Number of matching runs to skip before applying the limit.
 
         Returns
         -------

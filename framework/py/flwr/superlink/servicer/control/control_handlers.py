@@ -41,6 +41,7 @@ from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
     FAB_MAX_SIZE,
     HEARTBEAT_DEFAULT_INTERVAL,
+    INT64_MAX_VALUE,
     LOG_STREAM_INTERVAL,
     REFRESH_TOKEN_KEY,
     RUN_EVENTS_STREAM_INTERVAL,
@@ -118,6 +119,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SetFederationIconRequest,
+    SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
     StartAutomationRequest,
@@ -228,21 +231,43 @@ def list_connectors(
         key=lambda item: item.connector_ref,
     ):
         connector_ref = flow.connector_ref
-        connected = (
-            state.get_connector(
-                federation_id=request.federation, connector_ref=connector_ref
+        stored_connectors = state.get_connectors_by_ref(
+            request.federation, connector_ref
+        )
+        connectors.extend(
+            Connector(
+                connector_id=stored_connector.connector_id,
+                connector_ref=connector_ref,
+                display_name=_connector_display_name(
+                    stored_connector.config_json, flow.display_name
+                ),
+                description=flow.description,
+                connected=True,
             )
-            is not None
+            for stored_connector in stored_connectors
         )
         connectors.append(
             Connector(
                 connector_ref=connector_ref,
                 display_name=flow.display_name,
                 description=flow.description,
-                connected=connected,
+                connected=False,
             )
         )
     return ListConnectorsResponse(connectors=connectors)
+
+
+def _connector_display_name(config_json: str, fallback: str) -> str:
+    """Return the stored connection name, falling back to the provider name."""
+    try:
+        config = json.loads(config_json)
+    except (TypeError, ValueError):
+        return fallback
+    if isinstance(config, dict):
+        name = config.get("display_name")
+        if isinstance(name, str) and name.strip():
+            return name.strip()
+    return fallback
 
 
 def disconnect_connector(
@@ -252,25 +277,23 @@ def disconnect_connector(
 ) -> DisconnectConnectorResponse:
     """Delete one connector from the requested federation."""
     log(INFO, "ControlServicer.DisconnectConnector")
+    connector_id = request.connector_id
     federation_id = request.federation.strip()
     state.federation_manager.ensure_default_federations_exist(account.flwr_aid)
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
-    connector_ref = request.connector_ref.strip().lower()
-    if not connector_ref:
-        raise InvalidConnectorRequestError("connector_ref is required")
-    try:
-        connector_registry.get_oauth_flow(connector_ref)
-    except ValueError:
-        raise FlowerError(
-            ApiErrorCode.CONNECTOR_NOT_FOUND,
-            f"OAuth flow for connector '{connector_ref}' was not found.",
-        ) from None
+    # SQLite INTEGER cannot represent the full protobuf uint64 range.
+    if connector_id > INT64_MAX_VALUE:
+        raise InvalidConnectorRequestError(
+            f"connector_id must not exceed {INT64_MAX_VALUE}"
+        )
+    if connector_id <= 0:
+        raise InvalidConnectorRequestError("connector_id is required")
 
-    deleted = state.delete_connector(federation_id, connector_ref)
+    deleted = state.delete_connector(federation_id, connector_id)
     if not deleted:
         raise FlowerError(
             ApiErrorCode.CONNECTOR_NOT_FOUND,
-            f"Connector '{connector_ref}' is not connected for this federation.",
+            f"Connector '{connector_id}' is not connected for this federation.",
         )
     return DisconnectConnectorResponse()
 
@@ -282,10 +305,10 @@ def begin_connector_oauth(  # pylint: disable=too-many-locals
 ) -> BeginConnectorOAuthResponse:
     """Create a short-lived OAuth session for the requested federation."""
     log(INFO, "ControlServicer.BeginConnectorOAuth")
+    connector_ref = request.connector_ref.strip().lower()
     federation_id = request.federation.strip()
     state.federation_manager.ensure_default_federations_exist(account.flwr_aid)
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
-    connector_ref = request.connector_ref.strip().lower()
     if not connector_ref:
         raise InvalidConnectorRequestError("connector_ref is required")
     redirect_uri = request.redirect_uri.strip()
@@ -361,7 +384,7 @@ def begin_connector_oauth(  # pylint: disable=too-many-locals
     )
 
 
-def complete_connector_oauth(  # pylint: disable=too-many-locals
+def complete_connector_oauth(  # pylint: disable=too-many-locals,too-many-branches
     request: CompleteConnectorOAuthRequest,
     account: AccountInfo,
     state: LinkState,
@@ -446,30 +469,53 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
             f"credentials ({type(err).__name__})"
         ) from None
 
-    stored = state.upsert_connector(
+    connector_id = state.create_connector(
         federation_id=session.federation_id,
         connector_ref=connector_ref,
         credentials_json=credentials_json,
         config_json=config_json,
         created_by=account.flwr_aid,
     )
-    if not stored:
+    if connector_id is None:
         raise ConnectorFailureError("Connector credentials could not be stored")
-    return CompleteConnectorOAuthResponse(connector_ref=connector_ref)
+    return CompleteConnectorOAuthResponse(connector_id=connector_id)
 
 
-def validate_run_connector_refs(  # pylint: disable=unused-argument
-    connector_refs: Sequence[str],
-    account: AccountInfo,
+def _validate_run_connector_ids(
+    connector_ids: Sequence[int],
     state: LinkState,
     federation_id: str,
-) -> list[str]:
-    """Validate and canonicalize OAuth connector references for a new run."""
+) -> list[int]:
+    """Validate and deduplicate connector IDs for a new run."""
+    canonical_ids = list(set(connector_ids))
+    connector_refs: set[str] = set()
+    for connector_id in canonical_ids:
+        connector = state.get_connector_by_id(connector_id)
+        if connector is None or connector.federation_id != federation_id:
+            raise FlowerError(
+                ApiErrorCode.CONNECTOR_NOT_FOUND,
+                f"Connector '{connector_id}' is not connected for this federation.",
+            )
+        if connector.connector_ref in connector_refs:
+            raise InvalidConnectorRequestError(
+                "only one connection per connector type can be selected for a run"
+            )
+        connector_refs.add(connector.connector_ref)
+    return canonical_ids
+
+
+def _resolve_run_connector_refs(
+    connector_refs: Sequence[str],
+    state: LinkState,
+    federation_id: str,
+) -> list[int]:
+    """Resolve legacy connector references to unambiguous connector IDs."""
     canonical_refs = list(
-        dict.fromkeys(requested_ref.strip().lower() for requested_ref in connector_refs)
+        dict.fromkeys(connector_ref.strip().lower() for connector_ref in connector_refs)
     )
     if "" in canonical_refs:
         raise InvalidConnectorRequestError("connector_ref is required")
+    connector_ids: list[int] = []
     for connector_ref in canonical_refs:
         try:
             connector_registry.get_oauth_flow(connector_ref)
@@ -478,13 +524,19 @@ def validate_run_connector_refs(  # pylint: disable=unused-argument
                 ApiErrorCode.CONNECTOR_NOT_FOUND,
                 f"OAuth flow for connector '{connector_ref}' was not found.",
             ) from None
-        connector = state.get_connector(federation_id, connector_ref)
-        if connector is None:
+        matching_connectors = state.get_connectors_by_ref(federation_id, connector_ref)
+        if not matching_connectors:
             raise FlowerError(
                 ApiErrorCode.CONNECTOR_NOT_FOUND,
                 f"Connector '{connector_ref}' is not connected for this federation.",
             )
-    return canonical_refs
+        if len(matching_connectors) > 1:
+            raise InvalidConnectorRequestError(
+                f"connector_ref '{connector_ref}' is ambiguous; "
+                "connector_id is required"
+            )
+        connector_ids.append(matching_connectors[0].connector_id)
+    return connector_ids
 
 
 def _get_hub_app_id(
@@ -647,8 +699,13 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         return StartRunResponse()
 
     override_config = user_config_from_proto(request.override_config)
-    connector_refs = validate_run_connector_refs(
-        request.connector_refs, account, state, federation_id
+    connector_ids = _validate_run_connector_ids(
+        [
+            *request.connector_ids,
+            *_resolve_run_connector_refs(request.connector_refs, state, federation_id),
+        ],
+        state,
+        federation_id,
     )
 
     try:
@@ -733,7 +790,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             user_prompt=user_prompt or None,
             series_id=series_id,
             series_description=series_description,
-            connector_refs=connector_refs,
+            connector_ids=connector_ids,
         )
 
         if run_id == 0:
@@ -1170,12 +1227,14 @@ def list_runs(
     if not request.HasField("run_id"):
         # If no `run_id` is specified and account auth is enabled,
         # return run IDs for the authenticated account
-        limit = request.limit if request.HasField("limit") else None
+        limit = request.limit if request.HasField("limit") else 20
+        skip = request.skip if request.HasField("skip") else 0
         runs = state.get_run_info(
             flwr_aids=[flwr_aid],
             order_by="pending_at",
             ascending=False,
             limit=limit,
+            skip=skip,
         )
     # Build a set of run IDs for `flwr ls --run-id <run_id>`
     else:
@@ -1632,21 +1691,23 @@ def list_federations(
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     federations = state.federation_manager.get_federations(flwr_aid)
 
-    return ListFederationsResponse(
-        federations=[
-            Federation(
-                name=fed.id,
-                description=fed.description,
-                members=fed.members,
-                member_count=_get_federation_member_count(fed),
-                archived=fed.archived,
-                simulation=fed.simulation,
-                can_invite_members=fed.can_invite_members,
-                can_add_supernodes=fed.can_add_supernodes,
-            )
-            for fed in federations
-        ]
-    )
+    federation_protos = []
+    for fed in federations:
+        federation_proto = Federation(
+            name=fed.id,
+            description=fed.description,
+            members=fed.members,
+            member_count=_get_federation_member_count(fed),
+            archived=fed.archived,
+            simulation=fed.simulation,
+            can_invite_members=fed.can_invite_members,
+            can_add_supernodes=fed.can_add_supernodes,
+        )
+        if fed.icon_key is not None:
+            federation_proto.icon_key = fed.icon_key
+        federation_protos.append(federation_proto)
+
+    return ListFederationsResponse(federations=federation_protos)
 
 
 def list_apps(
@@ -1771,7 +1832,27 @@ def show_federation(
         can_invite_members=details.can_invite_members,
         can_add_supernodes=details.can_add_supernodes,
     )
+    if details.icon_key is not None:
+        federation_proto.icon_key = details.icon_key
     return ShowFederationResponse(federation=federation_proto, now=now().isoformat())
+
+
+def set_federation_icon(
+    request: SetFederationIconRequest, account: AccountInfo, state: LinkState
+) -> SetFederationIconResponse:
+    """Set or clear a federation icon."""
+    log(INFO, "ControlServicer.SetFederationIcon")
+
+    if not request.federation_name:
+        raise FederationNotSpecified()
+
+    icon_key = request.icon_key if request.HasField("icon_key") else None
+    state.federation_manager.set_icon_key(
+        flwr_aid=account.flwr_aid,
+        federation_id=request.federation_name,
+        icon_key=icon_key,
+    )
+    return SetFederationIconResponse()
 
 
 def create_federation(

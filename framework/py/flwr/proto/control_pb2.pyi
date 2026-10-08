@@ -333,20 +333,26 @@ class ListRunsRequest(google.protobuf.message.Message):
 
     RUN_ID_FIELD_NUMBER: builtins.int
     LIMIT_FIELD_NUMBER: builtins.int
+    SKIP_FIELD_NUMBER: builtins.int
     run_id: builtins.int
     limit: builtins.int
+    skip: builtins.int
+    """Skip this many newer runs when listing runs. Ignored when run_id is set."""
     def __init__(
         self,
         *,
         run_id: builtins.int | None = ...,
         limit: builtins.int | None = ...,
+        skip: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_limit", b"_limit", "_run_id", b"_run_id", "limit", b"limit", "run_id", b"run_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_limit", b"_limit", "_run_id", b"_run_id", "limit", b"limit", "run_id", b"run_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_limit", b"_limit", "_run_id", b"_run_id", "_skip", b"_skip", "limit", b"limit", "run_id", b"run_id", "skip", b"skip"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_limit", b"_limit", "_run_id", b"_run_id", "_skip", b"_skip", "limit", b"limit", "run_id", b"run_id", "skip", b"skip"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_run_id", b"_run_id"]) -> typing.Literal["run_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_skip", b"_skip"]) -> typing.Literal["skip"] | None: ...
 
 global___ListRunsRequest = ListRunsRequest
 
@@ -1164,6 +1170,36 @@ class ShowFederationResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["federation", b"federation", "now", b"now"]) -> None: ...
 
 global___ShowFederationResponse = ShowFederationResponse
+
+@typing.final
+class SetFederationIconRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_NAME_FIELD_NUMBER: builtins.int
+    ICON_KEY_FIELD_NUMBER: builtins.int
+    federation_name: builtins.str
+    icon_key: builtins.str
+    def __init__(
+        self,
+        *,
+        federation_name: builtins.str = ...,
+        icon_key: builtins.str | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_icon_key", b"_icon_key", "icon_key", b"icon_key"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_icon_key", b"_icon_key", "federation_name", b"federation_name", "icon_key", b"icon_key"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_icon_key", b"_icon_key"]) -> typing.Literal["icon_key"] | None: ...
+
+global___SetFederationIconRequest = SetFederationIconRequest
+
+@typing.final
+class SetFederationIconResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___SetFederationIconResponse = SetFederationIconResponse
 
 @typing.final
 class CreateFederationRequest(google.protobuf.message.Message):
