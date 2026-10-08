@@ -51,7 +51,6 @@ from flwr.superlink.routers.control import middlewares as control_middlewares
 from flwr.superlink.servicer.fleet import fleet_handlers
 
 from . import node_auth
-from .router import router as fleet_router
 
 
 def test_fleet_http_handlers_and_authentication(
@@ -62,7 +61,6 @@ def test_fleet_http_handlers_and_authentication(
     monkeypatch.setattr(extensions, "configure_app", lambda _: None)
     monkeypatch.setattr(control_middlewares, "get_license_plugin", lambda: None)
     app = main.create_app()
-    app.include_router(fleet_router)
     control_plugin = Mock(spec=EventLogWriterPlugin)
     app.state.control_event_log_plugin = control_plugin
     client = TestClient(app)
@@ -150,7 +148,6 @@ def test_fleet_http_event_log(monkeypatch: pytest.MonkeyPatch) -> None:
 
     app = main.create_app()
     app.state.fleet_event_log_plugin = fleet_plugin
-    app.include_router(fleet_router)
     monkeypatch.setattr(node_auth, "authenticate_node", lambda _: None)
     client = TestClient(app, raise_server_exceptions=False)
 
