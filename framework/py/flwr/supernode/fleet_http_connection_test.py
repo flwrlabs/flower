@@ -14,6 +14,8 @@
 # ==============================================================================
 """Tests for the SuperNode Fleet HTTP connection."""
 
+import os
+import signal
 from collections.abc import Callable
 from contextlib import nullcontext
 from unittest.mock import Mock
@@ -111,10 +113,10 @@ def test_http_connection_provides_worker_callbacks(  # pylint: disable=R0914
             response=httpx.Response(401),
         )
         kill = Mock(side_effect=SystemExit)
-        monkeypatch.setattr(connection.os, "kill", kill)
+        monkeypatch.setattr(os, "kill", kill)
         with raises(SystemExit):
             heartbeat_fns[0]()
-        kill.assert_called_once_with(connection.os.getpid(), connection.signal.SIGINT)
+        kill.assert_called_once_with(os.getpid(), signal.SIGINT)
 
     assert client.RegisterNode.call_count == 1
     assert client.ActivateNode.call_count == 1
