@@ -242,14 +242,14 @@ that specifies the name of a workload (i.e. deployment) to associate with the co
 The ``<name>`` is the default routing key if the ``--routing-key`` option is not
 specified.
 
-In our deployment, SuperLink listens on port ``9092`` corresponding to the Fleet API
+In our deployment, SuperLink serves the Fleet API over HTTP on port ``8000``
 (for more details, read our reference on `Flower network communication
 <ref-flower-network-communication.rst#flower-components-apis>`_). Since we have given
 the SuperLink deployment the name ``superlink``, we will use that as the workload name:
 
 .. code-block:: console
 
-    $ skupper connector create fleet-api 9092 --workload deployment/superlink
+    $ skupper connector create fleet-api 8000 --workload deployment/superlink
     Waiting for create to complete...
     Connector "fleet-api" is configured.
 
@@ -270,11 +270,11 @@ The ``<name>`` is the name of the listener resource, and will be the default rou
 and host if the ``--routing-key`` and ``--host`` options are not specified. In our case,
 the ``<name>`` must match the name of the connector we created in the SuperLink cluster,
 which is ``fleet-api``. The ``<port>`` is the port number that the listener will listen
-on, which must also match the port number of the connector (``9092``):
+on, which must also match the port number of the connector (``8000``):
 
 .. code-block:: console
 
-    $ skupper listener create fleet-api 9092
+    $ skupper listener create fleet-api 8000
     Waiting for create to complete...
     Listener "fleet-api" is configured.
 
@@ -320,7 +320,7 @@ Copy and paste the following YAML definition for the SuperNode pod.
                 args:
                   - "--insecure"
                   - "--superlink"
-                  - "<listener-service-dns>:9092" # Use the listener service DNS
+                  - "<listener-service-dns>:8000" # Use the listener service DNS
                   - "--host"
                   - "0.0.0.0"
                   - "--port"

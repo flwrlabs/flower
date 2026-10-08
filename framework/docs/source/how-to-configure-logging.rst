@@ -24,8 +24,8 @@ example, to launch your ``SuperLink`` with ``DEBUG`` logs, use:
     INFO 2025-08-20 17:13:31,360:      Starting Flower SuperLink
     INFO 2025-08-20 17:13:31,378:      Starting the SuperLink Runtime HTTP API on 127.0.0.1:8000.
     INFO 2025-08-20 17:13:31,381:      Starting the SuperLink Control HTTP API on 127.0.0.1:8000.
+    INFO 2025-08-20 17:13:31,381:      Starting the SuperLink Fleet HTTP API on 127.0.0.1:8000.
     DEBUG 2025-08-20 17:13:31,382:     Automatic node authentication enabled
-    INFO 2025-08-20 17:13:31,382:      Flower Deployment Runtime: Starting Fleet API (gRPC-rere) on 0.0.0.0:9092
     WARNING 2025-08-20 17:13:31,515:   DEBUG logs enabled. Do not use this in production, as it may expose sensitive details.
     INFO 2025-08-20 17:13:32,324:      Starting Flower SuperExec
 
@@ -40,7 +40,7 @@ example, to launch your ``SuperLink`` with ``DEBUG`` logs, use:
  Configure gRPC logging
 ************************
 
-Flower uses `gRPC <https://grpc.io/>`_ for the Fleet API and other gRPC-based
-connections (see :doc:`ref-flower-network-communication`). You can set the verbosity
-level of ``gRPC`` logs using `gRPC environment variables
+SuperNodes use HTTP for the Fleet API. Flower also supports gRPC-based compatibility
+connections and health checks (see :doc:`ref-flower-network-communication`). You can
+set the verbosity level of ``gRPC`` logs using `gRPC environment variables
 <https://github.com/grpc/grpc/blob/master/doc/environment_variables.md>`_.
