@@ -277,6 +277,7 @@ def pull_task_input(
             fab=fab_to_proto(fab),
             federation_config=state.get_federation_config(run_id),
             task_id=task.task_id,
+            traceparent=task.traceparent,
         )
 
     raise FlowerError(

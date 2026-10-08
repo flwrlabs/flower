@@ -114,6 +114,7 @@ from flwr.supercore.state.schema.corestate_models import TaskLogsTable
 from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
+from flwr.supercore.tracing import validate_traceparent
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
@@ -1280,6 +1281,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         connector_ref: str | None = None,
         connector_id: int | None = None,
         requesting_task_id: int | None = None,
+        traceparent: str = "",
     ) -> int | None:
         """Create a task and return its ID."""
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
@@ -1293,6 +1295,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             literal(model_ref, type_=TaskModel.model_ref.type),
             literal(connector_ref, type_=TaskModel.connector_ref.type),
             literal(connector_id, type_=TaskModel.connector_id.type),
+            literal(
+                validate_traceparent(traceparent) or None,
+                type_=TaskModel.traceparent.type,
+            ),
             literal(now(), type_=TaskModel.pending_at.type),
         )
         if requesting_task_id is not None:
@@ -1317,6 +1323,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     TaskModel.model_ref,
                     TaskModel.connector_ref,
                     TaskModel.connector_id,
+                    TaskModel.traceparent,
                     TaskModel.pending_at,
                 ],
                 task_values,
@@ -1987,6 +1994,7 @@ def task_from_row(row: dict[str, Any]) -> Task:
         model_ref=row["model_ref"],
         connector_ref=row["connector_ref"],
         connector_id=row["connector_id"],
+        traceparent=validate_traceparent(row["traceparent"]),
     )
 
 
@@ -2005,6 +2013,7 @@ def task_from_model(model: TaskModel) -> Task:
         model_ref=model.model_ref,
         connector_ref=model.connector_ref,
         connector_id=model.connector_id,
+        traceparent=validate_traceparent(model.traceparent),
     )
 
 

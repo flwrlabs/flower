@@ -35,6 +35,7 @@ from flwr.common.constant import (
 from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
+    Task,
     TaskEvent,
     TaskStatus,
     TaskUsage,
@@ -86,6 +87,26 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         mock_datetime.now.side_effect = timestamps
         return stack
+
+    def test_task_traceparent_persists_and_serializes(self) -> None:
+        """Both task stores preserve valid carriers and discard invalid ones."""
+        carrier = "00-" + "1" * 32 + "-" + "2" * 16 + "-01"
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        for value, expected in [(carrier, carrier), ("", ""), ("secret-invalid", "")]:
+            with self.subTest(traceparent=value):
+                task_id = state.create_task(TaskType.MODEL, run_id, traceparent=value)
+                self.assertIsNotNone(task_id)
+                task = state.get_tasks(task_ids=[cast(int, task_id)])[0]
+                self.assertEqual(task.traceparent, expected)
+                self.assertEqual(
+                    Task.FromString(task.SerializeToString()).traceparent, expected
+                )
+                token = state.claim_task(task.task_id)
+                claimed = state.get_task_by_token(cast(str, token))
+                self.assertIsNotNone(claimed)
+                assert claimed is not None
+                self.assertEqual(claimed.traceparent, expected)
 
     def test_store_list_and_delete_apps(self) -> None:
         """Federation apps can be stored, listed, limited, and deleted."""

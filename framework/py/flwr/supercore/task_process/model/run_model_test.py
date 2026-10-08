@@ -20,6 +20,8 @@ import importlib
 import os
 import signal
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from unittest.mock import Mock
 
 import pytest
@@ -35,6 +37,62 @@ from flwr.supercore.telemetry import EventType
 run_model_module = importlib.import_module(
     "flwr.supercore.task_process.model.run_model"
 )
+
+
+@pytest.mark.parametrize("resident", [False, True])
+@pytest.mark.parametrize("failure", [False, True])
+def test_model_tracing_ends_before_cold_or_resident_flush(
+    monkeypatch: pytest.MonkeyPatch, resident: bool, failure: bool
+) -> None:
+    """Both launch modes flush ended execution spans on success and failure."""
+    calls: list[str] = []
+    carrier = "00-" + "1" * 32 + "-" + "2" * 16 + "-01"
+    client = Mock()
+    client.PullTaskInput.return_value = PullTaskInputResponse(
+        task_id=17,
+        run=ProtoRun(run_id=42),
+        context=ProtoContext(node_id=99),
+        traceparent=carrier,
+    )
+
+    @contextmanager
+    def capture(name: str, **kwargs: object) -> Iterator[Mock]:
+        assert name == "model.execute"
+        assert kwargs["traceparent"] == carrier
+        assert kwargs["attributes"] == {
+            "flwr.component": "model",
+            "flwr.run_id": "42",
+            "flwr.task_id": "17",
+            "flwr.task_type": "flwr-model",
+        }
+        calls.append("enter")
+        try:
+            yield Mock()
+        finally:
+            calls.append("end")
+
+    def work(**_: object) -> None:
+        calls.append("work")
+        if failure:
+            raise ValueError("provider-secret")
+
+    monkeypatch.setattr(
+        run_model_module, "_create_runtime_client", Mock(return_value=(client, Mock()))
+    )
+    monkeypatch.setattr(run_model_module, "HeartbeatSender", Mock())
+    monkeypatch.setattr(run_model_module, "register_signal_handlers", Mock())
+    monkeypatch.setattr(run_model_module, "_register_resident_signal_handlers", Mock())
+    monkeypatch.setattr(run_model_module, "event", Mock())
+    monkeypatch.setattr(run_model_module, "trace_span", capture)
+    monkeypatch.setattr(run_model_module, "handle_task", work)
+    monkeypatch.setattr(run_model_module, "flush_traces", lambda: calls.append("flush"))
+    lifecycle, exit_code = run_model_module._run_model_task(
+        "runtime:9092", "token", True, None, resident=resident
+    )
+    assert exit_code == (ExitCode.TASK_PROC_EXCEPTION if failure else ExitCode.SUCCESS)
+    lifecycle.finalize()
+    lifecycle.finalize()
+    assert calls == ["enter", "work", "end", "flush"]
 
 
 @pytest.mark.parametrize(

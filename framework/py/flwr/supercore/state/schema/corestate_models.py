@@ -220,6 +220,7 @@ class Task(FlwrBase):
     model_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     connector_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     connector_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    traceparent: Mapped[str | None] = mapped_column(String(55), nullable=True)
     token: Mapped[str | None] = mapped_column(String, nullable=True)
     active_until: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     pending_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)

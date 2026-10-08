@@ -38,6 +38,7 @@ from flwr.supercore.retry import make_simple_http_retry_invoker
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import validate_and_resolve_root_certificates
+from flwr.supercore.tracing import flush_traces, trace_span
 
 from .executor import LaunchResult, LaunchResultStatus, get_executor
 from .executor.config import ExecutorConfig
@@ -258,13 +259,25 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                 )
             )
             if combined_res.HasField("task") and combined_res.token:
-                launch_result = plugin.launch_task(
-                    token=combined_res.token, task=combined_res.task
-                )
+                with trace_span(
+                    "task.dispatch",
+                    traceparent=combined_res.task.traceparent,
+                    attributes={
+                        "flwr.component": "superexec",
+                        "flwr.run_id": str(combined_res.task.run_id),
+                        "flwr.task_id": str(combined_res.task.task_id),
+                        "flwr.task_type": combined_res.task.type,
+                    },
+                ) as span:
+                    launch_result = plugin.launch_task(
+                        token=combined_res.token, task=combined_res.task
+                    )
+                    span.set_attribute("flwr.outcome", str(launch_result.status))
                 _handle_launch_result(launch_result, combined_res.task)
 
             # Sleep for a while before checking again
             time.sleep(task_poll_interval)
     finally:
+        flush_traces()
         client.close()
         executor.close()

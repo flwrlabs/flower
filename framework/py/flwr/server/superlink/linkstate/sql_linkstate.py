@@ -69,6 +69,7 @@ from flwr.supercore.state.schema.linkstate_models import MessageRes as MessageRe
 from flwr.supercore.state.schema.linkstate_models import Node as NodeModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
+from flwr.supercore.tracing import validate_traceparent
 from flwr.supercore.utils import (
     int64_to_uint64,
     simulation_config_from_json,
@@ -952,6 +953,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         connector_ids: Sequence[int] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
+        traceparent: str = "",
     ) -> int:
         """Create a new run."""
         if initial_task_event is not None:
@@ -1012,6 +1014,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     insert(TaskModel).values(
                         task_id=uint64_to_int64(task_id),
                         type=primary_task_type,
+                        traceparent=validate_traceparent(traceparent) or None,
                         run_id=uint64_to_int64(run_id),
                         fab_hash=fab_hash,
                         model_ref=None,

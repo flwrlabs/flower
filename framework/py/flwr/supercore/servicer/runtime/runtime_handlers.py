@@ -16,6 +16,7 @@
 
 # pylint: disable=unused-argument
 
+from datetime import datetime
 from logging import DEBUG, ERROR
 
 from flwr.common.constant import Status
@@ -54,8 +55,10 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.corestate import CoreState
+from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.task_process.connector import registry as connector_registry
+from flwr.supercore.tracing import current_traceparent, trace_span, validate_traceparent
 
 
 def pull_pending_tasks(
@@ -83,8 +86,30 @@ def acquire_task(request: AcquireTaskRequest, state: CoreState) -> AcquireTaskRe
     )
     for task in tasks:
         eligible = task.type in supported_types or task.fab_hash in agentapp_fab_hashes
-        if eligible and (token := state.claim_task(task.task_id)):
-            return AcquireTaskResponse(task=task, token=token)
+        if eligible:
+            with trace_span(
+                "task.acquire",
+                traceparent=task.traceparent,
+                attributes={
+                    "flwr.component": "superlink",
+                    "flwr.run_id": str(task.run_id),
+                    "flwr.task_id": str(task.task_id),
+                    "flwr.task_type": task.type,
+                },
+            ) as span:
+                token = state.claim_task(task.task_id)
+                span.set_attribute(
+                    "flwr.outcome", "claimed" if token else "unavailable"
+                )
+                if token:
+                    try:
+                        queued_ms = (
+                            now() - datetime.fromisoformat(task.pending_at)
+                        ).total_seconds() * 1000
+                        span.set_attribute("flwr.queue_ms", max(0.0, queued_ms))
+                    except (ValueError, TypeError):
+                        pass
+                    return AcquireTaskResponse(task=task, token=token)
     return AcquireTaskResponse()
 
 
@@ -132,6 +157,7 @@ def create_task(
         connector_ref=connector_ref,
         connector_id=connector_id,
         requesting_task_id=task.task_id,
+        traceparent=current_traceparent() or validate_traceparent(task.traceparent),
     )
     if created_task_id is None:
         raise FlowerError(

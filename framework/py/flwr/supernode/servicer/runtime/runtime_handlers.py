@@ -125,6 +125,7 @@ def pull_task_input(
             run=run_to_proto(run),
             fab=fab_to_proto(fab),
             task_id=task.task_id,
+            traceparent=task.traceparent,
         )
 
     log(ERROR, "Failed to start task %d of run %s", task.task_id, run_id)

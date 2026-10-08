@@ -166,6 +166,7 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.run import Run
 from flwr.supercore.task_process.connector import registry as connector_registry
+from flwr.supercore.tracing import current_traceparent, trace_span
 from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
@@ -778,20 +779,30 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         if primary_task_type == TaskType.AGENT_APP and series_id is None:
             series_description = _derive_run_series_description(user_prompt) or None
 
-        run_id = state.create_run(
-            fab_id,
-            fab_version,
-            fab.hash_str,
-            override_config,
-            federation_id,
-            resolved_federation_config,
-            flwr_aid,
-            primary_task_type,
-            user_prompt=user_prompt or None,
-            series_id=series_id,
-            series_description=series_description,
-            connector_ids=connector_ids,
-        )
+        with trace_span(
+            "run.create",
+            attributes={
+                "flwr.component": "superlink",
+                "flwr.task_type": primary_task_type,
+            },
+        ) as span:
+            run_id = state.create_run(
+                fab_id,
+                fab_version,
+                fab.hash_str,
+                override_config,
+                federation_id,
+                resolved_federation_config,
+                flwr_aid,
+                primary_task_type,
+                user_prompt=user_prompt or None,
+                series_id=series_id,
+                series_description=series_description,
+                connector_ids=connector_ids,
+                traceparent=current_traceparent(),
+            )
+            span.set_attribute("flwr.run_id", str(run_id))
+            span.set_attribute("flwr.outcome", "created" if run_id else "failed")
 
         if run_id == 0:
             raise FlowerError(

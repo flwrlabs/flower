@@ -370,6 +370,27 @@ class StateTest(CoreStateTest):
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
 
+    def test_create_run_persists_primary_task_traceparent(self) -> None:
+        """Primary task creation preserves only validated trace carriers."""
+        carrier = "00-" + "1" * 32 + "-" + "2" * 16 + "-01"
+        state = self.state_factory()
+        for value, expected in [(carrier, carrier), ("", ""), ("invalid", "")]:
+            with self.subTest(traceparent=value):
+                run_id = state.create_run(
+                    fab_id="flwr/test",
+                    fab_version="1.0.0",
+                    fab_hash="hash",
+                    override_config={},
+                    federation_id=NOOP_FEDERATION_ID,
+                    federation_config=None,
+                    flwr_aid="account",
+                    primary_task_type=TaskType.AGENT_APP,
+                    traceparent=value,
+                )
+                self.assertEqual(
+                    state.get_tasks(run_ids=[run_id])[0].traceparent, expected
+                )
+
     def test_create_run_binds_connectors(self) -> None:
         """Creating a run should atomically persist its connector allowlist."""
         state = self.state_factory()

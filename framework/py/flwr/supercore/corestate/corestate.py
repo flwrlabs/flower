@@ -738,6 +738,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         connector_ref: str | None = None,
         connector_id: int | None = None,
         requesting_task_id: int | None = None,
+        traceparent: str = "",
     ) -> int | None:
         """Create a new task.
 
@@ -758,6 +759,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         requesting_task_id : Optional[int] (default: None)
             Task requesting creation of the new task. If set, task creation fails
             when the requesting task does not exist or is already finished.
+        traceparent : str (default: "")
+            Optional W3C trace context, discarded when invalid.
 
         Returns
         -------

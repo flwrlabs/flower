@@ -48,6 +48,7 @@ from flwr.supercore.corestate.utils import validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.tracing import validate_traceparent
 from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import FederationManager
 
@@ -680,6 +681,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         connector_ids: Sequence[int] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
+        traceparent: str = "",
     ) -> int:
         """Create a new run."""
         if initial_task_event is not None:
@@ -746,6 +748,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             self.task_store[task_id] = Task(
                 task_id=task_id,
                 type=primary_task_type,
+                traceparent=validate_traceparent(traceparent),
                 run_id=run_id,
                 status=TaskStatus(
                     status=Status.PENDING,

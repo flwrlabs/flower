@@ -29,7 +29,9 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.task_process.usage import TaskUsageRecorder
+from flwr.supercore.tracing import TraceSpan, trace_span
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 
@@ -63,6 +65,8 @@ def handle_task(client: RuntimeHttpClient) -> None:
     # Stream events are exposed through Control.StreamRunEvents.
     events: list[TaskEvent] = []
     first_text_event_flushed = False
+    first_text_traced = False
+    provider_span = TraceSpan()
 
     def _flush_events() -> None:
         """Push buffered stream events."""
@@ -74,8 +78,12 @@ def handle_task(client: RuntimeHttpClient) -> None:
     def _buffer_event(event: JSONObject) -> None:
         """Buffer one Open Responses stream event."""
         nonlocal first_text_event_flushed
+        nonlocal first_text_traced
         if not is_stream:
             return
+        if not first_text_traced and event.get("type") == "response.output_text.delta":
+            provider_span.add_event("provider.first_text")
+            first_text_traced = True
         encoded = strict_json_dumps(event, compact=True)
         events.append(TaskEvent(event=cast(str, event["type"]), data=encoded))
         if event["type"] in _TEXT_DELTA_EVENTS and not first_text_event_flushed:
@@ -86,11 +94,25 @@ def handle_task(client: RuntimeHttpClient) -> None:
 
     response = None
     try:
-        response = invoke_model_provider(
-            request_message.payload,
-            on_stream_event=_buffer_event,
-            usage_recorder=TaskUsageRecorder(client),
-        )
+        with trace_span(
+            "model.provider",
+            attributes={
+                "flwr.component": "model",
+                "flwr.run_id": str(TaskIdentity.run_id),
+                "flwr.task_id": str(TaskIdentity.task_id),
+                "flwr.parent_task_id": str(request_message.metadata.src_task_id),
+            },
+        ) as provider_span:
+            try:
+                response = invoke_model_provider(
+                    request_message.payload,
+                    on_stream_event=_buffer_event,
+                    usage_recorder=TaskUsageRecorder(client),
+                )
+            except Exception:
+                provider_span.add_event("provider.error")
+                raise
+            provider_span.add_event("provider.completed")
     except Exception as ex:
         response = _make_error_response(ex)
         raise

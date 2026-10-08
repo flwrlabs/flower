@@ -308,6 +308,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         connector_ids: Sequence[int] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
+        traceparent: str = "",
     ) -> int:
         """Create a new run.
 
@@ -344,6 +345,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
         user_prompt : str | None (default: None)
             User prompt to store as an instruction Message for an AgentApp run.
             Ignored for other primary task types and when `None`.
+        traceparent : str (default: "")
+            Optional W3C trace context for the primary task, discarded when invalid.
 
         Returns
         -------

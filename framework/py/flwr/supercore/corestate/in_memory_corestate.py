@@ -57,6 +57,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
+from flwr.supercore.tracing import validate_traceparent
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
@@ -1014,6 +1015,7 @@ class InMemoryCoreState(
         connector_ref: str | None = None,
         connector_id: int | None = None,
         requesting_task_id: int | None = None,
+        traceparent: str = "",
     ) -> int | None:
         """Create a task and return its ID."""
         with self.lock_task_store:
@@ -1037,6 +1039,7 @@ class InMemoryCoreState(
                 model_ref=model_ref,
                 connector_ref=connector_ref,
                 connector_id=connector_id,
+                traceparent=validate_traceparent(traceparent),
             )
 
             self.task_store[task_id] = task

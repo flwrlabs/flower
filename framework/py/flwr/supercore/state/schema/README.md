@@ -218,6 +218,7 @@ erDiagram
     VARCHAR sub_status
     BIGINT task_id UK
     VARCHAR token "nullable"
+    VARCHAR(55) traceparent "nullable"
     VARCHAR type
   }
 

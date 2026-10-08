@@ -90,6 +90,7 @@ from flwr.supercore.superexec.dependency_installer import (
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
+from flwr.supercore.tracing import flush_traces, trace_span
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 from flwr.superlink.grid import HttpGrid
@@ -300,28 +301,38 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 grid=agent_grid,
             )
 
-            app_path, agent_app, agent_app_attr = self._prepare_task_app(fab, run)
-            self._context.run_config = get_fused_config_from_dir(
-                app_path, run.override_config
-            )
+            with trace_span(
+                "agentapp.execute",
+                traceparent=res.traceparent,
+                attributes={
+                    "flwr.component": "agentapp",
+                    "flwr.run_id": str(run.run_id),
+                    "flwr.task_id": str(task_id),
+                    "flwr.task_type": "flwr-agentapp",
+                },
+            ):
+                app_path, agent_app, agent_app_attr = self._prepare_task_app(fab, run)
+                self._context.run_config = get_fused_config_from_dir(
+                    app_path, run.override_config
+                )
 
-            event(
-                EventType.FLWR_AGENTAPP_RUN_ENTER,
-                event_details={"run-id-hash": self._hash_run_id},
-            )
+                event(
+                    EventType.FLWR_AGENTAPP_RUN_ENTER,
+                    event_details={"run-id-hash": self._hash_run_id},
+                )
 
-            _set_runtime_environment(
-                self._runtime_api_address,
-                self._token,
-                self._insecure,
-                self._certificates_path,
-            )
+                _set_runtime_environment(
+                    self._runtime_api_address,
+                    self._token,
+                    self._insecure,
+                    self._certificates_path,
+                )
 
-            if agent_app is None:
-                assert agent_app_attr is not None
-                agent_app = _load_agentapp_component(agent_app_attr, app_path)
-            agent_app(agent=agent, context=self._context)
-            self._agent_events.close()
+                if agent_app is None:
+                    assert agent_app_attr is not None
+                    agent_app = _load_agentapp_component(agent_app_attr, app_path)
+                agent_app(agent=agent, context=self._context)
+                self._agent_events.close()
 
             # Set sub_status and details for successful completion
             with self._lock:
@@ -407,6 +418,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             if self._finalized:
                 return
             self._finalized = True
+            flush_traces()
 
             log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
             self._grid._retry_invoker.max_tries = 1

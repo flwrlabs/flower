@@ -214,6 +214,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             connector_ref=None,
             connector_id=None,
             requesting_task_id=789,
+            traceparent="",
         )
         self.assertEqual(response.task_id, 456)
 
@@ -243,6 +244,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                     connector_ref=None,
                     connector_id=None,
                     requesting_task_id=789,
+                    traceparent="",
                 )
                 self.assertEqual(response.task_id, 456)
 
@@ -336,6 +338,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             connector_ref=None,
             connector_id=None,
             requesting_task_id=789,
+            traceparent="",
         )
 
     def test_create_task_rejects_missing_required_field(self) -> None:
