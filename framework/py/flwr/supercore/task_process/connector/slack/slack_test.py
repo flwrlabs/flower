@@ -39,13 +39,14 @@ def _response(payload: object) -> Mock:
     return response
 
 
-def test_slack_search_defaults() -> None:
+@pytest.mark.parametrize("query", ("release", "  release  "))
+def test_slack_search_defaults(query: str) -> None:
     """Use public channels and the captured default search options."""
     response = _response({"ok": True, "results": {"messages": []}})
     with patch(_HTTP_REQUEST, return_value=response) as request:
         result = registry.invoke_connector(
             "slack_search_public",
-            {"query": "release"},
+            {"query": query},
             Mock(),
             _CREDENTIALS,
             {},
@@ -56,7 +57,7 @@ def test_slack_search_defaults() -> None:
         "https://slack.com/api/assistant.search.context",
     )
     assert request.call_args.kwargs["json"] == {
-        "query": "release",
+        "query": query,
         "content_types": ["messages"],
         "channel_types": ["public_channel"],
         "include_bots": False,
@@ -68,18 +69,18 @@ def test_slack_search_defaults() -> None:
     ("action_name", "natural_language_query"),
     (
         ("slack_search_public", ""),
-        ("slack_search_public_and_private", "Where is the release plan?"),
+        ("slack_search_public_and_private", "  Where is the release plan?  "),
     ),
 )
 def test_slack_search_maps_captured_options(
     action_name: str, natural_language_query: str
 ) -> None:
     """Translate captured options into separate keyword clauses."""
-    keywords = ["alpha", '"release plan"', "gamma", "delta", "epsilon"]
-    keyword_query = 'alpha "release plan" gamma delta epsilon'
+    keywords = ["alpha", '"release plan"', "alpha", "delta", "epsilon"]
+    keyword_query = 'alpha "release plan" alpha delta epsilon'
     arguments: JSONObject = {
         "keywords": keywords,
-        "filters": "in:<#C1>",
+        "filters": "  in:<#C1>  ",
         "natural_language_query": natural_language_query,
         "content_types": "messages,files",
         "after": "1700000000",
@@ -112,9 +113,9 @@ def test_slack_search_maps_captured_options(
         "https://slack.com/api/assistant.search.context",
     )
     assert request.call_args.kwargs["json"] == {
-        "query": f"{natural_language_query or keyword_query} in:<#C1>",
+        "query": f"{natural_language_query or keyword_query}   in:<#C1>  ",
         "term_clauses": keywords,
-        "modifiers": "in:<#C1>",
+        "modifiers": "  in:<#C1>  ",
         "content_types": ["messages", "files"],
         "channel_types": channel_types,
         "after": 1700000000,
@@ -129,54 +130,52 @@ def test_slack_search_maps_captured_options(
     }
 
 
-def test_slack_search_rejects_too_many_keywords() -> None:
-    """Reject more than five keyword clauses before making an API request."""
+def test_slack_search_surfaces_api_argument_errors() -> None:
+    """Let Slack validate native options and return its error unchanged."""
+    keywords = ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"]
     with (
-        patch(_HTTP_REQUEST) as request,
-        pytest.raises(ValueError, match="at most 5 keywords"),
+        patch(
+            _HTTP_REQUEST,
+            return_value=_response({"ok": False, "error": "invalid_arguments"}),
+        ) as request,
+        pytest.raises(SlackApiError, match="invalid_arguments"),
     ):
         registry.invoke_connector(
             "slack_search_public",
-            {"keywords": ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"]},
+            {
+                "keywords": keywords,
+                "content_types": "messages, files,messages",
+                "limit": 21,
+                "include_bots": "false",
+                "include_context": "false",
+                "sort": "unsupported",
+            },
             Mock(),
             _CREDENTIALS,
             {},
         )
-    request.assert_not_called()
+    request.assert_called_once()
+    payload = request.call_args.kwargs["json"]
+    assert payload["term_clauses"] == keywords
+    assert payload["content_types"] == ["messages", " files", "messages"]
+    assert payload["limit"] == 21
+    assert payload["include_bots"] == "false"
+    assert payload["include_context_messages"] == "false"
+    assert payload["sort"] == "unsupported"
 
 
-@pytest.mark.parametrize("limit", (0, 21))
-def test_slack_search_rejects_invalid_limits(limit: int) -> None:
-    """Reject out-of-range limits before making an API request."""
+def test_slack_search_empty_query_is_validated_by_slack() -> None:
+    """Surface Slack's query error without imposing another input contract."""
     with (
-        patch(_HTTP_REQUEST) as request,
-        pytest.raises(ValueError, match="must be between 1 and 20"),
+        patch(
+            _HTTP_REQUEST,
+            return_value=_response({"ok": False, "error": "invalid_arguments"}),
+        ) as request,
+        pytest.raises(SlackApiError, match="invalid_arguments"),
     ):
-        registry.invoke_connector(
-            "slack_search_public",
-            {"query": "release", "limit": limit},
-            Mock(),
-            _CREDENTIALS,
-            {},
-        )
-    request.assert_not_called()
-
-
-@pytest.mark.parametrize("name", ("include_bots", "include_context"))
-def test_slack_search_rejects_non_boolean_options(name: str) -> None:
-    """Reject malformed boolean options before making an API request."""
-    with (
-        patch(_HTTP_REQUEST) as request,
-        pytest.raises(ValueError, match=f"{name} must be a boolean"),
-    ):
-        registry.invoke_connector(
-            "slack_search_public",
-            {"query": "release", name: "false"},
-            Mock(),
-            _CREDENTIALS,
-            {},
-        )
-    request.assert_not_called()
+        registry.invoke_connector("slack_search_public", {}, Mock(), _CREDENTIALS, {})
+    request.assert_called_once()
+    assert request.call_args.kwargs["json"]["query"] == ""
 
 
 def test_slack_search_only_my_channels_keeps_shared_files() -> None:
@@ -421,3 +420,51 @@ def test_slack_list_conversations_limit() -> None:
                 {},
             )
         assert request.call_args.kwargs["params"].get("limit") == expected_limit
+
+
+@pytest.mark.parametrize(
+    ("action_name", "arguments", "expected_params"),
+    (
+        (
+            "slack_list_conversations",
+            {
+                "types": ["im", "unsupported", "im"],
+                "limit": 1000,
+                "cursor": " next ",
+                "team_id": " T1 ",
+                "exclude_archived": True,
+            },
+            {
+                "types": "im,unsupported,im",
+                "limit": "1000",
+                "cursor": " next ",
+                "team_id": " T1 ",
+                "exclude_archived": "true",
+            },
+        ),
+        (
+            "slack_get_conversation_history",
+            {"channel_id": " C1 ", "cursor": "", "limit": 16},
+            {"channel": " C1 ", "cursor": "", "limit": "16"},
+        ),
+        (
+            "slack_get_conversation_replies",
+            {"channel_id": " C1 ", "thread_ts": " 1.0 ", "limit": 16},
+            {"channel": " C1 ", "ts": " 1.0 ", "limit": "16"},
+        ),
+    ),
+)
+def test_slack_conversation_arguments_are_validated_by_slack(
+    action_name: str, arguments: JSONObject, expected_params: dict[str, str]
+) -> None:
+    """Preserve native arguments and surface the API's validation error."""
+    with (
+        patch(
+            _HTTP_REQUEST,
+            return_value=_response({"ok": False, "error": "invalid_arguments"}),
+        ) as request,
+        pytest.raises(SlackApiError, match="invalid_arguments"),
+    ):
+        registry.invoke_connector(action_name, arguments, Mock(), _CREDENTIALS, {})
+    request.assert_called_once()
+    assert request.call_args.kwargs["params"] == expected_params

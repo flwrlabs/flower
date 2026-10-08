@@ -27,21 +27,13 @@ from ..http import ConnectorApiError, request_json_object
 from ..json_utils import (
     object_field,
     object_list_field,
-    optional_string,
     require_bool,
-    require_int_range,
-    require_string,
     required_string_field,
     string_field,
 )
-from .actions import (
-    SLACK_CONVERSATION_TYPES,
-    SLACK_LIST_CONVERSATIONS_MAX_LIMIT,
-    SLACK_MESSAGE_MAX_LIMIT,
-)
+from .actions import SLACK_CONVERSATION_TYPES
 
 _SLACK_API_BASE_URL = "https://slack.com/api"
-_SEARCH_CONTENT_TYPES = ("messages", "files")
 
 
 class SlackApiError(ConnectorApiError):
@@ -76,19 +68,10 @@ def _call_slack_api(
     return payload
 
 
-def _csv(
-    arguments: JSONObject,
-    name: str,
-    choices: tuple[str, ...],
-    *,
-    default: tuple[str, ...],
-) -> list[str]:
-    """Parse one comma-separated MCP-style option for a Web API request."""
-    raw = optional_string(arguments.get(name), "Slack", name)
-    values = list(default) if raw is None else [part.strip() for part in raw.split(",")]
-    if not values or any(value not in choices for value in values):
-        raise ValueError(f"Slack {name} contains an unsupported value.")
-    return list(dict.fromkeys(values))
+def _csv(arguments: JSONObject, name: str, default: tuple[str, ...]) -> list[str]:
+    """Convert a comma-separated tool option to a Web API array."""
+    raw = arguments.get(name)
+    return list(default) if raw is None else cast(str, raw).split(",")
 
 
 def _search(
@@ -130,23 +113,10 @@ def _search_payload(
     channel_types: tuple[str, ...],
 ) -> JSONObject:
     """Translate the shared search options to Real-time Search parameters."""
-    query = optional_string(arguments.get("query"), "Slack", "query")
-    keywords = arguments.get("keywords", [])
-    if not isinstance(keywords, list) or any(
-        not isinstance(term, str) or not term.strip() for term in keywords
-    ):
-        raise ValueError("Slack keywords must be an array of nonempty strings.")
-    terms = cast(list[str], keywords)
-    if len(terms) > 5:
-        raise ValueError(
-            "Slack search supports at most 5 keywords; reduce the keyword list."
-        )
-    filters = optional_string(arguments.get("filters"), "Slack", "filters")
-    natural_language_query = optional_string(
-        arguments.get("natural_language_query"), "Slack", "natural_language_query"
-    )
-    if not query and not terms and not filters:
-        raise ValueError("Slack search requires query, keywords, or filters.")
+    query = cast(str, arguments.get("query", ""))
+    terms = cast(list[str], arguments.get("keywords", []))
+    filters = cast(str, arguments.get("filters", ""))
+    natural_language_query = cast(str, arguments.get("natural_language_query", ""))
     query_parts = (
         [natural_language_query, query, filters]
         if natural_language_query
@@ -154,36 +124,25 @@ def _search_payload(
     )
     payload: JSONObject = {
         "query": " ".join(part for part in query_parts if part),
-        "content_types": _csv(
-            arguments, "content_types", _SEARCH_CONTENT_TYPES, default=("messages",)
-        ),
+        "content_types": _csv(arguments, "content_types", ("messages",)),
         "channel_types": (
             ["public_channel"]
             if channel_types == ("public_channel",)
-            else _csv(arguments, "channel_types", channel_types, default=channel_types)
+            else _csv(arguments, "channel_types", channel_types)
         ),
     }
     if terms:
         payload["term_clauses"] = terms
         if filters:
             payload["modifiers"] = filters
-    if "limit" in arguments:
-        payload["limit"] = require_int_range(
-            arguments["limit"], "Slack", "limit", maximum=20
-        )
-    for name in ("context_channel_id", "cursor", "sort", "sort_dir"):
+    for name in ("context_channel_id", "cursor", "sort", "sort_dir", "limit"):
         if name in arguments:
             payload[name] = arguments[name]
     for name in ("after", "before"):
-        value = optional_string(arguments.get(name), "Slack", name)
-        if value is not None:
-            payload[name] = int(value)
-    payload["include_bots"] = require_bool(
-        arguments.get("include_bots", False), "Slack", "include_bots"
-    )
-    payload["include_context_messages"] = require_bool(
-        arguments.get("include_context", True), "Slack", "include_context"
-    )
+        if name in arguments:
+            payload[name] = int(cast(str, arguments[name]))
+    payload["include_bots"] = arguments.get("include_bots", False)
+    payload["include_context_messages"] = arguments.get("include_context", True)
     return payload
 
 
@@ -308,90 +267,43 @@ def list_conversations(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
     """List conversations visible to the connected Slack user."""
-    types = arguments.get("types")
-    if types is not None and (
-        not isinstance(types, list) or not all(isinstance(item, str) for item in types)
-    ):
-        raise ValueError("Slack conversation types are invalid.")
-    selected_types = (
-        list(SLACK_CONVERSATION_TYPES) if types is None else cast(list[str], types)
-    )
-    if not selected_types or any(
-        item not in SLACK_CONVERSATION_TYPES for item in selected_types
-    ):
-        raise ValueError("Slack conversation types are invalid.")
-    params: dict[str, str | None] = {
-        "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
-        "types": ",".join(dict.fromkeys(selected_types)),
-        "team_id": optional_string(arguments.get("team_id"), "Slack", "team_id"),
-    }
+    types = cast(list[str], arguments.get("types", list(SLACK_CONVERSATION_TYPES)))
+    params = {"types": ",".join(types)}
+    for name in ("cursor", "team_id"):
+        if name in arguments:
+            params[name] = cast(str, arguments[name])
     if "limit" in arguments:
-        params["limit"] = str(
-            require_int_range(
-                arguments["limit"],
-                "Slack",
-                "limit",
-                maximum=SLACK_LIST_CONVERSATIONS_MAX_LIMIT,
-            )
-        )
+        params["limit"] = str(arguments["limit"])
     if "exclude_archived" in arguments:
-        params["exclude_archived"] = str(
-            require_bool(arguments["exclude_archived"], "Slack", "exclude_archived")
-        ).lower()
-    return _call_slack_api(
-        "conversations.list",
-        context.credentials,
-        params={key: value for key, value in params.items() if value is not None},
-    )
+        params["exclude_archived"] = str(arguments["exclude_archived"]).lower()
+    return _call_slack_api("conversations.list", context.credentials, params=params)
 
 
 def get_conversation_history(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
     """Get recent messages from a Slack conversation."""
-    params: dict[str, str | None] = {
-        "channel": require_string(arguments.get("channel_id"), "Slack", "channel_id"),
-        "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
-    }
+    params = {"channel": cast(str, arguments["channel_id"])}
+    if "cursor" in arguments:
+        params["cursor"] = cast(str, arguments["cursor"])
     if "limit" in arguments:
-        params["limit"] = str(
-            require_int_range(
-                arguments["limit"],
-                "Slack",
-                "limit",
-                maximum=SLACK_MESSAGE_MAX_LIMIT,
-            )
-        )
-    return _call_slack_api(
-        "conversations.history",
-        context.credentials,
-        params={key: value for key, value in params.items() if value is not None},
-    )
+        params["limit"] = str(arguments["limit"])
+    return _call_slack_api("conversations.history", context.credentials, params=params)
 
 
 def get_conversation_replies(
     arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONObject:
     """Get messages in a Slack thread."""
-    params: dict[str, str | None] = {
-        "channel": require_string(arguments.get("channel_id"), "Slack", "channel_id"),
-        "ts": require_string(arguments.get("thread_ts"), "Slack", "thread_ts"),
-        "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
+    params = {
+        "channel": cast(str, arguments["channel_id"]),
+        "ts": cast(str, arguments["thread_ts"]),
     }
+    if "cursor" in arguments:
+        params["cursor"] = cast(str, arguments["cursor"])
     if "limit" in arguments:
-        params["limit"] = str(
-            require_int_range(
-                arguments["limit"],
-                "Slack",
-                "limit",
-                maximum=SLACK_MESSAGE_MAX_LIMIT,
-            )
-        )
-    return _call_slack_api(
-        "conversations.replies",
-        context.credentials,
-        params={key: value for key, value in params.items() if value is not None},
-    )
+        params["limit"] = str(arguments["limit"])
+    return _call_slack_api("conversations.replies", context.credentials, params=params)
 
 
 EXECUTORS: dict[str, ConnectorExecutor] = {
