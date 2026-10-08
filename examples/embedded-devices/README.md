@@ -134,7 +134,7 @@ Now, launch your `SuperNode` pointing it to the dataset you `scp`-ed earlier:
 
 ```shell
 # Repeat for each embedded device (adjust SuperLink IP and dataset-path)
-flower-supernode --insecure --superlink="SUPERLINK_IP:9092" \
+flower-supernode --insecure --superlink="SUPERLINK_IP:8000" \
                  --node-config="dataset-path='path/to/fashionmnist_part_1'"
 ```
 

@@ -176,7 +176,7 @@ In a new terminal window, start the first long-running Flower client (SuperNode)
 flower-supernode \
     --root-certificates certificates/ca.crt \
     --auth-supernode-private-key keys/supernode_credentials_1 \
-    --superlink "127.0.0.1:9092" \
+    --superlink "127.0.0.1:8000" \
     --node-config 'dataset-path="datasets/cifar10_part_1"' \
     --host "127.0.0.1" \
     --port 9094
@@ -188,7 +188,7 @@ In yet another new terminal window, start the second long-running Flower client:
 flower-supernode \
     --root-certificates certificates/ca.crt \
     --auth-supernode-private-key keys/supernode_credentials_2 \
-    --superlink "127.0.0.1:9092" \
+    --superlink "127.0.0.1:8000" \
     --node-config 'dataset-path="datasets/cifar10_part_2"' \
     --host "127.0.0.1" \
     --port 9095
