@@ -175,9 +175,9 @@ def test_set_runtime_environment(
     monkeypatch: pytest.MonkeyPatch, insecure: bool, scheme: str
 ) -> None:
     """Expose the Runtime Responses base URL and AgentApp task token."""
-    monkeypatch.delenv("FLWR_RUNTIME_BASE_URL", raising=False)
-    monkeypatch.delenv("FLWR_RUNTIME_API_KEY", raising=False)
-    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+    monkeypatch.setenv("FLWR_RUNTIME_BASE_URL", "")
+    monkeypatch.setenv("FLWR_RUNTIME_API_KEY", "")
+    monkeypatch.setenv("SSL_CERT_FILE", "")
     _set_runtime_environment(
         "runtime.example:9092",
         "task-token",
