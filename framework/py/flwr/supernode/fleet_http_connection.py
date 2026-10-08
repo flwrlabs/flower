@@ -257,7 +257,6 @@ def http_request_response(  # pylint: disable=R0913,R0917,R0914,R0912,R0915
             log(ERROR, exc)
         finally:
             if node is not None:
-                retry_invoker.max_tries = 1
                 if heartbeat_sender.is_running:
                     heartbeat_sender.stop()
                 try:
