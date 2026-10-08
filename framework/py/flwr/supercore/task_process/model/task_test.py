@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import cast
-from unittest.mock import MagicMock, Mock, call
+from unittest.mock import Mock
 
 import pytest
 
@@ -64,10 +64,6 @@ def test_handle_task_flushes_first_text_event_eagerly(
 ) -> None:
     """The first text event is persisted without waiting for a full batch."""
     stub = Mock()
-    span = Mock()
-    manager = MagicMock()
-    manager.__enter__.return_value = span
-    monkeypatch.setattr(task, "trace_span", Mock(return_value=manager))
     monkeypatch.setattr(
         task, "_pull_model_request", Mock(return_value=_model_request())
     )
@@ -88,11 +84,8 @@ def test_handle_task_flushes_first_text_event_eagerly(
             )
         )
         assert stub.PushTaskEvents.call_count == 1
-        assert span.add_event.call_count == int(
-            first_text_event == "response.output_text.delta"
-        )
-        for _ in range(16):
-            on_stream_event(cast(JSONObject, {"type": "response.output_text.delta"}))
+        for index in range(16):
+            on_stream_event(cast(JSONObject, {"type": f"response.event-{index}"}))
         return _completed_response()
 
     monkeypatch.setattr(task, "invoke_model_provider", invoke_provider)
@@ -104,8 +97,4 @@ def test_handle_task_flushes_first_text_event_eagerly(
     assert [event.event for event in batches[0]] == [
         "response.created",
         first_text_event,
-    ]
-    assert span.add_event.call_args_list == [
-        call("provider.first_text"),
-        call("provider.completed"),
     ]

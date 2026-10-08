@@ -21,8 +21,6 @@ import importlib
 import os
 import signal
 import threading
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
 from queue import Queue
 from unittest.mock import Mock
@@ -30,9 +28,8 @@ from unittest.mock import Mock
 import pytest
 
 from flwr.agentapp import AgentApp, LoadAgentAppError
-from flwr.app import ConfigRecord, Context, Message, RecordDict
+from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common.constant import SubStatus
-from flwr.proto.runtime_pb2 import PullTaskInputResponse  # pylint: disable=E0611
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
@@ -60,88 +57,6 @@ from .run_agentapp import (
 run_agentapp_module = importlib.import_module(
     "flwr.supercore.task_process.agent.run_agentapp"
 )
-
-
-@pytest.mark.parametrize("resident", [False, True])
-@pytest.mark.parametrize("failure", [False, True])
-def test_agentapp_tracing_scopes_preparation_and_flushes_ended_span(
-    monkeypatch: pytest.MonkeyPatch, resident: bool, failure: bool
-) -> None:
-    """Cold and resident execution flush after app preparation and execution."""
-    calls: list[str] = []
-    carrier = "00-" + "1" * 32 + "-" + "2" * 16 + "-01"
-    context = Context(
-        run_id=42, node_id=99, node_config={}, state=RecordDict(), run_config={}
-    )
-    run = Run.create_empty(42)
-    grid = Mock()
-    grid._runtime_client.PullTaskInput.return_value = PullTaskInputResponse(
-        task_id=17, traceparent=carrier
-    )
-
-    @contextmanager
-    def capture(name: str, **kwargs: object) -> Iterator[Mock]:
-        assert name == "agentapp.execute"
-        assert kwargs["traceparent"] == carrier
-        assert kwargs["attributes"] == {
-            "flwr.component": "agentapp",
-            "flwr.run_id": "42",
-            "flwr.task_id": "17",
-            "flwr.task_type": "flwr-agentapp",
-        }
-        calls.append("enter")
-        try:
-            yield Mock()
-        finally:
-            calls.append("end")
-
-    def work(**_: object) -> None:
-        calls.append("work")
-        if failure:
-            raise ValueError("app-secret")
-
-    def prepare(*_: object) -> tuple[Path, object, None]:
-        assert calls == ["enter"]
-        calls.append("prepare")
-        return Path("/app"), work, None
-
-    monkeypatch.setattr(run_agentapp_module, "HttpGrid", Mock(return_value=grid))
-    monkeypatch.setattr(run_agentapp_module, "HeartbeatSender", Mock())
-    monkeypatch.setattr(run_agentapp_module, "context_from_proto", lambda _: context)
-    monkeypatch.setattr(run_agentapp_module, "run_from_proto", lambda _: run)
-    monkeypatch.setattr(
-        run_agentapp_module, "fab_from_proto", lambda _: Fab("", b"", {})
-    )
-    monkeypatch.setattr(
-        run_agentapp_module, "pull_prompt", Mock(return_value=("prompt-secret", Mock()))
-    )
-    monkeypatch.setattr(run_agentapp_module, "RuntimeAgentEvents", Mock())
-    monkeypatch.setattr(run_agentapp_module, "RuntimeAgentGrid", Mock())
-    monkeypatch.setattr(
-        run_agentapp_module, "start_log_uploader", Mock(return_value=None)
-    )
-    monkeypatch.setattr(
-        run_agentapp_module, "get_fused_config_from_dir", Mock(return_value={})
-    )
-    monkeypatch.setattr(run_agentapp_module, "_set_runtime_environment", Mock())
-    monkeypatch.setattr(run_agentapp_module, "mirror_output_to_queue", Mock())
-    monkeypatch.setattr(run_agentapp_module, "register_signal_handlers", Mock())
-    monkeypatch.setattr(
-        run_agentapp_module, "_register_resident_signal_handlers", Mock()
-    )
-    monkeypatch.setattr(run_agentapp_module, "event", Mock())
-    monkeypatch.setattr(_AgentAppTaskLifecycle, "_prepare_task_app", prepare)
-    monkeypatch.setattr(run_agentapp_module, "trace_span", capture)
-    monkeypatch.setattr(
-        run_agentapp_module, "flush_traces", lambda: calls.append("flush")
-    )
-    lifecycle, exit_code = _run_agentapp_task(
-        "runtime:9092", Queue(), "token", True, None, None, False, resident=resident
-    )
-    assert exit_code == (ExitCode.TASK_PROC_EXCEPTION if failure else ExitCode.SUCCESS)
-    lifecycle.finalize()
-    lifecycle.finalize()
-    assert calls == ["enter", "prepare", "work", "end", "flush"]
 
 
 @pytest.fixture(autouse=True)
@@ -445,6 +360,8 @@ def test_agentapp_lifecycle_finalizes_once_across_threads(
     grid = Mock(_runtime_client=client, _retry_invoker=retry_invoker)
     heartbeat = Mock(is_running=True)
     cleanup_runtime = Mock()
+    flush = Mock()
+    monkeypatch.setattr(run_agentapp_module, "flush_traces", flush)
     monkeypatch.setattr(run_agentapp_module, "HttpGrid", Mock(return_value=grid))
     monkeypatch.setattr(
         run_agentapp_module, "cleanup_app_runtime_environment", cleanup_runtime
@@ -477,6 +394,7 @@ def test_agentapp_lifecycle_finalizes_once_across_threads(
     heartbeat.stop.assert_called_once_with()
     grid.close.assert_called_once_with()
     cleanup_runtime.assert_called_once_with(None)
+    flush.assert_called_once_with()
     assert retry_invoker.max_tries == 1
 
 

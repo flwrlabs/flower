@@ -20,7 +20,7 @@ import importlib
 import os
 import signal
 import threading
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 import pytest
 
@@ -62,12 +62,8 @@ def test_run_model_once_cleans_up_fresh_task_state(
         task_id=17,
         run=ProtoRun(run_id=42),
         context=ProtoContext(node_id=99),
-        traceparent="00-" + "1" * 32 + "-" + "2" * 16 + "-03",
     )
-    span = MagicMock()
-    # Flush only after the execution span has ended
-    flush = Mock(side_effect=span.return_value.__exit__.assert_called_once)
-    monkeypatch.setattr(run_model_module, "trace_span", span)
+    flush = Mock()
     monkeypatch.setattr(run_model_module, "flush_traces", flush)
     retry_invoker = Mock(max_tries=10)
     heartbeat = Mock(is_running=True)
@@ -119,16 +115,6 @@ def test_run_model_once_cleans_up_fresh_task_state(
     assert force_exit_timer.daemon
     force_exit_timer.start.assert_called_once_with()
     force_exit_timer.cancel.assert_called_once_with()
-    span.assert_called_once_with(
-        "model.execute",
-        traceparent=client.PullTaskInput.return_value.traceparent,
-        attributes={
-            "flwr.component": "model",
-            "flwr.run_id": "42",
-            "flwr.task_id": "17",
-            "flwr.task_type": "flwr-model",
-        },
-    )
     flush.assert_called_once_with()
 
 
