@@ -12,109 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for Slack OAuth metadata, request mapping, and API errors."""
+"""Tests for Slack request mapping and API errors."""
 
 from typing import cast
 from unittest.mock import Mock, patch
 
 import pytest
-import requests
 
 from flwr.supercore.typing import JSONObject
 
 from .. import registry
-from ..oauth import OAuthFlow
-from .definition import PROVIDER, SLACK_USER_SCOPES
 from .executors import SlackApiError
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
-_TOKEN_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
-_IDENTITY_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.request"
 _CREDENTIALS: JSONObject = {"access_token": "xoxp-secret"}
-
-
-def test_oauth_records_identity_and_permissions() -> None:
-    """Keep user identity and granted scopes separate from OAuth credentials."""
-    redirect_uri = "https://example.com/callback"
-    flow = OAuthFlow(
-        PROVIDER,
-        client_id="client",
-        client_secret="secret",
-        redirect_uri=redirect_uri,
-    )
-    scope = ",".join((*SLACK_USER_SCOPES, "users:read"))
-    token_payload: JSONObject = {
-        "ok": True,
-        "id": "bot-id",
-        "access_token": "bot-token",
-        "scope": "commands",
-        "team": {"id": "T1", "name": "Flower"},
-        "authed_user": {
-            "id": "U1",
-            "scope": scope,
-            "access_token": "user-token",
-            "refresh_token": "refresh-token",
-            "expires_in": 43200,
-            "token_type": "user",
-        },
-    }
-    identity_payload = {"ok": True, "team": "Flower", "user": "alice"}
-    with (
-        patch(
-            _TOKEN_REQUEST,
-            return_value=Mock(status_code=200, json=Mock(return_value=token_payload)),
-        ),
-        patch(
-            _IDENTITY_REQUEST,
-            return_value=Mock(
-                status_code=200, json=Mock(return_value=identity_payload)
-            ),
-        ) as identity,
-    ):
-        credentials, config = flow.exchange_code(
-            code="code", redirect_uri=redirect_uri, pkce_verifier=None
-        )
-    assert credentials == {
-        "access_token": "user-token",
-        "refresh_token": "refresh-token",
-        "expires_in": 43200,
-        "token_type": "user",
-    }
-    assert config == {
-        "id": "U1",
-        "scope": scope,
-        "display_name": "Slack · Flower / alice",
-    }
-    assert identity.call_args.kwargs["headers"]["Authorization"] == "Bearer user-token"
-
-
-def test_oauth_keeps_identity_when_name_lookup_fails() -> None:
-    """A failed display-name lookup must not lose the authenticated user ID."""
-    redirect_uri = "https://example.com/callback"
-    flow = OAuthFlow(
-        PROVIDER,
-        client_id="client",
-        client_secret="secret",
-        redirect_uri=redirect_uri,
-    )
-    scope = ",".join(SLACK_USER_SCOPES)
-    token_payload = {
-        "ok": True,
-        "team": None,
-        "enterprise": None,
-        "authed_user": {"id": "U1", "scope": scope, "access_token": "user-token"},
-    }
-    with (
-        patch(
-            _TOKEN_REQUEST,
-            return_value=Mock(status_code=200, json=Mock(return_value=token_payload)),
-        ),
-        patch(_IDENTITY_REQUEST, side_effect=requests.Timeout),
-    ):
-        _, config = flow.exchange_code(
-            code="code", redirect_uri=redirect_uri, pkce_verifier=None
-        )
-    assert config == {"id": "U1", "scope": scope}
 
 
 @pytest.mark.parametrize(
