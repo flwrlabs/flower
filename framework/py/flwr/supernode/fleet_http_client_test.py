@@ -18,6 +18,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from flwr.common.constant import HEARTBEAT_CALL_TIMEOUT
 from flwr.supercore.protobuf.client import ProtobufClient
 
 from .fleet_http_client import FleetHttpClient
@@ -62,4 +63,6 @@ def test_fleet_method(endpoint: str) -> None:
     assert call.call_args.kwargs["response_type"].__name__ == (
         f"{message_name}Response"
     )
+    if endpoint == "send-node-heartbeat":
+        assert call.call_args.kwargs["timeout"] == HEARTBEAT_CALL_TIMEOUT
     client.close()
