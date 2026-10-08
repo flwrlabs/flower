@@ -48,7 +48,7 @@ from .fleet_http_client import FleetHttpClient
 from .node_auth_http_interceptor import NodeAuthHttpInterceptor
 
 
-def test_http_connection_provides_worker_callbacks(  # pylint: disable=R0914
+def test_http_connection_provides_worker_callbacks(  # pylint: disable=R0914,R0915
     monkeypatch: MonkeyPatch,
 ) -> None:
     """Map worker operations to Fleet HTTP calls and clean up the node."""
