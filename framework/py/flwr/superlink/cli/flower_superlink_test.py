@@ -109,6 +109,35 @@ def test_parse_superlink_lifespan_config_returns_final_defaults(
     assert config.database == FLWR_IN_MEMORY_DB_NAME
 
 
+def test_parse_superlink_lifespan_config_loads_event_log_plugins(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Load Control and Fleet writers when event logging is enabled."""
+    control_plugin = Mock()
+    fleet_plugin = Mock()
+    monkeypatch.setattr(
+        app_module,
+        "add_ee_args_superlink",
+        lambda parser: parser.add_argument("--enable-event-log", action="store_true"),
+    )
+    monkeypatch.setattr(
+        app_module, "load_control_event_log_plugin", Mock(return_value=control_plugin)
+    )
+    monkeypatch.setattr(
+        app_module, "load_fleet_event_log_plugin", Mock(return_value=fleet_plugin)
+    )
+    monkeypatch.setattr(
+        app_module.sys,
+        "argv",
+        ["flower-superlink", "--insecure", "--enable-event-log"],
+    )
+
+    config = _parse_superlink_lifespan_config()
+
+    assert config.event_log_plugin is control_plugin
+    assert config.fleet_event_log_plugin is fleet_plugin
+
+
 def test_parse_superlink_lifespan_config_keeps_fleet_address_unset_for_simulation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

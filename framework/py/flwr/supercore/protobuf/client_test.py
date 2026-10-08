@@ -102,6 +102,25 @@ def test_unary_unary_sends_and_receives_protobuf() -> None:
     assert send.call_args.kwargs == {}
 
 
+def test_unary_unary_overrides_timeout() -> None:
+    """Allow heartbeat calls to use a shorter timeout than other RPCs."""
+    with patch(
+        "flwr.supercore.protobuf.client.httpx.Client.send",
+        return_value=_response(200, _RESPONSE.SerializeToString()),
+    ) as send:
+        # pylint: disable=protected-access
+        ProtobufClient("https://api.example", timeout=30.0)._unary_unary(
+            path=_PATH,
+            rpc_method=_METHOD,
+            request=_REQUEST,
+            response_type=ClaimTaskResponse,
+            timeout=5.0,
+        )
+        # pylint: enable=protected-access
+
+    assert send.call_args.args[0].extensions["timeout"]["read"] == 5.0
+
+
 def test_configures_http_client() -> None:
     """Pass TLS verification and timeout settings to the HTTP client."""
     with patch("flwr.supercore.protobuf.client.httpx.Client") as client_class:
