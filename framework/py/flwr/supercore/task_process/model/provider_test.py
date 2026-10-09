@@ -114,6 +114,19 @@ def test_invoke_model_provider_keeps_auth_when_key_is_set(
     }
 
 
+def test_invoke_model_provider_uses_ten_minute_default_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Provider calls should allow long-running model inference by default."""
+    monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "http://proxy/v1/responses")
+    monkeypatch.delenv("FLWR_MODEL_API_TIMEOUT", raising=False)
+    post_mock = _patch_post(monkeypatch, _Response(body={"id": "resp_1"}))
+
+    invoke_model_provider({"model": "model", "input": []}, usage_recorder=Mock())
+
+    assert post_mock.call_args.kwargs["timeout"] == 600.0
+
+
 @pytest.mark.parametrize(
     ("request_payload", "expected_provider"),
     [

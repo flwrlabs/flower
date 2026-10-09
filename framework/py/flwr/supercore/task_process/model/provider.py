@@ -31,7 +31,7 @@ from flwr.supercore.task_process.usage import (
 from flwr.supercore.typing import JSONObject, JSONValue
 
 DEFAULT_MODEL_API_ENDPOINT = "https://api.flower.ai/v1/responses"
-DEFAULT_MODEL_API_TIMEOUT = 180.0
+DEFAULT_MODEL_API_TIMEOUT = 600.0
 _DEFAULT_PROVIDER = "unknown"
 _STREAM_CONTENT_TYPE = "text/event-stream"
 _TERMINAL_SUCCESS_EVENTS = frozenset({"response.completed", "response.incomplete"})
@@ -59,6 +59,19 @@ class ModelProviderError(RuntimeError):
             super().__init__(f"{message}: {formatted_detail}")
         else:
             super().__init__(f"{message}: {status_code} {formatted_detail}")
+
+
+def model_api_timeout() -> float:
+    """Return the configured model provider request timeout."""
+    raw_timeout = os.getenv(
+        "FLWR_MODEL_API_TIMEOUT",
+        str(DEFAULT_MODEL_API_TIMEOUT),
+    )
+    try:
+        timeout = float(raw_timeout.strip())
+    except ValueError:
+        timeout = DEFAULT_MODEL_API_TIMEOUT
+    return max(1.0, timeout)
 
 
 def invoke_model_provider(
@@ -91,16 +104,6 @@ def invoke_model_provider(
     if not api_key and responses_url == DEFAULT_MODEL_API_ENDPOINT:
         raise RuntimeError("Model API key is not set (FLWR_MODEL_API_KEY).")
 
-    raw_timeout = os.getenv(
-        "FLWR_MODEL_API_TIMEOUT",
-        str(DEFAULT_MODEL_API_TIMEOUT),
-    )
-    try:
-        timeout = float(raw_timeout.strip())
-    except ValueError:
-        timeout = DEFAULT_MODEL_API_TIMEOUT
-    timeout = max(1.0, timeout)
-
     # Build request metadata once, then execute the shared provider path.
     headers = {"Content-Type": "application/json"}
     if api_key:
@@ -109,7 +112,7 @@ def invoke_model_provider(
     return _invoke_provider_response(
         responses_url=responses_url,
         headers=headers,
-        timeout=timeout,
+        timeout=model_api_timeout(),
         request=payload,
         on_stream_event=on_stream_event,
         usage_recorder=usage_recorder,

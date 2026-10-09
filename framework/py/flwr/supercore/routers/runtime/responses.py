@@ -45,6 +45,7 @@ from flwr.supercore.error import FlowerError
 from flwr.supercore.json_message.base import make_json_message
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.servicer.runtime import runtime_handlers
+from flwr.supercore.task_process.model.provider import model_api_timeout
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 
@@ -69,7 +70,6 @@ _TERMINAL_EVENTS = frozenset(
     {"error", "response.completed", "response.failed", "response.incomplete"}
 )
 _POLL_INTERVAL = 0.25
-_DEFAULT_MODEL_RESPONSE_TIMEOUT = 300.0
 _DEFAULT_MODEL_TASK_LAUNCH_TIMEOUT = 300.0
 _MODEL_TASK_LAUNCH_TIMEOUT_ENV = "FLWR_MODEL_TASK_LAUNCH_TIMEOUT"
 
@@ -234,7 +234,7 @@ async def _wait_for_response(
     """Wait for and return one correlated model response."""
     started_at = time.monotonic()
     launch_deadline = started_at + _model_task_launch_timeout()
-    response_deadline = started_at + _DEFAULT_MODEL_RESPONSE_TIMEOUT
+    response_deadline = started_at + _model_response_timeout()
     complete = False
     try:
         while True:
@@ -275,7 +275,7 @@ async def _stream_response(
         exchange = await run_in_threadpool(_start_exchange, state, task, model_payload)
         started_at = time.monotonic()
         launch_deadline = started_at + _model_task_launch_timeout()
-        response_deadline = started_at + _DEFAULT_MODEL_RESPONSE_TIMEOUT
+        response_deadline = started_at + _model_response_timeout()
         while True:
             # The model task stores all stream events before its final reply.
             response = await run_in_threadpool(
@@ -425,6 +425,11 @@ def _model_task_launch_timeout() -> float:
     except ValueError:
         timeout = _DEFAULT_MODEL_TASK_LAUNCH_TIMEOUT
     return max(1.0, timeout)
+
+
+def _model_response_timeout() -> float:
+    """Return the time allowed for model task launch and provider inference."""
+    return _model_task_launch_timeout() + model_api_timeout()
 
 
 def _raise_for_failed_response(response: JSONObject) -> None:
