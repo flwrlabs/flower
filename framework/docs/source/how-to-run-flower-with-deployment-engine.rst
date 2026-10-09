@@ -139,7 +139,7 @@ need two terminals for this step.
 
        $ flower-supernode \
             --insecure \
-            --superlink 127.0.0.1:9092 \
+            --superlink 127.0.0.1:8000 \
             --host 127.0.0.1 \
             --port 9094 \
             --node-config "partition-id=0 num-partitions=2"
@@ -149,8 +149,8 @@ need two terminals for this step.
        * ``flower-supernode``: Name of the SuperNode installed CLI executable.
        * ``--insecure``: This flag tells the SuperNode to operate in an insecure mode, allowing
          unencrypted communication. Refer to the :doc:`how-to-enable-tls-connections` guide to learn how to run your SuperNode with TLS.
-       * ``--superlink 127.0.0.1:9092``: Connect to the SuperLink's Fleet API at the address
-         ``127.0.0.1:9092``. If you had launched the SuperLink in a different machine, you'd replace ``127.0.0.1`` with the public IP of that machine.
+       * ``--superlink 127.0.0.1:8000``: Connect to the SuperLink's Fleet API at the address
+         ``127.0.0.1:8000``. If you had launched the SuperLink in a different machine, you'd replace ``127.0.0.1`` with the public IP of that machine.
        * ``--host 127.0.0.1``: Set the host where the SuperNode listens for Runtime API requests.
        * ``--port 9094``: Set the Runtime API port used to communicate with the ``ClientApp``.
        * ``--node-config "partition-id=0 num-partitions=2"``: The ``ClientApp`` code generated via ``flwr new`` expects those two key-value pairs to be defined at run time. Set the partition ID to ``0`` and the number of partitions to ``2`` for the SuperNode configuration.
@@ -161,7 +161,7 @@ need two terminals for this step.
 
        $ flower-supernode \
             --insecure \
-            --superlink 127.0.0.1:9092 \
+            --superlink 127.0.0.1:8000 \
             --host 127.0.0.1 \
             --port 9095 \
             --node-config "partition-id=1 num-partitions=2"
