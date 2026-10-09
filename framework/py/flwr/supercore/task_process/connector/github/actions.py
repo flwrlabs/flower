@@ -12,6 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Internal operation for discovering GitHub's MCP tool catalog."""
+"""Build GitHub action definitions from the authenticated MCP catalog."""
 
-DISCOVERY_TOOL = "github__discover_tools"
+from typing import cast
+
+from flwr.supercore.typing import JSONObject
+
+from ..definition import ActionAccess, ActionDefinition
+from . import mcp
+
+
+def load_actions(credentials: JSONObject) -> tuple[ActionDefinition, ...]:
+    """Discover every GitHub tool and preserve its remote schema and name."""
+    tools = cast(list[JSONObject], mcp.request(None, {}, credentials))
+    return tuple(
+        ActionDefinition(
+            name=cast(str, tool["name"]),
+            description=cast(str, tool.get("description", "")),
+            access=(
+                ActionAccess.READ
+                if cast(JSONObject, tool.get("annotations", {})).get("readOnlyHint")
+                else ActionAccess.WRITE
+            ),
+            input_schema=cast(JSONObject, tool["inputSchema"]),
+        )
+        for tool in tools
+    )

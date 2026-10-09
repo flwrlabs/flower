@@ -17,29 +17,11 @@
 from flwr.supercore.typing import JSONObject, JSONValue
 
 from ..definition import ConnectorExecutionContext
-from ..json_utils import require_int_range
 from . import mcp
-
-
-def discover_tools(
-    arguments: JSONObject, context: ConnectorExecutionContext
-) -> JSONValue:
-    """Discover tools using the credential-bound connector worker."""
-    del arguments
-    return mcp.discover_tools(context.credentials)
 
 
 def execute(
     name: str, arguments: JSONObject, context: ConnectorExecutionContext
 ) -> JSONValue:
-    """Forward a discovered GitHub tool without narrowing its MCP schema."""
-    remote_name = name.removeprefix("github_")
-    arguments = dict(arguments)
-    # Preserve the pagination spelling accepted by the original Flower tool.
-    if remote_name == "search_code" and "per_page" in arguments:
-        if "perPage" in arguments:
-            raise ValueError("Use only one of GitHub per_page and perPage.")
-        arguments["perPage"] = require_int_range(
-            arguments.pop("per_page"), "GitHub", "per_page", maximum=100
-        )
-    return mcp.call_tool(remote_name, arguments, context.credentials)
+    """Call the remote name bound into an ordinary ConnectorExecutor."""
+    return mcp.request(name, arguments, context.credentials)

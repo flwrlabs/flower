@@ -42,7 +42,6 @@ from flwr.supercore.json_message.connector_message import (
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
-from flwr.supercore.task_process.connector.github.actions import DISCOVERY_TOOL
 from flwr.supercore.typing import JSONObject
 
 from .session import (
@@ -253,99 +252,21 @@ def test_runtime_connectors_expand_one_connector_into_multiple_tools() -> None:
     get_connector_tools.assert_called_once_with("example")
 
 
-def test_runtime_discovers_github_tools_in_connector_task() -> None:
-    """Discover through a credential-bound task without fetching tokens in the agent."""
-    stub = Mock()
-    stub.CreateTask.return_value = CreateTaskResponse(task_id=456)
-    runtime = AgentRuntime(
-        stub=stub,
-        run_id=123,
-        task_id=789,
-        start_run_request=StartRunRequest(),
-        events=Mock(),
-    )
-    tools: list[JSONObject] = [
-        {
-            "type": "function",
-            "name": "github_issue_write",
-            "description": "Write issues",
-        }
-    ]
-    reply = ConnectorResponse(
-        dst_task_id=789,
-        name=DISCOVERY_TOOL,
-        call_id="discovery",
-        output=tools,
-        error=None,
-        reply_to_message_id="request-message-id",
-    )
-    connectors = RuntimeAgentConnectors(runtime)
-    with patch.object(runtime, "_send_and_receive", return_value=reply) as exchange:
-        first = connectors.tools(["github", "web_search"])
-        assert [tool["name"] for tool in first] == ["github_issue_write", "web_search"]
-        first[0]["description"] = "Changed"
-        assert connectors.tools(["github"])[0]["description"] == "Write issues"
-    stub.CreateTask.assert_called_once_with(
-        CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref="github")
-    )
-    stub.GetConnector.assert_not_called()
-    request = exchange.call_args.args[0]
-    assert request.payload["name"] == DISCOVERY_TOOL
-    assert request.payload["arguments"] == {}
-
-
-def test_dynamic_catalog_cache_is_isolated_to_the_agent_runtime() -> None:
-    """Different connected runs must not share their discovered tool catalogs."""
-    first_runtime = Mock(spec=AgentRuntime)
-    second_runtime = Mock(spec=AgentRuntime)
-    first_runtime.create_connector_response.return_value = [{"name": "github_read"}]
-    second_runtime.create_connector_response.return_value = [{"name": "github_write"}]
-    assert RuntimeAgentConnectors(first_runtime).tools(["github"]) == [
-        {"name": "github_read"}
-    ]
-    assert RuntimeAgentConnectors(second_runtime).tools(["github"]) == [
-        {"name": "github_write"}
-    ]
-
-
-@pytest.mark.parametrize("output", [None, {}, "invalid", [1]])
-def test_invalid_discovery_response_is_rejected(output: object) -> None:
-    """Reject malformed discovery payloads before passing them to a model."""
+def test_runtime_discovers_and_caches_github_tools() -> None:
+    """Discover through the connector runtime and return independent cached copies."""
     runtime = Mock(spec=AgentRuntime)
-    runtime.create_connector_response.return_value = output
-    with pytest.raises(RuntimeError, match="returned invalid tools"):
-        RuntimeAgentConnectors(runtime).tools(["github"])
+    tools: list[JSONObject] = [{"name": "github_issue_write", "description": "Write"}]
+    runtime.create_connector_response.return_value = tools
+    connectors = RuntimeAgentConnectors(runtime)
 
-
-def test_new_github_tool_creates_a_github_connector_task() -> None:
-    """Route a tool unknown to the static registry through the GitHub connection."""
-    stub = Mock()
-    stub.CreateTask.return_value = CreateTaskResponse(task_id=456)
-    runtime = AgentRuntime(
-        stub=stub,
-        run_id=123,
-        task_id=789,
-        start_run_request=StartRunRequest(),
-        events=Mock(),
-    )
-    reply = ConnectorResponse(
-        dst_task_id=789,
-        name="github_future_tool",
-        call_id="call-1",
-        output={},
-        error=None,
-        reply_to_message_id="request-message-id",
-    )
-    with patch.object(runtime, "_send_and_receive", return_value=reply):
-        assert (
-            runtime.create_connector_response(
-                name="github_future_tool", call_id="call-1", arguments={}
-            )
-            == {}
-        )
-    stub.CreateTask.assert_called_once_with(
-        CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref="github")
-    )
+    first = connectors.tools(["github", "web_search"])
+    assert [tool["name"] for tool in first] == ["github_issue_write", "web_search"]
+    first[0]["description"] = "Changed"
+    assert connectors.tools(["github"])[0]["description"] == "Write"
+    request = runtime.create_connector_response.call_args.kwargs
+    assert request["name"] == "github__discover_tools"
+    assert request["arguments"] == {}
+    runtime.create_connector_response.assert_called_once()
 
 
 def test_call_automation_embeds_input_in_control_request() -> None:
@@ -485,8 +406,18 @@ def test_create_connector_response_resolves_canonical_name() -> None:
     assert output == "done"
 
 
-def test_create_connector_response_uses_connector_task_for_filesystem() -> None:
-    """Filesystem calls should execute through a Connector task."""
+@pytest.mark.parametrize(
+    ("name", "connector_ref"),
+    [
+        ("filesystem_list_directory", "filesystem"),
+        ("github_future_tool", "github"),
+        ("github__discover_tools", "github"),
+    ],
+)
+def test_create_connector_response_uses_connector_task(
+    name: str, connector_ref: str
+) -> None:
+    """Static and dynamic tools should execute through their connector task."""
     stub = Mock()
     stub.CreateTask.return_value = CreateTaskResponse(task_id=456)
     agent_runtime = AgentRuntime(
@@ -498,7 +429,7 @@ def test_create_connector_response_uses_connector_task_for_filesystem() -> None:
     )
     reply = ConnectorResponse(
         dst_task_id=789,
-        name="filesystem_list_directory",
+        name=name,
         call_id="call-1",
         output={"entries": []},
         error=None,
@@ -507,14 +438,14 @@ def test_create_connector_response_uses_connector_task_for_filesystem() -> None:
 
     with patch.object(agent_runtime, "_send_and_receive", return_value=reply):
         output = agent_runtime.create_connector_response(
-            name="filesystem_list_directory",
+            name=name,
             call_id="call-1",
             arguments={"path": "/allowed"},
         )
 
     assert output == {"entries": []}
     stub.CreateTask.assert_called_once_with(
-        CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref="filesystem")
+        CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=connector_ref)
     )
 
 

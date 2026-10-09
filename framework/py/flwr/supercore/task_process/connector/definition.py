@@ -48,7 +48,7 @@ class ActionDefinition:
 
     def tool_name(self, provider_ref: str) -> str:
         """Return the globally unique model-facing action name."""
-        return f"{provider_ref}_{self.name}"
+        return f"{provider_ref}_{self.name.lower()}"
 
     def tool(self, provider_ref: str) -> JSONObject:
         """Return the model-facing function tool for this action."""
@@ -114,13 +114,9 @@ class ConnectorExecutionContext:
 
 
 ConnectorExecutor = Callable[[JSONObject, ConnectorExecutionContext], JSONValue]
-DynamicConnectorExecutor = Callable[
-    [str, JSONObject, ConnectorExecutionContext], JSONValue
-]
 
 
 @dataclass(frozen=True)
-# pylint: disable-next=too-many-instance-attributes
 class ConnectorDefinition:
     """Group a connector's identity, tools, execution, and optional authentication."""
 
@@ -130,17 +126,18 @@ class ConnectorDefinition:
     requires_credentials: bool = False
     provider: ProviderDefinition | None = None
     oauth_flow: OAuthFlow | None = None
-    discovery_tool: str | None = None
-    dynamic_executor: DynamicConnectorExecutor | None = None
+    load_connector: Callable[[JSONObject], ConnectorDefinition] | None = None
 
     @classmethod
     def from_provider(
         cls,
         provider: ProviderDefinition,
-        executors: Mapping[str, ConnectorExecutor],
+        executors: Mapping[str, ConnectorExecutor] | None = None,
         oauth_flow: OAuthFlow | None = None,
+        load_connector: Callable[[JSONObject], ConnectorDefinition] | None = None,
     ) -> ConnectorDefinition:
-        """Build a federation-scoped connector from its provider actions."""
+        """Build a provider connector with static actions or a runtime loader."""
+        executors = executors or {}
         action_names = {action.name for action in provider.actions}
         if action_names != set(executors):
             raise ValueError(
@@ -156,6 +153,7 @@ class ConnectorDefinition:
             requires_credentials=True,
             provider=provider,
             oauth_flow=oauth_flow,
+            load_connector=load_connector,
         )
 
 

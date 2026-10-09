@@ -62,10 +62,13 @@ def invoke_connector(
         config=config or {},
         usage_recorder=usage_recorder,
     )
+    if connector.load_connector is not None:
+        discovery_tool = get_connector_discovery_tool(connector.ref)
+        connector = connector.load_connector(context.credentials)
+        if tool_name == discovery_tool:
+            return list(connector.tools)
     if executor := connector.executors.get(tool_name):
         return executor(arguments, context)
-    if connector.dynamic_executor is not None:
-        return connector.dynamic_executor(tool_name, arguments, context)
     raise ValueError(f"Unsupported connector '{tool_name}'.")
 
 
@@ -94,7 +97,9 @@ def get_connector_tools(connector_ref: str) -> list[JSONObject]:
 def get_connector_discovery_tool(connector_ref: str) -> str | None:
     """Return the worker operation used to discover a connection's tools."""
     connector = _CONNECTORS_BY_REF.get(connector_ref)
-    return connector.discovery_tool if connector is not None else None
+    if connector is not None and connector.load_connector is not None:
+        return f"{connector_ref}__discover_tools"
+    return None
 
 
 def _resolve_connector(tool_name: str) -> ConnectorDefinition | None:
@@ -104,7 +109,7 @@ def _resolve_connector(tool_name: str) -> ConnectorDefinition | None:
     for connector in _CONNECTORS_BY_REF.values():
         prefix = f"{connector.ref}_"
         if (
-            connector.dynamic_executor is not None
+            connector.load_connector is not None
             and tool_name.startswith(prefix)
             and len(tool_name) > len(prefix)
         ):

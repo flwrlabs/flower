@@ -14,10 +14,15 @@
 # ==============================================================================
 """GitHub connector definition."""
 
+from dataclasses import replace
+from functools import partial
+
+from flwr.supercore.typing import JSONObject
+
 from ..definition import ConnectorDefinition, OAuth2Definition, ProviderDefinition
 from ..oauth import load_oauth_flow
-from .actions import DISCOVERY_TOOL
-from .executors import discover_tools, execute
+from .actions import load_actions
+from .executors import execute
 
 GITHUB_CONNECTOR_REF = "github"
 
@@ -46,13 +51,19 @@ PROVIDER = ProviderDefinition(
     ),
 )
 
-CONNECTOR = ConnectorDefinition(
-    ref=GITHUB_CONNECTOR_REF,
-    tools=(),
-    executors={DISCOVERY_TOOL: discover_tools},
-    requires_credentials=True,
+
+def load_connector(credentials: JSONObject) -> ConnectorDefinition:
+    """Build ordinary actions and executors for this GitHub connection."""
+    actions = load_actions(credentials)
+    return ConnectorDefinition.from_provider(
+        provider=replace(PROVIDER, actions=actions),
+        executors={action.name: partial(execute, action.name) for action in actions},
+        oauth_flow=CONNECTOR.oauth_flow,
+    )
+
+
+CONNECTOR = ConnectorDefinition.from_provider(
     provider=PROVIDER,
     oauth_flow=load_oauth_flow(PROVIDER),
-    discovery_tool=DISCOVERY_TOOL,
-    dynamic_executor=execute,
+    load_connector=load_connector,
 )
