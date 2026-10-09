@@ -34,6 +34,8 @@ ROUTINE_ACCESS_PATHS = frozenset(
         "/v1/runtime/pull-pending-tasks",
         "/v1/runtime/push-logs",
         "/v1/runtime/send-task-heartbeat",
+        "/v1/runtime/pull-messages",
+        "/v1/runtime/pull-object",
     }
 )
 LOG_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"

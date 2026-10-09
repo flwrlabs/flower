@@ -39,6 +39,7 @@ from flwr.common.constant import (
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
     FLWR_INTERNAL_GRPC_CONTROL_API,
+    FLWR_INTERNAL_GRPC_FLEET_API,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
@@ -138,7 +139,8 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
         if os.getenv(FLWR_INTERNAL_GRPC_CONTROL_API) == "1":
             self._start_control_api()
-        self._start_fleet_api()
+        if os.getenv(FLWR_INTERNAL_GRPC_FLEET_API) == "1":
+            self._start_fleet_api()
         self._start_superexec_if_needed()
         self._start_health_server_if_needed()
         self._started = True
@@ -459,7 +461,7 @@ def flower_superlink() -> None:
     event(EventType.RUN_SUPERLINK_ENTER)
 
     # Blocking: FastAPI serves the Runtime and Control HTTP APIs while its lifespan
-    # owns the Fleet gRPC server and, when enabled, the gRPC Control API server.
+    # owns the gRPC Fleet and Control API servers when enabled.
     _run_superlink_http_api(lifespan_config=config)
 
 
@@ -491,6 +493,12 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
     log(
         INFO,
         "Starting the SuperLink Control HTTP API on %s:%s.",
+        lifespan_config.host,
+        lifespan_config.port,
+    )
+    log(
+        INFO,
+        "Starting the SuperLink Fleet HTTP API on %s:%s.",
         lifespan_config.host,
         lifespan_config.port,
     )
