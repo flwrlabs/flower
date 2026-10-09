@@ -1,6 +1,6 @@
-:og:description: Explore Flower Endeavor 1.0, a language model for reasoning, coding, and agent workflows, with managed API access and private deployment.
 .. meta::
     :description: Explore Flower Endeavor 1.0, a language model for reasoning, coding, and agent workflows, with managed API access and private deployment.
+    :property=og:description: Explore Flower Endeavor 1.0, a language model for reasoning, coding, and agent workflows, with managed API access and private deployment.
 
 Endeavor 1.0
 ============

@@ -1,6 +1,6 @@
-:og:description: Set your Flower API key for Endeavor in Codex and OpenCode CLI and Desktop apps on macOS.
 .. meta::
     :description: Set your Flower API key for Endeavor in Codex and OpenCode CLI and Desktop apps on macOS.
+    :property=og:description: Set your Flower API key for Endeavor in Codex and OpenCode CLI and Desktop apps on macOS.
 
 Set your Flower API key
 =======================
