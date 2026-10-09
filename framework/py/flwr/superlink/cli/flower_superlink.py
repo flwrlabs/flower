@@ -39,6 +39,7 @@ from flwr.common.constant import (
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
     FLWR_INTERNAL_GRPC_CONTROL_API,
+    FLWR_INTERNAL_GRPC_FLEET_API,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
@@ -138,7 +139,8 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
         if os.getenv(FLWR_INTERNAL_GRPC_CONTROL_API) == "1":
             self._start_control_api()
-        self._start_fleet_api()
+        if os.getenv(FLWR_INTERNAL_GRPC_FLEET_API) == "1":
+            self._start_fleet_api()
         self._start_superexec_if_needed()
         self._start_health_server_if_needed()
         self._started = True
@@ -297,6 +299,19 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         log(
             WARN,
             "The `--control-api-address` argument is deprecated. The Control API "
+            "now operates over HTTP. Use `--host` and `--port` instead.",
+        )
+
+    if "--fleet-api-type" in explicit_args:
+        log(
+            WARN,
+            "The `--fleet-api-type` argument is deprecated. The Fleet API now "
+            "operates over HTTP.",
+        )
+    if "--fleet-api-address" in explicit_args:
+        log(
+            WARN,
+            "The `--fleet-api-address` argument is deprecated. The Fleet API "
             "now operates over HTTP. Use `--host` and `--port` instead.",
         )
 
@@ -459,7 +474,7 @@ def flower_superlink() -> None:
     event(EventType.RUN_SUPERLINK_ENTER)
 
     # Blocking: FastAPI serves the Runtime and Control HTTP APIs while its lifespan
-    # owns the Fleet gRPC server and, when enabled, the gRPC Control API server.
+    # owns the gRPC Fleet and Control API servers when enabled.
     _run_superlink_http_api(lifespan_config=config)
 
 
@@ -491,6 +506,12 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
     log(
         INFO,
         "Starting the SuperLink Control HTTP API on %s:%s.",
+        lifespan_config.host,
+        lifespan_config.port,
+    )
+    log(
+        INFO,
+        "Starting the SuperLink Fleet HTTP API on %s:%s.",
         lifespan_config.host,
         lifespan_config.port,
     )
@@ -822,11 +843,11 @@ def _add_args_fleet_api(parser: argparse.ArgumentParser) -> None:
             TRANSPORT_TYPE_GRPC_RERE,
             TRANSPORT_TYPE_GRPC_ADAPTER,
         ],
-        help="Start a Fleet API server.",
+        help="Deprecated. The Fleet API now operates over HTTP.",
     )
     parser.add_argument(
         "--fleet-api-address",
-        help="Fleet API server address (IPv4, IPv6, or a domain name).",
+        help="Deprecated. Use `--host` and `--port` for the Fleet HTTP API.",
     )
 
 
