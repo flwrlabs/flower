@@ -257,9 +257,10 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                     PullTaskInputRequest()
                 )
 
-            self._context = context_from_proto(res.context)
-            run = run_from_proto(res.run)
-            fab = fab_from_proto(res.fab)
+            with self._timing.span("agent.context"):
+                self._context = context_from_proto(res.context)
+                run = run_from_proto(res.run)
+                fab = fab_from_proto(res.fab)
             task_id = res.task_id
             self._timing.run_id = run.run_id
             self._timing.task_id = task_id
@@ -428,6 +429,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             if self._finalized:
                 return
             self._finalized = True
+            self._timing.mark("agent.finalize_enter")
 
             log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
             self._grid._retry_invoker.max_tries = 1
@@ -451,7 +453,8 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 details=details,
             )
             try:
-                self._grid._runtime_client.PushTaskOutput(pushoutput_req)
+                with self._timing.span("agent.push_output"):
+                    self._grid._runtime_client.PushTaskOutput(pushoutput_req)
             except Exception as err:  # pylint: disable=broad-exception-caught
                 log(ERROR, "Failed to push AgentApp task output", exc_info=err)
 
@@ -476,6 +479,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 cleanup_app_runtime_environment(self._runtime_env_dir)
             except Exception as err:  # pylint: disable=broad-exception-caught
                 log(ERROR, "Failed to clean up AgentApp runtime", exc_info=err)
+            self._timing.mark("agent.finalize_end")
 
     def event_details(self, exit_code: int) -> JSONObject:
         """Return the AgentApp leave-event details."""

@@ -346,6 +346,7 @@ async def _stream_response(
         log(ERROR, "Runtime Responses stream failed unexpectedly", exc_info=err)
         yield _stream_error("Internal server error.", "internal_error", sequence_number)
     finally:
+        timing.mark("responses.stream_end", success=complete)
         if exchange is not None and not complete:
             with CancelScope(shield=True):
                 await run_in_threadpool(

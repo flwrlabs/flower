@@ -15,7 +15,8 @@
 """Opt-in, metadata-only DEBUG timings for Agent runs.
 
 Monotonic timestamps belong to one clock domain. Wall timestamps are correlation
-hints only; they must not be used for cross-process latency subtraction.
+hints only; they must not be used for cross-process latency subtraction. IDs and
+nanosecond values are decimal strings to preserve precision in log consumers.
 """
 
 from __future__ import annotations
@@ -91,18 +92,20 @@ class TimingProbe:  # pylint: disable=too-many-instance-attributes
             "schema": 1,
             "marker": marker,
             "clock_domain": f"{_CLOCK_DOMAIN}:{os.getpid()}",
-            "monotonic_ns": time.monotonic_ns(),
-            "unix_time_ns": time.time_ns(),
-            "run_id": self.run_id,
-            "task_id": self.task_id,
-            "parent_task_id": self.parent_task_id,
+            "monotonic_ns": str(time.monotonic_ns()),
+            "unix_time_ns": str(time.time_ns()),
+            "run_id": str(self.run_id) if self.run_id is not None else None,
+            "task_id": str(self.task_id) if self.task_id is not None else None,
+            "parent_task_id": (
+                str(self.parent_task_id) if self.parent_task_id is not None else None
+            ),
             "task_type": self.task_type,
             "fab_hash": fab_hash,
             "pod_name": self.pod_name,
             "route": self.route,
             "span_id": span_id,
-            "duration_ns": duration_ns,
-            "event_id": event_id,
+            "duration_ns": str(duration_ns) if duration_ns is not None else None,
+            "event_id": str(event_id) if event_id is not None else None,
             "success": success,
         }
         try:

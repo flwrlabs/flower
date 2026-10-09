@@ -157,12 +157,13 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
                 return
             self._retry_invoker.max_tries = 1
             try:
-                self._client.PushTaskOutput(
-                    PushTaskOutputRequest(
-                        sub_status=self._sub_status,
-                        details=self._details,
+                with TimingProbe.for_task().span("model.push_output"):
+                    self._client.PushTaskOutput(
+                        PushTaskOutputRequest(
+                            sub_status=self._sub_status,
+                            details=self._details,
+                        )
                     )
-                )
             except Exception as err:  # pylint: disable=broad-exception-caught
                 log(ERROR, "Failed to push task output", exc_info=err)
 
