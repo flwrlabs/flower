@@ -110,7 +110,7 @@ scp -r datasets/fashionmnist_part_1 <user>@<device-ip>:/path/to/home
 On your development machine, launch the `SuperLink`. You will connnect Flower `SuperNodes` to it in the next step.
 
 ```shell
-flower-superlink --insecure --host 0.0.0.0
+flower-superlink --insecure
 ```
 
 ### Connecting Flower `SuperNodes`
