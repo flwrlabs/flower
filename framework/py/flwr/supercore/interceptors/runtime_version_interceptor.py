@@ -147,6 +147,7 @@ class RuntimeVersionClientInterceptor(
 class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[misc]
     """Observe Flower runtime version metadata on inbound unary RPCs."""
 
+    # pylint: disable-next=too-many-arguments
     def __init__(
         self,
         *,
@@ -154,11 +155,13 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
         local_metadata: RuntimeVersionMetadata,
         send_warning_metadata: bool = True,
         reject_incompatible: bool = False,
+        warning_message: str | None = None,
     ) -> None:
         self._connection_name = connection_name
         self._local_metadata = local_metadata
         self._send_warning_metadata = send_warning_metadata
         self._reject_incompatible = reject_incompatible
+        self._warning_message = warning_message
 
     def intercept_service(
         self,
@@ -181,9 +184,12 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
 
         # Prepare trailing metadata
         trailing_metadata: tuple[tuple[str, str], ...] = ()
+        warning_message = self._warning_message or ""
         if incompat_details and self._send_warning_metadata:
-            trailing_metadata += (
-                (VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, incompat_details),
+            warning_message = f"{warning_message} {incompat_details}".strip()
+        if warning_message:
+            trailing_metadata = (
+                (VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, warning_message),
             )
 
         def maybe_reject(context: grpc.ServicerContext) -> None:
@@ -258,10 +264,15 @@ def create_control_runtime_version_server_interceptor(
     send_warning_metadata: bool = False,
     reject_incompatible: bool = False,
 ) -> RuntimeVersionServerInterceptor:
-    """Create the default runtime version interceptor for Control API."""
+    """Create the Control API interceptor with a gRPC deprecation warning."""
     return RuntimeVersionServerInterceptor(
         connection_name=connection_name,
         local_metadata=RuntimeVersionMetadata.from_local_component("SuperLink"),
         send_warning_metadata=send_warning_metadata,
         reject_incompatible=reject_incompatible,
+        warning_message=(
+            "The gRPC Control API is deprecated and may be removed soon. "
+            "Please upgrade to Flower 1.37.0 or newer to use the HTTP "
+            "Control API."
+        ),
     )

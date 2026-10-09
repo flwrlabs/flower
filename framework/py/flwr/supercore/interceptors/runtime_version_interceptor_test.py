@@ -403,18 +403,20 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_not_called()
 
-    def test_control_factory_observes_by_default(self) -> None:
-        """Control factory should not return warning metadata by default."""
+    def test_control_factory_warns_about_grpc_deprecation(self) -> None:
+        """Control calls receive a deprecation warning even without peer metadata."""
         self.interceptor = create_control_runtime_version_server_interceptor()
-        intercepted = self._intercept(
-            "/flwr.proto.Control/ListRuns",
-            _make_runtime_metadata("1.30.1"),
-        )
+        intercepted = self._intercept("/flwr.proto.Control/ListRuns", ())
 
         context = Mock()
         response = intercepted.unary_unary(GetNodesRequest(), context)
         self.assertEqual(response, "ok")
-        context.set_trailing_metadata.assert_not_called()
+        context.set_trailing_metadata.assert_called_once()
+        warning = dict(context.set_trailing_metadata.call_args.args[0])[
+            VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
+        ]
+        self.assertIn("deprecated", warning)
+        self.assertIn("upgrade", warning)
 
     def test_compatible_metadata_is_accepted(self) -> None:
         """Compatible peer version should not set trailing metadata for unary
