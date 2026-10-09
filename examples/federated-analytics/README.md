@@ -130,7 +130,7 @@ SuperLink connections are defined in the [Flower Configuration](https://flower.a
 
 ```toml
 [superlink.local-deployment]
-address = "127.0.0.1:9093"
+address = "127.0.0.1:8000"
 insecure = true
 ```
 

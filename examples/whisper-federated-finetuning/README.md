@@ -247,7 +247,7 @@ First, ensure you have a SuperLink connection defined in your Flower Configurati
 
 ```toml
 [superlink.remote]
-address = '127.0.0.1:9093' # IP:9093 of your superlink (assumed localhost superlink)
+address = '127.0.0.1:8000' # IP:8000 of your superlink (assumed localhost superlink)
 insecure = true # Check the documentation to setup with SSL
 ```
 

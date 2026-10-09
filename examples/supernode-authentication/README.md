@@ -93,7 +93,7 @@ Create a new Superlink connection named `my-connection`:
 
 ```TOML
 [superlink.my-connection]
-address = "127.0.0.1:9093" # Control API of SuperLink
+address = "127.0.0.1:8000" # Control API of SuperLink
 root-certificates = "/abs/path/to/certificates/ca.crt"
 ```
 
