@@ -110,7 +110,7 @@ scp -r datasets/fashionmnist_part_1 <user>@<device-ip>:/path/to/home
 On your development machine, launch the `SuperLink`. You will connnect Flower `SuperNodes` to it in the next step.
 
 ```shell
-flower-superlink --insecure
+flower-superlink --insecure --host 0.0.0.0
 ```
 
 ### Connecting Flower `SuperNodes`
@@ -134,7 +134,7 @@ Now, launch your `SuperNode` pointing it to the dataset you `scp`-ed earlier:
 
 ```shell
 # Repeat for each embedded device (adjust SuperLink IP and dataset-path)
-flower-supernode --insecure --superlink="SUPERLINK_IP:9092" \
+flower-supernode --insecure --superlink="SUPERLINK_IP:8000" \
                  --node-config="dataset-path='path/to/fashionmnist_part_1'"
 ```
 
@@ -162,7 +162,7 @@ Open this configuration file and add a new SuperLink connection at the end:
 
 ```TOML
 [superlink.embedded-federation]
-address = "127.0.0.1:9093" # ControlAPI of your SUPERLINK
+address = "127.0.0.1:8000" # ControlAPI of your SUPERLINK
 insecure = true
 ```
 

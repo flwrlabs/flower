@@ -69,7 +69,7 @@ Open your terminal and run:
     :substitutions:
 
     $ docker run --rm \
-          -p 8000:8000 -p 9092:9092 \
+          -p 8000:8000 \
           --network flwr-network \
           --name superlink \
           --detach \
@@ -83,10 +83,9 @@ Open your terminal and run:
 
     * ``docker run``: This tells Docker to run a container from an image.
     * ``--rm``: Remove the container once it is stopped or the command exits.
-    * ``-p 8000:8000 -p 9092:9092``: Map ports ``8000`` and ``9092`` of the
-      container to the same port of the host machine, allowing other services to access the
-      Runtime and Control APIs on ``http://localhost:8000`` and the Fleet API on
-      ``localhost:9092``.
+    * ``-p 8000:8000``: Map port ``8000`` of the container to the same port of the host
+      machine, allowing other services to access the Runtime, Control, and Fleet APIs
+      on ``http://localhost:8000``.
     * ``--network flwr-network``: Make the container join the network named ``flwr-network``.
     * ``--name superlink``: Assign the name ``superlink`` to the container.
     * ``--detach``: Run the container in the background, freeing up the terminal.
@@ -94,8 +93,8 @@ Open your terminal and run:
       tag of the image. The tag :substitution-code:`|stable_flwr_version|` represents a :doc:`specific version <pin-version>` of the image.
     * ``--insecure``: This flag tells the container to operate in an insecure mode, allowing
       unencrypted communication.
-    * ``--host 0.0.0.0``: Make the Runtime and Control HTTP APIs reachable outside the
-      container.
+    * ``--host 0.0.0.0``: Make the Runtime, Control, and Fleet HTTP APIs reachable
+      outside the container.
     * ``--isolation process``: Tells the SuperLink that the ServerApp is executed by separate
       independent process. The SuperLink does not attempt to execute it. You can learn more about
       the different process modes here: :doc:`run-as-subprocess`.
@@ -118,7 +117,7 @@ Start two SuperNode containers.
            --detach \
            flwr/supernode:|stable_flwr_version|  \
            --insecure \
-           --superlink superlink:9092 \
+           --superlink superlink:8000 \
            --node-config "partition-id=0 num-partitions=2" \
            --host 0.0.0.0 \
            --port 9094 \
@@ -138,8 +137,8 @@ Start two SuperNode containers.
          image to be run and the specific tag of the image.
        * ``--insecure``: This flag tells the container to operate in an insecure mode, allowing
          unencrypted communication.
-       * ``--superlink superlink:9092``: Connect to the SuperLink's Fleet API at the address
-         ``superlink:9092``.
+       * ``--superlink superlink:8000``: Connect to the SuperLink's Fleet API at the address
+         ``superlink:8000``.
        * ``--node-config "partition-id=0 num-partitions=2"``: Set the partition ID to ``0`` and the
          number of partitions to ``2`` for the SuperNode configuration.
        * ``--host 0.0.0.0``: Make the SuperNode Runtime API accessible outside the container.
@@ -161,7 +160,7 @@ Start two SuperNode containers.
            --detach \
            flwr/supernode:|stable_flwr_version|  \
            --insecure \
-           --superlink superlink:9092 \
+           --superlink superlink:8000 \
            --node-config "partition-id=1 num-partitions=2" \
            --host 0.0.0.0 \
            --port 9095 \

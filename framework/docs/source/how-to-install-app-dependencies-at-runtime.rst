@@ -73,7 +73,7 @@ prototyping:
     :emphasize-lines: 4
 
     $ flower-supernode \
-        --superlink 127.0.0.1:9092 \
+        --superlink 127.0.0.1:8000 \
         --insecure \
         --allow-runtime-dependency-installation
 

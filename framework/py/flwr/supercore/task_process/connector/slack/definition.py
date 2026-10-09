@@ -21,17 +21,21 @@ from .executors import EXECUTORS
 
 SLACK_CONNECTOR_REF = "slack"
 SLACK_USER_SCOPES = (
-    "search:read",
+    "search:read.public",
+    "search:read.private",
+    "search:read.mpim",
+    "search:read.im",
+    "search:read.files",
+    "files:read",
+    "channels:history",
+    "groups:history",
+    "mpim:history",
+    "im:history",
     "channels:read",
     "groups:read",
     "im:read",
     "mpim:read",
-    "channels:history",
-    "groups:history",
-    "im:history",
-    "mpim:history",
 )
-
 PROVIDER = ProviderDefinition(
     ref=SLACK_CONNECTOR_REF,
     display_name="Slack",
@@ -48,6 +52,7 @@ PROVIDER = ProviderDefinition(
         scope_separator=",",
         token_response_path=("authed_user",),
         success_field="ok",
+        config_fields=("id", "scope"),
         display_name_fields=("team", "user"),
         display_name_url="https://slack.com/api/auth.test",
         display_name_method="POST",
