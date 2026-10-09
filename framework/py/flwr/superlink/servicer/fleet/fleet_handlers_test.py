@@ -17,18 +17,52 @@
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from flwr.app import Metadata, RecordDict
 from flwr.app.message import make_message
 from flwr.common.serde import message_to_proto
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
+    ActivateNodeRequest,
     PullMessagesRequest,
     PushMessagesRequest,
+    RegisterNodeFleetRequest,
 )
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 
-from .message_handler import pull_messages, push_messages
+from .fleet_handlers import activate_node, pull_messages, push_messages, register_node
+
+
+def test_register_node_auth_error_is_transport_independent() -> None:
+    """The handler rejects registration before touching state when auth is enabled."""
+    state = MagicMock()
+
+    with pytest.raises(FlowerError) as exc_info:
+        register_node(
+            RegisterNodeFleetRequest(public_key=b"node"),
+            state,
+            enable_supernode_auth=True,
+        )
+
+    assert exc_info.value.code == ApiErrorCode.FLEET_SUPERNODE_REGISTRATION_DISABLED
+    state.create_node.assert_not_called()
+
+
+def test_activate_node_maps_interval_error_without_grpc() -> None:
+    """The handler raises the same Flower error without a gRPC servicer."""
+    state = MagicMock()
+    state.get_node_id_by_public_key.return_value = 123
+
+    with pytest.raises(FlowerError) as exc_info:
+        activate_node(
+            ActivateNodeRequest(public_key=b"node", heartbeat_interval=1), state
+        )
+
+    assert exc_info.value.code == ApiErrorCode.FLEET_INVALID_HEARTBEAT_INTERVAL
+    state.activate_node.assert_not_called()
 
 
 def test_pull_messages() -> None:

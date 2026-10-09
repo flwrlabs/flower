@@ -41,7 +41,7 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
 from flwr.supercore.dependencies.runtime import get_runtime_state, get_task
-from flwr.supercore.dependencies.runtime_version import RuntimeVersionDependency
+from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import (
@@ -73,7 +73,7 @@ def _create_app(
         router,
         dependencies=[
             Depends(
-                RuntimeVersionDependency(
+                VersionDependency(
                     component_name="SuperLink",
                     connection_name="Caller <-> SuperLink Runtime API",
                 )

@@ -22,13 +22,13 @@ case "$2" in
       server_auth='--enable-supernode-auth'
       client_auth_1='--auth-supernode-private-key ../keys/client_credentials_1'
       client_auth_2='--auth-supernode-private-key ../keys/client_credentials_2'
-      server_address='127.0.0.1:9092'
+      server_address='127.0.0.1:8000'
       ;;
     *)
     server_auth=''
     client_auth_1=''
     client_auth_2=''
-    server_address='127.0.0.1:9092'
+    server_address='127.0.0.1:8000'
     ;;
 esac
 

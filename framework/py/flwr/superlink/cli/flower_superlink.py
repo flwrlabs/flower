@@ -39,13 +39,12 @@ from flwr.common.constant import (
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
     FLWR_INTERNAL_GRPC_CONTROL_API,
+    FLWR_INTERNAL_GRPC_FLEET_API,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
-    EventLogWriterType,
 )
-from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
     add_FleetServicer_to_server,
 )
@@ -90,15 +89,12 @@ from flwr.superlink.config_loader import (
     SuperLinkLifespanConfig,
     load_control_authn_plugin,
     load_control_event_log_plugin,
+    load_fleet_event_log_plugin,
 )
 from flwr.superlink.servicer.control import run_control_api_grpc
 
 try:
-    from flwr.ee import (
-        add_ee_args_superlink,
-        get_ee_artifact_provider,
-        get_fleet_event_log_writer_plugins,
-    )
+    from flwr.ee import add_ee_args_superlink, get_ee_artifact_provider
 except ImportError:
 
     # pylint: disable-next=unused-argument
@@ -108,12 +104,6 @@ except ImportError:
     def get_ee_artifact_provider(config_path: str) -> ArtifactProvider:
         """Return the EE artifact provider."""
         raise NotImplementedError("No artifact provider is currently supported.")
-
-    def get_fleet_event_log_writer_plugins() -> dict[str, type[EventLogWriterPlugin]]:
-        """Return all Fleet API event log writer plugins."""
-        raise NotImplementedError(
-            "No event log writer plugins are currently supported."
-        )
 
 
 class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
@@ -149,7 +139,8 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
         if os.getenv(FLWR_INTERNAL_GRPC_CONTROL_API) == "1":
             self._start_control_api()
-        self._start_fleet_api()
+        if os.getenv(FLWR_INTERNAL_GRPC_FLEET_API) == "1":
+            self._start_fleet_api()
         self._start_superexec_if_needed()
         self._start_health_server_if_needed()
         self._started = True
@@ -229,7 +220,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         """Start the current Fleet gRPC request-response API."""
         interceptors = [NodeAuthServerInterceptor(self.state_factory)]
         if self.config.enable_event_log:
-            fleet_log_plugin = _try_obtain_fleet_event_log_writer_plugin()
+            fleet_log_plugin = self.config.fleet_event_log_plugin
             if fleet_log_plugin is not None:
                 interceptors.append(FleetEventLogInterceptor(fleet_log_plugin))
                 log(INFO, "Flower Fleet event logging enabled")
@@ -311,6 +302,19 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
             "now operates over HTTP. Use `--host` and `--port` instead.",
         )
 
+    if "--fleet-api-type" in explicit_args:
+        log(
+            WARN,
+            "The `--fleet-api-type` argument is deprecated. The Fleet API now "
+            "operates over HTTP.",
+        )
+    if "--fleet-api-address" in explicit_args:
+        log(
+            WARN,
+            "The `--fleet-api-address` argument is deprecated. The Fleet API "
+            "now operates over HTTP. Use `--host` and `--port` instead.",
+        )
+
     # Parse IP addresses
     control_address, _, _ = _format_address(args.control_api_address)
     health_server_address = None
@@ -350,6 +354,11 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
     authn_plugin = load_control_authn_plugin()
     event_log_plugin = (
         load_control_event_log_plugin()
+        if getattr(args, "enable_event_log", False)
+        else None
+    )
+    fleet_event_log_plugin = (
+        load_fleet_event_log_plugin()
         if getattr(args, "enable_event_log", False)
         else None
     )
@@ -426,6 +435,7 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         superexec_auth_secret=superexec_auth_secret,
         authn_plugin=authn_plugin,
         event_log_plugin=event_log_plugin,
+        fleet_event_log_plugin=fleet_event_log_plugin,
         enable_event_log=getattr(args, "enable_event_log", False),
         artifact_provider=artifact_provider,
         enable_supernode_auth=enable_supernode_auth,
@@ -464,7 +474,7 @@ def flower_superlink() -> None:
     event(EventType.RUN_SUPERLINK_ENTER)
 
     # Blocking: FastAPI serves the Runtime and Control HTTP APIs while its lifespan
-    # owns the Fleet gRPC server and, when enabled, the gRPC Control API server.
+    # owns the gRPC Fleet and Control API servers when enabled.
     _run_superlink_http_api(lifespan_config=config)
 
 
@@ -496,6 +506,12 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
     log(
         INFO,
         "Starting the SuperLink Control HTTP API on %s:%s.",
+        lifespan_config.host,
+        lifespan_config.port,
+    )
+    log(
+        INFO,
+        "Starting the SuperLink Fleet HTTP API on %s:%s.",
         lifespan_config.host,
         lifespan_config.port,
     )
@@ -555,20 +571,6 @@ def _get_superexec_command(
 def _runtime_dependency_install_default() -> bool:
     """Return default runtime dependency installation setting."""
     return os.getenv(FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION) != "1"
-
-
-def _try_obtain_fleet_event_log_writer_plugin() -> EventLogWriterPlugin | None:
-    """Return an instance of the Fleet Servicer event log writer plugin."""
-    try:
-        all_plugins: dict[str, type[EventLogWriterPlugin]] = (
-            get_fleet_event_log_writer_plugins()
-        )
-        plugin_class = all_plugins[EventLogWriterType.STDOUT]
-        return plugin_class()
-    except KeyError:
-        sys.exit("No Fleet API event log writer plugin is provided.")
-    except NotImplementedError:
-        sys.exit("No Fleet API event log writer plugins are currently supported.")
 
 
 def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
@@ -841,11 +843,11 @@ def _add_args_fleet_api(parser: argparse.ArgumentParser) -> None:
             TRANSPORT_TYPE_GRPC_RERE,
             TRANSPORT_TYPE_GRPC_ADAPTER,
         ],
-        help="Start a Fleet API server.",
+        help="Deprecated. The Fleet API now operates over HTTP.",
     )
     parser.add_argument(
         "--fleet-api-address",
-        help="Fleet API server address (IPv4, IPv6, or a domain name).",
+        help="Deprecated. Use `--host` and `--port` for the Fleet HTTP API.",
     )
 
 

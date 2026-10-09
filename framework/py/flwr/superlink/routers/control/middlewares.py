@@ -82,7 +82,9 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         """Write events before and after a Control handler call."""
-        if _is_control_sensitive_route(request):
+        if not _is_control_path(request.url.path) or _is_control_sensitive_route(
+            request
+        ):
             return await call_next(request)
 
         # Event logging is optional and only applies after the translation middleware

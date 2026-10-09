@@ -169,6 +169,25 @@ def get_block_children(
     )
 
 
+def query_meeting_notes(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """Query meeting notes available to the Notion connection."""
+    body: JSONObject = {}
+    if "filter" in arguments:
+        body["filter"] = _meeting_notes_filter(arguments["filter"])
+    return _call_notion_api(
+        "POST", "/blocks/meeting_notes/query", context.credentials, body=body
+    )
+
+
+def _meeting_notes_filter(value: object) -> JSONObject:
+    """Require a meeting-notes filter object and let Notion validate its DSL."""
+    if not isinstance(value, dict):
+        raise ValueError("Notion meeting-notes filter must be an object.")
+    return cast(JSONObject, value)
+
+
 def list_users(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
     """List workspace users."""
     params: dict[str, str] = {}
@@ -205,6 +224,7 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
     "get_database": get_database,
     "get_block": get_block,
     "get_block_children": get_block_children,
+    "query_meeting_notes": query_meeting_notes,
     "list_users": list_users,
     "get_user": get_user,
     "get_self": get_self,
