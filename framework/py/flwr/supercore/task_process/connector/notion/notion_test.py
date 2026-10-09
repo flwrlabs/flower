@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for the Notion connector."""
 
+from typing import cast
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
 
@@ -33,9 +34,39 @@ _OAUTH_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
 _CREDENTIALS: JSONObject = {"access_token": "ntn-secret"}
 
 
+def _meeting_note_operator_enums(property_filter: JSONObject) -> set[str]:
+    """Collect comparison operators from a meeting-note property schema."""
+    operator_enums: set[str] = set()
+    option_properties = cast(JSONObject, property_filter["properties"])
+    comparison_schema = cast(JSONObject, option_properties["filter"])
+    for comparison in cast(list[JSONObject], comparison_schema["anyOf"]):
+        comparison_properties = cast(JSONObject, comparison["properties"])
+        operator = cast(JSONObject, comparison_properties["operator"])
+        operator_enums.update(cast(list[str], operator["enum"]))
+        if operator["enum"] == ["is_empty", "is_not_empty"]:
+            assert "value" not in comparison_properties
+        else:
+            assert "value" in comparison_properties
+    return operator_enums
+
+
+def _nested_meeting_note_filter_items(
+    root_combinator: JSONObject, property_filter: JSONObject
+) -> JSONObject:
+    """Return the item schema inside the nested meeting-note combinator."""
+    root_properties = cast(JSONObject, root_combinator["properties"])
+    root_filters = cast(JSONObject, root_properties["filters"])
+    root_items = cast(JSONObject, root_filters["items"])
+    item_options = cast(list[JSONObject], root_items["anyOf"])
+    assert item_options[0] == property_filter
+    nested_properties = cast(JSONObject, item_options[1]["properties"])
+    nested_filters = cast(JSONObject, nested_properties["filters"])
+    return cast(JSONObject, nested_filters["items"])
+
+
 def test_notion_definition_is_registered() -> None:
     """Notion schemas and executors should form one federation-scoped connector."""
-    assert len(ACTIONS) == 9
+    assert len(ACTIONS) == 10
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     assert [
         tool["name"] for tool in registry.get_connector_tools(NOTION_CONNECTOR_REF)
@@ -46,6 +77,7 @@ def test_notion_definition_is_registered() -> None:
         "notion_get_database",
         "notion_get_block",
         "notion_get_block_children",
+        "notion_query_meeting_notes",
         "notion_list_users",
         "notion_get_user",
         "notion_get_self",
@@ -287,6 +319,67 @@ def test_notion_get_block_children_forwards_pagination() -> None:
         "page_size": "50",
         "start_cursor": "cursor-1",
     }
+
+
+def test_notion_query_meeting_notes_forwards_inputs() -> None:
+    """Query meeting notes should forward the filter."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"results": [], "has_more": False}
+    filter_: JSONObject = {
+        "property": "title",
+        "filter": {
+            "operator": "string_contains",
+            "value": {"type": "exact", "value": "standup"},
+        },
+    }
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            "notion_query_meeting_notes",
+            {"filter": filter_},
+            Mock(),
+            credentials=_CREDENTIALS,
+            config={},
+        )
+    assert result == response.json.return_value
+    assert request.call_args.args == (
+        "POST",
+        "https://api.notion.com/v1/blocks/meeting_notes/query",
+    )
+    assert request.call_args.kwargs["json"] == {"filter": filter_}
+
+
+def test_notion_meeting_note_filter_schema_is_explicit() -> None:
+    """Meeting-note tools should describe comparisons and one-level nesting."""
+    action = next(action for action in ACTIONS if action.name == "query_meeting_notes")
+    assert action.input_schema["additionalProperties"] == {}
+    properties = cast(JSONObject, action.input_schema["properties"])
+    filter_schema = cast(JSONObject, properties["filter"])
+    root_options = cast(list[JSONObject], filter_schema["anyOf"])
+    property_filter, root_combinator = root_options
+
+    assert _meeting_note_operator_enums(property_filter) == {
+        "string_is",
+        "string_is_not",
+        "string_contains",
+        "string_does_not_contain",
+        "string_starts_with",
+        "string_ends_with",
+        "person_contains",
+        "person_does_not_contain",
+        "date_is",
+        "date_is_before",
+        "date_is_after",
+        "date_is_on_or_before",
+        "date_is_on_or_after",
+        "date_is_within",
+        "date_is_relative_to",
+        "is_empty",
+        "is_not_empty",
+    }
+    assert (
+        _nested_meeting_note_filter_items(root_combinator, property_filter)
+        == property_filter
+    )
 
 
 def test_notion_list_users_forwards_pagination() -> None:

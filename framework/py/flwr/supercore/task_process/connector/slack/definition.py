@@ -52,6 +52,7 @@ PROVIDER = ProviderDefinition(
         scope_separator=",",
         token_response_path=("authed_user",),
         success_field="ok",
+        config_fields=("id", "scope"),
         display_name_fields=("team", "user"),
         display_name_url="https://slack.com/api/auth.test",
         display_name_method="POST",
