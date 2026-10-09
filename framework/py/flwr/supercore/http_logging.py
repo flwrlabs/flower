@@ -23,6 +23,12 @@ from uvicorn.logging import AccessFormatter, DefaultFormatter
 ROUTINE_ACCESS_PATHS = frozenset(
     {
         "/health",
+        "/v1/fleet/confirm-message-received",
+        "/v1/fleet/pull-messages",
+        "/v1/fleet/pull-object",
+        "/v1/fleet/push-messages",
+        "/v1/fleet/push-object",
+        "/v1/fleet/send-node-heartbeat",
         "/v1/runtime/get-nodes",
         "/v1/runtime/acquire-task",
         "/v1/runtime/pull-pending-tasks",

@@ -118,7 +118,7 @@ certificates for the SuperNode's Runtime API.
         --ssl-ca-certfile certificates/ca.crt \
         --ssl-certfile certificates/server.pem \
         --ssl-keyfile certificates/server.key \
-        --superlink 127.0.0.1:9092 \
+        --superlink 127.0.0.1:8000 \
         --host 127.0.0.1 \
         --port 9094 \
         --node-config="partition-id=0 num-partitions=2"
@@ -144,7 +144,7 @@ to launch the second SuperNode.
         --ssl-ca-certfile certificates/ca.crt \
         --ssl-certfile certificates/server.pem \
         --ssl-keyfile certificates/server.key \
-        --superlink 127.0.0.1:9092 \
+        --superlink 127.0.0.1:8000 \
         --host 127.0.0.1 \
         --port 9095 \
         --node-config="partition-id=1 num-partitions=2"
