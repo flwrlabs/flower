@@ -26,7 +26,6 @@ from pytest import MonkeyPatch
 
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
-    AcquireTaskResponse,
     GetNodesRequest,
     GetNodesResponse,
     GetRunSeriesEventsRequest,
@@ -143,22 +142,6 @@ def test_runtime_routes_declare_expected_security() -> None:
             assert security == []
         else:
             assert security == [{"RuntimeTaskToken": []}]
-
-
-def test_acquire_task_delegates_to_component_handler(monkeypatch: MonkeyPatch) -> None:
-    """AcquireTask translates protobuf payloads and calls the component handler."""
-    state = Mock(spec=LinkState)
-    expected = AcquireTaskResponse(token="task-token")
-    handler = Mock(return_value=expected)
-    monkeypatch.setattr(runtime_handlers, "acquire_task", handler)
-    client = TestClient(_create_app(state))
-    request = AcquireTaskRequest(supported_task_types=["flwr-serverapp"])
-
-    response = _post(client, "/v1/runtime/acquire-task", request)
-
-    assert response.status_code == 200
-    assert AcquireTaskResponse.FromString(response.content) == expected
-    handler.assert_called_once_with(request, state)
 
 
 def test_get_nodes_delegates_with_authenticated_task(

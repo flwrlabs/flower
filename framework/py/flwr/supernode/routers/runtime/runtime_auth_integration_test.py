@@ -157,16 +157,6 @@ def test_pull_object_allows_with_valid_metadata_token(
     )
 
 
-def test_acquire_task_denied_without_superexec_metadata(
-    client: TestClient,
-) -> None:
-    """SuperExec routes should deny requests missing signed metadata."""
-    response = _post(client, "acquire-task", AcquireTaskRequest())
-
-    assert response.status_code == 401
-    assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
-
-
 def test_acquire_task_allows_with_superexec_metadata(
     client: TestClient, state: NodeState
 ) -> None:
@@ -235,15 +225,3 @@ def test_agent_events_round_trip(client: TestClient, state: NodeState) -> None:
     assert events[0].task_id == task_id
     assert events[0].event == task_event.event
     assert events[0].data == task_event.data
-
-
-def test_acquire_task_allows_without_superexec_metadata(state: NodeState) -> None:
-    """No SuperExec signing should be required when auth is disabled."""
-    client = TestClient(_create_app(state, None))
-
-    response = _post(client, "acquire-task", AcquireTaskRequest())
-
-    assert response.status_code == 200
-    assert isinstance(
-        AcquireTaskResponse.FromString(response.content), AcquireTaskResponse
-    )

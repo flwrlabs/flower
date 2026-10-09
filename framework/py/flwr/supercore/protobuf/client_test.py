@@ -44,7 +44,7 @@ from .client import ProtobufCall, ProtobufClient, ProtobufRequestContext
 
 _PATH = "/v1/runtime/acquire-task"
 _METHOD = "/flwr.proto.Runtime/AcquireTask"
-_REQUEST = AcquireTaskRequest(supported_task_types=["task-type-123"])
+_REQUEST = AcquireTaskRequest(supported_task_types=["flwr-agentapp"])
 _RESPONSE = AcquireTaskResponse(token="task-token")
 
 

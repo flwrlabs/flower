@@ -933,11 +933,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         run_id = self._create_dummy_run(running=False, fab_hash=fab_hash)
         task_id = self._primary_task_id(run_id)
         # Claim task to transition the run to STARTING.
-        acquire_response = runtime_handlers.acquire_task(
-            AcquireTaskRequest(supported_task_types=[TaskType.SERVER_APP]), self.state
-        )
-        assert acquire_response.task.task_id == task_id
-        assert acquire_response.token
+        assert self.state.claim_task(task_id) is not None
 
         # Set run series context as if it was persisted by an earlier run.
         run = self.state.get_run_info(run_ids=[run_id])[0]

@@ -62,9 +62,9 @@ class TestSuperExecAuthPrimitives(TestCase):
 
     def test_compute_request_body_sha256_is_deterministic(self) -> None:
         """Body SHA256 should be deterministic for equivalent request payloads."""
-        req_a = AcquireTaskRequest(supported_task_types=["task-type-11"])
-        req_b = AcquireTaskRequest(supported_task_types=["task-type-11"])
-        req_c = AcquireTaskRequest(supported_task_types=["task-type-12"])
+        req_a = AcquireTaskRequest(supported_task_types=["flwr-agentapp"])
+        req_b = AcquireTaskRequest(supported_task_types=["flwr-agentapp"])
+        req_c = AcquireTaskRequest(supported_task_types=["flwr-clientapp"])
 
         hash_a = compute_request_body_sha256(req_a)
         hash_b = compute_request_body_sha256(req_b)
@@ -107,7 +107,7 @@ class TestVerifySuperExecRequest(TestCase):
 
     def setUp(self) -> None:
         """Create valid authentication fields."""
-        self.request = AcquireTaskRequest(supported_task_types=["task-type-11"])
+        self.request = AcquireTaskRequest(supported_task_types=["flwr-agentapp"])
         self.auth_secret = derive_auth_secret(b"master-secret")
         self.body_sha256 = compute_request_body_sha256(self.request)
         self.signature = compute_superexec_signature(

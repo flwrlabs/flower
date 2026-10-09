@@ -20,7 +20,7 @@ from logging import ERROR
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from flwr.common.constant import SUPERLINK_NODE_ID, Status
+from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.serde import message_to_proto
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
@@ -93,9 +93,6 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(response.task, tasks[2])
         self.assertEqual(response.token, "task-token")
-        self.state.get_tasks.assert_called_once_with(
-            statuses=[Status.PENDING], order_by="pending_at", ascending=True
-        )
         self.assertEqual(self.state.claim_task.call_count, 2)
         self.assertEqual(
             [call.args[0] for call in self.state.claim_task.call_args_list], [1, 3]

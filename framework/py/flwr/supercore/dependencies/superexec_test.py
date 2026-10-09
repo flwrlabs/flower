@@ -61,7 +61,7 @@ def _make_request(
             "app": app,
         }
     )
-    protobuf_request = AcquireTaskRequest(supported_task_types=["task-type-11"])
+    protobuf_request = AcquireTaskRequest(supported_task_types=["flwr-agentapp"])
     request.state.protobuf_request = protobuf_request
     return request, protobuf_request
 
