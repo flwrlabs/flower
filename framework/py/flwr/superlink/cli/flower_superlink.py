@@ -302,6 +302,19 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
             "now operates over HTTP. Use `--host` and `--port` instead.",
         )
 
+    if "--fleet-api-type" in explicit_args:
+        log(
+            WARN,
+            "The `--fleet-api-type` argument is deprecated. The Fleet API now "
+            "operates over HTTP.",
+        )
+    if "--fleet-api-address" in explicit_args:
+        log(
+            WARN,
+            "The `--fleet-api-address` argument is deprecated. The Fleet API "
+            "now operates over HTTP. Use `--host` and `--port` instead.",
+        )
+
     # Parse IP addresses
     control_address, _, _ = _format_address(args.control_api_address)
     health_server_address = None
@@ -830,11 +843,11 @@ def _add_args_fleet_api(parser: argparse.ArgumentParser) -> None:
             TRANSPORT_TYPE_GRPC_RERE,
             TRANSPORT_TYPE_GRPC_ADAPTER,
         ],
-        help="Start a Fleet API server.",
+        help="Deprecated. The Fleet API now operates over HTTP.",
     )
     parser.add_argument(
         "--fleet-api-address",
-        help="Fleet API server address (IPv4, IPv6, or a domain name).",
+        help="Deprecated. Use `--host` and `--port` for the Fleet HTTP API.",
     )
 
 
