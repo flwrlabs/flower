@@ -106,7 +106,8 @@ In the same terminal, change to your project directory and start Codex:
    codex
 
 Endeavor is selected by default. Send a prompt such as
-``Explain the structure of this project.`` Repeat `Set your Flower API key`_ when starting from a new terminal session.
+``Explain the structure of this project.`` Repeat the instructions in
+`Set your Flower API key`_ when starting from a new terminal session.
 
 ChatGPT/Codex desktop app on macOS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -121,8 +122,9 @@ This makes the key available to apps opened from the Dock. Reopen ChatGPT or
 Codex, start a new local Codex task, and select **Endeavor** in the model
 selector. Send a prompt to begin.
 
-Repeat `Set your Flower API key`_ and the ``launchctl`` command after
-signing out of or restarting macOS. To remove the key from the desktop environment, quit the app and run
+Repeat the instructions in `Set your Flower API key`_ and rerun the
+``launchctl`` command after signing out of or restarting macOS. To remove the
+key from the desktop environment, quit the app and run
 ``launchctl unsetenv FLOWER_API_KEY``.
 
 Get help

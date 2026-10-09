@@ -88,8 +88,9 @@ In the same terminal, change to your project directory and start OpenCode:
 
    opencode --model flower-labs/flwrlabs/endeavor-1.0
 
-Send a prompt such as ``Explain the structure of this project.`` Repeat
-`Set your Flower API key`_ when starting from a new terminal session.
+Send a prompt such as ``Explain the structure of this project.`` Repeat the
+instructions in `Set your Flower API key`_ when starting from a new terminal
+session.
 
 OpenCode Desktop on macOS
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -104,8 +105,9 @@ This makes the key available to apps opened from the Dock. Reopen OpenCode,
 open a local project, start a new session, and select **Endeavor** from
 **Flower Labs** in the model selector. Send a prompt to begin.
 
-Repeat `Set your Flower API key`_ and the ``launchctl`` command after
-signing out of or restarting macOS. To remove the key from the desktop environment, quit OpenCode and run
+Repeat the instructions in `Set your Flower API key`_ and rerun the
+``launchctl`` command after signing out of or restarting macOS. To remove the
+key from the desktop environment, quit OpenCode and run
 ``launchctl unsetenv FLOWER_API_KEY``.
 
 Get help
