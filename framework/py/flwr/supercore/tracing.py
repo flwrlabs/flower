@@ -12,25 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Optional, metadata-only tracing through a private process-local backend.
+"""Optional, metadata-only tracing with no core SDK dependency.
 
-Set ``FLWR_TRACING_ENABLED=1`` in SuperLink, SuperExec and task workers to use
-``flwr.ee.supercore.tracing`` when installed. Core has no tracing SDK or exporter
-dependency. The backend implements ``trace_span``, ``current_traceparent`` and
-``flush_traces`` with the signatures below; flushing must use a bounded timeout.
+Set ``FLWR_TRACING_ENABLED=1`` in services and workers to use the installed
+``flwr.ee.supercore.tracing`` backend. Backend failures do not affect execution.
+Application exceptions retain their type, without exporting messages or bodies.
 
-``run.create`` covers persistent run creation, not the full lifetime of a run.
-Its validated version-00 carrier is stored on the primary task and returned in
-task acquisition and input. Acquisition, dispatch and worker spans can be
-siblings under that creation context. Child model creation restores the
-authenticated task context, so ordinary Responses clients need no extra headers.
-This first slice establishes a shared trace ID rather than exact stack nesting.
-
-Provider milestones record the first output-text delta, terminal completion or
-error once. Reasoning deltas do not count as first text; non-streamed requests
-have no first-text milestone. Caller-selected attributes contain only metadata,
-never request/response bodies, credentials, URLs or exception messages. Backend
-errors are ignored and application exceptions are passed back unchanged.
+Validated version-00 task carriers correlate creation, acquisition, dispatch
+and execution. These spans can be siblings, not an exact nested run lifetime.
+The first output-text delta records ``provider.first_text``, excluding reasoning
+and non-streamed responses. Span end and ERROR status record completion/failure.
+Export is best effort with bounded flushing and metadata-only attributes.
 """
 
 from __future__ import annotations

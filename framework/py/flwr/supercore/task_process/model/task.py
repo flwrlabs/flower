@@ -103,16 +103,11 @@ def handle_task(client: RuntimeHttpClient) -> None:
                 "flwr.parent_task_id": str(request_message.metadata.src_task_id),
             },
         ) as provider_span:
-            try:
-                response = invoke_model_provider(
-                    request_message.payload,
-                    on_stream_event=_buffer_event,
-                    usage_recorder=TaskUsageRecorder(client),
-                )
-            except Exception:
-                provider_span.add_event("provider.error")
-                raise
-            provider_span.add_event("provider.completed")
+            response = invoke_model_provider(
+                request_message.payload,
+                on_stream_event=_buffer_event,
+                usage_recorder=TaskUsageRecorder(client),
+            )
     except Exception as ex:
         response = _make_error_response(ex)
         raise
