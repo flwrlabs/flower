@@ -16,16 +16,16 @@
 
 from ..definition import ConnectorDefinition, OAuth2Definition, ProviderDefinition
 from ..oauth import load_oauth_flow
-from .actions import ACTIONS
-from .executors import EXECUTORS
+from .actions import DISCOVERY_TOOL
+from .executors import discover_tools, execute
 
 GITHUB_CONNECTOR_REF = "github"
 
 PROVIDER = ProviderDefinition(
     ref=GITHUB_CONNECTOR_REF,
     display_name="GitHub",
-    description="Search code and read files in public repositories.",
-    actions=ACTIONS,
+    description="Use GitHub tools available to the connected account.",
+    actions=(),
     oauth=OAuth2Definition(
         authorization_url="https://github.com/login/oauth/authorize",
         token_url="https://github.com/login/oauth/access_token",
@@ -46,8 +46,13 @@ PROVIDER = ProviderDefinition(
     ),
 )
 
-CONNECTOR = ConnectorDefinition.from_provider(
+CONNECTOR = ConnectorDefinition(
+    ref=GITHUB_CONNECTOR_REF,
+    tools=(),
+    executors={DISCOVERY_TOOL: discover_tools},
+    requires_credentials=True,
     provider=PROVIDER,
-    executors=EXECUTORS,
     oauth_flow=load_oauth_flow(PROVIDER),
+    discovery_tool=DISCOVERY_TOOL,
+    dynamic_executor=execute,
 )

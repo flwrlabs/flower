@@ -84,6 +84,9 @@ class TestHandleTask(unittest.TestCase):
         self.connectors_by_tool = (
             registry._CONNECTORS_BY_TOOL  # pylint: disable=protected-access
         )
+        self.connectors_by_ref = (
+            registry._CONNECTORS_BY_REF  # pylint: disable=protected-access
+        )
         self.enterContext(patch.dict(self.connectors_by_tool, clear=True))
 
     def _configure_connector(self, name: str, connector_ref: str | None = None) -> None:
@@ -133,6 +136,54 @@ class TestHandleTask(unittest.TestCase):
         ):
             handle_task(client=self.stub)
 
+        self.provider.assert_not_called()
+
+    def test_dynamic_tool_receives_only_bound_connector_credentials(self) -> None:
+        """Dynamic names should load the same bound credentials as static tools."""
+        name = "github_future_tool"
+        self.pull_connector_request.return_value = _connector_request(name)
+        self.stub.GetConnector.return_value = GetConnectorResponse(
+            connector_ref="github",
+            credentials_json='{"access_token":"github-token"}',
+            config_json='{"account":"selected"}',
+        )
+        self.provider.return_value = {"content": []}
+        connector = ConnectorDefinition(
+            ref="github",
+            tools=(),
+            executors={},
+            requires_credentials=True,
+            dynamic_executor=self.provider,
+        )
+        with patch.dict(self.connectors_by_ref, {"github": connector}):
+            handle_task(client=self.stub)
+        self.stub.GetConnector.assert_called_once_with(GetConnectorRequest())
+        tool_name, arguments, context = self.provider.call_args.args
+        assert tool_name == name
+        assert arguments == {"query": "release notes"}
+        assert context.credentials == {"access_token": "github-token"}
+        assert context.config == {"account": "selected"}
+        assert _pushed_response(self.stub).payload["output"] == {"content": []}
+
+    def test_dynamic_tool_rejects_mismatched_connector_credentials(self) -> None:
+        """Never pass a different provider's tokens to a dynamic executor."""
+        self.pull_connector_request.return_value = _connector_request(
+            "github_future_tool"
+        )
+        connector = ConnectorDefinition(
+            ref="github",
+            tools=(),
+            executors={},
+            requires_credentials=True,
+            dynamic_executor=self.provider,
+        )
+        with (
+            patch.dict(self.connectors_by_ref, {"github": connector}),
+            self.assertRaisesRegex(
+                RuntimeError, "Credential-backed connector execution failed"
+            ),
+        ):
+            handle_task(client=self.stub)
         self.provider.assert_not_called()
 
     def test_does_not_expose_credentials_in_provider_errors(self) -> None:

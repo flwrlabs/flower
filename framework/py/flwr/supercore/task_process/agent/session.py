@@ -20,9 +20,11 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Sequence
+from copy import deepcopy
 from queue import Empty, Queue
 from threading import Lock, Thread
 from typing import cast
+from uuid import uuid4
 
 from google.protobuf.json_format import ParseDict
 
@@ -50,6 +52,7 @@ from flwr.supercore.json_message.connector_message import (
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
+    get_connector_discovery_tool,
     get_connector_ref,
     get_connector_tools,
 )
@@ -208,10 +211,27 @@ class RuntimeAgentConnectors(AgentConnectors):
 
     def __init__(self, agent_runtime: AgentRuntime) -> None:
         self._agent_runtime = agent_runtime
+        self._discovered_tools: dict[str, list[JSONObject]] = {}
 
     def tools(self, names: Sequence[str]) -> list[JSONObject]:
         """Return model-facing tool schemas for the requested connectors."""
-        return [tool for name in names for tool in get_connector_tools(name)]
+        tools: list[JSONObject] = []
+        for name in names:
+            discovery_tool = get_connector_discovery_tool(name)
+            if discovery_tool is None:
+                tools.extend(get_connector_tools(name))
+                continue
+            if name not in self._discovered_tools:
+                discovered = self._agent_runtime.create_connector_response(
+                    name=discovery_tool, call_id=uuid4().hex, arguments={}
+                )
+                if not isinstance(discovered, list) or not all(
+                    isinstance(tool, dict) for tool in discovered
+                ):
+                    raise RuntimeError(f"Connector '{name}' returned invalid tools.")
+                self._discovered_tools[name] = cast(list[JSONObject], discovered)
+            tools.extend(deepcopy(self._discovered_tools[name]))
+        return tools
 
     def call(self, tool_call: JSONObject) -> JSONObject:
         """Execute one model function_call and return a function_call_output item."""

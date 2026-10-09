@@ -114,9 +114,13 @@ class ConnectorExecutionContext:
 
 
 ConnectorExecutor = Callable[[JSONObject, ConnectorExecutionContext], JSONValue]
+DynamicConnectorExecutor = Callable[
+    [str, JSONObject, ConnectorExecutionContext], JSONValue
+]
 
 
 @dataclass(frozen=True)
+# pylint: disable-next=too-many-instance-attributes
 class ConnectorDefinition:
     """Group a connector's identity, tools, execution, and optional authentication."""
 
@@ -126,6 +130,8 @@ class ConnectorDefinition:
     requires_credentials: bool = False
     provider: ProviderDefinition | None = None
     oauth_flow: OAuthFlow | None = None
+    discovery_tool: str | None = None
+    dynamic_executor: DynamicConnectorExecutor | None = None
 
     @classmethod
     def from_provider(
