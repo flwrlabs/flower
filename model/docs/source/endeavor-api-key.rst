@@ -8,12 +8,13 @@ the `Endeavor 1.0 access form <https://flowerlabs.typeform.com/to/jlniHsuy>`_.
 Set the key for CLI use
 -----------------------
 
-In a zsh terminal, run the following, paste your key at the prompt, and press
-Enter:
+These commands work in Bash and zsh. Run ``printf`` and ``read``, paste your
+key at the prompt, and press Enter. Then run ``echo`` and ``export``.
 
-.. code-block:: zsh
+.. code-block:: bash
 
-   read -rs 'FLOWER_API_KEY?Flower API key: '
+   printf 'Flower API key: '
+   read -rs FLOWER_API_KEY
    echo
    export FLOWER_API_KEY
 
@@ -21,19 +22,19 @@ The input is hidden and is not saved in shell history. Keep this terminal
 open and start your client from it. Repeat these commands when starting from
 a new terminal session.
 
-Set the key for desktop use
+Set the key for Desktop use
 ---------------------------
 
-Fully quit your desktop client. On macOS, run the following in the same terminal
-where you set the key:
+Fully quit your desktop client. On macOS, run the following **in the same terminal
+where you set the key**:
 
 .. code-block:: zsh
 
    launchctl setenv FLOWER_API_KEY "$FLOWER_API_KEY"
 
 This makes the key available to apps opened from the Dock. Reopen your client
-after running the command. Repeat the CLI key setup and this command after
-signing out of or restarting macOS.
+after running the command. Set the environment variable again and rerun this
+command after signing out of or restarting macOS.
 
 To remove the key from the desktop environment, quit your client and run:
 
