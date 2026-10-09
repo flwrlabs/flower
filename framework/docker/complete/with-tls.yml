@@ -31,7 +31,7 @@ services:
   supernode-1:
     command:
       - --superlink
-      - superlink:9092
+      - superlink:8000
       - --host
       - 0.0.0.0
       - --port
@@ -49,7 +49,7 @@ services:
   supernode-2:
     command:
       - --superlink
-      - superlink:9092
+      - superlink:8000
       - --host
       - 0.0.0.0
       - --port
@@ -69,7 +69,7 @@ services:
   # supernode-3:
   #   command:
   #     - --superlink
-  #     - superlink:9092
+  #     - superlink:8000
   #     - --host
   #     - 0.0.0.0
   #     - --port

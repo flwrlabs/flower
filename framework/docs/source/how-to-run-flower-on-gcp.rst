@@ -340,7 +340,6 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                   - "--isolation"
                   - "process"
                 ports:  # which ports to expose/available
-                - containerPort: 9092
                 - containerPort: 8000
         ---
         apiVersion: v1
@@ -352,11 +351,7 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
             app: superlink
           ports:  # like a dynamic IP routing table/mapping that routes traffic to the designated ports
           - protocol: TCP
-            port: 9092   # Port for SuperNode connection
-            targetPort: 9092  # the SuperLink container port
-            name: superlink-fleetapi
-          - protocol: TCP
-            port: 8000   # Port for Control and Runtime API connections over HTTP
+            port: 8000   # Port for Fleet, Control, and Runtime APIs over HTTP
             targetPort: 8000  # the SuperLink container port
             name: superlink-http-api
           type: LoadBalancer  # balances workload, makes the service publicly available
@@ -386,7 +381,7 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                 args:
                   - "--insecure"
                   - "--superlink"
-                  - "superlink-service:9092"
+                  - "superlink-service:8000"
                   - "--host"
                   - "0.0.0.0"
                   - "--port"
@@ -433,7 +428,7 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                 args:
                   - "--insecure"
                   - "--superlink"
-                  - "superlink-service:9092"
+                  - "superlink-service:8000"
                   - "--host"
                   - "0.0.0.0"
                   - "--port"
