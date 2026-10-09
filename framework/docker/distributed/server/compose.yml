@@ -22,7 +22,6 @@ services:
       - source: superlink-keyfile
         target: /app/certificates/server.key
     ports:
-      - 9092:9092
       - 8000:8000
 
   superexec-serverapp:

@@ -29,7 +29,7 @@ Before you begin, make sure you have the following prerequisites:
 - The Docker daemon is running on your local machine and the remote machine.
 - Docker Compose V2 is installed on both your local machine and the remote machine.
 - You can connect to the remote machine from your local machine.
-- Ports ``8000`` and ``9092`` are accessible on the remote machine.
+- Port ``8000`` is accessible on the remote machine.
 
 .. note::
 
