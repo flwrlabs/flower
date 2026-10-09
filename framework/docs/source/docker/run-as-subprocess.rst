@@ -69,7 +69,7 @@ instructions below.
         .. code-block:: shell
 
             $ docker run --rm \
-                -p 8000:8000 -p 9092:9092 \
+                -p 8000:8000 \
                 --detach \
                 flwr_superlink:0.0.1 \
                 --insecure \
@@ -115,4 +115,4 @@ instructions below.
                 --detach \
                 flwr_supernode:0.0.1 \
                 --insecure \
-                --superlink <superlink-address>:9092
+                --superlink <superlink-address>:8000
