@@ -284,7 +284,7 @@ You can add more SuperNodes and ClientApps by uncommenting their definitions in 
         command:
           - --insecure
           - --superlink
-          - superlink:9092
+          - superlink:8000
           - --host
           - 0.0.0.0
           - --port
@@ -338,7 +338,7 @@ If you also want to enable TLS for the new SuperNode, uncomment the definition i
       supernode-3:
         command:
           - --superlink
-          - superlink:9092
+          - superlink:8000
           - --host
           - 0.0.0.0
           - --port
