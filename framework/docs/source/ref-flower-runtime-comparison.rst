@@ -47,8 +47,7 @@ deployment runtime.
         computing environment.
     - - **Communication**
       - In-memory communication.
-      - HTTP for Runtime API communication and gRPC for Fleet API communication. Both
-        support TLS.
+      - HTTP for Runtime and Fleet API communication, with TLS support.
     - - **Server-side Infrastructure**
       - In the standard local CLI workflow, ``flwr run`` submits the run to a managed
         local SuperLink, which then coordinates the simulation runtime and the workers
@@ -65,7 +64,7 @@ deployment runtime.
     - - **Client-side Infrastructure**
       - No user-managed client-side infrastructure is required. For local CLI workflows,
         the managed local SuperLink and simulation runtime remain self-contained.
-      - SuperNodes connect to the SuperLink via TLS-enabled gRPC using the Fleet API.
+      - SuperNodes connect to the SuperLink via TLS-enabled HTTP using the Fleet API.
         Node authentication can be enabled.
     - - **Client-side App execution**
       - Each process executes a ``ClientApp`` on demand. They might execute multiple
