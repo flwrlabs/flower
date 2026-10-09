@@ -46,6 +46,7 @@ def _access_record(path: str, status_code: object) -> logging.LogRecord:
     [
         ("/health", 200, False),
         ("/health?probe=readiness", "200", False),
+        ("/v1/fleet/confirm-message-received", 200, False),
         ("/v1/fleet/pull-messages", 200, False),
         ("/v1/fleet/pull-object", 200, False),
         ("/v1/fleet/push-messages", 200, False),
@@ -61,6 +62,7 @@ def _access_record(path: str, status_code: object) -> logging.LogRecord:
         ("/v1/runtime/send-task-heartbeat", 200, False),
         ("/v1/runtime/send-task-heartbeat?task_id=1", "200", False),
         ("/health", 500, True),
+        ("/v1/fleet/confirm-message-received", 500, True),
         ("/v1/fleet/pull-messages", 500, True),
         ("/v1/fleet/pull-object", 500, True),
         ("/v1/fleet/push-messages", 400, True),
@@ -83,6 +85,7 @@ def test_routine_access_filter(path: str, status_code: object, expected: bool) -
     "path",
     [
         "/health",
+        "/v1/fleet/confirm-message-received",
         "/v1/fleet/pull-messages",
         "/v1/fleet/pull-object",
         "/v1/fleet/push-messages",
