@@ -18,8 +18,8 @@ use macOS and its default shell, zsh. Install your preferred client using the
 For model details, see :doc:`endeavor`. To use ChatGPT/Codex instead, see
 :doc:`endeavor-chatgpt-codex`.
 
-1. Configure OpenCode
----------------------
+Configure OpenCode
+------------------
 
 The CLI and desktop app share the global OpenCode configuration. Create its
 directory if needed:
@@ -62,8 +62,8 @@ setup. See the `OpenCode provider documentation
 For context window and API limit details, see :ref:`Context window and limits
 <endeavor-context-limits>`.
 
-2. Set your Flower API key
---------------------------
+Set your Flower API key
+-----------------------
 
 Run this in your terminal, paste your key at the prompt, and press Enter:
 
@@ -76,8 +76,8 @@ Run this in your terminal, paste your key at the prompt, and press Enter:
 The input is hidden and is not saved in shell history. Keep this terminal
 open for the next step.
 
-3. Start using Endeavor
------------------------
+Start using Endeavor
+--------------------
 
 OpenCode CLI
 ~~~~~~~~~~~~
@@ -89,7 +89,7 @@ In the same terminal, change to your project directory and start OpenCode:
    opencode --model flower-labs/flwrlabs/endeavor-1.0
 
 Send a prompt such as ``Explain the structure of this project.`` Repeat
-step 2 when starting from a new terminal session.
+`Set your Flower API key`_ when starting from a new terminal session.
 
 OpenCode Desktop on macOS
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -104,13 +104,14 @@ This makes the key available to apps opened from the Dock. Reopen OpenCode,
 open a local project, start a new session, and select **Endeavor** from
 **Flower Labs** in the model selector. Send a prompt to begin.
 
-Repeat step 2 and the ``launchctl`` command after signing out of or restarting
-macOS. To remove the key from the desktop environment, quit OpenCode and run
+Repeat `Set your Flower API key`_ and the ``launchctl`` command after
+signing out of or restarting macOS. To remove the key from the desktop environment, quit OpenCode and run
 ``launchctl unsetenv FLOWER_API_KEY``.
 
 Get help
 --------
 
 If you encounter any issues, feel free to post on
-`Flower Discuss <https://discuss.flower.ai>`_. The Flower team will get back to
-you soon.
+`Flower Discuss <https://discuss.flower.ai>`_ or
+`Flower Slack <https://flower.ai/join-slack>`_. The Flower team will get back
+to you soon.

@@ -227,8 +227,8 @@ Policy <https://flower.ai/pdfs/legal/flower_labs_gmbh_terms_of_service_aup_05202
 Deployment-specific safety, monitoring, and support requirements will be detailed
 during onboarding.
 
-Next steps
-----------
+Guides and Next Steps
+---------------------
 
 - To see the first model in the Flower model program, see
   :doc:`lizzy-7b`.
@@ -246,3 +246,4 @@ Endeavor 1.0 pages
 
    endeavor-chatgpt-codex
    endeavor-opencode
+   endeavor-api-key
