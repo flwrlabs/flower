@@ -27,6 +27,7 @@ import pytest
 from flwr.common.constant import (
     FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
     FLWR_INTERNAL_GRPC_CONTROL_API,
+    FLWR_INTERNAL_GRPC_FLEET_API,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
@@ -75,6 +76,34 @@ def test_superlink_lifespan_starts_grpc_control_api_only_when_enabled(
     lifespan.startup()
 
     assert start_control_api.call_count == expected_call_count
+
+
+@pytest.mark.parametrize(
+    ("env_value", "expected_call_count"),
+    [(None, 0), ("0", 0), ("1", 1)],
+)
+def test_superlink_lifespan_starts_grpc_fleet_api_only_when_enabled(
+    env_value: str | None,
+    expected_call_count: int,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperLink should require an explicit opt-in for the gRPC Fleet API."""
+    if env_value is None:
+        monkeypatch.delenv(FLWR_INTERNAL_GRPC_FLEET_API, raising=False)
+    else:
+        monkeypatch.setenv(FLWR_INTERNAL_GRPC_FLEET_API, env_value)
+
+    state_factory = Mock()
+    lifespan = SuperLinkLifespan(Mock(), state_factory)
+    start_fleet_api = Mock()
+    monkeypatch.setattr(lifespan, "_start_control_api", Mock())
+    monkeypatch.setattr(lifespan, "_start_fleet_api", start_fleet_api)
+    monkeypatch.setattr(lifespan, "_start_superexec_if_needed", Mock())
+    monkeypatch.setattr(lifespan, "_start_health_server_if_needed", Mock())
+
+    lifespan.startup()
+
+    assert start_fleet_api.call_count == expected_call_count
 
 
 def test_parse_superlink_log_rotation_args_defaults() -> None:
