@@ -1,6 +1,6 @@
+:og:description: Set up Flower Endeavor 1.0 with OpenCode CLI and OpenCode Desktop on macOS using a Flower API key and the Flower Responses API.
 .. meta::
     :description: Set up Flower Endeavor 1.0 with OpenCode CLI and OpenCode Desktop on macOS using a Flower API key and the Flower Responses API.
-    :property=og:description: Set up Flower Endeavor 1.0 with OpenCode CLI and OpenCode Desktop on macOS using a Flower API key and the Flower Responses API.
 
 Use Endeavor with OpenCode
 ==========================

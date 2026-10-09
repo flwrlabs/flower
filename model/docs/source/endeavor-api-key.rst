@@ -1,3 +1,7 @@
+:og:description: Set your Flower API key for Endeavor in Codex and OpenCode CLI and Desktop apps on macOS.
+.. meta::
+    :description: Set your Flower API key for Endeavor in Codex and OpenCode CLI and Desktop apps on macOS.
+
 Set your Flower API key
 =======================
 
@@ -11,7 +15,7 @@ Set the key for CLI use
 These commands work in Bash and zsh. Run ``printf`` and ``read``, paste your
 key at the prompt, and press Enter. Then run ``echo`` and ``export``.
 
-.. code-block:: bash
+.. code-block:: zsh
 
    printf 'Flower API key: '
    read -rs FLOWER_API_KEY
