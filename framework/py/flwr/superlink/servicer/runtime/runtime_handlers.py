@@ -20,7 +20,7 @@ from itertools import chain
 from logging import DEBUG, ERROR, INFO
 
 from flwr.app import Message
-from flwr.common.constant import SUPERLINK_NODE_ID, Status
+from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -52,8 +52,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetRunSeriesEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
-    PullPendingTasksRequest,
-    PullPendingTasksResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushAppMessagesRequest,
@@ -92,19 +90,6 @@ def get_run_series_events(
     ]
     events = state.get_task_events(task_ids=primary_task_ids)
     return GetRunSeriesEventsResponse(events=events)
-
-
-def pull_pending_tasks(
-    request: PullPendingTasksRequest,
-    state: LinkState,
-) -> PullPendingTasksResponse:
-    """Process due automations, then pull pending tasks."""
-    log(DEBUG, "Runtime.PullPendingTasks")
-    process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
-    tasks = state.get_tasks(
-        statuses=[Status.PENDING], order_by="pending_at", ascending=True
-    )
-    return PullPendingTasksResponse(tasks=tasks)
 
 
 def acquire_task(request: AcquireTaskRequest, state: LinkState) -> AcquireTaskResponse:

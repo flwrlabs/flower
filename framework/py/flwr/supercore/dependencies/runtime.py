@@ -41,8 +41,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetRunSeriesEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
-    PullPendingTasksRequest,
-    PullPendingTasksResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushAppMessagesRequest,
@@ -75,11 +73,6 @@ class RuntimeHandlers(Protocol[StateT_contra]):
         self, request: AcquireTaskRequest, state: StateT_contra
     ) -> AcquireTaskResponse:
         """Claim the oldest supported pending task."""
-
-    def pull_pending_tasks(
-        self, request: PullPendingTasksRequest, state: StateT_contra
-    ) -> PullPendingTasksResponse:
-        """Pull pending tasks."""
 
     def pull_task_input(
         self, request: PullTaskInputRequest, state: StateT_contra, task: Task

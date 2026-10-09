@@ -50,8 +50,6 @@ _DEFAULT_TASK_POLL_INTERVAL_SECONDS = 1.0
 _SUPEREXEC_AUTH_METHODS = frozenset(
     {
         "/flwr.proto.Runtime/AcquireTask",
-        "/flwr.proto.Runtime/PullPendingTasks",
-        "/flwr.proto.Runtime/ClaimTask",
     }
 )
 

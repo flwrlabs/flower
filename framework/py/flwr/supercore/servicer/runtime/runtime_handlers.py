@@ -27,12 +27,8 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     AcquireTaskResponse,
-    ClaimTaskRequest,
-    ClaimTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
-    PullPendingTasksRequest,
-    PullPendingTasksResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
     PushTaskEventsRequest,
@@ -58,18 +54,6 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 
-def pull_pending_tasks(
-    request: PullPendingTasksRequest, state: CoreState
-) -> PullPendingTasksResponse:
-    """Pull pending tasks."""
-    log(DEBUG, "Runtime.PullPendingTasks")
-
-    tasks = state.get_tasks(
-        statuses=[Status.PENDING], order_by="pending_at", ascending=True
-    )
-    return PullPendingTasksResponse(tasks=tasks)
-
-
 def acquire_task(request: AcquireTaskRequest, state: CoreState) -> AcquireTaskResponse:
     """Claim the oldest pending task matching the executor's available capacity."""
     log(DEBUG, "Runtime.AcquireTask")
@@ -86,14 +70,6 @@ def acquire_task(request: AcquireTaskRequest, state: CoreState) -> AcquireTaskRe
         if eligible and (token := state.claim_task(task.task_id)):
             return AcquireTaskResponse(task=task, token=token)
     return AcquireTaskResponse()
-
-
-def claim_task(request: ClaimTaskRequest, state: CoreState) -> ClaimTaskResponse:
-    """Claim a pending task."""
-    log(DEBUG, "Runtime.ClaimTask")
-
-    token = state.claim_task(request.task_id)
-    return ClaimTaskResponse(token=token)
 
 
 def send_task_heartbeat(

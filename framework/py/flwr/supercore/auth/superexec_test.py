@@ -19,7 +19,7 @@ from datetime import UTC, datetime
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from flwr.proto.runtime_pb2 import ClaimTaskRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import AcquireTaskRequest  # pylint: disable=E0611
 from flwr.supercore.constant import (
     MAX_TIMESTAMP_DIFF_SECONDS,
     MIN_TIMESTAMP_DIFF_SECONDS,
@@ -34,7 +34,7 @@ from .superexec import (
     verify_superexec_signature,
 )
 
-_METHOD = "/flwr.proto.Runtime/ClaimTask"
+_METHOD = "/flwr.proto.Runtime/AcquireTask"
 _TIMESTAMP = 1_000
 
 
@@ -62,9 +62,9 @@ class TestSuperExecAuthPrimitives(TestCase):
 
     def test_compute_request_body_sha256_is_deterministic(self) -> None:
         """Body SHA256 should be deterministic for equivalent request payloads."""
-        req_a = ClaimTaskRequest(task_id=11)
-        req_b = ClaimTaskRequest(task_id=11)
-        req_c = ClaimTaskRequest(task_id=12)
+        req_a = AcquireTaskRequest(supported_task_types=["task-type-11"])
+        req_b = AcquireTaskRequest(supported_task_types=["task-type-11"])
+        req_c = AcquireTaskRequest(supported_task_types=["task-type-12"])
 
         hash_a = compute_request_body_sha256(req_a)
         hash_b = compute_request_body_sha256(req_b)
@@ -91,7 +91,7 @@ class TestSuperExecAuthPrimitives(TestCase):
         auth_secret = derive_auth_secret(b"master-secret")
         good_signature = compute_superexec_signature(
             auth_secret=auth_secret,
-            method="/flwr.proto.Runtime/ClaimTask",
+            method="/flwr.proto.Runtime/AcquireTask",
             timestamp=456,
             nonce="nonce-2",
             body_sha256="f" * 64,
@@ -107,7 +107,7 @@ class TestVerifySuperExecRequest(TestCase):
 
     def setUp(self) -> None:
         """Create valid authentication fields."""
-        self.request = ClaimTaskRequest(task_id=11)
+        self.request = AcquireTaskRequest(supported_task_types=["task-type-11"])
         self.auth_secret = derive_auth_secret(b"master-secret")
         self.body_sha256 = compute_request_body_sha256(self.request)
         self.signature = compute_superexec_signature(

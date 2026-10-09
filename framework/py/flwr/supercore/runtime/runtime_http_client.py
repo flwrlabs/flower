@@ -33,8 +33,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     AcquireTaskResponse,
-    ClaimTaskRequest,
-    ClaimTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
     GetConnectorRequest,
@@ -45,8 +43,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetRunSeriesEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
-    PullPendingTasksRequest,
-    PullPendingTasksResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PullTaskMessageRequest,
@@ -79,26 +75,6 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/AcquireTask",
             request=request,
             response_type=AcquireTaskResponse,
-        )
-
-    def PullPendingTasks(
-        self, request: PullPendingTasksRequest
-    ) -> PullPendingTasksResponse:
-        """Pull tasks waiting to be executed."""
-        return self._unary_unary(
-            path="/v1/runtime/pull-pending-tasks",
-            rpc_method="/flwr.proto.Runtime/PullPendingTasks",
-            request=request,
-            response_type=PullPendingTasksResponse,
-        )
-
-    def ClaimTask(self, request: ClaimTaskRequest) -> ClaimTaskResponse:
-        """Claim a task for execution."""
-        return self._unary_unary(
-            path="/v1/runtime/claim-task",
-            rpc_method="/flwr.proto.Runtime/ClaimTask",
-            request=request,
-            response_type=ClaimTaskResponse,
         )
 
     def SendTaskHeartbeat(

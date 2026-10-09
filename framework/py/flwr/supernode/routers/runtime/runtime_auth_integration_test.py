@@ -33,8 +33,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
-    PullPendingTasksRequest,
-    PullPendingTasksResponse,
     PushTaskEventsRequest,
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -159,11 +157,11 @@ def test_pull_object_allows_with_valid_metadata_token(
     )
 
 
-def test_pull_pending_tasks_denied_without_superexec_metadata(
+def test_acquire_task_denied_without_superexec_metadata(
     client: TestClient,
 ) -> None:
     """SuperExec routes should deny requests missing signed metadata."""
-    response = _post(client, "pull-pending-tasks", PullPendingTasksRequest())
+    response = _post(client, "acquire-task", AcquireTaskRequest())
 
     assert response.status_code == 401
     assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
@@ -239,13 +237,13 @@ def test_agent_events_round_trip(client: TestClient, state: NodeState) -> None:
     assert events[0].data == task_event.data
 
 
-def test_pull_pending_tasks_allows_without_superexec_metadata(state: NodeState) -> None:
+def test_acquire_task_allows_without_superexec_metadata(state: NodeState) -> None:
     """No SuperExec signing should be required when auth is disabled."""
     client = TestClient(_create_app(state, None))
 
-    response = _post(client, "pull-pending-tasks", PullPendingTasksRequest())
+    response = _post(client, "acquire-task", AcquireTaskRequest())
 
     assert response.status_code == 200
     assert isinstance(
-        PullPendingTasksResponse.FromString(response.content), PullPendingTasksResponse
+        AcquireTaskResponse.FromString(response.content), AcquireTaskResponse
     )

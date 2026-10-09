@@ -19,7 +19,7 @@ from unittest.mock import Mock, patch
 import pytest
 from fastapi import FastAPI, Request
 
-from flwr.proto.runtime_pb2 import ClaimTaskRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import AcquireTaskRequest  # pylint: disable=E0611
 from flwr.supercore.constant import (
     SUPEREXEC_AUTH_BODY_SHA256_HEADER,
     SUPEREXEC_AUTH_NONCE_HEADER,
@@ -31,7 +31,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 
 from .superexec import authenticate_superexec_request
 
-_METHOD = "/flwr.proto.Runtime/ClaimTask"
+_METHOD = "/flwr.proto.Runtime/AcquireTask"
 _HEADERS = {
     SUPEREXEC_AUTH_TIMESTAMP_HEADER: "1000",
     SUPEREXEC_AUTH_NONCE_HEADER: "nonce",
@@ -43,7 +43,7 @@ _HEADERS = {
 def _make_request(
     master_secret: bytes | None,
     headers: list[tuple[str, str]] | None = None,
-) -> tuple[Request, ClaimTaskRequest]:
+) -> tuple[Request, AcquireTaskRequest]:
     """Return a request carrying parsed protobuf and SuperExec headers."""
     headers = list(_HEADERS.items()) if headers is None else headers
     app = FastAPI()
@@ -52,7 +52,7 @@ def _make_request(
         {
             "type": "http",
             "method": "POST",
-            "path": "/v1/runtime/claim-task",
+            "path": "/v1/runtime/acquire-task",
             "headers": [(key.encode(), value.encode()) for key, value in headers],
             "query_string": b"",
             "server": ("testserver", 80),
@@ -61,7 +61,7 @@ def _make_request(
             "app": app,
         }
     )
-    protobuf_request = ClaimTaskRequest(task_id=11)
+    protobuf_request = AcquireTaskRequest(supported_task_types=["task-type-11"])
     request.state.protobuf_request = protobuf_request
     return request, protobuf_request
 

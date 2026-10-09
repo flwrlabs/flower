@@ -33,68 +33,6 @@ import typing
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 @typing.final
-class PullPendingTasksRequest(google.protobuf.message.Message):
-    """PullPendingTasks messages"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    def __init__(
-        self,
-    ) -> None: ...
-
-global___PullPendingTasksRequest = PullPendingTasksRequest
-
-@typing.final
-class PullPendingTasksResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    TASKS_FIELD_NUMBER: builtins.int
-    @property
-    def tasks(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.Task]: ...
-    def __init__(
-        self,
-        *,
-        tasks: collections.abc.Iterable[flwr.proto.task_pb2.Task] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["tasks", b"tasks"]) -> None: ...
-
-global___PullPendingTasksResponse = PullPendingTasksResponse
-
-@typing.final
-class ClaimTaskRequest(google.protobuf.message.Message):
-    """ClaimTask messages"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    TASK_ID_FIELD_NUMBER: builtins.int
-    task_id: builtins.int
-    def __init__(
-        self,
-        *,
-        task_id: builtins.int = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["task_id", b"task_id"]) -> None: ...
-
-global___ClaimTaskRequest = ClaimTaskRequest
-
-@typing.final
-class ClaimTaskResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    TOKEN_FIELD_NUMBER: builtins.int
-    token: builtins.str
-    def __init__(
-        self,
-        *,
-        token: builtins.str | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_token", b"_token", "token", b"token"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_token", b"_token", "token", b"token"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["_token", b"_token"]) -> typing.Literal["token"] | None: ...
-
-global___ClaimTaskResponse = ClaimTaskResponse
-
-@typing.final
 class SendTaskHeartbeatRequest(google.protobuf.message.Message):
     """SendTaskHeartbeat messages"""
 
