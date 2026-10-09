@@ -16,4 +16,4 @@ IPv6 address.
 Verify that the address is correctly formatted as one of the following:
     - URL (e.g., ``https://127.0.0.1:8080`` or ``https://example.com:8080``)
     - IPv4 (e.g., ``192.168.1.1:9091``)
-    - IPv6 (e.g., ``[2001:0db8::1]:9092``)
+    - IPv6 (e.g., ``[2001:0db8::1]:8000``)
