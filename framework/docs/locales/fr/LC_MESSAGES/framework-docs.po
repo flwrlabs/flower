@@ -23151,9 +23151,6 @@ msgid ""
 "the host machine, allowing other services to access the Runtime, Control,"
 " and Fleet APIs on ``http://localhost:8000``."
 msgstr ""
-"``-p 9094:9094``: Cartographiez le port ``9094`` du conteneur vers le "
-"même port de la machine hôte, permettant à d'autres services d'accéder au"
-" SuperNode API sur ``http://localhost:9094``: "
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:89
 #: ../../source/docker/tutorial-quickstart-docker.rst:133
@@ -23258,8 +23255,6 @@ msgid ""
 "``--superlink superlink:8000``: Connect to the SuperLink's Fleet API at "
 "the address ``superlink:8000``."
 msgstr ""
-"``--superlink superlink:9092``: Connectez-vous à l'API Fleet de SuperLink"
-" à l'adresse ``superlink:9092``."
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:142
 msgid ""
@@ -34862,7 +34857,7 @@ msgstr "**Adresses IP source/ranges CIDR**"
 #: ../../source/how-to-run-flower-on-azure.rst:108
 #, fuzzy
 msgid "add client VMs' Public IPs and your local machine's Public IP"
-msgstr "Ajoutez les adresses IP publiques des clients (séparées par une virgule)"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:109
 msgid "**Destination**"
@@ -36033,12 +36028,6 @@ msgid ""
 "apis>`_). Since we have given the SuperLink deployment the name "
 "``superlink``, we will use that as the workload name:"
 msgstr ""
-"Dans notre déploiement, SuperLink écoute sur le port ``9092`` "
-"correspondant à l'API Fleet (pour plus de détails, consultez notre "
-"référence sur `Flower network communication <ref-flower-network-"
-"communication.rst#flower-components-apis>`_). Puisque nous avons donné au"
-" déploiement SuperLink le nom ``superlink``, nous allons utiliser celui-"
-"ci comme nom de workload :"
 
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:258
 msgid "Create a Listener"
@@ -36068,13 +36057,6 @@ msgid ""
 "listen on, which must also match the port number of the connector "
 "(``8000``):"
 msgstr ""
-"Le ``<name>`` est le nom de la ressource d'écoute, et sera la clé de "
-"routage par défaut et hôte si les options ``--routing-key`` et ``--host``"
-" ne sont pas spécifiées. Dans notre cas, le ``<name>`` doit correspondre "
-"au nom du connecteur que nous avons créé dans le cluster SuperLink, qui "
-"est ``fleet-api``. Le ``<port>`` est le numéro de port que l'écouteur "
-"écoute sur, qui doit également correspondre au numéro de port du "
-"connecteur (``9092``) :"
 
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:283
 msgid "Deploy SuperNode in a Separate OpenShift Cluster"
@@ -37432,10 +37414,6 @@ msgid ""
 "different machine, you'd replace ``127.0.0.1`` with the public IP of that"
 " machine."
 msgstr ""
-"``--superlink 127.0.0.1:9092``: Connectez-vous à l'API Fleet du SuperLink"
-" à l'adresse ``127.0.0.1:9092``. Si vous aviez lancé le SuperLink dans "
-"une autre machine, vous remplaceriez ``127.0.0.1`` par l'IP publique de "
-"cette machine."
 
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:154
 msgid ""
@@ -59401,16 +59379,6 @@ msgid ""
 "should always use TLS (see :doc:`how-to-enable-tls-connections` to learn "
 "more), but ``insecure`` mode is supported for local testing."
 msgstr ""
-"**SuperNode vers SuperLink (Fleet API)** : dans la terminologie Flower, "
-"une fédération Flower est un ensemble de SuperNodes connectés au même "
-"SuperLink. Du point de vue réseau, chaque SuperNode agit comme un client "
-"gRPC et SuperLink agit comme un serveur gRPC. Cela signifie que, lors du "
-"déploiement d'un SuperNode, seules des connexions sortantes sont "
-"nécessaires pour se connecter au SuperLink. Seuls les SuperNodes peuvent "
-"initier ces requêtes et ils ne répondent pas aux requêtes entrantes. La "
-"connexion de SuperNode à SuperLink doit toujours utiliser TLS (consultez "
-":doc:`how-to-enable-tls-connections` pour en savoir plus), mais le mode "
-"``insecure`` est pris en charge pour les tests locaux."
 
 #: ../../source/ref-flower-network-communication.rst:97
 msgid "Optional Network Connections"
@@ -60046,8 +60014,6 @@ msgid ""
 "SuperNodes connect to the SuperLink via TLS-enabled HTTP using the Fleet "
 "API. Node authentication can be enabled."
 msgstr ""
-"Les SuperNodes se connectent au SuperLink via gRPC avec chiffrement TLS à"
-" l'aide de l'API Fleet. L'authentification des nœuds peut être activée."
 
 #: ../../source/ref-flower-runtime-comparison.rst:69
 msgid "**Client-side App execution**"
