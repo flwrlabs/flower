@@ -37,8 +37,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     AcquireTaskResponse,
-    ClaimTaskRequest,
-    ClaimTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
     GetConnectorRequest,
@@ -49,8 +47,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetRunSeriesEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
-    PullPendingTasksRequest,
-    PullPendingTasksResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PullTaskMessageRequest,
@@ -102,29 +98,10 @@ def create_runtime_router(component_name: str) -> APIRouter:
     return versioned_router
 
 
-PullPendingTasksAuthDependency = Annotated[
-    None,
-    Depends(SuperExecAuthDependency("/flwr.proto.Runtime/PullPendingTasks")),
-]
 AcquireTaskAuthDependency = Annotated[
     None,
     Depends(SuperExecAuthDependency("/flwr.proto.Runtime/AcquireTask")),
 ]
-ClaimTaskAuthDependency = Annotated[
-    None,
-    Depends(SuperExecAuthDependency("/flwr.proto.Runtime/ClaimTask")),
-]
-
-
-@router.post("/pull-pending-tasks")
-def pull_pending_tasks(
-    request: Annotated[PullPendingTasksRequest, PROTOBUF_REQUEST_DEPENDENCY],
-    state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
-    _auth: PullPendingTasksAuthDependency,
-) -> PullPendingTasksResponse:
-    """Pull pending tasks."""
-    return handlers.pull_pending_tasks(request, state)
 
 
 @router.post("/acquire-task")
@@ -136,16 +113,6 @@ def acquire_task(
 ) -> AcquireTaskResponse:
     """Acquire the oldest eligible pending task."""
     return handlers.acquire_task(request, state)
-
-
-@router.post("/claim-task")
-def claim_task(
-    request: Annotated[ClaimTaskRequest, PROTOBUF_REQUEST_DEPENDENCY],
-    state: RuntimeStateDependency,
-    _auth: ClaimTaskAuthDependency,
-) -> ClaimTaskResponse:
-    """Claim a pending task."""
-    return core_runtime_handlers.claim_task(request, state)
 
 
 @router.post("/send-task-heartbeat")

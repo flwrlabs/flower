@@ -49,8 +49,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetRunSeriesEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
-    PullPendingTasksRequest,
-    PullPendingTasksResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushAppMessagesRequest,
@@ -64,13 +62,6 @@ from flwr.supercore.constant import TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.supernode.nodestate import NodeState
-
-
-def pull_pending_tasks(
-    request: PullPendingTasksRequest, state: NodeState
-) -> PullPendingTasksResponse:
-    """Pull pending tasks."""
-    return core_runtime_handlers.pull_pending_tasks(request, state)
 
 
 def acquire_task(request: AcquireTaskRequest, state: NodeState) -> AcquireTaskResponse:

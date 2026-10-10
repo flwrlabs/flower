@@ -20,7 +20,7 @@ from logging import ERROR
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from flwr.common.constant import SUPERLINK_NODE_ID, Status
+from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.serde import message_to_proto
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
@@ -28,10 +28,8 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
-    ClaimTaskRequest,
     CreateTaskRequest,
     CreateTaskResponse,
-    PullPendingTasksRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskEventsResponse,
@@ -39,12 +37,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     RecordTaskUsageRequest,
     SendTaskHeartbeatRequest,
 )
-from flwr.proto.task_pb2 import (  # pylint: disable=E0611
-    Task,
-    TaskEvent,
-    TaskStatus,
-    TaskUsage,
-)
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
 from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -72,28 +65,6 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             self.state,
             Mock(task_id=789, run_id=123, type=TaskType.AGENT_APP),
         )
-
-    def test_pull_pending_tasks_returns_pending_tasks(self) -> None:
-        """PullPendingTasks should return pending tasks from state."""
-        # Prepare
-        task = Task(
-            task_id=123,
-            run_id=456,
-            status=TaskStatus(status=Status.PENDING, sub_status="", details=""),
-        )
-        self.state.get_tasks.return_value = [task]
-
-        # Execute
-        response = runtime_handlers.pull_pending_tasks(
-            PullPendingTasksRequest(), self.state
-        )
-
-        # Assert
-        self.state.get_tasks.assert_called_once_with(
-            statuses=[Status.PENDING], order_by="pending_at", ascending=True
-        )
-        self.assertEqual(len(response.tasks), 1)
-        self.assertEqual(response.tasks[0].task_id, 123)
 
     def test_acquire_task_returns_empty_when_queue_is_empty(self) -> None:
         """An empty queue must not claim a task."""
@@ -143,34 +114,6 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(response.task, tasks[2])
         self.state.claim_task.assert_called_once_with(3)
-
-    def test_claim_task_returns_token_when_claim_succeeds(self) -> None:
-        """ClaimTask should return the token from state."""
-        # Prepare
-        self.state.claim_task.return_value = "task-token"
-
-        # Execute
-        response = runtime_handlers.claim_task(
-            ClaimTaskRequest(task_id=123), self.state
-        )
-
-        # Assert
-        self.state.claim_task.assert_called_once_with(123)
-        self.assertEqual(response.token, "task-token")
-
-    def test_claim_task_returns_empty_token_when_claim_fails(self) -> None:
-        """ClaimTask should return an empty token if the claim fails."""
-        # Prepare
-        self.state.claim_task.return_value = None
-
-        # Execute
-        response = runtime_handlers.claim_task(
-            ClaimTaskRequest(task_id=123), self.state
-        )
-
-        # Assert
-        self.state.claim_task.assert_called_once_with(123)
-        self.assertFalse(response.HasField("token"))
 
     def test_send_task_heartbeat_acknowledges_authenticated_task(self) -> None:
         """SendTaskHeartbeat should use the authenticated task ID."""

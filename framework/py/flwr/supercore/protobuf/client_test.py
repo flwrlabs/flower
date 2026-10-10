@@ -24,8 +24,8 @@ import httpx
 import pytest
 
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    ClaimTaskRequest,
-    ClaimTaskResponse,
+    AcquireTaskRequest,
+    AcquireTaskResponse,
 )
 from flwr.supercore.constant import MAX_PROTOBUF_STREAM_MESSAGE_LENGTH
 from flwr.supercore.interceptors import (
@@ -42,10 +42,10 @@ from flwr.supercore.retry import make_simple_http_retry_invoker
 
 from .client import ProtobufCall, ProtobufClient, ProtobufRequestContext
 
-_PATH = "/v1/runtime/claim-task"
-_METHOD = "/flwr.proto.Runtime/ClaimTask"
-_REQUEST = ClaimTaskRequest(task_id=123)
-_RESPONSE = ClaimTaskResponse(token="task-token")
+_PATH = "/v1/runtime/acquire-task"
+_METHOD = "/flwr.proto.Runtime/AcquireTask"
+_REQUEST = AcquireTaskRequest(supported_task_types=["flwr-agentapp"])
+_RESPONSE = AcquireTaskResponse(token="task-token")
 
 
 def _response(status_code: int, content: bytes = b"") -> httpx.Response:
@@ -57,23 +57,23 @@ def _response(status_code: int, content: bytes = b"") -> httpx.Response:
     )
 
 
-def _call(client: ProtobufClient) -> ClaimTaskResponse:
+def _call(client: ProtobufClient) -> AcquireTaskResponse:
     """Call one representative unary protobuf operation."""
     return client._unary_unary(  # pylint: disable=protected-access
         path=_PATH,
         rpc_method=_METHOD,
         request=_REQUEST,
-        response_type=ClaimTaskResponse,
+        response_type=AcquireTaskResponse,
     )
 
 
-def _stream_call(client: ProtobufClient) -> Generator[ClaimTaskResponse, None, None]:
+def _stream_call(client: ProtobufClient) -> Generator[AcquireTaskResponse, None, None]:
     """Call one representative streaming protobuf operation."""
     return client._unary_stream(  # pylint: disable=protected-access
         path=_PATH,
         rpc_method=_METHOD,
         request=_REQUEST,
-        response_type=ClaimTaskResponse,
+        response_type=AcquireTaskResponse,
     )
 
 
@@ -113,7 +113,7 @@ def test_unary_unary_overrides_timeout() -> None:
             path=_PATH,
             rpc_method=_METHOD,
             request=_REQUEST,
-            response_type=ClaimTaskResponse,
+            response_type=AcquireTaskResponse,
             timeout=5.0,
         )
         # pylint: enable=protected-access
@@ -150,7 +150,7 @@ def test_unary_unary_normalizes_path() -> None:
             path=_PATH.removeprefix("/"),
             rpc_method=_METHOD,
             request=_REQUEST,
-            response_type=ClaimTaskResponse,
+            response_type=AcquireTaskResponse,
         )
 
     assert str(send.call_args.args[0].url) == f"http://api.example{_PATH}"
@@ -248,8 +248,8 @@ def _stream_response(status_code: int, chunks: list[bytes]) -> httpx.Response:
 
 def test_unary_stream_sends_and_receives_framed_protobuf() -> None:
     """Decode messages split across arbitrary HTTP response chunks."""
-    first = ClaimTaskResponse(token="first")
-    second = ClaimTaskResponse(token="second")
+    first = AcquireTaskResponse(token="first")
+    second = AcquireTaskResponse(token="second")
     content = frame_message(first) + frame_message(second)
     response = _stream_response(
         200,
@@ -342,8 +342,8 @@ def test_unary_stream_closes_response_when_iteration_stops() -> None:
     response = _stream_response(
         200,
         [
-            frame_message(ClaimTaskResponse(token="first")),
-            frame_message(ClaimTaskResponse(token="second")),
+            frame_message(AcquireTaskResponse(token="first")),
+            frame_message(AcquireTaskResponse(token="second")),
         ],
     )
     with patch(
@@ -446,7 +446,7 @@ def test_unary_stream_retries_only_before_returning_response() -> None:
     invalid_stream = _stream_response(
         200,
         [
-            frame_message(ClaimTaskResponse(token="first")),
+            frame_message(AcquireTaskResponse(token="first")),
             len(b"invalid").to_bytes(4, "big") + b"invalid",
         ],
     )
