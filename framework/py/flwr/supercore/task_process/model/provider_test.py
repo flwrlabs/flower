@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from unittest.mock import Mock
 
@@ -156,6 +157,11 @@ def test_invoke_model_provider_collects_stream_events(
 ) -> None:
     """Streaming calls should collect events and accept incomplete terminals."""
     monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
+    span = Mock()
+    monkeypatch.setattr(
+        "flwr.supercore.task_process.model.provider.trace_span",
+        lambda *args, **kwargs: nullcontext(span),
+    )
     post_mock = _patch_post(
         monkeypatch,
         _Response(
@@ -183,6 +189,7 @@ def test_invoke_model_provider_collects_stream_events(
     )
 
     assert result == {"id": "resp_1", "output_text": "hel"}
+    span.add_event.assert_called_once_with("provider.first_text")
     assert streamed_events == [
         {"type": "response.created", "response": {"id": "resp_1"}},
         {"delta": "hel", "type": "response.output_text.delta"},

@@ -16,7 +16,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
@@ -78,6 +78,7 @@ from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_DEPENDENCY
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
+from flwr.supercore.tracing import load_task_context, trace_span
 
 router = APIRouter(
     prefix="/v1/runtime",
@@ -129,13 +130,19 @@ def pull_pending_tasks(
 
 @router.post("/acquire-task")
 def acquire_task(
+    http_request: Request,
     request: Annotated[AcquireTaskRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
     handlers: RuntimeHandlersDependency,
     _auth: AcquireTaskAuthDependency,
 ) -> AcquireTaskResponse:
     """Acquire the oldest eligible pending task."""
-    return handlers.acquire_task(request, state)
+    response = handlers.acquire_task(request, state)
+    if response.HasField("task"):
+        carrier = load_task_context(state, response.task.task_id)
+        if carrier:
+            http_request.state.protobuf_response_headers = {"traceparent": carrier}
+    return response
 
 
 @router.post("/claim-task")
@@ -160,24 +167,40 @@ def send_task_heartbeat(
 
 @router.post("/pull-task-input")
 def pull_task_input(
+    http_request: Request,
     request: Annotated[PullTaskInputRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
     handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> PullTaskInputResponse:
     """Pull app process inputs."""
-    return handlers.pull_task_input(request, state, task)
+    response = handlers.pull_task_input(request, state, task)
+    carrier = load_task_context(state, task.task_id)
+    if carrier:
+        http_request.state.protobuf_response_headers = {"traceparent": carrier}
+    return response
 
 
 @router.post("/push-task-output")
 def push_task_output(
+    http_request: Request,
     request: Annotated[PushTaskOutputRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
     handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> PushTaskOutputResponse:
     """Push app process outputs."""
-    return handlers.push_task_output(request, state, task)
+    with trace_span(
+        "task.complete",
+        traceparent=http_request.headers.get("traceparent", "")
+        or load_task_context(state, task.task_id),
+        attributes={
+            "flwr.component": "superlink",
+            "flwr.task_id": str(task.task_id),
+            "flwr.run_id": str(task.run_id),
+        },
+    ):
+        return handlers.push_task_output(request, state, task)
 
 
 @router.post("/push-object")

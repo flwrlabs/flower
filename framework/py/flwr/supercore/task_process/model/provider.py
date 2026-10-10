@@ -28,6 +28,7 @@ from flwr.supercore.task_process.usage import (
     TaskUsageRecorder,
     task_usage_from_open_response,
 )
+from flwr.supercore.tracing import trace_span
 from flwr.supercore.typing import JSONObject, JSONValue
 
 DEFAULT_MODEL_API_ENDPOINT = "https://api.flower.ai/v1/responses"
@@ -106,15 +107,26 @@ def invoke_model_provider(
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     payload = dict(request)
-    return _invoke_provider_response(
-        responses_url=responses_url,
-        headers=headers,
-        timeout=timeout,
-        request=payload,
-        on_stream_event=on_stream_event,
-        usage_recorder=usage_recorder,
-        provider=_provider_from_request(payload),
-    )
+    with trace_span("model.provider", attributes={"flwr.component": "model"}) as span:
+        first_text = False
+
+        def forward_event(event: JSONObject) -> None:
+            nonlocal first_text
+            if not first_text and event.get("type") == "response.output_text.delta":
+                first_text = True
+                span.add_event("provider.first_text")
+            if on_stream_event is not None:
+                on_stream_event(event)
+
+        return _invoke_provider_response(
+            responses_url=responses_url,
+            headers=headers,
+            timeout=timeout,
+            request=payload,
+            on_stream_event=forward_event,
+            usage_recorder=usage_recorder,
+            provider=_provider_from_request(payload),
+        )
 
 
 def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branches,too-many-arguments,too-many-statements

@@ -55,6 +55,7 @@ from flwr.supercore.retry import RetryInvoker, make_simple_http_retry_invoker
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
+from flwr.supercore.tracing import flush_traces, trace_span
 
 from .task import handle_task
 
@@ -103,7 +104,16 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
             TaskIdentity.node_id = task_input.context.node_id
 
             event(EventType.FLWR_MODEL_RUN_ENTER)
-            handle_task(client=self._client)
+            with trace_span(
+                "model.execute",
+                traceparent=self._client.take_task_traceparent(task_input.task_id),
+                attributes={
+                    "flwr.component": "model",
+                    "flwr.task_id": str(task_input.task_id),
+                    "flwr.run_id": str(task_input.run.run_id),
+                },
+            ):
+                handle_task(client=self._client)
 
             with self._lock:
                 self._sub_status = SubStatus.COMPLETED
@@ -116,6 +126,8 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
                 self._details = f"Model task failed with exception: {str(ex)}"
                 self._task_finished = True
             exit_code = ExitCode.TASK_PROC_EXCEPTION
+        finally:
+            flush_traces()
         return exit_code
 
     def initialize(self) -> None:

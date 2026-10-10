@@ -46,6 +46,8 @@ class ProtobufRoute(APIRoute):
         async def protobuf_endpoint(*args: Any, **endpoint_kwargs: Any) -> Response:
             # Remove the injected HTTP request before calling the original handler.
             http_request = cast(Request, endpoint_kwargs.pop(_HTTP_REQUEST_PARAMETER))
+            for name in request_parameter_names:
+                endpoint_kwargs[name] = http_request
             # Match FastAPI's execution model for async and synchronous handlers.
             result: object
             if inspect.iscoroutinefunction(endpoint):
@@ -58,7 +60,9 @@ class ProtobufRoute(APIRoute):
                 result = await cast(Awaitable[object], result)
 
             http_request.state.protobuf_response = result
-            return Response()
+            return Response(
+                headers=getattr(http_request.state, "protobuf_response_headers", None)
+            )
 
         # Retain the handler name in route metadata, operation IDs, and logs.
         protobuf_endpoint.__name__ = endpoint.__name__
@@ -66,6 +70,9 @@ class ProtobufRoute(APIRoute):
         # Resolve postponed annotations in the original handler's module.
         endpoint_signature = inspect.signature(endpoint)
         endpoint_hints = get_type_hints(endpoint, include_extras=True)
+        request_parameter_names = [
+            name for name, hint in endpoint_hints.items() if hint is Request
+        ]
         if _HTTP_REQUEST_PARAMETER in endpoint_signature.parameters:
             raise TypeError(
                 f"{endpoint.__name__} parameter {_HTTP_REQUEST_PARAMETER!r} is reserved"

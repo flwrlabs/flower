@@ -69,6 +69,7 @@ from flwr.supercore.state.schema.linkstate_models import MessageRes as MessageRe
 from flwr.supercore.state.schema.linkstate_models import Node as NodeModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
+from flwr.supercore.tracing import current_traceparent, store_task_context
 from flwr.supercore.utils import (
     int64_to_uint64,
     simulation_config_from_json,
@@ -1026,6 +1027,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         details="",
                     )
                 )
+                store_task_context(self, task_id, current_traceparent())
                 if primary_task_type == TaskType.AGENT_APP and user_prompt is not None:
                     message = create_user_prompt_message(run_id, user_prompt)
                     self.store_message_ins(message)

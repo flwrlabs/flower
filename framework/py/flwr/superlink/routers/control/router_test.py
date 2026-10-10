@@ -458,7 +458,14 @@ def test_start_run_forwards_resolved_source() -> None:
         "flwr.superlink.routers.control.router.control_handlers.start_run",
         return_value=expected,
     ) as start_run:
-        response = start_run_route(request, linkstate, _ACCOUNT, "grpc-rere", "unknown")
+        response = start_run_route(
+            request,
+            linkstate,
+            _ACCOUNT,
+            "grpc-rere",
+            "unknown",
+            Request({"type": "http", "headers": []}),
+        )
 
     assert response is expected
     start_run.assert_called_once_with(
@@ -486,6 +493,7 @@ def test_start_run_forwards_caller_provided_source() -> None:
             _ACCOUNT,
             fleet_api_type="grpc-rere",
             run_source="cli",
+            http_request=Request({"type": "http", "headers": []}),
         )
 
     assert start_run.call_args.kwargs["source"] == "cli"

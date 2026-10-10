@@ -90,6 +90,7 @@ from flwr.supercore.superexec.dependency_installer import (
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
+from flwr.supercore.tracing import flush_traces, trace_span
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 from flwr.superlink.grid import HttpGrid
@@ -320,7 +321,16 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             if agent_app is None:
                 assert agent_app_attr is not None
                 agent_app = _load_agentapp_component(agent_app_attr, app_path)
-            agent_app(agent=agent, context=self._context)
+            with trace_span(
+                "agentapp.execute",
+                traceparent=grid._runtime_client.take_task_traceparent(task_id),
+                attributes={
+                    "flwr.component": "agentapp",
+                    "flwr.task_id": str(task_id),
+                    "flwr.run_id": str(run.run_id),
+                },
+            ):
+                agent_app(agent=agent, context=self._context)
             self._agent_events.close()
 
             # Set sub_status and details for successful completion
@@ -346,6 +356,8 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             elif isinstance(ex, RuntimeDependencyInstallationError):
                 exit_code = ExitCode.COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR
 
+        finally:
+            flush_traces()
         return exit_code
 
     def _prepare_task_app(
