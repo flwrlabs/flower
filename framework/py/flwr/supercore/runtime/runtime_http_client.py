@@ -14,6 +14,9 @@
 # ==============================================================================
 """HTTP client for the Runtime API."""
 
+import httpx
+from google.protobuf.message import Message
+
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
     StartAutomationResponse,
@@ -64,13 +67,43 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
-from flwr.supercore.protobuf.client import ProtobufClient
+from flwr.supercore.protobuf.client import ProtobufClient, ProtobufRequestContext
+from flwr.supercore.tracing import current_traceparent, validate_traceparent
 
 
 # Match the method names defined by the Runtime protobuf service.
 # pylint: disable=invalid-name
 class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-methods
     """Protobuf-over-HTTP client for the Runtime API."""
+
+    def _send(
+        self, context: ProtobufRequestContext, *, stream: bool = False
+    ) -> httpx.Response:
+        carrier = current_traceparent()
+        if carrier:
+            context.request.headers["traceparent"] = carrier
+        return super()._send(context, stream=stream)
+
+    def _on_response(self, response: httpx.Response, result: Message) -> None:
+        carrier = validate_traceparent(response.headers.get("traceparent"))
+        if not carrier:
+            return
+        if isinstance(result, AcquireTaskResponse) and result.HasField("task"):
+            task_id = result.task.task_id
+        elif isinstance(result, PullTaskInputResponse):
+            task_id = result.task_id
+        else:
+            return
+        if not hasattr(self, "_task_traceparents"):
+            # pylint: disable-next=attribute-defined-outside-init
+            self._task_traceparents: dict[int, str] = {}
+        self._task_traceparents[task_id] = carrier
+
+    def take_task_traceparent(self, task_id: int) -> str:
+        """Consume response metadata scoped to one acquired task."""
+        if not hasattr(self, "_task_traceparents"):
+            return ""
+        return self._task_traceparents.pop(task_id, "")
 
     def AcquireTask(self, request: AcquireTaskRequest) -> AcquireTaskResponse:
         """Acquire the oldest eligible pending task."""

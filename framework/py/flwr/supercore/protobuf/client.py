@@ -199,7 +199,11 @@ class ProtobufClient:
             result.ParseFromString(response.content)
         except DecodeError as exc:
             raise ValueError("Invalid protobuf response payload") from exc
+        self._on_response(response, result)
         return result
+
+    def _on_response(self, response: httpx.Response, result: Message) -> None:
+        """Allow specialized clients to consume response transport metadata."""
 
     def _unary_stream(
         self,

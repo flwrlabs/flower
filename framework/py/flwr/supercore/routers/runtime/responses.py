@@ -45,6 +45,7 @@ from flwr.supercore.error import FlowerError
 from flwr.supercore.json_message.base import make_json_message
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.servicer.runtime import runtime_handlers
+from flwr.supercore.tracing import load_task_context, trace_span
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 
@@ -185,9 +186,20 @@ def _start_exchange(
     """Create a child model task and send its request message."""
     model = cast(str, payload["model"])
     try:
-        response = runtime_handlers.create_task(
-            CreateTaskRequest(type=TaskType.MODEL, model_ref=model), state, task
-        )
+        with trace_span(
+            "model.create",
+            traceparent=load_task_context(state, task.task_id),
+            attributes={
+                "flwr.component": "superlink",
+                "flwr.run_id": str(task.run_id),
+                "flwr.parent_task_id": str(task.task_id),
+            },
+        ) as span:
+            response = runtime_handlers.create_task(
+                CreateTaskRequest(type=TaskType.MODEL, model_ref=model), state, task
+            )
+            if response.HasField("task_id"):
+                span.set_attribute("flwr.task_id", str(response.task_id))
     except FlowerError as err:
         raise _ResponsesError(
             500, "Model task could not be created.", "model_task_creation_failed"
