@@ -83,18 +83,17 @@ from all rounds.
 
 Congratulations, you have successfully run your first Flower App on SuperGrid! You've
 taken your first step into the world of collaborative AI with Flower. In this tutorial,
-you created a federation with simulated SuperNodes and ran an existing Flower App across
+you used a federation with simulated SuperNodes and ran an existing Flower App across
 them. You also explored the SuperGrid dashboard to monitor your app's progress and view
 its logs.
 
-If you return to the `Federations page <https://flower.ai/federations/>`__ and click
-your federation, you'll see the run you launched. You can click that run to open the
-same run details page you saw right after launching the app.
+To find the run later, visit the `All runs <https://flower.ai/runs>`__ page. Click the
+run you launched to reopen its details page.
 
-.. image:: ./_static/federation_dashboard_shows_run.png
-    :alt: Federation details page showing the run that was launched
+.. image:: ./_static/all_runs_page.png
+    :alt: All runs page showing the run that was launched
     :align: center
-    :target: ./_static/federation_dashboard_shows_run.png
+    :target: ./_static/all_runs_page.png
 
 In the next tutorial, you'll download an existing Flower App, run it from your local
 machine on SuperGrid, make a small customization, and learn how the main Flower App
