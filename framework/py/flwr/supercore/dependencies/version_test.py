@@ -36,7 +36,7 @@ def _make_request(headers: list[tuple[str, str]]) -> Request:
         {
             "type": "http",
             "method": "POST",
-            "path": "/v1/runtime/claim-task",
+            "path": "/v1/runtime/acquire-task",
             "headers": [(key.encode(), value.encode()) for key, value in headers],
             "query_string": b"",
             "server": ("testserver", 80),

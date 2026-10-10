@@ -128,8 +128,6 @@ def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
     request = client.AcquireTask.call_args.args[0]
     assert not request.supported_task_types
     assert set(request.agentapp_fab_hashes) == ready_fabs
-    client.PullPendingTasks.assert_not_called()
-    client.ClaimTask.assert_not_called()
     if ready_fabs:
         executor.launch.assert_called_once()
     else:
@@ -262,8 +260,6 @@ def test_run_superexec_preserves_accepted_launch_behavior(
     assert set(stub.AcquireTask.call_args.args[0].supported_task_types) == set(
         AutoExecPlugin.supported_task_types
     )
-    stub.PullPendingTasks.assert_not_called()
-    stub.ClaimTask.assert_not_called()
     plugin.launch_task.assert_called_once()
     executor.get_eligible_capacity.assert_called_once_with(
         set(AutoExecPlugin.supported_task_types),

@@ -20,7 +20,7 @@ from unittest.mock import Mock, patch
 
 import httpx
 
-from flwr.proto.runtime_pb2 import PullPendingTasksRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import AcquireTaskRequest  # pylint: disable=E0611
 from flwr.supercore.constant import (
     FLWR_COMPONENT_NAME_METADATA_KEY,
     FLWR_PACKAGE_NAME_METADATA_KEY,
@@ -37,8 +37,8 @@ from .runtime_version import RuntimeVersionHttpInterceptor
 def _context() -> ProtobufRequestContext:
     """Create a representative protobuf HTTP request context."""
     return ProtobufRequestContext(
-        rpc_method="/flwr.proto.Runtime/PullPendingTasks",
-        message=PullPendingTasksRequest(),
+        rpc_method="/flwr.proto.Runtime/AcquireTask",
+        message=AcquireTaskRequest(),
         request=httpx.Request("POST", "http://runtime.example"),
     )
 
