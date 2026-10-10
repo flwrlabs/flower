@@ -181,7 +181,16 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
 
         # Prepare trailing metadata
         trailing_metadata: tuple[tuple[str, str], ...] = ()
-        if incompat_details and self._send_warning_metadata:
+        if handler_call_details.method == "/flwr.proto.Fleet/SendNodeHeartbeat":
+            trailing_metadata = (
+                (
+                    VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
+                    "The gRPC Fleet API is deprecated and may be removed soon. "
+                    "Please upgrade to Flower 1.40.0 or newer to use the HTTP "
+                    "Fleet API.",
+                ),
+            )
+        elif incompat_details and self._send_warning_metadata:
             trailing_metadata += (
                 (VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, incompat_details),
             )
