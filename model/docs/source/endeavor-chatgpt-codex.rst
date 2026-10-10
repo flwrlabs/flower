@@ -1,6 +1,6 @@
 .. meta::
-    :description: Set up Flower Endeavor 1.0 with Codex CLI and the ChatGPT/Codex desktop app on macOS using a Flower API key and model catalog.
-    :property=og:description: Set up Flower Endeavor 1.0 with Codex CLI and the ChatGPT/Codex desktop app on macOS using a Flower API key and model catalog.
+    :description: Set up Flower Endeavor 1.0 with Codex CLI and the ChatGPT/Codex Desktop app on macOS using a Flower API key and model catalog.
+    :property=og:description: Set up Flower Endeavor 1.0 with Codex CLI and the ChatGPT/Codex Desktop app on macOS using a Flower API key and model catalog.
 
 Use Endeavor with ChatGPT/Codex
 ===============================
@@ -51,7 +51,7 @@ Copy the printed ``model_catalog_json`` line for the next step.
 The CLI and desktop app share ``~/.codex/config.toml``. Create the file if
 needed, back it up, and open it:
 
-.. code-block:: console
+.. code-block:: zsh
 
    touch "$HOME/.codex/config.toml"
    cp -p "$HOME/.codex/config.toml" \
@@ -60,8 +60,8 @@ needed, back it up, and open it:
 
 Add or update the following settings, preserving unrelated configuration.
 Keep the first four settings at the top level, before any ``[section]``.
-Replace the ``model_catalog_json`` line with the one printed in step 1, then
-save the file. Update existing keys and sections rather than adding duplicates.
+Replace the ``model_catalog_json`` line with the one printed in
+`1. Save the model catalog`_, then save the file. Update existing keys and sections rather than adding duplicates.
 
 .. code-block:: toml
 
@@ -82,16 +82,9 @@ For more options, see the `Codex configuration reference
 3. Set your Flower API key
 --------------------------
 
-Run this in your terminal, paste your key at the prompt, and press Enter:
-
-.. code-block:: zsh
-
-   read -rs 'FLOWER_API_KEY?Flower API key: '
-   echo
-   export FLOWER_API_KEY
-
-The input is hidden and is not saved in shell history. Keep this terminal
-open for the next step.
+Follow :doc:`endeavor-api-key` to set ``FLOWER_API_KEY`` in your terminal.
+For desktop use, also complete that guide's desktop setup before reopening
+the app. Keep the terminal open for the next step.
 
 4. Start using Endeavor
 -----------------------
@@ -106,29 +99,20 @@ In the same terminal, change to your project directory and start Codex:
    codex
 
 Endeavor is selected by default. Send a prompt such as
-``Explain the structure of this project.`` Repeat step 3 when starting from a
-new terminal session.
+``Explain the structure of this project.`` Repeat the instructions in
+:doc:`endeavor-api-key` when starting from a new terminal session.
 
 ChatGPT/Codex desktop app on macOS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Fully quit the app. In the same terminal where you set the key, run:
-
-.. code-block:: zsh
-
-   launchctl setenv FLOWER_API_KEY "$FLOWER_API_KEY"
-
-This makes the key available to apps opened from the Dock. Reopen ChatGPT or
-Codex, start a new local Codex task, and select **Endeavor** in the model
-selector. Send a prompt to begin.
-
-Repeat step 3 and the ``launchctl`` command after signing out of or restarting
-macOS. To remove the key from the desktop environment, quit the app and run
-``launchctl unsetenv FLOWER_API_KEY``.
+After completing the desktop key setup in :doc:`endeavor-api-key`, reopen
+ChatGPT or Codex, start a new local Codex task, and select **Endeavor** in the
+model selector. Send a prompt to begin.
 
 Get help
 --------
 
 If you encounter any issues, feel free to post on
-`Flower Discuss <https://discuss.flower.ai>`_. The Flower team will get back to
-you soon.
+`Flower Discuss <https://discuss.flower.ai>`_ or
+`Flower Slack <https://flower.ai/join-slack>`_. The Flower team will get back
+to you soon.
