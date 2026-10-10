@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower Docs\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-29 00:11+0000\n"
+"POT-Creation-Date: 2026-10-10 00:11+0000\n"
 "PO-Revision-Date: 2026-05-23 06:55+0000\n"
 "Last-Translator: lco <Leandro.COLLIER@student.umons.ac.be>\n"
 "Language: fr\n"
@@ -21700,9 +21700,9 @@ msgstr "Comprendre la commande"
 #: ../../source/docker/enable-tls.rst:215
 #: ../../source/docker/enable-tls.rst:240
 #: ../../source/docker/tutorial-quickstart-docker.rst:84
-#: ../../source/docker/tutorial-quickstart-docker.rst:129
-#: ../../source/docker/tutorial-quickstart-docker.rst:244
-#: ../../source/docker/tutorial-quickstart-docker.rst:278
+#: ../../source/docker/tutorial-quickstart-docker.rst:128
+#: ../../source/docker/tutorial-quickstart-docker.rst:243
+#: ../../source/docker/tutorial-quickstart-docker.rst:277
 msgid "``docker run``: This tells Docker to run a container from an image."
 msgstr ""
 "``docker run``: Cela dit à Docker de lancer un conteneur à partir d'une "
@@ -21714,9 +21714,9 @@ msgstr ""
 #: ../../source/docker/enable-tls.rst:216
 #: ../../source/docker/enable-tls.rst:241
 #: ../../source/docker/tutorial-quickstart-docker.rst:85
-#: ../../source/docker/tutorial-quickstart-docker.rst:130
-#: ../../source/docker/tutorial-quickstart-docker.rst:245
-#: ../../source/docker/tutorial-quickstart-docker.rst:279
+#: ../../source/docker/tutorial-quickstart-docker.rst:129
+#: ../../source/docker/tutorial-quickstart-docker.rst:244
+#: ../../source/docker/tutorial-quickstart-docker.rst:278
 msgid "``--rm``: Remove the container once it is stopped or the command exits."
 msgstr ""
 "``--rm``: Supprimez le conteneur une fois qu'il est arrêté ou que la "
@@ -22097,13 +22097,13 @@ msgstr ""
 #: ../../source/docker/tutorial-deploy-on-multiple-machines.rst:167
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:110
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:250
-#: ../../source/docker/tutorial-quickstart-docker.rst:322
+#: ../../source/docker/tutorial-quickstart-docker.rst:321
 #: ../../source/how-to-authenticate-accounts.rst:71
 #: ../../source/how-to-authenticate-supernodes.rst:122
 #: ../../source/how-to-enable-tls-connections.rst:217
-#: ../../source/how-to-run-flower-on-azure.rst:230
-#: ../../source/how-to-run-flower-on-gcp.rst:619
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:684
+#: ../../source/how-to-run-flower-on-azure.rst:197
+#: ../../source/how-to-run-flower-on-gcp.rst:614
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:678
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:214
 #: ../../source/how-to-upgrade-to-flower-1.28.rst:80
 #: ../../source/how-to-upgrade-to-flower-1.28.rst:99
@@ -22876,8 +22876,7 @@ msgstr ""
 "locale."
 
 #: ../../source/docker/tutorial-deploy-on-multiple-machines.rst:32
-#, fuzzy
-msgid "Ports ``8000`` and ``9092`` are accessible on the remote machine."
+msgid "Port ``8000`` is accessible on the remote machine."
 msgstr ""
 
 #: ../../source/docker/tutorial-deploy-on-multiple-machines.rst:36
@@ -23148,16 +23147,18 @@ msgstr "Ouvrez votre terminal et exécutez :"
 #: ../../source/docker/tutorial-quickstart-docker.rst:86
 #, fuzzy
 msgid ""
-"``-p 8000:8000 -p 9092:9092``: Map ports ``8000`` and ``9092`` of the "
-"container to the same port of the host machine, allowing other services "
-"to access the Runtime and Control APIs on ``http://localhost:8000`` and "
-"the Fleet API on ``localhost:9092``."
+"``-p 8000:8000``: Map port ``8000`` of the container to the same port of "
+"the host machine, allowing other services to access the Runtime, Control,"
+" and Fleet APIs on ``http://localhost:8000``."
 msgstr ""
+"``-p 9094:9094``: Cartographiez le port ``9094`` du conteneur vers le "
+"même port de la machine hôte, permettant à d'autres services d'accéder au"
+" SuperNode API sur ``http://localhost:9094``: "
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:90
-#: ../../source/docker/tutorial-quickstart-docker.rst:134
-#: ../../source/docker/tutorial-quickstart-docker.rst:246
-#: ../../source/docker/tutorial-quickstart-docker.rst:280
+#: ../../source/docker/tutorial-quickstart-docker.rst:89
+#: ../../source/docker/tutorial-quickstart-docker.rst:133
+#: ../../source/docker/tutorial-quickstart-docker.rst:245
+#: ../../source/docker/tutorial-quickstart-docker.rst:279
 msgid ""
 "``--network flwr-network``: Make the container join the network named "
 "``flwr-network``."
@@ -23165,20 +23166,20 @@ msgstr ""
 "``--network flwr-network``: Faites en sorte que le conteneur rejoigne le "
 "réseau nommé ``flwr-network``: "
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:91
+#: ../../source/docker/tutorial-quickstart-docker.rst:90
 msgid "``--name superlink``: Assign the name ``superlink`` to the container."
 msgstr "``--name superlink``: Attribuez au conteneur le nom ``superlink``: "
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:92
-#: ../../source/docker/tutorial-quickstart-docker.rst:136
-#: ../../source/docker/tutorial-quickstart-docker.rst:248
-#: ../../source/docker/tutorial-quickstart-docker.rst:282
+#: ../../source/docker/tutorial-quickstart-docker.rst:91
+#: ../../source/docker/tutorial-quickstart-docker.rst:135
+#: ../../source/docker/tutorial-quickstart-docker.rst:247
+#: ../../source/docker/tutorial-quickstart-docker.rst:281
 msgid ""
 "``--detach``: Run the container in the background, freeing up the "
 "terminal."
 msgstr "``--detach``: Exécutez le conteneur en arrière-plan, libérant la console."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:93
+#: ../../source/docker/tutorial-quickstart-docker.rst:92
 msgid ""
 ":substitution-code:`flwr/superlink:|stable_flwr_version|`: The name of "
 "the image to be run and the specific tag of the image. The tag "
@@ -23190,8 +23191,8 @@ msgstr ""
 "code:`|stable_flwr_version|` représente une :doc:`version spécifique "
 "<pin-version>` de l'image."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:95
-#: ../../source/docker/tutorial-quickstart-docker.rst:139
+#: ../../source/docker/tutorial-quickstart-docker.rst:94
+#: ../../source/docker/tutorial-quickstart-docker.rst:138
 msgid ""
 "``--insecure``: This flag tells the container to operate in an insecure "
 "mode, allowing unencrypted communication."
@@ -23199,13 +23200,13 @@ msgstr ""
 "``--insecure``: Ce drapeau indique au conteneur qu'il doit fonctionner "
 "dans un mode non sécurisé, permettant une communication non chiffrée."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:97
+#: ../../source/docker/tutorial-quickstart-docker.rst:96
 msgid ""
-"``--host 0.0.0.0``: Make the Runtime and Control HTTP APIs reachable "
-"outside the container."
+"``--host 0.0.0.0``: Make the Runtime, Control, and Fleet HTTP APIs "
+"reachable outside the container."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:99
+#: ../../source/docker/tutorial-quickstart-docker.rst:98
 msgid ""
 "``--isolation process``: Tells the SuperLink that the ServerApp is "
 "executed by separate independent process. The SuperLink does not attempt "
@@ -23217,19 +23218,19 @@ msgstr ""
 "Vous pouvez en savoir plus sur les différents modes de processus ici : "
 ":doc:`run-as-subprocess`: "
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:105
+#: ../../source/docker/tutorial-quickstart-docker.rst:104
 msgid "Step 3: Start the SuperNodes"
 msgstr "Étape 3 : Démarrer les SuperNodes"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:107
+#: ../../source/docker/tutorial-quickstart-docker.rst:106
 msgid "Start two SuperNode containers."
 msgstr "Démarrer deux conteneurs SuperNode."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:109
+#: ../../source/docker/tutorial-quickstart-docker.rst:108
 msgid "Start the first container:"
 msgstr "Démarrer le premier conteneur :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:131
+#: ../../source/docker/tutorial-quickstart-docker.rst:130
 msgid ""
 "``-p 9094:9094``: Map port ``9094`` of the container to the same port of "
 "the host machine, allowing other services to access the SuperNode API on "
@@ -23239,11 +23240,11 @@ msgstr ""
 "même port de la machine hôte, permettant à d'autres services d'accéder au"
 " SuperNode API sur ``http://localhost:9094``: "
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:135
+#: ../../source/docker/tutorial-quickstart-docker.rst:134
 msgid "``--name supernode-1``: Assign the name ``supernode-1`` to the container."
 msgstr "``--name supernode-1``: Attribuez au conteneur le nom ``supernode-1``: "
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:137
+#: ../../source/docker/tutorial-quickstart-docker.rst:136
 msgid ""
 ":substitution-code:`flwr/supernode:|stable_flwr_version|`: This is the "
 "name of the image to be run and the specific tag of the image."
@@ -23251,15 +23252,16 @@ msgstr ""
 ":substitution-code:`flwr/supernode:|stable_flwr_version|` : nom de "
 "l'image à exécuter et tag spécifique de l'image."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:141
+#: ../../source/docker/tutorial-quickstart-docker.rst:140
+#, fuzzy
 msgid ""
-"``--superlink superlink:9092``: Connect to the SuperLink's Fleet API at "
-"the address ``superlink:9092``."
+"``--superlink superlink:8000``: Connect to the SuperLink's Fleet API at "
+"the address ``superlink:8000``."
 msgstr ""
 "``--superlink superlink:9092``: Connectez-vous à l'API Fleet de SuperLink"
 " à l'adresse ``superlink:9092``."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:143
+#: ../../source/docker/tutorial-quickstart-docker.rst:142
 msgid ""
 "``--node-config \"partition-id=0 num-partitions=2\"``: Set the partition "
 "ID to ``0`` and the number of partitions to ``2`` for the SuperNode "
@@ -23269,13 +23271,13 @@ msgstr ""
 "partition à ``0`` et le nombre de partitions à ``2`` pour la "
 "configuration du SuperNode."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:145
+#: ../../source/docker/tutorial-quickstart-docker.rst:144
 msgid ""
 "``--host 0.0.0.0``: Make the SuperNode Runtime API accessible outside the"
 " container."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:146
+#: ../../source/docker/tutorial-quickstart-docker.rst:145
 msgid ""
 "``--port 9094``: Set the port where the SuperNode listens for the "
 "ClientApp process. If multiple SuperNodes are started on the same "
@@ -23288,7 +23290,7 @@ msgstr ""
 "chaque SuperNode. (Par exemple, à l'étape suivante, nous configurons le "
 "deuxième conteneur SuperNode pour écouter sur le port 9095)"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:149
+#: ../../source/docker/tutorial-quickstart-docker.rst:148
 msgid ""
 "``--isolation process``: Tells the SuperNode that the ClientApp is "
 "executed by a separate independent process. The SuperNode does not "
@@ -23297,15 +23299,15 @@ msgstr ""
 "``--isolation process``: Indique à SuperNode que ClientApp est exécuté "
 "par un processus indépendant. Le SuperNode ne tente pas d'exécuter cela."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:152
+#: ../../source/docker/tutorial-quickstart-docker.rst:151
 msgid "Start the second container:"
 msgstr "Démarrer le deuxième conteneur :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:172
+#: ../../source/docker/tutorial-quickstart-docker.rst:171
 msgid "Step 4: Start the SuperExec to execute ServerApps"
 msgstr "Étape 4 : Démarrer SuperExec pour exécuter les ServerApps"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:174
+#: ../../source/docker/tutorial-quickstart-docker.rst:173
 #, fuzzy
 msgid ""
 "The **SuperExec** Docker image comes with a pre-installed version of "
@@ -23313,14 +23315,14 @@ msgid ""
 " the appropriate processes on demand based on the tasks it receives."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:178
+#: ../../source/docker/tutorial-quickstart-docker.rst:177
 #, fuzzy
 msgid ""
 "To execute ServerApps, pass ``--runtime-api-address`` pointing to the "
 "SuperLink's **Runtime API** endpoint."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:181
+#: ../../source/docker/tutorial-quickstart-docker.rst:180
 msgid ""
 "Create a Dockerfile called ``superexec.Dockerfile`` and paste the "
 "following:"
@@ -23328,7 +23330,7 @@ msgstr ""
 "Créez un fichier Docker appelé ``superexec.Dockerfile`` et collez-y le "
 "suivant : "
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:183
+#: ../../source/docker/tutorial-quickstart-docker.rst:182
 #: ../../source/how-to-run-flower-on-gcp.rst
 msgid "superexec.Dockerfile"
 msgstr ""
@@ -23337,7 +23339,7 @@ msgstr ""
 msgid "Understand the Dockerfile"
 msgstr "Comprenez le fichier Dockerfile"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:199
+#: ../../source/docker/tutorial-quickstart-docker.rst:198
 msgid ""
 ":substitution-code:`FROM flwr/superexec:|stable_flwr_version|`: This line"
 " specifies that the Docker image to be built from is the "
@@ -23348,7 +23350,7 @@ msgstr ""
 "ligne indique que l'image Docker utilisée comme base est l'image "
 "``flwr/superexec``, version :substitution-code:`|stable_flwr_version|`."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:201
+#: ../../source/docker/tutorial-quickstart-docker.rst:200
 msgid ""
 "``WORKDIR /app``: Set the working directory for the container to "
 "``/app``. Any subsequent commands that reference a directory will be "
@@ -23358,7 +23360,7 @@ msgstr ""
 "sur ``/app``. Toute commande ultérieure qui référence un répertoire sera "
 "relative à ce répertoire."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:203
+#: ../../source/docker/tutorial-quickstart-docker.rst:202
 msgid ""
 "``COPY pyproject.toml .``: Copy the ``pyproject.toml`` file. from the "
 "current working directory into the container's ``/app`` directory."
@@ -23366,7 +23368,7 @@ msgstr ""
 "``COPY pyproject.toml .``: Copiez le fichier ``pyproject.toml``. from le "
 "répertoire courant dans le répertoire ``/app`` du conteneur."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:205
+#: ../../source/docker/tutorial-quickstart-docker.rst:204
 msgid ""
 "``RUN sed -i 's/.*flwr\\[simulation\\].*//' pyproject.toml``: Remove the "
 "``flwr`` dependency from the ``pyproject.toml``."
@@ -23374,7 +23376,7 @@ msgstr ""
 "``RUN sed -i 's/.*flwr\\[simulation\\].*//' pyproject.toml``: Supprimez "
 "la dépendance ``flwr`` du ``pyproject.toml``."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:207
+#: ../../source/docker/tutorial-quickstart-docker.rst:206
 msgid ""
 "``python -m pip install -U --no-cache-dir .``: Run the ``pip`` install "
 "command to install the dependencies defined in the ``pyproject.toml`` "
@@ -23384,7 +23386,7 @@ msgstr ""
 "d'installation ``pip`` pour installer les dépendances définies dans le "
 "fichier ``pyproject.toml``."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:210
+#: ../../source/docker/tutorial-quickstart-docker.rst:209
 msgid ""
 "The ``-U`` flag indicates that any existing packages should be upgraded, "
 "and ``--no-cache-dir`` prevents pip from using the cache to speed up the "
@@ -23394,7 +23396,7 @@ msgstr ""
 "et ``--no-cache-dir`` empêche pip d'utiliser la cache pour accélérer "
 "l'installation."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:212
+#: ../../source/docker/tutorial-quickstart-docker.rst:211
 msgid ""
 "``ENTRYPOINT [\"flower-superexec\"]``: Set the command ``flower-"
 "superexec`` to be the default command run when the container is started."
@@ -23403,7 +23405,7 @@ msgstr ""
 "superexec`` comme commande par défaut à exécuter lorsqu'on démarrage le "
 "conteneur."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:217
+#: ../../source/docker/tutorial-quickstart-docker.rst:216
 msgid ""
 "Note that `flwr <https://pypi.org/project/flwr/>`__ is already installed "
 "in the ``flwr/superexec`` base image, so only other package dependencies "
@@ -23418,7 +23420,7 @@ msgstr ""
 " est supprimée de l'image ``pyproject.toml`` après qu'elle a été copiée "
 "dans l'image Docker (voir ligne 5)."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:223
+#: ../../source/docker/tutorial-quickstart-docker.rst:222
 msgid ""
 "Afterward, in the directory that holds the Dockerfile, execute this "
 "Docker command to build the SuperExec image:"
@@ -23426,16 +23428,16 @@ msgstr ""
 "Après cela, dans le répertoire qui contient le fichier Dockerfile, "
 "exécutez cette commande Docker pour construire l'image SuperExec :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:230
+#: ../../source/docker/tutorial-quickstart-docker.rst:229
 msgid "Start the **SuperExec for ServerApps** container:"
 msgstr "Démarrer le **SuperExec pour les ServerApps** conteneur :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:247
+#: ../../source/docker/tutorial-quickstart-docker.rst:246
 msgid "``--name superexec-serverapp``: Give the container a descriptive name."
 msgstr "``--name superexec-serverapp``: Attribuez au conteneur un nom descriptif."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:249
-#: ../../source/docker/tutorial-quickstart-docker.rst:283
+#: ../../source/docker/tutorial-quickstart-docker.rst:248
+#: ../../source/docker/tutorial-quickstart-docker.rst:282
 msgid ""
 "``flwr_superexec:0.0.1``: This is the name of the image to be run and the"
 " specific tag of the image."
@@ -23443,8 +23445,8 @@ msgstr ""
 "``flwr_superexec:0.0.1``: C'est le nom de l'image à exécuter et la balise"
 " spécifique de l'image."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:251
-#: ../../source/docker/tutorial-quickstart-docker.rst:285
+#: ../../source/docker/tutorial-quickstart-docker.rst:250
+#: ../../source/docker/tutorial-quickstart-docker.rst:284
 msgid ""
 "``--insecure``: This flag tells the container to operate in an insecure "
 "mode, allowing unencrypted communication. Secure connections will be "
@@ -23454,39 +23456,39 @@ msgstr ""
 "mode non sécurisé, permettant la communication non chiffrée. Les "
 "connexions sécurisées seront ajoutées dans les futures versions."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:253
+#: ../../source/docker/tutorial-quickstart-docker.rst:252
 #, fuzzy
 msgid ""
 "``--runtime-api-address superlink:8000``: Connect to the SuperLink's "
 "Runtime API at the address ``superlink:8000``."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:258
+#: ../../source/docker/tutorial-quickstart-docker.rst:257
 msgid "Step 5: Start the SuperExec to execute ClientApps"
 msgstr "Étape 5 : Démarrer SuperExec pour exécuter les ClientApps"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:260
+#: ../../source/docker/tutorial-quickstart-docker.rst:259
 #, fuzzy
 msgid ""
 "For ClientApps, reuse the **same** image and pass ``--runtime-api-"
 "address`` pointing to the SuperNode's **Runtime API** endpoint."
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:263
+#: ../../source/docker/tutorial-quickstart-docker.rst:262
 msgid "(No new Dockerfile is needed; reuse ``flwr_superexec:0.0.1``.)"
 msgstr ""
 "(Aucun nouveau fichier Dockerfile n'est nécessaire ; réutilisez "
 "``flwr_superexec:0.0.1``)"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:264
+#: ../../source/docker/tutorial-quickstart-docker.rst:263
 msgid "Start the first **SuperExec for ClientApps** container:"
 msgstr "Démarrer le premier **SuperExec pour les ClientApps** conteneur :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:281
+#: ../../source/docker/tutorial-quickstart-docker.rst:280
 msgid "``--name superexec-clientapp-1``: Give the container a descriptive name."
 msgstr "``--name superexec-clientapp-1``: Donnez au conteneur un nom descriptif."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:287
+#: ../../source/docker/tutorial-quickstart-docker.rst:286
 #, fuzzy
 msgid ""
 "``--runtime-api-address supernode-1:9094``: Connect to the SuperNode's "
@@ -23495,16 +23497,16 @@ msgstr ""
 "``--appio-api-address supernode-1:9094``: Connectez-vous à l'API "
 "ClientAppIO de SuperNode à l'adresse ``supernode-1:9094``."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:290
+#: ../../source/docker/tutorial-quickstart-docker.rst:289
 msgid "Start the second **SuperExec for ClientApps** container:"
 msgstr "Démarrer le deuxième **SuperExec pour les ClientApps** conteneur :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:304
+#: ../../source/docker/tutorial-quickstart-docker.rst:303
 msgid "Step 6: Run the Quickstart Project"
 msgstr "Étape 6 : Exécuter le Projet Quickstart"
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:94
-#: ../../source/docker/tutorial-quickstart-docker.rst:306
+#: ../../source/docker/tutorial-quickstart-docker.rst:305
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:198
 msgid ""
 "Find the Flower Configuration TOML file in your machine. This file is "
@@ -23518,7 +23520,7 @@ msgstr ""
 "voir les connexions SuperLink disponibles ainsi que le chemin du fichier "
 "de configuration."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:320
+#: ../../source/docker/tutorial-quickstart-docker.rst:319
 msgid ""
 "Add the following lines to the ``config.toml`` to add a new SuperLink "
 "connection:"
@@ -23526,7 +23528,7 @@ msgstr ""
 "Ajoutez les lignes suivantes au ``config.toml`` pour ajouter une nouvelle"
 " connexion SuperLink: "
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:329
+#: ../../source/docker/tutorial-quickstart-docker.rst:328
 msgid ""
 "Run the ``quickstart-pytorch`` project and follow the ServerApp logs to "
 "track the execution of the run:"
@@ -23534,11 +23536,11 @@ msgstr ""
 "Exécutez le projet ``quickstart-pytorch`` et suivez les journaux "
 "ServerApp pour suivre l'exécution de l’exécution:"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:338
+#: ../../source/docker/tutorial-quickstart-docker.rst:337
 msgid "Step 7: Update the Application"
 msgstr "Étape 7 : Mettre à jour l'Application"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:340
+#: ../../source/docker/tutorial-quickstart-docker.rst:339
 msgid ""
 "Change the application code. For example, change the ``seed`` in "
 "``pytorchexample/task.py`` to ``43`` and save it:"
@@ -23546,16 +23548,16 @@ msgstr ""
 "Modifiez le code de l'application. Par exemple, changez la valeur "
 "``seed`` dans ``pytorchexample/task.py`` en ``43`` et sauvegardez-le:"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:343
+#: ../../source/docker/tutorial-quickstart-docker.rst:342
 msgid "pytorchexample/task.py"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:350
+#: ../../source/docker/tutorial-quickstart-docker.rst:349
 msgid "Stop the running containers:"
 msgstr "Arrêter les conteneurs en cours :"
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:148
-#: ../../source/docker/tutorial-quickstart-docker.rst:354
+#: ../../source/docker/tutorial-quickstart-docker.rst:353
 msgid ""
 "If you have modified the dependencies listed in your ``pyproject.toml`` "
 "file, it is essential to rebuild images."
@@ -23563,17 +23565,17 @@ msgstr ""
 "Si vous avez modifié les dépendances listées dans votre fichier "
 "``pyproject.toml``, il est essentiel de reconstruire les images."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:357
+#: ../../source/docker/tutorial-quickstart-docker.rst:356
 msgid "If you haven't made any changes, you can skip steps 2 through 4."
 msgstr ""
 "Si vous n'avez pas apporté de modifications, vous pouvez sauter les "
 "étapes 2 à 4."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:363
+#: ../../source/docker/tutorial-quickstart-docker.rst:362
 msgid "Rebuild the SuperExec image:"
 msgstr "Reconstruire l'image SuperExec :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:369
+#: ../../source/docker/tutorial-quickstart-docker.rst:368
 msgid ""
 "Launch **one SuperExec container** for the new ServerApp and **two "
 "SuperExec containers** for the new ClientApps:"
@@ -23581,32 +23583,32 @@ msgstr ""
 "Lancer **un conteneur SuperExec** pour la nouvelle ServerApp et **deux "
 "conteneurs SuperExec** pour les nouvelles ClientApps :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:396
+#: ../../source/docker/tutorial-quickstart-docker.rst:395
 msgid "Run the updated project:"
 msgstr "Lancer le projet mis à jour :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:404
+#: ../../source/docker/tutorial-quickstart-docker.rst:403
 msgid "Step 8: Clean Up"
 msgstr "Étape 8 : Nettoyage"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:406
+#: ../../source/docker/tutorial-quickstart-docker.rst:405
 msgid "Remove the containers and the bridge network:"
 msgstr "Supprimer les conteneurs et le réseau de pont :"
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:442
-#: ../../source/docker/tutorial-quickstart-docker.rst:418
+#: ../../source/docker/tutorial-quickstart-docker.rst:417
 msgid "Where to Go Next"
 msgstr "Où aller ensuite ?"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:420
+#: ../../source/docker/tutorial-quickstart-docker.rst:419
 msgid ":doc:`enable-tls`"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:421
+#: ../../source/docker/tutorial-quickstart-docker.rst:420
 msgid ":doc:`persist-superlink-state`"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:422
+#: ../../source/docker/tutorial-quickstart-docker.rst:421
 msgid ":doc:`tutorial-quickstart-docker-compose`"
 msgstr ""
 
@@ -30990,20 +30992,6 @@ msgstr ""
 "flower-with-deployment-engine`) ou en utilisant le `flwr CLI <ref-api-"
 "cli.html>`_."
 
-#: ../../source/how-to-configure-logging.rst:41
-msgid "Configure gRPC logging"
-msgstr "Configurez la journalisation gRPC"
-
-#: ../../source/how-to-configure-logging.rst:43
-#, fuzzy
-msgid ""
-"Flower uses `gRPC <https://grpc.io/>`_ for the Fleet API and other gRPC-"
-"based connections (see :doc:`ref-flower-network-communication`). You can "
-"set the verbosity level of ``gRPC`` logs using `gRPC environment "
-"variables "
-"<https://github.com/grpc/grpc/blob/master/doc/environment_variables.md>`_."
-msgstr ""
-
 #: ../../source/how-to-configure-pyproject-toml.rst:-1
 msgid ""
 "Learn how to configure your Flower app using the pyproject.toml file, "
@@ -33297,7 +33285,7 @@ msgstr ""
 " utilisant FedBN. Félicitations !"
 
 #: ../../source/how-to-implement-fedbn.rst:107
-#: ../../source/how-to-run-flower-on-azure.rst:241
+#: ../../source/how-to-run-flower-on-azure.rst:208
 msgid "Next Steps"
 msgstr "Prochaines étapes"
 
@@ -34832,18 +34820,15 @@ msgid "VM Networking"
 msgstr "Réseau de la VM"
 
 #: ../../source/how-to-run-flower-on-azure.rst:88
-#, fuzzy, python-brace-format
 msgid ""
 "During the execution of the Flower application, the server VM "
 "(``SuperLink``) will be responsible to orchestrate the execution of the "
-"application across the client VMs (``SuperNode``). When the SuperLink "
-"server starts, by default, it listens to the following ports: ``{8000, "
-"9092}``. Port ``9092`` is used to communicate with the federation clients"
-" (``SuperNode``), and port ``8000`` serves the HTTP Control API used to "
-"submit and execute Flower applications."
+"application across the client VMs (``SuperNode``). By default, SuperNodes"
+" use the Fleet API on port ``8000``. The SuperLink also serves the "
+"Control and Runtime APIs over HTTP on that port."
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-azure.rst:95
+#: ../../source/how-to-run-flower-on-azure.rst:93
 msgid ""
 "Therefore, to enable this communication we need to allow inbound traffic "
 "to the server VM instance. To achieve this, we need to navigate to the "
@@ -34858,102 +34843,70 @@ msgstr ""
 " rule``. Dans la nouvelle fenêtre qui s'affiche, nous modifierons les "
 "propriétés du règle comme suit:"
 
-#: ../../source/how-to-run-flower-on-azure.rst:100
+#: ../../source/how-to-run-flower-on-azure.rst:98
 msgid "The rest of the fields can be left at their default values."
 msgstr "Le reste des champs peut être laissé à leurs valeurs par défaut."
 
-#: ../../source/how-to-run-flower-on-azure.rst:107
-#: ../../source/how-to-run-flower-on-azure.rst:148
+#: ../../source/how-to-run-flower-on-azure.rst:105
 msgid "**Source**"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-azure.rst:108
+#: ../../source/how-to-run-flower-on-azure.rst:106
 msgid "``IP Addresses``"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-azure.rst:109
-#: ../../source/how-to-run-flower-on-azure.rst:136
+#: ../../source/how-to-run-flower-on-azure.rst:107
 msgid "**Source IP addresses/CIDR ranges**"
 msgstr "**Adresses IP source/ranges CIDR**"
 
-#: ../../source/how-to-run-flower-on-azure.rst:110
-msgid "add client VMs' Public IP (separated by comma)"
+#: ../../source/how-to-run-flower-on-azure.rst:108
+#, fuzzy
+msgid "add client VMs' Public IPs and your local machine's Public IP"
 msgstr "Ajoutez les adresses IP publiques des clients (séparées par une virgule)"
 
-#: ../../source/how-to-run-flower-on-azure.rst:111
+#: ../../source/how-to-run-flower-on-azure.rst:109
 msgid "**Destination**"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-azure.rst:112
-#: ../../source/how-to-run-flower-on-azure.rst:149
+#: ../../source/how-to-run-flower-on-azure.rst:110
 msgid "``Any``"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-azure.rst:113
+#: ../../source/how-to-run-flower-on-azure.rst:111
 msgid "**Service**"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-azure.rst:114
+#: ../../source/how-to-run-flower-on-azure.rst:112
 msgid "``custom``"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-azure.rst:115
-#: ../../source/how-to-run-flower-on-azure.rst:138
-#: ../../source/how-to-run-flower-on-azure.rst:150
+#: ../../source/how-to-run-flower-on-azure.rst:113
 msgid "**Destination port ranges**"
 msgstr "**Plages de ports de destination**"
 
-#: ../../source/how-to-run-flower-on-azure.rst:116
-msgid "``9092``"
-msgstr ""
-
-#: ../../source/how-to-run-flower-on-azure.rst:117
-msgid "**Protocol**"
-msgstr ""
-
-#: ../../source/how-to-run-flower-on-azure.rst:118
-msgid "``TCP``"
-msgstr ""
-
-#: ../../source/how-to-run-flower-on-azure.rst:120
-#, fuzzy
-msgid ""
-"Finally, we need to also open port 8000 to allow receiving and executing "
-"incoming application requests. To enable this we just need to repeat the "
-"steps above, i.e., create a new inbound rule, where for port range we "
-"assign port 8000. If we already know the Public IP from which our local "
-"machine (e.g., laptop) will be submitting applications to the Azure "
-"cluster, then we just need to specify the Source IP address/CIDR range. "
-"However, if we want to keep the port widely open we simply need to change"
-" source to ``Any``."
-msgstr ""
-
-#: ../../source/how-to-run-flower-on-azure.rst:128
-msgid ""
-"To be more precise, if we know the Public IP of our machine, then we make"
-" the following changes:"
-msgstr ""
-"Pour être plus précis, si nous connaissons l'adresse IP publique de notre"
-" machine, alors nous effectuons les modifications suivantes :"
-
-#: ../../source/how-to-run-flower-on-azure.rst:137
-msgid "add machine's Public IP"
-msgstr "Ajoutez l'adresse IP publique de la machine"
-
-#: ../../source/how-to-run-flower-on-azure.rst:139
-#: ../../source/how-to-run-flower-on-azure.rst:151
+#: ../../source/how-to-run-flower-on-azure.rst:114
 msgid "``8000``"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-azure.rst:141
-msgid "Otherwise, we change the properties as follows:"
-msgstr "Sinon, nous modifions les propriétés comme suit :"
+#: ../../source/how-to-run-flower-on-azure.rst:115
+msgid "**Protocol**"
+msgstr ""
 
-#: ../../source/how-to-run-flower-on-azure.rst:155
+#: ../../source/how-to-run-flower-on-azure.rst:116
+msgid "``TCP``"
+msgstr ""
+
+#: ../../source/how-to-run-flower-on-azure.rst:118
+msgid ""
+"This rule also allows your local machine to submit applications through "
+"the Control API."
+msgstr ""
+
+#: ../../source/how-to-run-flower-on-azure.rst:122
 msgid "Flower Environment"
 msgstr "Environnement Flower"
 
-#: ../../source/how-to-run-flower-on-azure.rst:157
+#: ../../source/how-to-run-flower-on-azure.rst:124
 msgid ""
 "Assuming we have been able to login to each VM, and create a Python "
 "environment with Flower and all its dependencies installed (``pip install"
@@ -34970,7 +34923,7 @@ msgstr ""
 "l'auteur et sélectionner le type du cadre de travail Flower que nous "
 "voulons exécuter, par exemple ``numpy``."
 
-#: ../../source/how-to-run-flower-on-azure.rst:165
+#: ../../source/how-to-run-flower-on-azure.rst:132
 msgid ""
 "An alternative approach would be to use Docker in each VM, with each "
 "image containing the necessary environment and dependencies. For more "
@@ -34981,11 +34934,11 @@ msgstr ""
 "Pour plus de détails, veuillez vous référer au guide "
 "|flower_docker_index|_."
 
-#: ../../source/how-to-run-flower-on-azure.rst:170
+#: ../../source/how-to-run-flower-on-azure.rst:137
 msgid "Server Initialization"
 msgstr "Initialisation du serveur"
 
-#: ../../source/how-to-run-flower-on-azure.rst:172
+#: ../../source/how-to-run-flower-on-azure.rst:139
 msgid ""
 "After configuring the Flower application environment, we proceed by "
 "starting the Flower long-running processes (i.e., ``SuperLink`` and "
@@ -34999,7 +34952,7 @@ msgstr ""
 "suivantes, d'abord sur le serveur (``SuperLink``) et ensuite sur chaque "
 "client (``SuperNode``)."
 
-#: ../../source/how-to-run-flower-on-azure.rst:179
+#: ../../source/how-to-run-flower-on-azure.rst:146
 msgid ""
 "To enable authentication and encrypted communication during the execution"
 " lifecycle of the Flower application, please have a look at the following"
@@ -35010,12 +34963,12 @@ msgstr ""
 "sur les ressources suivantes : |authenticate_supernodes|_, "
 "|enable_tls_connections|_"
 
-#: ../../source/how-to-run-flower-on-azure.rst:199
-#: ../../source/how-to-run-flower-on-gcp.rst:586
+#: ../../source/how-to-run-flower-on-azure.rst:166
+#: ../../source/how-to-run-flower-on-gcp.rst:581
 msgid "Run Flower App"
 msgstr "Exécutez l'application Flower"
 
-#: ../../source/how-to-run-flower-on-azure.rst:201
+#: ../../source/how-to-run-flower-on-azure.rst:168
 msgid ""
 "Finally, after all running Flower processes have been initialized on the "
 "Microsoft Azure cluster, in our local machine, we first need to install "
@@ -35025,7 +34978,7 @@ msgstr ""
 "Microsoft Azure, dans notre machine locale, nous devons d'abord installer"
 " Flower et créer une application Flower."
 
-#: ../../source/how-to-run-flower-on-azure.rst:212
+#: ../../source/how-to-run-flower-on-azure.rst:179
 msgid ""
 "Next, we need to create a new SuperLink connection in the Flower "
 "Configuration file:"
@@ -35033,9 +34986,9 @@ msgstr ""
 "Ensuite, nous devons créer une nouvelle connexion SuperLink dans le "
 "fichier de configuration Flower :"
 
-#: ../../source/how-to-run-flower-on-azure.rst:214
-#: ../../source/how-to-run-flower-on-gcp.rst:603
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:668
+#: ../../source/how-to-run-flower-on-azure.rst:181
+#: ../../source/how-to-run-flower-on-gcp.rst:598
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:662
 msgid ""
 "Run ``flwr config list`` to locate the Flower configuration file on your "
 "machine and view available SuperLink connections."
@@ -35044,9 +34997,9 @@ msgstr ""
 "Flower sur votre machine et afficher les connexions SuperLink "
 "disponibles."
 
-#: ../../source/how-to-run-flower-on-azure.rst:227
-#: ../../source/how-to-run-flower-on-gcp.rst:616
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:681
+#: ../../source/how-to-run-flower-on-azure.rst:194
+#: ../../source/how-to-run-flower-on-gcp.rst:611
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:675
 msgid ""
 "Open the Flower Configuration file (``config.toml``) and add a new "
 "SuperLink connection at the end:"
@@ -35054,13 +35007,13 @@ msgstr ""
 "Ouvrez le fichier de configuration Flower (``config.toml``) et ajoutez "
 "une nouvelle connexion SuperLink à la fin:"
 
-#: ../../source/how-to-run-flower-on-azure.rst:237
+#: ../../source/how-to-run-flower-on-azure.rst:204
 msgid "Then from our local machine we need to run ``flwr run . my-federation``."
 msgstr ""
 "Ensuite, depuis notre machine locale, nous devons exécuter ``flwr run . "
 "my-federation``."
 
-#: ../../source/how-to-run-flower-on-azure.rst:245
+#: ../../source/how-to-run-flower-on-azure.rst:212
 msgid ""
 "This guide is not suitable for production environments due to missing "
 "authentication and TLS security."
@@ -35068,7 +35021,7 @@ msgstr ""
 "Ce guide n'est pas adapté aux environnements de production en raison de "
 "la absence d'autentification et de sécurité TLS."
 
-#: ../../source/how-to-run-flower-on-azure.rst:248
+#: ../../source/how-to-run-flower-on-azure.rst:215
 msgid ""
 "To enable authentication and establish secure connections, please refer "
 "to the following resources: |authenticate_supernodes|_, "
@@ -35575,7 +35528,7 @@ msgstr ""
 msgid "superexec-clientapp-2-deployment.yaml"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:539
+#: ../../source/how-to-run-flower-on-gcp.rst:534
 msgid ""
 "Once you have created the required files, you can use the following "
 "``k8s-deploy.sh`` helper script to deploy all the ``Pods``."
@@ -35583,7 +35536,7 @@ msgstr ""
 "Une fois que vous avez créé les fichiers requis, vous pouvez utiliser l' "
 "aide script suivant ``k8s-deploy.sh`` pour déployer tous les ``Pods``."
 
-#: ../../source/how-to-run-flower-on-gcp.rst:544
+#: ../../source/how-to-run-flower-on-gcp.rst:539
 msgid ""
 "Make sure the Flower version you use to deploy the ``Pods`` matches the "
 "version of your Flower app."
@@ -35595,7 +35548,7 @@ msgstr ""
 msgid "k8s-deploy.sh"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:574
+#: ../../source/how-to-run-flower-on-gcp.rst:569
 msgid ""
 "To see that your ``Pods`` are deployed, please go to the ``Navigation "
 "Menu`` on the Google Console, select ``Kubernetes Engine`` and then the "
@@ -35607,7 +35560,7 @@ msgstr ""
 "Engine`` et puis la page ``Workloads``. La nouvelle fenêtre qui apparaît "
 "montrera l'état des ``Pods`` en cours de déploiement."
 
-#: ../../source/how-to-run-flower-on-gcp.rst:580
+#: ../../source/how-to-run-flower-on-gcp.rst:575
 msgid ""
 "Please wait for a couple of minutes (3' to 5' minutes should be enough) "
 "before the ``Pods`` are up and running. While ``Pods`` resources are "
@@ -35618,7 +35571,7 @@ msgstr ""
 "mise en place des ressources ``Pods``, certaines avertissements sont "
 "attendus."
 
-#: ../../source/how-to-run-flower-on-gcp.rst:588
+#: ../../source/how-to-run-flower-on-gcp.rst:583
 msgid ""
 "Once all ``Pods`` are up and running, we need to get the ``EXTERNAL_IP`` "
 "of the ``superlink-service`` and point our Flower app to use the "
@@ -35629,7 +35582,7 @@ msgstr ""
 "pointer notre application Flower pour utiliser le cluster Kubernetes pour"
 " soumettre et exécuter la tâche."
 
-#: ../../source/how-to-run-flower-on-gcp.rst:592
+#: ../../source/how-to-run-flower-on-gcp.rst:587
 msgid ""
 "To get the ``EXTERNAL-IP`` of the ``superlink-service`` we run the "
 "following command, which will show the ``NAME``, ``TYPE``, ``CLUSTER-"
@@ -35639,7 +35592,7 @@ msgstr ""
 "suivante, qui montrera les ``TYPE``, ``CLUSTER-IP``, ``EXTERNAL-IP``, "
 "``PORTS`` et __PH7__ de la service :"
 
-#: ../../source/how-to-run-flower-on-gcp.rst:600
+#: ../../source/how-to-run-flower-on-gcp.rst:595
 msgid ""
 "After we get the ``EXTERNAL-IP`` we need to create a new SuperLink "
 "connection in the Flower Configuration file:"
@@ -35647,11 +35600,11 @@ msgstr ""
 "Après avoir récupéré le ``EXTERNAL-IP``, nous avons besoin de créer un "
 "nouveau lien de connexion dans le fichier de configuration SuperLink :"
 
-#: ../../source/how-to-run-flower-on-gcp.rst:626
+#: ../../source/how-to-run-flower-on-gcp.rst:621
 msgid "Then we can execute the example on the GCP cluster by running:"
 msgstr "Nous pouvons ensuite exécuter l'exemple sur le cluster GCP en exécutant :"
 
-#: ../../source/how-to-run-flower-on-gcp.rst:634
+#: ../../source/how-to-run-flower-on-gcp.rst:629
 msgid ""
 "Please note that in the current deployment, communication is not "
 "encrypted. To enable TLS for secure connections, check the following "
@@ -35664,7 +35617,7 @@ msgstr ""
 "mettrons également à jour ce guide bientôt avec plus de détails sur la "
 "configuration de TLS."
 
-#: ../../source/how-to-run-flower-on-gcp.rst:639
+#: ../../source/how-to-run-flower-on-gcp.rst:634
 msgid ""
 "If the job is successfully submitted, and executed, then in your console "
 "you should see the logs from the run. The output should look like the one"
@@ -35678,7 +35631,7 @@ msgstr ""
 msgid "Expected Output"
 msgstr "Sortie attendue"
 
-#: ../../source/how-to-run-flower-on-gcp.rst:715
+#: ../../source/how-to-run-flower-on-gcp.rst:710
 msgid ""
 "Please note that if you terminate or shut down the cluster, and create a "
 "new one, the value of the ``EXTERNAL_IP`` changes. In that case, you will"
@@ -35688,11 +35641,11 @@ msgstr ""
 "nouveau, la valeur du ``EXTERNAL_IP`` change. Dans ce cas, vous devrez "
 "mettre à jour le fichier de configuration Flower."
 
-#: ../../source/how-to-run-flower-on-gcp.rst:721
+#: ../../source/how-to-run-flower-on-gcp.rst:716
 msgid "Shutdown Flower Infrastructure"
 msgstr "Arrêter l'infrastructure Flower"
 
-#: ../../source/how-to-run-flower-on-gcp.rst:723
+#: ../../source/how-to-run-flower-on-gcp.rst:718
 msgid ""
 "If you would like to shutdown all the running pods deployed during this "
 "guide, you can use the ``kubectl delete`` command and pass the the "
@@ -36072,9 +36025,10 @@ msgstr ""
 "spécifiée."
 
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:245
+#, fuzzy
 msgid ""
-"In our deployment, SuperLink listens on port ``9092`` corresponding to "
-"the Fleet API (for more details, read our reference on `Flower network "
+"In our deployment, SuperLink serves the Fleet API over HTTP on port "
+"``8000`` (for more details, read our reference on `Flower network "
 "communication <ref-flower-network-communication.rst#flower-components-"
 "apis>`_). Since we have given the SuperLink deployment the name "
 "``superlink``, we will use that as the workload name:"
@@ -36104,6 +36058,7 @@ msgstr ""
 "commande suivante :"
 
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:269
+#, fuzzy
 msgid ""
 "The ``<name>`` is the name of the listener resource, and will be the "
 "default routing key and host if the ``--routing-key`` and ``--host`` "
@@ -36111,7 +36066,7 @@ msgid ""
 "name of the connector we created in the SuperLink cluster, which is "
 "``fleet-api``. The ``<port>`` is the port number that the listener will "
 "listen on, which must also match the port number of the connector "
-"(``9092``):"
+"(``8000``):"
 msgstr ""
 "Le ``<name>`` est le nom de la ressource d'écoute, et sera la clé de "
 "routage par défaut et hôte si les options ``--routing-key`` et ``--host``"
@@ -36221,17 +36176,17 @@ msgstr ""
 "hat-openshift>`"
 
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:380
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:716
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:710
 msgid ":doc:`How to run Flower with Docker <docker/index>`"
 msgstr ":doc:`Exécuter Flower avec Docker <docker/index>`"
 
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:381
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:717
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:711
 msgid ":doc:`How to run Flower with Helm <helm/index>`"
 msgstr ":doc:`Exécuter Flower avec Helm <helm/index>`"
 
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:383
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:719
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:713
 msgid ""
 "To learn about running Flower on other cloud platforms, check out our "
 "guides below:"
@@ -36240,12 +36195,12 @@ msgstr ""
 "cloud, consultez nos guides ci-dessous :"
 
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:385
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:721
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:715
 msgid ":doc:`How to run Flower on Microsoft Azure <how-to-run-flower-on-azure>`"
 msgstr ":doc:`Exécuter Flower sur Microsoft Azure <how-to-run-flower-on-azure>`"
 
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:386
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:722
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:716
 msgid ""
 ":doc:`How to run Flower on Google Cloud Platform <how-to-run-flower-on-"
 "gcp>`"
@@ -36708,7 +36663,7 @@ msgstr ""
 " Ce manifeste est adapté de notre tutoriel sur :doc:`how to deploy Flower"
 " in GCP <how-to-run-flower-on-gcp>`."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:272
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:270
 msgid ""
 "After the SuperLink pod is created, add the service pod following the "
 "steps to create a pod and insert the following YAML definition:"
@@ -36720,13 +36675,13 @@ msgstr ""
 msgid "superlink-service.yaml"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:299
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:293
 msgid "Finally, spin up two SuperNode pods with the following YAML definitions:"
 msgstr ""
 "Finalement, lancez deux pods SuperNode avec les définitions YAML "
 "suivantes :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:419
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:413
 msgid ""
 "To view the status of pods that were just deployed, click on the "
 "``Workloads`` link in the left panel. You should be able to see three "
@@ -36737,15 +36692,15 @@ msgstr ""
 "trois pods Flower en état « Exécutant » comme montré dans la capture "
 "d'écran ci-dessous :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:423
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:417
 msgid "Flower SuperLink and SuperNode pods in Red Hat OpenShift"
 msgstr "Pods Flower SuperLink et SuperNode dans Red Hat OpenShift"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:428
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:422
 msgid "Flower SuperLink and SuperNode pods in Red Hat OpenShift."
 msgstr "Pods Flower SuperLink et SuperNode dans Red Hat OpenShift."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:430
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:424
 msgid ""
 "Click on the SuperLink pod to view the pod details and click on the "
 "``Logs`` tab. You should be able to view the SuperLink logs showing two "
@@ -36755,7 +36710,7 @@ msgstr ""
 "sur l'onglet ``Logs``. Vous devriez pouvoir afficher les journaux "
 "SuperLink montrant deux SuperNodes connectés."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:435
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:429
 msgid ""
 "To shut down the pods, navigate to ``Workloads`` > ``Deployments``, "
 "select the deployed pods, and click on ``Edit Pod Count`` to set the "
@@ -36768,11 +36723,11 @@ msgstr ""
 "pods en sélectionnant-les et en cliquant sur le bouton ``Delete "
 "Deployment``."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:442
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:436
 msgid "Deploy Red Hat OpenShift AI"
 msgstr "Déployer l'intelligence artificielle collaborative Red Hat OpenShift"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:444
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:438
 msgid ""
 "To interface with the deployed SuperLink and SuperNode in the OpenShift "
 "cluster, we want to make use of OpenShift AI workbench. So, we need to "
@@ -36783,7 +36738,7 @@ msgstr ""
 "Par conséquent, nous devons activer cet Opérateur dans le cluster "
 "OpenShift."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:448
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:442
 msgid ""
 "First, ensure that the Red Hat OpenShift AI is enabled via the Red Hat "
 "OpenShift console. You may enable a free trial if you do not have a "
@@ -36815,23 +36770,23 @@ msgstr ""
 "l'Opérateur ``Red Hat OpenShift AI`` dans le panneau ``Installed "
 "Operators`` :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:459
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:453
 msgid "Red Hat OpenShift AI Operator in OpenShift"
 msgstr ""
 "Opérateur d'intelligence artificielle collaborative Red Hat OpenShift "
 "dans OpenShift"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:464
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:458
 msgid "Red Hat OpenShift AI Operator in OpenShift."
 msgstr ""
 "Opérateur d'intelligence artificielle collaborative Red Hat OpenShift "
 "dans OpenShift."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:467
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:461
 msgid "Install Data Science Cluster"
 msgstr "Installer un cluster de science des données"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:469
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:463
 msgid ""
 "After installing the Operator, we need to install the "
 "``DataScienceCluster`` using the web console. Follow the official steps "
@@ -36871,7 +36826,7 @@ msgstr ""
 msgid "rhosai-datasciencecluster.yaml"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:524
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:518
 msgid ""
 "Click on ``Create`` to create the Data Science Cluster. If successful, "
 "you should see a ``default-dsc`` instance in the ``Data Science "
@@ -36881,19 +36836,19 @@ msgstr ""
 "vous devriez voir une instance ``default-dsc`` dans l'onglet ``Data "
 "Science Clusters`` avec un signe de vérification vert :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:527
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:521
 msgid "View of a successfully created Red Hat OpenShift AI Data Science Cluster"
 msgstr ""
 "Vue d'un cluster de science des données Red Hat OpenShift AI créé avec "
 "succès"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:532
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:526
 msgid "View of a successfully created Red Hat OpenShift AI Data Science Cluster."
 msgstr ""
 "Vue d'un cluster de science des données Red Hat OpenShift AI créé avec "
 "succès."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:534
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:528
 msgid ""
 "Once the above is complete, you will be able to launch OpenShift AI by "
 "clicking on the grid icon on the top right of the OpenShift console and "
@@ -36904,19 +36859,19 @@ msgstr ""
 "grilleau à droite supérieur de la console OpenShift et en cliquant sur le"
 " lien ``Red Hat OpenShift AI`` :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:538
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:532
 msgid "Launch Red Hat OpenShift AI from OpenShift console"
 msgstr ""
 "Lancer l'intelligence artificielle collaborative Red Hat OpenShift à "
 "partir de la console OpenShift"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:543
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:537
 msgid "Launch Red Hat OpenShift AI from OpenShift console."
 msgstr ""
 "Lancer l'intelligence artificielle collaborative Red Hat OpenShift à "
 "partir de la console OpenShift."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:545
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:539
 msgid ""
 "Follow the instructions when prompted to ``Log in with OpenShift``. After"
 " logging in, you will be taken to the OpenShift AI dashboard."
@@ -36925,11 +36880,11 @@ msgstr ""
 "OpenShift``. Après avoir connecté, vous serez redirigé vers le tableau de"
 " bord d'intelligence artificielle OpenShift."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:549
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:543
 msgid "Create a Custom OpenShift AI Image with Flower"
 msgstr "Créer une image d'OpenShift AI personnalisée avec Flower"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:551
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:545
 msgid ""
 "In OpenShift AI, you will be building and running your Flower app in a "
 "workbench, which is a Jupyter notebook environment. However, the default "
@@ -36954,7 +36909,7 @@ msgstr ""
 "/creating-custom-workbench-images#creating-a-custom-image-from-default-"
 "image_custom-images>`_."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:559
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:553
 msgid ""
 "**Pre-requisites**: Given that Red Hat OpenShift AI needs to be able to "
 "pull from a container registry, you will need to create an account on "
@@ -36972,7 +36927,7 @@ msgstr ""
 "<https://docs.docker.com/get-docker/>`_ sur votre système. Ensuite, "
 "connectez-vous à votre compte ``quay.io`` en utilisant la commande :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:570
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:564
 msgid ""
 "Now, we select a base image for our custom OpenShift AI image. In the Red"
 " Hat OpenShift console, go to ``Builds`` > ``ImageStreams``. You can find"
@@ -36990,7 +36945,7 @@ msgstr ""
 "l'identifiant ``sha256``. Dans ce guide, nous utilisons la balise "
 "``2025.1``."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:576
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:570
 msgid "Next, in your machine, create a Dockerfile with the following contents:"
 msgstr ""
 "Créez ensuite dans votre machine un fichier Dockerfile avec le contenu "
@@ -37000,7 +36955,7 @@ msgstr ""
 msgid "Dockerfile"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:589
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:583
 msgid ""
 "Build and push the container image to your public repository on "
 "``quay.io``:"
@@ -37008,7 +36963,7 @@ msgstr ""
 "Construirez et envoyez l'image de conteneur vers votre dépôt public sur "
 "``quay.io``: "
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:595
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:589
 msgid ""
 "Once the image is pushed, we will configure OpenShift AI to load this "
 "custom workbench image. In the OpenShift AI dashboard, go to ``Settings``"
@@ -37031,19 +36986,19 @@ msgstr ""
 " pour importer l'image. Si c'est réussi, vous devriez voir votre image "
 "personnalisée dans la liste des images de travail :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:603
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:597
 msgid "Custom OpenShift AI workbench image with Flower"
 msgstr "Image de travail OpenShift AI personnalisée avec Flower"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:608
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:602
 msgid "Custom OpenShift AI workbench image with Flower."
 msgstr "Image de travail OpenShift AI personnalisée avec Flower."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:611
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:605
 msgid "Create a Data Science Project"
 msgstr "Créer un projet de science des données"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:613
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:607
 msgid ""
 "Now we are ready to create a Data Science project in OpenShift AI and "
 "create a workbench using the custom image we just created from the "
@@ -37054,7 +37009,7 @@ msgstr ""
 "l'image personnalisée que nous avons créée précédemment dans la section "
 "précédente."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:616
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:610
 msgid ""
 "On the left sidebar, click on ``Home``, navigate to the ``Data Science "
 "Projects`` section, and click on the ``Create project`` button. Give your"
@@ -37068,15 +37023,15 @@ msgstr ""
 "demo``, et - si vous le souhaitez, une description. Ensuite, cliquez sur "
 "``Create``. Cliquez sur votre projet créé pour l'ouvrir."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:621
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:615
 msgid "Data Science project in Red Hat OpenShift AI"
 msgstr "Projet de science des données dans Red Hat OpenShift AI"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:626
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:620
 msgid "Data Science project in Red Hat OpenShift AI."
 msgstr "Projet de science des données dans Red Hat OpenShift AI."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:628
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:622
 msgid ""
 "Navigate to the ``Workbenches`` tab and click on ``Create workbench`` to "
 "create a new workbench. Under \"Name and description\", provide a name "
@@ -37097,25 +37052,25 @@ msgstr ""
 "``Create Workbench``. L'état de votre interface de travail devrait passer"
 " à ``Running`` après quelques minutes :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:636
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:630
 msgid "Running workbench in Red Hat OpenShift AI"
 msgstr "Interface de travail en cours d'exécution dans Red Hat OpenShift AI"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:641
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:635
 msgid "Running workbench in Red Hat OpenShift AI."
 msgstr "Interface de travail en cours d'exécution dans Red Hat OpenShift AI."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:643
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:637
 msgid "Now, click on your workbench and launch the JupyterLab environment."
 msgstr ""
 "Cliquez maintenant sur votre interface de travail et lancez "
 "l'environnement JupyterLab."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:647
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:641
 msgid "Run the Flower App in OpenShift AI"
 msgstr "Exécuter l'application Flower dans OpenShift AI"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:649
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:643
 msgid ""
 "With a running workbench and deployed SuperLink and SuperNode pods in "
 "your OpenShift cluster, you are now ready to run a Flower app! In the "
@@ -37130,19 +37085,19 @@ msgstr ""
 "correctement et fonctionne comme attendu : ouvrez un nouveau terminal et "
 "exécutez ``flwr --version`` pour vérifier la version de Flower :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:654
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:648
 msgid "Verify Flower installation in OpenShift AI workbench"
 msgstr ""
 "Vérification de l'installation de Flower dans l'interface de travail "
 "OpenShift AI"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:659
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:653
 msgid "Verify Flower installation in OpenShift AI workbench."
 msgstr ""
 "Vérification de l'installation de Flower dans l'interface de travail "
 "OpenShift AI."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:661
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:655
 msgid ""
 "With Flower running correctly, you can now follow the usual steps of "
 "using ``flwr new`` to create a new Flower app from a template, and ``flwr"
@@ -37162,21 +37117,21 @@ msgstr ""
 "une nouvelle connexion SuperLink dans le fichier de configuration Flower:"
 " "
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:691
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:685
 msgid "And finally, run your Flower app as usual with ``flwr run``:"
 msgstr ""
 "Et enfin, exécutez votre application Flower comme d'habitude avec ``flwr "
 "run``: "
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:693
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:687
 msgid "Running Flower app in OpenShift AI workbench"
 msgstr "Exécuter l'application Flower dans l'interface de travail OpenShift AI"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:698
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:692
 msgid "Running Flower app in OpenShift AI workbench."
 msgstr "Exécuter l'application Flower dans l'interface de travail OpenShift AI."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:700
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:694
 msgid ""
 "You can also view the logs of the SuperLink pod in the OpenShift console."
 " Navigate to ``Workloads`` > ``Pods``, click on the SuperLink pod, and "
@@ -37186,19 +37141,19 @@ msgstr ""
 "console OpenShift. Naviguez vers ``Workloads`` > ``Pods``, cliquez sur le"
 " pod SuperLink, puis cliquez sur l'icône ``Logs``: "
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:703
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:697
 msgid "SuperLink logs showing connected SuperNodes and running Flower app"
 msgstr ""
 "Journal des logs SuperLink montrant les SuperNodes connectés et "
 "l'application Flower en cours d'exécution"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:708
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:702
 msgid "SuperLink logs showing connected SuperNodes and running Flower app."
 msgstr ""
 "Journal des logs SuperLink montrant les SuperNodes connectés et "
 "l'application Flower en cours d'exécution."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:710
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:704
 msgid ""
 "Congratulations! You have successfully created, deployed, and run a "
 "Flower app on Red Hat OpenShift using the Red Hat OpenShift Service on "
@@ -37470,9 +37425,10 @@ msgstr ""
 "exécuter votre SuperNode avec TLS."
 
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:152
+#, fuzzy
 msgid ""
-"``--superlink 127.0.0.1:9092``: Connect to the SuperLink's Fleet API at "
-"the address ``127.0.0.1:9092``. If you had launched the SuperLink in a "
+"``--superlink 127.0.0.1:8000``: Connect to the SuperLink's Fleet API at "
+"the address ``127.0.0.1:8000``. If you had launched the SuperLink in a "
 "different machine, you'd replace ``127.0.0.1`` with the public IP of that"
 " machine."
 msgstr ""
@@ -58339,7 +58295,7 @@ msgid "IPv4 (e.g., ``192.168.1.1:9091``)"
 msgstr ""
 
 #: ../../source/ref-exit-codes/600.rst:19
-msgid "IPv6 (e.g., ``[2001:0db8::1]:9092``)"
+msgid "IPv6 (e.g., ``[2001:0db8::1]:8000``)"
 msgstr ""
 
 #: ../../source/ref-exit-codes/602.rst:3
@@ -59433,11 +59389,12 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:86
+#, fuzzy
 msgid ""
 "**SuperNode to SuperLink (Fleet API)**: In Flower terminology, a Flower "
 "federation is a set of SuperNodes connected to the same SuperLink. From a"
-" networking perspective, each SuperNode acts as a gRPC client and the "
-"SuperLink acts as a gRPC server. This means that, when deploying a "
+" networking perspective, each SuperNode acts as an HTTP client and the "
+"SuperLink acts as an HTTP server. This means that, when deploying a "
 "SuperNode, only outgoing connections are necessary to connect to the "
 "SuperLink. Only the SuperNodes can initiate such requests and they do not"
 " respond to incoming requests. The SuperNode to SuperLink connection "
@@ -59496,60 +59453,57 @@ msgstr ""
 msgid ""
 "Runtime API communication uses HTTP starting with Flower 1.35. Starting "
 "with Flower 1.37, the Flower CLI also communicates with the Control API "
-"over HTTP."
+"over HTTP. The Fleet API also uses HTTP by default."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:121
+#: ../../source/ref-flower-network-communication.rst:122
 msgid "Component"
 msgstr "Composant"
 
-#: ../../source/ref-flower-network-communication.rst:122
+#: ../../source/ref-flower-network-communication.rst:123
 msgid "Default Port"
 msgstr "Port par défaut"
 
-#: ../../source/ref-flower-network-communication.rst:123
+#: ../../source/ref-flower-network-communication.rst:124
 msgid "API"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:124
+#: ../../source/ref-flower-network-communication.rst:125
 msgid "Purpose"
 msgstr "Objectif"
 
-#: ../../source/ref-flower-network-communication.rst:125
+#: ../../source/ref-flower-network-communication.rst:126
 msgid "SuperLink"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:126
-#: ../../source/ref-flower-network-communication.rst:134
+#: ../../source/ref-flower-network-communication.rst:127
+#: ../../source/ref-flower-network-communication.rst:131
+#: ../../source/ref-flower-network-communication.rst:135
 msgid "8000"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:127
-#: ../../source/ref-flower-network-communication.rst:140
+#: ../../source/ref-flower-network-communication.rst:128
+#: ../../source/ref-flower-network-communication.rst:141
 msgid "Runtime API"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:128
+#: ../../source/ref-flower-network-communication.rst:129
 msgid "Used by the SuperExec and the ``ServerApp`` processes"
 msgstr "Utilisé par les processus SuperExec et les processus ``ServerApp``"
 
-#: ../../source/ref-flower-network-communication.rst:130
-msgid "9092"
-msgstr ""
-
-#: ../../source/ref-flower-network-communication.rst:131
+#: ../../source/ref-flower-network-communication.rst:132
 msgid "Fleet API"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:132
+#: ../../source/ref-flower-network-communication.rst:133
 msgid "Used by the SuperNodes"
 msgstr "Utilisé par les SuperNodes"
 
-#: ../../source/ref-flower-network-communication.rst:135
+#: ../../source/ref-flower-network-communication.rst:136
 msgid "Control API"
 msgstr "Contrôle API"
 
-#: ../../source/ref-flower-network-communication.rst:136
+#: ../../source/ref-flower-network-communication.rst:137
 msgid ""
 "Users interface with the SuperLink via this API using the `FlowerCLI "
 "<ref-api-cli.html>`_"
@@ -59557,25 +59511,25 @@ msgstr ""
 "L'utilisateur interagit avec le SuperLink via cette API en utilisant le "
 "`FlowerCLI <ref-api-cli.html>`_"
 
-#: ../../source/ref-flower-network-communication.rst:138
+#: ../../source/ref-flower-network-communication.rst:139
 msgid "SuperNode"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:139
+#: ../../source/ref-flower-network-communication.rst:140
 msgid "9094"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:141
+#: ../../source/ref-flower-network-communication.rst:142
 msgid "Used by the SuperExec and the ``ClientApp`` processes"
 msgstr "Utilisé par les processus SuperExec et ``ClientApp``,"
 
-#: ../../source/ref-flower-network-communication.rst:143
+#: ../../source/ref-flower-network-communication.rst:144
 msgid ""
-"The SuperLink Runtime and Control APIs share the same HTTP server and "
-"default port."
+"The SuperLink Runtime, Fleet, and Control APIs share the same HTTP server"
+" and default port."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:147
+#: ../../source/ref-flower-network-communication.rst:149
 #, fuzzy
 msgid ""
 "Runtime APIs enforce runtime version compatibility between the API server"
@@ -59596,11 +59550,11 @@ msgstr ""
 "SuperExec, ``ServerApp`` et ``ClientApp`` sur des versions Flower "
 "compatibles."
 
-#: ../../source/ref-flower-network-communication.rst:155
+#: ../../source/ref-flower-network-communication.rst:157
 msgid "Isolation Mode"
 msgstr "Mode d'isolement"
 
-#: ../../source/ref-flower-network-communication.rst:157
+#: ../../source/ref-flower-network-communication.rst:159
 msgid ""
 "Both SuperLink and SuperNode can operate in different isolation modes. "
 "The **SuperExec** is responsible for scheduling, launching, and managing "
@@ -59613,7 +59567,7 @@ msgstr ""
 "d'applications, tels que le processus ``ServerApp`` et le processus "
 "``ClientApp``."
 
-#: ../../source/ref-flower-network-communication.rst:161
+#: ../../source/ref-flower-network-communication.rst:163
 msgid ""
 "The ``subprocess`` isolation mode configures the SuperLink/SuperNode to "
 "automatically run the SuperExec as a subprocess upon start. The "
@@ -59637,7 +59591,7 @@ msgstr ""
 "guide :doc:`docker/index` pour une compréhension plus approfondie de la "
 "façon dont utiliser les deux modes."
 
-#: ../../source/ref-flower-network-communication.rst:169
+#: ../../source/ref-flower-network-communication.rst:171
 msgid ""
 "When using the ``process`` isolation mode, additional network connections"
 " are necessary to allow the external process running the SuperExec, "
@@ -59649,7 +59603,7 @@ msgstr ""
 "externe exécutant le SuperExec, ``ServerApp`` ou ``ClientApp`` de "
 "communiquer avec le SuperLink ou SuperNode: "
 
-#: ../../source/ref-flower-network-communication.rst:173
+#: ../../source/ref-flower-network-communication.rst:175
 #, fuzzy
 msgid ""
 "**SuperExec/ServerApp process to SuperLink (Runtime API)**: Both the "
@@ -59662,7 +59616,7 @@ msgid ""
 "SuperLink)."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:179
+#: ../../source/ref-flower-network-communication.rst:181
 #, fuzzy
 msgid ""
 "**SuperExec/ClientApp process to SuperNode (Runtime API)**: Both the "
@@ -59675,7 +59629,7 @@ msgid ""
 "to the SuperNode."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:188
+#: ../../source/ref-flower-network-communication.rst:190
 #, fuzzy
 msgid ""
 "The Runtime API links above can run with plaintext communication or with "
@@ -59683,15 +59637,15 @@ msgid ""
 "remain unencrypted and should stay inside a trusted network:"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:192
+#: ../../source/ref-flower-network-communication.rst:194
 msgid "SuperLink + SuperExec + ``ServerApp`` process"
 msgstr "Processus SuperLink + SuperExec + ``ServerApp``"
 
-#: ../../source/ref-flower-network-communication.rst:193
+#: ../../source/ref-flower-network-communication.rst:195
 msgid "SuperNode + SuperExec + ``ClientApp`` process"
 msgstr "Processus SuperNode + SuperExec + ``ClientApp``"
 
-#: ../../source/ref-flower-network-communication.rst:195
+#: ../../source/ref-flower-network-communication.rst:197
 #, fuzzy
 msgid ""
 "For SuperLink, ``--ssl-certfile``, ``--ssl-keyfile``, and ``--ssl-ca-"
@@ -59703,7 +59657,7 @@ msgid ""
 "commands."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:204
+#: ../../source/ref-flower-network-communication.rst:206
 msgid ""
 "When running without TLS, each group must remain inside a single trusted "
 "network. They should never communicate with each other over untrusted "
@@ -59713,11 +59667,11 @@ msgstr ""
 " confiance unique. Ils ne devraient jamais communiquer entre eux sur des "
 "réseaux non fiables (par exemple, Internet public)."
 
-#: ../../source/ref-flower-network-communication.rst:209
+#: ../../source/ref-flower-network-communication.rst:211
 msgid "Account Authentication"
 msgstr "Authentification de compte"
 
-#: ../../source/ref-flower-network-communication.rst:211
+#: ../../source/ref-flower-network-communication.rst:213
 msgid ""
 "When account authentication is enabled, Flower uses an OIDC-compatible "
 "server to authenticate requests:"
@@ -59725,7 +59679,7 @@ msgstr ""
 "Lorsque l'authentification de compte est activée, Flower utilise un "
 "serveur compatible OIDC pour authentifier les requêtes :"
 
-#: ../../source/ref-flower-network-communication.rst:214
+#: ../../source/ref-flower-network-communication.rst:216
 msgid ""
 "**SuperLink to OIDC server**: A SuperLink can optionally be configured to"
 " only allow authenticated users to interact with it. In this setting, the"
@@ -59736,11 +59690,11 @@ msgstr ""
 "ce cas, le SuperLink Flower agit comme client REST vers le serveur OIDC "
 "compatible."
 
-#: ../../source/ref-flower-network-communication.rst:219
+#: ../../source/ref-flower-network-communication.rst:221
 msgid "Application-specific Connections"
 msgstr "Connexions spécifiques à l'application"
 
-#: ../../source/ref-flower-network-communication.rst:221
+#: ../../source/ref-flower-network-communication.rst:223
 msgid ""
 "Users who write Flower Apps (``ServerApp`` and ``ClientApp``) can also "
 "make additional network requests. This is, strictly speaking, not part of"
@@ -59757,11 +59711,11 @@ msgstr ""
 "Flower doit se connecter et (b) de l'administrateur système sur les types"
 " de connexions qu'ils souhaitent autoriser."
 
-#: ../../source/ref-flower-network-communication.rst:227
+#: ../../source/ref-flower-network-communication.rst:229
 msgid "Typical examples include:"
 msgstr "Exemples typiques incluent :"
 
-#: ../../source/ref-flower-network-communication.rst:229
+#: ../../source/ref-flower-network-communication.rst:231
 msgid ""
 "**ClientApp to Database**: ``ClientApp`` instances typically need to be "
 "able to access the data to perform the action they have been designed for"
@@ -59781,7 +59735,7 @@ msgstr ""
 "connexion(s) vers la base de données peut(ont) probablement différer de "
 "l'illustration ci-dessus."
 
-#: ../../source/ref-flower-network-communication.rst:235
+#: ../../source/ref-flower-network-communication.rst:237
 msgid ""
 "**ServerApp to Database**: ``ServerApp`` instances might want to access "
 "the data to perform the action they have been designed for (e.g. evaluate"
@@ -59798,7 +59752,7 @@ msgstr ""
 " le diagramme ci-dessus, nous avons omis de montrer une base de données "
 "connectée aux composants ``ServerApp``."
 
-#: ../../source/ref-flower-network-communication.rst:240
+#: ../../source/ref-flower-network-communication.rst:242
 msgid ""
 "**ServerApp to metric logging service**: Metric logging services like "
 "TensorBoard, MLFlow and Weights & Biases are often used to track the "
@@ -59811,11 +59765,11 @@ msgstr ""
 "exécutions d'entraînement. Dans ce cas, le ``ServerApp`` agit "
 "généralement comme client vers le service de journalisation de métrique."
 
-#: ../../source/ref-flower-network-communication.rst:246
+#: ../../source/ref-flower-network-communication.rst:248
 msgid "Communication Model"
 msgstr "Modèle de communication"
 
-#: ../../source/ref-flower-network-communication.rst:248
+#: ../../source/ref-flower-network-communication.rst:250
 msgid ""
 "During real-world deployment, the push/pull communication model adopted "
 "by each component can influence decisions related to resource "
@@ -59829,7 +59783,7 @@ msgstr ""
 " soutenir ces décisions, la liste ci-dessous détaille le modèle de "
 "communication utilisé entre les composants Flower :"
 
-#: ../../source/ref-flower-network-communication.rst:253
+#: ../../source/ref-flower-network-communication.rst:255
 msgid ""
 "**SuperLink ↔ SuperNode (Fleet API)**: The SuperNode pulls/pushes "
 "Messages from/to the SuperLink via the Fleet API. The SuperNode also "
@@ -59839,7 +59793,7 @@ msgstr ""
 "Messages vers/à partir du SuperLink via l'API Fleet. Le SuperNode "
 "récupère également le FAB si une nouvelle exécution est en cours."
 
-#: ../../source/ref-flower-network-communication.rst:256
+#: ../../source/ref-flower-network-communication.rst:258
 #, fuzzy
 msgid ""
 "**SuperLink ↔ ServerApp (Runtime API)**: The ``ServerApp`` process "
@@ -59854,7 +59808,7 @@ msgstr ""
 " de la première interaction avec le SuperLink, et à la fin de l'exécution"
 " ils poussent le Context vers le SuperLink."
 
-#: ../../source/ref-flower-network-communication.rst:260
+#: ../../source/ref-flower-network-communication.rst:262
 #, fuzzy
 msgid ""
 "**SuperNode ↔ ClientApp (Runtime API)**: The ``ClientApp`` process "
@@ -60023,16 +59977,14 @@ msgid "In-memory communication."
 msgstr "Communication en mémoire."
 
 #: ../../source/ref-flower-runtime-comparison.rst:50
-msgid ""
-"HTTP for Runtime API communication and gRPC for Fleet API communication. "
-"Both support TLS."
+msgid "HTTP for Runtime and Fleet API communication, with TLS support."
 msgstr ""
 
-#: ../../source/ref-flower-runtime-comparison.rst:52
+#: ../../source/ref-flower-runtime-comparison.rst:51
 msgid "**Server-side Infrastructure**"
 msgstr "**Infrastructure côté serveur**"
 
-#: ../../source/ref-flower-runtime-comparison.rst:53
+#: ../../source/ref-flower-runtime-comparison.rst:52
 msgid ""
 "In the standard local CLI workflow, ``flwr run`` submits the run to a "
 "managed local SuperLink, which then coordinates the simulation runtime "
@@ -60046,7 +59998,7 @@ msgstr ""
 " Le Simulation Runtime lui-même peut toujours être démarré avec ou sans "
 "`SuperLink <ref-api-cli.html#flower-superlink>`_."
 
-#: ../../source/ref-flower-runtime-comparison.rst:57
+#: ../../source/ref-flower-runtime-comparison.rst:56
 msgid ""
 "The SuperLink awaits for SuperNodes to connect. User interface with the "
 "SuperLink using the `Flower CLI <ref-api-cli.html>`_."
@@ -60054,11 +60006,11 @@ msgstr ""
 "Le SuperLink attend que les SuperNodes se connectent. Interface "
 "utilisateur avec SuperLink à l'aide de `Flower CLI <ref-api-cli.html>`_."
 
-#: ../../source/ref-flower-runtime-comparison.rst:59
+#: ../../source/ref-flower-runtime-comparison.rst:58
 msgid "**Server-side App execution**"
 msgstr "**Exécution d'application côté serveur**"
 
-#: ../../source/ref-flower-runtime-comparison.rst:60
+#: ../../source/ref-flower-runtime-comparison.rst:59
 msgid ""
 "A ``ServerApp`` process is initialized inside a controlled environment "
 "and communicates in-memory with workers."
@@ -60066,7 +60018,7 @@ msgstr ""
 "Un processus ``ServerApp`` est initialisé à l'intérieur d'un "
 "environnement contrôlé et communique en mémoire avec des travailleurs."
 
-#: ../../source/ref-flower-runtime-comparison.rst:62
+#: ../../source/ref-flower-runtime-comparison.rst:61
 #, fuzzy
 msgid ""
 "``ServerApp`` `process or subprocess <ref-flower-network-"
@@ -60074,11 +60026,11 @@ msgid ""
 "communicates with it over HTTP via the Runtime API."
 msgstr ""
 
-#: ../../source/ref-flower-runtime-comparison.rst:65
+#: ../../source/ref-flower-runtime-comparison.rst:64
 msgid "**Client-side Infrastructure**"
 msgstr "**Infrastructure côté client**"
 
-#: ../../source/ref-flower-runtime-comparison.rst:66
+#: ../../source/ref-flower-runtime-comparison.rst:65
 msgid ""
 "No user-managed client-side infrastructure is required. For local CLI "
 "workflows, the managed local SuperLink and simulation runtime remain "
@@ -60088,19 +60040,20 @@ msgstr ""
 "Dans les flux de travail CLI locaux, le SuperLink et le Simulation "
 "Runtime restent auto-contenus."
 
-#: ../../source/ref-flower-runtime-comparison.rst:68
+#: ../../source/ref-flower-runtime-comparison.rst:67
+#, fuzzy
 msgid ""
-"SuperNodes connect to the SuperLink via TLS-enabled gRPC using the Fleet "
+"SuperNodes connect to the SuperLink via TLS-enabled HTTP using the Fleet "
 "API. Node authentication can be enabled."
 msgstr ""
 "Les SuperNodes se connectent au SuperLink via gRPC avec chiffrement TLS à"
 " l'aide de l'API Fleet. L'authentification des nœuds peut être activée."
 
-#: ../../source/ref-flower-runtime-comparison.rst:70
+#: ../../source/ref-flower-runtime-comparison.rst:69
 msgid "**Client-side App execution**"
 msgstr "**Exécution d'application côté client**"
 
-#: ../../source/ref-flower-runtime-comparison.rst:71
+#: ../../source/ref-flower-runtime-comparison.rst:70
 msgid ""
 "Each process executes a ``ClientApp`` on demand. They might execute "
 "multiple instances of the same ``ClientApp`` to simulate large amounts of"
@@ -60110,7 +60063,7 @@ msgstr ""
 "exécuter plusieurs instances de la même ``ClientApp`` pour simuler des "
 "quantités importantes de clients. Les ``ClientApps`` sont sans état."
 
-#: ../../source/ref-flower-runtime-comparison.rst:74
+#: ../../source/ref-flower-runtime-comparison.rst:73
 #, fuzzy
 msgid ""
 "Initialized as a ``ClientApp`` `process or subprocess <ref-flower-"
@@ -67027,4 +66980,116 @@ msgstr ""
 #~ " processus d'applications que SuperExec "
 #~ "doit lancer. Utilisez ``serverapp`` pour "
 #~ "un ``ServerApp`` SuperExec."
+
+#~ msgid "Ports ``8000`` and ``9092`` are accessible on the remote machine."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``-p 8000:8000 -p 9092:9092``: Map ports"
+#~ " ``8000`` and ``9092`` of the "
+#~ "container to the same port of the"
+#~ " host machine, allowing other services "
+#~ "to access the Runtime and Control "
+#~ "APIs on ``http://localhost:8000`` and the "
+#~ "Fleet API on ``localhost:9092``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``--host 0.0.0.0``: Make the Runtime and"
+#~ " Control HTTP APIs reachable outside "
+#~ "the container."
+#~ msgstr ""
+
+#~ msgid "Configure gRPC logging"
+#~ msgstr "Configurez la journalisation gRPC"
+
+#~ msgid ""
+#~ "Flower uses `gRPC <https://grpc.io/>`_ for "
+#~ "the Fleet API and other gRPC-based"
+#~ " connections (see :doc:`ref-flower-"
+#~ "network-communication`). You can set the"
+#~ " verbosity level of ``gRPC`` logs "
+#~ "using `gRPC environment variables "
+#~ "<https://github.com/grpc/grpc/blob/master/doc/environment_variables.md>`_."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "During the execution of the Flower "
+#~ "application, the server VM (``SuperLink``) "
+#~ "will be responsible to orchestrate the"
+#~ " execution of the application across "
+#~ "the client VMs (``SuperNode``). When the"
+#~ " SuperLink server starts, by default, "
+#~ "it listens to the following ports: "
+#~ "``{8000, 9092}``. Port ``9092`` is used"
+#~ " to communicate with the federation "
+#~ "clients (``SuperNode``), and port ``8000`` "
+#~ "serves the HTTP Control API used "
+#~ "to submit and execute Flower "
+#~ "applications."
+#~ msgstr ""
+
+#~ msgid "``9092``"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Finally, we need to also open port"
+#~ " 8000 to allow receiving and "
+#~ "executing incoming application requests. To"
+#~ " enable this we just need to "
+#~ "repeat the steps above, i.e., create "
+#~ "a new inbound rule, where for port"
+#~ " range we assign port 8000. If "
+#~ "we already know the Public IP from"
+#~ " which our local machine (e.g., "
+#~ "laptop) will be submitting applications "
+#~ "to the Azure cluster, then we just"
+#~ " need to specify the Source IP "
+#~ "address/CIDR range. However, if we want"
+#~ " to keep the port widely open "
+#~ "we simply need to change source to"
+#~ " ``Any``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "To be more precise, if we know "
+#~ "the Public IP of our machine, then"
+#~ " we make the following changes:"
+#~ msgstr ""
+#~ "Pour être plus précis, si nous "
+#~ "connaissons l'adresse IP publique de "
+#~ "notre machine, alors nous effectuons les"
+#~ " modifications suivantes :"
+
+#~ msgid "add machine's Public IP"
+#~ msgstr "Ajoutez l'adresse IP publique de la machine"
+
+#~ msgid "Otherwise, we change the properties as follows:"
+#~ msgstr "Sinon, nous modifions les propriétés comme suit :"
+
+#~ msgid "IPv6 (e.g., ``[2001:0db8::1]:9092``)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Runtime API communication uses HTTP "
+#~ "starting with Flower 1.35. Starting with"
+#~ " Flower 1.37, the Flower CLI also "
+#~ "communicates with the Control API over"
+#~ " HTTP."
+#~ msgstr ""
+
+#~ msgid "9092"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The SuperLink Runtime and Control APIs"
+#~ " share the same HTTP server and "
+#~ "default port."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "HTTP for Runtime API communication and"
+#~ " gRPC for Fleet API communication. "
+#~ "Both support TLS."
+#~ msgstr ""
 
