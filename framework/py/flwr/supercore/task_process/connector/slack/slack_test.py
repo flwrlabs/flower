@@ -78,6 +78,82 @@ def test_search_request(tool_name: str, channel_types: list[str]) -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("content_type", "options", "channel_types"),
+    (
+        ("channels", {}, ["public_channel"]),
+        (
+            "channels",
+            {
+                "channel_types": "public_channel,private_channel",
+                "include_archived": True,
+            },
+            ["public_channel", "private_channel"],
+        ),
+        ("users", {}, None),
+    ),
+)
+@pytest.mark.parametrize("response_format", ("detailed", "concise"))
+def test_directory_search(
+    content_type: str,
+    options: JSONObject,
+    channel_types: list[str] | None,
+    response_format: str,
+) -> None:
+    """Map directory search options and honor the requested output format."""
+    if content_type == "channels":
+        concise_item: JSONObject = {
+            "name": "engineering",
+            "topic": "Engineering updates",
+            "purpose": "Discuss engineering",
+            "permalink": "https://slack.com/archives/C1",
+        }
+        item: JSONObject = {**concise_item, "date_created": 1746570052}
+    else:
+        concise_item = {
+            "user_id": "U1",
+            "full_name": "Jason Chen",
+            "title": "Engineer",
+            "email": "jason@example.com",
+            "permalink": "https://example.slack.com/team/U1",
+        }
+        item = {**concise_item, "timezone": "America/Los_Angeles"}
+    payload: JSONObject = {"ok": True, "results": {content_type: [item]}}
+    response = Mock(status_code=200, json=Mock(return_value=payload))
+    with patch(_HTTP_REQUEST, return_value=response) as request:
+        result = registry.invoke_connector(
+            f"slack_search_{content_type}",
+            {
+                "keywords": ["engineering"],
+                "natural_language_query": "engineering directory",
+                "cursor": "next-page",
+                "limit": 21,
+                "response_format": response_format,
+                **options,
+            },
+            Mock(),
+            _CREDENTIALS,
+            {},
+        )
+    request.assert_called_once()
+    assert request.call_args.args == (
+        "POST",
+        "https://slack.com/api/assistant.search.context",
+    )
+    body = request.call_args.kwargs["json"]
+    assert body["content_types"] == [content_type]
+    assert body.get("channel_types") == channel_types
+    assert body["query"] == "engineering directory"
+    assert body["term_clauses"] == ["engineering"]
+    assert body["cursor"] == "next-page"
+    assert body["limit"] == 21
+    assert body.get("include_archived_channels") == options.get("include_archived")
+    assert result is payload
+    assert payload["results"] == {
+        content_type: [concise_item if response_format == "concise" else item]
+    }
+
+
 def test_slack_api_error() -> None:
     """Surface Slack's error without retrying through another API."""
     response = Mock(status_code=200)

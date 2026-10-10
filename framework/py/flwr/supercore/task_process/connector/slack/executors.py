@@ -61,6 +61,7 @@ def _search(
     arguments: JSONObject,
     context: ConnectorExecutionContext,
     *,
+    content_types: tuple[str, ...] | None = None,
     channel_types: tuple[str, ...] = SLACK_CONVERSATION_TYPES,
 ) -> JSONObject:
     """Map search arguments to one Slack Real-time Search request."""
@@ -75,15 +76,22 @@ def _search(
     )
     payload: JSONObject = {
         "query": " ".join(part for part in query_parts if part),
-        "content_types": cast(str, arguments.get("content_types", "messages")).split(
-            ","
+        "content_types": (
+            list(content_types)
+            if content_types is not None
+            else cast(str, arguments.get("content_types", "messages")).split(",")
         ),
-        "channel_types": list(channel_types),
         "include_bots": arguments.get("include_bots", False),
         "include_context_messages": arguments.get("include_context", True),
     }
-    if channel_types != ("public_channel",) and "channel_types" in arguments:
-        payload["channel_types"] = cast(str, arguments["channel_types"]).split(",")
+    if content_types != ("users",):
+        payload["channel_types"] = list(channel_types)
+        if (
+            channel_types != ("public_channel",) or content_types == ("channels",)
+        ) and "channel_types" in arguments:
+            payload["channel_types"] = cast(str, arguments["channel_types"]).split(",")
+    if "include_archived" in arguments:
+        payload["include_archived_channels"] = arguments["include_archived"]
     if terms:
         payload["term_clauses"] = terms
         if filters:
@@ -174,6 +182,15 @@ def _format_search_result(result: JSONObject, arguments: JSONObject) -> None:
                 "permalink",
             ),
             "files": ("file_id", "title", "content", "permalink"),
+            "channels": (
+                "channel_id",
+                "id",
+                "name",
+                "topic",
+                "purpose",
+                "permalink",
+            ),
+            "users": ("user_id", "full_name", "title", "email", "permalink"),
         }
         for kind, names in fields.items():
             if kind in results:
@@ -199,6 +216,25 @@ def search_public_and_private(
 ) -> JSONObject:
     """Search visible messages and files in all conversation types."""
     return _search(arguments, context)
+
+
+def search_channels(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """Search public and private channels."""
+    return _search(
+        arguments,
+        context,
+        content_types=("channels",),
+        channel_types=("public_channel",),
+    )
+
+
+def search_users(
+    arguments: JSONObject, context: ConnectorExecutionContext
+) -> JSONObject:
+    """Search workspace users."""
+    return _search(arguments, context, content_types=("users",))
 
 
 def list_conversations(
@@ -247,6 +283,8 @@ def get_conversation_replies(
 EXECUTORS: dict[str, ConnectorExecutor] = {
     "search_public": search_public,
     "search_public_and_private": search_public_and_private,
+    "search_channels": search_channels,
+    "search_users": search_users,
     "list_conversations": list_conversations,
     "get_conversation_history": get_conversation_history,
     "get_conversation_replies": get_conversation_replies,
