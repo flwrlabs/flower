@@ -252,6 +252,23 @@ def test_runtime_connectors_expand_one_connector_into_multiple_tools() -> None:
     get_connector_tools.assert_called_once_with("example")
 
 
+def test_runtime_discovers_and_caches_github_tools() -> None:
+    """Discover through the connector runtime and return independent cached copies."""
+    runtime = Mock(spec=AgentRuntime)
+    tools: list[JSONObject] = [{"name": "github_issue_write", "description": "Write"}]
+    runtime.create_connector_response.return_value = tools
+    connectors = RuntimeAgentConnectors(runtime)
+
+    first = connectors.tools(["github", "web_search"])
+    assert [tool["name"] for tool in first] == ["github_issue_write", "web_search"]
+    first[0]["description"] = "Changed"
+    assert connectors.tools(["github"])[0]["description"] == "Write"
+    request = runtime.create_connector_response.call_args.kwargs
+    assert request["name"] == "github__discover_tools"
+    assert request["arguments"] == {}
+    runtime.create_connector_response.assert_called_once()
+
+
 def test_call_automation_embeds_input_in_control_request() -> None:
     """Embed model input in the Control request sent to the Runtime API."""
     # Prepare
@@ -389,8 +406,18 @@ def test_create_connector_response_resolves_canonical_name() -> None:
     assert output == "done"
 
 
-def test_create_connector_response_uses_connector_task_for_filesystem() -> None:
-    """Filesystem calls should execute through a Connector task."""
+@pytest.mark.parametrize(
+    ("name", "connector_ref"),
+    [
+        ("filesystem_list_directory", "filesystem"),
+        ("github_future_tool", "github"),
+        ("github__discover_tools", "github"),
+    ],
+)
+def test_create_connector_response_uses_connector_task(
+    name: str, connector_ref: str
+) -> None:
+    """Static and dynamic tools should execute through their connector task."""
     stub = Mock()
     stub.CreateTask.return_value = CreateTaskResponse(task_id=456)
     agent_runtime = AgentRuntime(
@@ -402,7 +429,7 @@ def test_create_connector_response_uses_connector_task_for_filesystem() -> None:
     )
     reply = ConnectorResponse(
         dst_task_id=789,
-        name="filesystem_list_directory",
+        name=name,
         call_id="call-1",
         output={"entries": []},
         error=None,
@@ -411,14 +438,14 @@ def test_create_connector_response_uses_connector_task_for_filesystem() -> None:
 
     with patch.object(agent_runtime, "_send_and_receive", return_value=reply):
         output = agent_runtime.create_connector_response(
-            name="filesystem_list_directory",
+            name=name,
             call_id="call-1",
             arguments={"path": "/allowed"},
         )
 
     assert output == {"entries": []}
     stub.CreateTask.assert_called_once_with(
-        CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref="filesystem")
+        CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=connector_ref)
     )
 
 

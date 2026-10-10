@@ -21,7 +21,7 @@ from flwr.supercore.typing import JSONObject, JSONValue
 
 from . import browser_use, filesystem, web_fetch, web_search
 from .automation import START_AUTOMATION_TOOL_NAME, make_start_automation_tool
-from .definition import ConnectorExecutionContext
+from .definition import ConnectorDefinition, ConnectorExecutionContext
 from .loader import load_oauth_connectors
 from .oauth import OAuthFlow
 
@@ -52,30 +52,35 @@ def invoke_connector(
     config: JSONObject | None = None,
 ) -> JSONValue:
     """Invoke one connector tool by its model-facing name."""
-    connector = _CONNECTORS_BY_TOOL.get(tool_name)
+    connector = _resolve_connector(tool_name)
     if connector is None:
         raise ValueError(f"Unsupported connector '{tool_name}'.")
     if connector.requires_credentials and (credentials is None or config is None):
         raise RuntimeError("Connector credentials are required.")
-    return connector.executors[tool_name](
-        arguments,
-        ConnectorExecutionContext(
-            credentials=credentials or {},
-            config=config or {},
-            usage_recorder=usage_recorder,
-        ),
+    context = ConnectorExecutionContext(
+        credentials=credentials or {},
+        config=config or {},
+        usage_recorder=usage_recorder,
     )
+    if connector.load_connector is not None:
+        discovery_tool = get_connector_discovery_tool(connector.ref)
+        connector = connector.load_connector(context.credentials)
+        if tool_name == discovery_tool:
+            return list(connector.tools)
+    if executor := connector.executors.get(tool_name):
+        return executor(arguments, context)
+    raise ValueError(f"Unsupported connector '{tool_name}'.")
 
 
 def requires_connector_credentials(tool_name: str) -> bool:
     """Return whether a tool's connector uses federation-scoped credentials."""
-    connector = _CONNECTORS_BY_TOOL.get(tool_name)
+    connector = _resolve_connector(tool_name)
     return connector is not None and connector.requires_credentials
 
 
 def get_connector_ref(tool_name: str) -> str:
     """Resolve a connector tool name to its connector reference."""
-    connector = _CONNECTORS_BY_TOOL.get(tool_name)
+    connector = _resolve_connector(tool_name)
     return connector.ref if connector is not None else tool_name
 
 
@@ -87,6 +92,29 @@ def get_connector_tools(connector_ref: str) -> list[JSONObject]:
     if connector is None:
         raise ValueError(f"Unsupported connector '{connector_ref}'.")
     return list(deepcopy(connector.tools))
+
+
+def get_connector_discovery_tool(connector_ref: str) -> str | None:
+    """Return the worker operation used to discover a connection's tools."""
+    connector = _CONNECTORS_BY_REF.get(connector_ref)
+    if connector is not None and connector.load_connector is not None:
+        return f"{connector_ref}__discover_tools"
+    return None
+
+
+def _resolve_connector(tool_name: str) -> ConnectorDefinition | None:
+    """Resolve static tools first, then a dynamic connector's namespace."""
+    if connector := _CONNECTORS_BY_TOOL.get(tool_name):
+        return connector
+    for connector in _CONNECTORS_BY_REF.values():
+        prefix = f"{connector.ref}_"
+        if (
+            connector.load_connector is not None
+            and tool_name.startswith(prefix)
+            and len(tool_name) > len(prefix)
+        ):
+            return connector
+    return None
 
 
 def get_oauth_flow(connector_ref: str) -> OAuthFlow:

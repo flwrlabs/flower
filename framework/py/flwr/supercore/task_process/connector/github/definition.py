@@ -14,18 +14,23 @@
 # ==============================================================================
 """GitHub connector definition."""
 
+from dataclasses import replace
+from functools import partial
+
+from flwr.supercore.typing import JSONObject
+
 from ..definition import ConnectorDefinition, OAuth2Definition, ProviderDefinition
 from ..oauth import load_oauth_flow
-from .actions import ACTIONS
-from .executors import EXECUTORS
+from .actions import load_actions
+from .executors import execute
 
 GITHUB_CONNECTOR_REF = "github"
 
 PROVIDER = ProviderDefinition(
     ref=GITHUB_CONNECTOR_REF,
     display_name="GitHub",
-    description="Search code and read files in public repositories.",
-    actions=ACTIONS,
+    description="Use GitHub tools available to the connected account.",
+    actions=(),
     oauth=OAuth2Definition(
         authorization_url="https://github.com/login/oauth/authorize",
         token_url="https://github.com/login/oauth/access_token",
@@ -46,8 +51,19 @@ PROVIDER = ProviderDefinition(
     ),
 )
 
+
+def load_connector(credentials: JSONObject) -> ConnectorDefinition:
+    """Build ordinary actions and executors for this GitHub connection."""
+    actions = load_actions(credentials)
+    return ConnectorDefinition.from_provider(
+        provider=replace(PROVIDER, actions=actions),
+        executors={action.name: partial(execute, action.name) for action in actions},
+        oauth_flow=CONNECTOR.oauth_flow,
+    )
+
+
 CONNECTOR = ConnectorDefinition.from_provider(
     provider=PROVIDER,
-    executors=EXECUTORS,
     oauth_flow=load_oauth_flow(PROVIDER),
+    load_connector=load_connector,
 )

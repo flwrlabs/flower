@@ -12,72 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""GitHub action definitions."""
+"""Build GitHub action definitions from the authenticated MCP catalog."""
+
+from typing import cast
 
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ActionAccess, ActionDefinition
-from ..tool_schema import string_property
+from . import mcp
 
-GITHUB_PAGINATION_MINIMUM = 1
-GITHUB_PER_PAGE_MAXIMUM = 100
 
-_REPOSITORY: JSONObject = {
-    "owner": string_property("GitHub organization or repository owner."),
-    "repo": string_property("Public GitHub repository name."),
-}
-
-ACTIONS = (
-    ActionDefinition(
-        name="search_code",
-        description="Search GitHub code with GitHub search syntax.",
-        access=ActionAccess.READ,
-        input_schema={
-            "type": "object",
-            "properties": {
-                "query": string_property("GitHub code search query."),
-                "sort": {
-                    "type": "string",
-                    "enum": ["indexed"],
-                    "description": "Field used to sort results.",
-                },
-                "order": {
-                    "type": "string",
-                    "enum": ["asc", "desc"],
-                    "description": "Sort direction.",
-                },
-                "per_page": {
-                    "type": "integer",
-                    "minimum": GITHUB_PAGINATION_MINIMUM,
-                    "maximum": GITHUB_PER_PAGE_MAXIMUM,
-                    "description": "Number of results to return per page.",
-                },
-                "page": {
-                    "type": "integer",
-                    "minimum": GITHUB_PAGINATION_MINIMUM,
-                    "description": "Page number to return.",
-                },
-            },
-            "required": ["query"],
-            "additionalProperties": False,
-        },
-    ),
-    ActionDefinition(
-        name="get_file_contents",
-        description="Read a repository file.",
-        access=ActionAccess.READ,
-        input_schema={
-            "type": "object",
-            "properties": {
-                **_REPOSITORY,
-                "path": string_property("Repository-relative path to the file."),
-                "ref": {
-                    "type": "string",
-                    "description": "Optional branch, tag, or commit.",
-                },
-            },
-            "required": ["owner", "repo", "path"],
-            "additionalProperties": False,
-        },
-    ),
-)
+def load_actions(credentials: JSONObject) -> tuple[ActionDefinition, ...]:
+    """Discover every GitHub tool and preserve its remote schema and name."""
+    tools = cast(list[JSONObject], mcp.request(None, {}, credentials))
+    return tuple(
+        ActionDefinition(
+            name=cast(str, tool["name"]),
+            description=cast(str, tool.get("description", "")),
+            access=(
+                ActionAccess.READ
+                if cast(JSONObject, tool.get("annotations", {})).get("readOnlyHint")
+                else ActionAccess.WRITE
+            ),
+            input_schema=cast(JSONObject, tool["inputSchema"]),
+        )
+        for tool in tools
+    )

@@ -16,7 +16,7 @@
 
 import traceback
 import unittest
-from unittest.mock import ANY, Mock, patch
+from unittest.mock import ANY, Mock, call, patch
 
 from flwr.common.serde import message_from_proto
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
@@ -134,6 +134,39 @@ class TestHandleTask(unittest.TestCase):
             handle_task(client=self.stub)
 
         self.provider.assert_not_called()
+
+    def test_dynamic_tool_uses_only_bound_credentials(self) -> None:
+        """Reject mismatched accounts, then forward the bound GitHub token."""
+        self.pull_connector_request.return_value = _connector_request(
+            "github_future_tool"
+        )
+        self.provider.side_effect = [
+            [{"name": "future_tool", "inputSchema": {"type": "object"}}],
+            {"content": []},
+        ]
+        with patch(
+            "flwr.supercore.task_process.connector.github.mcp.request", self.provider
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError, "Credential-backed connector execution failed"
+            ):
+                handle_task(client=self.stub)
+            self.provider.assert_not_called()
+            self.stub.GetConnector.return_value = GetConnectorResponse(
+                connector_ref="github",
+                credentials_json='{"access_token":"github-token"}',
+                config_json="{}",
+            )
+            handle_task(client=self.stub)
+        assert self.provider.call_args_list == [
+            call(None, {}, {"access_token": "github-token"}),
+            call(
+                "future_tool",
+                {"query": "release notes"},
+                {"access_token": "github-token"},
+            ),
+        ]
+        assert _pushed_response(self.stub).payload["output"] == {"content": []}
 
     def test_does_not_expose_credentials_in_provider_errors(self) -> None:
         """Credential-backed provider failures should not expose secret values."""

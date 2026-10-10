@@ -14,7 +14,7 @@
 # ==============================================================================
 """Tests for the connector registry."""
 
-from .registry import CONNECTORS
+from .registry import CONNECTORS, get_connector_ref, requires_connector_credentials
 
 
 def test_connector_references_are_unique() -> None:
@@ -29,3 +29,11 @@ def test_connector_tool_names_are_unique() -> None:
     tool_names = [name for connector in CONNECTORS for name in connector.executors]
 
     assert len(tool_names) == len(set(tool_names))
+
+
+def test_dynamic_github_tools_require_github_credentials() -> None:
+    """Resolve newly discovered names without treating them as built-in tools."""
+    assert get_connector_ref("github_future_tool") == "github"
+    assert requires_connector_credentials("github_future_tool")
+    assert get_connector_ref("githubish_future_tool") == "githubish_future_tool"
+    assert not requires_connector_credentials("githubish_future_tool")
