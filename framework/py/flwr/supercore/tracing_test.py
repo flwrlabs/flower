@@ -48,6 +48,8 @@ def test_disabled_or_unavailable_backend_is_inert(
         span.add_event("provider.first_text")
         assert tracing.current_traceparent() == ""
     tracing.flush_traces()
+    tracing.store_task_context(object(), 1, _CARRIER)
+    assert tracing.load_task_context(object(), 1) == ""
     assert discover.call_count == int(enabled == "1")
 
 
@@ -131,15 +133,3 @@ def test_context_storage_failure_is_inert(monkeypatch: pytest.MonkeyPatch) -> No
     assert tracing.load_task_context(state, 1) == ""
     tracing.store_task_context(state, 1, "invalid")
     backend.store_task_context.assert_called_once_with(state, 1, _CARRIER)
-
-
-def test_disabled_storage_does_not_discover_backend(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Disabled tracing does not import an SDK or access optional storage."""
-    monkeypatch.delenv("FLWR_TRACING_ENABLED", raising=False)
-    discover = Mock()
-    monkeypatch.setattr(tracing, "_load_backend", discover)
-    tracing.store_task_context(object(), 1, _CARRIER)
-    assert tracing.load_task_context(object(), 1) == ""
-    discover.assert_not_called()
