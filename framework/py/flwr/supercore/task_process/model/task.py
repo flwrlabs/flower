@@ -30,6 +30,7 @@ from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.usage import TaskUsageRecorder
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 
@@ -43,7 +44,11 @@ _TEXT_DELTA_EVENTS = frozenset(
 
 def handle_task(client: RuntimeHttpClient) -> None:
     """Run one model task request."""
-    request_message = _pull_model_request(client)
+    timing = TimingProbe.for_task()
+    with timing.span("model.pull_request"):
+        request_message = _pull_model_request(client)
+        timing.parent_task_id = request_message.metadata.src_task_id
+    timing.mark("model.request_received")
     is_stream = request_message.payload.get("stream") is True
     if request_message.metadata.src_task_id is None:
         raise RuntimeError("Model request source task is not set.")
@@ -56,9 +61,10 @@ def handle_task(client: RuntimeHttpClient) -> None:
             reply_to_message_id=request_message.metadata.message_id,
         )
         message.metadata.__dict__["_message_id"] = message.object_id
-        client.PushTaskMessage(
-            PushTaskMessageRequest(message=message_to_proto(message))
-        )
+        with timing.span("model.push_response"):
+            client.PushTaskMessage(
+                PushTaskMessageRequest(message=message_to_proto(message))
+            )
 
     # Stream events are exposed through Control.StreamRunEvents.
     events: list[TaskEvent] = []
@@ -68,7 +74,10 @@ def handle_task(client: RuntimeHttpClient) -> None:
         """Push buffered stream events."""
         if not is_stream or not events:
             return
-        client.PushTaskEvents(PushTaskEventsRequest(events=events))
+        with timing.span("model.push_events"):
+            client.PushTaskEvents(PushTaskEventsRequest(events=events))
+        for event in events:
+            timing.first_event("model.events_push_returned", event.event)
         events.clear()
 
     def _buffer_event(event: JSONObject) -> None:
@@ -86,11 +95,12 @@ def handle_task(client: RuntimeHttpClient) -> None:
 
     response = None
     try:
-        response = invoke_model_provider(
-            request_message.payload,
-            on_stream_event=_buffer_event,
-            usage_recorder=TaskUsageRecorder(client),
-        )
+        with timing.span("model.provider_response"):
+            response = invoke_model_provider(
+                request_message.payload,
+                on_stream_event=_buffer_event,
+                usage_recorder=TaskUsageRecorder(client),
+            )
     except Exception as ex:
         response = _make_error_response(ex)
         raise

@@ -35,6 +35,7 @@ from flwr.supercore.constant import (
     TASK_TYPE_TO_COMMAND,
     TaskType,
 )
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.warm_executor_constants import (
     WARM_AGENTAPP_EXECUTOR_MODULE,
@@ -639,7 +640,15 @@ class KubernetesExecutor:
             return _launch_result_from_exception(exc)
 
         try:
-            self._client.create_namespaced_pod(self._config.namespace, pod)
+            timing = TimingProbe(
+                task_id=spec.task_id,
+                task_type=spec.task_type,
+                fab_hash=spec.fab_hash,
+                route="cold",
+                pod_name=cast(str, cast(JSONObject, pod["metadata"])["name"]),
+            )
+            with timing.span("kubernetes.pod_create"):
+                self._client.create_namespaced_pod(self._config.namespace, pod)
         except Exception as exc:  # pylint: disable=broad-exception-caught
             result = _launch_result_from_exception(exc)
             if _is_definite_pod_rejection(exc):

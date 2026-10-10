@@ -55,6 +55,7 @@ from flwr.supercore.retry import RetryInvoker, make_simple_http_retry_invoker
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
+from flwr.supercore.timing_probe import TimingProbe
 
 from .task import handle_task
 
@@ -85,6 +86,8 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
 
     def run(self) -> int:
         """Execute the task and return its Flower exit code."""
+        timing = TimingProbe(task_type="flwr-model")
+        timing.mark("model.task_enter")
         exit_code = ExitCode.SUCCESS
         try:
             if self._client is None:
@@ -95,15 +98,20 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
             self._heartbeat_sender.start()
 
             log(DEBUG, "[flwr-model] Pull task input")
-            task_input: PullTaskInputResponse = self._client.PullTaskInput(
-                PullTaskInputRequest()
-            )
+            with timing.span("model.pull_input"):
+                task_input: PullTaskInputResponse = self._client.PullTaskInput(
+                    PullTaskInputRequest()
+                )
+            timing.run_id = task_input.run.run_id
+            timing.task_id = task_input.task_id
+            timing.mark("model.input_ready")
             TaskIdentity.task_id = task_input.task_id
             TaskIdentity.run_id = task_input.run.run_id
             TaskIdentity.node_id = task_input.context.node_id
 
             event(EventType.FLWR_MODEL_RUN_ENTER)
-            handle_task(client=self._client)
+            with timing.span("model.handle_task"):
+                handle_task(client=self._client)
 
             with self._lock:
                 self._sub_status = SubStatus.COMPLETED
@@ -149,12 +157,13 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
                 return
             self._retry_invoker.max_tries = 1
             try:
-                self._client.PushTaskOutput(
-                    PushTaskOutputRequest(
-                        sub_status=self._sub_status,
-                        details=self._details,
+                with TimingProbe.for_task().span("model.push_output"):
+                    self._client.PushTaskOutput(
+                        PushTaskOutputRequest(
+                            sub_status=self._sub_status,
+                            details=self._details,
+                        )
                     )
-                )
             except Exception as err:  # pylint: disable=broad-exception-caught
                 log(ERROR, "Failed to push task output", exc_info=err)
 

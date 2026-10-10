@@ -68,6 +68,7 @@ from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.superlink.servicer.control.control_handlers import process_due_automations
 from flwr.superlink.servicer.control.control_handlers import (
     start_automation as start_control_automation,
@@ -255,6 +256,12 @@ def pull_task_input(
     if run and run.series_id:
         series_context = state.get_run_series_context(run.series_id)
     if run and fab and series_context and state.activate_task(task.task_id):
+        TimingProbe(
+            run_id=run_id,
+            task_id=task.task_id,
+            task_type=task.type,
+            fab_hash=task.fab_hash or None,
+        ).mark("runtime.task_active")
         log(INFO, "Started task %d of run %d", task.task_id, run_id)
         return PullTaskInputResponse(
             context=context_to_proto(series_context),
@@ -285,15 +292,19 @@ def push_task_output(
     if state.finish_task(
         task.task_id, sub_status=request.sub_status, details=request.details
     ):
+        timing = TimingProbe(run_id=run_id, task_id=task.task_id, task_type=task.type)
+        timing.mark("runtime.task_finished")
         log(INFO, "Finished task %d of run %d", task.task_id, run_id)
         if request.HasField("context"):
             runs = state.get_run_info(run_ids=[run_id])
             run = runs[0] if runs else None
             if run and run.series_id and run.primary_task_id == task.task_id:
-                state.set_run_series_context(
-                    run.series_id,
-                    context_from_proto(request.context),
-                )
+                with timing.span("runtime.context_store"):
+                    state.set_run_series_context(
+                        run.series_id,
+                        context_from_proto(request.context),
+                    )
+        timing.mark("runtime.output_stored")
     else:
         log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
     return PushTaskOutputResponse()

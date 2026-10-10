@@ -21,7 +21,7 @@ import sys
 import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
-from logging import INFO, WARNING
+from logging import DEBUG, INFO, WARNING
 from typing import TYPE_CHECKING
 
 from flwr.common.constant import (
@@ -34,6 +34,7 @@ from flwr.supercore.constant import (
     TASK_TYPE_TO_COMMAND,
     TaskType,
 )
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.warm_executor_constants import (
     WARM_AGENTAPP_EXECUTOR_MODULE,
     WARM_CONNECTOR_EXECUTOR_MODULE,
@@ -305,7 +306,7 @@ class KubernetesWarmExecutorDispatch:
         if output and not filtered_output:
             return
         log(
-            INFO,
+            DEBUG if "timing_probe {" in filtered_output else INFO,
             "Warm TaskExecutor output pod=%s task_id=%s stream=%s: %s",
             self._pod_name or "unknown",
             self._task_id if self._task_id is not None else "unknown",
@@ -444,20 +445,30 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             for candidate in candidates:
                 self._ensure_pool_capacity(candidate)
 
+        timing = TimingProbe(
+            task_id=spec.task_id,
+            task_type=spec.task_type,
+            fab_hash=spec.fab_hash,
+            pod_name=pod_name,
+            route="exact_warm" if pool.key.fab_hash else "generic_warm",
+        )
+        timing.mark("kubernetes.warm_reserved")
         try:
-            dispatch = self._open_dispatch(
-                pod_name=pod_name,
-                spec=spec,
-                pool_key=pool.key,
-                runtime_root_certificates=runtime_root_certificates,
-            )
+            with timing.span("kubernetes.exec_open"):
+                dispatch = self._open_dispatch(
+                    pod_name=pod_name,
+                    spec=spec,
+                    pool_key=pool.key,
+                    runtime_root_certificates=runtime_root_certificates,
+                )
         except WarmExecutorUnavailable:
             self._retire_unavailable_pod(pod_name, pool.key)
             self._log_dispatch(pool, "setup_unavailable")
             return None
 
         try:
-            dispatch.send_token(spec.token)
+            with timing.span("kubernetes.token_send"):
+                dispatch.send_token(spec.token)
         except Exception:  # pylint: disable=broad-exception-caught
             # End stdin if delivery stopped mid-frame. Reconciliation will
             # preserve the Pod if a task nevertheless started.
@@ -469,7 +480,10 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             )
 
         try:
-            accepted = dispatch.wait_for_acceptance(_WARM_EXECUTOR_ACK_TIMEOUT_SECONDS)
+            with timing.span("kubernetes.token_ack"):
+                accepted = dispatch.wait_for_acceptance(
+                    _WARM_EXECUTOR_ACK_TIMEOUT_SECONDS
+                )
         except Exception:  # pylint: disable=broad-exception-caught
             dispatch.close()
             self._retire_after_dispatch(pod_name, pool.key, dispatch)
@@ -477,6 +491,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes,t
             return LaunchResult.unknown(
                 "Warm executor token acknowledgement outcome was unknown."
             )
+        timing.mark("kubernetes.token_ack_result", success=accepted)
         if not accepted:
             dispatch.close()
         self._retire_after_dispatch(

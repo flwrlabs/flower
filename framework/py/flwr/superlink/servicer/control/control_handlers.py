@@ -166,6 +166,7 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.run import Run
 from flwr.supercore.task_process.connector import registry as connector_registry
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
@@ -609,6 +610,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 ) -> StartRunResponse:
     """Create run ID."""
     log(INFO, "ControlServicer.StartRun")
+    timing = TimingProbe()
+    timing.mark("control.start_run_enter")
 
     flwr_aid = account.flwr_aid
     account_name = account.account_name
@@ -698,6 +701,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         )
         return StartRunResponse()
 
+    timing.mark("control.fab_resolved")
     override_config = user_config_from_proto(request.override_config)
     connector_ids = _validate_run_connector_ids(
         [
@@ -743,6 +747,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             StartRunContext(federation_id=federation_id, runtime=runtime),
         )
 
+        timing.mark("control.access_resolved")
         # Create run
         fab = Fab(
             hashlib.sha256(fab_file).hexdigest(),
@@ -778,20 +783,24 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         if primary_task_type == TaskType.AGENT_APP and series_id is None:
             series_description = _derive_run_series_description(user_prompt) or None
 
-        run_id = state.create_run(
-            fab_id,
-            fab_version,
-            fab.hash_str,
-            override_config,
-            federation_id,
-            resolved_federation_config,
-            flwr_aid,
-            primary_task_type,
-            user_prompt=user_prompt or None,
-            series_id=series_id,
-            series_description=series_description,
-            connector_ids=connector_ids,
-        )
+        with timing.span("control.create_run"):
+            run_id = state.create_run(
+                fab_id,
+                fab_version,
+                fab.hash_str,
+                override_config,
+                federation_id,
+                resolved_federation_config,
+                flwr_aid,
+                primary_task_type,
+                user_prompt=user_prompt or None,
+                series_id=series_id,
+                series_description=series_description,
+                connector_ids=connector_ids,
+            )
+            timing.run_id = run_id
+            timing.task_type = primary_task_type
+            timing.fab_hash = fab.hash_str
 
         if run_id == 0:
             raise FlowerError(
@@ -803,6 +812,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             )
 
         run = state.get_run_info(run_ids=[run_id])[0]
+        timing.task_id = run.primary_task_id
+        timing.mark("control.primary_task_ready")
         series_id = run.series_id
         if series_description and series_id:
             start_title_generation(state, series_id, user_prompt)
@@ -831,6 +842,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 cached_fab.hash_str,
                 fleet_api_type,
             )
+    timing.mark("control.start_run_return")
     return response
 
 
@@ -943,6 +955,8 @@ def _stream_run_events(
     """Yield task events until the run finishes or the stream is cancelled."""
     # LinkState creates every run with a primary task, so casting is safe
     primary_task_id = cast(int, run.primary_task_id)
+    timing = TimingProbe(run_id=run_id, task_id=primary_task_id)
+    timing.mark("control.stream_enter")
     while is_active is None or is_active():
         should_break = run.status.status == Status.FINISHED
 
@@ -955,11 +969,13 @@ def _stream_run_events(
         )
         for event in events:
             after_task_event_id = event.id
+            timing.first_event("control.yield", event.event, event.id)
             yield StreamRunEventsResponse(task_event=event)
 
         # If the run was already finished before fetching this batch, all
         # events are returned at this point and the server ends the stream.
         if should_break:
+            timing.mark("control.stream_complete")
             log(INFO, "All events for run ID `%s` returned", run_id)
             break
 

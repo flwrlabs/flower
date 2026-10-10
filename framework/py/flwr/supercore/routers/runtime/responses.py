@@ -45,6 +45,7 @@ from flwr.supercore.error import FlowerError
 from flwr.supercore.json_message.base import make_json_message
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.servicer.runtime import runtime_handlers
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 
@@ -98,8 +99,13 @@ async def create_runtime_response(
     state: RuntimeStateDependency,
 ) -> Response:
     """Create a model response through a child model task."""
+    timing = TimingProbe()
+    timing.mark("responses.request_enter")
     try:
         task = await run_in_threadpool(_authenticate, request, state)
+        timing.run_id = task.run_id
+        timing.task_id = task.task_id
+        timing.mark("responses.authenticated")
         payload = await _read_request_payload(request)
         model_payload = _normalize_model_request_payload(payload)
         if model_payload.get("stream") is True:
@@ -183,6 +189,10 @@ def _start_exchange(
     payload: JSONObject,
 ) -> _Exchange:
     """Create a child model task and send its request message."""
+    timing = TimingProbe(
+        run_id=task.run_id, parent_task_id=task.task_id, task_type=TaskType.MODEL
+    )
+    timing.mark("responses.exchange_enter")
     model = cast(str, payload["model"])
     try:
         response = runtime_handlers.create_task(
@@ -198,6 +208,8 @@ def _start_exchange(
         )
 
     model_task_id = response.task_id
+    timing.task_id = model_task_id
+    timing.mark("responses.child_ready")
     node_id = state.get_node_id()
     metadata = Metadata(
         run_id=task.run_id,
@@ -222,6 +234,7 @@ def _start_exchange(
             500, "Model request could not be stored.", "model_request_failed"
         )
 
+    timing.mark("responses.request_stored")
     return _Exchange(
         agent_task_id=task.task_id,
         model_task_id=model_task_id,
@@ -267,12 +280,15 @@ async def _stream_response(
     state: CoreState, task: Task, model_payload: JSONObject
 ) -> AsyncIterator[str]:
     """Create an exchange and relay its events as Server-Sent Events."""
+    timing = TimingProbe(run_id=task.run_id, parent_task_id=task.task_id)
     cursor: int | None = None
     complete = False
     sequence_number = 0
     exchange: _Exchange | None = None
     try:
         exchange = await run_in_threadpool(_start_exchange, state, task, model_payload)
+        timing.task_id = exchange.model_task_id
+        timing.mark("responses.stream_enter")
         started_at = time.monotonic()
         launch_deadline = started_at + _model_task_launch_timeout()
         response_deadline = started_at + _DEFAULT_MODEL_RESPONSE_TIMEOUT
@@ -285,6 +301,8 @@ async def _stream_response(
                 launch_deadline,
                 response_deadline,
             )
+            if response is not None:
+                timing.mark_once("responses.model_reply_received")
             events = await run_in_threadpool(
                 state.get_task_events,
                 task_ids=[exchange.model_task_id],
@@ -292,6 +310,7 @@ async def _stream_response(
             )
             for event in events:
                 cursor = event.id
+                timing.first_event("responses.yield", event.event, event.id)
                 if event.event in _TERMINAL_EVENTS:
                     if response is None:
                         await _wait_for_terminal_reply(
@@ -300,6 +319,7 @@ async def _stream_response(
                             launch_deadline,
                             response_deadline,
                         )
+                        timing.mark_once("responses.model_reply_received")
                     complete = True
                     yield _sse_frame(event)
                     return
@@ -326,6 +346,7 @@ async def _stream_response(
         log(ERROR, "Runtime Responses stream failed unexpectedly", exc_info=err)
         yield _stream_error("Internal server error.", "internal_error", sequence_number)
     finally:
+        timing.mark("responses.stream_end", success=complete)
         if exchange is not None and not complete:
             with CancelScope(shield=True):
                 await run_in_threadpool(

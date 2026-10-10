@@ -37,6 +37,7 @@ from flwr.supercore.protobuf.client import ProtobufClientInterceptor
 from flwr.supercore.retry import make_simple_http_retry_invoker
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.telemetry import EventType
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 from .executor import LaunchResult, LaunchResultStatus, get_executor
@@ -243,21 +244,37 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     # Start the main loop
     try:
         while True:
-            executor.reconcile()
-            supported_task_types, agentapp_fab_hashes = executor.get_eligible_capacity(
-                set(plugin.supported_task_types),
-                insecure=insecure,
-                root_certificates_path=root_certificates_path,
-            )
-            combined_res = client.AcquireTask(
-                AcquireTaskRequest(
-                    supported_task_types=supported_task_types,
-                    agentapp_fab_hashes=agentapp_fab_hashes,
+            timing = TimingProbe()
+            with timing.span("superexec.reconcile"):
+                executor.reconcile()
+            with timing.span("superexec.capacity"):
+                supported_task_types, agentapp_fab_hashes = (
+                    executor.get_eligible_capacity(
+                        set(plugin.supported_task_types),
+                        insecure=insecure,
+                        root_certificates_path=root_certificates_path,
+                    )
                 )
-            )
+            with timing.span("superexec.acquire"):
+                combined_res = client.AcquireTask(
+                    AcquireTaskRequest(
+                        supported_task_types=supported_task_types,
+                        agentapp_fab_hashes=agentapp_fab_hashes,
+                    )
+                )
+                if combined_res.HasField("task"):
+                    timing.run_id = combined_res.task.run_id
+                    timing.task_id = combined_res.task.task_id
+                    timing.task_type = combined_res.task.type
+                    timing.fab_hash = combined_res.task.fab_hash or None
             if combined_res.HasField("task") and combined_res.token:
-                launch_result = plugin.launch_task(
-                    token=combined_res.token, task=combined_res.task
+                with timing.span("superexec.launch"):
+                    launch_result = plugin.launch_task(
+                        token=combined_res.token, task=combined_res.task
+                    )
+                timing.mark(
+                    "superexec.launch_result",
+                    success=launch_result.status == LaunchResultStatus.ACCEPTED,
                 )
                 _handle_launch_result(launch_result, combined_res.task)
 

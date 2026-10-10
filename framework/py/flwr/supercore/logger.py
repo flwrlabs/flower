@@ -69,6 +69,18 @@ LOGGER_NAME = "flwr"
 FLOWER_LOGGER = logging.getLogger(LOGGER_NAME)
 FLOWER_LOGGER.setLevel(logging.DEBUG)
 log = FLOWER_LOGGER.log  # pylint: disable=invalid-name
+_timing_log_context = threading.local()
+
+
+def log_timing_probe(message: str) -> None:
+    """Emit a DEBUG probe outside the user task-log upload queue."""
+    previous = getattr(_timing_log_context, "active", False)
+    _timing_log_context.active = True
+    try:
+        log(logging.DEBUG, "%s", message)
+    finally:
+        _timing_log_context.active = previous
+
 
 LOG_COLORS = {
     "DEBUG": "\033[94m",  # Blue
@@ -377,7 +389,8 @@ def mirror_output_to_queue(log_queue: Queue[str | None]) -> None:
             except UnicodeEncodeError:
                 ret = original_write(_remove_emojis(s))
             stream.flush()
-            log_queue.put(s)
+            if not getattr(_timing_log_context, "active", False):
+                log_queue.put(s)
             return ret
 
         return fn

@@ -95,6 +95,7 @@ from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import APP_ID_PATTERN, FLOWER_AGENT_APP_ID, TaskType
 from flwr.supercore.control import ControlHttpClient
+from flwr.supercore.timing_probe import TimingProbe
 from flwr.supercore.typing import JSONObject
 
 from ..utils import flwr_cli_exc_handler
@@ -827,6 +828,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         fab_content: bytes | None = None,
     ) -> None:
         """Start and stream one Flower AgentApp run."""
+        timing = TimingProbe()
         # Start a run in the current conversation series.
         self.run_id, self.series_id = start_chat_run(
             self.stub,
@@ -845,16 +847,22 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             self._stop_run(self.run_id)
             return
 
+        timing.run_id = self.run_id
+        timing.mark("client.stream_connect_started")
         terminal_event_seen = False
         response_start = len(self.transcript)
         reasoning_block: _DetailsBlock | None = None
         markdown_block: MarkdownBlock | None = None
         web_search_blocks: dict[str, _DetailsBlock] = {}
-        req_events = StreamRunEventsRequest(run_id=self.run_id)
         # Append streamed response content until the run reaches a terminal event.
         with flwr_cli_exc_handler():
-            for res_events in self.stub.StreamRunEvents(req_events):
+            for res_events in self.stub.StreamRunEvents(
+                StreamRunEventsRequest(run_id=self.run_id)
+            ):
                 event_type, payload = parse_task_event(res_events.task_event)
+                timing.first_event(
+                    "client.received", event_type, res_events.task_event.id
+                )
                 if event_type == CHAT_TEXT_DELTA_EVENT:
                     delta = payload.get("delta")
                     if isinstance(delta, str):
@@ -867,6 +875,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                             self.status = ""
                             markdown_block = MarkdownBlock()
                             self.transcript.append(markdown_block)
+                        if delta:
+                            timing.mark_once("client.first_text_render_requested")
                         markdown_block.body += delta
                         self.transcript_revision += 1
                         self.application.invalidate()
@@ -893,6 +903,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 elif event_type in CHAT_TERMINAL_EVENTS:
                     terminal_event_seen = True
 
+        timing.mark("client.stream_end", success=terminal_event_seen)
         if not terminal_event_seen and not self.cancel_requested:
             raise click.ClickException(
                 "Chat run ended before the agent response completed."
@@ -1181,8 +1192,11 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
     if series_id is not None:
         req.series_id = series_id
 
-    with flwr_cli_exc_handler():
+    timing = TimingProbe()
+    with flwr_cli_exc_handler(), timing.span("client.start_run"):
         res = stub.StartRun(req)
+        if res.HasField("run_id"):
+            timing.run_id = res.run_id
 
     if not res.HasField("run_id"):
         raise click.ClickException("Failed to start chat run.")
