@@ -1,0 +1,63 @@
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{0.85}
+\caption{Comprehensive performance and efficiency metrics for cifar10\_iid.}
+\label{tab:comprehensive_cifar10_iid}
+\noindent\textbf{Slow = 0\%} \\[0.2em]
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\hline
+Strategy & $\Delta_{loss}/time$ & Max Acc. & TTA 50\% & TTA 58\% & Acc@15s & Acc@25s \\
+\hline
+FedSaSync ($M = 8$) & \textbf{0.0204 $\pm$ 0.0004} & 52.5 $\pm$ 0.9\% & 37.3 $\pm$ 1.8s & N/A & 39.5 $\pm$ 1.1\% & 45.2 $\pm$ 0.6\% \\
+FedSaSync ($M = 10$) & 0.0157 $\pm$ 0.0006 & 55.6 $\pm$ 0.9\% & 36.8 $\pm$ 1.9s & N/A & 39.8 $\pm$ 0.7\% & 45.3 $\pm$ 0.6\% \\
+FedSaSync ($M = 12$) & 0.0136 $\pm$ 0.0004 & 57.8 $\pm$ 1.6\% & 36.8 $\pm$ 1.9s & 64.0 $\pm$ 2.4s\textsuperscript{3} & 40.3 $\pm$ 0.7\% & 45.7 $\pm$ 0.4\% \\
+FedSaSync ($M = 14$) & 0.0124 $\pm$ 0.0004 & 58.8 $\pm$ 1.8\% & 35.6 $\pm$ 1.6s & 66.7 $\pm$ 2.9s\textsuperscript{4} & 40.6 $\pm$ 0.4\% & 45.9 $\pm$ 0.6\% \\
+FedSaSync ($M = 16$) & 0.0109 $\pm$ 0.0006 & 60.1 $\pm$ 1.9\% & \textbf{33.9 $\pm$ 1.2s} & \textbf{63.3 $\pm$ 3.2s\textsuperscript{4}} & 40.5 $\pm$ 0.7\% & 46.0 $\pm$ 0.4\% \\
+FedSaSync ($M = 18$) & 0.0097 $\pm$ 0.0004 & 61.4 $\pm$ 2.1\% & 34.4 $\pm$ 0.7s & 63.5 $\pm$ 3.5s\textsuperscript{4} & 40.4 $\pm$ 0.6\% & \textbf{46.1 $\pm$ 0.3\%} \\
+FedSaSync ($M = 20$) & 0.0093 $\pm$ 0.0005 & 61.8 $\pm$ 2.4\% & 35.0 $\pm$ 1.4s & 63.4 $\pm$ 3.3s\textsuperscript{4} & \textbf{40.8 $\pm$ 0.5\%} & 46.1 $\pm$ 0.4\% \\
+FedAvg & 0.0094 $\pm$ 0.0005 & \textbf{61.9 $\pm$ 2.2\%} & 34.4 $\pm$ 1.5s & 68.3 $\pm$ 10.2s & 40.2 $\pm$ 0.5\% & \textbf{46.1 $\pm$ 0.3\%} \\
+\hline
+\end{tabular}%
+}
+\par\vspace{0.8em}
+\noindent\textbf{Slow = 20\%} \\[0.2em]
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\hline
+Strategy & $\Delta_{loss}/time$ & Max Acc. & TTA 50\% & TTA 58\% & Acc@15s & Acc@25s \\
+\hline
+FedSaSync ($M = 8$) & \textbf{0.0143 $\pm$ 0.0032} & 52.9 $\pm$ 1.6\% & 37.9 $\pm$ 4.3s & N/A & 39.3 $\pm$ 0.9\% & 45.2 $\pm$ 1.4\% \\
+FedSaSync ($M = 10$) & 0.0118 $\pm$ 0.0007 & 56.3 $\pm$ 1.5\% & 36.8 $\pm$ 2.6s & N/A & \textbf{41.0 $\pm$ 0.9\%} & 46.0 $\pm$ 0.6\% \\
+FedSaSync ($M = 12$) & 0.0118 $\pm$ 0.0003 & 57.2 $\pm$ 1.9\% & 36.1 $\pm$ 2.3s & N/A\textsuperscript{2} & 40.6 $\pm$ 0.6\% & 45.9 $\pm$ 0.4\% \\
+FedSaSync ($M = 14$) & 0.0107 $\pm$ 0.0003 & 58.8 $\pm$ 1.9\% & \textbf{35.9 $\pm$ 2.6s} & 67.8 $\pm$ 3.5s\textsuperscript{4} & 39.9 $\pm$ 0.5\% & 46.0 $\pm$ 0.6\% \\
+FedSaSync ($M = 16$) & 0.0103 $\pm$ 0.0005 & 59.9 $\pm$ 2.1\% & 36.1 $\pm$ 2.7s & \textbf{65.8 $\pm$ 3.1s\textsuperscript{4}} & 40.3 $\pm$ 1.1\% & \textbf{46.0 $\pm$ 0.3\%} \\
+FedSaSync ($M = 18$) & 0.0062 $\pm$ 0.0003 & 60.7 $\pm$ 1.9\% & 64.7 $\pm$ 3.5s & 116.2 $\pm$ 6.2s\textsuperscript{4} & 32.6 $\pm$ 3.0\% & 39.2 $\pm$ 1.8\% \\
+FedSaSync ($M = 20$) & 0.0033 $\pm$ 0.0002 & \textbf{61.9 $\pm$ 2.4\%} & 114.4 $\pm$ 4.5s & 208.4 $\pm$ 9.0s\textsuperscript{4} & 25.6 $\pm$ 1.3\% & 32.7 $\pm$ 0.6\% \\
+FedAvg & 0.0033 $\pm$ 0.0002 & 61.7 $\pm$ 2.3\% & 115.8 $\pm$ 3.8s & 208.7 $\pm$ 9.0s\textsuperscript{4} & 25.6 $\pm$ 1.3\% & 32.7 $\pm$ 0.5\% \\
+\hline
+\end{tabular}%
+}
+\par\vspace{0.8em}
+\noindent\textbf{Slow = 50\%} \\[0.2em]
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\hline
+Strategy & $\Delta_{loss}/time$ & Max Acc. & TTA 50\% & TTA 58\% & Acc@15s & Acc@25s \\
+\hline
+FedSaSync ($M = 8$) & \textbf{0.0152 $\pm$ 0.0003} & 54.0 $\pm$ 1.1\% & \textbf{36.8 $\pm$ 1.7s} & N/A & \textbf{41.0 $\pm$ 0.4\%} & \textbf{46.1 $\pm$ 0.6\%} \\
+FedSaSync ($M = 10$) & 0.0130 $\pm$ 0.0004 & 55.7 $\pm$ 1.5\% & 39.7 $\pm$ 4.0s & N/A & 39.1 $\pm$ 0.7\% & 45.3 $\pm$ 0.4\% \\
+FedSaSync ($M = 12$) & 0.0097 $\pm$ 0.0004 & 56.6 $\pm$ 1.4\% & 54.8 $\pm$ 4.6s & N/A & 33.0 $\pm$ 1.3\% & 40.1 $\pm$ 1.2\% \\
+FedSaSync ($M = 14$) & 0.0064 $\pm$ 0.0002 & 58.6 $\pm$ 1.7\% & 76.1 $\pm$ 3.0s & \textbf{139.4 $\pm$ 5.2s\textsuperscript{4}} & 32.4 $\pm$ 0.7\% & 37.8 $\pm$ 0.8\% \\
+FedSaSync ($M = 16$) & 0.0034 $\pm$ 0.0001 & 60.8 $\pm$ 2.1\% & 124.3 $\pm$ 6.0s & 226.1 $\pm$ 15.0s\textsuperscript{4} & 25.4 $\pm$ 1.6\% & 32.2 $\pm$ 0.6\% \\
+FedSaSync ($M = 18$) & 0.0033 $\pm$ 0.0001 & 61.2 $\pm$ 2.1\% & 122.5 $\pm$ 7.2s & 219.7 $\pm$ 9.2s\textsuperscript{4} & 25.4 $\pm$ 1.3\% & 32.4 $\pm$ 0.6\% \\
+FedSaSync ($M = 20$) & 0.0031 $\pm$ 0.0001 & \textbf{61.7 $\pm$ 2.2\%} & 121.7 $\pm$ 4.9s & 221.8 $\pm$ 9.6s\textsuperscript{4} & 25.6 $\pm$ 1.3\% & 29.6 $\pm$ 0.7\% \\
+FedAvg & 0.0031 $\pm$ 0.0001 & 61.7 $\pm$ 2.4\% & 123.3 $\pm$ 4.2s & 220.5 $\pm$ 10.1s\textsuperscript{4} & 25.6 $\pm$ 1.3\% & 29.6 $\pm$ 0.8\% \\
+\hline
+\end{tabular}%
+}
+\par\vspace{0.8em}
+\raggedright \footnotesize \textit{Note:} Superscripts indicate the number of successful runs out of 5 repetitions when not all runs finished within the target.
+\end{table*}

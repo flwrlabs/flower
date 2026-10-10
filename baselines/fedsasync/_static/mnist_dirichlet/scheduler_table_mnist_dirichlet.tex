@@ -1,0 +1,61 @@
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{0.85}
+\caption{Scheduler and communication overhead metrics for mnist\_dirichlet.}
+\label{tab:scheduler_mnist_dirichlet}
+\noindent\textbf{Slow = 0\%} \\[0.2em]
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccc}
+\hline
+Strategy & Polling Calls & Polling Overhead (\%) & Server CPU Util. (\%) & Agg. Rate (msgs/s) \\
+\hline
+FedSaSync ($M = 8$) & \textbf{525.8 $\pm$ 4.7} & \textbf{0.4 $\pm$ 0.0\%} & 24.6 $\pm$ 0.2\% & 8.40 $\pm$ 0.15 \\
+FedSaSync ($M = 10$) & 623.6 $\pm$ 10.0 & \textbf{0.4 $\pm$ 0.0\%} & 22.3 $\pm$ 0.4\% & 8.52 $\pm$ 0.19 \\
+FedSaSync ($M = 12$) & 713.0 $\pm$ 10.4 & \textbf{0.4 $\pm$ 0.0\%} & 20.9 $\pm$ 0.4\% & 8.71 $\pm$ 0.13 \\
+FedSaSync ($M = 14$) & 846.4 $\pm$ 8.7 & \textbf{0.4 $\pm$ 0.0\%} & 19.9 $\pm$ 0.4\% & 8.68 $\pm$ 0.13 \\
+FedSaSync ($M = 16$) & 938.2 $\pm$ 13.0 & \textbf{0.4 $\pm$ 0.0\%} & 19.8 $\pm$ 0.3\% & \textbf{8.85 $\pm$ 0.15} \\
+FedSaSync ($M = 18$) & 1041.4 $\pm$ 8.0 & \textbf{0.4 $\pm$ 0.0\%} & 19.5 $\pm$ 0.3\% & 8.79 $\pm$ 0.09 \\
+FedSaSync ($M = 20$) & 1182.6 $\pm$ 14.5 & \textbf{0.4 $\pm$ 0.0\%} & \textbf{18.2 $\pm$ 0.4\%} & 8.36 $\pm$ 0.10 \\
+FedAvg & 1154.2 $\pm$ 15.4 & \textbf{0.4 $\pm$ 0.0\%} & 18.4 $\pm$ 0.4\% & 8.56 $\pm$ 0.11 \\
+\hline
+\end{tabular}%
+}
+\par\vspace{0.8em}
+\noindent\textbf{Slow = 20\%} \\[0.2em]
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccc}
+\hline
+Strategy & Polling Calls & Polling Overhead (\%) & Server CPU Util. (\%) & Agg. Rate (msgs/s) \\
+\hline
+FedSaSync ($M = 8$) & \textbf{617.2 $\pm$ 35.9} & \textbf{0.3 $\pm$ 0.0\%} & 21.6 $\pm$ 1.3\% & 7.08 $\pm$ 0.43 \\
+FedSaSync ($M = 10$) & 736.0 $\pm$ 16.5 & 0.4 $\pm$ 0.0\% & 20.0 $\pm$ 0.6\% & 7.19 $\pm$ 0.17 \\
+FedSaSync ($M = 12$) & 871.4 $\pm$ 12.3 & 0.4 $\pm$ 0.0\% & 18.7 $\pm$ 0.3\% & 7.27 $\pm$ 0.12 \\
+FedSaSync ($M = 14$) & 946.4 $\pm$ 29.6 & 0.4 $\pm$ 0.0\% & 18.5 $\pm$ 0.6\% & \textbf{7.68 $\pm$ 0.24} \\
+FedSaSync ($M = 16$) & 1080.6 $\pm$ 6.0 & 0.4 $\pm$ 0.0\% & 17.9 $\pm$ 0.2\% & 7.50 $\pm$ 0.05 \\
+FedSaSync ($M = 18$) & 1887.6 $\pm$ 33.8 & 0.4 $\pm$ 0.0\% & 11.6 $\pm$ 0.3\% & 4.75 $\pm$ 0.09 \\
+FedSaSync ($M = 20$) & 3368.6 $\pm$ 9.4 & 0.4 $\pm$ 0.0\% & \textbf{7.7 $\pm$ 0.1\%} & 2.94 $\pm$ 0.01 \\
+FedAvg & 3369.8 $\pm$ 8.3 & 0.4 $\pm$ 0.0\% & 7.8 $\pm$ 0.0\% & 2.94 $\pm$ 0.01 \\
+\hline
+\end{tabular}%
+}
+\par\vspace{0.8em}
+\noindent\textbf{Slow = 50\%} \\[0.2em]
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccc}
+\hline
+Strategy & Polling Calls & Polling Overhead (\%) & Server CPU Util. (\%) & Agg. Rate (msgs/s) \\
+\hline
+FedSaSync ($M = 8$) & \textbf{724.6 $\pm$ 8.0} & \textbf{0.4 $\pm$ 0.0\%} & 20.6 $\pm$ 0.3\% & \textbf{6.06 $\pm$ 0.15} \\
+FedSaSync ($M = 10$) & 871.8 $\pm$ 23.0 & \textbf{0.4 $\pm$ 0.0\%} & 18.3 $\pm$ 0.7\% & 6.02 $\pm$ 0.17 \\
+FedSaSync ($M = 12$) & 1211.0 $\pm$ 80.5 & \textbf{0.4 $\pm$ 0.0\%} & 14.7 $\pm$ 1.1\% & 5.11 $\pm$ 0.34 \\
+FedSaSync ($M = 14$) & 1801.6 $\pm$ 5.2 & \textbf{0.4 $\pm$ 0.0\%} & 11.4 $\pm$ 0.1\% & 3.97 $\pm$ 0.03 \\
+FedSaSync ($M = 16$) & 3090.8 $\pm$ 7.9 & \textbf{0.4 $\pm$ 0.0\%} & \textbf{7.3 $\pm$ 0.2\%} & 2.58 $\pm$ 0.01 \\
+FedSaSync ($M = 18$) & 3238.0 $\pm$ 8.9 & \textbf{0.4 $\pm$ 0.0\%} & 8.2 $\pm$ 0.1\% & 2.78 $\pm$ 0.02 \\
+FedSaSync ($M = 20$) & 3401.4 $\pm$ 4.6 & 0.5 $\pm$ 0.0\% & 8.6 $\pm$ 0.1\% & 2.89 $\pm$ 0.00 \\
+FedAvg & 3454.8 $\pm$ 125.2 & 0.5 $\pm$ 0.0\% & 8.8 $\pm$ 0.4\% & 2.84 $\pm$ 0.10 \\
+\hline
+\end{tabular}%
+}
+\end{table*}
