@@ -65,16 +65,9 @@ For context window and API limit details, see :ref:`Context window and limits
 2. Set your Flower API key
 --------------------------
 
-Run this in your terminal, paste your key at the prompt, and press Enter:
-
-.. code-block:: console
-
-   read -rs 'FLOWER_API_KEY?Flower API key: '
-   echo
-   export FLOWER_API_KEY
-
-The input is hidden and is not saved in shell history. Keep this terminal
-open for the next step.
+Follow :doc:`endeavor-api-key` to set ``FLOWER_API_KEY`` in your terminal.
+For desktop use, also complete that guide's desktop setup before reopening
+OpenCode. Keep the terminal open for the next step.
 
 3. Start using Endeavor
 -----------------------
@@ -88,29 +81,21 @@ In the same terminal, change to your project directory and start OpenCode:
 
    opencode --model flower-labs/flwrlabs/endeavor-1.0
 
-Send a prompt such as ``Explain the structure of this project.`` Repeat
-step 2 when starting from a new terminal session.
+Send a prompt such as ``Explain the structure of this project.`` Repeat the
+instructions in :doc:`endeavor-api-key` when starting from a new terminal
+session.
 
 OpenCode Desktop on macOS
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Fully quit OpenCode. In the same terminal where you set the key, run:
-
-.. code-block:: zsh
-
-   launchctl setenv FLOWER_API_KEY "$FLOWER_API_KEY"
-
-This makes the key available to apps opened from the Dock. Reopen OpenCode,
-open a local project, start a new session, and select **Endeavor** from
-**Flower Labs** in the model selector. Send a prompt to begin.
-
-Repeat step 2 and the ``launchctl`` command after signing out of or restarting
-macOS. To remove the key from the desktop environment, quit OpenCode and run
-``launchctl unsetenv FLOWER_API_KEY``.
+After completing the desktop key setup in :doc:`endeavor-api-key`, reopen
+OpenCode, open a local project, start a new session, and select **Endeavor**
+from **Flower Labs** in the model selector. Send a prompt to begin.
 
 Get help
 --------
 
 If you encounter any issues, feel free to post on
-`Flower Discuss <https://discuss.flower.ai>`_. The Flower team will get back to
-you soon.
+`Flower Discuss <https://discuss.flower.ai>`_ or
+`Flower Slack <https://flower.ai/join-slack>`_. The Flower team will get back
+to you soon.
