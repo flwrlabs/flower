@@ -35,8 +35,11 @@
 #include <google/protobuf/map_entry.h>
 #include <google/protobuf/map_field_inl.h>
 #include <google/protobuf/unknown_field_set.h>
+#include "flwr/proto/heartbeat.pb.h"
 #include "flwr/proto/node.pb.h"
-#include "flwr/proto/task.pb.h"
+#include "flwr/proto/run.pb.h"
+#include "flwr/proto/fab.pb.h"
+#include "flwr/proto/message.pb.h"
 // @@protoc_insertion_point(includes)
 #include <google/protobuf/port_def.inc>
 #define PROTOBUF_INTERNAL_EXPORT_flwr_2fproto_2ffleet_2eproto
@@ -52,7 +55,7 @@ struct TableStruct_flwr_2fproto_2ffleet_2eproto {
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
   static const ::PROTOBUF_NAMESPACE_ID::internal::AuxiliaryParseTableField aux[]
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
-  static const ::PROTOBUF_NAMESPACE_ID::internal::ParseTable schema[15]
+  static const ::PROTOBUF_NAMESPACE_ID::internal::ParseTable schema[14]
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
   static const ::PROTOBUF_NAMESPACE_ID::internal::FieldMetadata field_metadata[];
   static const ::PROTOBUF_NAMESPACE_ID::internal::SerializationTable serialization_table[];
@@ -61,93 +64,89 @@ struct TableStruct_flwr_2fproto_2ffleet_2eproto {
 extern const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable descriptor_table_flwr_2fproto_2ffleet_2eproto;
 namespace flwr {
 namespace proto {
-class CreateNodeRequest;
-struct CreateNodeRequestDefaultTypeInternal;
-extern CreateNodeRequestDefaultTypeInternal _CreateNodeRequest_default_instance_;
-class CreateNodeResponse;
-struct CreateNodeResponseDefaultTypeInternal;
-extern CreateNodeResponseDefaultTypeInternal _CreateNodeResponse_default_instance_;
-class DeleteNodeRequest;
-struct DeleteNodeRequestDefaultTypeInternal;
-extern DeleteNodeRequestDefaultTypeInternal _DeleteNodeRequest_default_instance_;
-class DeleteNodeResponse;
-struct DeleteNodeResponseDefaultTypeInternal;
-extern DeleteNodeResponseDefaultTypeInternal _DeleteNodeResponse_default_instance_;
-class GetRunRequest;
-struct GetRunRequestDefaultTypeInternal;
-extern GetRunRequestDefaultTypeInternal _GetRunRequest_default_instance_;
-class GetRunResponse;
-struct GetRunResponseDefaultTypeInternal;
-extern GetRunResponseDefaultTypeInternal _GetRunResponse_default_instance_;
-class PingRequest;
-struct PingRequestDefaultTypeInternal;
-extern PingRequestDefaultTypeInternal _PingRequest_default_instance_;
-class PingResponse;
-struct PingResponseDefaultTypeInternal;
-extern PingResponseDefaultTypeInternal _PingResponse_default_instance_;
-class PullTaskInsRequest;
-struct PullTaskInsRequestDefaultTypeInternal;
-extern PullTaskInsRequestDefaultTypeInternal _PullTaskInsRequest_default_instance_;
-class PullTaskInsResponse;
-struct PullTaskInsResponseDefaultTypeInternal;
-extern PullTaskInsResponseDefaultTypeInternal _PullTaskInsResponse_default_instance_;
-class PushTaskResRequest;
-struct PushTaskResRequestDefaultTypeInternal;
-extern PushTaskResRequestDefaultTypeInternal _PushTaskResRequest_default_instance_;
-class PushTaskResResponse;
-struct PushTaskResResponseDefaultTypeInternal;
-extern PushTaskResResponseDefaultTypeInternal _PushTaskResResponse_default_instance_;
-class PushTaskResResponse_ResultsEntry_DoNotUse;
-struct PushTaskResResponse_ResultsEntry_DoNotUseDefaultTypeInternal;
-extern PushTaskResResponse_ResultsEntry_DoNotUseDefaultTypeInternal _PushTaskResResponse_ResultsEntry_DoNotUse_default_instance_;
+class ActivateNodeRequest;
+struct ActivateNodeRequestDefaultTypeInternal;
+extern ActivateNodeRequestDefaultTypeInternal _ActivateNodeRequest_default_instance_;
+class ActivateNodeResponse;
+struct ActivateNodeResponseDefaultTypeInternal;
+extern ActivateNodeResponseDefaultTypeInternal _ActivateNodeResponse_default_instance_;
+class DeactivateNodeRequest;
+struct DeactivateNodeRequestDefaultTypeInternal;
+extern DeactivateNodeRequestDefaultTypeInternal _DeactivateNodeRequest_default_instance_;
+class DeactivateNodeResponse;
+struct DeactivateNodeResponseDefaultTypeInternal;
+extern DeactivateNodeResponseDefaultTypeInternal _DeactivateNodeResponse_default_instance_;
+class PullMessagesRequest;
+struct PullMessagesRequestDefaultTypeInternal;
+extern PullMessagesRequestDefaultTypeInternal _PullMessagesRequest_default_instance_;
+class PullMessagesResponse;
+struct PullMessagesResponseDefaultTypeInternal;
+extern PullMessagesResponseDefaultTypeInternal _PullMessagesResponse_default_instance_;
+class PushMessagesRequest;
+struct PushMessagesRequestDefaultTypeInternal;
+extern PushMessagesRequestDefaultTypeInternal _PushMessagesRequest_default_instance_;
+class PushMessagesResponse;
+struct PushMessagesResponseDefaultTypeInternal;
+extern PushMessagesResponseDefaultTypeInternal _PushMessagesResponse_default_instance_;
+class PushMessagesResponse_ResultsEntry_DoNotUse;
+struct PushMessagesResponse_ResultsEntry_DoNotUseDefaultTypeInternal;
+extern PushMessagesResponse_ResultsEntry_DoNotUseDefaultTypeInternal _PushMessagesResponse_ResultsEntry_DoNotUse_default_instance_;
 class Reconnect;
 struct ReconnectDefaultTypeInternal;
 extern ReconnectDefaultTypeInternal _Reconnect_default_instance_;
-class Run;
-struct RunDefaultTypeInternal;
-extern RunDefaultTypeInternal _Run_default_instance_;
+class RegisterNodeFleetRequest;
+struct RegisterNodeFleetRequestDefaultTypeInternal;
+extern RegisterNodeFleetRequestDefaultTypeInternal _RegisterNodeFleetRequest_default_instance_;
+class RegisterNodeFleetResponse;
+struct RegisterNodeFleetResponseDefaultTypeInternal;
+extern RegisterNodeFleetResponseDefaultTypeInternal _RegisterNodeFleetResponse_default_instance_;
+class UnregisterNodeFleetRequest;
+struct UnregisterNodeFleetRequestDefaultTypeInternal;
+extern UnregisterNodeFleetRequestDefaultTypeInternal _UnregisterNodeFleetRequest_default_instance_;
+class UnregisterNodeFleetResponse;
+struct UnregisterNodeFleetResponseDefaultTypeInternal;
+extern UnregisterNodeFleetResponseDefaultTypeInternal _UnregisterNodeFleetResponse_default_instance_;
 }  // namespace proto
 }  // namespace flwr
 PROTOBUF_NAMESPACE_OPEN
-template<> ::flwr::proto::CreateNodeRequest* Arena::CreateMaybeMessage<::flwr::proto::CreateNodeRequest>(Arena*);
-template<> ::flwr::proto::CreateNodeResponse* Arena::CreateMaybeMessage<::flwr::proto::CreateNodeResponse>(Arena*);
-template<> ::flwr::proto::DeleteNodeRequest* Arena::CreateMaybeMessage<::flwr::proto::DeleteNodeRequest>(Arena*);
-template<> ::flwr::proto::DeleteNodeResponse* Arena::CreateMaybeMessage<::flwr::proto::DeleteNodeResponse>(Arena*);
-template<> ::flwr::proto::GetRunRequest* Arena::CreateMaybeMessage<::flwr::proto::GetRunRequest>(Arena*);
-template<> ::flwr::proto::GetRunResponse* Arena::CreateMaybeMessage<::flwr::proto::GetRunResponse>(Arena*);
-template<> ::flwr::proto::PingRequest* Arena::CreateMaybeMessage<::flwr::proto::PingRequest>(Arena*);
-template<> ::flwr::proto::PingResponse* Arena::CreateMaybeMessage<::flwr::proto::PingResponse>(Arena*);
-template<> ::flwr::proto::PullTaskInsRequest* Arena::CreateMaybeMessage<::flwr::proto::PullTaskInsRequest>(Arena*);
-template<> ::flwr::proto::PullTaskInsResponse* Arena::CreateMaybeMessage<::flwr::proto::PullTaskInsResponse>(Arena*);
-template<> ::flwr::proto::PushTaskResRequest* Arena::CreateMaybeMessage<::flwr::proto::PushTaskResRequest>(Arena*);
-template<> ::flwr::proto::PushTaskResResponse* Arena::CreateMaybeMessage<::flwr::proto::PushTaskResResponse>(Arena*);
-template<> ::flwr::proto::PushTaskResResponse_ResultsEntry_DoNotUse* Arena::CreateMaybeMessage<::flwr::proto::PushTaskResResponse_ResultsEntry_DoNotUse>(Arena*);
+template<> ::flwr::proto::ActivateNodeRequest* Arena::CreateMaybeMessage<::flwr::proto::ActivateNodeRequest>(Arena*);
+template<> ::flwr::proto::ActivateNodeResponse* Arena::CreateMaybeMessage<::flwr::proto::ActivateNodeResponse>(Arena*);
+template<> ::flwr::proto::DeactivateNodeRequest* Arena::CreateMaybeMessage<::flwr::proto::DeactivateNodeRequest>(Arena*);
+template<> ::flwr::proto::DeactivateNodeResponse* Arena::CreateMaybeMessage<::flwr::proto::DeactivateNodeResponse>(Arena*);
+template<> ::flwr::proto::PullMessagesRequest* Arena::CreateMaybeMessage<::flwr::proto::PullMessagesRequest>(Arena*);
+template<> ::flwr::proto::PullMessagesResponse* Arena::CreateMaybeMessage<::flwr::proto::PullMessagesResponse>(Arena*);
+template<> ::flwr::proto::PushMessagesRequest* Arena::CreateMaybeMessage<::flwr::proto::PushMessagesRequest>(Arena*);
+template<> ::flwr::proto::PushMessagesResponse* Arena::CreateMaybeMessage<::flwr::proto::PushMessagesResponse>(Arena*);
+template<> ::flwr::proto::PushMessagesResponse_ResultsEntry_DoNotUse* Arena::CreateMaybeMessage<::flwr::proto::PushMessagesResponse_ResultsEntry_DoNotUse>(Arena*);
 template<> ::flwr::proto::Reconnect* Arena::CreateMaybeMessage<::flwr::proto::Reconnect>(Arena*);
-template<> ::flwr::proto::Run* Arena::CreateMaybeMessage<::flwr::proto::Run>(Arena*);
+template<> ::flwr::proto::RegisterNodeFleetRequest* Arena::CreateMaybeMessage<::flwr::proto::RegisterNodeFleetRequest>(Arena*);
+template<> ::flwr::proto::RegisterNodeFleetResponse* Arena::CreateMaybeMessage<::flwr::proto::RegisterNodeFleetResponse>(Arena*);
+template<> ::flwr::proto::UnregisterNodeFleetRequest* Arena::CreateMaybeMessage<::flwr::proto::UnregisterNodeFleetRequest>(Arena*);
+template<> ::flwr::proto::UnregisterNodeFleetResponse* Arena::CreateMaybeMessage<::flwr::proto::UnregisterNodeFleetResponse>(Arena*);
 PROTOBUF_NAMESPACE_CLOSE
 namespace flwr {
 namespace proto {
 
 // ===================================================================
 
-class CreateNodeRequest final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.CreateNodeRequest) */ {
+class RegisterNodeFleetRequest final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.RegisterNodeFleetRequest) */ {
  public:
-  inline CreateNodeRequest() : CreateNodeRequest(nullptr) {}
-  ~CreateNodeRequest() override;
-  explicit constexpr CreateNodeRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+  inline RegisterNodeFleetRequest() : RegisterNodeFleetRequest(nullptr) {}
+  ~RegisterNodeFleetRequest() override;
+  explicit constexpr RegisterNodeFleetRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
 
-  CreateNodeRequest(const CreateNodeRequest& from);
-  CreateNodeRequest(CreateNodeRequest&& from) noexcept
-    : CreateNodeRequest() {
+  RegisterNodeFleetRequest(const RegisterNodeFleetRequest& from);
+  RegisterNodeFleetRequest(RegisterNodeFleetRequest&& from) noexcept
+    : RegisterNodeFleetRequest() {
     *this = ::std::move(from);
   }
 
-  inline CreateNodeRequest& operator=(const CreateNodeRequest& from) {
+  inline RegisterNodeFleetRequest& operator=(const RegisterNodeFleetRequest& from) {
     CopyFrom(from);
     return *this;
   }
-  inline CreateNodeRequest& operator=(CreateNodeRequest&& from) noexcept {
+  inline RegisterNodeFleetRequest& operator=(RegisterNodeFleetRequest&& from) noexcept {
     if (this == &from) return *this;
     if (GetOwningArena() == from.GetOwningArena()
   #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
@@ -170,20 +169,20 @@ class CreateNodeRequest final :
   static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  static const CreateNodeRequest& default_instance() {
+  static const RegisterNodeFleetRequest& default_instance() {
     return *internal_default_instance();
   }
-  static inline const CreateNodeRequest* internal_default_instance() {
-    return reinterpret_cast<const CreateNodeRequest*>(
-               &_CreateNodeRequest_default_instance_);
+  static inline const RegisterNodeFleetRequest* internal_default_instance() {
+    return reinterpret_cast<const RegisterNodeFleetRequest*>(
+               &_RegisterNodeFleetRequest_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
     0;
 
-  friend void swap(CreateNodeRequest& a, CreateNodeRequest& b) {
+  friend void swap(RegisterNodeFleetRequest& a, RegisterNodeFleetRequest& b) {
     a.Swap(&b);
   }
-  inline void Swap(CreateNodeRequest* other) {
+  inline void Swap(RegisterNodeFleetRequest* other) {
     if (other == this) return;
     if (GetOwningArena() == other->GetOwningArena()) {
       InternalSwap(other);
@@ -191,7 +190,7 @@ class CreateNodeRequest final :
       ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(CreateNodeRequest* other) {
+  void UnsafeArenaSwap(RegisterNodeFleetRequest* other) {
     if (other == this) return;
     GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
     InternalSwap(other);
@@ -199,17 +198,17 @@ class CreateNodeRequest final :
 
   // implements Message ----------------------------------------------
 
-  inline CreateNodeRequest* New() const final {
-    return new CreateNodeRequest();
+  inline RegisterNodeFleetRequest* New() const final {
+    return new RegisterNodeFleetRequest();
   }
 
-  CreateNodeRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
-    return CreateMaybeMessage<CreateNodeRequest>(arena);
+  RegisterNodeFleetRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<RegisterNodeFleetRequest>(arena);
   }
   using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const CreateNodeRequest& from);
+  void CopyFrom(const RegisterNodeFleetRequest& from);
   using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const CreateNodeRequest& from);
+  void MergeFrom(const RegisterNodeFleetRequest& from);
   private:
   static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
   public:
@@ -226,13 +225,13 @@ class CreateNodeRequest final :
   void SharedCtor();
   void SharedDtor();
   void SetCachedSize(int size) const final;
-  void InternalSwap(CreateNodeRequest* other);
+  void InternalSwap(RegisterNodeFleetRequest* other);
   friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
   static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "flwr.proto.CreateNodeRequest";
+    return "flwr.proto.RegisterNodeFleetRequest";
   }
   protected:
-  explicit CreateNodeRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+  explicit RegisterNodeFleetRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                        bool is_message_owned = false);
   private:
   static void ArenaDtor(void* object);
@@ -249,48 +248,53 @@ class CreateNodeRequest final :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kPingIntervalFieldNumber = 1,
+    kPublicKeyFieldNumber = 1,
   };
-  // double ping_interval = 1;
-  void clear_ping_interval();
-  double ping_interval() const;
-  void set_ping_interval(double value);
+  // bytes public_key = 1;
+  void clear_public_key();
+  const std::string& public_key() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_public_key(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_public_key();
+  PROTOBUF_MUST_USE_RESULT std::string* release_public_key();
+  void set_allocated_public_key(std::string* public_key);
   private:
-  double _internal_ping_interval() const;
-  void _internal_set_ping_interval(double value);
+  const std::string& _internal_public_key() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_public_key(const std::string& value);
+  std::string* _internal_mutable_public_key();
   public:
 
-  // @@protoc_insertion_point(class_scope:flwr.proto.CreateNodeRequest)
+  // @@protoc_insertion_point(class_scope:flwr.proto.RegisterNodeFleetRequest)
  private:
   class _Internal;
 
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
-  double ping_interval_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr public_key_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
 };
 // -------------------------------------------------------------------
 
-class CreateNodeResponse final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.CreateNodeResponse) */ {
+class RegisterNodeFleetResponse final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.RegisterNodeFleetResponse) */ {
  public:
-  inline CreateNodeResponse() : CreateNodeResponse(nullptr) {}
-  ~CreateNodeResponse() override;
-  explicit constexpr CreateNodeResponse(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+  inline RegisterNodeFleetResponse() : RegisterNodeFleetResponse(nullptr) {}
+  ~RegisterNodeFleetResponse() override;
+  explicit constexpr RegisterNodeFleetResponse(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
 
-  CreateNodeResponse(const CreateNodeResponse& from);
-  CreateNodeResponse(CreateNodeResponse&& from) noexcept
-    : CreateNodeResponse() {
+  RegisterNodeFleetResponse(const RegisterNodeFleetResponse& from);
+  RegisterNodeFleetResponse(RegisterNodeFleetResponse&& from) noexcept
+    : RegisterNodeFleetResponse() {
     *this = ::std::move(from);
   }
 
-  inline CreateNodeResponse& operator=(const CreateNodeResponse& from) {
+  inline RegisterNodeFleetResponse& operator=(const RegisterNodeFleetResponse& from) {
     CopyFrom(from);
     return *this;
   }
-  inline CreateNodeResponse& operator=(CreateNodeResponse&& from) noexcept {
+  inline RegisterNodeFleetResponse& operator=(RegisterNodeFleetResponse&& from) noexcept {
     if (this == &from) return *this;
     if (GetOwningArena() == from.GetOwningArena()
   #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
@@ -313,20 +317,20 @@ class CreateNodeResponse final :
   static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  static const CreateNodeResponse& default_instance() {
+  static const RegisterNodeFleetResponse& default_instance() {
     return *internal_default_instance();
   }
-  static inline const CreateNodeResponse* internal_default_instance() {
-    return reinterpret_cast<const CreateNodeResponse*>(
-               &_CreateNodeResponse_default_instance_);
+  static inline const RegisterNodeFleetResponse* internal_default_instance() {
+    return reinterpret_cast<const RegisterNodeFleetResponse*>(
+               &_RegisterNodeFleetResponse_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
     1;
 
-  friend void swap(CreateNodeResponse& a, CreateNodeResponse& b) {
+  friend void swap(RegisterNodeFleetResponse& a, RegisterNodeFleetResponse& b) {
     a.Swap(&b);
   }
-  inline void Swap(CreateNodeResponse* other) {
+  inline void Swap(RegisterNodeFleetResponse* other) {
     if (other == this) return;
     if (GetOwningArena() == other->GetOwningArena()) {
       InternalSwap(other);
@@ -334,7 +338,7 @@ class CreateNodeResponse final :
       ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(CreateNodeResponse* other) {
+  void UnsafeArenaSwap(RegisterNodeFleetResponse* other) {
     if (other == this) return;
     GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
     InternalSwap(other);
@@ -342,17 +346,17 @@ class CreateNodeResponse final :
 
   // implements Message ----------------------------------------------
 
-  inline CreateNodeResponse* New() const final {
-    return new CreateNodeResponse();
+  inline RegisterNodeFleetResponse* New() const final {
+    return new RegisterNodeFleetResponse();
   }
 
-  CreateNodeResponse* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
-    return CreateMaybeMessage<CreateNodeResponse>(arena);
+  RegisterNodeFleetResponse* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<RegisterNodeFleetResponse>(arena);
   }
   using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const CreateNodeResponse& from);
+  void CopyFrom(const RegisterNodeFleetResponse& from);
   using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const CreateNodeResponse& from);
+  void MergeFrom(const RegisterNodeFleetResponse& from);
   private:
   static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
   public:
@@ -369,13 +373,13 @@ class CreateNodeResponse final :
   void SharedCtor();
   void SharedDtor();
   void SetCachedSize(int size) const final;
-  void InternalSwap(CreateNodeResponse* other);
+  void InternalSwap(RegisterNodeFleetResponse* other);
   friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
   static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "flwr.proto.CreateNodeResponse";
+    return "flwr.proto.RegisterNodeFleetResponse";
   }
   protected:
-  explicit CreateNodeResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+  explicit RegisterNodeFleetResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                        bool is_message_owned = false);
   private:
   static void ArenaDtor(void* object);
@@ -392,57 +396,48 @@ class CreateNodeResponse final :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kNodeFieldNumber = 1,
+    kNodeIdFieldNumber = 1,
   };
-  // .flwr.proto.Node node = 1;
-  bool has_node() const;
+  // uint64 node_id = 1;
+  void clear_node_id();
+  ::PROTOBUF_NAMESPACE_ID::uint64 node_id() const;
+  void set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value);
   private:
-  bool _internal_has_node() const;
+  ::PROTOBUF_NAMESPACE_ID::uint64 _internal_node_id() const;
+  void _internal_set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value);
   public:
-  void clear_node();
-  const ::flwr::proto::Node& node() const;
-  PROTOBUF_MUST_USE_RESULT ::flwr::proto::Node* release_node();
-  ::flwr::proto::Node* mutable_node();
-  void set_allocated_node(::flwr::proto::Node* node);
-  private:
-  const ::flwr::proto::Node& _internal_node() const;
-  ::flwr::proto::Node* _internal_mutable_node();
-  public:
-  void unsafe_arena_set_allocated_node(
-      ::flwr::proto::Node* node);
-  ::flwr::proto::Node* unsafe_arena_release_node();
 
-  // @@protoc_insertion_point(class_scope:flwr.proto.CreateNodeResponse)
+  // @@protoc_insertion_point(class_scope:flwr.proto.RegisterNodeFleetResponse)
  private:
   class _Internal;
 
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
-  ::flwr::proto::Node* node_;
+  ::PROTOBUF_NAMESPACE_ID::uint64 node_id_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
 };
 // -------------------------------------------------------------------
 
-class DeleteNodeRequest final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.DeleteNodeRequest) */ {
+class ActivateNodeRequest final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.ActivateNodeRequest) */ {
  public:
-  inline DeleteNodeRequest() : DeleteNodeRequest(nullptr) {}
-  ~DeleteNodeRequest() override;
-  explicit constexpr DeleteNodeRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+  inline ActivateNodeRequest() : ActivateNodeRequest(nullptr) {}
+  ~ActivateNodeRequest() override;
+  explicit constexpr ActivateNodeRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
 
-  DeleteNodeRequest(const DeleteNodeRequest& from);
-  DeleteNodeRequest(DeleteNodeRequest&& from) noexcept
-    : DeleteNodeRequest() {
+  ActivateNodeRequest(const ActivateNodeRequest& from);
+  ActivateNodeRequest(ActivateNodeRequest&& from) noexcept
+    : ActivateNodeRequest() {
     *this = ::std::move(from);
   }
 
-  inline DeleteNodeRequest& operator=(const DeleteNodeRequest& from) {
+  inline ActivateNodeRequest& operator=(const ActivateNodeRequest& from) {
     CopyFrom(from);
     return *this;
   }
-  inline DeleteNodeRequest& operator=(DeleteNodeRequest&& from) noexcept {
+  inline ActivateNodeRequest& operator=(ActivateNodeRequest&& from) noexcept {
     if (this == &from) return *this;
     if (GetOwningArena() == from.GetOwningArena()
   #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
@@ -465,20 +460,20 @@ class DeleteNodeRequest final :
   static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  static const DeleteNodeRequest& default_instance() {
+  static const ActivateNodeRequest& default_instance() {
     return *internal_default_instance();
   }
-  static inline const DeleteNodeRequest* internal_default_instance() {
-    return reinterpret_cast<const DeleteNodeRequest*>(
-               &_DeleteNodeRequest_default_instance_);
+  static inline const ActivateNodeRequest* internal_default_instance() {
+    return reinterpret_cast<const ActivateNodeRequest*>(
+               &_ActivateNodeRequest_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
     2;
 
-  friend void swap(DeleteNodeRequest& a, DeleteNodeRequest& b) {
+  friend void swap(ActivateNodeRequest& a, ActivateNodeRequest& b) {
     a.Swap(&b);
   }
-  inline void Swap(DeleteNodeRequest* other) {
+  inline void Swap(ActivateNodeRequest* other) {
     if (other == this) return;
     if (GetOwningArena() == other->GetOwningArena()) {
       InternalSwap(other);
@@ -486,7 +481,7 @@ class DeleteNodeRequest final :
       ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(DeleteNodeRequest* other) {
+  void UnsafeArenaSwap(ActivateNodeRequest* other) {
     if (other == this) return;
     GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
     InternalSwap(other);
@@ -494,17 +489,17 @@ class DeleteNodeRequest final :
 
   // implements Message ----------------------------------------------
 
-  inline DeleteNodeRequest* New() const final {
-    return new DeleteNodeRequest();
+  inline ActivateNodeRequest* New() const final {
+    return new ActivateNodeRequest();
   }
 
-  DeleteNodeRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
-    return CreateMaybeMessage<DeleteNodeRequest>(arena);
+  ActivateNodeRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<ActivateNodeRequest>(arena);
   }
   using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const DeleteNodeRequest& from);
+  void CopyFrom(const ActivateNodeRequest& from);
   using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const DeleteNodeRequest& from);
+  void MergeFrom(const ActivateNodeRequest& from);
   private:
   static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
   public:
@@ -521,13 +516,13 @@ class DeleteNodeRequest final :
   void SharedCtor();
   void SharedDtor();
   void SetCachedSize(int size) const final;
-  void InternalSwap(DeleteNodeRequest* other);
+  void InternalSwap(ActivateNodeRequest* other);
   friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
   static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "flwr.proto.DeleteNodeRequest";
+    return "flwr.proto.ActivateNodeRequest";
   }
   protected:
-  explicit DeleteNodeRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+  explicit ActivateNodeRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                        bool is_message_owned = false);
   private:
   static void ArenaDtor(void* object);
@@ -544,56 +539,64 @@ class DeleteNodeRequest final :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kNodeFieldNumber = 1,
+    kPublicKeyFieldNumber = 1,
+    kHeartbeatIntervalFieldNumber = 2,
   };
-  // .flwr.proto.Node node = 1;
-  bool has_node() const;
+  // bytes public_key = 1;
+  void clear_public_key();
+  const std::string& public_key() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_public_key(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_public_key();
+  PROTOBUF_MUST_USE_RESULT std::string* release_public_key();
+  void set_allocated_public_key(std::string* public_key);
   private:
-  bool _internal_has_node() const;
+  const std::string& _internal_public_key() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_public_key(const std::string& value);
+  std::string* _internal_mutable_public_key();
   public:
-  void clear_node();
-  const ::flwr::proto::Node& node() const;
-  PROTOBUF_MUST_USE_RESULT ::flwr::proto::Node* release_node();
-  ::flwr::proto::Node* mutable_node();
-  void set_allocated_node(::flwr::proto::Node* node);
-  private:
-  const ::flwr::proto::Node& _internal_node() const;
-  ::flwr::proto::Node* _internal_mutable_node();
-  public:
-  void unsafe_arena_set_allocated_node(
-      ::flwr::proto::Node* node);
-  ::flwr::proto::Node* unsafe_arena_release_node();
 
-  // @@protoc_insertion_point(class_scope:flwr.proto.DeleteNodeRequest)
+  // double heartbeat_interval = 2;
+  void clear_heartbeat_interval();
+  double heartbeat_interval() const;
+  void set_heartbeat_interval(double value);
+  private:
+  double _internal_heartbeat_interval() const;
+  void _internal_set_heartbeat_interval(double value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:flwr.proto.ActivateNodeRequest)
  private:
   class _Internal;
 
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
-  ::flwr::proto::Node* node_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr public_key_;
+  double heartbeat_interval_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
 };
 // -------------------------------------------------------------------
 
-class DeleteNodeResponse final :
-    public ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase /* @@protoc_insertion_point(class_definition:flwr.proto.DeleteNodeResponse) */ {
+class ActivateNodeResponse final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.ActivateNodeResponse) */ {
  public:
-  inline DeleteNodeResponse() : DeleteNodeResponse(nullptr) {}
-  explicit constexpr DeleteNodeResponse(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+  inline ActivateNodeResponse() : ActivateNodeResponse(nullptr) {}
+  ~ActivateNodeResponse() override;
+  explicit constexpr ActivateNodeResponse(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
 
-  DeleteNodeResponse(const DeleteNodeResponse& from);
-  DeleteNodeResponse(DeleteNodeResponse&& from) noexcept
-    : DeleteNodeResponse() {
+  ActivateNodeResponse(const ActivateNodeResponse& from);
+  ActivateNodeResponse(ActivateNodeResponse&& from) noexcept
+    : ActivateNodeResponse() {
     *this = ::std::move(from);
   }
 
-  inline DeleteNodeResponse& operator=(const DeleteNodeResponse& from) {
+  inline ActivateNodeResponse& operator=(const ActivateNodeResponse& from) {
     CopyFrom(from);
     return *this;
   }
-  inline DeleteNodeResponse& operator=(DeleteNodeResponse&& from) noexcept {
+  inline ActivateNodeResponse& operator=(ActivateNodeResponse&& from) noexcept {
     if (this == &from) return *this;
     if (GetOwningArena() == from.GetOwningArena()
   #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
@@ -616,20 +619,20 @@ class DeleteNodeResponse final :
   static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  static const DeleteNodeResponse& default_instance() {
+  static const ActivateNodeResponse& default_instance() {
     return *internal_default_instance();
   }
-  static inline const DeleteNodeResponse* internal_default_instance() {
-    return reinterpret_cast<const DeleteNodeResponse*>(
-               &_DeleteNodeResponse_default_instance_);
+  static inline const ActivateNodeResponse* internal_default_instance() {
+    return reinterpret_cast<const ActivateNodeResponse*>(
+               &_ActivateNodeResponse_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
     3;
 
-  friend void swap(DeleteNodeResponse& a, DeleteNodeResponse& b) {
+  friend void swap(ActivateNodeResponse& a, ActivateNodeResponse& b) {
     a.Swap(&b);
   }
-  inline void Swap(DeleteNodeResponse* other) {
+  inline void Swap(ActivateNodeResponse* other) {
     if (other == this) return;
     if (GetOwningArena() == other->GetOwningArena()) {
       InternalSwap(other);
@@ -637,7 +640,7 @@ class DeleteNodeResponse final :
       ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(DeleteNodeResponse* other) {
+  void UnsafeArenaSwap(ActivateNodeResponse* other) {
     if (other == this) return;
     GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
     InternalSwap(other);
@@ -645,28 +648,313 @@ class DeleteNodeResponse final :
 
   // implements Message ----------------------------------------------
 
-  inline DeleteNodeResponse* New() const final {
-    return new DeleteNodeResponse();
+  inline ActivateNodeResponse* New() const final {
+    return new ActivateNodeResponse();
   }
 
-  DeleteNodeResponse* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
-    return CreateMaybeMessage<DeleteNodeResponse>(arena);
+  ActivateNodeResponse* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<ActivateNodeResponse>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const ActivateNodeResponse& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom(const ActivateNodeResponse& from);
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  ::PROTOBUF_NAMESPACE_ID::uint8* _InternalSerialize(
+      ::PROTOBUF_NAMESPACE_ID::uint8* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _cached_size_.Get(); }
+
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(ActivateNodeResponse* other);
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "flwr.proto.ActivateNodeResponse";
+  }
+  protected:
+  explicit ActivateNodeResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  private:
+  static void ArenaDtor(void* object);
+  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kNodeIdFieldNumber = 1,
+  };
+  // uint64 node_id = 1;
+  void clear_node_id();
+  ::PROTOBUF_NAMESPACE_ID::uint64 node_id() const;
+  void set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value);
+  private:
+  ::PROTOBUF_NAMESPACE_ID::uint64 _internal_node_id() const;
+  void _internal_set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:flwr.proto.ActivateNodeResponse)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::uint64 node_id_;
+  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
+};
+// -------------------------------------------------------------------
+
+class DeactivateNodeRequest final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.DeactivateNodeRequest) */ {
+ public:
+  inline DeactivateNodeRequest() : DeactivateNodeRequest(nullptr) {}
+  ~DeactivateNodeRequest() override;
+  explicit constexpr DeactivateNodeRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  DeactivateNodeRequest(const DeactivateNodeRequest& from);
+  DeactivateNodeRequest(DeactivateNodeRequest&& from) noexcept
+    : DeactivateNodeRequest() {
+    *this = ::std::move(from);
+  }
+
+  inline DeactivateNodeRequest& operator=(const DeactivateNodeRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline DeactivateNodeRequest& operator=(DeactivateNodeRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const DeactivateNodeRequest& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const DeactivateNodeRequest* internal_default_instance() {
+    return reinterpret_cast<const DeactivateNodeRequest*>(
+               &_DeactivateNodeRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    4;
+
+  friend void swap(DeactivateNodeRequest& a, DeactivateNodeRequest& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(DeactivateNodeRequest* other) {
+    if (other == this) return;
+    if (GetOwningArena() == other->GetOwningArena()) {
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(DeactivateNodeRequest* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  inline DeactivateNodeRequest* New() const final {
+    return new DeactivateNodeRequest();
+  }
+
+  DeactivateNodeRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<DeactivateNodeRequest>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const DeactivateNodeRequest& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom(const DeactivateNodeRequest& from);
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  ::PROTOBUF_NAMESPACE_ID::uint8* _InternalSerialize(
+      ::PROTOBUF_NAMESPACE_ID::uint8* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _cached_size_.Get(); }
+
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(DeactivateNodeRequest* other);
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "flwr.proto.DeactivateNodeRequest";
+  }
+  protected:
+  explicit DeactivateNodeRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  private:
+  static void ArenaDtor(void* object);
+  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kNodeIdFieldNumber = 1,
+  };
+  // uint64 node_id = 1;
+  void clear_node_id();
+  ::PROTOBUF_NAMESPACE_ID::uint64 node_id() const;
+  void set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value);
+  private:
+  ::PROTOBUF_NAMESPACE_ID::uint64 _internal_node_id() const;
+  void _internal_set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:flwr.proto.DeactivateNodeRequest)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::uint64 node_id_;
+  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
+};
+// -------------------------------------------------------------------
+
+class DeactivateNodeResponse final :
+    public ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase /* @@protoc_insertion_point(class_definition:flwr.proto.DeactivateNodeResponse) */ {
+ public:
+  inline DeactivateNodeResponse() : DeactivateNodeResponse(nullptr) {}
+  explicit constexpr DeactivateNodeResponse(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  DeactivateNodeResponse(const DeactivateNodeResponse& from);
+  DeactivateNodeResponse(DeactivateNodeResponse&& from) noexcept
+    : DeactivateNodeResponse() {
+    *this = ::std::move(from);
+  }
+
+  inline DeactivateNodeResponse& operator=(const DeactivateNodeResponse& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline DeactivateNodeResponse& operator=(DeactivateNodeResponse&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const DeactivateNodeResponse& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const DeactivateNodeResponse* internal_default_instance() {
+    return reinterpret_cast<const DeactivateNodeResponse*>(
+               &_DeactivateNodeResponse_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    5;
+
+  friend void swap(DeactivateNodeResponse& a, DeactivateNodeResponse& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(DeactivateNodeResponse* other) {
+    if (other == this) return;
+    if (GetOwningArena() == other->GetOwningArena()) {
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(DeactivateNodeResponse* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  inline DeactivateNodeResponse* New() const final {
+    return new DeactivateNodeResponse();
+  }
+
+  DeactivateNodeResponse* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<DeactivateNodeResponse>(arena);
   }
   using ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::CopyFrom;
-  inline void CopyFrom(const DeleteNodeResponse& from) {
+  inline void CopyFrom(const DeactivateNodeResponse& from) {
     ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::CopyImpl(this, from);
   }
   using ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::MergeFrom;
-  void MergeFrom(const DeleteNodeResponse& from) {
+  void MergeFrom(const DeactivateNodeResponse& from) {
     ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::MergeImpl(this, from);
   }
   public:
   friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
   static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "flwr.proto.DeleteNodeResponse";
+    return "flwr.proto.DeactivateNodeResponse";
   }
   protected:
-  explicit DeleteNodeResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+  explicit DeactivateNodeResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                        bool is_message_owned = false);
   private:
   public:
@@ -680,7 +968,7 @@ class DeleteNodeResponse final :
 
   // accessors -------------------------------------------------------
 
-  // @@protoc_insertion_point(class_scope:flwr.proto.DeleteNodeResponse)
+  // @@protoc_insertion_point(class_scope:flwr.proto.DeactivateNodeResponse)
  private:
   class _Internal;
 
@@ -692,24 +980,24 @@ class DeleteNodeResponse final :
 };
 // -------------------------------------------------------------------
 
-class PingRequest final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.PingRequest) */ {
+class UnregisterNodeFleetRequest final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.UnregisterNodeFleetRequest) */ {
  public:
-  inline PingRequest() : PingRequest(nullptr) {}
-  ~PingRequest() override;
-  explicit constexpr PingRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+  inline UnregisterNodeFleetRequest() : UnregisterNodeFleetRequest(nullptr) {}
+  ~UnregisterNodeFleetRequest() override;
+  explicit constexpr UnregisterNodeFleetRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
 
-  PingRequest(const PingRequest& from);
-  PingRequest(PingRequest&& from) noexcept
-    : PingRequest() {
+  UnregisterNodeFleetRequest(const UnregisterNodeFleetRequest& from);
+  UnregisterNodeFleetRequest(UnregisterNodeFleetRequest&& from) noexcept
+    : UnregisterNodeFleetRequest() {
     *this = ::std::move(from);
   }
 
-  inline PingRequest& operator=(const PingRequest& from) {
+  inline UnregisterNodeFleetRequest& operator=(const UnregisterNodeFleetRequest& from) {
     CopyFrom(from);
     return *this;
   }
-  inline PingRequest& operator=(PingRequest&& from) noexcept {
+  inline UnregisterNodeFleetRequest& operator=(UnregisterNodeFleetRequest&& from) noexcept {
     if (this == &from) return *this;
     if (GetOwningArena() == from.GetOwningArena()
   #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
@@ -732,326 +1020,20 @@ class PingRequest final :
   static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  static const PingRequest& default_instance() {
+  static const UnregisterNodeFleetRequest& default_instance() {
     return *internal_default_instance();
   }
-  static inline const PingRequest* internal_default_instance() {
-    return reinterpret_cast<const PingRequest*>(
-               &_PingRequest_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages =
-    4;
-
-  friend void swap(PingRequest& a, PingRequest& b) {
-    a.Swap(&b);
-  }
-  inline void Swap(PingRequest* other) {
-    if (other == this) return;
-    if (GetOwningArena() == other->GetOwningArena()) {
-      InternalSwap(other);
-    } else {
-      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(PingRequest* other) {
-    if (other == this) return;
-    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  inline PingRequest* New() const final {
-    return new PingRequest();
-  }
-
-  PingRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
-    return CreateMaybeMessage<PingRequest>(arena);
-  }
-  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const PingRequest& from);
-  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const PingRequest& from);
-  private:
-  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
-  public:
-  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
-  bool IsInitialized() const final;
-
-  size_t ByteSizeLong() const final;
-  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
-  ::PROTOBUF_NAMESPACE_ID::uint8* _InternalSerialize(
-      ::PROTOBUF_NAMESPACE_ID::uint8* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
-  int GetCachedSize() const final { return _cached_size_.Get(); }
-
-  private:
-  void SharedCtor();
-  void SharedDtor();
-  void SetCachedSize(int size) const final;
-  void InternalSwap(PingRequest* other);
-  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
-  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "flwr.proto.PingRequest";
-  }
-  protected:
-  explicit PingRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
-                       bool is_message_owned = false);
-  private:
-  static void ArenaDtor(void* object);
-  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
-  public:
-
-  static const ClassData _class_data_;
-  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
-
-  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
-
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-
-  enum : int {
-    kNodeFieldNumber = 1,
-    kPingIntervalFieldNumber = 2,
-  };
-  // .flwr.proto.Node node = 1;
-  bool has_node() const;
-  private:
-  bool _internal_has_node() const;
-  public:
-  void clear_node();
-  const ::flwr::proto::Node& node() const;
-  PROTOBUF_MUST_USE_RESULT ::flwr::proto::Node* release_node();
-  ::flwr::proto::Node* mutable_node();
-  void set_allocated_node(::flwr::proto::Node* node);
-  private:
-  const ::flwr::proto::Node& _internal_node() const;
-  ::flwr::proto::Node* _internal_mutable_node();
-  public:
-  void unsafe_arena_set_allocated_node(
-      ::flwr::proto::Node* node);
-  ::flwr::proto::Node* unsafe_arena_release_node();
-
-  // double ping_interval = 2;
-  void clear_ping_interval();
-  double ping_interval() const;
-  void set_ping_interval(double value);
-  private:
-  double _internal_ping_interval() const;
-  void _internal_set_ping_interval(double value);
-  public:
-
-  // @@protoc_insertion_point(class_scope:flwr.proto.PingRequest)
- private:
-  class _Internal;
-
-  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
-  typedef void InternalArenaConstructable_;
-  typedef void DestructorSkippable_;
-  ::flwr::proto::Node* node_;
-  double ping_interval_;
-  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
-  friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
-};
-// -------------------------------------------------------------------
-
-class PingResponse final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.PingResponse) */ {
- public:
-  inline PingResponse() : PingResponse(nullptr) {}
-  ~PingResponse() override;
-  explicit constexpr PingResponse(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
-
-  PingResponse(const PingResponse& from);
-  PingResponse(PingResponse&& from) noexcept
-    : PingResponse() {
-    *this = ::std::move(from);
-  }
-
-  inline PingResponse& operator=(const PingResponse& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline PingResponse& operator=(PingResponse&& from) noexcept {
-    if (this == &from) return *this;
-    if (GetOwningArena() == from.GetOwningArena()
-  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
-        && GetOwningArena() != nullptr
-  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
-    ) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
-    return GetDescriptor();
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  static const PingResponse& default_instance() {
-    return *internal_default_instance();
-  }
-  static inline const PingResponse* internal_default_instance() {
-    return reinterpret_cast<const PingResponse*>(
-               &_PingResponse_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages =
-    5;
-
-  friend void swap(PingResponse& a, PingResponse& b) {
-    a.Swap(&b);
-  }
-  inline void Swap(PingResponse* other) {
-    if (other == this) return;
-    if (GetOwningArena() == other->GetOwningArena()) {
-      InternalSwap(other);
-    } else {
-      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(PingResponse* other) {
-    if (other == this) return;
-    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  inline PingResponse* New() const final {
-    return new PingResponse();
-  }
-
-  PingResponse* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
-    return CreateMaybeMessage<PingResponse>(arena);
-  }
-  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const PingResponse& from);
-  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const PingResponse& from);
-  private:
-  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
-  public:
-  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
-  bool IsInitialized() const final;
-
-  size_t ByteSizeLong() const final;
-  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
-  ::PROTOBUF_NAMESPACE_ID::uint8* _InternalSerialize(
-      ::PROTOBUF_NAMESPACE_ID::uint8* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
-  int GetCachedSize() const final { return _cached_size_.Get(); }
-
-  private:
-  void SharedCtor();
-  void SharedDtor();
-  void SetCachedSize(int size) const final;
-  void InternalSwap(PingResponse* other);
-  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
-  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "flwr.proto.PingResponse";
-  }
-  protected:
-  explicit PingResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
-                       bool is_message_owned = false);
-  private:
-  static void ArenaDtor(void* object);
-  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
-  public:
-
-  static const ClassData _class_data_;
-  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
-
-  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
-
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-
-  enum : int {
-    kSuccessFieldNumber = 1,
-  };
-  // bool success = 1;
-  void clear_success();
-  bool success() const;
-  void set_success(bool value);
-  private:
-  bool _internal_success() const;
-  void _internal_set_success(bool value);
-  public:
-
-  // @@protoc_insertion_point(class_scope:flwr.proto.PingResponse)
- private:
-  class _Internal;
-
-  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
-  typedef void InternalArenaConstructable_;
-  typedef void DestructorSkippable_;
-  bool success_;
-  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
-  friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
-};
-// -------------------------------------------------------------------
-
-class PullTaskInsRequest final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.PullTaskInsRequest) */ {
- public:
-  inline PullTaskInsRequest() : PullTaskInsRequest(nullptr) {}
-  ~PullTaskInsRequest() override;
-  explicit constexpr PullTaskInsRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
-
-  PullTaskInsRequest(const PullTaskInsRequest& from);
-  PullTaskInsRequest(PullTaskInsRequest&& from) noexcept
-    : PullTaskInsRequest() {
-    *this = ::std::move(from);
-  }
-
-  inline PullTaskInsRequest& operator=(const PullTaskInsRequest& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline PullTaskInsRequest& operator=(PullTaskInsRequest&& from) noexcept {
-    if (this == &from) return *this;
-    if (GetOwningArena() == from.GetOwningArena()
-  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
-        && GetOwningArena() != nullptr
-  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
-    ) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
-    return GetDescriptor();
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  static const PullTaskInsRequest& default_instance() {
-    return *internal_default_instance();
-  }
-  static inline const PullTaskInsRequest* internal_default_instance() {
-    return reinterpret_cast<const PullTaskInsRequest*>(
-               &_PullTaskInsRequest_default_instance_);
+  static inline const UnregisterNodeFleetRequest* internal_default_instance() {
+    return reinterpret_cast<const UnregisterNodeFleetRequest*>(
+               &_UnregisterNodeFleetRequest_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
     6;
 
-  friend void swap(PullTaskInsRequest& a, PullTaskInsRequest& b) {
+  friend void swap(UnregisterNodeFleetRequest& a, UnregisterNodeFleetRequest& b) {
     a.Swap(&b);
   }
-  inline void Swap(PullTaskInsRequest* other) {
+  inline void Swap(UnregisterNodeFleetRequest* other) {
     if (other == this) return;
     if (GetOwningArena() == other->GetOwningArena()) {
       InternalSwap(other);
@@ -1059,7 +1041,7 @@ class PullTaskInsRequest final :
       ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(PullTaskInsRequest* other) {
+  void UnsafeArenaSwap(UnregisterNodeFleetRequest* other) {
     if (other == this) return;
     GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
     InternalSwap(other);
@@ -1067,17 +1049,17 @@ class PullTaskInsRequest final :
 
   // implements Message ----------------------------------------------
 
-  inline PullTaskInsRequest* New() const final {
-    return new PullTaskInsRequest();
+  inline UnregisterNodeFleetRequest* New() const final {
+    return new UnregisterNodeFleetRequest();
   }
 
-  PullTaskInsRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
-    return CreateMaybeMessage<PullTaskInsRequest>(arena);
+  UnregisterNodeFleetRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<UnregisterNodeFleetRequest>(arena);
   }
   using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const PullTaskInsRequest& from);
+  void CopyFrom(const UnregisterNodeFleetRequest& from);
   using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const PullTaskInsRequest& from);
+  void MergeFrom(const UnregisterNodeFleetRequest& from);
   private:
   static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
   public:
@@ -1094,13 +1076,13 @@ class PullTaskInsRequest final :
   void SharedCtor();
   void SharedDtor();
   void SetCachedSize(int size) const final;
-  void InternalSwap(PullTaskInsRequest* other);
+  void InternalSwap(UnregisterNodeFleetRequest* other);
   friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
   static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "flwr.proto.PullTaskInsRequest";
+    return "flwr.proto.UnregisterNodeFleetRequest";
   }
   protected:
-  explicit PullTaskInsRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+  explicit UnregisterNodeFleetRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                        bool is_message_owned = false);
   private:
   static void ArenaDtor(void* object);
@@ -1117,83 +1099,47 @@ class PullTaskInsRequest final :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kTaskIdsFieldNumber = 2,
-    kNodeFieldNumber = 1,
+    kNodeIdFieldNumber = 1,
   };
-  // repeated string task_ids = 2;
-  int task_ids_size() const;
+  // uint64 node_id = 1;
+  void clear_node_id();
+  ::PROTOBUF_NAMESPACE_ID::uint64 node_id() const;
+  void set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value);
   private:
-  int _internal_task_ids_size() const;
-  public:
-  void clear_task_ids();
-  const std::string& task_ids(int index) const;
-  std::string* mutable_task_ids(int index);
-  void set_task_ids(int index, const std::string& value);
-  void set_task_ids(int index, std::string&& value);
-  void set_task_ids(int index, const char* value);
-  void set_task_ids(int index, const char* value, size_t size);
-  std::string* add_task_ids();
-  void add_task_ids(const std::string& value);
-  void add_task_ids(std::string&& value);
-  void add_task_ids(const char* value);
-  void add_task_ids(const char* value, size_t size);
-  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>& task_ids() const;
-  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>* mutable_task_ids();
-  private:
-  const std::string& _internal_task_ids(int index) const;
-  std::string* _internal_add_task_ids();
+  ::PROTOBUF_NAMESPACE_ID::uint64 _internal_node_id() const;
+  void _internal_set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value);
   public:
 
-  // .flwr.proto.Node node = 1;
-  bool has_node() const;
-  private:
-  bool _internal_has_node() const;
-  public:
-  void clear_node();
-  const ::flwr::proto::Node& node() const;
-  PROTOBUF_MUST_USE_RESULT ::flwr::proto::Node* release_node();
-  ::flwr::proto::Node* mutable_node();
-  void set_allocated_node(::flwr::proto::Node* node);
-  private:
-  const ::flwr::proto::Node& _internal_node() const;
-  ::flwr::proto::Node* _internal_mutable_node();
-  public:
-  void unsafe_arena_set_allocated_node(
-      ::flwr::proto::Node* node);
-  ::flwr::proto::Node* unsafe_arena_release_node();
-
-  // @@protoc_insertion_point(class_scope:flwr.proto.PullTaskInsRequest)
+  // @@protoc_insertion_point(class_scope:flwr.proto.UnregisterNodeFleetRequest)
  private:
   class _Internal;
 
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
-  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> task_ids_;
-  ::flwr::proto::Node* node_;
+  ::PROTOBUF_NAMESPACE_ID::uint64 node_id_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
 };
 // -------------------------------------------------------------------
 
-class PullTaskInsResponse final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.PullTaskInsResponse) */ {
+class UnregisterNodeFleetResponse final :
+    public ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase /* @@protoc_insertion_point(class_definition:flwr.proto.UnregisterNodeFleetResponse) */ {
  public:
-  inline PullTaskInsResponse() : PullTaskInsResponse(nullptr) {}
-  ~PullTaskInsResponse() override;
-  explicit constexpr PullTaskInsResponse(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+  inline UnregisterNodeFleetResponse() : UnregisterNodeFleetResponse(nullptr) {}
+  explicit constexpr UnregisterNodeFleetResponse(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
 
-  PullTaskInsResponse(const PullTaskInsResponse& from);
-  PullTaskInsResponse(PullTaskInsResponse&& from) noexcept
-    : PullTaskInsResponse() {
+  UnregisterNodeFleetResponse(const UnregisterNodeFleetResponse& from);
+  UnregisterNodeFleetResponse(UnregisterNodeFleetResponse&& from) noexcept
+    : UnregisterNodeFleetResponse() {
     *this = ::std::move(from);
   }
 
-  inline PullTaskInsResponse& operator=(const PullTaskInsResponse& from) {
+  inline UnregisterNodeFleetResponse& operator=(const UnregisterNodeFleetResponse& from) {
     CopyFrom(from);
     return *this;
   }
-  inline PullTaskInsResponse& operator=(PullTaskInsResponse&& from) noexcept {
+  inline UnregisterNodeFleetResponse& operator=(UnregisterNodeFleetResponse&& from) noexcept {
     if (this == &from) return *this;
     if (GetOwningArena() == from.GetOwningArena()
   #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
@@ -1216,20 +1162,20 @@ class PullTaskInsResponse final :
   static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  static const PullTaskInsResponse& default_instance() {
+  static const UnregisterNodeFleetResponse& default_instance() {
     return *internal_default_instance();
   }
-  static inline const PullTaskInsResponse* internal_default_instance() {
-    return reinterpret_cast<const PullTaskInsResponse*>(
-               &_PullTaskInsResponse_default_instance_);
+  static inline const UnregisterNodeFleetResponse* internal_default_instance() {
+    return reinterpret_cast<const UnregisterNodeFleetResponse*>(
+               &_UnregisterNodeFleetResponse_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
     7;
 
-  friend void swap(PullTaskInsResponse& a, PullTaskInsResponse& b) {
+  friend void swap(UnregisterNodeFleetResponse& a, UnregisterNodeFleetResponse& b) {
     a.Swap(&b);
   }
-  inline void Swap(PullTaskInsResponse* other) {
+  inline void Swap(UnregisterNodeFleetResponse* other) {
     if (other == this) return;
     if (GetOwningArena() == other->GetOwningArena()) {
       InternalSwap(other);
@@ -1237,7 +1183,7 @@ class PullTaskInsResponse final :
       ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(PullTaskInsResponse* other) {
+  void UnsafeArenaSwap(UnregisterNodeFleetResponse* other) {
     if (other == this) return;
     GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
     InternalSwap(other);
@@ -1245,17 +1191,133 @@ class PullTaskInsResponse final :
 
   // implements Message ----------------------------------------------
 
-  inline PullTaskInsResponse* New() const final {
-    return new PullTaskInsResponse();
+  inline UnregisterNodeFleetResponse* New() const final {
+    return new UnregisterNodeFleetResponse();
   }
 
-  PullTaskInsResponse* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
-    return CreateMaybeMessage<PullTaskInsResponse>(arena);
+  UnregisterNodeFleetResponse* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<UnregisterNodeFleetResponse>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::CopyFrom;
+  inline void CopyFrom(const UnregisterNodeFleetResponse& from) {
+    ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::CopyImpl(this, from);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::MergeFrom;
+  void MergeFrom(const UnregisterNodeFleetResponse& from) {
+    ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::MergeImpl(this, from);
+  }
+  public:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "flwr.proto.UnregisterNodeFleetResponse";
+  }
+  protected:
+  explicit UnregisterNodeFleetResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  private:
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  // @@protoc_insertion_point(class_scope:flwr.proto.UnregisterNodeFleetResponse)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
+};
+// -------------------------------------------------------------------
+
+class PullMessagesRequest final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.PullMessagesRequest) */ {
+ public:
+  inline PullMessagesRequest() : PullMessagesRequest(nullptr) {}
+  ~PullMessagesRequest() override;
+  explicit constexpr PullMessagesRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  PullMessagesRequest(const PullMessagesRequest& from);
+  PullMessagesRequest(PullMessagesRequest&& from) noexcept
+    : PullMessagesRequest() {
+    *this = ::std::move(from);
+  }
+
+  inline PullMessagesRequest& operator=(const PullMessagesRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline PullMessagesRequest& operator=(PullMessagesRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const PullMessagesRequest& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const PullMessagesRequest* internal_default_instance() {
+    return reinterpret_cast<const PullMessagesRequest*>(
+               &_PullMessagesRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    8;
+
+  friend void swap(PullMessagesRequest& a, PullMessagesRequest& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(PullMessagesRequest* other) {
+    if (other == this) return;
+    if (GetOwningArena() == other->GetOwningArena()) {
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(PullMessagesRequest* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  inline PullMessagesRequest* New() const final {
+    return new PullMessagesRequest();
+  }
+
+  PullMessagesRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<PullMessagesRequest>(arena);
   }
   using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const PullTaskInsResponse& from);
+  void CopyFrom(const PullMessagesRequest& from);
   using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const PullTaskInsResponse& from);
+  void MergeFrom(const PullMessagesRequest& from);
   private:
   static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
   public:
@@ -1272,13 +1334,13 @@ class PullTaskInsResponse final :
   void SharedCtor();
   void SharedDtor();
   void SetCachedSize(int size) const final;
-  void InternalSwap(PullTaskInsResponse* other);
+  void InternalSwap(PullMessagesRequest* other);
   friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
   static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "flwr.proto.PullTaskInsResponse";
+    return "flwr.proto.PullMessagesRequest";
   }
   protected:
-  explicit PullTaskInsResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+  explicit PullMessagesRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                        bool is_message_owned = false);
   private:
   static void ArenaDtor(void* object);
@@ -1295,26 +1357,223 @@ class PullTaskInsResponse final :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kTaskInsListFieldNumber = 2,
+    kMessageIdsFieldNumber = 2,
+    kNodeFieldNumber = 1,
+  };
+  // repeated string message_ids = 2;
+  int message_ids_size() const;
+  private:
+  int _internal_message_ids_size() const;
+  public:
+  void clear_message_ids();
+  const std::string& message_ids(int index) const;
+  std::string* mutable_message_ids(int index);
+  void set_message_ids(int index, const std::string& value);
+  void set_message_ids(int index, std::string&& value);
+  void set_message_ids(int index, const char* value);
+  void set_message_ids(int index, const char* value, size_t size);
+  std::string* add_message_ids();
+  void add_message_ids(const std::string& value);
+  void add_message_ids(std::string&& value);
+  void add_message_ids(const char* value);
+  void add_message_ids(const char* value, size_t size);
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>& message_ids() const;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>* mutable_message_ids();
+  private:
+  const std::string& _internal_message_ids(int index) const;
+  std::string* _internal_add_message_ids();
+  public:
+
+  // .flwr.proto.Node node = 1;
+  bool has_node() const;
+  private:
+  bool _internal_has_node() const;
+  public:
+  void clear_node();
+  const ::flwr::proto::Node& node() const;
+  PROTOBUF_MUST_USE_RESULT ::flwr::proto::Node* release_node();
+  ::flwr::proto::Node* mutable_node();
+  void set_allocated_node(::flwr::proto::Node* node);
+  private:
+  const ::flwr::proto::Node& _internal_node() const;
+  ::flwr::proto::Node* _internal_mutable_node();
+  public:
+  void unsafe_arena_set_allocated_node(
+      ::flwr::proto::Node* node);
+  ::flwr::proto::Node* unsafe_arena_release_node();
+
+  // @@protoc_insertion_point(class_scope:flwr.proto.PullMessagesRequest)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> message_ids_;
+  ::flwr::proto::Node* node_;
+  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
+};
+// -------------------------------------------------------------------
+
+class PullMessagesResponse final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.PullMessagesResponse) */ {
+ public:
+  inline PullMessagesResponse() : PullMessagesResponse(nullptr) {}
+  ~PullMessagesResponse() override;
+  explicit constexpr PullMessagesResponse(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  PullMessagesResponse(const PullMessagesResponse& from);
+  PullMessagesResponse(PullMessagesResponse&& from) noexcept
+    : PullMessagesResponse() {
+    *this = ::std::move(from);
+  }
+
+  inline PullMessagesResponse& operator=(const PullMessagesResponse& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline PullMessagesResponse& operator=(PullMessagesResponse&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const PullMessagesResponse& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const PullMessagesResponse* internal_default_instance() {
+    return reinterpret_cast<const PullMessagesResponse*>(
+               &_PullMessagesResponse_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    9;
+
+  friend void swap(PullMessagesResponse& a, PullMessagesResponse& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(PullMessagesResponse* other) {
+    if (other == this) return;
+    if (GetOwningArena() == other->GetOwningArena()) {
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(PullMessagesResponse* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  inline PullMessagesResponse* New() const final {
+    return new PullMessagesResponse();
+  }
+
+  PullMessagesResponse* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<PullMessagesResponse>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const PullMessagesResponse& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom(const PullMessagesResponse& from);
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  ::PROTOBUF_NAMESPACE_ID::uint8* _InternalSerialize(
+      ::PROTOBUF_NAMESPACE_ID::uint8* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _cached_size_.Get(); }
+
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(PullMessagesResponse* other);
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "flwr.proto.PullMessagesResponse";
+  }
+  protected:
+  explicit PullMessagesResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  private:
+  static void ArenaDtor(void* object);
+  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kMessagesListFieldNumber = 2,
+    kMessageObjectTreesFieldNumber = 3,
     kReconnectFieldNumber = 1,
   };
-  // repeated .flwr.proto.TaskIns task_ins_list = 2;
-  int task_ins_list_size() const;
+  // repeated .flwr.proto.Message messages_list = 2;
+  int messages_list_size() const;
   private:
-  int _internal_task_ins_list_size() const;
+  int _internal_messages_list_size() const;
   public:
-  void clear_task_ins_list();
-  ::flwr::proto::TaskIns* mutable_task_ins_list(int index);
-  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::TaskIns >*
-      mutable_task_ins_list();
+  void clear_messages_list();
+  ::flwr::proto::Message* mutable_messages_list(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::Message >*
+      mutable_messages_list();
   private:
-  const ::flwr::proto::TaskIns& _internal_task_ins_list(int index) const;
-  ::flwr::proto::TaskIns* _internal_add_task_ins_list();
+  const ::flwr::proto::Message& _internal_messages_list(int index) const;
+  ::flwr::proto::Message* _internal_add_messages_list();
   public:
-  const ::flwr::proto::TaskIns& task_ins_list(int index) const;
-  ::flwr::proto::TaskIns* add_task_ins_list();
-  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::TaskIns >&
-      task_ins_list() const;
+  const ::flwr::proto::Message& messages_list(int index) const;
+  ::flwr::proto::Message* add_messages_list();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::Message >&
+      messages_list() const;
+
+  // repeated .flwr.proto.ObjectTree message_object_trees = 3;
+  int message_object_trees_size() const;
+  private:
+  int _internal_message_object_trees_size() const;
+  public:
+  void clear_message_object_trees();
+  ::flwr::proto::ObjectTree* mutable_message_object_trees(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::ObjectTree >*
+      mutable_message_object_trees();
+  private:
+  const ::flwr::proto::ObjectTree& _internal_message_object_trees(int index) const;
+  ::flwr::proto::ObjectTree* _internal_add_message_object_trees();
+  public:
+  const ::flwr::proto::ObjectTree& message_object_trees(int index) const;
+  ::flwr::proto::ObjectTree* add_message_object_trees();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::ObjectTree >&
+      message_object_trees() const;
 
   // .flwr.proto.Reconnect reconnect = 1;
   bool has_reconnect() const;
@@ -1334,38 +1593,39 @@ class PullTaskInsResponse final :
       ::flwr::proto::Reconnect* reconnect);
   ::flwr::proto::Reconnect* unsafe_arena_release_reconnect();
 
-  // @@protoc_insertion_point(class_scope:flwr.proto.PullTaskInsResponse)
+  // @@protoc_insertion_point(class_scope:flwr.proto.PullMessagesResponse)
  private:
   class _Internal;
 
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
-  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::TaskIns > task_ins_list_;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::Message > messages_list_;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::ObjectTree > message_object_trees_;
   ::flwr::proto::Reconnect* reconnect_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
 };
 // -------------------------------------------------------------------
 
-class PushTaskResRequest final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.PushTaskResRequest) */ {
+class PushMessagesRequest final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.PushMessagesRequest) */ {
  public:
-  inline PushTaskResRequest() : PushTaskResRequest(nullptr) {}
-  ~PushTaskResRequest() override;
-  explicit constexpr PushTaskResRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+  inline PushMessagesRequest() : PushMessagesRequest(nullptr) {}
+  ~PushMessagesRequest() override;
+  explicit constexpr PushMessagesRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
 
-  PushTaskResRequest(const PushTaskResRequest& from);
-  PushTaskResRequest(PushTaskResRequest&& from) noexcept
-    : PushTaskResRequest() {
+  PushMessagesRequest(const PushMessagesRequest& from);
+  PushMessagesRequest(PushMessagesRequest&& from) noexcept
+    : PushMessagesRequest() {
     *this = ::std::move(from);
   }
 
-  inline PushTaskResRequest& operator=(const PushTaskResRequest& from) {
+  inline PushMessagesRequest& operator=(const PushMessagesRequest& from) {
     CopyFrom(from);
     return *this;
   }
-  inline PushTaskResRequest& operator=(PushTaskResRequest&& from) noexcept {
+  inline PushMessagesRequest& operator=(PushMessagesRequest&& from) noexcept {
     if (this == &from) return *this;
     if (GetOwningArena() == from.GetOwningArena()
   #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
@@ -1388,20 +1648,20 @@ class PushTaskResRequest final :
   static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  static const PushTaskResRequest& default_instance() {
+  static const PushMessagesRequest& default_instance() {
     return *internal_default_instance();
   }
-  static inline const PushTaskResRequest* internal_default_instance() {
-    return reinterpret_cast<const PushTaskResRequest*>(
-               &_PushTaskResRequest_default_instance_);
+  static inline const PushMessagesRequest* internal_default_instance() {
+    return reinterpret_cast<const PushMessagesRequest*>(
+               &_PushMessagesRequest_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    8;
+    10;
 
-  friend void swap(PushTaskResRequest& a, PushTaskResRequest& b) {
+  friend void swap(PushMessagesRequest& a, PushMessagesRequest& b) {
     a.Swap(&b);
   }
-  inline void Swap(PushTaskResRequest* other) {
+  inline void Swap(PushMessagesRequest* other) {
     if (other == this) return;
     if (GetOwningArena() == other->GetOwningArena()) {
       InternalSwap(other);
@@ -1409,7 +1669,7 @@ class PushTaskResRequest final :
       ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(PushTaskResRequest* other) {
+  void UnsafeArenaSwap(PushMessagesRequest* other) {
     if (other == this) return;
     GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
     InternalSwap(other);
@@ -1417,17 +1677,17 @@ class PushTaskResRequest final :
 
   // implements Message ----------------------------------------------
 
-  inline PushTaskResRequest* New() const final {
-    return new PushTaskResRequest();
+  inline PushMessagesRequest* New() const final {
+    return new PushMessagesRequest();
   }
 
-  PushTaskResRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
-    return CreateMaybeMessage<PushTaskResRequest>(arena);
+  PushMessagesRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<PushMessagesRequest>(arena);
   }
   using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const PushTaskResRequest& from);
+  void CopyFrom(const PushMessagesRequest& from);
   using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const PushTaskResRequest& from);
+  void MergeFrom(const PushMessagesRequest& from);
   private:
   static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
   public:
@@ -1444,13 +1704,13 @@ class PushTaskResRequest final :
   void SharedCtor();
   void SharedDtor();
   void SetCachedSize(int size) const final;
-  void InternalSwap(PushTaskResRequest* other);
+  void InternalSwap(PushMessagesRequest* other);
   friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
   static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "flwr.proto.PushTaskResRequest";
+    return "flwr.proto.PushMessagesRequest";
   }
   protected:
-  explicit PushTaskResRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+  explicit PushMessagesRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                        bool is_message_owned = false);
   private:
   static void ArenaDtor(void* object);
@@ -1467,56 +1727,120 @@ class PushTaskResRequest final :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kTaskResListFieldNumber = 1,
+    kMessagesListFieldNumber = 2,
+    kMessageObjectTreesFieldNumber = 3,
+    kClientappRuntimeListFieldNumber = 4,
+    kNodeFieldNumber = 1,
   };
-  // repeated .flwr.proto.TaskRes task_res_list = 1;
-  int task_res_list_size() const;
+  // repeated .flwr.proto.Message messages_list = 2;
+  int messages_list_size() const;
   private:
-  int _internal_task_res_list_size() const;
+  int _internal_messages_list_size() const;
   public:
-  void clear_task_res_list();
-  ::flwr::proto::TaskRes* mutable_task_res_list(int index);
-  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::TaskRes >*
-      mutable_task_res_list();
+  void clear_messages_list();
+  ::flwr::proto::Message* mutable_messages_list(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::Message >*
+      mutable_messages_list();
   private:
-  const ::flwr::proto::TaskRes& _internal_task_res_list(int index) const;
-  ::flwr::proto::TaskRes* _internal_add_task_res_list();
+  const ::flwr::proto::Message& _internal_messages_list(int index) const;
+  ::flwr::proto::Message* _internal_add_messages_list();
   public:
-  const ::flwr::proto::TaskRes& task_res_list(int index) const;
-  ::flwr::proto::TaskRes* add_task_res_list();
-  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::TaskRes >&
-      task_res_list() const;
+  const ::flwr::proto::Message& messages_list(int index) const;
+  ::flwr::proto::Message* add_messages_list();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::Message >&
+      messages_list() const;
 
-  // @@protoc_insertion_point(class_scope:flwr.proto.PushTaskResRequest)
+  // repeated .flwr.proto.ObjectTree message_object_trees = 3;
+  int message_object_trees_size() const;
+  private:
+  int _internal_message_object_trees_size() const;
+  public:
+  void clear_message_object_trees();
+  ::flwr::proto::ObjectTree* mutable_message_object_trees(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::ObjectTree >*
+      mutable_message_object_trees();
+  private:
+  const ::flwr::proto::ObjectTree& _internal_message_object_trees(int index) const;
+  ::flwr::proto::ObjectTree* _internal_add_message_object_trees();
+  public:
+  const ::flwr::proto::ObjectTree& message_object_trees(int index) const;
+  ::flwr::proto::ObjectTree* add_message_object_trees();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::ObjectTree >&
+      message_object_trees() const;
+
+  // repeated double clientapp_runtime_list = 4;
+  int clientapp_runtime_list_size() const;
+  private:
+  int _internal_clientapp_runtime_list_size() const;
+  public:
+  void clear_clientapp_runtime_list();
+  private:
+  double _internal_clientapp_runtime_list(int index) const;
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedField< double >&
+      _internal_clientapp_runtime_list() const;
+  void _internal_add_clientapp_runtime_list(double value);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedField< double >*
+      _internal_mutable_clientapp_runtime_list();
+  public:
+  double clientapp_runtime_list(int index) const;
+  void set_clientapp_runtime_list(int index, double value);
+  void add_clientapp_runtime_list(double value);
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedField< double >&
+      clientapp_runtime_list() const;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedField< double >*
+      mutable_clientapp_runtime_list();
+
+  // .flwr.proto.Node node = 1;
+  bool has_node() const;
+  private:
+  bool _internal_has_node() const;
+  public:
+  void clear_node();
+  const ::flwr::proto::Node& node() const;
+  PROTOBUF_MUST_USE_RESULT ::flwr::proto::Node* release_node();
+  ::flwr::proto::Node* mutable_node();
+  void set_allocated_node(::flwr::proto::Node* node);
+  private:
+  const ::flwr::proto::Node& _internal_node() const;
+  ::flwr::proto::Node* _internal_mutable_node();
+  public:
+  void unsafe_arena_set_allocated_node(
+      ::flwr::proto::Node* node);
+  ::flwr::proto::Node* unsafe_arena_release_node();
+
+  // @@protoc_insertion_point(class_scope:flwr.proto.PushMessagesRequest)
  private:
   class _Internal;
 
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
-  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::TaskRes > task_res_list_;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::Message > messages_list_;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::ObjectTree > message_object_trees_;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedField< double > clientapp_runtime_list_;
+  ::flwr::proto::Node* node_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
 };
 // -------------------------------------------------------------------
 
-class PushTaskResResponse_ResultsEntry_DoNotUse : public ::PROTOBUF_NAMESPACE_ID::internal::MapEntry<PushTaskResResponse_ResultsEntry_DoNotUse, 
+class PushMessagesResponse_ResultsEntry_DoNotUse : public ::PROTOBUF_NAMESPACE_ID::internal::MapEntry<PushMessagesResponse_ResultsEntry_DoNotUse, 
     std::string, ::PROTOBUF_NAMESPACE_ID::uint32,
     ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_STRING,
     ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_UINT32> {
 public:
-  typedef ::PROTOBUF_NAMESPACE_ID::internal::MapEntry<PushTaskResResponse_ResultsEntry_DoNotUse, 
+  typedef ::PROTOBUF_NAMESPACE_ID::internal::MapEntry<PushMessagesResponse_ResultsEntry_DoNotUse, 
     std::string, ::PROTOBUF_NAMESPACE_ID::uint32,
     ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_STRING,
     ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_UINT32> SuperType;
-  PushTaskResResponse_ResultsEntry_DoNotUse();
-  explicit constexpr PushTaskResResponse_ResultsEntry_DoNotUse(
+  PushMessagesResponse_ResultsEntry_DoNotUse();
+  explicit constexpr PushMessagesResponse_ResultsEntry_DoNotUse(
       ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
-  explicit PushTaskResResponse_ResultsEntry_DoNotUse(::PROTOBUF_NAMESPACE_ID::Arena* arena);
-  void MergeFrom(const PushTaskResResponse_ResultsEntry_DoNotUse& other);
-  static const PushTaskResResponse_ResultsEntry_DoNotUse* internal_default_instance() { return reinterpret_cast<const PushTaskResResponse_ResultsEntry_DoNotUse*>(&_PushTaskResResponse_ResultsEntry_DoNotUse_default_instance_); }
+  explicit PushMessagesResponse_ResultsEntry_DoNotUse(::PROTOBUF_NAMESPACE_ID::Arena* arena);
+  void MergeFrom(const PushMessagesResponse_ResultsEntry_DoNotUse& other);
+  static const PushMessagesResponse_ResultsEntry_DoNotUse* internal_default_instance() { return reinterpret_cast<const PushMessagesResponse_ResultsEntry_DoNotUse*>(&_PushMessagesResponse_ResultsEntry_DoNotUse_default_instance_); }
   static bool ValidateKey(std::string* s) {
-    return ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(s->data(), static_cast<int>(s->size()), ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::PARSE, "flwr.proto.PushTaskResResponse.ResultsEntry.key");
+    return ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(s->data(), static_cast<int>(s->size()), ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::PARSE, "flwr.proto.PushMessagesResponse.ResultsEntry.key");
  }
   static bool ValidateValue(void*) { return true; }
   using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
@@ -1525,24 +1849,24 @@ public:
 
 // -------------------------------------------------------------------
 
-class PushTaskResResponse final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.PushTaskResResponse) */ {
+class PushMessagesResponse final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.PushMessagesResponse) */ {
  public:
-  inline PushTaskResResponse() : PushTaskResResponse(nullptr) {}
-  ~PushTaskResResponse() override;
-  explicit constexpr PushTaskResResponse(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+  inline PushMessagesResponse() : PushMessagesResponse(nullptr) {}
+  ~PushMessagesResponse() override;
+  explicit constexpr PushMessagesResponse(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
 
-  PushTaskResResponse(const PushTaskResResponse& from);
-  PushTaskResResponse(PushTaskResResponse&& from) noexcept
-    : PushTaskResResponse() {
+  PushMessagesResponse(const PushMessagesResponse& from);
+  PushMessagesResponse(PushMessagesResponse&& from) noexcept
+    : PushMessagesResponse() {
     *this = ::std::move(from);
   }
 
-  inline PushTaskResResponse& operator=(const PushTaskResResponse& from) {
+  inline PushMessagesResponse& operator=(const PushMessagesResponse& from) {
     CopyFrom(from);
     return *this;
   }
-  inline PushTaskResResponse& operator=(PushTaskResResponse&& from) noexcept {
+  inline PushMessagesResponse& operator=(PushMessagesResponse&& from) noexcept {
     if (this == &from) return *this;
     if (GetOwningArena() == from.GetOwningArena()
   #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
@@ -1565,20 +1889,20 @@ class PushTaskResResponse final :
   static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  static const PushTaskResResponse& default_instance() {
+  static const PushMessagesResponse& default_instance() {
     return *internal_default_instance();
   }
-  static inline const PushTaskResResponse* internal_default_instance() {
-    return reinterpret_cast<const PushTaskResResponse*>(
-               &_PushTaskResResponse_default_instance_);
+  static inline const PushMessagesResponse* internal_default_instance() {
+    return reinterpret_cast<const PushMessagesResponse*>(
+               &_PushMessagesResponse_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    10;
+    12;
 
-  friend void swap(PushTaskResResponse& a, PushTaskResResponse& b) {
+  friend void swap(PushMessagesResponse& a, PushMessagesResponse& b) {
     a.Swap(&b);
   }
-  inline void Swap(PushTaskResResponse* other) {
+  inline void Swap(PushMessagesResponse* other) {
     if (other == this) return;
     if (GetOwningArena() == other->GetOwningArena()) {
       InternalSwap(other);
@@ -1586,7 +1910,7 @@ class PushTaskResResponse final :
       ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(PushTaskResResponse* other) {
+  void UnsafeArenaSwap(PushMessagesResponse* other) {
     if (other == this) return;
     GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
     InternalSwap(other);
@@ -1594,17 +1918,17 @@ class PushTaskResResponse final :
 
   // implements Message ----------------------------------------------
 
-  inline PushTaskResResponse* New() const final {
-    return new PushTaskResResponse();
+  inline PushMessagesResponse* New() const final {
+    return new PushMessagesResponse();
   }
 
-  PushTaskResResponse* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
-    return CreateMaybeMessage<PushTaskResResponse>(arena);
+  PushMessagesResponse* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<PushMessagesResponse>(arena);
   }
   using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const PushTaskResResponse& from);
+  void CopyFrom(const PushMessagesResponse& from);
   using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const PushTaskResResponse& from);
+  void MergeFrom(const PushMessagesResponse& from);
   private:
   static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
   public:
@@ -1621,13 +1945,13 @@ class PushTaskResResponse final :
   void SharedCtor();
   void SharedDtor();
   void SetCachedSize(int size) const final;
-  void InternalSwap(PushTaskResResponse* other);
+  void InternalSwap(PushMessagesResponse* other);
   friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
   static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "flwr.proto.PushTaskResResponse";
+    return "flwr.proto.PushMessagesResponse";
   }
   protected:
-  explicit PushTaskResResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+  explicit PushMessagesResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                        bool is_message_owned = false);
   private:
   static void ArenaDtor(void* object);
@@ -1646,6 +1970,7 @@ class PushTaskResResponse final :
 
   enum : int {
     kResultsFieldNumber = 2,
+    kObjectsToPushFieldNumber = 3,
     kReconnectFieldNumber = 1,
   };
   // map<string, uint32> results = 2;
@@ -1665,6 +1990,30 @@ class PushTaskResResponse final :
   ::PROTOBUF_NAMESPACE_ID::Map< std::string, ::PROTOBUF_NAMESPACE_ID::uint32 >*
       mutable_results();
 
+  // repeated string objects_to_push = 3;
+  int objects_to_push_size() const;
+  private:
+  int _internal_objects_to_push_size() const;
+  public:
+  void clear_objects_to_push();
+  const std::string& objects_to_push(int index) const;
+  std::string* mutable_objects_to_push(int index);
+  void set_objects_to_push(int index, const std::string& value);
+  void set_objects_to_push(int index, std::string&& value);
+  void set_objects_to_push(int index, const char* value);
+  void set_objects_to_push(int index, const char* value, size_t size);
+  std::string* add_objects_to_push();
+  void add_objects_to_push(const std::string& value);
+  void add_objects_to_push(std::string&& value);
+  void add_objects_to_push(const char* value);
+  void add_objects_to_push(const char* value, size_t size);
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>& objects_to_push() const;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>* mutable_objects_to_push();
+  private:
+  const std::string& _internal_objects_to_push(int index) const;
+  std::string* _internal_add_objects_to_push();
+  public:
+
   // .flwr.proto.Reconnect reconnect = 1;
   bool has_reconnect() const;
   private:
@@ -1683,7 +2032,7 @@ class PushTaskResResponse final :
       ::flwr::proto::Reconnect* reconnect);
   ::flwr::proto::Reconnect* unsafe_arena_release_reconnect();
 
-  // @@protoc_insertion_point(class_scope:flwr.proto.PushTaskResResponse)
+  // @@protoc_insertion_point(class_scope:flwr.proto.PushMessagesResponse)
  private:
   class _Internal;
 
@@ -1691,481 +2040,12 @@ class PushTaskResResponse final :
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
   ::PROTOBUF_NAMESPACE_ID::internal::MapField<
-      PushTaskResResponse_ResultsEntry_DoNotUse,
+      PushMessagesResponse_ResultsEntry_DoNotUse,
       std::string, ::PROTOBUF_NAMESPACE_ID::uint32,
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_STRING,
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_UINT32> results_;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> objects_to_push_;
   ::flwr::proto::Reconnect* reconnect_;
-  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
-  friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
-};
-// -------------------------------------------------------------------
-
-class Run final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.Run) */ {
- public:
-  inline Run() : Run(nullptr) {}
-  ~Run() override;
-  explicit constexpr Run(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
-
-  Run(const Run& from);
-  Run(Run&& from) noexcept
-    : Run() {
-    *this = ::std::move(from);
-  }
-
-  inline Run& operator=(const Run& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline Run& operator=(Run&& from) noexcept {
-    if (this == &from) return *this;
-    if (GetOwningArena() == from.GetOwningArena()
-  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
-        && GetOwningArena() != nullptr
-  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
-    ) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
-    return GetDescriptor();
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  static const Run& default_instance() {
-    return *internal_default_instance();
-  }
-  static inline const Run* internal_default_instance() {
-    return reinterpret_cast<const Run*>(
-               &_Run_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages =
-    11;
-
-  friend void swap(Run& a, Run& b) {
-    a.Swap(&b);
-  }
-  inline void Swap(Run* other) {
-    if (other == this) return;
-    if (GetOwningArena() == other->GetOwningArena()) {
-      InternalSwap(other);
-    } else {
-      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(Run* other) {
-    if (other == this) return;
-    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  inline Run* New() const final {
-    return new Run();
-  }
-
-  Run* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
-    return CreateMaybeMessage<Run>(arena);
-  }
-  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const Run& from);
-  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const Run& from);
-  private:
-  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
-  public:
-  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
-  bool IsInitialized() const final;
-
-  size_t ByteSizeLong() const final;
-  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
-  ::PROTOBUF_NAMESPACE_ID::uint8* _InternalSerialize(
-      ::PROTOBUF_NAMESPACE_ID::uint8* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
-  int GetCachedSize() const final { return _cached_size_.Get(); }
-
-  private:
-  void SharedCtor();
-  void SharedDtor();
-  void SetCachedSize(int size) const final;
-  void InternalSwap(Run* other);
-  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
-  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "flwr.proto.Run";
-  }
-  protected:
-  explicit Run(::PROTOBUF_NAMESPACE_ID::Arena* arena,
-                       bool is_message_owned = false);
-  private:
-  static void ArenaDtor(void* object);
-  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
-  public:
-
-  static const ClassData _class_data_;
-  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
-
-  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
-
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-
-  enum : int {
-    kFabIdFieldNumber = 2,
-    kFabVersionFieldNumber = 3,
-    kRunIdFieldNumber = 1,
-  };
-  // string fab_id = 2;
-  void clear_fab_id();
-  const std::string& fab_id() const;
-  template <typename ArgT0 = const std::string&, typename... ArgT>
-  void set_fab_id(ArgT0&& arg0, ArgT... args);
-  std::string* mutable_fab_id();
-  PROTOBUF_MUST_USE_RESULT std::string* release_fab_id();
-  void set_allocated_fab_id(std::string* fab_id);
-  private:
-  const std::string& _internal_fab_id() const;
-  inline PROTOBUF_ALWAYS_INLINE void _internal_set_fab_id(const std::string& value);
-  std::string* _internal_mutable_fab_id();
-  public:
-
-  // string fab_version = 3;
-  void clear_fab_version();
-  const std::string& fab_version() const;
-  template <typename ArgT0 = const std::string&, typename... ArgT>
-  void set_fab_version(ArgT0&& arg0, ArgT... args);
-  std::string* mutable_fab_version();
-  PROTOBUF_MUST_USE_RESULT std::string* release_fab_version();
-  void set_allocated_fab_version(std::string* fab_version);
-  private:
-  const std::string& _internal_fab_version() const;
-  inline PROTOBUF_ALWAYS_INLINE void _internal_set_fab_version(const std::string& value);
-  std::string* _internal_mutable_fab_version();
-  public:
-
-  // sint64 run_id = 1;
-  void clear_run_id();
-  ::PROTOBUF_NAMESPACE_ID::int64 run_id() const;
-  void set_run_id(::PROTOBUF_NAMESPACE_ID::int64 value);
-  private:
-  ::PROTOBUF_NAMESPACE_ID::int64 _internal_run_id() const;
-  void _internal_set_run_id(::PROTOBUF_NAMESPACE_ID::int64 value);
-  public:
-
-  // @@protoc_insertion_point(class_scope:flwr.proto.Run)
- private:
-  class _Internal;
-
-  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
-  typedef void InternalArenaConstructable_;
-  typedef void DestructorSkippable_;
-  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr fab_id_;
-  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr fab_version_;
-  ::PROTOBUF_NAMESPACE_ID::int64 run_id_;
-  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
-  friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
-};
-// -------------------------------------------------------------------
-
-class GetRunRequest final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.GetRunRequest) */ {
- public:
-  inline GetRunRequest() : GetRunRequest(nullptr) {}
-  ~GetRunRequest() override;
-  explicit constexpr GetRunRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
-
-  GetRunRequest(const GetRunRequest& from);
-  GetRunRequest(GetRunRequest&& from) noexcept
-    : GetRunRequest() {
-    *this = ::std::move(from);
-  }
-
-  inline GetRunRequest& operator=(const GetRunRequest& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline GetRunRequest& operator=(GetRunRequest&& from) noexcept {
-    if (this == &from) return *this;
-    if (GetOwningArena() == from.GetOwningArena()
-  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
-        && GetOwningArena() != nullptr
-  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
-    ) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
-    return GetDescriptor();
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  static const GetRunRequest& default_instance() {
-    return *internal_default_instance();
-  }
-  static inline const GetRunRequest* internal_default_instance() {
-    return reinterpret_cast<const GetRunRequest*>(
-               &_GetRunRequest_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages =
-    12;
-
-  friend void swap(GetRunRequest& a, GetRunRequest& b) {
-    a.Swap(&b);
-  }
-  inline void Swap(GetRunRequest* other) {
-    if (other == this) return;
-    if (GetOwningArena() == other->GetOwningArena()) {
-      InternalSwap(other);
-    } else {
-      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(GetRunRequest* other) {
-    if (other == this) return;
-    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  inline GetRunRequest* New() const final {
-    return new GetRunRequest();
-  }
-
-  GetRunRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
-    return CreateMaybeMessage<GetRunRequest>(arena);
-  }
-  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const GetRunRequest& from);
-  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const GetRunRequest& from);
-  private:
-  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
-  public:
-  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
-  bool IsInitialized() const final;
-
-  size_t ByteSizeLong() const final;
-  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
-  ::PROTOBUF_NAMESPACE_ID::uint8* _InternalSerialize(
-      ::PROTOBUF_NAMESPACE_ID::uint8* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
-  int GetCachedSize() const final { return _cached_size_.Get(); }
-
-  private:
-  void SharedCtor();
-  void SharedDtor();
-  void SetCachedSize(int size) const final;
-  void InternalSwap(GetRunRequest* other);
-  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
-  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "flwr.proto.GetRunRequest";
-  }
-  protected:
-  explicit GetRunRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
-                       bool is_message_owned = false);
-  private:
-  static void ArenaDtor(void* object);
-  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
-  public:
-
-  static const ClassData _class_data_;
-  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
-
-  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
-
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-
-  enum : int {
-    kRunIdFieldNumber = 1,
-  };
-  // sint64 run_id = 1;
-  void clear_run_id();
-  ::PROTOBUF_NAMESPACE_ID::int64 run_id() const;
-  void set_run_id(::PROTOBUF_NAMESPACE_ID::int64 value);
-  private:
-  ::PROTOBUF_NAMESPACE_ID::int64 _internal_run_id() const;
-  void _internal_set_run_id(::PROTOBUF_NAMESPACE_ID::int64 value);
-  public:
-
-  // @@protoc_insertion_point(class_scope:flwr.proto.GetRunRequest)
- private:
-  class _Internal;
-
-  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
-  typedef void InternalArenaConstructable_;
-  typedef void DestructorSkippable_;
-  ::PROTOBUF_NAMESPACE_ID::int64 run_id_;
-  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
-  friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
-};
-// -------------------------------------------------------------------
-
-class GetRunResponse final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.GetRunResponse) */ {
- public:
-  inline GetRunResponse() : GetRunResponse(nullptr) {}
-  ~GetRunResponse() override;
-  explicit constexpr GetRunResponse(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
-
-  GetRunResponse(const GetRunResponse& from);
-  GetRunResponse(GetRunResponse&& from) noexcept
-    : GetRunResponse() {
-    *this = ::std::move(from);
-  }
-
-  inline GetRunResponse& operator=(const GetRunResponse& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline GetRunResponse& operator=(GetRunResponse&& from) noexcept {
-    if (this == &from) return *this;
-    if (GetOwningArena() == from.GetOwningArena()
-  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
-        && GetOwningArena() != nullptr
-  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
-    ) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
-    return GetDescriptor();
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  static const GetRunResponse& default_instance() {
-    return *internal_default_instance();
-  }
-  static inline const GetRunResponse* internal_default_instance() {
-    return reinterpret_cast<const GetRunResponse*>(
-               &_GetRunResponse_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages =
-    13;
-
-  friend void swap(GetRunResponse& a, GetRunResponse& b) {
-    a.Swap(&b);
-  }
-  inline void Swap(GetRunResponse* other) {
-    if (other == this) return;
-    if (GetOwningArena() == other->GetOwningArena()) {
-      InternalSwap(other);
-    } else {
-      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(GetRunResponse* other) {
-    if (other == this) return;
-    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  inline GetRunResponse* New() const final {
-    return new GetRunResponse();
-  }
-
-  GetRunResponse* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
-    return CreateMaybeMessage<GetRunResponse>(arena);
-  }
-  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const GetRunResponse& from);
-  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const GetRunResponse& from);
-  private:
-  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
-  public:
-  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
-  bool IsInitialized() const final;
-
-  size_t ByteSizeLong() const final;
-  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
-  ::PROTOBUF_NAMESPACE_ID::uint8* _InternalSerialize(
-      ::PROTOBUF_NAMESPACE_ID::uint8* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
-  int GetCachedSize() const final { return _cached_size_.Get(); }
-
-  private:
-  void SharedCtor();
-  void SharedDtor();
-  void SetCachedSize(int size) const final;
-  void InternalSwap(GetRunResponse* other);
-  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
-  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "flwr.proto.GetRunResponse";
-  }
-  protected:
-  explicit GetRunResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
-                       bool is_message_owned = false);
-  private:
-  static void ArenaDtor(void* object);
-  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
-  public:
-
-  static const ClassData _class_data_;
-  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
-
-  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
-
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-
-  enum : int {
-    kRunFieldNumber = 1,
-  };
-  // .flwr.proto.Run run = 1;
-  bool has_run() const;
-  private:
-  bool _internal_has_run() const;
-  public:
-  void clear_run();
-  const ::flwr::proto::Run& run() const;
-  PROTOBUF_MUST_USE_RESULT ::flwr::proto::Run* release_run();
-  ::flwr::proto::Run* mutable_run();
-  void set_allocated_run(::flwr::proto::Run* run);
-  private:
-  const ::flwr::proto::Run& _internal_run() const;
-  ::flwr::proto::Run* _internal_mutable_run();
-  public:
-  void unsafe_arena_set_allocated_run(
-      ::flwr::proto::Run* run);
-  ::flwr::proto::Run* unsafe_arena_release_run();
-
-  // @@protoc_insertion_point(class_scope:flwr.proto.GetRunResponse)
- private:
-  class _Internal;
-
-  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
-  typedef void InternalArenaConstructable_;
-  typedef void DestructorSkippable_;
-  ::flwr::proto::Run* run_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_flwr_2fproto_2ffleet_2eproto;
 };
@@ -2219,7 +2099,7 @@ class Reconnect final :
                &_Reconnect_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    14;
+    13;
 
   friend void swap(Reconnect& a, Reconnect& b) {
     a.Swap(&b);
@@ -2321,538 +2201,420 @@ class Reconnect final :
   #pragma GCC diagnostic push
   #pragma GCC diagnostic ignored "-Wstrict-aliasing"
 #endif  // __GNUC__
-// CreateNodeRequest
+// RegisterNodeFleetRequest
 
-// double ping_interval = 1;
-inline void CreateNodeRequest::clear_ping_interval() {
-  ping_interval_ = 0;
+// bytes public_key = 1;
+inline void RegisterNodeFleetRequest::clear_public_key() {
+  public_key_.ClearToEmpty();
 }
-inline double CreateNodeRequest::_internal_ping_interval() const {
-  return ping_interval_;
+inline const std::string& RegisterNodeFleetRequest::public_key() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.RegisterNodeFleetRequest.public_key)
+  return _internal_public_key();
 }
-inline double CreateNodeRequest::ping_interval() const {
-  // @@protoc_insertion_point(field_get:flwr.proto.CreateNodeRequest.ping_interval)
-  return _internal_ping_interval();
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void RegisterNodeFleetRequest::set_public_key(ArgT0&& arg0, ArgT... args) {
+ 
+ public_key_.SetBytes(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:flwr.proto.RegisterNodeFleetRequest.public_key)
 }
-inline void CreateNodeRequest::_internal_set_ping_interval(double value) {
-  
-  ping_interval_ = value;
-}
-inline void CreateNodeRequest::set_ping_interval(double value) {
-  _internal_set_ping_interval(value);
-  // @@protoc_insertion_point(field_set:flwr.proto.CreateNodeRequest.ping_interval)
-}
-
-// -------------------------------------------------------------------
-
-// CreateNodeResponse
-
-// .flwr.proto.Node node = 1;
-inline bool CreateNodeResponse::_internal_has_node() const {
-  return this != internal_default_instance() && node_ != nullptr;
-}
-inline bool CreateNodeResponse::has_node() const {
-  return _internal_has_node();
-}
-inline const ::flwr::proto::Node& CreateNodeResponse::_internal_node() const {
-  const ::flwr::proto::Node* p = node_;
-  return p != nullptr ? *p : reinterpret_cast<const ::flwr::proto::Node&>(
-      ::flwr::proto::_Node_default_instance_);
-}
-inline const ::flwr::proto::Node& CreateNodeResponse::node() const {
-  // @@protoc_insertion_point(field_get:flwr.proto.CreateNodeResponse.node)
-  return _internal_node();
-}
-inline void CreateNodeResponse::unsafe_arena_set_allocated_node(
-    ::flwr::proto::Node* node) {
-  if (GetArenaForAllocation() == nullptr) {
-    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(node_);
-  }
-  node_ = node;
-  if (node) {
-    
-  } else {
-    
-  }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:flwr.proto.CreateNodeResponse.node)
-}
-inline ::flwr::proto::Node* CreateNodeResponse::release_node() {
-  
-  ::flwr::proto::Node* temp = node_;
-  node_ = nullptr;
-#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
-  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
-  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
-  if (GetArenaForAllocation() == nullptr) { delete old; }
-#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
-  if (GetArenaForAllocation() != nullptr) {
-    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
-  }
-#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
-  return temp;
-}
-inline ::flwr::proto::Node* CreateNodeResponse::unsafe_arena_release_node() {
-  // @@protoc_insertion_point(field_release:flwr.proto.CreateNodeResponse.node)
-  
-  ::flwr::proto::Node* temp = node_;
-  node_ = nullptr;
-  return temp;
-}
-inline ::flwr::proto::Node* CreateNodeResponse::_internal_mutable_node() {
-  
-  if (node_ == nullptr) {
-    auto* p = CreateMaybeMessage<::flwr::proto::Node>(GetArenaForAllocation());
-    node_ = p;
-  }
-  return node_;
-}
-inline ::flwr::proto::Node* CreateNodeResponse::mutable_node() {
-  ::flwr::proto::Node* _msg = _internal_mutable_node();
-  // @@protoc_insertion_point(field_mutable:flwr.proto.CreateNodeResponse.node)
-  return _msg;
-}
-inline void CreateNodeResponse::set_allocated_node(::flwr::proto::Node* node) {
-  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
-  if (message_arena == nullptr) {
-    delete reinterpret_cast< ::PROTOBUF_NAMESPACE_ID::MessageLite*>(node_);
-  }
-  if (node) {
-    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
-        ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper<
-            ::PROTOBUF_NAMESPACE_ID::MessageLite>::GetOwningArena(
-                reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(node));
-    if (message_arena != submessage_arena) {
-      node = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
-          message_arena, node, submessage_arena);
-    }
-    
-  } else {
-    
-  }
-  node_ = node;
-  // @@protoc_insertion_point(field_set_allocated:flwr.proto.CreateNodeResponse.node)
-}
-
-// -------------------------------------------------------------------
-
-// DeleteNodeRequest
-
-// .flwr.proto.Node node = 1;
-inline bool DeleteNodeRequest::_internal_has_node() const {
-  return this != internal_default_instance() && node_ != nullptr;
-}
-inline bool DeleteNodeRequest::has_node() const {
-  return _internal_has_node();
-}
-inline const ::flwr::proto::Node& DeleteNodeRequest::_internal_node() const {
-  const ::flwr::proto::Node* p = node_;
-  return p != nullptr ? *p : reinterpret_cast<const ::flwr::proto::Node&>(
-      ::flwr::proto::_Node_default_instance_);
-}
-inline const ::flwr::proto::Node& DeleteNodeRequest::node() const {
-  // @@protoc_insertion_point(field_get:flwr.proto.DeleteNodeRequest.node)
-  return _internal_node();
-}
-inline void DeleteNodeRequest::unsafe_arena_set_allocated_node(
-    ::flwr::proto::Node* node) {
-  if (GetArenaForAllocation() == nullptr) {
-    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(node_);
-  }
-  node_ = node;
-  if (node) {
-    
-  } else {
-    
-  }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:flwr.proto.DeleteNodeRequest.node)
-}
-inline ::flwr::proto::Node* DeleteNodeRequest::release_node() {
-  
-  ::flwr::proto::Node* temp = node_;
-  node_ = nullptr;
-#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
-  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
-  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
-  if (GetArenaForAllocation() == nullptr) { delete old; }
-#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
-  if (GetArenaForAllocation() != nullptr) {
-    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
-  }
-#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
-  return temp;
-}
-inline ::flwr::proto::Node* DeleteNodeRequest::unsafe_arena_release_node() {
-  // @@protoc_insertion_point(field_release:flwr.proto.DeleteNodeRequest.node)
-  
-  ::flwr::proto::Node* temp = node_;
-  node_ = nullptr;
-  return temp;
-}
-inline ::flwr::proto::Node* DeleteNodeRequest::_internal_mutable_node() {
-  
-  if (node_ == nullptr) {
-    auto* p = CreateMaybeMessage<::flwr::proto::Node>(GetArenaForAllocation());
-    node_ = p;
-  }
-  return node_;
-}
-inline ::flwr::proto::Node* DeleteNodeRequest::mutable_node() {
-  ::flwr::proto::Node* _msg = _internal_mutable_node();
-  // @@protoc_insertion_point(field_mutable:flwr.proto.DeleteNodeRequest.node)
-  return _msg;
-}
-inline void DeleteNodeRequest::set_allocated_node(::flwr::proto::Node* node) {
-  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
-  if (message_arena == nullptr) {
-    delete reinterpret_cast< ::PROTOBUF_NAMESPACE_ID::MessageLite*>(node_);
-  }
-  if (node) {
-    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
-        ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper<
-            ::PROTOBUF_NAMESPACE_ID::MessageLite>::GetOwningArena(
-                reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(node));
-    if (message_arena != submessage_arena) {
-      node = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
-          message_arena, node, submessage_arena);
-    }
-    
-  } else {
-    
-  }
-  node_ = node;
-  // @@protoc_insertion_point(field_set_allocated:flwr.proto.DeleteNodeRequest.node)
-}
-
-// -------------------------------------------------------------------
-
-// DeleteNodeResponse
-
-// -------------------------------------------------------------------
-
-// PingRequest
-
-// .flwr.proto.Node node = 1;
-inline bool PingRequest::_internal_has_node() const {
-  return this != internal_default_instance() && node_ != nullptr;
-}
-inline bool PingRequest::has_node() const {
-  return _internal_has_node();
-}
-inline const ::flwr::proto::Node& PingRequest::_internal_node() const {
-  const ::flwr::proto::Node* p = node_;
-  return p != nullptr ? *p : reinterpret_cast<const ::flwr::proto::Node&>(
-      ::flwr::proto::_Node_default_instance_);
-}
-inline const ::flwr::proto::Node& PingRequest::node() const {
-  // @@protoc_insertion_point(field_get:flwr.proto.PingRequest.node)
-  return _internal_node();
-}
-inline void PingRequest::unsafe_arena_set_allocated_node(
-    ::flwr::proto::Node* node) {
-  if (GetArenaForAllocation() == nullptr) {
-    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(node_);
-  }
-  node_ = node;
-  if (node) {
-    
-  } else {
-    
-  }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:flwr.proto.PingRequest.node)
-}
-inline ::flwr::proto::Node* PingRequest::release_node() {
-  
-  ::flwr::proto::Node* temp = node_;
-  node_ = nullptr;
-#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
-  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
-  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
-  if (GetArenaForAllocation() == nullptr) { delete old; }
-#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
-  if (GetArenaForAllocation() != nullptr) {
-    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
-  }
-#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
-  return temp;
-}
-inline ::flwr::proto::Node* PingRequest::unsafe_arena_release_node() {
-  // @@protoc_insertion_point(field_release:flwr.proto.PingRequest.node)
-  
-  ::flwr::proto::Node* temp = node_;
-  node_ = nullptr;
-  return temp;
-}
-inline ::flwr::proto::Node* PingRequest::_internal_mutable_node() {
-  
-  if (node_ == nullptr) {
-    auto* p = CreateMaybeMessage<::flwr::proto::Node>(GetArenaForAllocation());
-    node_ = p;
-  }
-  return node_;
-}
-inline ::flwr::proto::Node* PingRequest::mutable_node() {
-  ::flwr::proto::Node* _msg = _internal_mutable_node();
-  // @@protoc_insertion_point(field_mutable:flwr.proto.PingRequest.node)
-  return _msg;
-}
-inline void PingRequest::set_allocated_node(::flwr::proto::Node* node) {
-  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
-  if (message_arena == nullptr) {
-    delete reinterpret_cast< ::PROTOBUF_NAMESPACE_ID::MessageLite*>(node_);
-  }
-  if (node) {
-    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
-        ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper<
-            ::PROTOBUF_NAMESPACE_ID::MessageLite>::GetOwningArena(
-                reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(node));
-    if (message_arena != submessage_arena) {
-      node = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
-          message_arena, node, submessage_arena);
-    }
-    
-  } else {
-    
-  }
-  node_ = node;
-  // @@protoc_insertion_point(field_set_allocated:flwr.proto.PingRequest.node)
-}
-
-// double ping_interval = 2;
-inline void PingRequest::clear_ping_interval() {
-  ping_interval_ = 0;
-}
-inline double PingRequest::_internal_ping_interval() const {
-  return ping_interval_;
-}
-inline double PingRequest::ping_interval() const {
-  // @@protoc_insertion_point(field_get:flwr.proto.PingRequest.ping_interval)
-  return _internal_ping_interval();
-}
-inline void PingRequest::_internal_set_ping_interval(double value) {
-  
-  ping_interval_ = value;
-}
-inline void PingRequest::set_ping_interval(double value) {
-  _internal_set_ping_interval(value);
-  // @@protoc_insertion_point(field_set:flwr.proto.PingRequest.ping_interval)
-}
-
-// -------------------------------------------------------------------
-
-// PingResponse
-
-// bool success = 1;
-inline void PingResponse::clear_success() {
-  success_ = false;
-}
-inline bool PingResponse::_internal_success() const {
-  return success_;
-}
-inline bool PingResponse::success() const {
-  // @@protoc_insertion_point(field_get:flwr.proto.PingResponse.success)
-  return _internal_success();
-}
-inline void PingResponse::_internal_set_success(bool value) {
-  
-  success_ = value;
-}
-inline void PingResponse::set_success(bool value) {
-  _internal_set_success(value);
-  // @@protoc_insertion_point(field_set:flwr.proto.PingResponse.success)
-}
-
-// -------------------------------------------------------------------
-
-// PullTaskInsRequest
-
-// .flwr.proto.Node node = 1;
-inline bool PullTaskInsRequest::_internal_has_node() const {
-  return this != internal_default_instance() && node_ != nullptr;
-}
-inline bool PullTaskInsRequest::has_node() const {
-  return _internal_has_node();
-}
-inline const ::flwr::proto::Node& PullTaskInsRequest::_internal_node() const {
-  const ::flwr::proto::Node* p = node_;
-  return p != nullptr ? *p : reinterpret_cast<const ::flwr::proto::Node&>(
-      ::flwr::proto::_Node_default_instance_);
-}
-inline const ::flwr::proto::Node& PullTaskInsRequest::node() const {
-  // @@protoc_insertion_point(field_get:flwr.proto.PullTaskInsRequest.node)
-  return _internal_node();
-}
-inline void PullTaskInsRequest::unsafe_arena_set_allocated_node(
-    ::flwr::proto::Node* node) {
-  if (GetArenaForAllocation() == nullptr) {
-    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(node_);
-  }
-  node_ = node;
-  if (node) {
-    
-  } else {
-    
-  }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:flwr.proto.PullTaskInsRequest.node)
-}
-inline ::flwr::proto::Node* PullTaskInsRequest::release_node() {
-  
-  ::flwr::proto::Node* temp = node_;
-  node_ = nullptr;
-#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
-  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
-  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
-  if (GetArenaForAllocation() == nullptr) { delete old; }
-#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
-  if (GetArenaForAllocation() != nullptr) {
-    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
-  }
-#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
-  return temp;
-}
-inline ::flwr::proto::Node* PullTaskInsRequest::unsafe_arena_release_node() {
-  // @@protoc_insertion_point(field_release:flwr.proto.PullTaskInsRequest.node)
-  
-  ::flwr::proto::Node* temp = node_;
-  node_ = nullptr;
-  return temp;
-}
-inline ::flwr::proto::Node* PullTaskInsRequest::_internal_mutable_node() {
-  
-  if (node_ == nullptr) {
-    auto* p = CreateMaybeMessage<::flwr::proto::Node>(GetArenaForAllocation());
-    node_ = p;
-  }
-  return node_;
-}
-inline ::flwr::proto::Node* PullTaskInsRequest::mutable_node() {
-  ::flwr::proto::Node* _msg = _internal_mutable_node();
-  // @@protoc_insertion_point(field_mutable:flwr.proto.PullTaskInsRequest.node)
-  return _msg;
-}
-inline void PullTaskInsRequest::set_allocated_node(::flwr::proto::Node* node) {
-  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
-  if (message_arena == nullptr) {
-    delete reinterpret_cast< ::PROTOBUF_NAMESPACE_ID::MessageLite*>(node_);
-  }
-  if (node) {
-    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
-        ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper<
-            ::PROTOBUF_NAMESPACE_ID::MessageLite>::GetOwningArena(
-                reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(node));
-    if (message_arena != submessage_arena) {
-      node = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
-          message_arena, node, submessage_arena);
-    }
-    
-  } else {
-    
-  }
-  node_ = node;
-  // @@protoc_insertion_point(field_set_allocated:flwr.proto.PullTaskInsRequest.node)
-}
-
-// repeated string task_ids = 2;
-inline int PullTaskInsRequest::_internal_task_ids_size() const {
-  return task_ids_.size();
-}
-inline int PullTaskInsRequest::task_ids_size() const {
-  return _internal_task_ids_size();
-}
-inline void PullTaskInsRequest::clear_task_ids() {
-  task_ids_.Clear();
-}
-inline std::string* PullTaskInsRequest::add_task_ids() {
-  std::string* _s = _internal_add_task_ids();
-  // @@protoc_insertion_point(field_add_mutable:flwr.proto.PullTaskInsRequest.task_ids)
+inline std::string* RegisterNodeFleetRequest::mutable_public_key() {
+  std::string* _s = _internal_mutable_public_key();
+  // @@protoc_insertion_point(field_mutable:flwr.proto.RegisterNodeFleetRequest.public_key)
   return _s;
 }
-inline const std::string& PullTaskInsRequest::_internal_task_ids(int index) const {
-  return task_ids_.Get(index);
+inline const std::string& RegisterNodeFleetRequest::_internal_public_key() const {
+  return public_key_.Get();
 }
-inline const std::string& PullTaskInsRequest::task_ids(int index) const {
-  // @@protoc_insertion_point(field_get:flwr.proto.PullTaskInsRequest.task_ids)
-  return _internal_task_ids(index);
+inline void RegisterNodeFleetRequest::_internal_set_public_key(const std::string& value) {
+  
+  public_key_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
 }
-inline std::string* PullTaskInsRequest::mutable_task_ids(int index) {
-  // @@protoc_insertion_point(field_mutable:flwr.proto.PullTaskInsRequest.task_ids)
-  return task_ids_.Mutable(index);
+inline std::string* RegisterNodeFleetRequest::_internal_mutable_public_key() {
+  
+  return public_key_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
 }
-inline void PullTaskInsRequest::set_task_ids(int index, const std::string& value) {
-  task_ids_.Mutable(index)->assign(value);
-  // @@protoc_insertion_point(field_set:flwr.proto.PullTaskInsRequest.task_ids)
+inline std::string* RegisterNodeFleetRequest::release_public_key() {
+  // @@protoc_insertion_point(field_release:flwr.proto.RegisterNodeFleetRequest.public_key)
+  return public_key_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
 }
-inline void PullTaskInsRequest::set_task_ids(int index, std::string&& value) {
-  task_ids_.Mutable(index)->assign(std::move(value));
-  // @@protoc_insertion_point(field_set:flwr.proto.PullTaskInsRequest.task_ids)
+inline void RegisterNodeFleetRequest::set_allocated_public_key(std::string* public_key) {
+  if (public_key != nullptr) {
+    
+  } else {
+    
+  }
+  public_key_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), public_key,
+      GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set_allocated:flwr.proto.RegisterNodeFleetRequest.public_key)
 }
-inline void PullTaskInsRequest::set_task_ids(int index, const char* value) {
+
+// -------------------------------------------------------------------
+
+// RegisterNodeFleetResponse
+
+// uint64 node_id = 1;
+inline void RegisterNodeFleetResponse::clear_node_id() {
+  node_id_ = uint64_t{0u};
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint64 RegisterNodeFleetResponse::_internal_node_id() const {
+  return node_id_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint64 RegisterNodeFleetResponse::node_id() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.RegisterNodeFleetResponse.node_id)
+  return _internal_node_id();
+}
+inline void RegisterNodeFleetResponse::_internal_set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value) {
+  
+  node_id_ = value;
+}
+inline void RegisterNodeFleetResponse::set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value) {
+  _internal_set_node_id(value);
+  // @@protoc_insertion_point(field_set:flwr.proto.RegisterNodeFleetResponse.node_id)
+}
+
+// -------------------------------------------------------------------
+
+// ActivateNodeRequest
+
+// bytes public_key = 1;
+inline void ActivateNodeRequest::clear_public_key() {
+  public_key_.ClearToEmpty();
+}
+inline const std::string& ActivateNodeRequest::public_key() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.ActivateNodeRequest.public_key)
+  return _internal_public_key();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void ActivateNodeRequest::set_public_key(ArgT0&& arg0, ArgT... args) {
+ 
+ public_key_.SetBytes(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:flwr.proto.ActivateNodeRequest.public_key)
+}
+inline std::string* ActivateNodeRequest::mutable_public_key() {
+  std::string* _s = _internal_mutable_public_key();
+  // @@protoc_insertion_point(field_mutable:flwr.proto.ActivateNodeRequest.public_key)
+  return _s;
+}
+inline const std::string& ActivateNodeRequest::_internal_public_key() const {
+  return public_key_.Get();
+}
+inline void ActivateNodeRequest::_internal_set_public_key(const std::string& value) {
+  
+  public_key_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* ActivateNodeRequest::_internal_mutable_public_key() {
+  
+  return public_key_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* ActivateNodeRequest::release_public_key() {
+  // @@protoc_insertion_point(field_release:flwr.proto.ActivateNodeRequest.public_key)
+  return public_key_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void ActivateNodeRequest::set_allocated_public_key(std::string* public_key) {
+  if (public_key != nullptr) {
+    
+  } else {
+    
+  }
+  public_key_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), public_key,
+      GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set_allocated:flwr.proto.ActivateNodeRequest.public_key)
+}
+
+// double heartbeat_interval = 2;
+inline void ActivateNodeRequest::clear_heartbeat_interval() {
+  heartbeat_interval_ = 0;
+}
+inline double ActivateNodeRequest::_internal_heartbeat_interval() const {
+  return heartbeat_interval_;
+}
+inline double ActivateNodeRequest::heartbeat_interval() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.ActivateNodeRequest.heartbeat_interval)
+  return _internal_heartbeat_interval();
+}
+inline void ActivateNodeRequest::_internal_set_heartbeat_interval(double value) {
+  
+  heartbeat_interval_ = value;
+}
+inline void ActivateNodeRequest::set_heartbeat_interval(double value) {
+  _internal_set_heartbeat_interval(value);
+  // @@protoc_insertion_point(field_set:flwr.proto.ActivateNodeRequest.heartbeat_interval)
+}
+
+// -------------------------------------------------------------------
+
+// ActivateNodeResponse
+
+// uint64 node_id = 1;
+inline void ActivateNodeResponse::clear_node_id() {
+  node_id_ = uint64_t{0u};
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint64 ActivateNodeResponse::_internal_node_id() const {
+  return node_id_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint64 ActivateNodeResponse::node_id() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.ActivateNodeResponse.node_id)
+  return _internal_node_id();
+}
+inline void ActivateNodeResponse::_internal_set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value) {
+  
+  node_id_ = value;
+}
+inline void ActivateNodeResponse::set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value) {
+  _internal_set_node_id(value);
+  // @@protoc_insertion_point(field_set:flwr.proto.ActivateNodeResponse.node_id)
+}
+
+// -------------------------------------------------------------------
+
+// DeactivateNodeRequest
+
+// uint64 node_id = 1;
+inline void DeactivateNodeRequest::clear_node_id() {
+  node_id_ = uint64_t{0u};
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint64 DeactivateNodeRequest::_internal_node_id() const {
+  return node_id_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint64 DeactivateNodeRequest::node_id() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.DeactivateNodeRequest.node_id)
+  return _internal_node_id();
+}
+inline void DeactivateNodeRequest::_internal_set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value) {
+  
+  node_id_ = value;
+}
+inline void DeactivateNodeRequest::set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value) {
+  _internal_set_node_id(value);
+  // @@protoc_insertion_point(field_set:flwr.proto.DeactivateNodeRequest.node_id)
+}
+
+// -------------------------------------------------------------------
+
+// DeactivateNodeResponse
+
+// -------------------------------------------------------------------
+
+// UnregisterNodeFleetRequest
+
+// uint64 node_id = 1;
+inline void UnregisterNodeFleetRequest::clear_node_id() {
+  node_id_ = uint64_t{0u};
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint64 UnregisterNodeFleetRequest::_internal_node_id() const {
+  return node_id_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint64 UnregisterNodeFleetRequest::node_id() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.UnregisterNodeFleetRequest.node_id)
+  return _internal_node_id();
+}
+inline void UnregisterNodeFleetRequest::_internal_set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value) {
+  
+  node_id_ = value;
+}
+inline void UnregisterNodeFleetRequest::set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value) {
+  _internal_set_node_id(value);
+  // @@protoc_insertion_point(field_set:flwr.proto.UnregisterNodeFleetRequest.node_id)
+}
+
+// -------------------------------------------------------------------
+
+// UnregisterNodeFleetResponse
+
+// -------------------------------------------------------------------
+
+// PullMessagesRequest
+
+// .flwr.proto.Node node = 1;
+inline bool PullMessagesRequest::_internal_has_node() const {
+  return this != internal_default_instance() && node_ != nullptr;
+}
+inline bool PullMessagesRequest::has_node() const {
+  return _internal_has_node();
+}
+inline const ::flwr::proto::Node& PullMessagesRequest::_internal_node() const {
+  const ::flwr::proto::Node* p = node_;
+  return p != nullptr ? *p : reinterpret_cast<const ::flwr::proto::Node&>(
+      ::flwr::proto::_Node_default_instance_);
+}
+inline const ::flwr::proto::Node& PullMessagesRequest::node() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.PullMessagesRequest.node)
+  return _internal_node();
+}
+inline void PullMessagesRequest::unsafe_arena_set_allocated_node(
+    ::flwr::proto::Node* node) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(node_);
+  }
+  node_ = node;
+  if (node) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:flwr.proto.PullMessagesRequest.node)
+}
+inline ::flwr::proto::Node* PullMessagesRequest::release_node() {
+  
+  ::flwr::proto::Node* temp = node_;
+  node_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::flwr::proto::Node* PullMessagesRequest::unsafe_arena_release_node() {
+  // @@protoc_insertion_point(field_release:flwr.proto.PullMessagesRequest.node)
+  
+  ::flwr::proto::Node* temp = node_;
+  node_ = nullptr;
+  return temp;
+}
+inline ::flwr::proto::Node* PullMessagesRequest::_internal_mutable_node() {
+  
+  if (node_ == nullptr) {
+    auto* p = CreateMaybeMessage<::flwr::proto::Node>(GetArenaForAllocation());
+    node_ = p;
+  }
+  return node_;
+}
+inline ::flwr::proto::Node* PullMessagesRequest::mutable_node() {
+  ::flwr::proto::Node* _msg = _internal_mutable_node();
+  // @@protoc_insertion_point(field_mutable:flwr.proto.PullMessagesRequest.node)
+  return _msg;
+}
+inline void PullMessagesRequest::set_allocated_node(::flwr::proto::Node* node) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete reinterpret_cast< ::PROTOBUF_NAMESPACE_ID::MessageLite*>(node_);
+  }
+  if (node) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper<
+            ::PROTOBUF_NAMESPACE_ID::MessageLite>::GetOwningArena(
+                reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(node));
+    if (message_arena != submessage_arena) {
+      node = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, node, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  node_ = node;
+  // @@protoc_insertion_point(field_set_allocated:flwr.proto.PullMessagesRequest.node)
+}
+
+// repeated string message_ids = 2;
+inline int PullMessagesRequest::_internal_message_ids_size() const {
+  return message_ids_.size();
+}
+inline int PullMessagesRequest::message_ids_size() const {
+  return _internal_message_ids_size();
+}
+inline void PullMessagesRequest::clear_message_ids() {
+  message_ids_.Clear();
+}
+inline std::string* PullMessagesRequest::add_message_ids() {
+  std::string* _s = _internal_add_message_ids();
+  // @@protoc_insertion_point(field_add_mutable:flwr.proto.PullMessagesRequest.message_ids)
+  return _s;
+}
+inline const std::string& PullMessagesRequest::_internal_message_ids(int index) const {
+  return message_ids_.Get(index);
+}
+inline const std::string& PullMessagesRequest::message_ids(int index) const {
+  // @@protoc_insertion_point(field_get:flwr.proto.PullMessagesRequest.message_ids)
+  return _internal_message_ids(index);
+}
+inline std::string* PullMessagesRequest::mutable_message_ids(int index) {
+  // @@protoc_insertion_point(field_mutable:flwr.proto.PullMessagesRequest.message_ids)
+  return message_ids_.Mutable(index);
+}
+inline void PullMessagesRequest::set_message_ids(int index, const std::string& value) {
+  message_ids_.Mutable(index)->assign(value);
+  // @@protoc_insertion_point(field_set:flwr.proto.PullMessagesRequest.message_ids)
+}
+inline void PullMessagesRequest::set_message_ids(int index, std::string&& value) {
+  message_ids_.Mutable(index)->assign(std::move(value));
+  // @@protoc_insertion_point(field_set:flwr.proto.PullMessagesRequest.message_ids)
+}
+inline void PullMessagesRequest::set_message_ids(int index, const char* value) {
   GOOGLE_DCHECK(value != nullptr);
-  task_ids_.Mutable(index)->assign(value);
-  // @@protoc_insertion_point(field_set_char:flwr.proto.PullTaskInsRequest.task_ids)
+  message_ids_.Mutable(index)->assign(value);
+  // @@protoc_insertion_point(field_set_char:flwr.proto.PullMessagesRequest.message_ids)
 }
-inline void PullTaskInsRequest::set_task_ids(int index, const char* value, size_t size) {
-  task_ids_.Mutable(index)->assign(
+inline void PullMessagesRequest::set_message_ids(int index, const char* value, size_t size) {
+  message_ids_.Mutable(index)->assign(
     reinterpret_cast<const char*>(value), size);
-  // @@protoc_insertion_point(field_set_pointer:flwr.proto.PullTaskInsRequest.task_ids)
+  // @@protoc_insertion_point(field_set_pointer:flwr.proto.PullMessagesRequest.message_ids)
 }
-inline std::string* PullTaskInsRequest::_internal_add_task_ids() {
-  return task_ids_.Add();
+inline std::string* PullMessagesRequest::_internal_add_message_ids() {
+  return message_ids_.Add();
 }
-inline void PullTaskInsRequest::add_task_ids(const std::string& value) {
-  task_ids_.Add()->assign(value);
-  // @@protoc_insertion_point(field_add:flwr.proto.PullTaskInsRequest.task_ids)
+inline void PullMessagesRequest::add_message_ids(const std::string& value) {
+  message_ids_.Add()->assign(value);
+  // @@protoc_insertion_point(field_add:flwr.proto.PullMessagesRequest.message_ids)
 }
-inline void PullTaskInsRequest::add_task_ids(std::string&& value) {
-  task_ids_.Add(std::move(value));
-  // @@protoc_insertion_point(field_add:flwr.proto.PullTaskInsRequest.task_ids)
+inline void PullMessagesRequest::add_message_ids(std::string&& value) {
+  message_ids_.Add(std::move(value));
+  // @@protoc_insertion_point(field_add:flwr.proto.PullMessagesRequest.message_ids)
 }
-inline void PullTaskInsRequest::add_task_ids(const char* value) {
+inline void PullMessagesRequest::add_message_ids(const char* value) {
   GOOGLE_DCHECK(value != nullptr);
-  task_ids_.Add()->assign(value);
-  // @@protoc_insertion_point(field_add_char:flwr.proto.PullTaskInsRequest.task_ids)
+  message_ids_.Add()->assign(value);
+  // @@protoc_insertion_point(field_add_char:flwr.proto.PullMessagesRequest.message_ids)
 }
-inline void PullTaskInsRequest::add_task_ids(const char* value, size_t size) {
-  task_ids_.Add()->assign(reinterpret_cast<const char*>(value), size);
-  // @@protoc_insertion_point(field_add_pointer:flwr.proto.PullTaskInsRequest.task_ids)
+inline void PullMessagesRequest::add_message_ids(const char* value, size_t size) {
+  message_ids_.Add()->assign(reinterpret_cast<const char*>(value), size);
+  // @@protoc_insertion_point(field_add_pointer:flwr.proto.PullMessagesRequest.message_ids)
 }
 inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>&
-PullTaskInsRequest::task_ids() const {
-  // @@protoc_insertion_point(field_list:flwr.proto.PullTaskInsRequest.task_ids)
-  return task_ids_;
+PullMessagesRequest::message_ids() const {
+  // @@protoc_insertion_point(field_list:flwr.proto.PullMessagesRequest.message_ids)
+  return message_ids_;
 }
 inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>*
-PullTaskInsRequest::mutable_task_ids() {
-  // @@protoc_insertion_point(field_mutable_list:flwr.proto.PullTaskInsRequest.task_ids)
-  return &task_ids_;
+PullMessagesRequest::mutable_message_ids() {
+  // @@protoc_insertion_point(field_mutable_list:flwr.proto.PullMessagesRequest.message_ids)
+  return &message_ids_;
 }
 
 // -------------------------------------------------------------------
 
-// PullTaskInsResponse
+// PullMessagesResponse
 
 // .flwr.proto.Reconnect reconnect = 1;
-inline bool PullTaskInsResponse::_internal_has_reconnect() const {
+inline bool PullMessagesResponse::_internal_has_reconnect() const {
   return this != internal_default_instance() && reconnect_ != nullptr;
 }
-inline bool PullTaskInsResponse::has_reconnect() const {
+inline bool PullMessagesResponse::has_reconnect() const {
   return _internal_has_reconnect();
 }
-inline void PullTaskInsResponse::clear_reconnect() {
+inline void PullMessagesResponse::clear_reconnect() {
   if (GetArenaForAllocation() == nullptr && reconnect_ != nullptr) {
     delete reconnect_;
   }
   reconnect_ = nullptr;
 }
-inline const ::flwr::proto::Reconnect& PullTaskInsResponse::_internal_reconnect() const {
+inline const ::flwr::proto::Reconnect& PullMessagesResponse::_internal_reconnect() const {
   const ::flwr::proto::Reconnect* p = reconnect_;
   return p != nullptr ? *p : reinterpret_cast<const ::flwr::proto::Reconnect&>(
       ::flwr::proto::_Reconnect_default_instance_);
 }
-inline const ::flwr::proto::Reconnect& PullTaskInsResponse::reconnect() const {
-  // @@protoc_insertion_point(field_get:flwr.proto.PullTaskInsResponse.reconnect)
+inline const ::flwr::proto::Reconnect& PullMessagesResponse::reconnect() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.PullMessagesResponse.reconnect)
   return _internal_reconnect();
 }
-inline void PullTaskInsResponse::unsafe_arena_set_allocated_reconnect(
+inline void PullMessagesResponse::unsafe_arena_set_allocated_reconnect(
     ::flwr::proto::Reconnect* reconnect) {
   if (GetArenaForAllocation() == nullptr) {
     delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(reconnect_);
@@ -2863,9 +2625,9 @@ inline void PullTaskInsResponse::unsafe_arena_set_allocated_reconnect(
   } else {
     
   }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:flwr.proto.PullTaskInsResponse.reconnect)
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:flwr.proto.PullMessagesResponse.reconnect)
 }
-inline ::flwr::proto::Reconnect* PullTaskInsResponse::release_reconnect() {
+inline ::flwr::proto::Reconnect* PullMessagesResponse::release_reconnect() {
   
   ::flwr::proto::Reconnect* temp = reconnect_;
   reconnect_ = nullptr;
@@ -2880,14 +2642,14 @@ inline ::flwr::proto::Reconnect* PullTaskInsResponse::release_reconnect() {
 #endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
   return temp;
 }
-inline ::flwr::proto::Reconnect* PullTaskInsResponse::unsafe_arena_release_reconnect() {
-  // @@protoc_insertion_point(field_release:flwr.proto.PullTaskInsResponse.reconnect)
+inline ::flwr::proto::Reconnect* PullMessagesResponse::unsafe_arena_release_reconnect() {
+  // @@protoc_insertion_point(field_release:flwr.proto.PullMessagesResponse.reconnect)
   
   ::flwr::proto::Reconnect* temp = reconnect_;
   reconnect_ = nullptr;
   return temp;
 }
-inline ::flwr::proto::Reconnect* PullTaskInsResponse::_internal_mutable_reconnect() {
+inline ::flwr::proto::Reconnect* PullMessagesResponse::_internal_mutable_reconnect() {
   
   if (reconnect_ == nullptr) {
     auto* p = CreateMaybeMessage<::flwr::proto::Reconnect>(GetArenaForAllocation());
@@ -2895,12 +2657,12 @@ inline ::flwr::proto::Reconnect* PullTaskInsResponse::_internal_mutable_reconnec
   }
   return reconnect_;
 }
-inline ::flwr::proto::Reconnect* PullTaskInsResponse::mutable_reconnect() {
+inline ::flwr::proto::Reconnect* PullMessagesResponse::mutable_reconnect() {
   ::flwr::proto::Reconnect* _msg = _internal_mutable_reconnect();
-  // @@protoc_insertion_point(field_mutable:flwr.proto.PullTaskInsResponse.reconnect)
+  // @@protoc_insertion_point(field_mutable:flwr.proto.PullMessagesResponse.reconnect)
   return _msg;
 }
-inline void PullTaskInsResponse::set_allocated_reconnect(::flwr::proto::Reconnect* reconnect) {
+inline void PullMessagesResponse::set_allocated_reconnect(::flwr::proto::Reconnect* reconnect) {
   ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
   if (message_arena == nullptr) {
     delete reconnect_;
@@ -2917,116 +2679,323 @@ inline void PullTaskInsResponse::set_allocated_reconnect(::flwr::proto::Reconnec
     
   }
   reconnect_ = reconnect;
-  // @@protoc_insertion_point(field_set_allocated:flwr.proto.PullTaskInsResponse.reconnect)
+  // @@protoc_insertion_point(field_set_allocated:flwr.proto.PullMessagesResponse.reconnect)
 }
 
-// repeated .flwr.proto.TaskIns task_ins_list = 2;
-inline int PullTaskInsResponse::_internal_task_ins_list_size() const {
-  return task_ins_list_.size();
+// repeated .flwr.proto.Message messages_list = 2;
+inline int PullMessagesResponse::_internal_messages_list_size() const {
+  return messages_list_.size();
 }
-inline int PullTaskInsResponse::task_ins_list_size() const {
-  return _internal_task_ins_list_size();
+inline int PullMessagesResponse::messages_list_size() const {
+  return _internal_messages_list_size();
 }
-inline ::flwr::proto::TaskIns* PullTaskInsResponse::mutable_task_ins_list(int index) {
-  // @@protoc_insertion_point(field_mutable:flwr.proto.PullTaskInsResponse.task_ins_list)
-  return task_ins_list_.Mutable(index);
+inline ::flwr::proto::Message* PullMessagesResponse::mutable_messages_list(int index) {
+  // @@protoc_insertion_point(field_mutable:flwr.proto.PullMessagesResponse.messages_list)
+  return messages_list_.Mutable(index);
 }
-inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::TaskIns >*
-PullTaskInsResponse::mutable_task_ins_list() {
-  // @@protoc_insertion_point(field_mutable_list:flwr.proto.PullTaskInsResponse.task_ins_list)
-  return &task_ins_list_;
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::Message >*
+PullMessagesResponse::mutable_messages_list() {
+  // @@protoc_insertion_point(field_mutable_list:flwr.proto.PullMessagesResponse.messages_list)
+  return &messages_list_;
 }
-inline const ::flwr::proto::TaskIns& PullTaskInsResponse::_internal_task_ins_list(int index) const {
-  return task_ins_list_.Get(index);
+inline const ::flwr::proto::Message& PullMessagesResponse::_internal_messages_list(int index) const {
+  return messages_list_.Get(index);
 }
-inline const ::flwr::proto::TaskIns& PullTaskInsResponse::task_ins_list(int index) const {
-  // @@protoc_insertion_point(field_get:flwr.proto.PullTaskInsResponse.task_ins_list)
-  return _internal_task_ins_list(index);
+inline const ::flwr::proto::Message& PullMessagesResponse::messages_list(int index) const {
+  // @@protoc_insertion_point(field_get:flwr.proto.PullMessagesResponse.messages_list)
+  return _internal_messages_list(index);
 }
-inline ::flwr::proto::TaskIns* PullTaskInsResponse::_internal_add_task_ins_list() {
-  return task_ins_list_.Add();
+inline ::flwr::proto::Message* PullMessagesResponse::_internal_add_messages_list() {
+  return messages_list_.Add();
 }
-inline ::flwr::proto::TaskIns* PullTaskInsResponse::add_task_ins_list() {
-  ::flwr::proto::TaskIns* _add = _internal_add_task_ins_list();
-  // @@protoc_insertion_point(field_add:flwr.proto.PullTaskInsResponse.task_ins_list)
+inline ::flwr::proto::Message* PullMessagesResponse::add_messages_list() {
+  ::flwr::proto::Message* _add = _internal_add_messages_list();
+  // @@protoc_insertion_point(field_add:flwr.proto.PullMessagesResponse.messages_list)
   return _add;
 }
-inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::TaskIns >&
-PullTaskInsResponse::task_ins_list() const {
-  // @@protoc_insertion_point(field_list:flwr.proto.PullTaskInsResponse.task_ins_list)
-  return task_ins_list_;
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::Message >&
+PullMessagesResponse::messages_list() const {
+  // @@protoc_insertion_point(field_list:flwr.proto.PullMessagesResponse.messages_list)
+  return messages_list_;
 }
 
-// -------------------------------------------------------------------
-
-// PushTaskResRequest
-
-// repeated .flwr.proto.TaskRes task_res_list = 1;
-inline int PushTaskResRequest::_internal_task_res_list_size() const {
-  return task_res_list_.size();
+// repeated .flwr.proto.ObjectTree message_object_trees = 3;
+inline int PullMessagesResponse::_internal_message_object_trees_size() const {
+  return message_object_trees_.size();
 }
-inline int PushTaskResRequest::task_res_list_size() const {
-  return _internal_task_res_list_size();
+inline int PullMessagesResponse::message_object_trees_size() const {
+  return _internal_message_object_trees_size();
 }
-inline ::flwr::proto::TaskRes* PushTaskResRequest::mutable_task_res_list(int index) {
-  // @@protoc_insertion_point(field_mutable:flwr.proto.PushTaskResRequest.task_res_list)
-  return task_res_list_.Mutable(index);
+inline ::flwr::proto::ObjectTree* PullMessagesResponse::mutable_message_object_trees(int index) {
+  // @@protoc_insertion_point(field_mutable:flwr.proto.PullMessagesResponse.message_object_trees)
+  return message_object_trees_.Mutable(index);
 }
-inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::TaskRes >*
-PushTaskResRequest::mutable_task_res_list() {
-  // @@protoc_insertion_point(field_mutable_list:flwr.proto.PushTaskResRequest.task_res_list)
-  return &task_res_list_;
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::ObjectTree >*
+PullMessagesResponse::mutable_message_object_trees() {
+  // @@protoc_insertion_point(field_mutable_list:flwr.proto.PullMessagesResponse.message_object_trees)
+  return &message_object_trees_;
 }
-inline const ::flwr::proto::TaskRes& PushTaskResRequest::_internal_task_res_list(int index) const {
-  return task_res_list_.Get(index);
+inline const ::flwr::proto::ObjectTree& PullMessagesResponse::_internal_message_object_trees(int index) const {
+  return message_object_trees_.Get(index);
 }
-inline const ::flwr::proto::TaskRes& PushTaskResRequest::task_res_list(int index) const {
-  // @@protoc_insertion_point(field_get:flwr.proto.PushTaskResRequest.task_res_list)
-  return _internal_task_res_list(index);
+inline const ::flwr::proto::ObjectTree& PullMessagesResponse::message_object_trees(int index) const {
+  // @@protoc_insertion_point(field_get:flwr.proto.PullMessagesResponse.message_object_trees)
+  return _internal_message_object_trees(index);
 }
-inline ::flwr::proto::TaskRes* PushTaskResRequest::_internal_add_task_res_list() {
-  return task_res_list_.Add();
+inline ::flwr::proto::ObjectTree* PullMessagesResponse::_internal_add_message_object_trees() {
+  return message_object_trees_.Add();
 }
-inline ::flwr::proto::TaskRes* PushTaskResRequest::add_task_res_list() {
-  ::flwr::proto::TaskRes* _add = _internal_add_task_res_list();
-  // @@protoc_insertion_point(field_add:flwr.proto.PushTaskResRequest.task_res_list)
+inline ::flwr::proto::ObjectTree* PullMessagesResponse::add_message_object_trees() {
+  ::flwr::proto::ObjectTree* _add = _internal_add_message_object_trees();
+  // @@protoc_insertion_point(field_add:flwr.proto.PullMessagesResponse.message_object_trees)
   return _add;
 }
-inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::TaskRes >&
-PushTaskResRequest::task_res_list() const {
-  // @@protoc_insertion_point(field_list:flwr.proto.PushTaskResRequest.task_res_list)
-  return task_res_list_;
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::ObjectTree >&
+PullMessagesResponse::message_object_trees() const {
+  // @@protoc_insertion_point(field_list:flwr.proto.PullMessagesResponse.message_object_trees)
+  return message_object_trees_;
+}
+
+// -------------------------------------------------------------------
+
+// PushMessagesRequest
+
+// .flwr.proto.Node node = 1;
+inline bool PushMessagesRequest::_internal_has_node() const {
+  return this != internal_default_instance() && node_ != nullptr;
+}
+inline bool PushMessagesRequest::has_node() const {
+  return _internal_has_node();
+}
+inline const ::flwr::proto::Node& PushMessagesRequest::_internal_node() const {
+  const ::flwr::proto::Node* p = node_;
+  return p != nullptr ? *p : reinterpret_cast<const ::flwr::proto::Node&>(
+      ::flwr::proto::_Node_default_instance_);
+}
+inline const ::flwr::proto::Node& PushMessagesRequest::node() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.PushMessagesRequest.node)
+  return _internal_node();
+}
+inline void PushMessagesRequest::unsafe_arena_set_allocated_node(
+    ::flwr::proto::Node* node) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(node_);
+  }
+  node_ = node;
+  if (node) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:flwr.proto.PushMessagesRequest.node)
+}
+inline ::flwr::proto::Node* PushMessagesRequest::release_node() {
+  
+  ::flwr::proto::Node* temp = node_;
+  node_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::flwr::proto::Node* PushMessagesRequest::unsafe_arena_release_node() {
+  // @@protoc_insertion_point(field_release:flwr.proto.PushMessagesRequest.node)
+  
+  ::flwr::proto::Node* temp = node_;
+  node_ = nullptr;
+  return temp;
+}
+inline ::flwr::proto::Node* PushMessagesRequest::_internal_mutable_node() {
+  
+  if (node_ == nullptr) {
+    auto* p = CreateMaybeMessage<::flwr::proto::Node>(GetArenaForAllocation());
+    node_ = p;
+  }
+  return node_;
+}
+inline ::flwr::proto::Node* PushMessagesRequest::mutable_node() {
+  ::flwr::proto::Node* _msg = _internal_mutable_node();
+  // @@protoc_insertion_point(field_mutable:flwr.proto.PushMessagesRequest.node)
+  return _msg;
+}
+inline void PushMessagesRequest::set_allocated_node(::flwr::proto::Node* node) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete reinterpret_cast< ::PROTOBUF_NAMESPACE_ID::MessageLite*>(node_);
+  }
+  if (node) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper<
+            ::PROTOBUF_NAMESPACE_ID::MessageLite>::GetOwningArena(
+                reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(node));
+    if (message_arena != submessage_arena) {
+      node = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, node, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  node_ = node;
+  // @@protoc_insertion_point(field_set_allocated:flwr.proto.PushMessagesRequest.node)
+}
+
+// repeated .flwr.proto.Message messages_list = 2;
+inline int PushMessagesRequest::_internal_messages_list_size() const {
+  return messages_list_.size();
+}
+inline int PushMessagesRequest::messages_list_size() const {
+  return _internal_messages_list_size();
+}
+inline ::flwr::proto::Message* PushMessagesRequest::mutable_messages_list(int index) {
+  // @@protoc_insertion_point(field_mutable:flwr.proto.PushMessagesRequest.messages_list)
+  return messages_list_.Mutable(index);
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::Message >*
+PushMessagesRequest::mutable_messages_list() {
+  // @@protoc_insertion_point(field_mutable_list:flwr.proto.PushMessagesRequest.messages_list)
+  return &messages_list_;
+}
+inline const ::flwr::proto::Message& PushMessagesRequest::_internal_messages_list(int index) const {
+  return messages_list_.Get(index);
+}
+inline const ::flwr::proto::Message& PushMessagesRequest::messages_list(int index) const {
+  // @@protoc_insertion_point(field_get:flwr.proto.PushMessagesRequest.messages_list)
+  return _internal_messages_list(index);
+}
+inline ::flwr::proto::Message* PushMessagesRequest::_internal_add_messages_list() {
+  return messages_list_.Add();
+}
+inline ::flwr::proto::Message* PushMessagesRequest::add_messages_list() {
+  ::flwr::proto::Message* _add = _internal_add_messages_list();
+  // @@protoc_insertion_point(field_add:flwr.proto.PushMessagesRequest.messages_list)
+  return _add;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::Message >&
+PushMessagesRequest::messages_list() const {
+  // @@protoc_insertion_point(field_list:flwr.proto.PushMessagesRequest.messages_list)
+  return messages_list_;
+}
+
+// repeated .flwr.proto.ObjectTree message_object_trees = 3;
+inline int PushMessagesRequest::_internal_message_object_trees_size() const {
+  return message_object_trees_.size();
+}
+inline int PushMessagesRequest::message_object_trees_size() const {
+  return _internal_message_object_trees_size();
+}
+inline ::flwr::proto::ObjectTree* PushMessagesRequest::mutable_message_object_trees(int index) {
+  // @@protoc_insertion_point(field_mutable:flwr.proto.PushMessagesRequest.message_object_trees)
+  return message_object_trees_.Mutable(index);
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::ObjectTree >*
+PushMessagesRequest::mutable_message_object_trees() {
+  // @@protoc_insertion_point(field_mutable_list:flwr.proto.PushMessagesRequest.message_object_trees)
+  return &message_object_trees_;
+}
+inline const ::flwr::proto::ObjectTree& PushMessagesRequest::_internal_message_object_trees(int index) const {
+  return message_object_trees_.Get(index);
+}
+inline const ::flwr::proto::ObjectTree& PushMessagesRequest::message_object_trees(int index) const {
+  // @@protoc_insertion_point(field_get:flwr.proto.PushMessagesRequest.message_object_trees)
+  return _internal_message_object_trees(index);
+}
+inline ::flwr::proto::ObjectTree* PushMessagesRequest::_internal_add_message_object_trees() {
+  return message_object_trees_.Add();
+}
+inline ::flwr::proto::ObjectTree* PushMessagesRequest::add_message_object_trees() {
+  ::flwr::proto::ObjectTree* _add = _internal_add_message_object_trees();
+  // @@protoc_insertion_point(field_add:flwr.proto.PushMessagesRequest.message_object_trees)
+  return _add;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::flwr::proto::ObjectTree >&
+PushMessagesRequest::message_object_trees() const {
+  // @@protoc_insertion_point(field_list:flwr.proto.PushMessagesRequest.message_object_trees)
+  return message_object_trees_;
+}
+
+// repeated double clientapp_runtime_list = 4;
+inline int PushMessagesRequest::_internal_clientapp_runtime_list_size() const {
+  return clientapp_runtime_list_.size();
+}
+inline int PushMessagesRequest::clientapp_runtime_list_size() const {
+  return _internal_clientapp_runtime_list_size();
+}
+inline void PushMessagesRequest::clear_clientapp_runtime_list() {
+  clientapp_runtime_list_.Clear();
+}
+inline double PushMessagesRequest::_internal_clientapp_runtime_list(int index) const {
+  return clientapp_runtime_list_.Get(index);
+}
+inline double PushMessagesRequest::clientapp_runtime_list(int index) const {
+  // @@protoc_insertion_point(field_get:flwr.proto.PushMessagesRequest.clientapp_runtime_list)
+  return _internal_clientapp_runtime_list(index);
+}
+inline void PushMessagesRequest::set_clientapp_runtime_list(int index, double value) {
+  clientapp_runtime_list_.Set(index, value);
+  // @@protoc_insertion_point(field_set:flwr.proto.PushMessagesRequest.clientapp_runtime_list)
+}
+inline void PushMessagesRequest::_internal_add_clientapp_runtime_list(double value) {
+  clientapp_runtime_list_.Add(value);
+}
+inline void PushMessagesRequest::add_clientapp_runtime_list(double value) {
+  _internal_add_clientapp_runtime_list(value);
+  // @@protoc_insertion_point(field_add:flwr.proto.PushMessagesRequest.clientapp_runtime_list)
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedField< double >&
+PushMessagesRequest::_internal_clientapp_runtime_list() const {
+  return clientapp_runtime_list_;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedField< double >&
+PushMessagesRequest::clientapp_runtime_list() const {
+  // @@protoc_insertion_point(field_list:flwr.proto.PushMessagesRequest.clientapp_runtime_list)
+  return _internal_clientapp_runtime_list();
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedField< double >*
+PushMessagesRequest::_internal_mutable_clientapp_runtime_list() {
+  return &clientapp_runtime_list_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedField< double >*
+PushMessagesRequest::mutable_clientapp_runtime_list() {
+  // @@protoc_insertion_point(field_mutable_list:flwr.proto.PushMessagesRequest.clientapp_runtime_list)
+  return _internal_mutable_clientapp_runtime_list();
 }
 
 // -------------------------------------------------------------------
 
 // -------------------------------------------------------------------
 
-// PushTaskResResponse
+// PushMessagesResponse
 
 // .flwr.proto.Reconnect reconnect = 1;
-inline bool PushTaskResResponse::_internal_has_reconnect() const {
+inline bool PushMessagesResponse::_internal_has_reconnect() const {
   return this != internal_default_instance() && reconnect_ != nullptr;
 }
-inline bool PushTaskResResponse::has_reconnect() const {
+inline bool PushMessagesResponse::has_reconnect() const {
   return _internal_has_reconnect();
 }
-inline void PushTaskResResponse::clear_reconnect() {
+inline void PushMessagesResponse::clear_reconnect() {
   if (GetArenaForAllocation() == nullptr && reconnect_ != nullptr) {
     delete reconnect_;
   }
   reconnect_ = nullptr;
 }
-inline const ::flwr::proto::Reconnect& PushTaskResResponse::_internal_reconnect() const {
+inline const ::flwr::proto::Reconnect& PushMessagesResponse::_internal_reconnect() const {
   const ::flwr::proto::Reconnect* p = reconnect_;
   return p != nullptr ? *p : reinterpret_cast<const ::flwr::proto::Reconnect&>(
       ::flwr::proto::_Reconnect_default_instance_);
 }
-inline const ::flwr::proto::Reconnect& PushTaskResResponse::reconnect() const {
-  // @@protoc_insertion_point(field_get:flwr.proto.PushTaskResResponse.reconnect)
+inline const ::flwr::proto::Reconnect& PushMessagesResponse::reconnect() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.PushMessagesResponse.reconnect)
   return _internal_reconnect();
 }
-inline void PushTaskResResponse::unsafe_arena_set_allocated_reconnect(
+inline void PushMessagesResponse::unsafe_arena_set_allocated_reconnect(
     ::flwr::proto::Reconnect* reconnect) {
   if (GetArenaForAllocation() == nullptr) {
     delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(reconnect_);
@@ -3037,9 +3006,9 @@ inline void PushTaskResResponse::unsafe_arena_set_allocated_reconnect(
   } else {
     
   }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:flwr.proto.PushTaskResResponse.reconnect)
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:flwr.proto.PushMessagesResponse.reconnect)
 }
-inline ::flwr::proto::Reconnect* PushTaskResResponse::release_reconnect() {
+inline ::flwr::proto::Reconnect* PushMessagesResponse::release_reconnect() {
   
   ::flwr::proto::Reconnect* temp = reconnect_;
   reconnect_ = nullptr;
@@ -3054,14 +3023,14 @@ inline ::flwr::proto::Reconnect* PushTaskResResponse::release_reconnect() {
 #endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
   return temp;
 }
-inline ::flwr::proto::Reconnect* PushTaskResResponse::unsafe_arena_release_reconnect() {
-  // @@protoc_insertion_point(field_release:flwr.proto.PushTaskResResponse.reconnect)
+inline ::flwr::proto::Reconnect* PushMessagesResponse::unsafe_arena_release_reconnect() {
+  // @@protoc_insertion_point(field_release:flwr.proto.PushMessagesResponse.reconnect)
   
   ::flwr::proto::Reconnect* temp = reconnect_;
   reconnect_ = nullptr;
   return temp;
 }
-inline ::flwr::proto::Reconnect* PushTaskResResponse::_internal_mutable_reconnect() {
+inline ::flwr::proto::Reconnect* PushMessagesResponse::_internal_mutable_reconnect() {
   
   if (reconnect_ == nullptr) {
     auto* p = CreateMaybeMessage<::flwr::proto::Reconnect>(GetArenaForAllocation());
@@ -3069,12 +3038,12 @@ inline ::flwr::proto::Reconnect* PushTaskResResponse::_internal_mutable_reconnec
   }
   return reconnect_;
 }
-inline ::flwr::proto::Reconnect* PushTaskResResponse::mutable_reconnect() {
+inline ::flwr::proto::Reconnect* PushMessagesResponse::mutable_reconnect() {
   ::flwr::proto::Reconnect* _msg = _internal_mutable_reconnect();
-  // @@protoc_insertion_point(field_mutable:flwr.proto.PushTaskResResponse.reconnect)
+  // @@protoc_insertion_point(field_mutable:flwr.proto.PushMessagesResponse.reconnect)
   return _msg;
 }
-inline void PushTaskResResponse::set_allocated_reconnect(::flwr::proto::Reconnect* reconnect) {
+inline void PushMessagesResponse::set_allocated_reconnect(::flwr::proto::Reconnect* reconnect) {
   ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
   if (message_arena == nullptr) {
     delete reconnect_;
@@ -3091,270 +3060,111 @@ inline void PushTaskResResponse::set_allocated_reconnect(::flwr::proto::Reconnec
     
   }
   reconnect_ = reconnect;
-  // @@protoc_insertion_point(field_set_allocated:flwr.proto.PushTaskResResponse.reconnect)
+  // @@protoc_insertion_point(field_set_allocated:flwr.proto.PushMessagesResponse.reconnect)
 }
 
 // map<string, uint32> results = 2;
-inline int PushTaskResResponse::_internal_results_size() const {
+inline int PushMessagesResponse::_internal_results_size() const {
   return results_.size();
 }
-inline int PushTaskResResponse::results_size() const {
+inline int PushMessagesResponse::results_size() const {
   return _internal_results_size();
 }
-inline void PushTaskResResponse::clear_results() {
+inline void PushMessagesResponse::clear_results() {
   results_.Clear();
 }
 inline const ::PROTOBUF_NAMESPACE_ID::Map< std::string, ::PROTOBUF_NAMESPACE_ID::uint32 >&
-PushTaskResResponse::_internal_results() const {
+PushMessagesResponse::_internal_results() const {
   return results_.GetMap();
 }
 inline const ::PROTOBUF_NAMESPACE_ID::Map< std::string, ::PROTOBUF_NAMESPACE_ID::uint32 >&
-PushTaskResResponse::results() const {
-  // @@protoc_insertion_point(field_map:flwr.proto.PushTaskResResponse.results)
+PushMessagesResponse::results() const {
+  // @@protoc_insertion_point(field_map:flwr.proto.PushMessagesResponse.results)
   return _internal_results();
 }
 inline ::PROTOBUF_NAMESPACE_ID::Map< std::string, ::PROTOBUF_NAMESPACE_ID::uint32 >*
-PushTaskResResponse::_internal_mutable_results() {
+PushMessagesResponse::_internal_mutable_results() {
   return results_.MutableMap();
 }
 inline ::PROTOBUF_NAMESPACE_ID::Map< std::string, ::PROTOBUF_NAMESPACE_ID::uint32 >*
-PushTaskResResponse::mutable_results() {
-  // @@protoc_insertion_point(field_mutable_map:flwr.proto.PushTaskResResponse.results)
+PushMessagesResponse::mutable_results() {
+  // @@protoc_insertion_point(field_mutable_map:flwr.proto.PushMessagesResponse.results)
   return _internal_mutable_results();
 }
 
-// -------------------------------------------------------------------
-
-// Run
-
-// sint64 run_id = 1;
-inline void Run::clear_run_id() {
-  run_id_ = int64_t{0};
+// repeated string objects_to_push = 3;
+inline int PushMessagesResponse::_internal_objects_to_push_size() const {
+  return objects_to_push_.size();
 }
-inline ::PROTOBUF_NAMESPACE_ID::int64 Run::_internal_run_id() const {
-  return run_id_;
+inline int PushMessagesResponse::objects_to_push_size() const {
+  return _internal_objects_to_push_size();
 }
-inline ::PROTOBUF_NAMESPACE_ID::int64 Run::run_id() const {
-  // @@protoc_insertion_point(field_get:flwr.proto.Run.run_id)
-  return _internal_run_id();
+inline void PushMessagesResponse::clear_objects_to_push() {
+  objects_to_push_.Clear();
 }
-inline void Run::_internal_set_run_id(::PROTOBUF_NAMESPACE_ID::int64 value) {
-  
-  run_id_ = value;
-}
-inline void Run::set_run_id(::PROTOBUF_NAMESPACE_ID::int64 value) {
-  _internal_set_run_id(value);
-  // @@protoc_insertion_point(field_set:flwr.proto.Run.run_id)
-}
-
-// string fab_id = 2;
-inline void Run::clear_fab_id() {
-  fab_id_.ClearToEmpty();
-}
-inline const std::string& Run::fab_id() const {
-  // @@protoc_insertion_point(field_get:flwr.proto.Run.fab_id)
-  return _internal_fab_id();
-}
-template <typename ArgT0, typename... ArgT>
-inline PROTOBUF_ALWAYS_INLINE
-void Run::set_fab_id(ArgT0&& arg0, ArgT... args) {
- 
- fab_id_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
-  // @@protoc_insertion_point(field_set:flwr.proto.Run.fab_id)
-}
-inline std::string* Run::mutable_fab_id() {
-  std::string* _s = _internal_mutable_fab_id();
-  // @@protoc_insertion_point(field_mutable:flwr.proto.Run.fab_id)
+inline std::string* PushMessagesResponse::add_objects_to_push() {
+  std::string* _s = _internal_add_objects_to_push();
+  // @@protoc_insertion_point(field_add_mutable:flwr.proto.PushMessagesResponse.objects_to_push)
   return _s;
 }
-inline const std::string& Run::_internal_fab_id() const {
-  return fab_id_.Get();
+inline const std::string& PushMessagesResponse::_internal_objects_to_push(int index) const {
+  return objects_to_push_.Get(index);
 }
-inline void Run::_internal_set_fab_id(const std::string& value) {
-  
-  fab_id_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+inline const std::string& PushMessagesResponse::objects_to_push(int index) const {
+  // @@protoc_insertion_point(field_get:flwr.proto.PushMessagesResponse.objects_to_push)
+  return _internal_objects_to_push(index);
 }
-inline std::string* Run::_internal_mutable_fab_id() {
-  
-  return fab_id_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+inline std::string* PushMessagesResponse::mutable_objects_to_push(int index) {
+  // @@protoc_insertion_point(field_mutable:flwr.proto.PushMessagesResponse.objects_to_push)
+  return objects_to_push_.Mutable(index);
 }
-inline std::string* Run::release_fab_id() {
-  // @@protoc_insertion_point(field_release:flwr.proto.Run.fab_id)
-  return fab_id_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+inline void PushMessagesResponse::set_objects_to_push(int index, const std::string& value) {
+  objects_to_push_.Mutable(index)->assign(value);
+  // @@protoc_insertion_point(field_set:flwr.proto.PushMessagesResponse.objects_to_push)
 }
-inline void Run::set_allocated_fab_id(std::string* fab_id) {
-  if (fab_id != nullptr) {
-    
-  } else {
-    
-  }
-  fab_id_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), fab_id,
-      GetArenaForAllocation());
-  // @@protoc_insertion_point(field_set_allocated:flwr.proto.Run.fab_id)
+inline void PushMessagesResponse::set_objects_to_push(int index, std::string&& value) {
+  objects_to_push_.Mutable(index)->assign(std::move(value));
+  // @@protoc_insertion_point(field_set:flwr.proto.PushMessagesResponse.objects_to_push)
 }
-
-// string fab_version = 3;
-inline void Run::clear_fab_version() {
-  fab_version_.ClearToEmpty();
+inline void PushMessagesResponse::set_objects_to_push(int index, const char* value) {
+  GOOGLE_DCHECK(value != nullptr);
+  objects_to_push_.Mutable(index)->assign(value);
+  // @@protoc_insertion_point(field_set_char:flwr.proto.PushMessagesResponse.objects_to_push)
 }
-inline const std::string& Run::fab_version() const {
-  // @@protoc_insertion_point(field_get:flwr.proto.Run.fab_version)
-  return _internal_fab_version();
+inline void PushMessagesResponse::set_objects_to_push(int index, const char* value, size_t size) {
+  objects_to_push_.Mutable(index)->assign(
+    reinterpret_cast<const char*>(value), size);
+  // @@protoc_insertion_point(field_set_pointer:flwr.proto.PushMessagesResponse.objects_to_push)
 }
-template <typename ArgT0, typename... ArgT>
-inline PROTOBUF_ALWAYS_INLINE
-void Run::set_fab_version(ArgT0&& arg0, ArgT... args) {
- 
- fab_version_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
-  // @@protoc_insertion_point(field_set:flwr.proto.Run.fab_version)
+inline std::string* PushMessagesResponse::_internal_add_objects_to_push() {
+  return objects_to_push_.Add();
 }
-inline std::string* Run::mutable_fab_version() {
-  std::string* _s = _internal_mutable_fab_version();
-  // @@protoc_insertion_point(field_mutable:flwr.proto.Run.fab_version)
-  return _s;
+inline void PushMessagesResponse::add_objects_to_push(const std::string& value) {
+  objects_to_push_.Add()->assign(value);
+  // @@protoc_insertion_point(field_add:flwr.proto.PushMessagesResponse.objects_to_push)
 }
-inline const std::string& Run::_internal_fab_version() const {
-  return fab_version_.Get();
+inline void PushMessagesResponse::add_objects_to_push(std::string&& value) {
+  objects_to_push_.Add(std::move(value));
+  // @@protoc_insertion_point(field_add:flwr.proto.PushMessagesResponse.objects_to_push)
 }
-inline void Run::_internal_set_fab_version(const std::string& value) {
-  
-  fab_version_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+inline void PushMessagesResponse::add_objects_to_push(const char* value) {
+  GOOGLE_DCHECK(value != nullptr);
+  objects_to_push_.Add()->assign(value);
+  // @@protoc_insertion_point(field_add_char:flwr.proto.PushMessagesResponse.objects_to_push)
 }
-inline std::string* Run::_internal_mutable_fab_version() {
-  
-  return fab_version_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+inline void PushMessagesResponse::add_objects_to_push(const char* value, size_t size) {
+  objects_to_push_.Add()->assign(reinterpret_cast<const char*>(value), size);
+  // @@protoc_insertion_point(field_add_pointer:flwr.proto.PushMessagesResponse.objects_to_push)
 }
-inline std::string* Run::release_fab_version() {
-  // @@protoc_insertion_point(field_release:flwr.proto.Run.fab_version)
-  return fab_version_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>&
+PushMessagesResponse::objects_to_push() const {
+  // @@protoc_insertion_point(field_list:flwr.proto.PushMessagesResponse.objects_to_push)
+  return objects_to_push_;
 }
-inline void Run::set_allocated_fab_version(std::string* fab_version) {
-  if (fab_version != nullptr) {
-    
-  } else {
-    
-  }
-  fab_version_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), fab_version,
-      GetArenaForAllocation());
-  // @@protoc_insertion_point(field_set_allocated:flwr.proto.Run.fab_version)
-}
-
-// -------------------------------------------------------------------
-
-// GetRunRequest
-
-// sint64 run_id = 1;
-inline void GetRunRequest::clear_run_id() {
-  run_id_ = int64_t{0};
-}
-inline ::PROTOBUF_NAMESPACE_ID::int64 GetRunRequest::_internal_run_id() const {
-  return run_id_;
-}
-inline ::PROTOBUF_NAMESPACE_ID::int64 GetRunRequest::run_id() const {
-  // @@protoc_insertion_point(field_get:flwr.proto.GetRunRequest.run_id)
-  return _internal_run_id();
-}
-inline void GetRunRequest::_internal_set_run_id(::PROTOBUF_NAMESPACE_ID::int64 value) {
-  
-  run_id_ = value;
-}
-inline void GetRunRequest::set_run_id(::PROTOBUF_NAMESPACE_ID::int64 value) {
-  _internal_set_run_id(value);
-  // @@protoc_insertion_point(field_set:flwr.proto.GetRunRequest.run_id)
-}
-
-// -------------------------------------------------------------------
-
-// GetRunResponse
-
-// .flwr.proto.Run run = 1;
-inline bool GetRunResponse::_internal_has_run() const {
-  return this != internal_default_instance() && run_ != nullptr;
-}
-inline bool GetRunResponse::has_run() const {
-  return _internal_has_run();
-}
-inline void GetRunResponse::clear_run() {
-  if (GetArenaForAllocation() == nullptr && run_ != nullptr) {
-    delete run_;
-  }
-  run_ = nullptr;
-}
-inline const ::flwr::proto::Run& GetRunResponse::_internal_run() const {
-  const ::flwr::proto::Run* p = run_;
-  return p != nullptr ? *p : reinterpret_cast<const ::flwr::proto::Run&>(
-      ::flwr::proto::_Run_default_instance_);
-}
-inline const ::flwr::proto::Run& GetRunResponse::run() const {
-  // @@protoc_insertion_point(field_get:flwr.proto.GetRunResponse.run)
-  return _internal_run();
-}
-inline void GetRunResponse::unsafe_arena_set_allocated_run(
-    ::flwr::proto::Run* run) {
-  if (GetArenaForAllocation() == nullptr) {
-    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(run_);
-  }
-  run_ = run;
-  if (run) {
-    
-  } else {
-    
-  }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:flwr.proto.GetRunResponse.run)
-}
-inline ::flwr::proto::Run* GetRunResponse::release_run() {
-  
-  ::flwr::proto::Run* temp = run_;
-  run_ = nullptr;
-#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
-  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
-  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
-  if (GetArenaForAllocation() == nullptr) { delete old; }
-#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
-  if (GetArenaForAllocation() != nullptr) {
-    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
-  }
-#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
-  return temp;
-}
-inline ::flwr::proto::Run* GetRunResponse::unsafe_arena_release_run() {
-  // @@protoc_insertion_point(field_release:flwr.proto.GetRunResponse.run)
-  
-  ::flwr::proto::Run* temp = run_;
-  run_ = nullptr;
-  return temp;
-}
-inline ::flwr::proto::Run* GetRunResponse::_internal_mutable_run() {
-  
-  if (run_ == nullptr) {
-    auto* p = CreateMaybeMessage<::flwr::proto::Run>(GetArenaForAllocation());
-    run_ = p;
-  }
-  return run_;
-}
-inline ::flwr::proto::Run* GetRunResponse::mutable_run() {
-  ::flwr::proto::Run* _msg = _internal_mutable_run();
-  // @@protoc_insertion_point(field_mutable:flwr.proto.GetRunResponse.run)
-  return _msg;
-}
-inline void GetRunResponse::set_allocated_run(::flwr::proto::Run* run) {
-  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
-  if (message_arena == nullptr) {
-    delete run_;
-  }
-  if (run) {
-    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
-        ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper<::flwr::proto::Run>::GetOwningArena(run);
-    if (message_arena != submessage_arena) {
-      run = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
-          message_arena, run, submessage_arena);
-    }
-    
-  } else {
-    
-  }
-  run_ = run;
-  // @@protoc_insertion_point(field_set_allocated:flwr.proto.GetRunResponse.run)
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>*
+PushMessagesResponse::mutable_objects_to_push() {
+  // @@protoc_insertion_point(field_mutable_list:flwr.proto.PushMessagesResponse.objects_to_push)
+  return &objects_to_push_;
 }
 
 // -------------------------------------------------------------------
@@ -3384,8 +3194,6 @@ inline void Reconnect::set_reconnect(::PROTOBUF_NAMESPACE_ID::uint64 value) {
 #ifdef __GNUC__
   #pragma GCC diagnostic pop
 #endif  // __GNUC__
-// -------------------------------------------------------------------
-
 // -------------------------------------------------------------------
 
 // -------------------------------------------------------------------
