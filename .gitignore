@@ -7,6 +7,11 @@ framework/docs/source/dataset/
 flwr_logs
 .cache
 
+# Local GitHub Actions runs with act
+.github/act/*.local
+.github/act/events/*.local.json
+.github/act/profiles/*.local
+
 # Node.js
 node_modules
 

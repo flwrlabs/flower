@@ -1,0 +1,41 @@
+{
+  "action": "opened",
+  "number": 1,
+  "pull_request": {
+    "number": 1,
+    "title": "ci(devtool): Add act smoke test harness",
+    "base": {
+      "ref": "main",
+      "repo": {
+        "default_branch": "main",
+        "full_name": "flwrlabs/flower",
+        "name": "flower",
+        "owner": {
+          "login": "flwrlabs"
+        }
+      }
+    },
+    "head": {
+      "ref": "act-local",
+      "repo": {
+        "fork": false,
+        "full_name": "flwrlabs/flower",
+        "name": "flower",
+        "owner": {
+          "login": "flwrlabs"
+        }
+      }
+    }
+  },
+  "repository": {
+    "default_branch": "main",
+    "full_name": "flwrlabs/flower",
+    "name": "flower",
+    "owner": {
+      "login": "flwrlabs"
+    }
+  },
+  "sender": {
+    "login": "act"
+  }
+}
