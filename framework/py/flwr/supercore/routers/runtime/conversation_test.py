@@ -22,9 +22,9 @@ from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate import CoreState
-from flwr.supercore.typing import ConversationSummary
+from flwr.supercore.typing import ConversationSummary, JSONObject
 
-from .conversation import load_conversation
+from .conversation import assemble_input, load_conversation
 
 
 def _state() -> Mock:
@@ -84,3 +84,79 @@ def test_load_conversation_rejects_unknown_series() -> None:
         load_conversation(state, 42)
 
     state.get_task_events.assert_not_called()
+
+
+def test_assemble_input_preserves_order_and_unwraps_response() -> None:
+    """Keep raw calls and replies in order without forwarding event wrappers."""
+    summary = ConversationSummary("Earlier decision", through_event_id=4)
+    events = [
+        TaskEvent(
+            id=5,
+            event="message",
+            data='{"type":"message","role":"user","content":"Find the record"}',
+        ),
+        TaskEvent(
+            id=6,
+            event="function_call",
+            data='{"type":"function_call","call_id":"call-1","name":"search",'
+            '"arguments":"{}"}',
+        ),
+        TaskEvent(
+            id=7,
+            event="function_call_output",
+            data='{"type":"function_call_output","call_id":"call-1",'
+            '"output":"Found it"}',
+        ),
+        TaskEvent(
+            id=8,
+            event="response.completed",
+            data='{"type":"response.completed","response":{"output":['
+            '{"type":"message","role":"assistant","content":'
+            '[{"type":"output_text","text":"Record found"}]}]}}',
+        ),
+    ]
+    new_input: list[JSONObject] = [
+        {"type": "message", "role": "user", "content": "What next?"}
+    ]
+
+    result = assemble_input(events, new_input, summary=summary)
+
+    assert result == [
+        {
+            "type": "message",
+            "role": "user",
+            "content": "Summary of earlier conversation:\nEarlier decision",
+        },
+        {"type": "message", "role": "user", "content": "Find the record"},
+        {
+            "type": "function_call",
+            "call_id": "call-1",
+            "name": "search",
+            "arguments": "{}",
+        },
+        {"type": "function_call_output", "call_id": "call-1", "output": "Found it"},
+        {
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "output_text", "text": "Record found"}],
+        },
+        *new_input,
+    ]
+    assert new_input == [{"type": "message", "role": "user", "content": "What next?"}]
+
+
+def test_assemble_input_accepts_string_without_summary() -> None:
+    """Wrap a string request as the final user message."""
+    assert assemble_input([], "Hello") == [
+        {"type": "message", "role": "user", "content": "Hello"}
+    ]
+
+
+def test_assemble_input_rejects_incomplete_response_event() -> None:
+    """Do not silently lose a stored response with no output."""
+    event = TaskEvent(
+        id=8, event="response.completed", data='{"type":"response.completed"}'
+    )
+
+    with pytest.raises(ValueError, match="Task event 8 has no response output"):
+        assemble_input([event], "Next")
