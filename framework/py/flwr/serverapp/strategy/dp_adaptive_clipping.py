@@ -105,9 +105,11 @@ class DifferentialPrivacyAdaptiveBase(Strategy, ABC):
     def _noisy_fraction(self, count: int, total: int) -> float:
         return float(np.random.normal(count, self.clipped_count_stddev)) / float(total)
 
-    def _geometric_update(self, clipped_fraction: float) -> None:
+    def _geometric_update(self, unclipped_fraction: float) -> None:
+        # Andrew et al., Algorithm 1: b_i = 1 for updates that were *not* clipped, so
+        # the norm settles where `target_clipped_quantile` of the updates fit under it.
         self.clipping_norm *= math.exp(
-            -self.clip_norm_lr * (clipped_fraction - self.target_clipped_quantile)
+            -self.clip_norm_lr * (unclipped_fraction - self.target_clipped_quantile)
         )
 
     def configure_evaluate(
@@ -210,10 +212,10 @@ class DifferentialPrivacyServerSideAdaptiveClipping(DifferentialPrivacyAdaptiveB
                 self.clipping_norm,
             )
 
-        clipped_fraction = self._noisy_fraction(
-            clipped_indicator_count, len(replies_list)
+        unclipped_fraction = self._noisy_fraction(
+            len(replies_list) - clipped_indicator_count, len(replies_list)
         )
-        self._geometric_update(clipped_fraction)
+        self._geometric_update(unclipped_fraction)
 
         aggregated_arrays, aggregated_metrics = self.strategy.aggregate_train(
             server_round, replies_list
@@ -340,5 +342,5 @@ class DifferentialPrivacyClientSideAdaptiveClipping(DifferentialPrivacyAdaptiveB
                 ):
                     clipped_count += int(bool(msg.content.metrics[KEY_NORM_BIT]))
 
-        clipped_fraction = self._noisy_fraction(clipped_count, total)
-        self._geometric_update(clipped_fraction)
+        unclipped_fraction = self._noisy_fraction(total - clipped_count, total)
+        self._geometric_update(unclipped_fraction)
