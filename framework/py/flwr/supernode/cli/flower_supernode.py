@@ -406,7 +406,8 @@ def _parse_args_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--superlink",
         default=SUPERLINK_DEFAULT_CLIENT_ADDRESS,
-        help="SuperLink Fleet API address (IPv4, IPv6, or a domain name).",
+        help="SuperLink Fleet API address as host:port (IPv4, IPv6, or a domain "
+        "name), without a URL prefix. HTTPS is enabled by default.",
     )
     parser.add_argument(
         "--max-retries",

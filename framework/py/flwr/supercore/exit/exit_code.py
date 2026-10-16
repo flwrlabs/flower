@@ -173,7 +173,8 @@ EXIT_CODE_HELP = {
     ),
     # Common exit codes (600-699)
     ExitCode.COMMON_ADDRESS_INVALID: (
-        "Please provide a valid URL, IPv4 or IPv6 address."
+        "Please provide a domain name, IPv4 or IPv6 address with a port, "
+        "without a URL prefix (e.g. api.flower.ai:443)."
     ),
     ExitCode.COMMON_TLS_NOT_SUPPORTED: "Please use the '--insecure' flag.",
     ExitCode.COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE: (
