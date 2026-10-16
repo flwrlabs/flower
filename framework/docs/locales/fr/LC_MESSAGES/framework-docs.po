@@ -31909,10 +31909,10 @@ msgstr "``flwr/supernode:XYZ``: Utilisez l'image officielle SuperNode Docker."
 
 #: ../../source/how-to-connect-supernodes-to-supergrid.rst:167
 msgid ""
-"``--superlink fleet-supergrid.flower.ai:443``: Connect the SuperNode to "
+"``--superlink api.flower.ai:443``: Connect the SuperNode to "
 "SuperGrid."
 msgstr ""
-"``--superlink fleet-supergrid.flower.ai:443``: Connectez le SuperNode à "
+"``--superlink api.flower.ai:443``: Connectez le SuperNode à "
 "SuperGrid."
 
 #: ../../source/how-to-connect-supernodes-to-supergrid.rst:169
