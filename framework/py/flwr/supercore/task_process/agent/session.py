@@ -38,12 +38,15 @@ from flwr.common.serde import message_from_proto, message_to_proto
 
 # pylint: disable=E0611
 from flwr.proto.control_pb2 import StartAutomationRequest, StartRunRequest
+from flwr.proto.runseries_pb2 import CompactedContext
 from flwr.proto.runtime_pb2 import (
     CreateTaskRequest,
+    GetCompactedContextsRequest,
     GetRunSeriesEventsRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskMessageRequest,
+    PutCompactedContextRequest,
 )
 from flwr.proto.task_pb2 import TaskEvent
 
@@ -119,6 +122,67 @@ class RuntimeAgentEvents(AgentEvents):
             for event in response.events
         ]
 
+    def get_compacted_contexts(
+        self, *, limit: int = 1, before_context_id: int | None = None
+    ) -> list[JSONObject]:
+        """Get summaries from the current run series and emit their IDs."""
+        response = self._stub.GetCompactedContexts(
+            GetCompactedContextsRequest(
+                limit=limit, before_context_id=before_context_id
+            )
+        )
+        self._emit_compacted_context_event(
+            {
+                "type": "compacted_contexts.get.completed",
+                "context_ids": [context.id for context in response.contexts],
+            }
+        )
+        return [
+            {
+                "id": context.id,
+                "series_id": context.series_id,
+                "through_event_id": context.through_event_id,
+                "text": context.text,
+                "created_at": context.created_at,
+            }
+            for context in response.contexts
+        ]
+
+    def put_compacted_context(self, *, through_event_id: int, text: str) -> None:
+        """Store a summary and emit the write outcome."""
+        self._emit_compacted_context_event(
+            {
+                "type": "compacted_context.put.started",
+                "through_event_id": through_event_id,
+            }
+        )
+        try:
+            self._stub.PutCompactedContext(
+                PutCompactedContextRequest(
+                    context=CompactedContext(
+                        through_event_id=through_event_id, text=text
+                    )
+                )
+            )
+        except Exception as exc:
+            event: JSONObject = {
+                "type": "compacted_context.put.failed",
+                "through_event_id": through_event_id,
+                "error_type": type(exc).__name__,
+            }
+            if isinstance(exc, HTTPStatusError):
+                error = FlowerError.from_json(exc.response.text)
+                if error is not None:
+                    event["error_code"] = error.code
+            self._emit_compacted_context_event(event)
+            raise
+        self._emit_compacted_context_event(
+            {
+                "type": "compacted_context.put.succeeded",
+                "through_event_id": through_event_id,
+            }
+        )
+
     def emit(self, event: JSONObject) -> None:
         """Queue one event for publication to run-event subscribers."""
         if self._closed:
@@ -187,6 +251,13 @@ class RuntimeAgentEvents(AgentEvents):
             error = self._error
         if error is not None:
             raise RuntimeError("Failed to publish AgentApp events.") from error
+
+    def _emit_compacted_context_event(self, event: JSONObject) -> None:
+        """Keep event publication failures from changing summary request outcomes."""
+        try:
+            self.emit(event)
+        except Exception:  # pylint: disable=broad-exception-caught
+            log(ERROR, "Failed to publish compacted context event.", exc_info=True)
 
 
 class RuntimeAgentSession(AgentSession):

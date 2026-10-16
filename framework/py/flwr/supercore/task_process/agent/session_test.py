@@ -27,14 +27,18 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationResponse,
     StartRunRequest,
 )
+from flwr.proto.runseries_pb2 import CompactedContext  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     CreateTaskResponse,
+    GetCompactedContextsRequest,
+    GetCompactedContextsResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
     PushTaskEventsRequest,
+    PutCompactedContextRequest,
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
@@ -193,6 +197,117 @@ def test_get_trace_without_filters_requests_all_events() -> None:
     events.close()
 
     stub.GetRunSeriesEvents.assert_called_once_with(GetRunSeriesEventsRequest())
+
+
+def test_get_compacted_contexts_emits_returned_ids() -> None:
+    """Return summaries and emit their IDs."""
+    stub = Mock()
+    stub.GetCompactedContexts.return_value = GetCompactedContextsResponse(
+        contexts=[
+            CompactedContext(
+                id=12,
+                series_id=42,
+                through_event_id=9,
+                text="Private summary",
+                created_at="2026-10-16T12:00:00+00:00",
+            )
+        ]
+    )
+    events = RuntimeAgentEvents(stub)
+
+    with patch.object(events, "emit") as emit:
+        contexts = events.get_compacted_contexts(limit=2, before_context_id=20)
+    events.close()
+
+    stub.GetCompactedContexts.assert_called_once_with(
+        GetCompactedContextsRequest(limit=2, before_context_id=20)
+    )
+    assert contexts == [
+        {
+            "id": 12,
+            "series_id": 42,
+            "through_event_id": 9,
+            "text": "Private summary",
+            "created_at": "2026-10-16T12:00:00+00:00",
+        }
+    ]
+    emit.assert_called_once_with(
+        {"type": "compacted_contexts.get.completed", "context_ids": [12]}
+    )
+
+
+def test_put_compacted_context_emits_start_and_success() -> None:
+    """Emit events before and after a successful write."""
+    stub = Mock()
+    events = RuntimeAgentEvents(stub)
+    order: list[JSONObject | str] = []
+
+    def record_emit(event: JSONObject) -> None:
+        order.append(event)
+
+    stub.PutCompactedContext.side_effect = lambda _request: order.append("request")
+
+    with patch.object(events, "emit", side_effect=record_emit):
+        events.put_compacted_context(through_event_id=9, text="Private summary")
+    events.close()
+
+    assert order == [
+        {"type": "compacted_context.put.started", "through_event_id": 9},
+        "request",
+        {"type": "compacted_context.put.succeeded", "through_event_id": 9},
+    ]
+    stub.PutCompactedContext.assert_called_once_with(
+        PutCompactedContextRequest(
+            context=CompactedContext(through_event_id=9, text="Private summary")
+        )
+    )
+
+
+def test_put_compacted_context_emits_failure_and_reraises() -> None:
+    """Emit a safe error code and re-raise the request failure."""
+    stub = Mock()
+    request = httpx.Request("POST", "https://example.com/put-compacted-context")
+    response = httpx.Response(
+        409,
+        json={
+            "code": ApiErrorCode.RUNTIME_COMPACTED_CONTEXT_ALREADY_EXISTS,
+            "detail": "Compacted context already exists.",
+        },
+        request=request,
+    )
+    error = httpx.HTTPStatusError("Duplicate", request=request, response=response)
+    stub.PutCompactedContext.side_effect = error
+    events = RuntimeAgentEvents(stub)
+
+    with patch.object(events, "emit") as emit:
+        with pytest.raises(httpx.HTTPStatusError) as caught:
+            events.put_compacted_context(through_event_id=9, text="Private summary")
+    events.close()
+
+    assert caught.value is error
+    assert emit.call_args_list == [
+        call({"type": "compacted_context.put.started", "through_event_id": 9}),
+        call(
+            {
+                "type": "compacted_context.put.failed",
+                "through_event_id": 9,
+                "error_type": "HTTPStatusError",
+                "error_code": ApiErrorCode.RUNTIME_COMPACTED_CONTEXT_ALREADY_EXISTS,
+            }
+        ),
+    ]
+
+
+def test_context_event_failure_does_not_change_write_outcome() -> None:
+    """A failed event publisher must not turn a successful write into an error."""
+    stub = Mock()
+    events = RuntimeAgentEvents(stub)
+
+    with patch.object(events, "emit", side_effect=RuntimeError("Publisher failed")):
+        events.put_compacted_context(through_event_id=9, text="Summary")
+    events.close()
+
+    stub.PutCompactedContext.assert_called_once()
 
 
 def test_agent_events_and_connector_items_use_same_publisher() -> None:
