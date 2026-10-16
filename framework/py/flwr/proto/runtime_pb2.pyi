@@ -351,16 +351,9 @@ global___PutCompactedContextRequest = PutCompactedContextRequest
 class PutCompactedContextResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    CONTEXT_FIELD_NUMBER: builtins.int
-    @property
-    def context(self) -> flwr.proto.runseries_pb2.CompactedContext: ...
     def __init__(
         self,
-        *,
-        context: flwr.proto.runseries_pb2.CompactedContext | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["context", b"context"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["context", b"context"]) -> None: ...
 
 global___PutCompactedContextResponse = PutCompactedContextResponse
 

@@ -60,6 +60,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
+    PutCompactedContextRequest,
+    PutCompactedContextResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
@@ -113,6 +115,20 @@ def get_compacted_contexts(
             ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
         )
     return core_runtime_handlers.get_compacted_contexts(
+        request, state, runs[0].series_id
+    )
+
+
+def put_compacted_context(
+    request: PutCompactedContextRequest, state: LinkState, task: Task
+) -> PutCompactedContextResponse:
+    """Store a summary for the authenticated task's run series."""
+    runs = state.get_run_info(run_ids=[task.run_id])
+    if not runs:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
+        )
+    return core_runtime_handlers.put_compacted_context(
         request, state, runs[0].series_id
     )
 

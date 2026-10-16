@@ -43,6 +43,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectRequest,
 )
 from flwr.proto.node_pb2 import Node, NodeInfo  # pylint: disable=E0611
+from flwr.proto.runseries_pb2 import CompactedContext  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     CreateTaskRequest,
@@ -61,6 +62,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
+    PutCompactedContextRequest,
 )
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
@@ -218,6 +220,19 @@ def test_get_compacted_contexts_uses_authenticated_series() -> None:
     state.get_compacted_contexts.assert_called_once_with(
         456, limit=1, before_context_id=None
     )
+
+
+def test_put_compacted_context_uses_authenticated_series() -> None:
+    """Summary writes use the authenticated task's series."""
+    state = Mock(spec=LinkState)
+    state.get_run_info.return_value = [Mock(series_id=456)]
+    request = PutCompactedContextRequest(
+        context=CompactedContext(through_event_id=9, text="Summary")
+    )
+
+    runtime_handlers.put_compacted_context(request, state, Task(run_id=123))
+
+    state.store_compacted_context.assert_called_once_with(456, 9, "Summary")
 
 
 def _create_shared_runtime(

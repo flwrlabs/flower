@@ -81,7 +81,7 @@ message GetCompactedContextsResponse { repeated CompactedContext contexts = 1; }
 
 // PutCompactedContext messages
 message PutCompactedContextRequest { CompactedContext context = 1; }
-message PutCompactedContextResponse { CompactedContext context = 1; }
+message PutCompactedContextResponse {}
 
 // PullTaskMessage messages
 message PullTaskMessageRequest {

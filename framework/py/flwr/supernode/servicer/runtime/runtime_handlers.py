@@ -57,6 +57,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
+    PutCompactedContextRequest,
+    PutCompactedContextResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
@@ -282,6 +284,18 @@ def get_compacted_contexts(
             ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
         )
     return core_runtime_handlers.get_compacted_contexts(request, state, run.series_id)
+
+
+def put_compacted_context(
+    request: PutCompactedContextRequest, state: NodeState, task: Task
+) -> PutCompactedContextResponse:
+    """Store a summary for the authenticated task's run series."""
+    run = state.get_run(task.run_id)
+    if run is None:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
+        )
+    return core_runtime_handlers.put_compacted_context(request, state, run.series_id)
 
 
 def start_automation(

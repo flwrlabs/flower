@@ -25,12 +25,17 @@ from google.protobuf.message import Message
 from httpx import Response
 from pytest import MonkeyPatch
 
+from flwr.proto.runseries_pb2 import CompactedContext  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
+    GetCompactedContextsRequest,
+    GetCompactedContextsResponse,
     GetNodesRequest,
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    PutCompactedContextRequest,
+    PutCompactedContextResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
@@ -202,6 +207,47 @@ def test_get_run_series_events_delegates_with_authenticated_task(
 
     assert response.status_code == 200
     assert GetRunSeriesEventsResponse.FromString(response.content) == expected
+    handler.assert_called_once_with(request, state, task)
+
+
+def test_get_compacted_contexts_delegates_with_authenticated_task(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """The summary route passes the authenticated task to its handler."""
+    state = Mock(spec=LinkState)
+    task = Task(task_id=123)
+    client = TestClient(_create_app(state, task=task))
+    request = GetCompactedContextsRequest()
+    expected = GetCompactedContextsResponse()
+    handler = Mock(return_value=expected)
+    monkeypatch.setattr(runtime_handlers, "get_compacted_contexts", handler)
+
+    response = _post(client, "/v1/runtime/get-compacted-contexts", request)
+
+    assert response.status_code == 200
+    assert GetCompactedContextsResponse.FromString(response.content) == expected
+    handler.assert_called_once_with(request, state, task)
+
+
+def test_put_compacted_context_delegates_with_authenticated_task(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """The summary write route passes the authenticated task to its handler."""
+    state = Mock(spec=LinkState)
+    task = Task(task_id=123)
+    client = TestClient(_create_app(state, task=task))
+    request = PutCompactedContextRequest(
+        context=CompactedContext(through_event_id=9, text="Summary")
+    )
+    handler = Mock(return_value=PutCompactedContextResponse())
+    monkeypatch.setattr(runtime_handlers, "put_compacted_context", handler)
+
+    response = _post(client, "/v1/runtime/put-compacted-context", request)
+
+    assert response.status_code == 200
+    assert (
+        PutCompactedContextResponse.FromString(response.content) == handler.return_value
+    )
     handler.assert_called_once_with(request, state, task)
 
 

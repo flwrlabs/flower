@@ -20,6 +20,9 @@ from logging import ERROR
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from fastapi import status
+from sqlalchemy.exc import IntegrityError
+
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.serde import message_to_proto
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
@@ -36,6 +39,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskEventsRequest,
     PushTaskEventsResponse,
     PushTaskMessageRequest,
+    PutCompactedContextRequest,
     RecordTaskUsageRequest,
     SendTaskHeartbeatRequest,
 )
@@ -43,6 +47,7 @@ from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
 from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 from . import runtime_handlers
@@ -78,6 +83,57 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             error.exception.code,
             ApiErrorCode.RUNTIME_INVALID_COMPACTED_CONTEXT_REQUEST,
+        )
+
+    def test_put_compacted_context(self) -> None:
+        """Store only a valid summary for the authenticated series."""
+        request = PutCompactedContextRequest(
+            context=CompactedContext(series_id=42, through_event_id=9, text="Summary")
+        )
+
+        response = runtime_handlers.put_compacted_context(request, self.state, 42)
+
+        self.assertFalse(response.ListFields())
+        self.state.store_compacted_context.assert_called_once_with(42, 9, "Summary")
+
+        request.context.series_id = 43
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.put_compacted_context(request, self.state, 42)
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_INVALID_COMPACTED_CONTEXT_REQUEST,
+        )
+        self.state.store_compacted_context.assert_called_once()
+
+        with self.assertRaises(FlowerError):
+            runtime_handlers.put_compacted_context(
+                PutCompactedContextRequest(), self.state, 42
+            )
+
+    def test_put_compacted_context_rejects_duplicates(self) -> None:
+        """Map duplicate writes from either backend to a conflict response."""
+        request = PutCompactedContextRequest(
+            context=CompactedContext(through_event_id=9, text="Summary")
+        )
+        errors = (
+            ValueError("Duplicate"),
+            IntegrityError("INSERT", {}, Exception("Duplicate")),
+        )
+
+        for error in errors:
+            with self.subTest(error=type(error).__name__):
+                self.state.store_compacted_context.side_effect = error
+                with self.assertRaises(FlowerError) as caught:
+                    runtime_handlers.put_compacted_context(request, self.state, 42)
+                self.assertEqual(
+                    caught.exception.code,
+                    ApiErrorCode.RUNTIME_COMPACTED_CONTEXT_ALREADY_EXISTS,
+                )
+        self.assertEqual(
+            API_ERROR_MAP[
+                ApiErrorCode.RUNTIME_COMPACTED_CONTEXT_ALREADY_EXISTS
+            ].http_status_code,
+            status.HTTP_409_CONFLICT,
         )
 
     def _create_connector_task(self, connector_ref: str) -> CreateTaskResponse:

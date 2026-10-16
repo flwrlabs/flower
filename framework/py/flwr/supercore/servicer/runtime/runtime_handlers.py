@@ -18,6 +18,8 @@
 
 from logging import DEBUG, ERROR
 
+from sqlalchemy.exc import IntegrityError
+
 from flwr.common.constant import Status
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
@@ -37,6 +39,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskEventsResponse,
     PushTaskMessageRequest,
     PushTaskMessageResponse,
+    PutCompactedContextRequest,
+    PutCompactedContextResponse,
     RecordTaskUsageRequest,
     RecordTaskUsageResponse,
     SendTaskHeartbeatRequest,
@@ -74,6 +78,32 @@ def get_compacted_contexts(
         ),
     )
     return GetCompactedContextsResponse(contexts=contexts)
+
+
+def put_compacted_context(
+    request: PutCompactedContextRequest, state: CoreState, series_id: int
+) -> PutCompactedContextResponse:
+    """Store a compacted context in the authenticated task's series."""
+    if not request.HasField("context") or not request.context.text:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_COMPACTED_CONTEXT_REQUEST,
+            "Compacted context text is required.",
+        )
+    context = request.context
+    if context.series_id and context.series_id != series_id:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_COMPACTED_CONTEXT_REQUEST,
+            "Compacted context series does not match the authenticated task.",
+        )
+    try:
+        state.store_compacted_context(series_id, context.through_event_id, context.text)
+    except (ValueError, IntegrityError) as exc:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_COMPACTED_CONTEXT_ALREADY_EXISTS,
+            f"Compacted context already exists for series {series_id} "
+            f"and event {context.through_event_id}.",
+        ) from exc
+    return PutCompactedContextResponse()
 
 
 def acquire_task(request: AcquireTaskRequest, state: CoreState) -> AcquireTaskResponse:

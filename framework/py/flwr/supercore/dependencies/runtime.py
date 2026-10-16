@@ -49,6 +49,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
+    PutCompactedContextRequest,
+    PutCompactedContextResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
@@ -141,6 +143,11 @@ class RuntimeHandlers(Protocol[StateT_contra]):
         self, request: GetCompactedContextsRequest, state: StateT_contra, task: Task
     ) -> GetCompactedContextsResponse:
         """Get summaries from the authenticated task's run series."""
+
+    def put_compacted_context(
+        self, request: PutCompactedContextRequest, state: StateT_contra, task: Task
+    ) -> PutCompactedContextResponse:
+        """Store a summary in the authenticated task's run series."""
 
 
 def get_runtime_state(request: Request) -> CoreState:
