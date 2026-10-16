@@ -17,6 +17,9 @@
 CONNECTOR_PACKAGES: tuple[str, ...] = (
     "flwr.supercore.task_process.connector.attio",
     "flwr.supercore.task_process.connector.github",
+    "flwr.supercore.task_process.connector.gmail",
+    "flwr.supercore.task_process.connector.google_calendar",
+    "flwr.supercore.task_process.connector.google_drive",
     "flwr.supercore.task_process.connector.notion",
     "flwr.supercore.task_process.connector.slack",
 )
