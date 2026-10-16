@@ -42,6 +42,7 @@ def test_exchange_records_absolute_expiry() -> None:
     response.json.return_value = {
         "access_token": "token",
         "refresh_token": "refresh",
+        "token_type": "bearer",
         "expires_in": 3600,
     }
     with (
@@ -52,12 +53,15 @@ def test_exchange_records_absolute_expiry() -> None:
         ),
     ):
         credentials, _ = _flow().exchange_code(
-            code="code", redirect_uri="https://example.com/callback", pkce_verifier=None
+            code="code",
+            redirect_uri="https://example.com/callback",
+            pkce_verifier="verifier",
         )
 
     assert credentials == {
         "access_token": "token",
         "refresh_token": "refresh",
+        "token_type": "bearer",
         "expires_in": 3600,
         "expires_at": 4600,
     }

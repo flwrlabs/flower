@@ -81,6 +81,7 @@ class OAuth2Definition:
     success_field: str | None = None
     use_pkce: bool = False
     authorization_params: Mapping[str, str] = field(default_factory=dict)
+    token_params: Mapping[str, str] = field(default_factory=dict)
     token_request_format: Literal["form", "json"] = "form"
     token_headers: Mapping[str, str] = field(default_factory=dict)
     config_fields: tuple[str, ...] = ()

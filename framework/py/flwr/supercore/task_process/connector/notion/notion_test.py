@@ -12,482 +12,135 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the Notion connector."""
+"""Essential tests for Notion MCP and OAuth."""
 
+import traceback
 from typing import cast
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, call, patch
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+from mcp import ClientSession, types
 
 from flwr.supercore.typing import JSONObject
 
 from .. import registry
-from ..definition import ActionAccess
 from ..oauth import OAuthFlow
-from .actions import ACTIONS
-from .definition import NOTION_CONNECTOR_REF, PROVIDER
-from .executors import NotionApiError
+from . import mcp
+from .definition import PROVIDER
 
-_HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
-_OAUTH_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
-_CREDENTIALS: JSONObject = {"access_token": "ntn-secret"}
+_CREDENTIALS: JSONObject = {"access_token": "private-token"}
 
 
-def _meeting_note_operator_enums(property_filter: JSONObject) -> set[str]:
-    """Collect comparison operators from a meeting-note property schema."""
-    operator_enums: set[str] = set()
-    option_properties = cast(JSONObject, property_filter["properties"])
-    comparison_schema = cast(JSONObject, option_properties["filter"])
-    for comparison in cast(list[JSONObject], comparison_schema["anyOf"]):
-        comparison_properties = cast(JSONObject, comparison["properties"])
-        operator = cast(JSONObject, comparison_properties["operator"])
-        operator_enums.update(cast(list[str], operator["enum"]))
-        if operator["enum"] == ["is_empty", "is_not_empty"]:
-            assert "value" not in comparison_properties
-        else:
-            assert "value" in comparison_properties
-    return operator_enums
-
-
-def _nested_meeting_note_filter_items(
-    root_combinator: JSONObject, property_filter: JSONObject
-) -> JSONObject:
-    """Return the item schema inside the nested meeting-note combinator."""
-    root_properties = cast(JSONObject, root_combinator["properties"])
-    root_filters = cast(JSONObject, root_properties["filters"])
-    root_items = cast(JSONObject, root_filters["items"])
-    item_options = cast(list[JSONObject], root_items["anyOf"])
-    assert item_options[0] == property_filter
-    nested_properties = cast(JSONObject, item_options[1]["properties"])
-    nested_filters = cast(JSONObject, nested_properties["filters"])
-    return cast(JSONObject, nested_filters["items"])
-
-
-def test_notion_definition_is_registered() -> None:
-    """Notion schemas and executors should form one federation-scoped connector."""
-    assert len(ACTIONS) == 10
-    assert all(action.access is ActionAccess.READ for action in ACTIONS)
-    assert [
-        tool["name"] for tool in registry.get_connector_tools(NOTION_CONNECTOR_REF)
-    ] == [
-        "notion_search",
-        "notion_get_page",
-        "notion_get_page_property",
-        "notion_get_database",
-        "notion_get_block",
-        "notion_get_block_children",
-        "notion_query_meeting_notes",
-        "notion_list_users",
-        "notion_get_user",
-        "notion_get_self",
-    ]
-
-
-def test_notion_search_forwards_api_inputs() -> None:
-    """Notion search should forward inputs using the API field names."""
-    response = Mock(status_code=200)
-    response.json.return_value = {"results": [], "has_more": False}
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        result = registry.invoke_connector(
-            "notion_search",
-            {
-                "query": "release",
-                "filter": {
-                    "property": "object",
-                    "value": "page",
-                    "in_trash": False,
-                },
-                "sort": {
-                    "timestamp": "last_edited_time",
-                    "direction": "descending",
-                },
-                "page_size": 100,
-                "start_cursor": "cursor-1",
-            },
-            Mock(),
-            credentials=_CREDENTIALS,
-            config={},
-        )
-    assert result == response.json.return_value
-    assert request.call_args.args == ("POST", "https://api.notion.com/v1/search")
-    assert request.call_args.kwargs["headers"]["Notion-Version"] == "2026-03-11"
-    assert request.call_args.kwargs["json"] == {
-        "query": "release",
-        "filter": {
-            "property": "object",
-            "value": "page",
-            "in_trash": False,
-        },
-        "sort": {
-            "timestamp": "last_edited_time",
-            "direction": "descending",
-        },
-        "page_size": 100,
-        "start_cursor": "cursor-1",
-    }
-
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        registry.invoke_connector(
-            "notion_search", {}, Mock(), credentials=_CREDENTIALS, config={}
-        )
-    assert request.call_args.kwargs["json"] == {}
-
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        registry.invoke_connector(
-            "notion_search",
-            {"filter": {"in_trash": True}},
-            Mock(),
-            credentials=_CREDENTIALS,
-            config={},
-        )
-    assert request.call_args.kwargs["json"] == {"filter": {"in_trash": True}}
-
-
-@pytest.mark.parametrize(
-    "filter_",
-    [
-        {},
-        {"property": "object"},
-        {"value": "page"},
-        {"value": "page", "in_trash": True},
-    ],
-)
-def test_notion_search_rejects_invalid_filter(filter_: JSONObject) -> None:
-    """Notion search should reject incomplete and mixed filter shapes."""
-    with patch(_HTTP_REQUEST) as request, pytest.raises(ValueError):
-        registry.invoke_connector(
-            "notion_search",
-            {"filter": filter_},
-            Mock(),
-            credentials=_CREDENTIALS,
-            config={},
-        )
-    request.assert_not_called()
-
-
-def test_notion_get_page_forwards_property_filter() -> None:
-    """Get page should call only its endpoint and forward property filters."""
-    response = Mock(status_code=200)
-    response.json.return_value = {"object": "page", "id": "page-1"}
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        result = registry.invoke_connector(
-            "notion_get_page",
-            {"page_id": "page/1", "filter_properties": ["title", "f%5C%3Ap"]},
-            Mock(),
-            credentials=_CREDENTIALS,
-            config={},
-        )
-    assert result == response.json.return_value
-    assert request.call_args.args == (
-        "GET",
-        "https://api.notion.com/v1/pages/page%2F1",
+def test_discovery_and_execution() -> None:
+    """Preserve paginated schemas and call once without a trailing catalog lookup."""
+    schema = {"type": "object", "properties": {"title": {"type": "string"}}}
+    rpc = AsyncMock(
+        side_effect=[
+            types.ListToolsResult(
+                tools=[types.Tool(name="FutureTool", inputSchema=schema)],
+                nextCursor="next",
+            ),
+            types.ListToolsResult(
+                tools=[types.Tool(name="notion-search", inputSchema=schema)]
+            ),
+        ]
     )
-    assert request.call_args.kwargs["params"] == {
-        "filter_properties": ["title", "f\\:p"]
-    }
-
-
-def test_notion_get_page_property_forwards_pagination() -> None:
-    """Get page property should preserve encoded IDs and forward pagination."""
-    response = Mock(status_code=200)
-    response.json.return_value = {
-        "object": "list",
-        "type": "property_item",
-        "results": [],
-        "has_more": True,
-        "next_cursor": "cursor-2",
-    }
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        result = registry.invoke_connector(
-            "notion_get_page_property",
-            {
-                "page_id": "page/1",
-                "property_id": "f%5C%5C%3Ap",
-                "page_size": 50,
-                "start_cursor": "cursor-1",
-            },
-            Mock(),
-            credentials=_CREDENTIALS,
-            config={},
-        )
-    assert result == response.json.return_value
-    assert request.call_args.args == (
-        "GET",
-        "https://api.notion.com/v1/pages/page%2F1/properties/f%5C%5C%3Ap",
-    )
-    assert request.call_args.kwargs["params"] == {
-        "page_size": "50",
-        "start_cursor": "cursor-1",
-    }
-
-
-def test_notion_get_page_property_returns_single_item() -> None:
-    """Get page property should also pass through single-item responses."""
-    response = Mock(status_code=200)
-    response.json.return_value = {
-        "object": "property_item",
-        "id": "status",
-        "type": "status",
-        "status": None,
-    }
-    with patch(_HTTP_REQUEST, return_value=response):
-        result = registry.invoke_connector(
-            "notion_get_page_property",
-            {"page_id": "page-1", "property_id": "status"},
-            Mock(),
-            credentials=_CREDENTIALS,
-            config={},
-        )
-    assert result == response.json.return_value
-
-
-def test_notion_get_database_encodes_id() -> None:
-    """Get database should retrieve exactly one safely encoded database ID."""
-    response = Mock(status_code=200)
-    response.json.return_value = {
-        "object": "database",
-        "id": "database-1",
-        "data_sources": [{"id": "source-1", "name": "Tasks"}],
-    }
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        result = registry.invoke_connector(
-            "notion_get_database",
-            {"database_id": "database/1"},
-            Mock(),
-            credentials=_CREDENTIALS,
-            config={},
-        )
-    assert result == response.json.return_value
-    assert request.call_args.args == (
-        "GET",
-        "https://api.notion.com/v1/databases/database%2F1",
-    )
-
-
-def test_notion_get_block_encodes_id() -> None:
-    """Get block should retrieve exactly one safely encoded block ID."""
-    response = Mock(status_code=200)
-    response.json.return_value = {
-        "object": "block",
-        "id": "block-1",
-        "type": "paragraph",
-    }
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        result = registry.invoke_connector(
-            "notion_get_block",
-            {"block_id": "block/1"},
-            Mock(),
-            credentials=_CREDENTIALS,
-            config={},
-        )
-    assert result == response.json.return_value
-    assert request.call_args.args == (
-        "GET",
-        "https://api.notion.com/v1/blocks/block%2F1",
-    )
-
-
-def test_notion_get_block_children_forwards_pagination() -> None:
-    """Get block children should forward Notion's pagination parameters."""
-    response = Mock(status_code=200)
-    response.json.return_value = {
-        "object": "list",
-        "type": "block",
-        "results": [],
-        "has_more": False,
-        "next_cursor": None,
-    }
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        result = registry.invoke_connector(
-            "notion_get_block_children",
-            {
-                "block_id": "block/1",
-                "page_size": 50,
-                "start_cursor": "cursor-1",
-            },
-            Mock(),
-            credentials=_CREDENTIALS,
-            config={},
-        )
-    assert result == response.json.return_value
-    assert request.call_args.args == (
-        "GET",
-        "https://api.notion.com/v1/blocks/block%2F1/children",
-    )
-    assert request.call_args.kwargs["params"] == {
-        "page_size": "50",
-        "start_cursor": "cursor-1",
-    }
-
-
-def test_notion_query_meeting_notes_forwards_inputs() -> None:
-    """Query meeting notes should forward the filter."""
-    response = Mock(status_code=200)
-    response.json.return_value = {"results": [], "has_more": False}
-    filter_: JSONObject = {
-        "property": "title",
-        "filter": {
-            "operator": "string_contains",
-            "value": {"type": "exact", "value": "standup"},
-        },
-    }
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        result = registry.invoke_connector(
-            "notion_query_meeting_notes",
-            {"filter": filter_},
-            Mock(),
-            credentials=_CREDENTIALS,
-            config={},
-        )
-    assert result == response.json.return_value
-    assert request.call_args.args == (
-        "POST",
-        "https://api.notion.com/v1/blocks/meeting_notes/query",
-    )
-    assert request.call_args.kwargs["json"] == {"filter": filter_}
-
-
-def test_notion_meeting_note_filter_schema_is_explicit() -> None:
-    """Meeting-note tools should describe comparisons and one-level nesting."""
-    action = next(action for action in ACTIONS if action.name == "query_meeting_notes")
-    assert action.input_schema["additionalProperties"] == {}
-    properties = cast(JSONObject, action.input_schema["properties"])
-    filter_schema = cast(JSONObject, properties["filter"])
-    root_options = cast(list[JSONObject], filter_schema["anyOf"])
-    property_filter, root_combinator = root_options
-
-    assert _meeting_note_operator_enums(property_filter) == {
-        "string_is",
-        "string_is_not",
-        "string_contains",
-        "string_does_not_contain",
-        "string_starts_with",
-        "string_ends_with",
-        "person_contains",
-        "person_does_not_contain",
-        "date_is",
-        "date_is_before",
-        "date_is_after",
-        "date_is_on_or_before",
-        "date_is_on_or_after",
-        "date_is_within",
-        "date_is_relative_to",
-        "is_empty",
-        "is_not_empty",
-    }
-    assert (
-        _nested_meeting_note_filter_items(root_combinator, property_filter)
-        == property_filter
-    )
-
-
-def test_notion_list_users_forwards_pagination() -> None:
-    """List users should forward Notion's pagination parameters."""
-    response = Mock(status_code=200)
-    response.json.return_value = {"object": "list", "results": []}
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        result = registry.invoke_connector(
-            "notion_list_users",
-            {"page_size": 50, "start_cursor": "cursor-1"},
-            Mock(),
-            credentials=_CREDENTIALS,
-            config={},
-        )
-    assert result == response.json.return_value
-    assert request.call_args.args == ("GET", "https://api.notion.com/v1/users")
-    assert request.call_args.kwargs["params"] == {
-        "page_size": "50",
-        "start_cursor": "cursor-1",
-    }
-
-
-def test_notion_get_user_encodes_id() -> None:
-    """Get user should retrieve exactly one safely encoded user ID."""
-    response = Mock(status_code=200)
-    response.json.return_value = {"object": "user", "id": "user-1"}
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        result = registry.invoke_connector(
-            "notion_get_user",
-            {"user_id": "user/1"},
-            Mock(),
-            credentials=_CREDENTIALS,
-            config={},
-        )
-    assert result == response.json.return_value
-    assert request.call_args.args == (
-        "GET",
-        "https://api.notion.com/v1/users/user%2F1",
-    )
-
-
-def test_notion_get_self_retrieves_token_user() -> None:
-    """Get self should retrieve the user associated with the access token."""
-    response = Mock(status_code=200)
-    response.json.return_value = {"object": "user", "id": "user-1"}
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        result = registry.invoke_connector(
-            "notion_get_self",
-            {},
-            Mock(),
-            credentials=_CREDENTIALS,
-            config={},
-        )
-    assert result == response.json.return_value
-    assert request.call_args.args == ("GET", "https://api.notion.com/v1/users/me")
-
-
-def test_notion_api_errors_include_code_and_message() -> None:
-    """Notion's documented error fields should remain readable to callers."""
-    response = Mock(status_code=400)
-    response.json.return_value = {
-        "code": "validation_error",
-        "message": "Invalid start_cursor value",
-    }
     with (
-        patch(_HTTP_REQUEST, return_value=response),
-        pytest.raises(NotionApiError) as error,
+        patch.object(ClientSession, "send_request", rpc),
+        patch.object(mcp, "_session") as open_session,
     ):
-        registry.invoke_connector(
-            "notion_search", {"query": "release"}, Mock(), _CREDENTIALS, {}
+        open_session.return_value.__aenter__.side_effect = lambda: ClientSession(
+            Mock(), Mock()
         )
-    assert error.value.code == "validation_error"
-    assert str(error.value) == (
-        "Notion API request failed: validation_error (400): Invalid start_cursor value."
+        tools = cast(
+            list[JSONObject],
+            registry.invoke_connector(
+                "notion__discover_tools", {}, Mock(), _CREDENTIALS, {}
+            ),
+        )
+        assert [tool["name"] for tool in tools] == [
+            "notion_FutureTool",
+            "notion_notion-search",
+        ]
+        assert tools[0]["parameters"] == schema
+        assert rpc.await_args_list[1].args[0].root.params.cursor == "next"
+
+        output = types.CallToolResult(
+            content=[types.TextContent(type="text", text="done")]
+        )
+        rpc.reset_mock(side_effect=True)
+        rpc.side_effect = [output, RuntimeError("Catalog unavailable")]
+        result = registry.invoke_connector(
+            "notion_FutureTool", {"title": "New page"}, Mock(), _CREDENTIALS, {}
+        )
+    assert result == output.model_dump(mode="json", by_alias=True, exclude_none=True)
+    rpc.assert_awaited_once()
+    request = rpc.await_args_list[0].args[0].root
+    assert request.params.name == "FutureTool"
+    assert request.params.arguments == {"title": "New page"}
+
+
+def test_fallback_does_not_retry_failed_tool() -> None:
+    """Fall back during setup, then preserve a redacted tool failure without retry."""
+    session = Mock(spec=ClientSession)
+    session.send_request.return_value = types.CallToolResult(
+        isError=True,
+        content=[types.TextContent(type="text", text="Denied private-token")],
     )
-    assert "ntn-secret" not in str(error.value)
+    with patch.object(mcp, "_initialized_session") as connect:
+        connect.return_value.__aenter__.side_effect = [
+            RuntimeError("HTTP unavailable"),
+            session,
+        ]
+        with pytest.raises(mcp.NotionApiError) as error:
+            registry.invoke_connector("notion_FutureTool", {}, Mock(), _CREDENTIALS, {})
+    assert connect.call_args_list == [
+        call("private-token", use_sse=False),
+        call("private-token", use_sse=True),
+    ]
+    session.send_request.assert_awaited_once()
+    assert error.value.code == "tool_error"
+    assert error.value.message == "Denied [REDACTED]"
+    assert "private-token" not in "".join(traceback.format_exception(error.value))
 
 
-def test_notion_oauth_flow() -> None:
-    """Notion OAuth should authorize and separate credentials from metadata."""
-    redirect_uri = "https://example.com/callback"
+def test_oauth_resource_exchange_and_refresh() -> None:
+    """Bind Notion's authorization, code exchange, and refresh to its resource."""
     flow = OAuthFlow(
         PROVIDER,
         client_id="client",
         client_secret="secret",
-        redirect_uri=redirect_uri,
+        redirect_uri="https://example.com/callback",
     )
-    url = flow.build_authorization_url(
-        redirect_uri=redirect_uri, state="state", pkce_challenge=None
-    )
-    assert parse_qs(urlparse(url).query)["owner"] == ["user"]
-    response = Mock(status_code=200)
-    response.json.return_value = {
-        "access_token": "token",
-        "workspace_id": "workspace-1",
-        "workspace_name": "Flower",
-    }
-    with patch(_OAUTH_REQUEST, return_value=response):
-        credentials, config = flow.exchange_code(
-            code="code", redirect_uri=redirect_uri, pkce_verifier=None
+    url = urlparse(
+        flow.build_authorization_url(
+            redirect_uri="https://example.com/callback",
+            state="state",
+            pkce_challenge="challenge",
         )
-    assert credentials == {"access_token": "token"}
-    assert config == {
-        "workspace_id": "workspace-1",
-        "workspace_name": "Flower",
-        "display_name": "Notion · Flower",
-    }
-
-    response.json.return_value = {"error": "secret"}
-    with patch(_OAUTH_REQUEST, return_value=response), pytest.raises(RuntimeError):
-        flow.exchange_code(code="code", redirect_uri=redirect_uri, pkce_verifier=None)
+    )
+    query = parse_qs(url.query)
+    assert query["resource"] == ["https://mcp.notion.com/mcp"]
+    assert query["code_challenge_method"] == ["S256"]
+    response = Mock(status_code=200)
+    response.json.return_value = {"access_token": "token", "token_type": "bearer"}
+    with patch(
+        "flwr.supercore.task_process.connector.oauth.requests.post",
+        return_value=response,
+    ) as post:
+        credentials, _ = flow.exchange_code(
+            code="code",
+            redirect_uri="https://example.com/callback",
+            pkce_verifier="verifier",
+        )
+        flow.refresh_credentials(
+            {**credentials, "refresh_token": "refresh", "expires_at": 0}
+        )
+    exchange, refresh = post.call_args_list
+    for request in (exchange, refresh):
+        assert request.args == ("https://mcp.notion.com/token",)
+        assert request.kwargs["data"]["resource"] == "https://mcp.notion.com/mcp"
+    assert exchange.kwargs["data"]["code_verifier"] == "verifier"
+    assert refresh.kwargs["data"]["grant_type"] == "refresh_token"
+    assert credentials["access_token"] == "token"

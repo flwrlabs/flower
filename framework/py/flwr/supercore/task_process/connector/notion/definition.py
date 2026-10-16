@@ -14,37 +14,51 @@
 # ==============================================================================
 """Notion connector definition."""
 
-from ..definition import ConnectorDefinition, OAuth2Definition, ProviderDefinition
+from ..definition import (
+    ConnectorDefinition,
+    ConnectorToolSource,
+    OAuth2Definition,
+    ProviderDefinition,
+)
 from ..oauth import load_oauth_flow
-from .actions import ACTIONS
-from .executors import EXECUTORS, NOTION_API_VERSION
+from .mcp import discover_tools, execute_tool
 
 NOTION_CONNECTOR_REF = "notion"
 
 PROVIDER = ProviderDefinition(
     ref=NOTION_CONNECTOR_REF,
     display_name="Notion",
-    description=(
-        "Search shared Notion page and data-source titles; retrieve page "
-        "properties, database metadata, blocks, and workspace user information."
-    ),
-    actions=ACTIONS,
+    description="Use Notion tools available to the connected workspace.",
+    actions=(),
     oauth=OAuth2Definition(
-        authorization_url="https://api.notion.com/v1/oauth/authorize",
-        token_url="https://api.notion.com/v1/oauth/token",
+        authorization_url="https://mcp.notion.com/authorize",
+        token_url="https://mcp.notion.com/token",
         client_id_env="FLWR_NOTION_CLIENT_ID",
         client_secret_env="FLWR_NOTION_CLIENT_SECRET",
         redirect_uri_env="FLWR_NOTION_REDIRECT_URI",
-        authorization_params={"owner": "user"},
-        token_request_format="json",
-        token_headers={"Notion-Version": NOTION_API_VERSION},
-        config_fields=("workspace_id", "workspace_name", "bot_id"),
+        scopes=("default",),
+        token_auth_method="client_secret_post",
+        authorization_params={"resource": "https://mcp.notion.com/mcp"},
+        token_params={"resource": "https://mcp.notion.com/mcp"},
+        token_headers={"Accept": "application/json"},
+        use_pkce=True,
+        expected_token_type="bearer",
+        config_fields=(
+            "user_id",
+            "workspace_id",
+            "email_domain",
+            "bot_id",
+            "workspace_name",
+            "workspace_icon",
+        ),
         display_name_fields=("workspace_name",),
     ),
 )
 
+
 CONNECTOR = ConnectorDefinition.from_provider(
     provider=PROVIDER,
-    executors=EXECUTORS,
+    executors={},
     oauth_flow=load_oauth_flow(PROVIDER),
+    tool_source=ConnectorToolSource(discover=discover_tools, execute=execute_tool),
 )
