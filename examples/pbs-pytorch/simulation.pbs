@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -N flower-sim
+#PBS -q gpu-queue
+#PBS -l select=4:ncpus=8:mpiprocs=1:ngpus=1
+#PBS -l place=scatter:exclhost
+#PBS -l walltime=00:30:00
+#PBS -j oe
+
+set -Eeuo pipefail
+# Replace the queue and resource requests above with your site's settings.
+# Load your site's CUDA and PBS-enabled Open MPI modules before launching.
+# Example: module load cuda openmpi
+bash "${PBS_O_WORKDIR:?}/launch.sh" simulation

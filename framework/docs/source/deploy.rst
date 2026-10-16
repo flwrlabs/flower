@@ -32,3 +32,4 @@ Problem-oriented how-to guides show step-by-step how to achieve a specific goal.
     how-to-connect-supernodes-to-supergrid
     how-to-run-flower-apps-on-supergrid
     how-to-deploy-supernode-using-slurm
+    how-to-deploy-supernode-using-pbs
