@@ -209,8 +209,6 @@ class _ChatCompleter(Completer):
         connector_prefix = f"{CHAT_CONNECTOR_COMMAND} "
         if text.lower().startswith(connector_prefix):
             query = text[len(connector_prefix) :]
-            if any(char.isspace() for char in query):
-                return
             try:
                 connectors = self.load_connectors()
             except click.ClickException:
@@ -308,8 +306,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_fab_hash: str | None = None
         self.agent_name = CHAT_AGENT_NAME
         self.local_agent: LocalAgent | None = None
-        self.connector_refs: list[str] = []
-        self.connector_display_names: dict[str, str] = {}
+        self.selected_connector_by_ref: dict[str, Connector] = {}
         self.completer = _ChatCompleter(stub, self.federation, federations)
         self.input_buffer = Buffer(
             completer=ThreadedCompleter(self.completer),
@@ -548,16 +545,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
     def _handle_connector_command(self, event: KeyPressEvent, prompt: str) -> bool:
         """Show the connector selector or apply its selection."""
         if prompt.lower() == f"{CHAT_CONNECTOR_COMMAND} {CHAT_CONNECTOR_CLEAR}":
-            self.connector_refs.clear()
-            self.connector_display_names.clear()
+            self.selected_connector_by_ref.clear()
             event.app.invalidate()
-            return True
-
-        if not self.federation.endswith(f"/{CHAT_DEFAULT_FEDERATION_NAME}"):
-            self._append_transcript(
-                "class:notice",
-                "Connectors are only available in the personal federation.\n\n",
-            )
             return True
 
         if prompt.lower() == CHAT_CONNECTOR_COMMAND:
@@ -590,11 +579,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             self._append_transcript("class:error", f"{exc.format_message()}\n\n")
             return True
 
-        if connector.connector_ref not in self.connector_refs:
-            self.connector_refs.append(connector.connector_ref)
-        self.connector_display_names[connector.connector_ref] = (
-            connector.display_name or connector.connector_ref
-        )
+        self.selected_connector_by_ref[connector.connector_ref] = connector
         event.app.invalidate()
         return True
 
@@ -675,8 +660,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_fab_hash = None
         self.agent_name = CHAT_AGENT_NAME
         self.local_agent = None
-        self.connector_refs.clear()
-        self.connector_display_names.clear()
+        self.selected_connector_by_ref.clear()
         self.series_id = None
         self._clear_transcript()
         return True
@@ -836,7 +820,10 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             app_spec,
             fab_hash,
             fab_content,
-            self.connector_refs,
+            [
+                connector.connector_id
+                for connector in self.selected_connector_by_ref.values()
+            ],
         )
         if fab_content is not None:
             self.completer.invalidate_agents()
@@ -1013,10 +1000,10 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         connectors = (
             " · connectors: "
             + ", ".join(
-                self.connector_display_names.get(connector_ref, connector_ref)
-                for connector_ref in self.connector_refs
+                connector.display_name or connector.connector_ref
+                for connector in self.selected_connector_by_ref.values()
             )
-            if self.connector_refs
+            if self.selected_connector_by_ref
             else ""
         )
         return [
@@ -1167,7 +1154,7 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
     app_spec: str = FLOWER_AGENT_APP_ID,
     fab_hash: str | None = None,
     fab_content: bytes | None = None,
-    connector_refs: Sequence[str] = (),
+    connector_ids: Sequence[int] = (),
 ) -> tuple[int, int | None]:
     """Start one Flower AgentApp run."""
     req = StartRunRequest(
@@ -1176,7 +1163,7 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
         user_prompt=prompt,
         federation=federation or "",
         fab=Fab(hash_str=fab_hash or "", content=fab_content or b""),
-        connector_refs=connector_refs,
+        connector_ids=connector_ids,
     )
     if series_id is not None:
         req.series_id = series_id
