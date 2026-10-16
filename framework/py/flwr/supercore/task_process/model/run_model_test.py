@@ -82,6 +82,8 @@ def test_run_model_once_cleans_up_fresh_task_state(
     monkeypatch.setattr(run_model_module, "event", telemetry)
     monkeypatch.setattr(run_model_module, "_register_resident_signal_handlers", Mock())
     monkeypatch.setattr(run_model_module.threading, "Timer", timer_cls)
+    flush = Mock(side_effect=client.close.assert_called_once_with)
+    monkeypatch.setattr(run_model_module, "flush_traces", flush)
 
     assert (
         run_model_module.run_model_once("runtime.example:9092", "task-token", True)
@@ -98,6 +100,7 @@ def test_run_model_once_cleans_up_fresh_task_state(
     assert retry_invoker.max_tries == 1
     heartbeat.stop.assert_called_once_with()
     client.close.assert_called_once_with()
+    flush.assert_called_once_with()
     assert telemetry.call_args_list[-1].args == (
         EventType.FLWR_MODEL_RUN_LEAVE,
         {"exit_code": 0 if failure is None else ExitCode.TASK_PROC_EXCEPTION},

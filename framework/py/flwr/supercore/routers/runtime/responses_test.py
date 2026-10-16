@@ -197,11 +197,17 @@ def test_responses_streams_only_child_task_events() -> None:
         _reply(state.store_task_message.call_args.args[0].metadata.message_id)
     ]
 
-    response = _client(state).post(
-        "/v1/runtime/responses",
-        json={"model": "model", "input": "hello", "stream": True},
-        headers={"Authorization": "Bearer task-token"},
-    )
+    with patch("flwr.supercore.routers.runtime.responses.trace_span") as trace:
+        response = _client(state).post(
+            "/v1/runtime/responses",
+            json={"model": "model", "input": "hello", "stream": True},
+            headers={"Authorization": "Bearer task-token"},
+        )
+    assert [call.args[0] for call in trace.call_args_list] == [
+        "model.round_trip",
+        "model.create",
+        "model.response_wait",
+    ]
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")

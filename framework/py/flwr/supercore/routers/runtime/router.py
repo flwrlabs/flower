@@ -76,6 +76,7 @@ from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_DEPENDENCY
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
+from flwr.supercore.tracing import trace_span
 
 from .tracing import TaskCompletionTracingDependency
 
@@ -137,7 +138,14 @@ def pull_task_input(
     task: TaskDependency,
 ) -> PullTaskInputResponse:
     """Pull app process inputs."""
-    return handlers.pull_task_input(request, state, task)
+    with trace_span(
+        "task.input",
+        attributes={
+            "flwr.run_id": str(task.run_id),
+            "flwr.task_id": str(task.task_id),
+        },
+    ):
+        return handlers.pull_task_input(request, state, task)
 
 
 @router.post("/push-task-output")

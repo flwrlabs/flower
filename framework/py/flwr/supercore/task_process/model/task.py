@@ -30,6 +30,7 @@ from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.usage import TaskUsageRecorder
+from flwr.supercore.tracing import trace_span
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 
@@ -43,7 +44,8 @@ _TEXT_DELTA_EVENTS = frozenset(
 
 def handle_task(client: RuntimeHttpClient) -> None:
     """Run one model task request."""
-    request_message = _pull_model_request(client)
+    with trace_span("model.request_wait"):
+        request_message = _pull_model_request(client)
     is_stream = request_message.payload.get("stream") is True
     if request_message.metadata.src_task_id is None:
         raise RuntimeError("Model request source task is not set.")
@@ -99,7 +101,8 @@ def handle_task(client: RuntimeHttpClient) -> None:
         _flush_events()
         # Push the response
         if response is not None:
-            _push_model_response(response)
+            with trace_span("model.response_publish"):
+                _push_model_response(response)
 
 
 def _pull_model_request(client: RuntimeHttpClient) -> ModelRequest:

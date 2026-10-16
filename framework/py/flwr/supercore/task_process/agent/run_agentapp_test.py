@@ -371,6 +371,8 @@ def test_agentapp_lifecycle_finalizes_once_across_threads(
         preloaded=None,
     )
     lifecycle._heartbeat_sender = heartbeat
+    flush = Mock(side_effect=lambda: cleanup_runtime.assert_called_once_with(None))
+    monkeypatch.setattr(run_agentapp_module, "flush_traces", flush)
 
     threads = [threading.Thread(target=lifecycle.finalize) for _ in range(2)]
     for thread in threads:
@@ -388,6 +390,7 @@ def test_agentapp_lifecycle_finalizes_once_across_threads(
     heartbeat.stop.assert_called_once_with()
     grid.close.assert_called_once_with()
     cleanup_runtime.assert_called_once_with(None)
+    flush.assert_called_once_with()
     assert retry_invoker.max_tries == 1
 
 
