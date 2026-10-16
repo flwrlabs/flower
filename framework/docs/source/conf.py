@@ -29,8 +29,8 @@ rst_prolog = """
 .. The SuperLink Docker image digest is version-independent and does not necessarily track |stable_flwr_version|.
 .. |stable_flwr_superlink_docker_digest| replace:: 4b317d5b6030710b476f4dbfab2c3a33021ad40a0fcfa54d7edd45e0c51d889c
 .. |ubuntu_version| replace:: 24.04
-.. |setuptools_version| replace:: 82.0.0
-.. |pip_version| replace:: 26.0.1
+.. |setuptools_version| replace:: 83.0.0
+.. |pip_version| replace:: 26.2.1
 .. |python_version| replace:: 3.11
 .. |python_full_version| replace:: 3.11.14
 """
