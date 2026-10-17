@@ -19,7 +19,14 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 
-from flwr.app import ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
+from flwr.app import (
+    Array,
+    ArrayRecord,
+    ConfigRecord,
+    Message,
+    MetricRecord,
+    RecordDict,
+)
 from flwr.supercore.privacy_accounting import (
     GaussianPrivacyEvent,
     NeighboringRelation,
@@ -162,3 +169,64 @@ def test_budget_is_checked_before_training() -> None:
     with pytest.raises(PrivacyBudgetExhausted):
         list(wrapper.configure_train(1, ArrayRecord(), ConfigRecord(), _grid()))
     accountant.compose.assert_not_called()
+
+
+def test_mixed_dtype_two_round_dp_strategy() -> None:
+    """Regression test: integer buffers survive multiple rounds without float promotion."""
+    wrapper = DifferentialPrivacyServerSideFixedClipping(
+        strategy=FedAvg(min_train_nodes=2, min_available_nodes=2),
+        noise_multiplier=0.0,
+        clipping_norm=10.0,
+        num_sampled_clients=2,
+    )
+
+    # Initial model with float weights and an integer tracking buffer
+    arrays = ArrayRecord(
+        {
+            "weights": Array(np.array([1.0, 2.0], dtype=np.float32)),
+            "num_batches_tracked": Array(np.array([10], dtype=np.int64)),
+        }
+    )
+
+    # Round 1
+    _ = list(wrapper.configure_train(1, arrays, ConfigRecord(), _grid()))
+    reply1 = Mock(spec=Message)
+    reply1.content = RecordDict(
+        {
+            "arrays": ArrayRecord(
+                {
+                    "weights": Array(np.array([1.5, 2.5], dtype=np.float32)),
+                    "num_batches_tracked": Array(np.array([15], dtype=np.int64)),
+                }
+            ),
+            "metrics": MetricRecord({"num-examples": 1.0}),
+        }
+    )
+    reply1.has_error.return_value = False
+
+    reply2 = Mock(spec=Message)
+    reply2.content = RecordDict(
+        {
+            "arrays": ArrayRecord(
+                {
+                    "weights": Array(np.array([2.5, 3.5], dtype=np.float32)),
+                    "num_batches_tracked": Array(np.array([15], dtype=np.int64)),
+                }
+            ),
+            "metrics": MetricRecord({"num-examples": 1.0}),
+        }
+    )
+    reply2.has_error.return_value = False
+
+    agg_arrays, _ = wrapper.aggregate_train(1, [reply1, reply2])
+    assert agg_arrays is not None
+    # Verify integer buffer kept its integer dtype and didn't get promoted to float
+    assert agg_arrays["num_batches_tracked"].numpy().dtype == np.int64
+    assert agg_arrays["num_batches_tracked"].numpy()[0] == 15
+
+    # Round 2: ensure subtract in round 2 doesn't fail or promote to float norm
+    _ = list(wrapper.configure_train(2, agg_arrays, ConfigRecord(), _grid()))
+    agg_arrays_r2, _ = wrapper.aggregate_train(2, [reply1, reply2])
+    assert agg_arrays_r2 is not None
+    assert agg_arrays_r2["num_batches_tracked"].numpy().dtype == np.int64
+

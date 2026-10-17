@@ -84,15 +84,26 @@ def aggregate_arrayrecords(
 
     # Perform weighted aggregation
     aggregated_np_arrays: dict[str, NDArray] = {}
+    original_dtypes: dict[str, np.dtype] = {}
 
     for record, weight in zip(records, weight_factors, strict=True):
         for record_item in record.array_records.values():
             # aggregate in-place
             for key, value in record_item.items():
+                np_val = value.numpy()
+                if key not in original_dtypes:
+                    original_dtypes[key] = np_val.dtype
                 if key not in aggregated_np_arrays:
-                    aggregated_np_arrays[key] = value.numpy() * weight
+                    aggregated_np_arrays[key] = np_val * weight
                 else:
-                    aggregated_np_arrays[key] += value.numpy() * weight
+                    aggregated_np_arrays[key] += np_val * weight
+
+    # Preserve integer dtypes if original arrays were integers
+    for key, orig_dtype in original_dtypes.items():
+        if np.issubdtype(orig_dtype, np.integer):
+            aggregated_np_arrays[key] = np.round(aggregated_np_arrays[key]).astype(
+                orig_dtype
+            )
 
     return ArrayRecord(
         {k: Array(np.asarray(v)) for k, v in aggregated_np_arrays.items()}
