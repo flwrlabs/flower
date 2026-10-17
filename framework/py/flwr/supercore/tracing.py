@@ -18,8 +18,8 @@ Set ``FLWR_TRACING_ENABLED=1`` in services and workers to use the installed
 ``flwr.ee.supercore.tracing`` backend. Backend failures do not affect execution.
 Application exceptions retain their type, without exporting messages or bodies.
 
-Validated version-00 task carriers correlate creation, acquisition, dispatch
-and execution. These spans can be siblings, not an exact nested run lifetime.
+Validated version-00 HTTP carriers preserve direct request context. Independent
+task traces correlate through run/task metadata, not persisted parent context.
 The first output-text delta records ``provider.first_text``, excluding reasoning
 and non-streamed responses. Span end and ERROR status record completion/failure.
 Export is best effort with bounded flushing and metadata-only attributes.
@@ -143,25 +143,3 @@ def flush_traces() -> None:
             backend.flush_traces()
         except Exception:  # pylint: disable=broad-exception-caught
             pass
-
-
-def store_task_context(state: object, task_id: int, traceparent: str) -> None:
-    """Persist a task carrier through the optional extension, best effort."""
-    carrier = validate_traceparent(traceparent)
-    backend = _backend()
-    if backend is not None and carrier:
-        try:
-            backend.store_task_context(state, task_id, carrier)
-        except Exception:  # pylint: disable=broad-exception-caught
-            pass
-
-
-def load_task_context(state: object, task_id: int) -> str:
-    """Load a queued task carrier without putting it in application data."""
-    backend = _backend()
-    if backend is not None:
-        try:
-            return validate_traceparent(backend.load_task_context(state, task_id))
-        except Exception:  # pylint: disable=broad-exception-caught
-            pass
-    return ""

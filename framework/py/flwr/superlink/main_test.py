@@ -28,7 +28,6 @@ from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.error import http_error_translator
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers.health.router import health
-from flwr.supercore.routers.runtime.tracing import RuntimeTracingMiddleware
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.routers.control.middlewares import (
     ControlAuthenticationMiddleware,
@@ -70,7 +69,6 @@ def _control_middleware_classes() -> list[type[object]]:
         ControlAuthenticationMiddleware,
         ControlLicenseMiddleware,
         ProtobufTranslationMiddleware,
-        RuntimeTracingMiddleware,
         ControlEventLogMiddleware,
         NodeAuthMiddleware,
         FleetEventLogMiddleware,

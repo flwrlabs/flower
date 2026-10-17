@@ -45,7 +45,7 @@ from flwr.supercore.error import FlowerError
 from flwr.supercore.json_message.base import make_json_message
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.servicer.runtime import runtime_handlers
-from flwr.supercore.tracing import load_task_context, trace_span
+from flwr.supercore.tracing import trace_span
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 
@@ -189,7 +189,6 @@ def _start_exchange(
     try:
         with trace_span(
             "model.create",
-            traceparent=load_task_context(state, task.task_id),
             attributes={
                 "flwr.component": "superlink",
                 "flwr.run_id": str(task.run_id),

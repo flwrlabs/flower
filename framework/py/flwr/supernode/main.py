@@ -30,7 +30,6 @@ from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health
 from flwr.supercore.routers.runtime import create_runtime_router, responses_router
-from flwr.supercore.routers.runtime.tracing import RuntimeTracingMiddleware
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 from flwr.supernode.servicer.runtime import runtime_handlers
 
@@ -71,7 +70,6 @@ def create_app(
     fastapi_app.include_router(create_runtime_router("SuperNode"))
     fastapi_app.include_router(responses_router)
 
-    fastapi_app.add_middleware(RuntimeTracingMiddleware)
     fastapi_app.add_middleware(ProtobufTranslationMiddleware)
 
     # Apply the FlowerError translation layer last to make it outermost

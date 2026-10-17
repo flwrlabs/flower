@@ -14,64 +14,21 @@
 # ==============================================================================
 """Best-effort tracing integration for the Runtime HTTP API."""
 
-import os
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import Depends, Request, Response
-from starlette.concurrency import run_in_threadpool
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from fastapi import Depends, Request
 
-from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    AcquireTaskResponse,
-    PullTaskInputResponse,
-)
-from flwr.supercore.dependencies.runtime import (
-    RuntimeStateDependency,
-    TaskDependency,
-    get_runtime_state,
-)
-from flwr.supercore.tracing import load_task_context, trace_span, validate_traceparent
-
-
-class RuntimeTracingMiddleware(BaseHTTPMiddleware):
-    """Attach task context inside the protobuf translation middleware."""
-
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
-        """Return the business response even when optional metadata fails."""
-        response = await call_next(request)
-        if os.getenv("FLWR_TRACING_ENABLED") != "1" or response.status_code >= 400:
-            return response
-        try:
-            result = getattr(request.state, "protobuf_response", None)
-            if isinstance(result, AcquireTaskResponse) and result.HasField("task"):
-                task_id = result.task.task_id
-            elif isinstance(result, PullTaskInputResponse):
-                task_id = result.task_id
-            else:
-                return response
-
-            def load_context() -> str:
-                # Create/use synchronous state in the worker thread, not the loop.
-                return load_task_context(get_runtime_state(request), task_id)
-
-            if carrier := await run_in_threadpool(load_context):
-                response.headers["traceparent"] = carrier
-        except Exception:  # pylint: disable=broad-exception-caught
-            pass
-        return response
+from flwr.supercore.dependencies.runtime import TaskDependency
+from flwr.supercore.tracing import trace_span, validate_traceparent
 
 
 async def trace_task_completion(
-    request: Request, state: RuntimeStateDependency, task: TaskDependency
+    request: Request, task: TaskDependency
 ) -> AsyncIterator[None]:
     """Scope completion tracing to the authenticated handler."""
     try:
         carrier = validate_traceparent(request.headers.get("traceparent"))
-        if not carrier and os.getenv("FLWR_TRACING_ENABLED") == "1":
-            carrier = await run_in_threadpool(load_task_context, state, task.task_id)
     except Exception:  # pylint: disable=broad-exception-caught
         carrier = ""
     with trace_span(

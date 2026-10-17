@@ -48,8 +48,6 @@ def test_disabled_or_unavailable_backend_is_inert(
         span.add_event("provider.first_text")
         assert tracing.current_traceparent() == ""
     tracing.flush_traces()
-    tracing.store_task_context(object(), 1, _CARRIER)
-    assert tracing.load_task_context(object(), 1) == ""
     assert discover.call_count == int(enabled == "1")
 
 
@@ -119,17 +117,3 @@ def test_valid_traceparent(flags: str) -> None:
     """The complete version-00 trace-flags byte round trips unchanged."""
     carrier = _CARRIER[:-2] + flags
     assert tracing.validate_traceparent(carrier) == carrier
-
-
-def test_context_storage_failure_is_inert(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Optional storage cannot affect task execution or return invalid metadata."""
-    monkeypatch.setenv("FLWR_TRACING_ENABLED", "1")
-    backend = Mock()
-    backend.store_task_context.side_effect = RuntimeError("private database detail")
-    backend.load_task_context.side_effect = RuntimeError("private database detail")
-    monkeypatch.setattr(tracing, "_load_backend", lambda: backend)
-    state = object()
-    tracing.store_task_context(state, 1, _CARRIER)
-    assert tracing.load_task_context(state, 1) == ""
-    tracing.store_task_context(state, 1, "invalid")
-    backend.store_task_context.assert_called_once_with(state, 1, _CARRIER)

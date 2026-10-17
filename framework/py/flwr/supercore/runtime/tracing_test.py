@@ -37,7 +37,6 @@ from flwr.supercore.interceptors import RuntimeTokenHttpInterceptor
 from flwr.supercore.protobuf.client import ProtobufRequestContext
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
-from flwr.supercore.routers.runtime import tracing as server_tracing
 from flwr.supercore.routers.runtime.router import router
 from flwr.supercore.runtime import RuntimeHttpClient
 
@@ -58,18 +57,14 @@ def runtime_app(monkeypatch: pytest.MonkeyPatch) -> FastAPI:
     app.state.runtime_state_factory = Mock(state=lambda: state)
     app.dependency_overrides[get_runtime_state] = lambda: state
     app.dependency_overrides[get_task] = lambda: Task(task_id=5, run_id=7)
-    app.add_middleware(server_tracing.RuntimeTracingMiddleware)
     app.add_middleware(ProtobufTranslationMiddleware)
     return app
 
 
-def test_task_context_round_trips_in_headers(
+def test_direct_request_context_without_persisted_task_parent(
     monkeypatch: pytest.MonkeyPatch, app: FastAPI
 ) -> None:
-    """HTTP headers preserve task context alongside authentication metadata."""
-    monkeypatch.setattr(
-        server_tracing, "load_task_context", lambda state, task_id: _CARRIER
-    )
+    """Requests keep HTTP context without returning persisted task parents."""
     monkeypatch.setattr(tracing, "current_traceparent", lambda: _CARRIER)
     handlers = app.state.runtime_handlers
     handlers.acquire_task.return_value = AcquireTaskResponse(
@@ -104,14 +99,8 @@ def test_task_context_round_trips_in_headers(
             client._client, "send", side_effect=send  # pylint: disable=protected-access
         ):
             assert client.AcquireTask(AcquireTaskRequest()).task.task_id == 5
-            assert interceptor.take_task_traceparent(5) == _CARRIER
             assert interceptor.take_task_traceparent(5) == ""
             assert client.PullTaskInput(PullTaskInputRequest()).task_id == 5
-            assert interceptor.take_task_traceparent(5) == _CARRIER
-            app.state.runtime_state_factory.state = Mock(
-                side_effect=RuntimeError("metadata")
-            )
-            assert client.AcquireTask(AcquireTaskRequest()).task.task_id == 5
             assert interceptor.take_task_traceparent(5) == ""
 
 
@@ -146,10 +135,9 @@ def test_tracing_interceptor_failure_preserves_response(
 def test_completion_tracing_scopes_handler_and_preserves_failure(
     monkeypatch: pytest.MonkeyPatch, app: FastAPI, failed: bool
 ) -> None:
-    """The dependency wraps business work even if the metadata lookup fails."""
+    """The dependency wraps business work and preserves application failures."""
     manager = MagicMock()
     backend = Mock(trace_span=Mock(return_value=manager))
-    backend.load_task_context.side_effect = RuntimeError("metadata")
     monkeypatch.setattr("flwr.supercore.tracing._load_backend", lambda: backend)
     error = ValueError("business failure")
 
@@ -166,7 +154,7 @@ def test_completion_tracing_scopes_handler_and_preserves_failure(
             server.post,
             "/v1/runtime/push-task-output",
             content=PushTaskOutputRequest().SerializeToString(),
-            headers={"content-type": PROTOBUF_MEDIA_TYPE},
+            headers={"content-type": PROTOBUF_MEDIA_TYPE, "traceparent": _CARRIER},
         )
         if failed:
             with pytest.raises(ValueError) as caught:
@@ -175,3 +163,4 @@ def test_completion_tracing_scopes_handler_and_preserves_failure(
         else:
             assert push().status_code == 200
         manager.__exit__.assert_called_once_with(None, None, None)
+        assert backend.trace_span.call_args.kwargs["traceparent"] == _CARRIER

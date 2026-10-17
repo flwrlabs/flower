@@ -121,11 +121,6 @@ from flwr.supercore.state.schema.corestate_models import TaskLogsTable
 from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
-from flwr.supercore.tracing import (
-    current_traceparent,
-    load_task_context,
-    store_task_context,
-)
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
@@ -1564,10 +1559,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             try:
                 if session.scalar(insert_stmt) is None:
                     return None
-                carrier = current_traceparent()
-                if not carrier and requesting_task_id is not None:
-                    carrier = load_task_context(self, requesting_task_id)
-                store_task_context(self, task_id, carrier)
                 return task_id
             except IntegrityError:
                 return None
