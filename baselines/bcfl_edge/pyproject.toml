@@ -1,0 +1,144 @@
+# =====================================================================
+# For a full TOML configuration guide, check the Flower docs:
+# https://flower.ai/docs/framework/how-to-configure-pyproject-toml.html
+# =====================================================================
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bcfl-edge"
+version = "1.0.0"
+description = "Energy-Efficient and Latency-Aware Blockchain-Enabled Federated Learning for Edge Networks"
+license = "Apache-2.0"
+# Dependencies for your Flower App
+dependencies = [
+    "flwr[simulation]>=1.42.0",
+    "flwr-datasets[audio]>=0.6.1",
+    "torch==2.14.1",
+    "bcfl-optimizer @ git+https://github.com/v1nayh3g/bcfl-optimizer@76fea2c93fa2dd5e4784570ffac98baa9c3750db",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[project.optional-dependencies]
+dev = [
+    "isort==5.13.2",
+    "black==24.2.0",
+    "mypy==1.8.0",
+    "pylint==3.3.1",
+    "pytest==7.4.4",
+    "pytest-watch==4.2.0",
+    "ruff==0.4.5",
+    "types-requests==2.31.0.20240125",
+]
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line-length = 88
+target-version = ["py310", "py311", "py312"]
+
+[tool.pytest.ini_options]
+minversion = "6.2"
+addopts = "-qq"
+
+[tool.mypy]
+ignore_missing_imports = true
+strict = false
+plugins = "numpy.typing.mypy_plugin"
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = "duplicate-code,too-few-public-methods,useless-import-alias"
+good-names = "i,j,k,_,x,y,X,Y,K,N"
+max-args = 10
+max-attributes = 15
+max-locals = 36
+max-branches = 20
+max-statements = 55
+
+[tool.pylint.typecheck]
+generated-members = "numpy.*, torch.*, tensorflow.*"
+
+[[tool.mypy.overrides]]
+module = [
+    "importlib.metadata.*",
+    "importlib_metadata.*",
+]
+follow_imports = "skip"
+follow_imports_for_stubs = true
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = "torch.*"
+follow_imports = "skip"
+follow_imports_for_stubs = true
+
+[[tool.mypy.overrides]]
+module = "sqlalchemy.*"
+follow_imports = "skip"
+follow_imports_for_stubs = true
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    "proto",
+]
+
+[tool.ruff.lint]
+select = ["D", "E", "F", "W", "B", "ISC", "C4", "UP"]
+fixable = ["D", "E", "F", "W", "B", "ISC", "C4", "UP"]
+ignore = ["B024", "B027", "D205", "D209"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.flwr.app]
+publisher = "flwrlabs"
+
+# Point to your ServerApp and ClientApp objects
+# Format: "<module>:<object>"
+[tool.flwr.app.components]
+serverapp = "bcfl_edge.server_app:app"
+clientapp = "bcfl_edge.client_app:app"
+
+# Custom config values accessible via `context.run_config`
+[tool.flwr.app.config]
+num-server-rounds = 50
+num-devices = 50          # N_D, must equal num-supernodes
+num-miners = 15           # N_M
+selected-devices = 40     # S_D, devices trained on in every round
+selection = "bcfl"        # "bcfl" (Algorithm 1) or "random"
+beta = 0.5                # latency vs. energy weight, Eq. (11)
+seed = 42                 # simulated network and random baseline
+local-epochs = 1
+batch-size = 32
+learning-rate = 0.01
+dataset = "google/speech_commands"
