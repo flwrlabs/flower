@@ -21,7 +21,12 @@ from datasets import Audio, ClassLabel, Dataset, Features
 
 from bcfl_edge.dataset import KEYWORDS
 
-URL = "https://download.tensorflow.org/data/speech_commands_v0.01.tar.gz"
+# The same official file, from Google Cloud Storage first.
+URLS = (
+    "https://storage.googleapis.com/download.tensorflow.org/data/"
+    "speech_commands_v0.01.tar.gz",
+    "https://download.tensorflow.org/data/speech_commands_v0.01.tar.gz",
+)
 
 README = """---
 configs:
@@ -66,6 +71,21 @@ def convert(root: Path, out_dir: Path) -> None:
     (out_dir / "README.md").write_text(README.format(keywords=", ".join(KEYWORDS)))
 
 
+def download(path: Path) -> None:
+    """Download the archive, trying each official URL in turn."""
+    for url in URLS:
+        print(f"Downloading {url} (1.4 GB)...")
+        try:
+            urllib.request.urlretrieve(url, path)
+            return
+        except OSError as error:
+            print(f"  failed: {error}")
+    raise SystemExit(
+        "Could not download the archive. Download it in a browser from\n"
+        f"  {URLS[0]}\nand pass it with --archive <path>."
+    )
+
+
 def main() -> None:
     """Download, extract and convert the dataset."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n", maxsplit=1)[0])
@@ -79,8 +99,7 @@ def main() -> None:
         archive = args.archive
         if archive is None:
             archive = Path(tmp) / "speech_commands_v0.01.tar.gz"
-            print(f"Downloading {URL} (1.4 GB)...")
-            urllib.request.urlretrieve(URL, archive)
+            download(archive)
         root = Path(tmp) / "extracted"
         with tarfile.open(archive) as tar:
             # Extract only the eight keyword folders and the test list.
