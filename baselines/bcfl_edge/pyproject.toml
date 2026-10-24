@@ -17,7 +17,7 @@ dependencies = [
     "flwr[simulation]>=1.42.0",
     "flwr-datasets[audio]>=0.6.1",
     "torch==2.14.1",
-    "bcfl-optimizer @ git+https://github.com/v1nayh3g/bcfl-optimizer@76fea2c93fa2dd5e4784570ffac98baa9c3750db",
+    "bcfl-optimizer==0.2.0",
 ]
 
 [tool.hatch.metadata]

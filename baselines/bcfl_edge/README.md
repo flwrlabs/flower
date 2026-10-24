@@ -120,7 +120,7 @@ The resource side of the paper does not depend on training. Running the referenc
 implementation on the paper's exact simulation parameters reproduces Fig. 3(a, c):
 
 ```bash
-git clone https://github.com/v1nayh3g/bcfl-optimizer && cd bcfl-optimizer
+git clone --branch v0.2.0 https://github.com/v1nayh3g/bcfl-optimizer && cd bcfl-optimizer
 pip install -e ".[plot]" && python reproduce/reproduce.py --plot
 ```
 
