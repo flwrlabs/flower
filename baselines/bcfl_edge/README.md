@@ -30,7 +30,7 @@ The paper selects which devices, and therefore which miners, take part, so as to
 
 The `random` selection gives the paper's random baseline (Fig. 4). The cost model and Algorithm 1 come from [`bcfl-optimizer`](https://github.com/v1nayh3g/bcfl-optimizer), the authors' reference implementation. On the exact parameters behind the paper's figures, it selects the same number of miners, with the same A_fork, in all 30 settings of Fig. 3.
 
-**Datasets:** [Google Speech Commands](https://huggingface.co/datasets/google/speech_commands) v0.01 (about 1.5 GB), through Flower Datasets.
+**Datasets:** [Google Speech Commands](https://huggingface.co/datasets/google/speech_commands) v0.01 (1.4 GB archive), converted by `bcfl_edge.prepare_data` and partitioned with Flower Datasets.
 
 **Hardware Setup:** One round with 40 selected devices takes about a minute on 2 CPU cores. Algorithm 1 runs once before the first round, in under a minute for N_M = 15. No GPU is needed.
 
@@ -91,13 +91,24 @@ pip install -e .
 
 Decoding the audio requires FFmpeg (`apt install ffmpeg` or `brew install ffmpeg`).
 
+Prepare the data once. `google/speech_commands` on the Hub is a loading script that
+recent versions of `datasets` no longer run, so this downloads Google's official v0.01
+archive (1.4 GB) and writes the eight keywords, with the official test split, as Parquet:
+
+```bash
+python -m bcfl_edge.prepare_data data/speech_commands
+```
+
+It prints the absolute path of the folder; pass it as `dataset` in every run below
+(shown as `$DATA`).
+
 
 ## Running the Experiments
 
 Train on the 40 devices selected by Algorithm 1 (S_D = 80% of N_D, the setting of Sec. V):
 
 ```bash
-flwr run . --federation-config "num-supernodes=50" --stream
+flwr run . --federation-config "num-supernodes=50" --run-config "dataset='$DATA'" --stream
 ```
 
 Each run writes `outputs/<selection>_sd<S_D>_<time>.json`. The file holds:
@@ -108,9 +119,9 @@ Each run writes `outputs/<selection>_sd<S_D>_<time>.json`. The file holds:
 Compare with random selection, and vary S_D (Fig. 3, Fig. 4):
 
 ```bash
-flwr run . --federation-config "num-supernodes=50" --run-config "selection='random'"
+flwr run . --federation-config "num-supernodes=50" --run-config "dataset='$DATA' selection='random'"
 for sd in 10 20 30 40 50; do
-  flwr run . --federation-config "num-supernodes=50" --run-config "selected-devices=$sd"
+  flwr run . --federation-config "num-supernodes=50" --run-config "dataset='$DATA' selected-devices=$sd"
 done
 ```
 

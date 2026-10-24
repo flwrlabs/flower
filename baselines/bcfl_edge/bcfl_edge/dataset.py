@@ -55,6 +55,11 @@ def _to_tensors(batch):
 
 def _federated_dataset(dataset: str, num_partitions: int) -> FederatedDataset:
     global FDS  # pylint: disable=global-statement
+    if not dataset:
+        raise ValueError(
+            "Set `dataset` to the folder written by "
+            "`python -m bcfl_edge.prepare_data <folder>` (see README)."
+        )
     if FDS is None:
         FDS = FederatedDataset(
             dataset=dataset,
