@@ -1,5 +1,6 @@
 """bcfl_edge: FedAvg on the devices selected by Algorithm 1 (Kushwaha et al.)."""
 
+import time
 from collections.abc import Iterable
 from logging import INFO
 from typing import cast
@@ -10,7 +11,6 @@ from flwr.app import ArrayRecord, ConfigRecord, Message, MessageType, RecordDict
 from flwr.common import log
 from flwr.serverapp import Grid
 from flwr.serverapp.strategy import FedAvg
-from flwr.serverapp.strategy.strategy_utils import sample_nodes
 
 
 class BCFL(FedAvg):
@@ -39,6 +39,10 @@ class BCFL(FedAvg):
         "bcfl" for Algorithm 1, or "random" for the paper's random baseline.
     seed : int (default: 42)
         Seed of the simulated network and of the random baseline.
+    local_epochs : int (default: 1)
+        Local epochs per round, used in the devices' computation cost (Eq. 2).
+    discovery_timeout : float (default: 600)
+        Seconds to wait for all nodes to connect and report their profile.
     **kwargs
         Passed to FedAvg.
     """
@@ -52,6 +56,8 @@ class BCFL(FedAvg):
         beta: float = 0.5,
         selection: str = "bcfl",
         seed: int = 42,
+        local_epochs: int = 1,
+        discovery_timeout: float = 600.0,
         **kwargs,
     ) -> None:
         if selection not in ("bcfl", "random"):
@@ -63,6 +69,8 @@ class BCFL(FedAvg):
         self.beta = beta
         self.selection = selection
         self.seed = seed
+        self.local_epochs = local_epochs
+        self.discovery_timeout = discovery_timeout
         self.round_cost: dict[str, float | int | list[int]] = {}
         self._train_nodes: list[int] = []
 
@@ -88,7 +96,16 @@ class BCFL(FedAvg):
 
     def _select_devices(self, grid: Grid) -> list[int]:
         """Query every node, build the network and run the device selection."""
-        node_ids, _ = sample_nodes(grid, self.num_devices, self.num_devices)
+        deadline = time.time() + self.discovery_timeout
+        while len(node_ids := sorted(grid.get_node_ids())) < self.num_devices:
+            if time.time() > deadline:
+                raise RuntimeError(
+                    f"Only {len(node_ids)} of {self.num_devices} nodes connected "
+                    f"within {self.discovery_timeout} s."
+                )
+            log(INFO, "Waiting for nodes: %d of %d", len(node_ids), self.num_devices)
+            time.sleep(1)
+        node_ids = node_ids[: self.num_devices]
         queries = [
             Message(
                 content=RecordDict({self.configrecord_key: ConfigRecord()}),
@@ -98,7 +115,15 @@ class BCFL(FedAvg):
             for node_id in node_ids
         ]
         profiles = []
-        for reply in grid.send_and_receive(queries):
+        replies = list(
+            grid.send_and_receive(queries, timeout=max(1.0, deadline - time.time()))
+        )
+        if len(replies) < self.num_devices:
+            raise RuntimeError(
+                f"Only {len(replies)} of {self.num_devices} nodes reported their "
+                f"profile within {self.discovery_timeout} s."
+            )
+        for reply in replies:
             if reply.has_error():
                 raise RuntimeError(f"Node query failed: {reply.error.reason}")
             profile = reply.content.metric_records["profile"]
@@ -113,7 +138,11 @@ class BCFL(FedAvg):
         data_size = [size for _, size, _ in profiles]
 
         devices = DevicePool.random(
-            len(profiles), self.num_miners, seed=self.seed, data_size=data_size
+            len(profiles),
+            self.num_miners,
+            seed=self.seed,
+            data_size=data_size,
+            epochs=self.local_epochs,
         )
         miners = MinerPool.random(self.num_miners, seed=self.seed)
         if self.selection == "bcfl":
@@ -127,8 +156,9 @@ class BCFL(FedAvg):
             miner_set = np.unique(devices.miner[chosen])
 
         latency, energy = round_cost(devices, miners, chosen, miner_set)
+        all_miners = np.unique(devices.miner)
         all_latency, all_energy = round_cost(
-            devices, miners, np.arange(devices.n), np.unique(devices.miner)
+            devices, miners, np.arange(devices.n), all_miners
         )
         self.round_cost = {
             "selected-devices": [int(i) for i in chosen],
@@ -140,6 +170,9 @@ class BCFL(FedAvg):
             "energy": float(energy),
             "latency-all-devices": float(all_latency),
             "energy-all-devices": float(all_energy),
+            "a-fork-all-devices": forking_multiplier(
+                miners.block_time(all_miners), miners.mining_rate
+            ),
         }
         log(
             INFO,

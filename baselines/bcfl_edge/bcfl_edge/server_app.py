@@ -35,6 +35,7 @@ def main(grid: Grid, context: Context) -> None:
         beta=float(cfg["beta"]),
         selection=str(cfg["selection"]),
         seed=int(cfg["seed"]),
+        local_epochs=int(cfg["local-epochs"]),
         fraction_evaluate=0.0,  # the global model is evaluated centrally
     )
     result = strategy.start(
