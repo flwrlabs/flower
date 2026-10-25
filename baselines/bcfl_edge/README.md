@@ -32,7 +32,7 @@ The `random` selection gives the paper's random baseline (Fig. 4). The cost mode
 
 **Datasets:** [Google Speech Commands](https://huggingface.co/datasets/google/speech_commands) v0.01 (1.4 GB archive), converted by `bcfl_edge.prepare_data` and partitioned with Flower Datasets.
 
-**Hardware Setup:** One round with 40 selected devices takes about a minute on 2 CPU cores. Algorithm 1 runs once before the first round, in under a minute for N_M = 15. No GPU is needed.
+**Hardware Setup:** On a Windows laptop with an NVIDIA GPU, preparing the data takes about 4 minutes and each 50-round run about 30 minutes. Algorithm 1 runs once before the first round, in under a minute for N_M = 15. A GPU is not required; on CPU, rounds are slower.
 
 **Contributors:** Vinayaka Hegde ([@v1nayh3g](https://github.com/v1nayh3g))
 
@@ -55,7 +55,7 @@ The `random` selection gives the paper's random baseline (Fig. 4). The cost mode
 
 | Dataset | Keywords | Devices (N_D) | Partitioning | Train / test samples |
 |---|---|---|---|---|
-| Speech Commands v0.01 | go, stop, left, right, up, down, yes, no | 50 | Dirichlet over labels, α = 0.5, at least 20 samples per device | about 14.8k / 2k |
+| Speech Commands v0.01 | go, stop, left, right, up, down, yes, no | 50 | Dirichlet over labels, α = 0.5, at least 20 samples per device | 16,899 / 2,059 |
 
 Each device reports its number of samples D_n to the server before the first round. The
 blockchain network is simulated from the paper's Table I. Each device is associated with
@@ -89,7 +89,9 @@ pyenv activate bcfl-edge
 pip install -e .
 ```
 
-Decoding the audio requires FFmpeg (`apt install ffmpeg` or `brew install ffmpeg`).
+Decoding the audio requires FFmpeg (`apt install ffmpeg`, `brew install ffmpeg`, or `conda install -c conda-forge ffmpeg` on Windows).
+
+On Windows, set `PYTHONUTF8=1` before `flwr run`. Otherwise Flower's log output can stop with a `'charmap' codec can't encode` error (the simulation itself keeps running).
 
 Prepare the data once. `google/speech_commands` on the Hub is a loading script that
 recent versions of `datasets` no longer run, so this downloads Google's official v0.01
@@ -127,7 +129,22 @@ done
 
 ### Expected results
 
-The resource side of the paper does not depend on training. Running the reference
+**Training (Fig. 3(b), Fig. 4).** 50 rounds on Speech Commands v0.01 with N_D = 50, N_M = 15 and S_D = 40, comparing Algorithm 1 with random selection of the same number of devices:
+
+| Selection | Miners | A_fork | Round latency (s) | Round energy (J) | Final accuracy | Final F1 |
+|---|---|---|---|---|---|---|
+| Algorithm 1 | 10 | 153 | 332 | 6,216 | 0.787 | 0.786 |
+| Random selection | 15 | 2,815 | 5,526 | 150,372 | 0.789 | 0.787 |
+
+![Test accuracy and F1 per round](_static/accuracy.png)
+
+Both selections reach the same accuracy. Algorithm 1 keeps the selected devices on 10 of the 15 miners. That cuts the forking multiplier 18×, round latency 17× and round energy 24× (using all 50 devices: 5,813 s and 192,588 J). To plot your own runs:
+
+```bash
+python -m bcfl_edge.plot outputs _static/accuracy.png
+```
+
+**Blockchain cost (Fig. 3(a, c)).** The resource side of the paper does not depend on training. Running the reference
 implementation on the paper's exact simulation parameters reproduces Fig. 3(a, c):
 
 ```bash
