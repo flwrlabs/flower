@@ -20,13 +20,56 @@
 ## Supported tags
 
 - `latest`
-  - points to `1.29.0` and `1.29.0-py3.13-ubuntu24.04`
+  - points to `1.42.0` and `1.42.0-py3.13-ubuntu24.04`
   - uses Python 3.13 and Ubuntu 24.04
 - `unstable`
   - points to the last successful build of the `main` branch
-- `nightly`, `<version>.dev<YYYYMMDD>` e.g. `1.30.0.dev20260412`
+- `nightly`, `<version>.dev<YYYYMMDD>` e.g. `1.43.0.dev20261022`
   - uses Python 3.13 and Ubuntu 24.04
-- `1.29.0`, `1.29.0-py3.13-ubuntu24.04`, `latest`
+- `1.42.0`, `1.42.0-py3.13-ubuntu24.04`, `latest`
+- `1.42.0-py3.12-ubuntu24.04`
+- `1.42.0-py3.11-ubuntu24.04`
+- `1.41.0`, `1.41.0-py3.13-ubuntu24.04`
+- `1.41.0-py3.12-ubuntu24.04`
+- `1.41.0-py3.11-ubuntu24.04`
+- `1.40.0`, `1.40.0-py3.13-ubuntu24.04`
+- `1.40.0-py3.12-ubuntu24.04`
+- `1.40.0-py3.11-ubuntu24.04`
+- `1.39.0`, `1.39.0-py3.13-ubuntu24.04`
+- `1.39.0-py3.12-ubuntu24.04`
+- `1.39.0-py3.11-ubuntu24.04`
+- `1.38.0`, `1.38.0-py3.13-ubuntu24.04`
+- `1.38.0-py3.12-ubuntu24.04`
+- `1.38.0-py3.11-ubuntu24.04`
+- `1.37.0`, `1.37.0-py3.13-ubuntu24.04`
+- `1.37.0-py3.12-ubuntu24.04`
+- `1.37.0-py3.11-ubuntu24.04`
+- `1.36.0`, `1.36.0-py3.13-ubuntu24.04`
+- `1.36.0-py3.12-ubuntu24.04`
+- `1.36.0-py3.11-ubuntu24.04`
+- `1.35.0`, `1.35.0-py3.13-ubuntu24.04`
+- `1.35.0-py3.12-ubuntu24.04`
+- `1.35.0-py3.11-ubuntu24.04`
+- `1.34.0`, `1.34.0-py3.13-ubuntu24.04`
+- `1.34.0-py3.12-ubuntu24.04`
+- `1.34.0-py3.11-ubuntu24.04`
+- `1.33.0`, `1.33.0-py3.13-ubuntu24.04`
+- `1.33.0-py3.12-ubuntu24.04`
+- `1.33.0-py3.11-ubuntu24.04`
+- `1.32.1`, `1.32.1-py3.13-ubuntu24.04`
+- `1.32.1-py3.12-ubuntu24.04`
+- `1.32.1-py3.11-ubuntu24.04`
+- `1.32.0`, `1.32.0-py3.13-ubuntu24.04`
+- `1.32.0-py3.12-ubuntu24.04`
+- `1.32.0-py3.11-ubuntu24.04`
+- `1.31.0`, `1.31.0-py3.13-ubuntu24.04`
+- `1.31.0-py3.12-ubuntu24.04`
+- `1.31.0-py3.11-ubuntu24.04`
+- `1.30.0`, `1.30.0-py3.13-ubuntu24.04`
+- `1.30.0-py3.12-ubuntu24.04`
+- `1.30.0-py3.11-ubuntu24.04`
+- `1.30.0-py3.10-ubuntu24.04`
+- `1.29.0`, `1.29.0-py3.13-ubuntu24.04`
 - `1.29.0-py3.12-ubuntu24.04`
 - `1.29.0-py3.11-ubuntu24.04`
 - `1.29.0-py3.10-ubuntu24.04`

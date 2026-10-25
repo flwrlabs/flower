@@ -17,12 +17,12 @@
 
 import unittest
 from itertools import product
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import numpy as np
 from parameterized import parameterized
 
-from flwr.common import ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
+from flwr.app import ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectRequest,
     PullObjectResponse,
@@ -31,11 +31,12 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.inflatable.inflatable_utils import (
-    ObjectIdNotPreregisteredError,
-    ObjectUnavailableError,
+    ObjectPullError,
+    ObjectPushError,
     pull_objects,
     push_objects,
 )
+from flwr.supercore.task_identity import TaskIdentity
 
 from .inflatable_object import get_all_nested_objects
 from .inflatable_protobuf_utils import (
@@ -66,6 +67,11 @@ class TestInflatableStubHelpers(unittest.TestCase):  # pylint: disable=R0902
 
     def setUp(self) -> None:
         """Initialize mock stub and server interceptor."""
+        identity_patcher = patch.multiple(
+            TaskIdentity, _task_id=123, _run_id=456, _node_id=789
+        )
+        identity_patcher.start()
+        self.addCleanup(identity_patcher.stop)
         self.mock_store: dict[str, bytes] = {}
         self.mock_stub = Mock()
 
@@ -88,7 +94,7 @@ class TestInflatableStubHelpers(unittest.TestCase):  # pylint: disable=R0902
         node = Node(node_id=456)
         run_id = 1234
         self.push_object_fn = make_push_object_fn_protobuf(
-            self.mock_stub.PushObject, node, run_id
+            self.mock_stub.PushObject, node, run_id, session_id=""
         )
         self.pull_object_fn = make_pull_object_fn_protobuf(
             self.mock_stub.PullObject, node, run_id
@@ -124,6 +130,14 @@ class TestInflatableStubHelpers(unittest.TestCase):  # pylint: disable=R0902
         assert self.mock_stub.PushObject.call_count == expected_obj_count
         assert num_pushed_objects == expected_obj_count
 
+    def test_push_object_failure(self) -> None:
+        """Test pushing an object that the receiver fails to store."""
+        with self.assertRaisesRegex(
+            ObjectPushError,
+            "Failed to push object with ID 'unknown-object' for run 1234",
+        ):
+            self.push_object_fn("unknown-object", b"content")
+
     @parameterized.expand(base_cases)  # type: ignore
     def test_pull_objects_success(
         self,
@@ -148,11 +162,11 @@ class TestInflatableStubHelpers(unittest.TestCase):  # pylint: disable=R0902
         assert pulled_objects == {k: v.deflate() for k, v in all_objects.items()}
 
     @parameterized.expand(base_cases)  # type: ignore
-    def test_pull_objects_no_preregistration_failure(
+    def test_pull_objects_missing_object_failure(
         self,
         records: dict[str, ArrayRecord | ConfigRecord | MetricRecord],
     ) -> None:
-        """Test pulling objects without pre-registering them."""
+        """Test pulling objects when one object cannot be found."""
         # Prepare
         obj = Message(RecordDict(records), dst_node_id=123, message_type="query")
         # Prepare: Pre-register all objects
@@ -167,7 +181,7 @@ class TestInflatableStubHelpers(unittest.TestCase):  # pylint: disable=R0902
         push_objects(all_objects, self.push_object_fn)
 
         # Execute and assert
-        with self.assertRaises(ObjectIdNotPreregisteredError):
+        with self.assertRaises(ObjectPullError):
             _ = pull_objects(all_object_ids, self.pull_object_fn)
 
     @parameterized.expand(base_cases)  # type: ignore
@@ -188,7 +202,7 @@ class TestInflatableStubHelpers(unittest.TestCase):  # pylint: disable=R0902
         push_objects(all_objects, self.push_object_fn)
 
         # Execute
-        with self.assertRaises(ObjectUnavailableError):
+        with self.assertRaises(ObjectPullError):
             _ = pull_objects(
                 all_object_ids,
                 self.pull_object_fn,
@@ -214,7 +228,7 @@ class TestInflatableStubHelpers(unittest.TestCase):  # pylint: disable=R0902
         push_objects(all_objects, self.push_object_fn)
 
         # Execute
-        with self.assertRaises(ObjectUnavailableError):
+        with self.assertRaises(ObjectPullError):
             _ = pull_objects(
                 all_object_ids,
                 self.pull_object_fn,

@@ -12,30 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Shared auth policy definitions."""
+"""Shared authentication helpers."""
 
 
-from .policy import (
-    CLIENTAPPIO_METHOD_AUTH_POLICY,
-    SERVERAPPIO_METHOD_AUTH_POLICY,
-    MethodTokenPolicy,
-)
 from .superexec import (
     compute_request_body_sha256,
     compute_superexec_signature,
+    create_superexec_auth_metadata,
     derive_auth_secret,
+    verify_superexec_request,
     verify_superexec_signature,
 )
 from .superexec_secret import add_superexec_auth_secret_args, load_superexec_auth_secret
 
 __all__ = [
-    "CLIENTAPPIO_METHOD_AUTH_POLICY",
-    "MethodTokenPolicy",
-    "SERVERAPPIO_METHOD_AUTH_POLICY",
     "add_superexec_auth_secret_args",
     "compute_request_body_sha256",
     "compute_superexec_signature",
+    "create_superexec_auth_metadata",
     "derive_auth_secret",
     "load_superexec_auth_secret",
+    "verify_superexec_request",
     "verify_superexec_signature",
 ]

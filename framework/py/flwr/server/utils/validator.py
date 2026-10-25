@@ -15,7 +15,7 @@
 """Validators."""
 
 
-from flwr.common import Message
+from flwr.app import Message
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.supercore.date import now
 
@@ -72,10 +72,6 @@ def validate_message(message: Message, is_reply_message: bool) -> list[str]:
         if metadata.src_node_id != SUPERLINK_NODE_ID:
             validation_errors.append(
                 f"`metadata.src_node_id` is not {SUPERLINK_NODE_ID} (SuperLink node ID)"
-            )
-        if metadata.dst_node_id == SUPERLINK_NODE_ID:
-            validation_errors.append(
-                f"`metadata.dst_node_id` is {SUPERLINK_NODE_ID} (SuperLink node ID)"
             )
     else:
         if metadata.reply_to_message_id == "":

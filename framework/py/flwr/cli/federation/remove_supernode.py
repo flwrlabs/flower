@@ -25,12 +25,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.control import ControlHttpClient
 
 from ..utils import (
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
-    init_channel_from_connection,
+    flwr_cli_exc_handler,
+    init_http_client_from_connection,
     print_json_to_stdout,
 )
 
@@ -43,7 +43,7 @@ def remove_supernode(
     ],
     federation: Annotated[
         str,
-        typer.Argument(help="Name of the federation."),
+        typer.Argument(help="Federation ID."),
     ],
     superlink: Annotated[
         str | None,
@@ -65,30 +65,29 @@ def remove_supernode(
 
         # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
-        channel = None
+        control_client = None
 
         try:
-            channel = init_channel_from_connection(superlink_connection)
-            stub = ControlStub(channel)
+            control_client = init_http_client_from_connection(superlink_connection)
 
             request = RemoveNodeFromFederationRequest(
                 federation_name=federation,
                 node_id=node_id,
             )
-            _remove_supernode(stub=stub, request=request, is_json=is_json)
+            _remove_supernode(stub=control_client, request=request, is_json=is_json)
 
         finally:
-            if channel:
-                channel.close()
+            if control_client:
+                control_client.close()
 
 
 def _remove_supernode(  # pylint: disable=W0613
-    stub: ControlStub,
+    stub: ControlHttpClient,
     request: RemoveNodeFromFederationRequest,
     is_json: bool,
 ) -> None:
     """Remove a SuperNode from a federation."""
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         _: RemoveNodeFromFederationResponse = stub.RemoveNodeFromFederation(request)
 
     if is_json:

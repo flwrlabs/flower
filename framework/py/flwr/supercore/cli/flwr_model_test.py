@@ -14,18 +14,24 @@
 # ==============================================================================
 """Tests for ModelApp process CLI parsing and wiring."""
 
-
 import importlib
+import io
+import sys
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
 
-from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+from flwr.common.constant import (
+    FLWR_TASK_TOKEN_LENGTH,
+    FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
+)
+from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 
 from .flwr_model import _parse_args_run_flwr_model
 
 flwr_model_module = importlib.import_module("flwr.supercore.cli.flwr_model")
+_VALID_TASK_TOKEN = "a" * (FLWR_TASK_TOKEN_LENGTH * 2)
 
 
 def test_parse_flwr_model_requires_token() -> None:
@@ -53,43 +59,50 @@ def test_parse_flwr_model_parses_tokenized_invocation() -> None:
         ]
     )
 
-    assert args.serverappio_api_address == SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+    assert args.runtime_api_address == SUPERLINK_DEFAULT_CLIENT_ADDRESS
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
     assert args.runtime_dependency_install is True
 
 
-def test_flwr_model_parses_args_before_mirroring_output() -> None:
-    """Argument parsing should happen before stdout/stderr redirection."""
+def test_parse_flwr_model_accepts_only_one_token_source() -> None:
+    """The private stdin mode should be mutually exclusive with other sources."""
+    parser = _parse_args_run_flwr_model()
 
-    class _Parser:
-        def parse_args(self) -> SimpleNamespace:
-            """Raise a parser error before any side effects happen."""
-            raise SystemExit(2)
+    assert parser.parse_args(["--token-stdin"]).token_stdin is True
 
-    mirror_output_to_queue = Mock()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--token", "test-token", "--token-stdin"])
+
+
+def test_flwr_model_reads_stdin_token_and_acknowledges_start(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The private handoff should consume one token before acknowledging it."""
+    token_stdin = io.TextIOWrapper(io.BytesIO(f"{_VALID_TASK_TOKEN}\n".encode()))
+    monkeypatch.setattr(sys, "stdin", token_stdin)
+    monkeypatch.setattr(sys, "argv", ["flwr-model", "--token-stdin", "--insecure"])
 
     with (
-        patch.object(flwr_model_module, "_parse_args_run_flwr_model", _Parser),
-        patch.object(
-            flwr_model_module,
-            "mirror_output_to_queue",
-            mirror_output_to_queue,
-        ),
-        pytest.raises(SystemExit),
+        patch.object(flwr_model_module, "restore_output"),
+        patch.object(flwr_model_module, "run_model") as run_model,
     ):
         flwr_model_module.flwr_model()
 
-    mirror_output_to_queue.assert_not_called()
+    assert token_stdin.closed
+    assert FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT in capsys.readouterr().out
+    assert run_model.call_args.kwargs["token"] == _VALID_TASK_TOKEN
 
 
 def test_flwr_model_forwards_cli_args() -> None:
     """The ModelApp CLI should forward parsed args to the runtime."""
     args = SimpleNamespace(
         insecure=True,
-        serverappio_api_address="127.0.0.1:9091",
+        runtime_api_address="127.0.0.1:9091",
         token="test-token",
+        root_certificates=None,
         parent_pid=321,
         runtime_dependency_install=True,
     )
@@ -99,29 +112,18 @@ def test_flwr_model_forwards_cli_args() -> None:
             """Return a fixed namespace for CLI forwarding tests."""
             return args
 
-    mirror_output_to_queue = Mock()
-    restore_output = Mock()
     run_model = Mock()
 
     with (
         patch.object(flwr_model_module, "_parse_args_run_flwr_model", _Parser),
-        patch.object(
-            flwr_model_module,
-            "mirror_output_to_queue",
-            mirror_output_to_queue,
-        ),
-        patch.object(flwr_model_module, "restore_output", restore_output),
         patch.object(flwr_model_module, "run_model", run_model),
     ):
         flwr_model_module.flwr_model()
 
-    mirror_output_to_queue.assert_called_once()
-    restore_output.assert_called_once_with()
     run_model.assert_called_once()
     kwargs = run_model.call_args.kwargs
-    assert kwargs["serverappio_api_address"] == "127.0.0.1:9091"
-    assert kwargs["log_queue"] is mirror_output_to_queue.call_args.args[0]
+    assert kwargs["runtime_api_address"] == "127.0.0.1:9091"
     assert kwargs["token"] == "test-token"
+    assert kwargs["insecure"] is True
     assert kwargs["certificates"] is None
     assert kwargs["parent_pid"] == 321
-    assert kwargs["runtime_dependency_install"] is True

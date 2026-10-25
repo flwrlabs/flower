@@ -55,15 +55,18 @@ ARG PIP_VERSION
 ARG SETUPTOOLS_VERSION
 # Keep the version of system Python pip and setuptools in sync with those installed in the
 # virtualenv.
-RUN pip install -U --no-cache-dir pip==${PIP_VERSION} setuptools==${SETUPTOOLS_VERSION} \
+RUN pip_wheel='pip @ https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl#sha256=fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70' \
+    && test "${PIP_VERSION}" = "26.2.2" \
+    && python -m pip install -U --no-cache-dir "${pip_wheel}" \
+    && python -m pip install -U --no-cache-dir setuptools==${SETUPTOOLS_VERSION} \
     # Use a virtual environment to ensure that Python packages are installed in the same location
     # regardless of whether the subsequent image build is run with the app or the root user
     && python -m venv /python/venv
 ENV PATH=/python/venv/bin:$PATH
 
-RUN pip install -U --no-cache-dir \
-    pip==${PIP_VERSION} \
-    setuptools==${SETUPTOOLS_VERSION}
+RUN pip_wheel='pip @ https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl#sha256=fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70' \
+    && python -m pip install -U --no-cache-dir "${pip_wheel}" \
+    && python -m pip install -U --no-cache-dir setuptools==${SETUPTOOLS_VERSION}
 
 ARG FLWR_VERSION
 ARG FLWR_VERSION_REF

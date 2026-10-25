@@ -30,7 +30,7 @@ env:
 
 jobs:
   build_and_deploy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Build and deploy framework docs
     steps:
       - uses: actions/checkout@v5
@@ -45,7 +45,7 @@ jobs:
       - name: Install Flower Framework
         run: |
           cd framework
-          python -m poetry install
+          uv sync --locked --all-groups
       - name: Sync required docs build assets from main for release branches
         if: ${{ startsWith(github.ref, 'refs/heads/release/framework-') || (github.event_name == 'pull_request' && startsWith(github.base_ref, 'release/framework-')) || (github.event_name == 'release' && startsWith(github.ref, 'refs/tags/framework-')) }}
         run: |
@@ -55,6 +55,7 @@ jobs:
             framework/docs/source/_static/docs-ui.js \
             framework/docs/source/_static/custom.css \
             framework/docs/source/conf_base.py \
+            framework/docs/source/ref-changelog.md \
             framework/docs/source/_templates/
       - name: Resolve docs version
         id: doc_version
@@ -89,7 +90,8 @@ jobs:
           DOC_VERSION: ${{ steps.doc_version.outputs.version }}
         run: |
           echo "Building docs for version: ${DOC_VERSION}"
-          ./framework/dev/build-docs.sh full
+          cd framework
+          uv run --no-sync ./dev/build-docs.sh full
       - name: Determine if this is the latest stable version
         if: ${{ github.repository == 'flwrlabs/flower' && ((startsWith(github.ref, 'refs/heads/release/framework-') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'release' && startsWith(github.ref, 'refs/tags/framework-'))) }}
         id: latest_check
@@ -131,20 +133,21 @@ jobs:
             aws s3 sync --exclude ".*" --cache-control "no-cache" ./framework/docs/build/html/${DOC_VERSION}/en/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/framework/
           fi
       - name: Generate and deploy shared docs UI metadata from main
-        if: ${{ github.repository == 'flwrlabs/flower' && (github.ref == 'refs/heads/main' || github.event_name == 'release') }}
+        if: ${{ github.repository == 'flwrlabs/flower' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/framework-')) }}
         env:
           AWS_DEFAULT_REGION: ${{ secrets.DOCS_AWS_DEFAULT_REGION }}
           AWS_ACCESS_KEY_ID: ${{ secrets.DOCS_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DOCS_AWS_SECRET_KEY_ID }}
         run: |
-          if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
-            echo "GitHub release event detected; generating docs UI metadata from `main`"
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "Generating docs UI metadata from `main`"
             git fetch origin main
             git checkout origin/main
           fi
 
-          python ./framework/docs/generate_docs_ui_metadata.py \
-            --docs-ui-config ./dev/docs-ui-config.yml \
-            --output ./framework/docs/build/docs-ui-metadata.json
+          cd framework
+          uv run --no-sync python ./docs/generate_docs_ui_metadata.py \
+            --docs-ui-config ../dev/docs-ui-config.yml \
+            --output ./docs/build/docs-ui-metadata.json
 
-          aws s3 cp --cache-control "no-cache" ./framework/docs/build/docs-ui-metadata.json s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/framework/docs-ui-metadata.json
+          aws s3 cp --cache-control "no-cache" ./docs/build/docs-ui-metadata.json s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/framework/docs-ui-metadata.json

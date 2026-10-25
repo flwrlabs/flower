@@ -27,6 +27,7 @@ Problem-oriented how-to guides show step-by-step how to achieve a specific goal.
     how-to-use-differential-privacy
     how-to-implement-fedbn
     how-to-use-cli-json-output
+    how-to-install-app-dependencies-at-runtime
     how-to-migrate-from-openfl
     how-to-upgrade-to-flower-1.0
     how-to-upgrade-to-flower-1.13

@@ -21,14 +21,7 @@ import numpy as np
 import pytest
 from parameterized import parameterized
 
-from flwr.common import (
-    Array,
-    ArrayRecord,
-    ConfigRecord,
-    Message,
-    MetricRecord,
-    RecordDict,
-)
+from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
 from flwr.serverapp.exception import InconsistentMessageReplies
 
 from .strategy_utils import (

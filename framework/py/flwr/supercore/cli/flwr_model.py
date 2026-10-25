@@ -14,45 +14,40 @@
 # ==============================================================================
 """`flwr-model` command."""
 
-
 import argparse
 from logging import DEBUG, INFO
-from queue import Queue
 
-from flwr.common.args import add_args_flwr_app_common
-from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
-from flwr.common.exit import ExitCode, flwr_exit
-from flwr.common.logger import log, mirror_output_to_queue, restore_output
-from flwr.supercore.executors.run_model import run_model
+from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
+from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
+from flwr.supercore import log
+from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
+from flwr.supercore.logger import restore_output
+from flwr.supercore.task_process import run_model
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 
 def flwr_model() -> None:
-    """Run process-isolated Flower ModelApp."""
+    """Run process-isolated Flower model task."""
     args = _parse_args_run_flwr_model().parse_args()
+    token = try_obtain_flwr_app_token(args)
 
-    if not args.insecure:
-        flwr_exit(
-            ExitCode.COMMON_TLS_NOT_SUPPORTED,
-            "`flwr-model` does not support TLS yet.",
-        )
-
-    # Capture stdout/stderr
-    log_queue: Queue[str | None] = Queue()
-    mirror_output_to_queue(log_queue)
+    if bool(getattr(args, "token_stdin", False)):
+        print(FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT, flush=True)
 
     log(INFO, "Start `flwr-model` process")
     log(
         DEBUG,
-        "`flwr-model` will attempt to connect to SuperLink's ServerAppIo API at %s",
-        args.serverappio_api_address,
+        "`flwr-model` will attempt to connect to SuperLink's Runtime API at %s",
+        args.runtime_api_address,
     )
     run_model(
-        serverappio_api_address=args.serverappio_api_address,
-        log_queue=log_queue,
-        token=args.token,
-        certificates=None,
+        runtime_api_address=args.runtime_api_address,
+        token=token,
+        insecure=args.insecure,
+        certificates=validate_and_resolve_root_certificates(
+            args.root_certificates, args.insecure
+        ),
         parent_pid=args.parent_pid,
-        runtime_dependency_install=args.runtime_dependency_install,
     )
 
     # Restore stdout/stderr
@@ -62,14 +57,15 @@ def flwr_model() -> None:
 def _parse_args_run_flwr_model() -> argparse.ArgumentParser:
     """Parse `flwr-model` command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Run a Flower ModelApp",
+        description="Run a Flower model task",
     )
     parser.add_argument(
-        "--serverappio-api-address",
-        default=SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+        "--runtime-api-address",
+        dest="runtime_api_address",
+        default=SUPERLINK_DEFAULT_CLIENT_ADDRESS,
         type=str,
-        help="Address of SuperLink's ServerAppIo API (IPv4, IPv6, or a domain name)."
-        f"By default, it is set to {SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS}.",
+        help="Address of SuperLink's Runtime API (IPv4, IPv6, or a domain name)."
+        f"By default, it is set to {SUPERLINK_DEFAULT_CLIENT_ADDRESS}.",
     )
-    add_args_flwr_app_common(parser=parser)
+    add_args_flwr_app_common(parser=parser, include_token_stdin=True)
     return parser

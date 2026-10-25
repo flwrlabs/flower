@@ -17,44 +17,27 @@
 
 from typing import Any
 
-from flwr.common import ConfigRecord, Context, Error, Message, Metadata, now, serde
-from flwr.common.constant import (
-    HEARTBEAT_PATIENCE,
-    SUPERLINK_NODE_ID,
-    ErrorCode,
-    Status,
-    SubStatus,
-)
-from flwr.common.message import make_message
+from flwr.app import DEFAULT_TTL, ConfigRecord, Error, Message, Metadata, RecordDict
+from flwr.app.message import make_message
+from flwr.common.constant import HEARTBEAT_PATIENCE, SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
-from flwr.common.typing import RunStatus
 
 # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError
-from flwr.proto.message_pb2 import Context as ProtoContext
-from flwr.proto.recorddict_pb2 import ConfigRecord as ProtoConfigRecord
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
-from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
+from flwr.supercore.constant import (
+    AGENT_MESSAGE_CONTENT_RECORD_KEY,
+    AGENT_MESSAGE_TEXT_KEY,
+    SYSTEM_MESSAGE_TYPE,
+)
 from flwr.supercore.corestate.utils import (
     generate_rand_int_from_bytes as corestate_generate_rand_int_from_bytes,
 )
+from flwr.supercore.date import now
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 # pylint: enable=E0611
-VALID_RUN_STATUS_TRANSITIONS = {
-    (Status.PENDING, Status.STARTING),
-    (Status.STARTING, Status.RUNNING),
-    (Status.RUNNING, Status.FINISHED),
-    # Any non-FINISHED status can transition to FINISHED
-    (Status.PENDING, Status.FINISHED),
-    (Status.STARTING, Status.FINISHED),
-}
-VALID_RUN_SUB_STATUSES = {
-    SubStatus.COMPLETED,
-    SubStatus.FAILED,
-    SubStatus.STOPPED,
-}
 MESSAGE_UNAVAILABLE_ERROR_REASON = (
     "Error: Message Unavailable - The requested message could not be found in the "
     "database. It may have expired due to its TTL, been deleted because the "
@@ -67,6 +50,26 @@ NODE_UNAVAILABLE_ERROR_REASON = (
     "Error: Node Unavailable — The destination node failed to report a heartbeat "
     f"within {HEARTBEAT_PATIENCE} × its expected interval."
 )
+
+
+def create_user_prompt_message(run_id: int, user_prompt: str) -> Message:
+    """Create a SuperLink instruction Message carrying an AgentApp user prompt."""
+    metadata = Metadata(
+        run_id=run_id,
+        message_id="",
+        src_node_id=SUPERLINK_NODE_ID,
+        dst_node_id=SUPERLINK_NODE_ID,
+        reply_to_message_id="",
+        group_id="",
+        message_type=SYSTEM_MESSAGE_TYPE,
+        created_at=now().timestamp(),
+        ttl=DEFAULT_TTL,
+    )
+    agent_record = ConfigRecord({AGENT_MESSAGE_TEXT_KEY: user_prompt})
+    content = RecordDict({AGENT_MESSAGE_CONTENT_RECORD_KEY: agent_record})
+    message = make_message(metadata=metadata, content=content)
+    message.metadata.__dict__["_message_id"] = message.object_id
+    return message
 
 
 def generate_rand_int_from_bytes(
@@ -110,80 +113,6 @@ def convert_sint64_values_in_dict_to_uint64(
             data_dict[key] = int64_to_uint64(data_dict[key])
 
 
-def context_to_bytes(context: Context) -> bytes:
-    """Serialize `Context` to bytes."""
-    return serde.context_to_proto(context).SerializeToString()
-
-
-def context_from_bytes(context_bytes: bytes) -> Context:
-    """Deserialize `Context` from bytes."""
-    return serde.context_from_proto(ProtoContext.FromString(context_bytes))
-
-
-def configrecord_to_bytes(config_record: ConfigRecord) -> bytes:
-    """Serialize a `ConfigRecord` to bytes."""
-    return serde.config_record_to_proto(config_record).SerializeToString()
-
-
-def configrecord_from_bytes(configrecord_bytes: bytes) -> ConfigRecord:
-    """Deserialize `ConfigRecord` from bytes."""
-    return serde.config_record_from_proto(
-        ProtoConfigRecord.FromString(configrecord_bytes)
-    )
-
-
-def is_valid_transition(current_status: RunStatus, new_status: RunStatus) -> bool:
-    """Check if a transition between two run statuses is valid.
-
-    Parameters
-    ----------
-    current_status : RunStatus
-        The current status of the run.
-    new_status : RunStatus
-        The new status to transition to.
-
-    Returns
-    -------
-    bool
-        True if the transition is valid, False otherwise.
-    """
-    # Transition to FINISHED from a non-RUNNING status is only allowed
-    # if the sub-status is not COMPLETED
-    if (
-        current_status.status in [Status.PENDING, Status.STARTING]
-        and new_status.status == Status.FINISHED
-    ):
-        return new_status.sub_status != SubStatus.COMPLETED
-
-    return (
-        current_status.status,
-        new_status.status,
-    ) in VALID_RUN_STATUS_TRANSITIONS
-
-
-def has_valid_sub_status(status: RunStatus) -> bool:
-    """Check if the 'sub_status' field of the given status is valid.
-
-    Parameters
-    ----------
-    status : RunStatus
-        The status object to be checked.
-
-    Returns
-    -------
-    bool
-        True if the status object has a valid sub-status, False otherwise.
-
-    Notes
-    -----
-    Only an empty string (i.e., "") is considered a valid sub-status for
-    non-finished statuses. The sub-status of a finished status cannot be empty.
-    """
-    if status.status == Status.FINISHED:
-        return status.sub_status in VALID_RUN_SUB_STATUSES
-    return status.sub_status == ""
-
-
 def create_message_error_unavailable_res_message(
     ins_metadata: Metadata, error_type: str
 ) -> Message:
@@ -201,6 +130,8 @@ def create_message_error_unavailable_res_message(
         message_type=ins_metadata.message_type,
         created_at=current_time,
         ttl=ttl,
+        src_task_id=ins_metadata.dst_task_id,
+        dst_task_id=ins_metadata.src_task_id,
     )
 
     msg = make_message(
@@ -222,11 +153,13 @@ def create_message_error_unavailable_res_message(
     return msg
 
 
-def create_message_error_unavailable_ins_message(reply_to_message_id: str) -> Message:
+def create_message_error_unavailable_ins_message(
+    reply_to_message_id: str, run_id: int
+) -> Message:
     """Error to indicate that the enquired Message had expired before reply arrived or
     that it isn't found."""
     metadata = Metadata(
-        run_id=0,  # Unknown
+        run_id=run_id,
         message_id="",
         src_node_id=SUPERLINK_NODE_ID,
         dst_node_id=SUPERLINK_NODE_ID,
@@ -256,6 +189,7 @@ def message_ttl_has_expired(message_metadata: Metadata, current_time: float) -> 
 def verify_message_ids(
     inquired_message_ids: set[str],
     found_message_ins_dict: dict[str, Message],
+    run_id: int,
     current_time: float | None = None,
     update_set: bool = True,
 ) -> dict[str, Message]:
@@ -267,6 +201,8 @@ def verify_message_ids(
         Set of Message IDs for which to generate error Message if invalid.
     found_message_ins_dict : dict[str, Message]
         Dictionary containing all found Message indexed by their IDs.
+    run_id : int
+        The run ID to use for generated error Messages.
     current_time : Optional[float] (default: None)
         The current time to check for expiration. If set to `None`, the current time
         will automatically be set to the current timestamp using `now().timestamp()`.
@@ -290,7 +226,9 @@ def verify_message_ids(
         ):
             if update_set:
                 inquired_message_ids.remove(message_id)
-            message_res = create_message_error_unavailable_ins_message(message_id)
+            message_res = create_message_error_unavailable_ins_message(
+                message_id, run_id
+            )
             ret_dict[message_id] = message_res
     return ret_dict
 

@@ -17,7 +17,7 @@
 
 import numpy as np
 
-from flwr.common import ArrayRecord
+from flwr.app import ArrayRecord
 
 from .krum import Krum
 from .multikrum import MultiKrum

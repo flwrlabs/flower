@@ -12,35 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Simulation Engine Backends."""
+"""Simulation Runtime Backends."""
 
-
-import importlib
 
 from .backend import Backend, BackendConfig
-
-is_ray_installed = importlib.util.find_spec("ray") is not None
-
-# Mapping of supported backends
-supported_backends: dict[str, type[Backend]] = {}
-
-# To log backend-specific error message when chosen backend isn't available
-error_messages_backends: dict[str, str] = {}
-
-if is_ray_installed:
-    from .raybackend import RayBackend
-
-    supported_backends["ray"] = RayBackend
-else:
-    error_messages_backends[
-        "ray"
-    ] = """Unable to import module `ray`.
-
-    To install the necessary dependencies, install `flwr` with the `simulation` extra:
-
-        pip install -U "flwr[simulation]"
-    """
-
 
 __all__ = [
     "Backend",

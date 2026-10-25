@@ -19,7 +19,6 @@ from __future__ import annotations
 
 RECORD_KEY_STATE = "secaggplus_state"
 RECORD_KEY_CONFIGS = "secaggplus_configs"
-RATIO_QUANTIZATION_RANGE = 1073741824  # 1 << 30
 
 
 class Stage:

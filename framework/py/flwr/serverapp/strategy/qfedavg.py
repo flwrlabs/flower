@@ -23,19 +23,12 @@ from logging import INFO
 
 import numpy as np
 
-from flwr.common import (
-    Array,
-    ArrayRecord,
-    ConfigRecord,
-    Message,
-    MetricRecord,
-    NDArray,
-    RecordDict,
-)
-from flwr.common.logger import log
-from flwr.server import Grid
+from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
+from flwr.common import NDArray
+from flwr.supercore import log
 
 from ..exception import AggregationError
+from ..grid import Grid
 from .fedavg import FedAvg
 
 

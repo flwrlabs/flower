@@ -153,7 +153,9 @@ def get_object_body(object_content: bytes, cls: type[T]) -> bytes:
     return _get_object_body(object_content)
 
 
-def add_header_to_object_body(object_body: bytes, obj: InflatableObject) -> bytes:
+def add_header_to_object_body(
+    object_body: bytes | memoryview, obj: InflatableObject
+) -> bytes:
     """Add header to object content."""
     # Construct header
     header = f"%s{HEAD_VALUE_DIVIDER}%s{HEAD_VALUE_DIVIDER}%d" % (
@@ -213,11 +215,6 @@ def get_object_type_from_object_content(object_content: bytes) -> str:
 def get_object_children_ids_from_object_content(object_content: bytes) -> list[str]:
     """Return object children IDs from bytes."""
     return get_object_head_values_from_object_content(object_content)[1]
-
-
-def get_object_body_len_from_object_content(object_content: bytes) -> int:
-    """Return length of the object body."""
-    return get_object_head_values_from_object_content(object_content)[2]
 
 
 def get_object_head_values_from_object_content(

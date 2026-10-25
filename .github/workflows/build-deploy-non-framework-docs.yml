@@ -1,4 +1,4 @@
-name: Build and deploy baselines, examples, datasets, and hub docs
+name: Build and deploy agent, baselines, examples, datasets, hub, and model docs
 
 on:
   push:
@@ -17,7 +17,7 @@ env:
 
 jobs:
   build_and_deploy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Build and deploy (non-framework)
     steps:
       - uses: actions/checkout@v5
@@ -27,33 +27,50 @@ jobs:
         run: ./dev/test-copyright.sh
       - name: Bootstrap
         uses: ./.github/actions/bootstrap
-        with:
-          uv-skip: "false"
       - name: Install pandoc
         run: sudo apt install pandoc
       - name: Install docs dependencies
         run: |
           cd framework
-          python -m poetry install
-          python -m pip install -e ../datasets
+          uv sync --locked --all-groups
+          uv pip install -e ../datasets
+      - name: Install Agent docs dependencies
+        run: |
+          cd agent
+          uv sync --locked
       - name: Install devtool dependencies
         run: |
           cd dev
-          uv sync --frozen
+          uv sync --locked
       - name: Update HTML theme options
         run: |
           cd dev
-          uv run python -m devtool.update_html_themes
+          uv run --no-sync python -m devtool.update_html_themes
+      - name: Check and build Agent docs
+        run: |
+          cd agent
+          uv run --no-sync ./dev/build-agent-docs.sh
       - name: Build baselines docs
-        run: ./dev/build-baseline-docs.sh
+        run: |
+          cd framework
+          uv run --no-sync ../dev/build-baseline-docs.sh
       - name: Build examples docs
         run: |
           cd dev
-          uv run python -m devtool.build_example_docs
+          uv run --no-sync python -m devtool.build_example_docs
       - name: Build datasets docs
-        run: ./datasets/dev/build-flwr-datasets-docs.sh
+        run: |
+          cd framework
+          uv run --no-sync ../datasets/dev/build-flwr-datasets-docs.sh
       - name: Build hub docs
-        run: ./dev/build-hub-docs.sh
+        run: |
+          cd framework
+          uv run --no-sync ../dev/build-hub-docs.sh
+      - name: Build model docs
+        run: |
+          # Reuse the framework docs environment for the shared Sphinx toolchain.
+          cd framework
+          uv run --no-sync ../dev/build-model-docs.sh
       - name: Deploy docs
         if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         env:
@@ -61,7 +78,9 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.DOCS_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DOCS_AWS_SECRET_KEY_ID }}
         run: |
+          aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./agent/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/agent
           aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./baselines/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/baselines
           aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./examples/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/examples
           aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./datasets/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/datasets
           aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./hub/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/hub
+          aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./model/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/model

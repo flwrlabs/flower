@@ -17,7 +17,8 @@
 
 import numpy as np
 
-from flwr.common import ArrayRecord, Message, NDArrays
+from flwr.app import ArrayRecord, Message
+from flwr.common import NDArrays
 
 from .fedavgm import FedAvgM
 from .strategy_utils_test import create_mock_reply

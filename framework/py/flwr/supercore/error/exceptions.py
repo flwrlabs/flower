@@ -14,9 +14,6 @@
 # ==============================================================================
 """Concrete API error types."""
 
-
-import json
-
 from .base import ApiErrorCode, FlowerError
 
 
@@ -25,36 +22,25 @@ class EntitlementError(FlowerError):
 
     Parameters
     ----------
-    details : str
+    message : str
+        Sensitive diagnostic message intended for server-side logs.
+    public_details : str
         Client-visible explanation of why the entitlement check failed.
     entitlement_code : int
         Service-defined entitlement code included in the serialized payload
         for programmatic handling.
     """
 
-    def __init__(self, details: str, entitlement_code: int):
+    def __init__(self, message: str, public_details: str, entitlement_code: int):
         super().__init__(
-            message=details,
-            public_details=details,
             code=ApiErrorCode.ENTITLEMENT_ERROR,
+            message=message,  # Sensitive message
+            public_details=public_details,
         )
         self.entitlement_code = entitlement_code
 
-    def to_json(self, public_message: str) -> str:
-        """Serialize the entitlement error payload as JSON.
-
-        Parameters
-        ----------
-        public_message : str
-            Sanitized message that should be exposed to the client together with
-            the entitlement-specific details.
-
-        Returns
-        -------
-        str
-            A JSON string containing the base client-visible error fields plus
-            the entitlement code used for programmatic handling on the client.
-        """
-        base_dict = json.loads(super().to_json(public_message))
-        base_dict["entitlement_code"] = self.entitlement_code
-        return json.dumps(base_dict)
+    def to_json(self, public_message: str) -> dict[str, int | str]:
+        """Return the HTTP error payload with its entitlement code."""
+        payload = super().to_json(public_message)
+        payload["entitlement_code"] = self.entitlement_code
+        return payload

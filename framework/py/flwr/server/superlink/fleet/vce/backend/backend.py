@@ -12,22 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Generic Backend class for Fleet API using the Simulation Engine."""
+"""Generic Backend class for Fleet API using the Simulation Runtime."""
 
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
+from flwr.app.message import Context, Message
+from flwr.app.typing import ConfigRecordValues
 from flwr.clientapp.client_app import ClientApp
-from flwr.common.context import Context
-from flwr.common.message import Message
-from flwr.common.typing import ConfigRecordValues
 
 BackendConfig = dict[str, dict[str, ConfigRecordValues]]
 
 
 class Backend(ABC):
-    """Abstract base class for a Simulation Engine Backend."""
+    """Abstract base class for a Simulation Runtime Backend."""
 
     def __init__(self, backend_config: BackendConfig) -> None:
         """Construct a backend."""

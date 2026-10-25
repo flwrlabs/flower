@@ -15,14 +15,10 @@
 """Flower SuperExec plugins."""
 
 
-from .clientapp_exec_plugin import ClientAppExecPlugin
+from .base_exec_plugin import AutoExecPlugin
 from .exec_plugin import ExecPlugin
-from .serverapp_ephemeral_exec_plugin import ServerAppEphemeralExecPlugin
-from .serverapp_exec_plugin import ServerAppExecPlugin
 
 __all__ = [
-    "ClientAppExecPlugin",
+    "AutoExecPlugin",
     "ExecPlugin",
-    "ServerAppEphemeralExecPlugin",
-    "ServerAppExecPlugin",
 ]

@@ -1,0 +1,1088 @@
+# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""SuperLink Runtime API handler tests."""
+
+# pylint: disable=too-many-lines
+
+
+import hashlib
+import json
+import os
+import tempfile
+import threading
+import unittest
+from collections.abc import Callable
+from datetime import UTC, datetime
+from unittest.mock import Mock, patch
+
+from parameterized import parameterized
+
+from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
+from flwr.common.constant import NOOP_FLWR_AID, SUPERLINK_NODE_ID, Status, SubStatus
+from flwr.common.serde import context_to_proto, message_from_proto
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
+    StartRunRequest,
+)
+from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    ConfirmMessageReceivedRequest,
+    ConfirmMessageReceivedResponse,
+    ObjectTree,
+    PullObjectRequest,
+    PushObjectRequest,
+)
+from flwr.proto.node_pb2 import Node, NodeInfo  # pylint: disable=E0611
+from flwr.proto.recorddict_pb2 import StringList  # pylint: disable=E0611
+from flwr.proto.runseries_pb2 import CompactedContext  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    CreateTaskRequest,
+    GetCompactedContextsRequest,
+    GetConnectorRequest,
+    GetConnectorResponse,
+    GetNodesRequest,
+    GetNodesResponse,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
+    PullAppMessagesRequest,
+    PullAppMessagesResponse,
+    PullTaskInputRequest,
+    PullTaskInputResponse,
+    PushAppMessagesRequest,
+    PushAppMessagesResponse,
+    PushTaskOutputRequest,
+    PushTaskOutputResponse,
+    PutCompactedContextRequest,
+)
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
+from flwr.server.superlink.linkstate.linkstate import LinkState
+from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
+from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_DB_NAME,
+    NOOP_FEDERATION_ID,
+    AutomationStatus,
+    TaskType,
+)
+from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.fab import Fab
+from flwr.supercore.inflatable.inflatable_object import (
+    get_all_nested_objects,
+    get_object_id,
+    get_object_tree,
+    iterate_object_tree,
+)
+from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
+from flwr.supercore.task_process.connector import registry as connector_registry
+from flwr.supercore.task_process.connector.oauth import OAuthFlow
+from flwr.superlink.federation import NoOpFederationManager
+from flwr.superlink.servicer.runtime import runtime_handlers
+
+# pylint: disable=broad-except,too-many-lines
+
+
+def test_get_nodes_returns_metadata() -> None:
+    """Return names and locations for available nodes."""
+    state = Mock(spec=LinkState)
+    state.get_nodes.return_value = {11, 22}
+    state.get_node_info.return_value = [
+        NodeInfo(node_id=11, name="London", location="51.5072,-0.1276"),
+        NodeInfo(node_id=22),
+    ]
+
+    response = runtime_handlers.get_nodes(GetNodesRequest(), state, Task(run_id=123))
+
+    assert response == GetNodesResponse(
+        nodes=[
+            NodeInfo(node_id=11, name="London", location="51.5072,-0.1276"),
+            NodeInfo(node_id=22),
+        ]
+    )
+
+
+def test_raise_if_false() -> None:
+    """."""
+    # Prepare
+    validation_error = False
+    detail = "test"
+
+    try:
+        # Execute
+        runtime_handlers._raise_if(  # pylint: disable=protected-access
+            validation_error=validation_error,
+            request_name="DummyRequest",
+            detail=detail,
+        )
+
+        # Assert
+        assert True
+    except ValueError as err:
+        raise AssertionError() from err
+    except Exception as err:
+        raise AssertionError() from err
+
+
+def test_raise_if_true() -> None:
+    """."""
+    # Prepare
+    validation_error = True
+    detail = "test"
+
+    try:
+        # Execute
+        runtime_handlers._raise_if(  # pylint: disable=protected-access
+            validation_error=validation_error,
+            request_name="DummyRequest",
+            detail=detail,
+        )
+
+        # Assert
+        raise AssertionError()
+    except ValueError as err:
+        assert str(err) == "Malformed DummyRequest: test"
+    except Exception as err:
+        raise AssertionError() from err
+
+
+def test_get_run_series_events_uses_authenticated_task_series() -> None:
+    """GetRunSeriesEvents should derive the series from task authentication."""
+    state = Mock(spec=LinkState)
+    current_run = Mock(run_id=123, series_id=456, primary_task_id=789)
+    series_runs = [Mock(run_id=120, primary_task_id=780), current_run]
+    state.get_run_info.side_effect = [[current_run], series_runs]
+    state.get_run_series.return_value = [Mock(run_ids=[120, 123])]
+    expected_event = TaskEvent(
+        id=11,
+        run_id=120,
+        task_id=780,
+        event="response.created",
+        data='{"type":"response.created"}',
+    )
+    state.get_task_events.return_value = [expected_event]
+    request = GetRunSeriesEventsRequest(
+        event_types=["response.created"],
+        after_event_id=10,
+        before_event_id=20,
+        last_n=1,
+    )
+
+    response = runtime_handlers.get_run_series_events(
+        request,
+        state,
+        Task(task_id=790, run_id=123, type=TaskType.MODEL),
+    )
+
+    assert isinstance(response, GetRunSeriesEventsResponse)
+    assert list(response.events) == [expected_event]
+    state.get_run_series.assert_called_once_with(series_ids=[456])
+    state.get_task_events.assert_called_once_with(
+        task_ids=[780, 789],
+        event_types=["response.created"],
+        after_task_event_id=10,
+        before_task_event_id=20,
+        last_n=1,
+    )
+
+    state.get_task_events.reset_mock()
+    state.get_run_info.side_effect = [[current_run], series_runs]
+    runtime_handlers.get_run_series_events(
+        GetRunSeriesEventsRequest(after_event_id=10, last_n=0),
+        state,
+        Task(task_id=790, run_id=123, type=TaskType.MODEL),
+    )
+    state.get_task_events.assert_called_once_with(
+        task_ids=[780, 789],
+        event_types=None,
+        after_task_event_id=10,
+        before_task_event_id=None,
+        last_n=None,
+    )
+
+
+def test_get_compacted_contexts_uses_authenticated_series() -> None:
+    """Summary requests use the authenticated task's series."""
+    state = Mock(spec=LinkState)
+    state.get_run_info.return_value = [Mock(series_id=456)]
+    state.get_compacted_contexts.return_value = []
+    task = Task(run_id=123)
+
+    runtime_handlers.get_compacted_contexts(GetCompactedContextsRequest(), state, task)
+
+    state.get_compacted_contexts.assert_called_once_with(
+        456, limit=1, before_context_id=None
+    )
+
+
+def test_put_compacted_context_uses_authenticated_series() -> None:
+    """Summary writes use the authenticated task's series."""
+    state = Mock(spec=LinkState)
+    state.get_run_info.return_value = [Mock(series_id=456)]
+    request = PutCompactedContextRequest(
+        context=CompactedContext(through_event_id=9, text="Summary", token_count=123)
+    )
+
+    runtime_handlers.put_compacted_context(request, state, Task(run_id=123))
+
+    state.store_compacted_context.assert_called_once_with(456, 9, "Summary", 123)
+
+
+def _create_shared_runtime(
+    tmpdir: str,
+) -> tuple[int, int, LinkState, LinkState]:
+    database_path = os.path.join(tmpdir, "shared.db")
+
+    objectstore_factory_0 = ObjectStoreFactory()
+    objectstore_factory_1 = ObjectStoreFactory()
+    state_factory_0 = LinkStateFactory(
+        database_path, NoOpFederationManager(), objectstore_factory_0
+    )
+    state_factory_1 = LinkStateFactory(
+        database_path, NoOpFederationManager(), objectstore_factory_1
+    )
+    state_0 = state_factory_0.state()
+    fab_content = b"mock fab content"
+    fab_hash = state_0.store_fab(
+        Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
+    )
+
+    run_id = state_0.create_run(
+        "",
+        "",
+        fab_hash,
+        {},
+        NOOP_FEDERATION_ID,
+        None,
+        "",
+        TaskType.SERVER_APP,
+    )
+    run = state_0.get_run_info(run_ids=[run_id])[0]
+    state_0.set_run_series_context(
+        run.series_id,
+        Context(
+            run_id,
+            SUPERLINK_NODE_ID,
+            {},
+            RecordDict(),
+            {},
+            series_id=run.series_id,
+        ),
+    )
+    assert run.primary_task_id is not None
+    task_id = run.primary_task_id
+    return run_id, task_id, state_0, state_factory_1.state()
+
+
+def _activate_in_parallel(
+    state_0: LinkState, state_1: LinkState, task: Task
+) -> list[bool | None]:
+    timeout = 5.0
+    barrier = threading.Barrier(3)
+    results: list[bool | None] = [None, None]
+    exceptions: list[Exception] = []
+
+    def activate_task(idx: int, state: LinkState) -> None:
+        try:
+            barrier.wait(timeout=timeout)
+            runtime_handlers.pull_task_input(PullTaskInputRequest(), state, task)
+            results[idx] = True
+        except FlowerError as err:
+            assert err.code == ApiErrorCode.RUNTIME_TASK_START_FAILED
+            results[idx] = False
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            exceptions.append(ex)
+
+    threads = [
+        threading.Thread(target=activate_task, args=(0, state_0)),
+        threading.Thread(target=activate_task, args=(1, state_1)),
+    ]
+    for thread in threads:
+        thread.start()
+    try:
+        barrier.wait(timeout=timeout)
+    except threading.BrokenBarrierError as ex:
+        exceptions.append(ex)
+    for thread in threads:
+        thread.join(timeout=timeout)
+
+    alive_threads = [thread for thread in threads if thread.is_alive()]
+    if alive_threads:
+        raise AssertionError(
+            f"Concurrent PullTaskInput test timed out; {len(alive_threads)} "
+            f"thread(s) still alive after {timeout} seconds."
+        )
+    if exceptions:
+        raise exceptions[0]
+    return results
+
+
+class TestGetConnector(unittest.TestCase):
+    """Test connector authorization and credential refresh with mocked state."""
+
+    def setUp(self) -> None:
+        """Create an authorized connector task and mocked state."""
+        self.state = Mock(spec=LinkState)
+        self.task = Task(type=TaskType.CONNECTOR, connector_id=42, run_id=123)
+        self.state.get_run_info.return_value = [Mock(federation_id="@bob/fed-a")]
+        self.state.get_run_connector_ids.return_value = [42]
+        self.connector = Mock(
+            connector_id=42,
+            connector_ref="example",
+            credentials_json=(
+                '{"access_token":"old-token","refresh_token":"refresh-secret",'
+                '"expires_at":0}'
+            ),
+            config_json='{"workspace":"primary"}',
+        )
+        self.state.get_connector_by_id.return_value = self.connector
+        self.flow = Mock(spec=OAuthFlow)
+        self.enterContext(
+            patch.dict(
+                connector_registry.OAUTH_FLOWS, {"example": self.flow}, clear=True
+            )
+        )
+
+    def test_persists_rotated_refresh_tokens_for_successive_requests(self) -> None:
+        """Reuse valid tokens, then refresh with the persisted replacement token."""
+
+        def update_credentials(
+            _connector_id: int, _current_credentials: str, update: Callable[[], str]
+        ) -> str:
+            credentials_json = update()
+            self.connector.credentials_json = credentials_json
+            return credentials_json
+
+        self.state.update_connector_credentials.side_effect = update_credentials
+        self.flow.refresh_credentials.side_effect = [
+            {
+                "access_token": "first-token",
+                "refresh_token": "rotated-token",
+                "expires_at": 4600,
+            },
+            {"access_token": "second-token", "refresh_token": "rotated-token"},
+        ]
+        request = GetConnectorRequest()
+        with patch(
+            "flwr.supercore.task_process.connector.oauth.time", return_value=1000
+        ) as clock:
+            first = runtime_handlers.get_connector(request, self.state, self.task)
+            reused = runtime_handlers.get_connector(request, self.state, self.task)
+            assert reused == first
+            clock.return_value = 4540  # Refresh within 60 seconds of expiry.
+            second = runtime_handlers.get_connector(request, self.state, self.task)
+
+        assert [
+            call.args[0]["refresh_token"]
+            for call in self.flow.refresh_credentials.call_args_list
+        ] == ["refresh-secret", "rotated-token"]
+        assert json.loads(self.connector.credentials_json) == {
+            **json.loads(second.credentials_json),
+            "refresh_token": "rotated-token",
+        }
+        assert "refresh_token" not in first.credentials_json
+        assert "refresh_token" not in second.credentials_json
+
+    def test_access_token_only_without_oauth_configuration(self) -> None:
+        """Return the authorized task's manual token without OAuth configuration."""
+        self.connector.credentials_json = '{"access_token":"manual-token"}'
+        with patch.dict(connector_registry.OAUTH_FLOWS, {}, clear=True):
+            response = runtime_handlers.get_connector(
+                GetConnectorRequest(), self.state, self.task
+            )
+
+        assert response == GetConnectorResponse(
+            connector_id=42,
+            connector_ref="example",
+            credentials_json=self.connector.credentials_json,
+            config_json='{"workspace":"primary"}',
+        )
+        self.state.get_run_connector_ids.assert_called_once_with(123)
+        self.state.get_connector_by_id.assert_called_once_with(42)
+        self.state.update_connector_credentials.assert_not_called()
+
+    def test_refresh_failure_does_not_expose_credentials(self) -> None:
+        """Hide refresh errors instead of returning stale or secret credentials."""
+        self.state.update_connector_credentials.side_effect = RuntimeError(
+            "refresh-secret old-token"
+        )
+
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.get_connector(GetConnectorRequest(), self.state, self.task)
+
+        assert error.exception.code == ApiErrorCode.CONNECTOR_FAILURE
+        assert str(error.exception) == "Connector credentials could not be refreshed."
+
+    @parameterized.expand([(TaskType.AGENT_APP, 42), (TaskType.CONNECTOR, 0)])  # type: ignore
+    def test_rejects_wrong_task_identity(
+        self, task_type: str, connector_id: int
+    ) -> None:
+        """GetConnector should reject tasks without a connector identity."""
+        self.task.type = task_type
+        self.task.connector_id = connector_id
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.get_connector(GetConnectorRequest(), self.state, self.task)
+
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_CONNECTOR_CREDENTIALS_NOT_AVAILABLE,
+        )
+        self.state.get_run_connector_ids.assert_not_called()
+        self.state.get_connector_by_id.assert_not_called()
+
+
+class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902, R0904
+    """SuperLink Runtime API handler tests."""
+
+    def setUp(self) -> None:
+        """Initialize state shared by handler tests."""
+        objectstore_factory = ObjectStoreFactory()
+        state_factory = LinkStateFactory(
+            FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
+        )
+        self.objectstore_factory = objectstore_factory
+        self.state_factory = state_factory
+        self.state = state_factory.state()
+        self.store = objectstore_factory.store()
+        self.node_pk = b"fake public key"
+        self.node_id = self.state.create_node(
+            "mock_owner", "fake_name", self.node_pk, 30
+        )
+        self.state.acknowledge_node_heartbeat(self.node_id, 1e3)
+
+        self._auth_run_id = self.state.create_run(
+            "", "", "", {}, NOOP_FEDERATION_ID, None, "", TaskType.SERVER_APP
+        )
+        auth_task_id = self._primary_task_id(self._auth_run_id)
+        assert self.state.claim_task(auth_task_id) is not None
+        assert self.state.activate_task(auth_task_id)
+        self._auth_task = self.state.get_tasks(task_ids=[auth_task_id])[0]
+
+    def _primary_task_id(self, run_id: int) -> int:
+        run = self.state.get_run_info(run_ids=[run_id])[0]
+        assert run.primary_task_id is not None
+        return run.primary_task_id
+
+    def _transition_run_status(self, run_id: int, num_transitions: int) -> None:
+        task_id = self._primary_task_id(run_id)
+        if num_transitions > 0:
+            assert self.state.claim_task(task_id) is not None
+        if num_transitions > 1:
+            assert self.state.activate_task(task_id)
+        if num_transitions > 2:
+            assert self.state.finish_task(task_id, "", "")
+
+    def test_acquire_task_processes_due_automations(self) -> None:
+        """A SuperExec poll should create and claim a due automation's task."""
+        series_id = self.state.get_run_info(run_ids=[self._auth_run_id])[0].series_id
+        automation = self.state.store_automation(
+            federation_id=NOOP_FEDERATION_ID,
+            flwr_aid=NOOP_FLWR_AID,
+            start_run_request=StartRunRequest(
+                app_spec="@flwr/demo",
+                federation=NOOP_FEDERATION_ID,
+                series_id=series_id,
+            ),
+            series_id=series_id,
+            next_run_at=datetime.now(tz=UTC).isoformat(),
+            max_runs=1,
+        )
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
+                return_value=(b"fab", {}, None),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/demo", "0.1.0"),
+            ),
+        ):
+            response = runtime_handlers.acquire_task(
+                AcquireTaskRequest(supported_task_types=[TaskType.SERVER_APP]),
+                self.state,
+            )
+
+        self.assertTrue(response.token)
+        run = self.state.get_run_info(run_ids=[response.task.run_id])[0]
+        self.assertEqual(run.series_id, automation.series_id)
+        completed = self.state.list_automations(
+            automation_ids=[automation.automation_id],
+            statuses=[AutomationStatus.COMPLETED],
+            order_by="updated_at",
+        )
+        self.assertEqual(len(completed), 1)
+        active = self.state.list_automations(
+            automation_ids=[automation.automation_id],
+            statuses=[AutomationStatus.ACTIVE],
+            order_by="updated_at",
+        )
+        self.assertEqual(active, [])
+
+    def test_acquire_task_processes_due_automations_without_capacity(self) -> None:
+        """An empty acquisition still triggers scheduled automations."""
+        with patch.object(runtime_handlers, "process_due_automations") as process_due:
+            response = runtime_handlers.acquire_task(AcquireTaskRequest(), self.state)
+
+        process_due.assert_called_once()
+        self.assertFalse(response.HasField("task"))
+        self.assertFalse(response.token)
+
+    def _create_dummy_run(self, running: bool = True, *, fab_hash: str = "") -> int:
+        run_id = self.state.create_run(
+            "",
+            "",
+            fab_hash,
+            {},
+            NOOP_FEDERATION_ID,
+            None,
+            "",
+            TaskType.SERVER_APP,
+        )
+        if running:
+            self._transition_run_status(run_id, 2)
+        return run_id
+
+    def test_create_task_uses_authenticated_run_id(self) -> None:
+        """CreateTask should create tasks for the authenticated run."""
+        response = core_runtime_handlers.create_task(
+            CreateTaskRequest(type=TaskType.MODEL, model_ref="models/abc"),
+            self.state,
+            self._auth_task,
+        )
+
+        assert response.HasField("task_id")
+        task = self.state.get_tasks(task_ids=[response.task_id])[0]
+        assert task.run_id == self._auth_run_id
+        assert task.type == TaskType.MODEL
+        assert task.model_ref == "models/abc"
+
+    def test_start_automation_enriches_connector_ids(self) -> None:
+        """Enrich connector IDs and delegate automation creation."""
+        # Prepare
+        request = StartAutomationRequest(
+            start_run_request=StartRunRequest(
+                connector_ids=[999], connector_refs=["legacy"]
+            )
+        )
+        expected = StartAutomationResponse(automation_id=1)
+
+        # Execute
+        with (
+            patch(
+                "flwr.superlink.servicer.runtime.runtime_handlers."
+                "start_control_automation",
+                return_value=expected,
+            ) as start_automation_mock,
+            patch.object(self.state, "get_run_connector_ids", return_value=[42]),
+        ):
+            response = runtime_handlers.start_automation(
+                request,
+                self.state,
+                Task(run_id=self._auth_run_id, type=TaskType.SERVER_APP),
+            )
+
+        # Assert
+        assert response is expected
+        assert list(request.start_run_request.connector_ids) == [42]
+        assert not request.start_run_request.connector_refs
+        assert start_automation_mock.call_args.args[0] is request
+
+    def test_start_automation_rejects_clientapp_task(self) -> None:
+        """ClientApp tasks cannot create automations through the Runtime API."""
+        # Execute
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.start_automation(
+                StartAutomationRequest(),
+                self.state,
+                Task(run_id=self._auth_run_id, type=TaskType.CLIENT_APP),
+            )
+
+        # Assert
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,
+        )
+
+    def test_push_task_output_stores_simulation_runtime(self) -> None:
+        """PushTaskOutput should persist Simulation Runtime usage."""
+        # Prepare
+        request = PushTaskOutputRequest(
+            sub_status="completed",
+            details="",
+            clientapp_runtime=7.89,
+        )
+
+        # Execute
+        response = runtime_handlers.push_task_output(
+            request, self.state, self._auth_task
+        )
+
+        # Assert
+        assert isinstance(response, PushTaskOutputResponse)
+        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        assert run.clientapp_runtime == 7.89
+
+    def test_push_task_output_stores_run_series_context(self) -> None:
+        """PushTaskOutput should persist context in the authenticated run series."""
+        # Prepare
+        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        request_context = Context(
+            run_id=123,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={"key": "value"},
+            state=RecordDict(),
+            run_config={"test": "test"},
+            series_id=456,
+        )
+        request = PushTaskOutputRequest(
+            sub_status="completed",
+            details="",
+            context=context_to_proto(request_context),
+        )
+
+        # Execute
+        response = runtime_handlers.push_task_output(
+            request, self.state, self._auth_task
+        )
+
+        # Assert
+        assert isinstance(response, PushTaskOutputResponse)
+        stored_context = self.state.get_run_series_context(run.series_id)
+        assert stored_context is not None
+        assert stored_context == request_context
+
+    def test_get_node(self) -> None:
+        """Test `GetNode` success."""
+        # Prepare
+        request = GetNodesRequest()
+
+        # Execute
+        response = runtime_handlers.get_nodes(request, self.state, self._auth_task)
+
+        # Assert
+        assert isinstance(response, GetNodesResponse)
+
+    def test_push_messages_keeps_shared_upload_hint_after_rejection(self) -> None:
+        """PushMessages should keep accepted-message upload hints."""
+        # Prepare
+        run_id = self._auth_run_id
+        message_1 = create_ins_message(
+            src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
+        )
+        message_2 = create_ins_message(
+            src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
+        )
+        shared_child_id = hashlib.sha256(b"shared-child").hexdigest()
+        object_tree_1 = ObjectTree(
+            object_id=message_1.metadata.message_id,
+            children=[ObjectTree(object_id=shared_child_id)],
+        )
+        object_tree_2 = ObjectTree(
+            object_id=message_2.metadata.message_id,
+            children=[ObjectTree(object_id=shared_child_id)],
+        )
+        request = PushAppMessagesRequest(
+            messages_list=[message_1, message_2],
+            message_object_trees=[object_tree_1, object_tree_2],
+        )
+        original_store_message_ins = self.state.store_message_ins
+        primary_task_id = self._primary_task_id(run_id)
+        call_count = 0
+
+        def store_message_ins_and_finish_run(message: Message) -> str | None:
+            nonlocal call_count
+            call_count += 1
+            message_id = original_store_message_ins(message)
+            if call_count == 1:
+                assert self.state.finish_task(primary_task_id, SubStatus.COMPLETED, "")
+            return message_id
+
+        # Execute
+        with patch.object(
+            self.state,
+            "store_message_ins",
+            side_effect=store_message_ins_and_finish_run,
+        ):
+            response = runtime_handlers.push_messages(
+                request, self.state, self._auth_task
+            )
+
+        # Assert
+        assert isinstance(response, PushAppMessagesResponse)
+        assert list(response.message_ids) == [message_1.metadata.message_id, ""]
+        assert response.session_id
+        assert set(response.objects_to_push) == {
+            message_1.metadata.message_id,
+            shared_child_id,
+        }
+
+    @parameterized.expand(
+        [
+            # The normal case:
+            # The message is recognized by both `LinkState` and `ObjectStore`
+            (True,),
+            # The failure case:
+            # The message is found in `LinkState` but not in `ObjectStore`
+            (False,),
+        ]
+    )  # type: ignore
+    def test_pull_messages(self, register_in_store: bool) -> None:
+        """Test `PullMessages` success if objects are registered in ObjectStore."""
+        # Prepare
+        run_id = self._auth_run_id
+
+        # Push Messages and reply
+        message_ins = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
+            )
+        )
+        # pylint: disable-next=W0212
+        message_ins.metadata._message_id = message_ins.object_id  # type: ignore
+        msg_id = self.state.store_message_ins(message=message_ins)
+        msg_ = self.state.get_message_ins(node_id=self.node_id, limit=1)[0]
+
+        reply_msg = Message(RecordDict(), reply_to=msg_)
+        # pylint: disable-next=W0212
+        reply_msg.metadata._message_id = reply_msg.object_id  # type: ignore
+        self.state.store_message_res(message=reply_msg)
+
+        # Register response in ObjectStore (so pulling message request can be completed)
+        obj_ids_registered: list[str] = []
+        if register_in_store:
+            obj_ids_registered = self.store.preregister(
+                run_id, get_object_tree(reply_msg)
+            )
+
+        request = PullAppMessagesRequest(
+            reply_to_message_ids=StringList(vals=[str(msg_id)])
+        )
+
+        # Execute
+        response = runtime_handlers.pull_messages(request, self.state, self._auth_task)
+
+        # Assert
+        assert isinstance(response, PullAppMessagesResponse)
+
+        if register_in_store:
+            object_tree = response.message_object_trees[0]
+            object_ids_in_response = [
+                tree.object_id for tree in iterate_object_tree(object_tree)
+            ]
+            # Assert expected object_ids
+            assert set(obj_ids_registered) == set(object_ids_in_response)
+            # Assert the root node of the object tree is the message
+            assert reply_msg.object_id == object_tree.object_id
+        else:
+            assert len(response.messages_list) == 0
+            assert len(response.message_object_trees) == 0
+            # Ins message was deleted
+            assert self.state.num_message_ins() == 0
+
+    def test_pull_messages_rejects_message_from_another_run(self) -> None:
+        """Reject message IDs not owned by the authenticated run."""
+        other_run_id = self.state.create_run(
+            "", "", "", {}, NOOP_FEDERATION_ID, None, "", TaskType.SERVER_APP
+        )
+        self._transition_run_status(other_run_id, 2)
+        message = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=self.node_id,
+                run_id=other_run_id,
+            )
+        )
+        message_id = self.state.store_message_ins(message)
+        assert message_id
+
+        request = PullAppMessagesRequest(
+            reply_to_message_ids=StringList(vals=[message_id])
+        )
+        with self.assertRaisesRegex(ValueError, "contains invalid IDs"):
+            runtime_handlers.pull_messages(request, self.state, self._auth_task)
+
+        assert self.state.num_message_ins() == 1
+
+    @parameterized.expand(
+        [
+            # Reply with Message
+            (RecordDict(), None),
+            # Reply with Error
+            (None, Error(code=0)),
+        ]
+    )  # type: ignore
+    def test_successful_pull_messages_deletes_messages_in_linkstate(
+        self, content: RecordDict | None, error: Error | None
+    ) -> None:
+        """Test `PullMessages` deletes messages from LinkState."""
+        # Prepare
+        run_id = self._auth_run_id
+
+        # Push Messages and reply
+        message_ins = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
+            )
+        )
+        # pylint: disable-next=W0212
+        message_ins.metadata._message_id = message_ins.object_id  # type: ignore
+
+        msg_id = self.state.store_message_ins(message=message_ins)
+        msg_ = self.state.get_message_ins(node_id=self.node_id, limit=1)[0]
+
+        if content is not None:
+            reply_msg = Message(content, reply_to=msg_)
+        else:
+            assert error is not None
+            reply_msg = Message(error, reply_to=msg_)
+
+        # pylint: disable-next=W0212
+        reply_msg.metadata._message_id = reply_msg.object_id  # type: ignore
+
+        self.state.store_message_res(message=reply_msg)
+        # Register response in ObjectStore (so pulling message request can be completed)
+        self.store.preregister(run_id, get_object_tree(reply_msg))
+        request = PullAppMessagesRequest(
+            reply_to_message_ids=StringList(vals=[str(msg_id)])
+        )
+
+        # Execute
+        response = runtime_handlers.pull_messages(request, self.state, self._auth_task)
+
+        # Assert
+        assert isinstance(response, PullAppMessagesResponse)
+        assert self.state.num_message_ins() == 0
+        assert self.state.num_message_res() == 0
+
+    def test_push_object_successful(self) -> None:
+        """Test `PushObject`."""
+        # Prepare
+        run_id = self._auth_run_id
+        obj = ConfigRecord({"a": 123, "b": [4, 5, 6]})
+        obj_b = obj.deflate()
+
+        # Pre-register object
+        session_id = self.state.start_session(run_id)
+        self.state.preregister_object_tree(get_object_tree(obj), session_id)
+
+        # Execute
+        req = PushObjectRequest(
+            node=Node(node_id=SUPERLINK_NODE_ID),
+            run_id=run_id,
+            object_id=obj.object_id,
+            object_content=obj_b,
+            session_id=session_id,
+        )
+        res = runtime_handlers.push_object(req, self.state, self._auth_task)
+
+        # Empty response
+        assert res.stored
+
+    def test_push_object_fails(self) -> None:
+        """Test `PushObject` in unsupported scenarios."""
+        run_id = self._auth_run_id
+
+        # Node ID isn't recognized
+        req = PushObjectRequest(node=Node(node_id=123), run_id=run_id)
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.push_object(req, self.state, self._auth_task)
+        assert error.exception.code == ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID
+
+        # Prepare
+        obj = ConfigRecord({"a": 123, "b": [4, 5, 6]})
+        obj_b = obj.deflate()
+        session_id = self.state.start_session(run_id)
+
+        # Push valid object but it hasn't been pre-registered
+        req = PushObjectRequest(
+            node=Node(node_id=SUPERLINK_NODE_ID),
+            run_id=run_id,
+            object_id=obj.object_id,
+            object_content=obj_b,
+            session_id=session_id,
+        )
+        res = runtime_handlers.push_object(req, self.state, self._auth_task)
+
+        # Assert: object not inserted
+        assert not res.stored
+
+        # Push valid object but its hash doesnt match the one passed in the request
+        # Preregister under a different object-id
+        fake_object_id = get_object_id(b"1234")
+        self.state.preregister_object_tree(
+            ObjectTree(object_id=fake_object_id), session_id
+        )
+
+        # Execute
+        req = PushObjectRequest(
+            node=Node(node_id=SUPERLINK_NODE_ID),
+            run_id=run_id,
+            object_id=fake_object_id,
+            object_content=obj_b,
+            session_id=session_id,
+        )
+        res = runtime_handlers.push_object(req, self.state, self._auth_task)
+
+        # Assert: object not inserted
+        assert not res.stored
+
+    def test_pull_object_successful(self) -> None:
+        """Test `PullObject` functionality."""
+        # Prepare
+        run_id = self._create_dummy_run()
+        obj = ConfigRecord({"a": 123, "b": [4, 5, 6]})
+        obj_b = obj.deflate()
+
+        # Preregister object
+        self.store.preregister(run_id, get_object_tree(obj))
+
+        # Pull
+        req = PullObjectRequest(
+            node=Node(node_id=SUPERLINK_NODE_ID), run_id=run_id, object_id=obj.object_id
+        )
+        res = runtime_handlers.pull_object(req, self.state, self._auth_task)
+
+        # Assert object content is b"" (it was never pushed)
+        assert res.object_found
+        assert not res.object_available
+        assert res.object_content == b""
+
+        # Put object in store, then check it can be pulled
+        self.store.put(object_id=obj.object_id, object_content=obj_b)
+        req = PullObjectRequest(
+            node=Node(node_id=SUPERLINK_NODE_ID), run_id=run_id, object_id=obj.object_id
+        )
+        res = runtime_handlers.pull_object(req, self.state, self._auth_task)
+
+        # Assert, identical object pulled
+        assert res.object_found
+        assert res.object_available
+        assert obj_b == res.object_content
+
+    def test_pull_object_fails(self) -> None:
+        """Test `PullObject` in unsuported scenarios."""
+        run_id = self._create_dummy_run(running=False)
+
+        # Run is running but node ID isn't recognized
+        self._transition_run_status(run_id, 2)
+        req = PullObjectRequest(node=Node(node_id=123), run_id=run_id)
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.pull_object(req, self.state, self._auth_task)
+        assert error.exception.code == ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID
+
+        # Attempt pulling object that doesn't exist
+        req = PullObjectRequest(
+            node=Node(node_id=SUPERLINK_NODE_ID), run_id=run_id, object_id="1234"
+        )
+        res = runtime_handlers.pull_object(req, self.state, self._auth_task)
+        # Empty response
+        assert not res.object_found
+
+    def test_confirm_message_received_successful(self) -> None:
+        """Test `ConfirmMessageReceived` success."""
+        # Prepare
+        run_id = self._create_dummy_run()
+        proto = create_ins_message(
+            src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
+        )
+        message_ins = message_from_proto(proto)
+        message_res = Message(
+            RecordDict({"cfg": ConfigRecord({"key": "value"})}), reply_to=message_ins
+        )
+
+        # Prepare: Save reply message in ObjectStore
+        all_objects = get_all_nested_objects(message_res)
+        self.store.preregister(run_id, get_object_tree(message_res))
+        for obj_id, obj in all_objects.items():
+            self.store.put(object_id=obj_id, object_content=obj.deflate())
+
+        # Assert: All objects are stored in the ObjectStore
+        assert len(self.store) == len(all_objects)
+
+        # Execute: Confirm message received
+        request = ConfirmMessageReceivedRequest(
+            node=Node(node_id=self.node_id),
+            run_id=run_id,
+            message_object_id=message_res.object_id,
+        )
+        response = runtime_handlers.confirm_message_received(
+            request, self.state, self._auth_task
+        )
+
+        # Assert
+        assert isinstance(response, ConfirmMessageReceivedResponse)
+
+        # Assert: Message is removed from LinkState
+        assert len(self.store) == 0
+
+    def test_run_status_transitions(self) -> None:
+        """Test `PullTaskInput` activates a claimed task and marks the run running."""
+        # Prepare: Create a run with FAB
+        fab_content = b"mock fab content"
+        fab_hash = self.state.store_fab(
+            Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
+        )
+        run_id = self._create_dummy_run(running=False, fab_hash=fab_hash)
+        task_id = self._primary_task_id(run_id)
+        # Claim task to transition the run to STARTING.
+        assert self.state.claim_task(task_id) is not None
+
+        # Set run series context as if it was persisted by an earlier run.
+        run = self.state.get_run_info(run_ids=[run_id])[0]
+        context = Context(
+            123,
+            SUPERLINK_NODE_ID,
+            {},
+            RecordDict(),
+            {},
+            series_id=run.series_id,
+        )
+        self.state.set_run_series_context(run.series_id, context)
+
+        run_status = self.state.get_run_status({run_id})[run_id]
+        assert run_status.status == Status.STARTING
+
+        # Execute: Pull task input
+        request = PullTaskInputRequest()
+        task = self.state.get_tasks(task_ids=[task_id])[0]
+        response = runtime_handlers.pull_task_input(request, self.state, task)
+
+        # Assert: Response is successful and run status is now RUNNING
+        assert isinstance(response, PullTaskInputResponse)
+        assert response.context.run_id == 123
+        assert response.context.series_id == run.series_id
+        run_status = self.state.get_run_status({run_id})[run_id]
+        assert run_status.status == Status.RUNNING
+
+
+def test_ha_pull_task_input_claim_is_unique_across_replicas() -> None:
+    """Ensure only one replica can claim STARTING -> RUNNING via PullTaskInput."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        _, task_id, state_0, state_1 = _create_shared_runtime(tmpdir)
+        assert state_0.claim_task(task_id) is not None
+        task = state_0.get_tasks(task_ids=[task_id])[0]
+
+        results = _activate_in_parallel(state_0, state_1, task)
+
+        assert results.count(True) == 1
+        assert results.count(False) == 1
+        task_status = state_0.get_tasks(task_ids=[task_id])[0].status
+        assert task_status.status == Status.RUNNING

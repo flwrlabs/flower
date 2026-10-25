@@ -24,9 +24,14 @@ from typing import Any
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.constant import VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
-from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
+from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
+from flwr.supercore.exit import ExitCode, flwr_exit
+from flwr.supercore.runtime_version_compatibility import (
+    RuntimeVersionMetadata,
+    get_runtime_version_incompatibility_exit_message,
+)
 from flwr.supercore.utils import get_metadata_str
 
 
@@ -39,22 +44,76 @@ class RuntimeVersionClientInterceptor(
 
     def __init__(self, component_name: str) -> None:
         self._metadata = RuntimeVersionMetadata.from_local_component(component_name)
-        self._compatibility_warning_logged = False
 
     def _maybe_log_incompat_warning(
         self,
         grpc_metadata: Any | None,
     ) -> None:
-        if self._compatibility_warning_logged:
-            return
-
         incompat_message = get_metadata_str(
             grpc_metadata,
             VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
         )
         if incompat_message:
-            self._compatibility_warning_logged = True
             log(WARN, incompat_message)
+
+    def _get_incompat_exit_message(self, grpc_error: grpc.RpcError) -> str | None:
+        """Return the exit message for a runtime-version rejection, if present."""
+        details = grpc_error.details() if hasattr(grpc_error, "details") else None
+        return get_runtime_version_incompatibility_exit_message(details)
+
+    def _maybe_exit_on_incompat_error(self, grpc_error: grpc.RpcError) -> None:
+        """Exit on runtime-version rejections encoded as FlowerError JSON."""
+        if exit_message := self._get_incompat_exit_message(grpc_error):
+            flwr_exit(ExitCode.RUNTIME_VERSION_INCOMPATIBLE, exit_message)
+
+    def _intercept_call(
+        self,
+        continuation: Callable[[Any, Any], Any],
+        client_call_details: grpc.ClientCallDetails,
+        request: GrpcMessage,
+        inspect_errors_immediately: bool,
+    ) -> grpc.Call:
+        """Add runtime version metadata and inspect RPC completion metadata."""
+        details = client_call_details._replace(
+            metadata=self._metadata.append_to_grpc_metadata(
+                client_call_details.metadata
+            )
+        )
+
+        def _maybe_exit_on_call_error(call: grpc.Call) -> None:
+            # Some successful call objects (e.g., unary-stream) can also be
+            # subclasses of grpc.RpcError. Do not treat RpcError alone as failure;
+            # _get_incompat_exit_message checks the actual RPC details.
+            if isinstance(call, grpc.RpcError):
+                self._maybe_exit_on_incompat_error(call)
+
+        try:
+            call: grpc.Call = continuation(details, request)
+        except grpc.RpcError as err:
+            self._maybe_exit_on_incompat_error(err)
+            raise
+
+        # Avoid duplicate handling when tests mock flwr_exit and execution continues
+        incompat_error_handled = False
+        if inspect_errors_immediately and isinstance(call, grpc.RpcError):
+            if exit_message := self._get_incompat_exit_message(call):
+                incompat_error_handled = True
+                flwr_exit(ExitCode.RUNTIME_VERSION_INCOMPATIBLE, exit_message)
+
+        def _handle_completion() -> None:
+            self._maybe_log_incompat_warning(call.trailing_metadata())
+            if not incompat_error_handled:
+                _maybe_exit_on_call_error(call)
+
+        # NOTE: Some gRPC call objects expose callback registration without
+        # implementing it.
+        try:
+            if not call.add_callback(_handle_completion):
+                _handle_completion()
+        except (NotImplementedError, AttributeError):
+            pass
+
+        return call
 
     def intercept_unary_unary(
         self,
@@ -62,18 +121,13 @@ class RuntimeVersionClientInterceptor(
         client_call_details: grpc.ClientCallDetails,
         request: GrpcMessage,
     ) -> grpc.Call:
-        """Add the runtime version metadata headers."""
-        details = client_call_details._replace(
-            metadata=self._metadata.append_to_grpc_metadata(
-                client_call_details.metadata
-            )
+        """Add the runtime version metadata headers for unary-unary RPCs."""
+        return self._intercept_call(
+            continuation,
+            client_call_details,
+            request,
+            inspect_errors_immediately=True,
         )
-        call: grpc.Call = continuation(details, request)
-
-        # Log the incompatibility message from the response metadata
-        self._maybe_log_incompat_warning(call.trailing_metadata())
-
-        return call
 
     def intercept_unary_stream(
         self,
@@ -82,20 +136,12 @@ class RuntimeVersionClientInterceptor(
         request: GrpcMessage,
     ) -> grpc.Call:
         """Add the runtime version metadata headers for unary-stream RPCs."""
-        details = client_call_details._replace(
-            metadata=self._metadata.append_to_grpc_metadata(
-                client_call_details.metadata
-            )
+        return self._intercept_call(
+            continuation,
+            client_call_details,
+            request,
+            inspect_errors_immediately=False,
         )
-        call: grpc.Call = continuation(details, request)
-
-        def _log_incompat_warning() -> None:
-            self._maybe_log_incompat_warning(call.trailing_metadata())
-
-        if not call.add_callback(_log_incompat_warning):
-            _log_incompat_warning()
-
-        return call
 
 
 class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[misc]
@@ -106,9 +152,13 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
         *,
         connection_name: str,
         local_metadata: RuntimeVersionMetadata,
+        send_warning_metadata: bool = True,
+        reject_incompatible: bool = False,
     ) -> None:
         self._connection_name = connection_name
         self._local_metadata = local_metadata
+        self._send_warning_metadata = send_warning_metadata
+        self._reject_incompatible = reject_incompatible
 
     def intercept_service(
         self,
@@ -131,14 +181,33 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
 
         # Prepare trailing metadata
         trailing_metadata: tuple[tuple[str, str], ...] = ()
-        if incompat_details:
-            incompat_message = (
-                "Runtime version compatibility check failed for "
-                f"{self._connection_name}. {incompat_details}"
+        if handler_call_details.method == "/flwr.proto.Fleet/SendNodeHeartbeat":
+            trailing_metadata = (
+                (
+                    VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
+                    "The gRPC Fleet API is deprecated and may be removed soon. "
+                    "Please upgrade to Flower 1.40.0 or newer to use the HTTP "
+                    "Fleet API.",
+                ),
             )
+        elif incompat_details and self._send_warning_metadata:
             trailing_metadata += (
-                (VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, incompat_message),
+                (VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, incompat_details),
             )
+
+        def maybe_reject(context: grpc.ServicerContext) -> None:
+            if not incompat_details or not self._reject_incompatible:
+                return
+
+            with rpc_error_translator(context, handler_call_details.method):
+                raise FlowerError(
+                    ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
+                    (
+                        "Runtime version compatibility check failed for "
+                        f"{self._connection_name}. {incompat_details}"
+                    ),
+                    public_details=incompat_details,
+                )
 
         def maybe_set_trailing_metadata(
             context: grpc.ServicerContext,
@@ -151,6 +220,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
             def wrapped(
                 request: GrpcMessage, context: grpc.ServicerContext
             ) -> GrpcMessage:
+                maybe_reject(context)
                 maybe_set_trailing_metadata(context)
                 return method_handler.unary_unary(request, context)  # type: ignore
 
@@ -165,6 +235,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
             def wrapped_stream(
                 request: GrpcMessage, context: grpc.ServicerContext
             ) -> Any:
+                maybe_reject(context)
                 maybe_set_trailing_metadata(context)
                 yield from method_handler.unary_stream(request, context)
 
@@ -177,11 +248,29 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
         return method_handler
 
 
-def create_serverappio_runtime_version_server_interceptor(
-    connection_name: str = "Caller <-> SuperLink ServerAppIo API",
+def create_fleet_runtime_version_server_interceptor(
+    connection_name: str = "SuperNode <-> SuperLink Fleet API",
+    send_warning_metadata: bool = False,
+    reject_incompatible: bool = False,
 ) -> RuntimeVersionServerInterceptor:
-    """Create the default runtime version interceptor for ServerAppIo."""
+    """Create the default runtime version interceptor for Fleet API."""
     return RuntimeVersionServerInterceptor(
         connection_name=connection_name,
         local_metadata=RuntimeVersionMetadata.from_local_component("SuperLink"),
+        send_warning_metadata=send_warning_metadata,
+        reject_incompatible=reject_incompatible,
+    )
+
+
+def create_control_runtime_version_server_interceptor(
+    connection_name: str = "flwr CLI <-> SuperLink Control API",
+    send_warning_metadata: bool = False,
+    reject_incompatible: bool = False,
+) -> RuntimeVersionServerInterceptor:
+    """Create the default runtime version interceptor for Control API."""
+    return RuntimeVersionServerInterceptor(
+        connection_name=connection_name,
+        local_metadata=RuntimeVersionMetadata.from_local_component("SuperLink"),
+        send_warning_metadata=send_warning_metadata,
+        reject_incompatible=reject_incompatible,
     )

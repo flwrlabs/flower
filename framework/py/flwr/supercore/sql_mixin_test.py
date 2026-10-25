@@ -16,15 +16,22 @@
 
 
 import unittest
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
-from sqlalchemy import Column, Integer, MetaData, Table
+from sqlalchemy import Column, Integer, MetaData, Table, create_engine
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.pool import SingletonThreadPool
+
+from flwr.supercore.constant import SQL_ALLOWED_DIALECTS
 
 from .sql_mixin import SqlMixin
 
 
 class DummyDbSqlAlchemy(SqlMixin):
     """Simple subclass for testing SqlMixin behavior with SQLAlchemy."""
+
+    allowed_dialects: frozenset[str] | None = None
 
     def get_metadata(self) -> MetaData:
         """Return MetaData with test table definition."""
@@ -53,6 +60,12 @@ class DummyDbSqlAlchemy(SqlMixin):
         return deleted
 
 
+class SqliteOnlyDummyDb(DummyDbSqlAlchemy):
+    """SQLite-only SqlMixin subclass used for dialect allowlist tests."""
+
+    allowed_dialects = SQL_ALLOWED_DIALECTS
+
+
 class TestSqlMixin(unittest.TestCase):
     """Test SqlMixin session and transaction behavior."""
 
@@ -60,6 +73,24 @@ class TestSqlMixin(unittest.TestCase):
         """Set up test database for each test."""
         self.db = DummyDbSqlAlchemy(":memory:")
         self.db.initialize()
+
+    def test_initialize_accepts_engine_kwargs(self) -> None:
+        """Engine kwargs should be forwarded and override SQLite defaults."""
+        with patch(
+            "flwr.supercore.sql_mixin.create_engine", wraps=create_engine
+        ) as create_engine_mock:
+            self.db.initialize(
+                pool_pre_ping=True,
+                connect_args={"timeout": 30},
+                poolclass=SingletonThreadPool,
+            )
+
+        create_engine_mock.assert_called_once_with(
+            self.db.database_url,
+            pool_pre_ping=True,
+            connect_args={"timeout": 30},
+            poolclass=SingletonThreadPool,
+        )
 
     def test_session_commits_all_queries_atomitcally(self) -> None:
         """Test that all queries in a session are committed as a single transaction."""
@@ -121,6 +152,44 @@ class TestSqlMixin(unittest.TestCase):
         self.assertEqual(rows[0]["value"], 101)
         self.assertEqual(rows[1]["value"], 201)
         self.assertEqual(rows[2]["value"], 301)
+
+    def test_nested_sessions_are_scoped_to_database(self) -> None:
+        """Test that nested sessions reuse only the matching database session."""
+        other_db = DummyDbSqlAlchemy(":memory:")
+        other_db.initialize()
+
+        with self.db.session() as outer_session:
+            with other_db.session() as other_session:
+                self.assertIsNot(other_session, outer_session)
+
+                with self.db.session() as reentered_session:
+                    self.assertIs(reentered_session, outer_session)
+
+    def test_in_memory_url_instances_do_not_share_session(self) -> None:
+        """Test that equivalent in-memory URL forms remain instance-scoped."""
+        for database_url in ("sqlite://", "sqlite+pysqlite:///:memory:"):
+            with self.subTest(database_url=database_url):
+                first_db = DummyDbSqlAlchemy(database_url)
+                second_db = DummyDbSqlAlchemy(database_url)
+                first_db.initialize()
+                second_db.initialize()
+
+                with first_db.session() as first_session:
+                    with second_db.session() as second_session:
+                        self.assertIsNot(second_session, first_session)
+
+    def test_instances_for_same_database_share_session(self) -> None:
+        """Test that instances for the same persistent database share a session."""
+        with TemporaryDirectory() as temp_dir:
+            database_path = f"{temp_dir}/state.db"
+            first_db = DummyDbSqlAlchemy(database_path)
+            second_db = DummyDbSqlAlchemy(database_path)
+            first_db.initialize()
+            second_db.initialize()
+
+            with first_db.session() as first_session:
+                with second_db.session() as second_session:
+                    self.assertIs(second_session, first_session)
 
     def test_query_without_session(self) -> None:
         """Test that query() works independently when not in a session context."""
@@ -244,3 +313,30 @@ class TestSqlMixin(unittest.TestCase):
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0]["value"], -1)  # Deletion was rolled back
         self.assertEqual(rows[1]["value"], 108)
+
+    def test_init_accepts_explicit_sqlalchemy_url(self) -> None:
+        """Explicit URLs should be preserved and dialect should be extracted."""
+        db = DummyDbSqlAlchemy("dummysql://localhost/flwr")
+        self.assertEqual(db.database_url, "dummysql://localhost/flwr")
+        self.assertEqual(db.database_backend, "dummysql")
+
+    def test_init_normalizes_file_path_to_sqlite_url(self) -> None:
+        """File paths should be normalized to SQLite URLs."""
+        db = DummyDbSqlAlchemy("state.db")
+        self.assertTrue(db.database_url.startswith("sqlite:///"))
+        self.assertEqual(db.database_backend, "sqlite")
+
+    def test_dialect_insert_returns_sqlite_insert(self) -> None:
+        """Dialect insert should expose SQLite conflict helpers for SQLite state."""
+        metadata = self.db.get_metadata()
+        stmt = self.db.dialect_insert(metadata.tables["test"])
+
+        self.assertTrue(hasattr(stmt, "on_conflict_do_nothing"))
+
+    def test_sqlite_allowlist_rejects_non_sqlite_url(self) -> None:
+        """SQLite-only classes should reject non-SQLite URLs."""
+        with self.assertRaisesRegex(
+            ValueError,
+            "Supported backends are in-memory and SQLite paths/URLs.",
+        ):
+            _ = SqliteOnlyDummyDb("dummysql://localhost/flwr")

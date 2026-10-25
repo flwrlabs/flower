@@ -12,77 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SQLAlchemy Core Table definitions for CoreState."""
+"""Compatibility wrapper for CoreState SQLAlchemy metadata."""
 
+from sqlalchemy import MetaData
 
-from sqlalchemy import (
-    BigInteger,
-    Column,
-    Float,
-    Index,
-    LargeBinary,
-    MetaData,
-    String,
-    Table,
-    text,
-)
+from flwr.supercore.state.schema.corestate_models import FlwrBase
 
 
 def create_corestate_metadata() -> MetaData:
     """Create and return MetaData with CoreState table definitions."""
     metadata = MetaData()
-
-    # --------------------------------------------------------------------------
-    #  Table: token_store
-    # --------------------------------------------------------------------------
-    Table(
-        "token_store",
-        metadata,
-        Column("run_id", BigInteger, primary_key=True, nullable=True),
-        Column("token", String, unique=True, nullable=False),
-        Column("active_until", Float),
-    )
-
-    nonce_store = Table(
-        "nonce_store",
-        metadata,
-        Column("namespace", String, primary_key=True, nullable=False),
-        Column("nonce", String, primary_key=True, nullable=False),
-        Column("expires_at", Float, nullable=False),
-    )
-    Index("idx_nonce_store_expires_at", nonce_store.c.expires_at)
-
-    # --------------------------------------------------------------------------
-    #  Table: fab
-    # --------------------------------------------------------------------------
-    Table(
-        "fab",
-        metadata,
-        Column("fab_hash", String, primary_key=True),
-        Column("content", LargeBinary, nullable=False),
-        Column("verifications", String, nullable=False),
-    )
-
-    # --------------------------------------------------------------------------
-    #  Table: task
-    # --------------------------------------------------------------------------
-    Table(
-        "task",
-        metadata,
-        Column("task_id", BigInteger, nullable=False, unique=True),
-        Column("type", String, nullable=False),
-        Column("run_id", BigInteger, nullable=False),
-        Column("fab_hash", String, nullable=True),
-        Column("model_ref", String, nullable=True),
-        Column("connector_ref", String, nullable=True),
-        Column("token", String, nullable=True),
-        Column("active_until", BigInteger, nullable=True),
-        Column("pending_at", String, nullable=False),
-        Column("starting_at", String, nullable=True),
-        Column("running_at", String, nullable=True),
-        Column("finished_at", String, nullable=True),
-        Column("sub_status", String, nullable=False, server_default=text("''")),
-        Column("details", String, nullable=False, server_default=text("''")),
-    )
-
+    for table in FlwrBase.metadata.tables.values():
+        table.to_metadata(metadata)
     return metadata

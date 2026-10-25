@@ -22,12 +22,17 @@ from unittest.mock import patch
 
 from parameterized import parameterized
 
-from flwr.common import ConfigRecord, Context, Message, Metadata, RecordDict, now
-from flwr.common.constant import ErrorCode
-from flwr.common.message import make_message
-from flwr.common.typing import Fab, Run
+from flwr.app import ConfigRecord, Message, Metadata, RecordDict
+from flwr.app.message import make_message
+from flwr.common.constant import SUPERLINK_NODE_ID, ErrorCode, SubStatus
+from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
+from flwr.supercore.corestate.utils_test import create_task_message
+from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
+from flwr.supercore.inflatable.inflatable_object import get_object_tree
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.run import Run
 
 from . import InMemoryNodeState, NodeState
 
@@ -46,6 +51,13 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         """Provide state implementation to test."""
         raise NotImplementedError()
 
+    def _claim_client_task(self, run_id: int) -> int:
+        """Create and claim a ClientApp task for the given run."""
+        task_id = self.state.create_task(task_type=TaskType.CLIENT_APP, run_id=run_id)
+        assert task_id is not None
+        assert self.state.claim_task(task_id) is not None
+        return task_id
+
     def test_get_set_node_id(self) -> None:
         """Test set_node_id."""
         # Prepare
@@ -61,9 +73,31 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
 
     def test_get_node_id_fails(self) -> None:
         """Test get_node_id fails correctly if node_id is not set."""
-        # Execute and assert
+        state = InMemoryNodeState(ObjectStoreFactory().store())
+
         with self.assertRaises(ValueError):
-            self.state.get_node_id()
+            state.get_node_id()
+
+    def test_store_task_message_uses_supernode_id(self) -> None:
+        """Task Messages should use the node ID of their CoreState."""
+        node_id = 123
+        self.state.set_node_id(node_id)
+        src_task_id = self.state.create_task(task_type=TaskType.CLIENT_APP, run_id=42)
+        dst_task_id = self.state.create_task(task_type=TaskType.MODEL, run_id=42)
+        assert src_task_id is not None and dst_task_id is not None
+        message = create_task_message(
+            src_task_id=src_task_id,
+            dst_task_id=dst_task_id,
+            run_id=42,
+            node_id=node_id,
+        )
+
+        self.assertTrue(self.state.store_task_message(message))
+        pulled = self.state.get_task_message(dst_task_ids=[dst_task_id])
+
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual(pulled[0].metadata.src_node_id, node_id)
+        self.assertEqual(pulled[0].metadata.dst_node_id, node_id)
 
     def test_store_and_get_run(self) -> None:
         """Test storing and retrieving a run."""
@@ -102,24 +136,6 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         with self.assertRaisesRegex(ValueError, "FAB hash mismatch"):
             self.state.store_fab(Fab("not-the-content-hash", b"fab-content", {}))
 
-    def test_store_and_get_context(self) -> None:
-        """Test storing and retrieving a context."""
-        # Prepare
-        ctx = Context(
-            run_id=99,
-            node_id=1,
-            node_config={"key1": "value1"},
-            state=RecordDict({"cfg": ConfigRecord({"key2": "value2"})}),
-            run_config={"key3": "value3"},
-        )
-        self.state.store_context(ctx)
-
-        # Execute
-        retrieved = self.state.get_context(99)
-
-        # Assert
-        self.assertEqual(retrieved, ctx)
-
     def test_store_and_get_message_basic(self) -> None:
         """Test storing and retrieving a message."""
         # Prepare
@@ -129,14 +145,47 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.state.store_message(msg)
 
         # Basic retrieval with no filters
-        retrieved_msg = self.state.get_messages()[0]
+        retrieved_msg = self.state.get_messages_legacy()[0]
 
         self.assertIn("test_msg", retrieved_msg.metadata.message_id)
         self.assertEqual(retrieved_msg, msg)
 
         # Ensure message won't be retrieved again
-        result = self.state.get_messages()
+        result = self.state.get_messages_legacy()
         self.assertEqual(len(result), 0)
+
+    def test_store_message_and_object_tree(self) -> None:
+        """Test storing a message and preregistering its object tree."""
+        # Prepare
+        msg = make_dummy_message()
+        session_id = self.state.start_session(msg.metadata.run_id)
+
+        # Execute
+        stored, missing_objects = self.state.store_message_and_object_tree(
+            msg, get_object_tree(msg), session_id
+        )
+
+        # Assert
+        self.assertTrue(stored)
+        self.assertIn(msg.metadata.message_id, missing_objects)
+        self.assertTrue(msg.metadata.message_id in self.state.object_store)
+        self.assertEqual(self.state.get_messages_legacy()[0], msg)
+
+    def test_store_message_duplicate_same_message_is_idempotent(self) -> None:
+        """Test storing a duplicate message returns its message ID."""
+        # Prepare
+        msg = make_dummy_message(msg_id="test_msg")
+
+        # Execute
+        first_msg_id = self.state.store_message(msg)
+        second_msg_id = self.state.store_message(msg)
+        messages = self.state.get_messages_legacy()
+
+        # Assert
+        self.assertEqual(first_msg_id, "test_msg")
+        self.assertEqual(second_msg_id, "test_msg")
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0], msg)
 
     @parameterized.expand(  # type: ignore
         [
@@ -162,7 +211,7 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.state.store_message(make_dummy_message(3, True, "msg4"))
 
         # Execute
-        result = self.state.get_messages(**filters)
+        result = self.state.get_messages_legacy(**filters)
         result_ids = {msg.metadata.message_id for msg in result}
 
         # Assert
@@ -184,46 +233,34 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.state.delete_messages(message_ids=["msg1"])
 
         # Assert: msg1 should be deleted, msg2 should remain
-        msgs = self.state.get_messages()
+        msgs = self.state.get_messages_legacy()
         msg_ids = {msg.metadata.message_id for msg in msgs}
         self.assertNotIn("msg1", msg_ids)
         self.assertIn("msg2", msg_ids)
 
-    def test_get_run_ids_with_pending_messages(self) -> None:
-        """Test retrieving run IDs with pending messages."""
-        # Prepare: store messages for runs 1, 2, and 3
-        # Run 1 has a pending message, run 2 has a token, run 3 has a reply,
-        # run 4 has a retrieved message (not pending),
-        #  and run 5 was assigned a token but was later deleted due to
-        # `flwr-clientapp` finishing the handling of a message.
-        self.state.store_message(make_dummy_message(1, False, "msg1"))
-        self.state.store_message(make_dummy_message(2, False, "msg2"))
-        self.state.store_message(make_dummy_message(3, True, "msg3"))
-        self.state.store_message(make_dummy_message(4, False, "msg4"))
-        self.state.store_message(make_dummy_message(5, False, "msg5"))
-        self.state.get_messages(run_ids=[4])
-        self.state.create_token(2)
-        self.state.create_token(5)
-        self.state.delete_token(5)
+    def test_push_session_expiry_deletes_message(self) -> None:
+        """Test deleting a Message belonging to an expired push session."""
+        self.state.store_message(make_dummy_message(msg_id="msg1"))
 
-        # Execute
-        run_ids = self.state.get_run_ids_with_pending_messages()
+        self.state._on_push_session_expired(  # pylint: disable=protected-access
+            {"msg1"}
+        )
 
-        # Assert: run 1 and run 5 should be returned
-        self.assertEqual(set(run_ids), {1, 5})
+        self.assertEqual(self.state.get_messages_legacy(), [])
 
-    def test_get_error_reply_when_token_expires(self) -> None:
-        """Test that error replies are created when tokens expire."""
-        # Prepare: Create a token for a run
+    def test_get_error_reply_when_running_task_claim_expires(self) -> None:
+        """Test that error replies are created when running task claims expire."""
+        # Prepare: Create a running task for a run
         run_id = 110
         created_at = now()
-        token = self.state.create_token(run_id)
-        assert token is not None
+        task_id = self._claim_client_task(run_id)
+        assert self.state.activate_task(task_id)
 
         # Prepare: store and retrieve a message for the run
         msg = make_dummy_message(run_id=run_id)
         self.state.store_message(msg)
-        assert self.state.get_messages(run_ids=[run_id])
+        assert self.state.get_messages_legacy(run_ids=[run_id])
+        self.state.record_message_processing_start(msg.metadata.message_id)
 
         # Execute: retrieve
         with patch("datetime.datetime") as mock_datetime:
@@ -231,13 +268,79 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
             mock_datetime.now.return_value = created_at + timedelta(seconds=1e5)
 
             # Retrieve replies
-            replies = self.state.get_messages(is_reply=True)
+            replies = self.state.get_messages_legacy(is_reply=True)
 
         # Assert: error replies should be created for the message
         self.assertEqual(len(replies), 1)
         self.assertEqual(replies[0].metadata.reply_to_message_id, msg.object_id)
         self.assertTrue(replies[0].has_error())
         self.assertEqual(replies[0].error.code, ErrorCode.CLIENT_APP_CRASHED)
+        self.assertGreater(
+            self.state.get_message_processing_duration(msg.metadata.message_id), 0.0
+        )
+
+    def test_failed_agent_task_creates_error_reply(self) -> None:
+        """A failed AgentApp task should reply to its retrieved request."""
+        run_id = 110
+        task_id = self.state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+        assert self.state.claim_task(task_id)
+        assert self.state.activate_task(task_id)
+        msg = make_dummy_message(run_id=run_id)
+        self.state.store_message(msg)
+        assert self.state.get_messages_legacy(run_ids=[run_id], is_reply=False) == [msg]
+        self.state.record_message_processing_start(msg.metadata.message_id)
+
+        assert self.state.finish_task(task_id, SubStatus.FAILED, "AgentApp crashed")
+
+        replies = self.state.get_messages_legacy(is_reply=True)
+        self.assertEqual(len(replies), 1)
+        self.assertEqual(
+            replies[0].metadata.reply_to_message_id, msg.metadata.message_id
+        )
+        self.assertEqual(replies[0].error.code, ErrorCode.UNKNOWN)
+        self.assertEqual(replies[0].error.reason, "AgentApp failed before replying.")
+
+    def test_failed_agent_task_does_not_duplicate_reply(self) -> None:
+        """Failure after an AgentApp reply should not generate another reply."""
+        run_id = 110
+        task_id = self.state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+        assert self.state.claim_task(task_id)
+        assert self.state.activate_task(task_id)
+        msg = make_dummy_message(run_id=run_id)
+        self.state.store_message(msg)
+        assert self.state.get_messages_legacy(run_ids=[run_id], is_reply=False) == [msg]
+        reply = Message(RecordDict(), reply_to=msg)
+        reply.metadata.__dict__["_message_id"] = reply.object_id
+        self.state.store_message(reply)
+
+        assert self.state.finish_task(task_id, SubStatus.FAILED, "AgentApp crashed")
+
+        self.assertEqual(self.state.get_messages_legacy(is_reply=True), [reply])
+
+    def test_expired_agent_task_creates_error_reply(self) -> None:
+        """An AgentApp that exits without reporting failure should still reply."""
+        run_id = 110
+        created_at = now()
+        task_id = self.state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+        assert self.state.claim_task(task_id)
+        assert self.state.activate_task(task_id)
+        msg = make_dummy_message(run_id=run_id)
+        self.state.store_message(msg)
+        assert self.state.get_messages_legacy(run_ids=[run_id], is_reply=False) == [msg]
+        self.state.record_message_processing_start(msg.metadata.message_id)
+
+        with patch("datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = created_at + timedelta(seconds=1e5)
+            replies = self.state.get_messages_legacy(is_reply=True)
+
+        self.assertEqual(len(replies), 1)
+        self.assertEqual(
+            replies[0].metadata.reply_to_message_id, msg.metadata.message_id
+        )
+        self.assertEqual(replies[0].error.code, ErrorCode.UNKNOWN)
 
     def test_record_message_processing_timing(self) -> None:
         """Test recording message processing start and end times."""
@@ -264,26 +367,28 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
             self.assertGreater(duration, 0.0)
 
     def test_get_message_processing_duration_missing_message(self) -> None:
-        """Test getting duration for non-existent message raises error."""
+        """Test getting duration for non-existent message returns zero."""
         # Execute and assert
         msg_id = "non_existent_msg"
-        with self.assertRaises(ValueError) as ctx:
-            self.state.get_message_processing_duration(msg_id)
-        self.assertIn(f"Message ID {msg_id} not found", str(ctx.exception))
+        with self.assertLogs("flwr", level="ERROR") as logs:
+            duration = self.state.get_message_processing_duration(msg_id)
+
+        self.assertEqual(duration, 0.0)
+        self.assertIn(f"Message ID {msg_id} not found", logs.output[0])
 
     def test_record_message_processing_end_missing_start(self) -> None:
-        """Test recording end time without start time raises error."""
+        """Test recording end time without start time logs an error."""
         # Execute and assert
         msg_id = "msg_without_start"
-        with self.assertRaises(ValueError) as ctx:
+        with self.assertLogs("flwr", level="ERROR") as logs:
             self.state.record_message_processing_end(msg_id)
         self.assertIn(
             f"Cannot record end time: Message ID {msg_id} not found.",
-            str(ctx.exception),
+            logs.output[0],
         )
 
     def test_get_message_processing_duration_incomplete_timing(self) -> None:
-        """Test getting duration when only start time is recorded raises error."""
+        """Test getting duration when only start time is recorded returns zero."""
         # Prepare
         msg_id = "incomplete_msg"
         msg = make_dummy_message(msg_id=msg_id)
@@ -291,12 +396,13 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
 
         self.state.record_message_processing_start(msg_id)
 
-        # Execute and assert: should raise error since end time is missing
-        with self.assertRaises(ValueError) as ctx:
-            self.state.get_message_processing_duration(msg_id)
+        # Execute and assert: should return zero since end time is missing
+        with self.assertLogs("flwr", level="ERROR") as logs:
+            duration = self.state.get_message_processing_duration(msg_id)
+        self.assertEqual(duration, 0.0)
         self.assertIn(
             f"Start time or end time for message ID {msg_id} is missing.",
-            str(ctx.exception),
+            logs.output[0],
         )
 
     def test_message_processing_timing_multiple_messages(self) -> None:
@@ -368,12 +474,13 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
             mock_dt.now.return_value = patched_dt + timedelta(seconds=1)
             self.state.record_message_processing_end(msg_id)
 
-        # Assert: old message should be cleaned up and raise error
-        with self.assertRaises(ValueError) as ctx:
-            self.state.get_message_processing_duration(msg_id)
+        # Assert: old message should be cleaned up and return zero
+        with self.assertLogs("flwr", level="ERROR") as logs:
+            duration = self.state.get_message_processing_duration(msg_id)
 
         # Verify it was cleaned up (not just missing end time)
-        self.assertIn(f"Message ID {msg_id} not found.", str(ctx.exception))
+        self.assertEqual(duration, 0.0)
+        self.assertIn(f"Message ID {msg_id} not found.", logs.output[0])
 
     def test_cleanup_orphaned_message_times(self) -> None:
         """Test that timing entries without corresponding messages are cleaned up."""
@@ -398,9 +505,10 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.state.get_message_processing_duration(other_msg_id)
 
         # Assert: orphaned message should be cleaned up
-        with self.assertRaises(ValueError) as ctx:
-            self.state.get_message_processing_duration(orphan_msg_id)
-        self.assertIn(f"Message ID {orphan_msg_id} not found.", str(ctx.exception))
+        with self.assertLogs("flwr", level="ERROR") as logs:
+            duration = self.state.get_message_processing_duration(orphan_msg_id)
+        self.assertEqual(duration, 0.0)
+        self.assertIn(f"Message ID {orphan_msg_id} not found.", logs.output[0])
 
 
 def make_dummy_message(
@@ -435,4 +543,6 @@ class InMemoryStateTest(StateTest):
 
     def state_factory(self) -> NodeState:
         """Return InMemoryState."""
-        return InMemoryNodeState(ObjectStoreFactory().store())
+        state = InMemoryNodeState(ObjectStoreFactory().store())
+        state.set_node_id(SUPERLINK_NODE_ID)
+        return state

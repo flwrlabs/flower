@@ -251,6 +251,8 @@ class PushMessagesResponse(google.protobuf.message.Message):
     RECONNECT_FIELD_NUMBER: builtins.int
     RESULTS_FIELD_NUMBER: builtins.int
     OBJECTS_TO_PUSH_FIELD_NUMBER: builtins.int
+    SESSION_ID_FIELD_NUMBER: builtins.int
+    session_id: builtins.str
     @property
     def reconnect(self) -> global___Reconnect: ...
     @property
@@ -263,9 +265,10 @@ class PushMessagesResponse(google.protobuf.message.Message):
         reconnect: global___Reconnect | None = ...,
         results: collections.abc.Mapping[builtins.str, builtins.int] | None = ...,
         objects_to_push: collections.abc.Iterable[builtins.str] | None = ...,
+        session_id: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["reconnect", b"reconnect"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["objects_to_push", b"objects_to_push", "reconnect", b"reconnect", "results", b"results"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["objects_to_push", b"objects_to_push", "reconnect", b"reconnect", "results", b"results", "session_id", b"session_id"]) -> None: ...
 
 global___PushMessagesResponse = PushMessagesResponse
 

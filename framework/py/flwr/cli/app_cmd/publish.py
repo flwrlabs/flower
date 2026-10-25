@@ -28,11 +28,11 @@ from flwr.cli.config_utils import load_and_validate
 from flwr.common.constant import FAB_CONFIG_FILE
 from flwr.supercore.constant import (
     APP_PUBLISH_ALLOWED_LICENSE_FILES,
+    FLWR_SUPERGRID_API_URL,
     MAX_FILE_BYTES,
     MAX_FILE_COUNT,
     MAX_TOTAL_BYTES,
     MIME_MAP,
-    PLATFORM_API_URL,
     SUPERGRID_ADDRESS,
     UTF8,
 )
@@ -41,6 +41,7 @@ from flwr.supercore.version import package_version as flwr_version
 from ..auth_plugin.oidc_cli_plugin import OidcCliPlugin
 from ..config_utils import load as load_toml
 from ..utils import (
+    AppPathDepthError,
     collect_files,
     filter_paths_for_publish,
     load_cli_auth_plugin_from_connection,
@@ -194,6 +195,8 @@ def _collect_file_paths(root: Path) -> list[Path]:
             typer.secho(f"Skip: {path}", fg=typer.colors.YELLOW)
         # Build list of absolute file paths (sorted by relative path for stability)
         file_paths = [files[key].expanduser().resolve() for key in sorted(files.keys())]
+    except AppPathDepthError as err:
+        raise err.to_click_exception() from None
     except ValueError as err:
         raise click.ClickException(str(err)) from err
 
@@ -288,7 +291,7 @@ def _post_files(
     token: str,
 ) -> Response:
     """POST multipart with one part per file."""
-    url = f"{PLATFORM_API_URL}/hub/apps/publish"
+    url = f"{FLWR_SUPERGRID_API_URL}/hub/apps/publish"
     headers = {"Authorization": f"Bearer {token}"}
     body = {"flwr_version": flwr_version}
 

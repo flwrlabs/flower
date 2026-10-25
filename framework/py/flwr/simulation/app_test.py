@@ -17,13 +17,14 @@
 
 import importlib
 import unittest
+from pathlib import Path
 from queue import Queue
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
 
-from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 
 from .app import _parse_args_run_flwr_simulation, run_simulation_process
 
@@ -45,19 +46,19 @@ class TestRunSimulationProcess(unittest.TestCase):
         """`run_simulation_process` should pass token into SimulationIoConnection."""
         mock_conn = Mock()
         mock_conn.configure_mock(
-            **{"_stub.PullAppInputs.side_effect": RuntimeError("boom")}
+            **{"_stub.PullTaskInput.side_effect": RuntimeError("boom")}
         )
         mock_connection_cls.return_value = mock_conn
 
         run_simulation_process(
-            serverappio_api_address="127.0.0.1:9091",
+            runtime_api_address="127.0.0.1:9091",
             log_queue=Queue(),
             insecure=True,
             token="test-token",
         )
 
         mock_connection_cls.assert_called_once_with(
-            serverappio_api_address="127.0.0.1:9091",
+            runtime_api_address="127.0.0.1:9091",
             insecure=True,
             root_certificates=None,
             token="test-token",
@@ -92,7 +93,7 @@ def test_parse_flwr_simulation_parses_tokenized_invocation() -> None:
         ]
     )
 
-    assert args.serverappio_api_address == SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+    assert args.runtime_api_address == SUPERLINK_DEFAULT_CLIENT_ADDRESS
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
@@ -132,7 +133,7 @@ def test_flwr_simulation_forwards_cli_args(
     """The simulation CLI should forward parsed args to the runtime."""
     args = SimpleNamespace(
         insecure=True,
-        serverappio_api_address="127.0.0.1:9091",
+        runtime_api_address="127.0.0.1:9091",
         token="test-token",
         root_certificates=None,
         parent_pid=321,
@@ -169,8 +170,51 @@ def test_flwr_simulation_forwards_cli_args(
     simulation_app_module.flwr_simulation()
 
     assert calls == ["mirror", "restore"]
-    assert captured["serverappio_api_address"] == "127.0.0.1:9091"
+    assert captured["runtime_api_address"] == "127.0.0.1:9091"
     assert captured["token"] == "test-token"
     assert captured["certificates"] is None
     assert captured["parent_pid"] == 321
     assert captured["runtime_dependency_install"] is True
+
+
+def test_flwr_simulation_forwards_token_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """The simulation CLI should read and forward token file contents."""
+    token_file = tmp_path / "token"
+    token_file.write_text("test-token\n", encoding="utf-8")
+    args = SimpleNamespace(
+        insecure=True,
+        runtime_api_address="127.0.0.1:9091",
+        token=None,
+        token_file=str(token_file),
+        root_certificates=None,
+        parent_pid=321,
+        runtime_dependency_install=True,
+    )
+    captured: dict[str, object] = {}
+
+    class _Parser:
+        def parse_args(self) -> SimpleNamespace:
+            """Return a fixed namespace for CLI forwarding tests."""
+            return args
+
+    monkeypatch.setattr(
+        simulation_app_module, "_parse_args_run_flwr_simulation", _Parser
+    )
+    monkeypatch.setattr(
+        simulation_app_module,
+        "mirror_output_to_queue",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(simulation_app_module, "restore_output", lambda: None)
+    monkeypatch.setattr(
+        simulation_app_module,
+        "run_simulation_process",
+        lambda **kwargs: captured.update(kwargs),
+    )
+
+    simulation_app_module.flwr_simulation()
+
+    assert captured["token"] == "test-token"

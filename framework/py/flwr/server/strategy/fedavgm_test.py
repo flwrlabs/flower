@@ -20,8 +20,14 @@ from unittest.mock import MagicMock
 from numpy import array, float32
 from numpy.testing import assert_almost_equal
 
-from flwr.common import Code, FitRes, NDArrays, Status, parameters_to_ndarrays
-from flwr.common.parameter import ndarrays_to_parameters
+from flwr.common import (
+    Code,
+    FitRes,
+    NDArrays,
+    Status,
+    ndarrays_to_parameters,
+    parameters_to_ndarrays,
+)
 from flwr.server.client_proxy import ClientProxy
 
 from .fedavgm import FedAvgM

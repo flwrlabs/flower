@@ -198,8 +198,9 @@ def test_runtime_version_metadata_allows_expected_cases(
         (
             RuntimeVersionMetadata("flwr", "1.29.2", "SuperLink"),
             RuntimeVersionMetadata("flwr", "1.30.0", "SuperNode"),
-            "SuperLink version 1.29.2 only accepts peers from the same "
-            "major.minor release, but received SuperNode version 1.30.0.",
+            "SuperLink version 1.29.2 detected a runtime version mismatch: "
+            "expected a peer from the same major.minor release, but received "
+            "SuperNode version 1.30.0.",
         ),
         (
             RuntimeVersionMetadata("unknown", "unknown", "SuperLink"),

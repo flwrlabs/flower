@@ -10,13 +10,13 @@
 
 .. |recorddict_link| replace:: ``RecordDict``
 
-.. _arrayrecord_link: ref-api/flwr.common.ArrayRecord.html
+.. _arrayrecord_link: ref-api/flwr.app.ArrayRecord.html
 
 .. _fedavg_link: ref-api/flwr.serverapp.FedAvg.html
 
-.. _metricrecord_link: ref-api/flwr.common.MetricRecord.html
+.. _metricrecord_link: ref-api/flwr.app.MetricRecord.html
 
-.. _recorddict_link: ref-api/flwr.common.RecordDict.html
+.. _recorddict_link: ref-api/flwr.app.RecordDict.html
 
 *************
  Description

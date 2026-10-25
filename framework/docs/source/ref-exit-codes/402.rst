@@ -1,0 +1,20 @@
+#########################################
+ [402] SUPEREXEC_INVALID_EXECUTOR_CONFIG
+#########################################
+
+*************
+ Description
+*************
+
+The SuperExec executor could not be selected, or its configuration could not be loaded,
+parsed, or applied.
+
+****************
+ How to Resolve
+****************
+
+1. Confirm that the selected ``--executor`` is supported by the running Flower version.
+2. Confirm that the ``--executor-config`` path exists and is readable.
+3. Ensure the file is valid YAML.
+4. Ensure the YAML document is a mapping.
+5. Review the accompanying error message for the exact failure.

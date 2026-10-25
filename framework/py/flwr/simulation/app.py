@@ -16,61 +16,64 @@
 
 
 import argparse
+import importlib.util
+import os
 from dataclasses import replace
-from logging import DEBUG, ERROR, INFO
+from logging import DEBUG, ERROR, INFO, WARNING
 from queue import Queue
 
-from flwr.app import RecordDict
+import httpx
+
+from flwr.app.message import Context, RecordDict
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
-from flwr.common import EventType, event
-from flwr.common.args import add_args_flwr_app_common
+from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.config import (
     get_fused_config_from_dir,
     get_project_config,
     get_project_dir,
 )
-from flwr.common.constant import (
-    RUNTIME_DEPENDENCY_INSTALL,
-    SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
-    Status,
-    SubStatus,
-)
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.common.logger import (
-    log,
-    mirror_output_to_queue,
-    restore_output,
-    start_log_uploader,
-    stop_log_uploader,
-)
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
     fab_from_proto,
     run_from_proto,
-    run_status_to_proto,
-)
-from flwr.common.typing import RunStatus
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    PullAppInputsRequest,
-    PullAppInputsResponse,
-    PushAppOutputsRequest,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
-from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    PullTaskInputRequest,
+    PullTaskInputResponse,
+    PushTaskOutputRequest,
+)
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
+from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
+from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import NOOP_FEDERATION
-from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
+from flwr.supercore.constant import NOOP_FEDERATION_ID, SUPERLINK_DEFAULT_CLIENT_ADDRESS
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
+from flwr.supercore.logger import (
+    flush_logs,
+    mirror_output_to_queue,
+    restore_output,
+    start_log_uploader,
+    stop_log_uploader,
+)
 from flwr.supercore.superexec.dependency_installer import (
+    RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
+from flwr.supercore.task_identity import TaskIdentity
+from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
+
+# Disable Ray's uv runtime-env hook when running flwr-simulation.
+os.environ.setdefault("RAY_ENABLE_UV_RUN_RUNTIME_ENV", "0")
 
 
 def _run_simulation_settings(
@@ -109,6 +112,7 @@ def _run_simulation_settings(
 def flwr_simulation() -> None:
     """Run process-isolated Flower Simulation."""
     args = _parse_args_run_flwr_simulation().parse_args()
+    token = try_obtain_flwr_app_token(args)
 
     # Capture stdout/stderr
     log_queue: Queue[str | None] = Queue()
@@ -121,13 +125,13 @@ def flwr_simulation() -> None:
     log(INFO, "Starting Flower Simulation")
     log(
         DEBUG,
-        "Starting isolated `Simulation` connected to SuperLink ServerAppIo API at %s",
-        args.serverappio_api_address,
+        "Starting isolated `Simulation` connected to SuperLink Runtime API at %s",
+        args.runtime_api_address,
     )
     run_simulation_process(
-        serverappio_api_address=args.serverappio_api_address,
+        runtime_api_address=args.runtime_api_address,
         log_queue=log_queue,
-        token=args.token,
+        token=token,
         insecure=args.insecure,
         certificates=certificates,
         parent_pid=args.parent_pid,
@@ -139,7 +143,7 @@ def flwr_simulation() -> None:
 
 
 def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
-    serverappio_api_address: str,
+    runtime_api_address: str,
     log_queue: Queue[str | None],
     token: str,
     insecure: bool,
@@ -153,56 +157,74 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         start_parent_process_monitor(parent_pid)
 
     conn = SimulationIoConnection(
-        serverappio_api_address=serverappio_api_address,
+        runtime_api_address=runtime_api_address,
         insecure=insecure,
         root_certificates=certificates,
         token=token,
     )
 
-    # Initialize variables for finally block
+    # Initialize variables for exit handler
     log_uploader = None
     run_id_hash = None
     heartbeat_sender = None
-    run = None
-    run_status = None
-    run_id_hash = None
+    sub_status = SubStatus.FAILED
+    details = "Task failed with unknown error."
+    context: Context | None = None
+    metrics = VceMetrics()
     runtime_env_dir = None
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
-        # Stop heartbeat sender
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
+        log(DEBUG, "[flwr-simulation] Will push Simulation task output")
+
+        # Limit Runtime HTTP retries to avoid blocking on exit
+        conn._retry_invoker.max_tries = 1
+
+        # Upload any remaining logs before pushing final output
+        if log_uploader:
+            flush_logs(log_queue)
+
+        # Push final status and context (if available)
+        out_req = PushTaskOutputRequest(
+            context=context_to_proto(context) if context else None,
+            sub_status=sub_status,
+            details=details,
+            clientapp_runtime=metrics.clientapp_runtime,
+        )
+        try:
+            conn._stub.PushTaskOutput(out_req)
+        except httpx.HTTPError as err:
+            log(ERROR, "Failed to push task output: %s", str(err))
 
         # Stop log uploader for this run and upload final logs
         if log_uploader:
             stop_log_uploader(log_queue, log_uploader)
 
-        # Update run status
-        if run and run_status:
-            run_status_proto = run_status_to_proto(run_status)
-            conn._stub.UpdateRunStatus(
-                UpdateRunStatusRequest(run_id=run.run_id, run_status=run_status_proto)
-            )
+        # Stop heartbeat sender
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
+        # Close the Runtime HTTP connection
+        conn._disconnect()
 
         cleanup_app_runtime_environment(runtime_env_dir)
 
     register_signal_handlers(
         event_type=EventType.FLWR_SIMULATION_RUN_LEAVE,
-        exit_message="Run stopped by user.",
+        exit_message="Task stopped by user.",
         exit_handlers=[on_exit],
     )
 
     try:
         # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(
-            make_app_heartbeat_fn_grpc(conn._stub, token)
-        )
+        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_http(conn._stub))
         heartbeat_sender.start()
 
         # Pull SimulationInputs from LinkState
-        req = PullAppInputsRequest(token=token)
-        res: PullAppInputsResponse = conn._stub.PullAppInputs(req)
+        res: PullTaskInputResponse = conn._stub.PullTaskInput(PullTaskInputRequest())
+        TaskIdentity.task_id = res.task_id
+        TaskIdentity.run_id = res.run.run_id
+        TaskIdentity.node_id = res.context.node_id
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)
@@ -212,7 +234,36 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             log_queue=log_queue,
             node_id=context.node_id,
             run_id=run.run_id,
-            stub=conn._stub,
+            client=conn._stub,
+        )
+
+        # Extract federation configuration
+        (
+            num_supernodes,
+            backend_name,
+            backend_config,
+            verbose,
+            enable_tf_gpu_growth,
+        ) = _run_simulation_settings(res.federation_config)
+        # Warn about changed default federation size
+        log(
+            WARNING,
+            "Since flwr 1.32, default simulated SuperNodes changed from 10 to 2.",
+        )
+        # Log federation size
+        log(
+            INFO,
+            "Federation `%s` (%s simulated SuperNodes)",
+            run.federation_id,
+            num_supernodes,
+        )
+        # Indicate how to resize federation
+        log(INFO, "To change federation size, use the following command:")
+        log(
+            INFO,
+            "\tflwr federation simulation-config "
+            "%s <superlink> --num-supernodes <N>",
+            run.federation_id,
         )
 
         log(DEBUG, "Simulation process starts FAB installation.")
@@ -238,6 +289,13 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
                     "fab_hash": fab.hash_str,
                 },
             )
+            if backend_name == "ray" and importlib.util.find_spec("ray") is None:
+                # Surface unsupported Ray/Python/platform combinations as dependency
+                # installation failures instead of missing simulation extras.
+                raise RuntimeDependencyInstallationError(
+                    "Runtime dependency installation completed, but `ray` is not "
+                    "available. Ensure your OS+Python combination supports `ray`."
+                )
         else:
             log(DEBUG, "Simulation runtime dependency installation is disabled.")
 
@@ -265,14 +323,6 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             app_path,
         )
 
-        (
-            num_supernodes,
-            backend_name,
-            backend_config,
-            verbose,
-            enable_tf_gpu_growth,
-        ) = _run_simulation_settings(res.federation_config)
-
         run_id_hash = get_sha256_hash(run.run_id)
         event(
             EventType.FLWR_SIMULATION_RUN_ENTER,
@@ -284,39 +334,42 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
 
         # Launch the simulation
-        updated_context = _run_simulation(
+        simulation_result = _run_simulation(
             server_app_attr=server_app_attr,
             client_app_attr=client_app_attr,
             num_supernodes=num_supernodes,
             backend_name=backend_name,
             backend_config=backend_config,
             app_dir=str(app_path),
-            run=replace(run, federation=NOOP_FEDERATION),
+            run=replace(run, federation_id=NOOP_FEDERATION_ID),
             enable_tf_gpu_growth=enable_tf_gpu_growth,
             verbose_logging=verbose,
             server_app_context=context,
             is_app=True,
             exit_event=EventType.FLWR_SIMULATION_RUN_LEAVE,
+            metrics=metrics,
         )
+        context = simulation_result.context
 
         # Send resulting context
         # Temporarily disable pushing resulting context to SuperLink
-        updated_context.state = RecordDict()
-        context_proto = context_to_proto(updated_context)
-        out_req = PushAppOutputsRequest(
-            token=token, run_id=run.run_id, context=context_proto
-        )
-        _ = conn._stub.PushAppOutputs(out_req)
+        context.state = RecordDict()
 
-        run_status = RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
+        sub_status = SubStatus.COMPLETED
+        details = ""
 
     except Exception as ex:  # pylint: disable=broad-exception-caught
         exc_entity = "Simulation"
         log(ERROR, "%s raised an exception", exc_entity, exc_info=ex)
-        run_status = RunStatus(Status.FINISHED, SubStatus.FAILED, str(ex))
+        sub_status = SubStatus.FAILED
+        details = f"Simulation failed with exception: {str(ex)}"
 
         # General exit code
         exit_code = ExitCode.SIMULATION_EXCEPTION
+        if isinstance(ex, ImportError):
+            exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
+        elif isinstance(ex, RuntimeDependencyInstallationError):
+            exit_code = ExitCode.COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR
 
     flwr_exit(
         code=exit_code,
@@ -334,14 +387,14 @@ def _parse_args_run_flwr_simulation() -> argparse.ArgumentParser:
         description="Run a Flower Simulation",
     )
     parser.add_argument(
-        "--serverappio-api-address",
+        "--runtime-api-address",
         "--simulationio-api-address",
-        dest="serverappio_api_address",
-        default=SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+        dest="runtime_api_address",
+        default=SUPERLINK_DEFAULT_CLIENT_ADDRESS,
         type=str,
-        help="Address of SuperLink's ServerAppIo API (IPv4, IPv6, or a domain name). "
+        help="Address of SuperLink's Runtime API (IPv4, IPv6, or a domain name). "
         "`--simulationio-api-address` is accepted as a deprecated alias. "
-        f"By default, it is set to {SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS}.",
+        f"By default, it is set to {SUPERLINK_DEFAULT_CLIENT_ADDRESS}.",
     )
     add_args_flwr_app_common(parser=parser)
     return parser

@@ -16,12 +16,14 @@
 
 
 import unittest
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-from typing import cast
-from unittest.mock import patch
+from typing import Any, cast
+from unittest.mock import MagicMock, patch
 
+from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
@@ -35,9 +37,11 @@ from sqlalchemy import (
     inspect,
     text,
 )
-from sqlalchemy.engine import URL, Engine
+from sqlalchemy.engine import URL, Connection, Engine
 
-from flwr.common.exit import ExitCode
+from flwr.common.constant import SubStatus
+from flwr.supercore.constant import TaskType
+from flwr.supercore.exit import ExitCode
 from flwr.supercore.state.alembic.utils import (
     ALEMBIC_DIR,
     ALEMBIC_VERSION_TABLE,
@@ -51,6 +55,22 @@ from flwr.supercore.state.alembic.utils import (
     register_version_location,
     run_migrations,
 )
+
+
+class TestMigrationGraph(unittest.TestCase):
+    """Test the structure of the Flower migration graph."""
+
+    def test_flwr_migrations_have_single_head(self) -> None:
+        """Ensure Flower migrations form a graph with exactly one head."""
+        script = ScriptDirectory(str(ALEMBIC_DIR))
+
+        heads = script.get_heads()
+
+        self.assertEqual(
+            len(heads),
+            1,
+            f"Expected exactly one Flower migration head, found: {heads}",
+        )
 
 
 class TestAlembicRun(unittest.TestCase):
@@ -73,6 +93,106 @@ class TestAlembicRun(unittest.TestCase):
         db_path = self.temp_path / db_name
         return create_engine(f"sqlite:///{db_path}")
 
+    def create_mock_engine(self, dialect_name: str) -> tuple[MagicMock, MagicMock]:
+        """Create a mock SQLAlchemy engine and connection."""
+        engine = MagicMock()
+        connection = MagicMock(spec=Connection)
+        engine.dialect.name = dialect_name
+        engine.connect.return_value.__enter__.return_value = connection
+        return engine, connection
+
+    def create_advisory_lock_event_recorder(
+        self, events: list[str]
+    ) -> Callable[[object, object], None]:
+        """Return a side effect that records advisory lock SQL statements."""
+
+        def record_event(statement: object, _params: object) -> None:
+            sql = str(statement)
+            if "pg_advisory_lock" in sql:
+                events.append("lock")
+            if "pg_advisory_unlock" in sql:
+                events.append("unlock")
+
+        return record_event
+
+    def upgrade_to_revision(self, engine: Engine, revision: str) -> None:
+        """Upgrade the test database to the specified Alembic revision."""
+        command.upgrade(build_alembic_config(engine), revision)
+
+    def downgrade_to_revision(self, engine: Engine, revision: str) -> None:
+        """Downgrade the test database to the specified Alembic revision."""
+        command.downgrade(build_alembic_config(engine), revision)
+
+    def build_run_row(  # pylint: disable=too-many-arguments
+        self,
+        run_id: int,
+        *,
+        fab_id: str,
+        fab_version: str,
+        fab_hash: str,
+        pending_at: str,
+        **overrides: Any,
+    ) -> dict[str, Any]:
+        """Build a run row with defaults suited for migration backfill tests."""
+        row: dict[str, Any] = {
+            "run_id": run_id,
+            "fab_id": fab_id,
+            "fab_version": fab_version,
+            "fab_hash": fab_hash,
+            "override_config": "{}",
+            "pending_at": pending_at,
+            "starting_at": "",
+            "running_at": "",
+            "finished_at": "",
+            "usage_reported_at": "",
+            "sub_status": None,
+            "details": None,
+            "federation": "@me/fed",
+            "federation_config": None,
+            "run_type": "serverapp",
+            "flwr_aid": "aid",
+            "bytes_sent": 0,
+            "bytes_recv": 0,
+            "clientapp_runtime": 0.0,
+        }
+        row.update(overrides)
+        return row
+
+    def insert_runs(
+        self, connection: Connection, runs: Sequence[dict[str, Any]]
+    ) -> None:
+        """Insert run rows into the test database."""
+        connection.execute(
+            text(
+                """
+                INSERT INTO run (
+                    run_id, fab_id, fab_version, fab_hash, override_config,
+                    pending_at, starting_at, running_at, finished_at,
+                    usage_reported_at, sub_status, details, federation,
+                    federation_config, run_type, flwr_aid, bytes_sent,
+                    bytes_recv, clientapp_runtime
+                ) VALUES (
+                    :run_id, :fab_id, :fab_version, :fab_hash, :override_config,
+                    :pending_at, :starting_at, :running_at, :finished_at,
+                    :usage_reported_at, :sub_status, :details, :federation,
+                    :federation_config, :run_type, :flwr_aid, :bytes_sent,
+                    :bytes_recv, :clientapp_runtime
+                )
+                """
+            ),
+            list(runs),
+        )
+
+    def assert_timestamp_equal(self, actual: Any, expected: str) -> None:
+        """Assert DB timestamp values match regardless of storage formatting."""
+
+        def normalize(value: Any) -> str:
+            timestamp = str(value).replace("T", " ")
+            timestamp = timestamp.replace("+00:00", "")
+            return timestamp.split(".", maxsplit=1)[0]
+
+        self.assertEqual(normalize(actual), normalize(expected))
+
     def test_run_migrations_sets_revision(self) -> None:
         """Ensure migrations advance the database to the latest head."""
         # Prepare
@@ -93,6 +213,70 @@ class TestAlembicRun(unittest.TestCase):
             self.assertFalse(check_migrations_pending(engine))
         finally:
             engine.dispose()
+
+    @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")
+    def test_run_migrations_uses_postgresql_advisory_lock(
+        self, mock_run_migrations: MagicMock
+    ) -> None:
+        """Ensure PostgreSQL migrations are serialized with an advisory lock."""
+        # Prepare
+        events: list[str] = []
+        engine, connection = self.create_mock_engine("postgresql")
+        connection.in_transaction.return_value = True
+        connection.execute.side_effect = self.create_advisory_lock_event_recorder(
+            events
+        )
+        connection.commit.side_effect = lambda: events.append("commit")
+        mock_run_migrations.side_effect = lambda _engine, _bind: events.append(
+            "migrate"
+        )
+
+        # Execute
+        run_migrations(engine)
+
+        # Assert
+        self.assertEqual(
+            events, ["lock", "commit", "migrate", "commit", "unlock", "commit"]
+        )
+        self.assertEqual(connection.commit.call_count, 3)
+        mock_run_migrations.assert_called_once_with(engine, connection)
+
+    @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")
+    def test_run_migrations_releases_postgresql_advisory_lock_on_error(
+        self, mock_run_migrations: MagicMock
+    ) -> None:
+        """Ensure PostgreSQL advisory locks are released when migrations fail."""
+        # Prepare
+        events: list[str] = []
+        engine, connection = self.create_mock_engine("postgresql")
+        connection.in_transaction.return_value = True
+        connection.execute.side_effect = self.create_advisory_lock_event_recorder(
+            events
+        )
+        mock_run_migrations.side_effect = RuntimeError("migration failed")
+
+        # Execute & Assert
+        with self.assertRaisesRegex(RuntimeError, "migration failed"):
+            run_migrations(engine)
+
+        self.assertEqual(events, ["lock", "unlock"])
+        connection.rollback.assert_called_once_with()
+        mock_run_migrations.assert_called_once_with(engine, connection)
+
+    @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")
+    def test_run_migrations_does_not_lock_non_postgresql_backends(
+        self, mock_run_migrations: MagicMock
+    ) -> None:
+        """Ensure non-PostgreSQL backends keep the existing migration behavior."""
+        # Prepare
+        engine, _ = self.create_mock_engine("sqlite")
+
+        # Execute
+        run_migrations(engine)
+
+        # Assert
+        engine.connect.assert_not_called()
+        mock_run_migrations.assert_called_once_with(engine, engine)
 
     def test_migrated_schema_matches_metadata(self) -> None:
         """Verify that migrations match current SQLAlchemy metadata."""
@@ -117,51 +301,378 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
-    def test_compare_metadata_detects_server_default_changes(self) -> None:
-        """Verify autogenerate reports added server defaults."""
-        engine = self.create_engine()
-        base_metadata = MetaData()
-        Table(
-            "server_default_example",
-            base_metadata,
-            Column("id", Integer, primary_key=True),
-            Column("value", Integer, nullable=False),
-        )
-        updated_metadata = MetaData()
-        Table(
-            "server_default_example",
-            updated_metadata,
-            Column("id", Integer, primary_key=True),
-            Column("value", Integer, nullable=False, server_default=text("0")),
-        )
-
+    def test_hub_origin_migration_preserves_unknown_legacy_rows(self) -> None:
+        """Ensure legacy federation apps retain unknown Hub provenance."""
+        engine = self.create_engine("federation_app_hub_origin.db")
         try:
-            base_metadata.create_all(engine)
+            self.upgrade_to_revision(engine, "03f4cfe3ff15")
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO federation_app (
+                            federation_id, app_id, fab_hash, app_type,
+                            added_by, added_at
+                        ) VALUES (
+                            :federation_id, :app_id, :fab_hash, :app_type,
+                            :added_by, :added_at
+                        )
+                        """
+                    ),
+                    {
+                        "federation_id": "@alice/research",
+                        "app_id": "@flwragent/flwr-agent",
+                        "fab_hash": "legacy-hash",
+                        "app_type": TaskType.AGENT_APP,
+                        "added_by": "alice",
+                        "added_at": "2026-08-23 10:00:00+00:00",
+                    },
+                )
+
+            self.upgrade_to_revision(engine, "heads")
 
             with engine.connect() as connection:
-                context = MigrationContext.configure(
-                    connection,
-                    opts={"compare_server_default": True},
-                )
-                diffs = compare_metadata(context, updated_metadata)
+                is_hub_app = connection.execute(
+                    text(
+                        """
+                        SELECT is_hub_app
+                        FROM federation_app
+                        WHERE federation_id = :federation_id
+                          AND app_id = :app_id
+                        """
+                    ),
+                    {
+                        "federation_id": "@alice/research",
+                        "app_id": "@flwragent/flwr-agent",
+                    },
+                ).scalar_one()
 
-            self.assertEqual(len(diffs), 1)
-            modify_default = diffs[0][0]
-            self.assertEqual(modify_default[0], "modify_default")
-            self.assertEqual(modify_default[2], "server_default_example")
-            self.assertEqual(modify_default[3], "value")
-            self.assertIsNone(modify_default[5])
-            self.assertIsNotNone(modify_default[6])
+            self.assertIsNone(is_hub_app)
         finally:
             engine.dispose()
 
-    def test_migrations_create_fab_table(self) -> None:
-        """Ensure FAB state storage is present after migrations."""
-        engine = self.create_engine()
+    def test_automation_timestamp_migration_normalizes_sqlite_text(self) -> None:
+        """Ensure legacy SQLite automation timestamps use ORM-compatible text."""
+        engine = self.create_engine("automation_timestamp_normalization.db")
         try:
-            run_migrations(engine)
+            self.upgrade_to_revision(engine, "28482626dbdc")
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO automation (
+                            federation_id, flwr_aid, series_id, status,
+                            created_at, updated_at, next_run_at, stopped_at,
+                            fixed_interval, remaining_runs, start_run_request
+                        ) VALUES (
+                            :federation_id, :flwr_aid, :series_id, :status,
+                            :created_at, :updated_at, :next_run_at, :stopped_at,
+                            :fixed_interval, :remaining_runs, :start_run_request
+                        )
+                        """
+                    ),
+                    {
+                        "federation_id": "fed",
+                        "flwr_aid": "aid",
+                        "series_id": 7,
+                        "status": "active",
+                        "created_at": "2026-08-10T10:00:00+00:00",
+                        "updated_at": "2026-08-10T10:01:00+00:00",
+                        "next_run_at": "2026-08-10T10:02:00+00:00",
+                        "stopped_at": "2026-08-10T10:03:00+00:00",
+                        "fixed_interval": 60,
+                        "remaining_runs": 1,
+                        "start_run_request": None,
+                    },
+                )
+
+            self.upgrade_to_revision(engine, "heads")
+
+            with engine.connect() as connection:
+                automation = (
+                    connection.execute(
+                        text(
+                            """
+                            SELECT created_at, updated_at, next_run_at, stopped_at
+                            FROM automation
+                            WHERE federation_id = :federation_id
+                            """
+                        ),
+                        {"federation_id": "fed"},
+                    )
+                    .mappings()
+                    .one()
+                )
+
+            self.assertEqual(automation["created_at"], "2026-08-10 10:00:00+00:00")
+            self.assertEqual(automation["updated_at"], "2026-08-10 10:01:00+00:00")
+            self.assertEqual(automation["next_run_at"], "2026-08-10 10:02:00+00:00")
+            self.assertEqual(automation["stopped_at"], "2026-08-10 10:03:00+00:00")
+        finally:
+            engine.dispose()
+
+    def test_primary_task_backfill_populates_historical_runs(self) -> None:
+        """Ensure historical runs get backfilled primary tasks during migration."""
+        engine = self.create_engine("primary_task_backfill.db")
+        try:
+            self.upgrade_to_revision(engine, "b277e6f3656c")
+            with engine.begin() as connection:
+                self.insert_runs(
+                    connection,
+                    [
+                        self.build_run_row(
+                            run_id=101,
+                            fab_id="publisher/pending",
+                            fab_version="1.0.0",
+                            fab_hash="fab-pending",
+                            pending_at="2026-04-27T10:00:00+00:00",
+                            federation="@me/fed-a",
+                            flwr_aid="aid-a",
+                        ),
+                        self.build_run_row(
+                            run_id=102,
+                            fab_id="publisher/sim",
+                            fab_version="2.0.0",
+                            fab_hash="fab-sim",
+                            pending_at="2026-04-27T11:00:00+00:00",
+                            starting_at="2026-04-27T11:01:00+00:00",
+                            running_at="2026-04-27T11:02:00+00:00",
+                            finished_at="2026-04-27T11:03:00+00:00",
+                            sub_status="completed",
+                            details="done",
+                            federation="@me/fed-b",
+                            federation_config="{}",
+                            run_type="simulation",
+                            flwr_aid="aid-b",
+                            bytes_sent=7,
+                            bytes_recv=8,
+                            clientapp_runtime=9.5,
+                        ),
+                        self.build_run_row(
+                            run_id=103,
+                            fab_id="publisher/failed",
+                            fab_version="3.0.0",
+                            fab_hash="fab-failed",
+                            pending_at="2026-04-27T12:00:00+00:00",
+                            finished_at="2026-04-27T12:05:00+00:00",
+                            sub_status="failed",
+                            details="boom",
+                            federation="@me/fed-c",
+                            flwr_aid="aid-c",
+                            bytes_sent=1,
+                            bytes_recv=2,
+                            clientapp_runtime=3.0,
+                        ),
+                    ],
+                )
+
+            self.upgrade_to_revision(engine, "heads")
+
+            with engine.connect() as connection:
+                runs = {
+                    row["run_id"]: row
+                    for row in connection.execute(
+                        text(
+                            """
+                            SELECT run_id, primary_task_id
+                            FROM run
+                            ORDER BY run_id
+                            """
+                        )
+                    ).mappings()
+                }
+                tasks = {
+                    row["task_id"]: row
+                    for row in connection.execute(
+                        text(
+                            """
+                            SELECT task_id, type, run_id, fab_hash, model_ref,
+                                   pending_at, starting_at, running_at, finished_at,
+                                   sub_status, details
+                            FROM task
+                            ORDER BY task_id
+                            """
+                        )
+                    ).mappings()
+                }
+
+            # Assert: Primary task inserted for run 101
+            task = tasks[runs[101]["primary_task_id"]]
+            self.assertEqual(task["type"], TaskType.SERVER_APP)
+            self.assertEqual(task["run_id"], 101)
+            self.assert_timestamp_equal(task["pending_at"], "2026-04-27T10:00:00+00:00")
+            self.assertIsNone(task["starting_at"])
+            self.assertIsNone(task["running_at"])
+            self.assertIsNone(task["finished_at"])
+
+            # Assert: Primary task inserted for run 102
+            task = tasks[runs[102]["primary_task_id"]]
+            self.assertEqual(task["type"], TaskType.SIMULATION)
+            self.assertEqual(task["run_id"], 102)
+            self.assert_timestamp_equal(
+                task["starting_at"], "2026-04-27T11:01:00+00:00"
+            )
+            self.assert_timestamp_equal(task["running_at"], "2026-04-27T11:02:00+00:00")
+            self.assert_timestamp_equal(
+                task["finished_at"], "2026-04-27T11:03:00+00:00"
+            )
+            self.assertEqual(task["sub_status"], "completed")
+            self.assertEqual(task["details"], "done")
+
+            # Assert: Primary task inserted for run 103
+            task = tasks[runs[103]["primary_task_id"]]
+            self.assertEqual(task["type"], TaskType.SERVER_APP)
+            self.assertEqual(task["run_id"], 103)
+            self.assert_timestamp_equal(
+                task["finished_at"], "2026-04-27T12:05:00+00:00"
+            )
+            self.assertEqual(task["sub_status"], "failed")
+            self.assertEqual(task["details"], "boom")
+        finally:
+            engine.dispose()
+
+    def test_primary_task_backfill_stops_running_runs(self) -> None:
+        """Ensure STARTING/RUNNING runs are migrated to FINISHED:STOPPED."""
+        engine = self.create_engine("primary_task_backfill_stopped.db")
+        try:
+            self.upgrade_to_revision(engine, "b277e6f3656c")
+            with engine.begin() as connection:
+                self.insert_runs(
+                    connection,
+                    [
+                        self.build_run_row(
+                            201,
+                            fab_id="publisher/live",
+                            fab_version="1.0.0",
+                            fab_hash="fab-live",
+                            pending_at="2026-04-27T13:00:00+00:00",
+                            starting_at="2026-04-27T13:01:00+00:00",
+                            running_at="2026-04-27T13:02:00+00:00",
+                            federation="@me/live",
+                            flwr_aid="aid-live",
+                        )
+                    ],
+                )
+
+            self.upgrade_to_revision(engine, "heads")
+
+            with engine.connect() as connection:
+                primary_task = (
+                    connection.execute(
+                        text(
+                            """
+                        SELECT
+                            r.primary_task_id,
+                            t.type,
+                            t.starting_at,
+                            t.running_at,
+                            t.finished_at,
+                            t.sub_status,
+                            t.details
+                        FROM run AS r
+                        JOIN task AS t ON t.task_id = r.primary_task_id
+                        WHERE r.run_id = :run_id
+                        """
+                        ),
+                        {"run_id": 201},
+                    )
+                    .mappings()
+                    .one()
+                )
+
+            self.assertIsNotNone(primary_task["primary_task_id"])
+            self.assertEqual(primary_task["type"], TaskType.SERVER_APP)
+            self.assert_timestamp_equal(
+                primary_task["starting_at"], "2026-04-27T13:01:00+00:00"
+            )
+            self.assert_timestamp_equal(
+                primary_task["running_at"], "2026-04-27T13:02:00+00:00"
+            )
+            self.assertTrue(primary_task["finished_at"])
+            self.assertEqual(primary_task["sub_status"], SubStatus.STOPPED)
+            self.assertEqual(
+                primary_task["details"], "Run stopped during server upgrade."
+            )
+        finally:
+            engine.dispose()
+
+    def test_squashed_migration_downgrade_restores_parent_schema(self) -> None:
+        """Ensure downgrade from the squashed head returns to the nonce revision."""
+        engine = self.create_engine("squashed_migration_downgrade.db")
+        try:
+            self.upgrade_to_revision(engine, "b277e6f3656c")
+            with engine.begin() as connection:
+                self.insert_runs(
+                    connection,
+                    [
+                        self.build_run_row(
+                            run_id=301,
+                            fab_id="publisher/downgrade",
+                            fab_version="1.0.0",
+                            fab_hash="fab-downgrade",
+                            pending_at="2026-04-27T10:00:00+00:00",
+                            starting_at="2026-04-27T10:01:00+00:00",
+                            running_at="2026-04-27T10:02:00+00:00",
+                            finished_at="2026-04-27T10:03:00+00:00",
+                            sub_status=SubStatus.COMPLETED,
+                            details="done",
+                            federation="@me/fed",
+                            flwr_aid="aid",
+                        )
+                    ],
+                )
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO logs (timestamp, run_id, node_id, log)
+                        VALUES (:timestamp, :run_id, :node_id, :log)
+                        """
+                    ),
+                    {
+                        "timestamp": 1.5,
+                        "run_id": 301,
+                        "node_id": 9,
+                        "log": "log entry",
+                    },
+                )
+
+            self.upgrade_to_revision(engine, "heads")
+            self.downgrade_to_revision(engine, "b277e6f3656c")
+
             inspector = inspect(engine)
-            self.assertTrue(inspector.has_table("fab"))
+            self.assertTrue(inspector.has_table("nonce_store"))
+            self.assertTrue(inspector.has_table("token_store"))
+            self.assertFalse(inspector.has_table("task"))
+            self.assertFalse(inspector.has_table("task_logs"))
+            self.assertFalse(inspector.has_table("task_message"))
+
+            run_columns = {column["name"] for column in inspector.get_columns("run")}
+            self.assertIn("pending_at", run_columns)
+            self.assertNotIn("primary_task_id", run_columns)
+
+            with engine.connect() as connection:
+                query = """
+                SELECT pending_at, starting_at, running_at, finished_at,
+                       sub_status, details
+                FROM run
+                WHERE run_id = :run_id
+                """
+                params = {"run_id": 301}
+                run = connection.execute(text(query), params).mappings().one()
+                query = """
+                SELECT log
+                FROM logs
+                WHERE run_id = :run_id AND node_id = 0
+                """
+                copied_log = connection.execute(text(query), params).scalar_one()
+
+            self.assert_timestamp_equal(run["pending_at"], "2026-04-27T10:00:00+00:00")
+            self.assert_timestamp_equal(run["starting_at"], "2026-04-27T10:01:00+00:00")
+            self.assert_timestamp_equal(run["running_at"], "2026-04-27T10:02:00+00:00")
+            self.assert_timestamp_equal(run["finished_at"], "2026-04-27T10:03:00+00:00")
+            self.assertEqual(run["sub_status"], SubStatus.COMPLETED)
+            self.assertEqual(run["details"], "done")
+            self.assertEqual(copied_log, "log entry")
         finally:
             engine.dispose()
 

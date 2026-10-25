@@ -17,27 +17,21 @@
 
 from math import pi
 from random import shuffle
+from unittest.mock import patch
 
 import ray
 
+from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.client import Client, NumPyClient
-from flwr.client.run_info_store import DeprecatedRunInfoStore
 from flwr.clientapp import ClientApp
-from flwr.common import (
-    Config,
-    ConfigRecord,
-    Context,
-    Message,
-    MessageTypeLegacy,
-    RecordDict,
-    Scalar,
-)
+from flwr.common import Config, MessageTypeLegacy, Scalar
 from flwr.common.constant import NUM_PARTITIONS_KEY, PARTITION_ID_KEY
-from flwr.common.recorddict_compat import (
+from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
+from flwr.compat.common.recorddict_compat import (
     getpropertiesins_to_recorddict,
     recorddict_to_getpropertiesres,
 )
-from flwr.common.recorddict_compat_test import _get_valid_getpropertiesins
+from flwr.compat.common.recorddict_compat_test import _get_valid_getpropertiesins
 from flwr.simulation.legacy_app import (
     NodeToPartitionMapping,
     _create_node_id_to_partition_mapping,
@@ -48,6 +42,7 @@ from flwr.simulation.ray_transport.ray_actor import (
     VirtualClientEngineActorPool,
 )
 from flwr.simulation.ray_transport.ray_client_proxy import RayActorClientProxy
+from flwr.supercore.task_identity import TaskIdentity
 
 
 class DummyClient(NumPyClient):
@@ -90,8 +85,9 @@ def prep(
         client_resources=client_resources,
     )
 
-    # Create 373 client proxies
-    num_proxies = 373  # a prime number
+    # Create enough proxies to exercise queueing and shuffled result retrieval while
+    # keeping this per-test integration workload small enough for pull requests.
+    num_proxies = 37  # a prime number
     mapping = _create_node_id_to_partition_mapping(num_proxies)
     proxies = [
         RayActorClientProxy(
@@ -211,22 +207,24 @@ def test_cid_consistency_without_proxies() -> None:
     # submit all jobs (collect later)
     shuffle(node_ids)
     run_id = 0
-    for node_id in node_ids:
-        message = Message(
-            content=recorddict,
-            dst_node_id=node_id,
-            message_type=MessageTypeLegacy.GET_PROPERTIES,
-            group_id=str(0),
-        )
-        message.metadata.__dict__["_run_id"] = run_id
-        # register and retrieve context
-        node_info_stores[node_id].register_context(run_id=run_id)
-        context = node_info_stores[node_id].retrieve_context(run_id=run_id)
-        partition_id_str = str(context.node_config[PARTITION_ID_KEY])
-        pool.submit_client_job(
-            lambda a, c_fn, j_fn, nid_, state: a.run.remote(c_fn, j_fn, nid_, state),
-            (_load_app, message, partition_id_str, context),
-        )
+    with patch.multiple(TaskIdentity, _task_id=123, _run_id=run_id, _node_id=0):
+        for node_id in node_ids:
+            message = Message(
+                content=recorddict,
+                dst_node_id=node_id,
+                message_type=MessageTypeLegacy.GET_PROPERTIES,
+                group_id=str(0),
+            )
+            # register and retrieve context
+            node_info_stores[node_id].register_context(run_id=run_id)
+            context = node_info_stores[node_id].retrieve_context(run_id=run_id)
+            partition_id_str = str(context.node_config[PARTITION_ID_KEY])
+            pool.submit_client_job(
+                lambda a, c_fn, j_fn, nid_, state: a.run.remote(
+                    c_fn, j_fn, nid_, state
+                ),
+                (_load_app, message, partition_id_str, context),
+            )
 
     # fetch results one at a time
     shuffle(node_ids)

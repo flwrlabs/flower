@@ -18,23 +18,13 @@
 from __future__ import annotations
 
 import argparse
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import grpc_tools
 from grpc_tools import protoc
-
-_toml: Any
-
-try:
-    import tomllib
-
-    _toml = tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
-    import tomli
-
-    _toml = tomli
 
 
 class ProtocConfigError(ValueError):
@@ -71,7 +61,7 @@ def _load_pyproject(project_dir: Path) -> dict[str, Any]:
     if not pyproject_path.is_file():
         raise ProtocConfigError(f"Missing pyproject.toml: {pyproject_path}")
     with pyproject_path.open("rb") as pyproject_file:
-        return cast(dict[str, Any], _toml.load(pyproject_file))
+        return tomllib.load(pyproject_file)
 
 
 def _resolve_dir(project_dir: Path, value: str, *, field_name: str) -> Path:

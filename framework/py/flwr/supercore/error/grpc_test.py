@@ -51,6 +51,95 @@ def test_rpc_error_translator_mapped_flower_error() -> None:
     }
 
 
+def test_flower_error_to_json_and_from_json() -> None:
+    """Serialize and deserialize the canonical HTTP FlowerError payload."""
+    err = FlowerError(
+        ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
+        "internal diagnostic message",
+        public_details="public details",
+    )
+
+    payload = err.to_json("public message")
+    parsed = FlowerError.from_json(json.dumps(payload))
+
+    assert payload == {
+        "code": ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
+        "detail": "public message",
+        "extra": "public details",
+    }
+    assert parsed is not None
+    assert parsed.code == ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
+    assert parsed.message == "public message"
+    assert parsed.public_details == "public details"
+
+
+def test_flower_error_from_grpc_json() -> None:
+    """Continue to deserialize the legacy gRPC FlowerError payload."""
+    parsed = FlowerError.from_json(
+        json.dumps(
+            {
+                "public_message": "public message",
+                "code": ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE.value,
+                "public_details": "public details",
+            }
+        )
+    )
+
+    assert parsed is not None
+    assert parsed.code == ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
+    assert parsed.message == "public message"
+    assert parsed.public_details == "public details"
+
+
+def test_flower_error_from_json_returns_base_error_for_subclass_call() -> None:
+    """Use the base HTTP representation and deserialize into a base FlowerError."""
+    err = EntitlementError(
+        "internal diagnostic message",
+        public_details="public details",
+        entitlement_code=123,
+    )
+
+    payload = err.to_json("public message")
+    parsed = EntitlementError.from_json(json.dumps(payload))
+
+    assert payload == {
+        "code": ApiErrorCode.ENTITLEMENT_ERROR,
+        "detail": "public message",
+        "extra": "public details",
+        "entitlement_code": 123,
+    }
+    assert isinstance(parsed, FlowerError)
+    assert not isinstance(parsed, EntitlementError)
+    assert parsed.code == ApiErrorCode.ENTITLEMENT_ERROR
+    assert parsed.message == "public message"
+    assert parsed.public_details == "public details"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        "not json",
+        "[]",
+        '{"public_message": "missing code"}',
+        '{"code": 1}',
+        '{"code": "1", "public_message": "wrong code type"}',
+        '{"code": true, "public_message": "wrong code type"}',
+        '{"code": 1, "public_message": "ok", "public_details": 1}',
+        '{"detail": "missing code"}',
+        '{"code": "1", "detail": "wrong code type"}',
+        '{"code": true, "detail": "wrong code type"}',
+        '{"code": 1, "detail": 1}',
+        '{"code": 1, "detail": "ok", "extra": 1}',
+    ],
+)
+def test_flower_error_from_json_returns_none_for_invalid_payloads(
+    value: str | None,
+) -> None:
+    """Invalid public FlowerError payloads should not raise."""
+    assert FlowerError.from_json(value) is None
+
+
 def test_rpc_error_translator_grpc_error() -> None:
     """Allow `context.abort()` to propagate unmodified."""
     context = Mock(spec=grpc.ServicerContext)
@@ -95,7 +184,11 @@ def test_rpc_error_translator_entitlement_error_preserves_error_message() -> Non
 
     with pytest.raises(grpc.RpcError):
         with rpc_error_translator(context, "MockApi.MockRpc"):
-            raise EntitlementError(error_message, entitlement_code)
+            raise EntitlementError(
+                "internal diagnostic message",
+                public_details=error_message,
+                entitlement_code=entitlement_code,
+            )
 
     context.abort.assert_called_once()
     grpc_status, payload = context.abort.call_args.args

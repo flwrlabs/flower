@@ -15,6 +15,8 @@
 """Flower command line interface `build` command."""
 
 
+from __future__ import annotations
+
 import hashlib
 import zipfile
 from collections.abc import Mapping
@@ -28,7 +30,7 @@ import tomli
 import tomli_w
 import typer
 
-from flwr.common.config import check_pattern_list_value
+from flwr.common.config import check_pattern_list_value, validate_config
 from flwr.common.constant import (
     FAB_CONFIG_FILE,
     FAB_DATE,
@@ -47,6 +49,7 @@ from flwr.supercore.fab_format_version import (
 
 from .config_utils import load_and_validate
 from .utils import (
+    AppPathDepthError,
     build_pathspec,
     collect_files,
     filter_paths_for_publish,
@@ -160,6 +163,8 @@ def build(
     # Build FAB
     try:
         fab_bytes = build_fab_from_disk(app)
+    except AppPathDepthError as err:
+        raise err.to_click_exception() from None
     except ValueError as e:
         raise click.ClickException(str(e)) from None
 
@@ -261,6 +266,12 @@ def build_fab_from_files(
     pyproject_content = _to_bytes(files[FAB_CONFIG_FILE])
     config = tomli.loads(pyproject_content.decode("utf-8"))
     validate_project_name(_get_project_name(config), "The Flower App [project].name")
+    is_valid, errors, _ = validate_config(config, check_module=False)
+    if not is_valid:
+        raise ValueError(
+            "Invalid Flower App configuration:\n"
+            + "\n".join([f"- {line}" for line in errors])
+        )
     metadata = normalize_and_validate_fab_format(config)
 
     # Remove the 'federations' field if it exists
@@ -360,12 +371,10 @@ def get_filtered_fab_paths(
     # or all files if no user patterns are defined.
     candidate_paths = normalized_paths
     if user_include_spec:
-        candidate_paths = list(
-            user_include_spec.match_files(candidate_paths)  # type: ignore
-        )
+        candidate_paths = list(user_include_spec.match_files(candidate_paths))
     if user_exclude_spec:
         candidate_paths = list(
-            user_exclude_spec.match_files(candidate_paths, negate=True)  # type: ignore
+            user_exclude_spec.match_files(candidate_paths, negate=True)
         )
 
     # Apply built-in constraints and validate against user patterns
@@ -402,7 +411,7 @@ def _raise_on_unresolved_patterns(
 
 def _raise_on_built_in_pattern_conflicts(
     candidate_paths: list[str],
-    built_in_include_spec: pathspec.PathSpec,
+    built_in_include_spec: pathspec.PathSpec[pathspec.pattern.Pattern],
 ) -> None:
     """Raise ValueError for user-defined rules and built-in rules conflicts."""
     # Only count files whose type is not supported by built-in include patterns

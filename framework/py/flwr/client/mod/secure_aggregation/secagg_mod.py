@@ -15,8 +15,8 @@
 """Modifier for the SecAgg protocol."""
 
 
-from flwr.client.typing import ClientAppCallable
-from flwr.common import Context, Message
+from flwr.app import Context, Message
+from flwr.clientapp.typing import ClientAppCallable
 
 from .secaggplus_mod import secaggplus_mod
 

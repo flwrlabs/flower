@@ -45,6 +45,24 @@ class ControlStub:
     ]
     """Stop run upon request"""
 
+    StartAutomation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StartAutomationRequest,
+        flwr.proto.control_pb2.StartAutomationResponse,
+    ]
+    """Start automation upon request"""
+
+    ListAutomations: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAutomationsRequest,
+        flwr.proto.control_pb2.ListAutomationsResponse,
+    ]
+    """List automations"""
+
+    StopAutomation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StopAutomationRequest,
+        flwr.proto.control_pb2.StopAutomationResponse,
+    ]
+    """Stop automation"""
+
     StreamLogs: grpc.UnaryStreamMultiCallable[
         flwr.proto.control_pb2.StreamLogsRequest,
         flwr.proto.control_pb2.StreamLogsResponse,
@@ -57,6 +75,30 @@ class ControlStub:
     ]
     """flwr ls command"""
 
+    ListRunSeries: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListRunSeriesRequest,
+        flwr.proto.control_pb2.ListRunSeriesResponse,
+    ]
+    """List run series"""
+
+    GetRunSeries: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.GetRunSeriesRequest,
+        flwr.proto.control_pb2.GetRunSeriesResponse,
+    ]
+    """Get run series"""
+
+    UpdateRunSeriesDescription: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionRequest,
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse,
+    ]
+    """Update run series description"""
+
+    ListRunSeriesEvents: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListRunSeriesEventsRequest,
+        flwr.proto.control_pb2.ListRunSeriesEventsResponse,
+    ]
+    """List events for all runs in a run series"""
+
     GetLoginDetails: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
         flwr.proto.control_pb2.GetLoginDetailsResponse,
@@ -68,6 +110,30 @@ class ControlStub:
         flwr.proto.control_pb2.GetAuthTokensResponse,
     ]
     """Get auth tokens upon request"""
+
+    ListConnectors: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListConnectorsRequest,
+        flwr.proto.control_pb2.ListConnectorsResponse,
+    ]
+    """List OAuth connectors available to the authenticated account"""
+
+    DisconnectConnector: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.DisconnectConnectorRequest,
+        flwr.proto.control_pb2.DisconnectConnectorResponse,
+    ]
+    """Disconnect connector credentials for the authenticated account"""
+
+    BeginConnectorOAuth: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.BeginConnectorOAuthRequest,
+        flwr.proto.control_pb2.BeginConnectorOAuthResponse,
+    ]
+    """Begin OAuth connector authorization flow"""
+
+    CompleteConnectorOAuth: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CompleteConnectorOAuthRequest,
+        flwr.proto.control_pb2.CompleteConnectorOAuthResponse,
+    ]
+    """Complete OAuth connector authorization flow"""
 
     PullArtifacts: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.PullArtifactsRequest,
@@ -99,11 +165,41 @@ class ControlStub:
     ]
     """List Federations"""
 
+    ListApps: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppsRequest,
+        flwr.proto.control_pb2.ListAppsResponse,
+    ]
+    """List Apps in a Federation"""
+
+    ListAppAssociations: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppAssociationsRequest,
+        flwr.proto.control_pb2.ListAppAssociationsResponse,
+    ]
+    """List Federations associated with an App"""
+
+    AddApp: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.AddAppRequest,
+        flwr.proto.control_pb2.AddAppResponse,
+    ]
+    """Add App to a Federation"""
+
+    RemoveApp: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.RemoveAppRequest,
+        flwr.proto.control_pb2.RemoveAppResponse,
+    ]
+    """Remove App from a Federation"""
+
     ShowFederation: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
         flwr.proto.control_pb2.ShowFederationResponse,
     ]
     """Show Federation"""
+
+    SetFederationIcon: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.SetFederationIconRequest,
+        flwr.proto.control_pb2.SetFederationIconResponse,
+    ]
+    """Set Federation icon"""
 
     CreateFederation: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.CreateFederationRequest,
@@ -195,6 +291,24 @@ class ControlAsyncStub:
     ]
     """Stop run upon request"""
 
+    StartAutomation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StartAutomationRequest,
+        flwr.proto.control_pb2.StartAutomationResponse,
+    ]
+    """Start automation upon request"""
+
+    ListAutomations: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAutomationsRequest,
+        flwr.proto.control_pb2.ListAutomationsResponse,
+    ]
+    """List automations"""
+
+    StopAutomation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StopAutomationRequest,
+        flwr.proto.control_pb2.StopAutomationResponse,
+    ]
+    """Stop automation"""
+
     StreamLogs: grpc.aio.UnaryStreamMultiCallable[
         flwr.proto.control_pb2.StreamLogsRequest,
         flwr.proto.control_pb2.StreamLogsResponse,
@@ -207,6 +321,30 @@ class ControlAsyncStub:
     ]
     """flwr ls command"""
 
+    ListRunSeries: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListRunSeriesRequest,
+        flwr.proto.control_pb2.ListRunSeriesResponse,
+    ]
+    """List run series"""
+
+    GetRunSeries: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.GetRunSeriesRequest,
+        flwr.proto.control_pb2.GetRunSeriesResponse,
+    ]
+    """Get run series"""
+
+    UpdateRunSeriesDescription: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionRequest,
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse,
+    ]
+    """Update run series description"""
+
+    ListRunSeriesEvents: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListRunSeriesEventsRequest,
+        flwr.proto.control_pb2.ListRunSeriesEventsResponse,
+    ]
+    """List events for all runs in a run series"""
+
     GetLoginDetails: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
         flwr.proto.control_pb2.GetLoginDetailsResponse,
@@ -218,6 +356,30 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.GetAuthTokensResponse,
     ]
     """Get auth tokens upon request"""
+
+    ListConnectors: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListConnectorsRequest,
+        flwr.proto.control_pb2.ListConnectorsResponse,
+    ]
+    """List OAuth connectors available to the authenticated account"""
+
+    DisconnectConnector: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.DisconnectConnectorRequest,
+        flwr.proto.control_pb2.DisconnectConnectorResponse,
+    ]
+    """Disconnect connector credentials for the authenticated account"""
+
+    BeginConnectorOAuth: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.BeginConnectorOAuthRequest,
+        flwr.proto.control_pb2.BeginConnectorOAuthResponse,
+    ]
+    """Begin OAuth connector authorization flow"""
+
+    CompleteConnectorOAuth: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CompleteConnectorOAuthRequest,
+        flwr.proto.control_pb2.CompleteConnectorOAuthResponse,
+    ]
+    """Complete OAuth connector authorization flow"""
 
     PullArtifacts: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.PullArtifactsRequest,
@@ -249,11 +411,41 @@ class ControlAsyncStub:
     ]
     """List Federations"""
 
+    ListApps: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppsRequest,
+        flwr.proto.control_pb2.ListAppsResponse,
+    ]
+    """List Apps in a Federation"""
+
+    ListAppAssociations: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppAssociationsRequest,
+        flwr.proto.control_pb2.ListAppAssociationsResponse,
+    ]
+    """List Federations associated with an App"""
+
+    AddApp: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.AddAppRequest,
+        flwr.proto.control_pb2.AddAppResponse,
+    ]
+    """Add App to a Federation"""
+
+    RemoveApp: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.RemoveAppRequest,
+        flwr.proto.control_pb2.RemoveAppResponse,
+    ]
+    """Remove App from a Federation"""
+
     ShowFederation: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
         flwr.proto.control_pb2.ShowFederationResponse,
     ]
     """Show Federation"""
+
+    SetFederationIcon: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.SetFederationIconRequest,
+        flwr.proto.control_pb2.SetFederationIconResponse,
+    ]
+    """Set Federation icon"""
 
     CreateFederation: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.CreateFederationRequest,
@@ -350,6 +542,30 @@ class ControlServicer(metaclass=abc.ABCMeta):
         """Stop run upon request"""
 
     @abc.abstractmethod
+    def StartAutomation(
+        self,
+        request: flwr.proto.control_pb2.StartAutomationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.StartAutomationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.StartAutomationResponse]]:
+        """Start automation upon request"""
+
+    @abc.abstractmethod
+    def ListAutomations(
+        self,
+        request: flwr.proto.control_pb2.ListAutomationsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListAutomationsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAutomationsResponse]]:
+        """List automations"""
+
+    @abc.abstractmethod
+    def StopAutomation(
+        self,
+        request: flwr.proto.control_pb2.StopAutomationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.StopAutomationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.StopAutomationResponse]]:
+        """Stop automation"""
+
+    @abc.abstractmethod
     def StreamLogs(
         self,
         request: flwr.proto.control_pb2.StreamLogsRequest,
@@ -366,6 +582,38 @@ class ControlServicer(metaclass=abc.ABCMeta):
         """flwr ls command"""
 
     @abc.abstractmethod
+    def ListRunSeries(
+        self,
+        request: flwr.proto.control_pb2.ListRunSeriesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListRunSeriesResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListRunSeriesResponse]]:
+        """List run series"""
+
+    @abc.abstractmethod
+    def GetRunSeries(
+        self,
+        request: flwr.proto.control_pb2.GetRunSeriesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.GetRunSeriesResponse, collections.abc.Awaitable[flwr.proto.control_pb2.GetRunSeriesResponse]]:
+        """Get run series"""
+
+    @abc.abstractmethod
+    def UpdateRunSeriesDescription(
+        self,
+        request: flwr.proto.control_pb2.UpdateRunSeriesDescriptionRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse, collections.abc.Awaitable[flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse]]:
+        """Update run series description"""
+
+    @abc.abstractmethod
+    def ListRunSeriesEvents(
+        self,
+        request: flwr.proto.control_pb2.ListRunSeriesEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListRunSeriesEventsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListRunSeriesEventsResponse]]:
+        """List events for all runs in a run series"""
+
+    @abc.abstractmethod
     def GetLoginDetails(
         self,
         request: flwr.proto.control_pb2.GetLoginDetailsRequest,
@@ -380,6 +628,38 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.GetAuthTokensResponse, collections.abc.Awaitable[flwr.proto.control_pb2.GetAuthTokensResponse]]:
         """Get auth tokens upon request"""
+
+    @abc.abstractmethod
+    def ListConnectors(
+        self,
+        request: flwr.proto.control_pb2.ListConnectorsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListConnectorsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListConnectorsResponse]]:
+        """List OAuth connectors available to the authenticated account"""
+
+    @abc.abstractmethod
+    def DisconnectConnector(
+        self,
+        request: flwr.proto.control_pb2.DisconnectConnectorRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.DisconnectConnectorResponse, collections.abc.Awaitable[flwr.proto.control_pb2.DisconnectConnectorResponse]]:
+        """Disconnect connector credentials for the authenticated account"""
+
+    @abc.abstractmethod
+    def BeginConnectorOAuth(
+        self,
+        request: flwr.proto.control_pb2.BeginConnectorOAuthRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.BeginConnectorOAuthResponse, collections.abc.Awaitable[flwr.proto.control_pb2.BeginConnectorOAuthResponse]]:
+        """Begin OAuth connector authorization flow"""
+
+    @abc.abstractmethod
+    def CompleteConnectorOAuth(
+        self,
+        request: flwr.proto.control_pb2.CompleteConnectorOAuthRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.CompleteConnectorOAuthResponse, collections.abc.Awaitable[flwr.proto.control_pb2.CompleteConnectorOAuthResponse]]:
+        """Complete OAuth connector authorization flow"""
 
     @abc.abstractmethod
     def PullArtifacts(
@@ -422,12 +702,52 @@ class ControlServicer(metaclass=abc.ABCMeta):
         """List Federations"""
 
     @abc.abstractmethod
+    def ListApps(
+        self,
+        request: flwr.proto.control_pb2.ListAppsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListAppsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAppsResponse]]:
+        """List Apps in a Federation"""
+
+    @abc.abstractmethod
+    def ListAppAssociations(
+        self,
+        request: flwr.proto.control_pb2.ListAppAssociationsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListAppAssociationsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAppAssociationsResponse]]:
+        """List Federations associated with an App"""
+
+    @abc.abstractmethod
+    def AddApp(
+        self,
+        request: flwr.proto.control_pb2.AddAppRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.AddAppResponse, collections.abc.Awaitable[flwr.proto.control_pb2.AddAppResponse]]:
+        """Add App to a Federation"""
+
+    @abc.abstractmethod
+    def RemoveApp(
+        self,
+        request: flwr.proto.control_pb2.RemoveAppRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.RemoveAppResponse, collections.abc.Awaitable[flwr.proto.control_pb2.RemoveAppResponse]]:
+        """Remove App from a Federation"""
+
+    @abc.abstractmethod
     def ShowFederation(
         self,
         request: flwr.proto.control_pb2.ShowFederationRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.ShowFederationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ShowFederationResponse]]:
         """Show Federation"""
+
+    @abc.abstractmethod
+    def SetFederationIcon(
+        self,
+        request: flwr.proto.control_pb2.SetFederationIconRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.SetFederationIconResponse, collections.abc.Awaitable[flwr.proto.control_pb2.SetFederationIconResponse]]:
+        """Set Federation icon"""
 
     @abc.abstractmethod
     def CreateFederation(

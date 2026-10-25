@@ -16,11 +16,12 @@
 
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Any
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
-from flwr.common.typing import Run
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore.superexec.executor import Executor, LaunchResult
 
 
 class ExecPlugin(ABC):
@@ -28,17 +29,18 @@ class ExecPlugin(ABC):
 
     def __init__(  # pylint: disable=R0913, R0917
         self,
-        appio_api_address: str,
+        runtime_api_address: str,
         insecure: bool,
         root_certificates_path: str | None,
-        get_run: Callable[[int], Run],
         runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
+        *,
+        executor: Executor,
     ) -> None:
-        self.appio_api_address = appio_api_address
+        self.runtime_api_address = runtime_api_address
         self.insecure = insecure
         self.root_certificates_path = root_certificates_path
-        self.get_run = get_run
         self.runtime_dependency_install = runtime_dependency_install
+        self.executor = executor
 
     @abstractmethod
     def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:
@@ -59,20 +61,24 @@ class ExecPlugin(ABC):
         """
 
     @abstractmethod
-    def launch_app(self, token: str, run_id: int) -> None:
-        """Launch the application associated with a given run ID and token.
+    def launch_task(self, token: str, task: Task) -> LaunchResult:
+        """Launch the process to execute the given task using the given token.
 
-        This method starts the application process using the given `token`.
-        The `run_id` is used solely for bookkeeping purposes, allowing any
-        plugin implementation to associate this launch with a specific run.
+        This method starts the TaskExecutor process using the given `token`.
+        The `task` identifies what should be executed and allows plugin
+        implementations to associate the launch with a specific task.
 
         Parameters
         ----------
         token : str
-            The token required to run the application.
-        run_id : int
-           The ID of the run associated with the token, used for tracking or
-           logging purposes.
+            The token required to run the TaskExecutor process.
+        task : Task
+            The task to execute.
+
+        Returns
+        -------
+        LaunchResult
+            The immediate launch outcome.
         """
 
     # This method is optional to implement

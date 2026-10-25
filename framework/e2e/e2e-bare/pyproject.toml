@@ -7,7 +7,7 @@ name = "e2e-bare"
 version = "1.0.0"
 description = "Bare Federated Learning test with Flower"
 license = "Apache-2.0"
-dependencies = ["flwr[simulation,rest] @ {root:parent:parent:uri}"]
+dependencies = ["flwr[simulation] @ {root:parent:parent:uri}"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]

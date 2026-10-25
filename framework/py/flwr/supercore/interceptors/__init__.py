@@ -12,43 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Shared gRPC interceptors used across supercore services."""
+"""Shared client and server interceptors used across supercore services."""
 
+from flwr.supercore.constant import TASK_TOKEN_HEADER
 
-from .appio_token_interceptor import (
-    APP_TOKEN_HEADER,
-    AUTHENTICATION_FAILED_MESSAGE,
-    AppIoTokenClientInterceptor,
-    AppIoTokenServerInterceptor,
-    create_clientappio_token_auth_server_interceptor,
-    create_serverappio_token_auth_server_interceptor,
-    get_authenticated_task_id,
+from .http import (
+    RuntimeTokenHttpInterceptor,
+    RuntimeVersionHttpInterceptor,
+    SuperExecAuthHttpInterceptor,
 )
+from .rpc_error_translation_interceptor import RpcErrorTranslationServerInterceptor
 from .runtime_version_interceptor import (
     RuntimeVersionClientInterceptor,
     RuntimeVersionServerInterceptor,
-    create_serverappio_runtime_version_server_interceptor,
-)
-from .superexec_auth_interceptor import (
-    SuperExecAuthClientInterceptor,
-    SuperExecAuthServerInterceptor,
-    create_clientappio_superexec_auth_server_interceptor,
-    create_serverappio_superexec_auth_server_interceptor,
+    create_control_runtime_version_server_interceptor,
+    create_fleet_runtime_version_server_interceptor,
 )
 
 __all__ = [
-    "APP_TOKEN_HEADER",
-    "AUTHENTICATION_FAILED_MESSAGE",
-    "AppIoTokenClientInterceptor",
-    "AppIoTokenServerInterceptor",
+    "RpcErrorTranslationServerInterceptor",
+    "RuntimeTokenHttpInterceptor",
     "RuntimeVersionClientInterceptor",
+    "RuntimeVersionHttpInterceptor",
     "RuntimeVersionServerInterceptor",
-    "SuperExecAuthClientInterceptor",
-    "SuperExecAuthServerInterceptor",
-    "create_clientappio_superexec_auth_server_interceptor",
-    "create_clientappio_token_auth_server_interceptor",
-    "create_serverappio_runtime_version_server_interceptor",
-    "create_serverappio_superexec_auth_server_interceptor",
-    "create_serverappio_token_auth_server_interceptor",
-    "get_authenticated_task_id",
+    "SuperExecAuthHttpInterceptor",
+    "TASK_TOKEN_HEADER",
+    "create_control_runtime_version_server_interceptor",
+    "create_fleet_runtime_version_server_interceptor",
 ]

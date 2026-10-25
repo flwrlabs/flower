@@ -6,21 +6,21 @@
  Design stateful ClientApps
 ############################
 
-.. _array: ref-api/flwr.common.Array.html
+.. _array: ref-api/flwr.app.Array.html
 
-.. _arrayrecord: ref-api/flwr.common.ArrayRecord.html
+.. _arrayrecord: ref-api/flwr.app.ArrayRecord.html
 
 .. _clientapp: ref-api/flwr.client.ClientApp.html
 
-.. _configrecord: ref-api/flwr.common.ConfigRecord.html
+.. _configrecord: ref-api/flwr.app.ConfigRecord.html
 
-.. _context: ref-api/flwr.common.Context.html
+.. _context: ref-api/flwr.app.Context.html
 
-.. _metricrecord: ref-api/flwr.common.MetricRecord.html
+.. _metricrecord: ref-api/flwr.app.MetricRecord.html
 
 .. _numpyclient: ref-api/flwr.client.NumPyClient.html
 
-.. _recorddict: ref-api/flwr.common.RecordDict.html#recorddict
+.. _recorddict: ref-api/flwr.app.RecordDict.html#recorddict
 
 By design, ClientApp_ objects are stateless. This means that the ``ClientApp`` object is
 recreated each time a new ``Message`` is to be processed. This behavior is identical

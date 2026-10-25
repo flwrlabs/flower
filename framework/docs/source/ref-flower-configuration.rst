@@ -78,7 +78,7 @@ clearer naming.
     address = ":local:"
 
     [superlink.local-poc]
-    address = "127.0.0.1:9093"
+    address = "127.0.0.1:8000"
     insecure = true
 
 **Explanation**
@@ -93,7 +93,7 @@ clearer naming.
   will run simulations using the default configuration of the :doc:`Simulation Runtime
   <how-to-run-simulations>`.
 - ``[superlink.local-poc]`` defines a configuration for connecting to a locally running
-  SuperLink at address ``127.0.0.1:9093``
+  SuperLink at address ``127.0.0.1:8000``
 
 Connection configuration names must be unique and use the ``superlink.`` prefix.
 
@@ -132,7 +132,7 @@ testing before deploying to real distributed environments.
     address = ":local:"
 
 This creates a managed local SuperLink profile using the default simulation
-configuration, which involves running 10 simulated SuperNodes through the simulation
+configuration, which involves running two simulated SuperNodes through the simulation
 runtime. Check the :doc:`Simulation Runtime docs <how-to-run-simulations>` to learn how
 to customize the number of SuperNodes and resources (CPU/GPU) allocated to your
 simulations.
@@ -158,9 +158,8 @@ when the managed local SuperLink is shut down.
 - Use ``address = ":local-in-memory:"`` when the managed local SuperLink runs on a
   filesystem where SQLite performs poorly, such as some network drives or HPC storage
 
-Learn more in the `How to Run Simulations
-<https://flower.ai/docs/framework/how-to-run-simulations.html>`_ guide about other
-optional parameters you can use to configure your local simulation.
+Learn more in the `How to Run Simulations <how-to-run-simulations.html>`_ guide about
+other optional parameters you can use to configure your local simulation.
 
 When you use a local simulation profile with ``address = ":local:"`` or ``address =
 ":local-in-memory:"``, Flower CLI commands that communicate with SuperLink use the
@@ -188,11 +187,11 @@ configure connections that point to a remote SuperLink.
 **Explanation**
 
 - ``address`` (required): The address of the SuperLink Control API to connect to (e.g.,
-  ``my-server.example.com:9093``).
+  ``my-server.example.com:8000``).
 - ``root-certificates``: Path to the root certificate file for TLS encryption. This
   secures the communication between your CLI and the SuperLink. If omitted, Flower uses
-  the default gRPC root certificate. This field is ignored if ``insecure`` is set to
-  ``true``.
+  the default CA bundle configured by its HTTP client. This field is ignored if
+  ``insecure`` is set to ``true``.
 - ``insecure``: Set to ``true`` to disable TLS encryption (only use this for local
   testing, never in production). Defaults to ``false`` if omitted, meaning TLS is
   enabled by default.
@@ -207,8 +206,8 @@ prevent eavesdropping and tampering. In production, you should always use TLS by
 
 Only set ``insecure = true`` for local testing environments.
 
-Refer to the `deployment documentation <https://flower.ai/docs/framework/deploy.html>`_
-for TLS setup and advanced configurations.
+Refer to the `deployment documentation <deploy.html>`_ for TLS setup and advanced
+configurations.
 
 ********************************************
  Upgrading from previous versions of Flower

@@ -25,7 +25,6 @@ echo "Formatting started: Python"
 python -m devtool.check_copyright flwr_datasets/
 python -m isort flwr_datasets/
 python -m black -q flwr_datasets/
-python -m docformatter -i -r flwr_datasets/
 python -m ruff check --fix flwr_datasets/
 echo "Formatting done: Python"
 

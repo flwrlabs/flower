@@ -20,7 +20,6 @@ virtualenv >= 20.24.6
 ##### dev-dependencies
 isort == 5.13.2
 black == 24.3.0
-docformatter == 1.7.5
 mypy == 0.961
 pylint == 2.8.2
 flake8 == 3.9.2

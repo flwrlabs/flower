@@ -15,10 +15,8 @@
 """Server-side utilities."""
 
 
-from .tensorboard import tensorboard as tensorboard
 from .validator import validate_message as validate_message
 
 __all__ = [
-    "tensorboard",
     "validate_message",
 ]

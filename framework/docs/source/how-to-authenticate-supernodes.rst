@@ -48,6 +48,12 @@ enabled:
     :doc:`how-to-enable-tls-connections` guide and extends it to introduce node
     authentication to the SuperLink ↔ SuperNode connection.
 
+.. note::
+
+    This guide covers CLI-managed SuperNode authentication for a self-hosted SuperLink.
+    To register SuperNodes in the SuperGrid dashboard and add them to a deployment
+    federation, see :doc:`how-to-connect-supernodes-to-supergrid`.
+
 .. tip::
 
     Checkout the `Flower Authentication
@@ -118,7 +124,7 @@ the path to the CA certificate used to launch the SuperLink. For example:
     :emphasize-lines: 3
 
     [superlink.local-deployment]
-    address = "127.0.0.1:9093"
+    address = "127.0.0.1:8000"
     root-certificates = "/absolute/path/to/certificates/ca.crt"
 
 You can verify that your connection is correctly configured by running a ``flwr ls``
@@ -185,13 +191,19 @@ Connecting a SuperNode to a SuperLink that has node authentication enabled requi
 passing one additional argument (i.e. the private key of the SuperNode) in addition to
 the TLS certificate.
 
+.. note::
+
+    To enable TLS also for the Runtime API on SuperNodes, please refer to
+    :ref:`Launching the SuperNodes with TLS <connecting-the-supernodes-with-tls>`.
+
 .. code-block:: bash
     :emphasize-lines: 6
 
     $ flower-supernode \
         --root-certificates certificates/ca.crt \
-        --superlink 127.0.0.1:9092 \
-        --clientappio-api-address 127.0.0.1:9094 \
+        --superlink 127.0.0.1:8000 \
+        --host 127.0.0.1 \
+        --port 9094 \
         --node-config="partition-id=0 num-partitions=2" \
         --auth-supernode-private-key keys/supernode_credentials_1
 
@@ -207,8 +219,9 @@ private key:
 
     $ flower-supernode \
         --root-certificates certificates/ca.crt \
-        --superlink 127.0.0.1:9092 \
-        --clientappio-api-address 127.0.0.1:9095 \
+        --superlink 127.0.0.1:8000 \
+        --host 127.0.0.1 \
+        --port 9095 \
         --node-config="partition-id=1 num-partitions=2" \
         --auth-supernode-private-key keys/supernode_credentials_2
 

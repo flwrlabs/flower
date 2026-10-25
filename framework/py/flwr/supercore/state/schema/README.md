@@ -10,9 +10,53 @@
         layout: elk
 ---
 erDiagram
-  context {
-    BIGINT run_id FK "nullable"
-    BLOB context "nullable"
+  automation {
+    INTEGER automation_id PK
+    TIMESTAMP created_at
+    VARCHAR federation_id
+    BIGINT fixed_interval "nullable"
+    VARCHAR flwr_aid
+    TIMESTAMP next_run_at
+    INTEGER remaining_runs "nullable"
+    BIGINT series_id
+    BLOB start_run_request "nullable"
+    VARCHAR status
+    TIMESTAMP stopped_at "nullable"
+    TIMESTAMP updated_at
+  }
+
+  compacted_contexts {
+    BIGINT id PK
+    TIMESTAMP created_at
+    BIGINT series_id
+    TEXT text
+    BIGINT through_event_id
+    BIGINT token_count
+  }
+
+  connector {
+    INTEGER connector_id PK
+    VARCHAR config_json
+    VARCHAR connector_ref
+    TIMESTAMP created_at
+    VARCHAR created_by
+    VARCHAR credentials_json
+    TIMESTAMP deleted_at "nullable"
+    VARCHAR deleted_by "nullable"
+    VARCHAR federation_id
+  }
+
+  connector_oauth_session {
+    VARCHAR oauth_session_id PK
+    TIMESTAMP completed_at "nullable"
+    VARCHAR connector_ref
+    TIMESTAMP created_at
+    TIMESTAMP expires_at
+    VARCHAR federation_id
+    VARCHAR flwr_aid
+    VARCHAR pkce_verifier "nullable"
+    VARCHAR redirect_uri
+    VARCHAR state
   }
 
   fab {
@@ -21,11 +65,36 @@ erDiagram
     VARCHAR verifications
   }
 
-  logs {
-    BIGINT run_id FK "nullable"
-    VARCHAR log "nullable"
-    BIGINT node_id "nullable"
-    FLOAT timestamp "nullable"
+  federation_app {
+    VARCHAR app_id PK
+    VARCHAR federation_id PK
+    TIMESTAMP added_at
+    VARCHAR added_by
+    VARCHAR app_type
+    VARCHAR color "nullable"
+    VARCHAR description "nullable"
+    VARCHAR display_name "nullable"
+    VARCHAR fab_hash
+    BOOLEAN is_hub_app "nullable"
+    TIMESTAMP updated_at
+  }
+
+  message {
+    VARCHAR message_id PK
+    VARCHAR reply_to_message_id FK "nullable"
+    TIMESTAMP acknowledged_at "nullable"
+    TIMESTAMP cancelled_at "nullable"
+    BOOLEAN cleared
+    DOUBLE created_at
+    BIGINT dst_node_id
+    BIGINT dst_task_id "nullable"
+    TIMESTAMP expires_at
+    VARCHAR group_id
+    VARCHAR message_type
+    BIGINT run_id
+    BIGINT src_node_id
+    BIGINT src_task_id "nullable"
+    DOUBLE ttl
   }
 
   message_ins {
@@ -62,8 +131,10 @@ erDiagram
     FLOAT heartbeat_interval "nullable"
     VARCHAR last_activated_at "nullable"
     VARCHAR last_deactivated_at "nullable"
+    VARCHAR location "nullable"
+    VARCHAR name "nullable"
     BIGINT node_id UK "nullable"
-    TIMESTAMP online_until "nullable"
+    FLOAT online_until "nullable"
     VARCHAR owner_aid "nullable"
     VARCHAR owner_name "nullable"
     BLOB public_key UK "nullable"
@@ -83,6 +154,23 @@ erDiagram
     VARCHAR parent_id PK,FK
   }
 
+  object_push_session_pending {
+    VARCHAR object_id PK
+    VARCHAR session_id PK,FK
+  }
+
+  object_push_session_roots {
+    VARCHAR root_object_id PK
+    VARCHAR session_id FK
+  }
+
+  object_push_sessions {
+    VARCHAR session_id PK
+    TIMESTAMP expires_at
+    INTEGER pending_count
+    BIGINT run_id
+  }
+
   objects {
     VARCHAR object_id PK "nullable"
     BLOB content "nullable"
@@ -90,27 +178,31 @@ erDiagram
     INTEGER ref_count
   }
 
+  objectstore_locks {
+    VARCHAR lock_id PK
+    INTEGER lock_value
+  }
+
   run {
     BIGINT bytes_recv "nullable"
     BIGINT bytes_sent "nullable"
     FLOAT clientapp_runtime "nullable"
-    VARCHAR details "nullable"
     VARCHAR fab_hash "nullable"
     VARCHAR fab_id "nullable"
     VARCHAR fab_version "nullable"
-    VARCHAR federation "nullable"
     VARCHAR federation_config "nullable"
-    VARCHAR finished_at "nullable"
+    VARCHAR federation_id "nullable"
     VARCHAR flwr_aid "nullable"
     VARCHAR override_config "nullable"
-    VARCHAR pending_at "nullable"
-    BIGINT primary_task_id "nullable"
+    BIGINT primary_task_id
     BIGINT run_id UK "nullable"
-    VARCHAR run_type
-    VARCHAR running_at "nullable"
-    VARCHAR starting_at "nullable"
-    VARCHAR sub_status "nullable"
+    BIGINT series_id "nullable"
     VARCHAR usage_reported_at
+  }
+
+  run_connector {
+    INTEGER connector_id PK
+    BIGINT run_id PK
   }
 
   run_objects {
@@ -118,36 +210,98 @@ erDiagram
     BIGINT run_id PK
   }
 
+  run_series {
+    BIGINT series_id PK
+    TIMESTAMP created_at
+    VARCHAR description "nullable"
+    VARCHAR federation_id
+    BOOLEAN is_agent
+    TIMESTAMP updated_at
+  }
+
+  series_context {
+    BIGINT series_id PK
+    BLOB context "nullable"
+  }
+
+  series_runs {
+    INTEGER id PK
+    BIGINT run_id UK
+    BIGINT series_id
+  }
+
   task {
-    BIGINT active_until "nullable"
+    TIMESTAMP active_until "nullable"
+    INTEGER connector_id "nullable"
     VARCHAR connector_ref "nullable"
     VARCHAR details
     VARCHAR fab_hash "nullable"
-    VARCHAR finished_at "nullable"
+    TIMESTAMP finished_at "nullable"
     VARCHAR model_ref "nullable"
-    VARCHAR pending_at
+    TIMESTAMP pending_at
     BIGINT run_id
-    VARCHAR running_at "nullable"
-    VARCHAR starting_at "nullable"
+    TIMESTAMP running_at "nullable"
+    TIMESTAMP starting_at "nullable"
     VARCHAR sub_status
     BIGINT task_id UK
     VARCHAR token "nullable"
     VARCHAR type
   }
 
-  token_store {
-    BIGINT run_id PK "nullable"
-    FLOAT active_until "nullable"
-    VARCHAR token UK
+  task_event {
+    BIGINT id PK
+    BIGINT task_id FK
+    VARCHAR data
+    VARCHAR event
+    BIGINT run_id
+    TIMESTAMP timestamp
   }
 
-  run ||--o| context : run_id
-  run ||--o{ logs : run_id
+  task_logs {
+    BIGINT task_id FK
+    VARCHAR log
+    FLOAT timestamp
+  }
+
+  task_message {
+    VARCHAR message_id PK
+    BIGINT dst_task_id FK
+    BIGINT src_task_id FK
+    BLOB content "nullable"
+    FLOAT created_at
+    BLOB error "nullable"
+    VARCHAR message_type
+    VARCHAR reply_to_message_id "nullable"
+    BIGINT run_id
+    FLOAT ttl
+  }
+
+  task_usage {
+    INTEGER id PK
+    BIGINT task_id FK
+    TIMESTAMP created_at
+    BIGINT input_tokens "nullable"
+    BIGINT output_tokens "nullable"
+    VARCHAR provider
+    TIMESTAMP reported_at "nullable"
+    BIGINT run_id
+    BIGINT total_tokens "nullable"
+    VARCHAR usage_type
+  }
+
+  message ||--o{ message : reply_to_message_id
   run ||--o{ message_ins : run_id
   run ||--o{ message_res : run_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
+  object_push_sessions ||--o| object_push_session_pending : session_id
+  object_push_sessions ||--o{ object_push_session_roots : session_id
   objects ||--o| run_objects : object_id
+  task ||--o{ task_event : task_id
+  task ||--o{ task_logs : task_id
+  task ||--o{ task_message : src_task_id
+  task ||--o{ task_message : dst_task_id
+  task ||--o{ task_usage : task_id
 
 ```
 <!-- END_SQLALCHEMY_DOCS -->

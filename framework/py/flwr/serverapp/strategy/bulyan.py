@@ -24,15 +24,9 @@ from typing import cast
 
 import numpy as np
 
-from flwr.common import (
-    Array,
-    ArrayRecord,
-    Message,
-    MetricRecord,
-    NDArrays,
-    RecordDict,
-    log,
-)
+from flwr.app import Array, ArrayRecord, Message, MetricRecord, RecordDict
+from flwr.common import NDArrays
+from flwr.supercore import log
 
 from .fedavg import FedAvg
 from .multikrum import select_multikrum
