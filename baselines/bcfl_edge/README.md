@@ -30,7 +30,7 @@ The paper selects which devices, and therefore which miners, take part, so as to
 
 The `random` selection gives the paper's random baseline (Fig. 4). The cost model and Algorithm 1 come from [`bcfl-optimizer`](https://github.com/v1nayh3g/bcfl-optimizer), the authors' reference implementation. On the exact parameters behind the paper's figures, it selects the same number of miners, with the same A_fork, in all 30 settings of Fig. 3.
 
-**Datasets:** [Google Speech Commands](https://huggingface.co/datasets/google/speech_commands) v0.01 (1.4 GB archive), converted by `bcfl_edge.prepare_data` and partitioned with Flower Datasets.
+**Datasets:** [Google Speech Commands](https://arxiv.org/abs/1804.03209) v0.01, the 8 keywords of the paper (600 MB), loaded from [`v1nayh3g/speech-commands-v0.01-8kw`](https://huggingface.co/datasets/v1nayh3g/speech-commands-v0.01-8kw) on the Hub and partitioned with Flower Datasets.
 
 **Hardware Setup:** On a Windows laptop with an NVIDIA GPU, preparing the data takes about 4 minutes and each 50-round run about 30 minutes. Algorithm 1 runs once before the first round, in under a minute for N_M = 15. A GPU is not required; on CPU, rounds are slower.
 
@@ -93,16 +93,15 @@ Decoding the audio requires FFmpeg (`apt install ffmpeg`, `brew install ffmpeg`,
 
 On Windows, set `PYTHONUTF8=1` before `flwr run`. Otherwise Flower's log output can stop with a `'charmap' codec can't encode` error (the simulation itself keeps running).
 
-Prepare the data once. `google/speech_commands` on the Hub is a loading script that
-recent versions of `datasets` no longer run, so this downloads Google's official v0.01
-archive (1.4 GB) and writes the eight keywords, with the official test split, as Parquet:
+The data is downloaded from the Hub on the first run. (`google/speech_commands` is a
+loading script that recent versions of `datasets` no longer run, so the baseline uses a
+Parquet copy of the eight keywords with the official test split.) To build the same data
+yourself from Google's official archive (1.4 GB) instead, run the following, then add
+`dataset='<printed path>'` to `--run-config`:
 
 ```bash
 python -m bcfl_edge.prepare_data data/speech_commands
 ```
-
-It prints the absolute path of the folder; pass it as `dataset` in every run below
-(shown as `$DATA`).
 
 
 ## Running the Experiments
@@ -110,7 +109,7 @@ It prints the absolute path of the folder; pass it as `dataset` in every run bel
 Train on the 40 devices selected by Algorithm 1 (S_D = 80% of N_D, the setting of Sec. V):
 
 ```bash
-flwr run . --federation-config "num-supernodes=50" --run-config "dataset='$DATA'" --stream
+flwr run . --federation-config "num-supernodes=50" --stream
 ```
 
 Each run writes `outputs/<selection>_sd<S_D>_<time>.json`. The file holds:
@@ -121,9 +120,9 @@ Each run writes `outputs/<selection>_sd<S_D>_<time>.json`. The file holds:
 Compare with random selection, and vary S_D (Fig. 3, Fig. 4):
 
 ```bash
-flwr run . --federation-config "num-supernodes=50" --run-config "dataset='$DATA' selection='random'"
+flwr run . --federation-config "num-supernodes=50" --run-config "selection='random'"
 for sd in 10 20 30 40 50; do
-  flwr run . --federation-config "num-supernodes=50" --run-config "dataset='$DATA' selected-devices=$sd"
+  flwr run . --federation-config "num-supernodes=50" --run-config "selected-devices=$sd"
 done
 ```
 

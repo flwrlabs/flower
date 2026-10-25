@@ -1,10 +1,11 @@
 """bcfl_edge: Download Speech Commands v0.01 and convert it to Parquet.
 
 `google/speech_commands` on the Hugging Face Hub is a loading script, which
-recent versions of `datasets` cannot run. This script builds the same data from
+recent versions of `datasets` cannot run. This script builds the data from
 Google's official archive instead, keeping the paper's eight keywords and the
 official test split (`testing_list.txt`). The remaining clips, including the
-official validation list, form the training split.
+official validation list, form the training split. It produced the copy on the
+Hub (`v1nayh3g/speech-commands-v0.01-8kw`) that the baseline loads by default.
 
     python -m bcfl_edge.prepare_data data/speech_commands
 

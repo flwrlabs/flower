@@ -141,4 +141,4 @@ seed = 42                 # simulated network and random baseline
 local-epochs = 1
 batch-size = 32
 learning-rate = 0.01
-dataset = ""                # absolute path written by bcfl_edge.prepare_data
+dataset = "v1nayh3g/speech-commands-v0.01-8kw"  # or a folder from bcfl_edge.prepare_data
