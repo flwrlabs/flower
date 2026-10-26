@@ -110,15 +110,18 @@ def invoke_model_provider(
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-    payload = dict(request)
     with trace_span("model.provider", attributes={"flwr.component": "model"}) as span:
         started_at = monotonic()
         if isinstance(request.get("model"), str):
             span.set_attribute("flwr.model.name", cast(str, request["model"]))
         first_text = False
+        first_event = False
 
         def forward_event(event: JSONObject) -> None:
-            nonlocal first_text
+            nonlocal first_text, first_event
+            if not first_event:
+                first_event = True
+                span.add_event("provider.first_event")
             if not first_text and event.get("type") == "response.output_text.delta":
                 first_text = True
                 span.set_attribute(
@@ -132,10 +135,10 @@ def invoke_model_provider(
             responses_url=responses_url,
             headers=headers,
             timeout=model_api_timeout(),
-            request=payload,
+            request=dict(request),
             on_stream_event=forward_event,
             usage_recorder=usage_recorder,
-            provider=_provider_from_request(payload),
+            provider=_provider_from_request(request),
         )
         usage = response.get("usage")
         if isinstance(usage, dict):
@@ -173,13 +176,15 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
 
     # Send one HTTP request and let HTTP status represent transport failure.
     try:
-        response = requests.post(
-            responses_url,
-            headers=headers,
-            json=request,
-            timeout=timeout,
-            stream=stream,
-        )
+        # For streams this ends at response headers, not at the first SSE event.
+        with trace_span("model.provider_http"):
+            response = requests.post(
+                responses_url,
+                headers=headers,
+                json=request,
+                timeout=timeout,
+                stream=stream,
+            )
     except requests.RequestException as exc:
         raise ModelProviderError(detail=str(exc)) from exc
 

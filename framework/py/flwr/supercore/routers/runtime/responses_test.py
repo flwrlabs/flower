@@ -206,7 +206,9 @@ def test_responses_streams_only_child_task_events() -> None:
     assert [call.args[0] for call in trace.call_args_list] == [
         "model.round_trip",
         "model.create",
+        "model.request_publish",
         "model.response_wait",
+        "model.first_text_wait",
     ]
 
     assert response.status_code == 200

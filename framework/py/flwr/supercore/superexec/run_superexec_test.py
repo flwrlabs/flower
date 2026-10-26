@@ -31,6 +31,7 @@ from flwr.supercore.interceptors import (
 from flwr.supercore.runtime.tracing import RuntimeTracingInterceptor
 from flwr.supercore.superexec.executor import LaunchResult, LaunchResultStatus
 from flwr.supercore.superexec.plugin import AutoExecPlugin
+from flwr.supercore.tracing import PhaseTimings
 
 from . import run_superexec as run_superexec_module
 
@@ -103,6 +104,8 @@ def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
     order = Mock()
     order.attach_mock(executor.get_eligible_capacity, "capacity")
     order.attach_mock(client.AcquireTask, "acquire")
+    publish = Mock()
+    monkeypatch.setattr(PhaseTimings, "publish", publish)
     monkeypatch.setattr(
         run_superexec_module, "get_executor", Mock(return_value=executor)
     )
@@ -131,8 +134,13 @@ def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
     assert set(request.agentapp_fab_hashes) == ready_fabs
     if ready_fabs:
         executor.launch.assert_called_once()
+        publish.assert_called_once_with(
+            "executor.acquire",
+            {"flwr.component": "superexec", "flwr.task_id": "123", "flwr.run_id": "0"},
+        )
     else:
         executor.launch.assert_not_called()
+        publish.assert_not_called()
 
 
 @pytest.mark.parametrize(

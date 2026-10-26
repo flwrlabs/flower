@@ -57,7 +57,7 @@ from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.runtime.tracing import RuntimeTracingInterceptor
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
-from flwr.supercore.tracing import flush_traces, trace_span
+from flwr.supercore.tracing import PhaseTimings, flush_traces, trace_span
 
 from .task import handle_task
 
@@ -73,6 +73,7 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
         certificates: bytes | None,
     ) -> None:
         self._bootstrap_started = monotonic()
+        self.timings = PhaseTimings()
         self._runtime_api_address = runtime_api_address
         self._token = token
         self._insecure = insecure
@@ -124,6 +125,7 @@ class _ModelTaskLifecycle:  # pylint: disable=too-many-instance-attributes
                 initialization.set_attribute("flwr.run_id", str(task_input.run.run_id))
                 initialization.set_attribute("flwr.task_id", str(task_input.task_id))
 
+            self.timings.publish("task.bootstrap", self._trace_attributes)
             event(EventType.FLWR_MODEL_RUN_ENTER)
             with trace_span(
                 "model.execute",
@@ -254,7 +256,8 @@ def _run_model_task(  # pylint: disable=too-many-arguments
         insecure,
         certificates,
     )
-    lifecycle.initialize()
+    with lifecycle.timings.measure("task.runtime_client"):
+        lifecycle.initialize()
     if resident:
         _register_resident_signal_handlers(lifecycle)
     else:
@@ -267,7 +270,8 @@ def _run_model_task(  # pylint: disable=too-many-arguments
         )
     # Transfer task authority only after Runtime state and signal ownership exist
     if on_started is not None:
-        on_started()
+        with lifecycle.timings.measure("task.accept"):
+            on_started()
     return lifecycle, lifecycle.run()
 
 

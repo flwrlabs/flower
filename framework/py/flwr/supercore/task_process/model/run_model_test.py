@@ -251,6 +251,7 @@ def test_resident_accepts_only_after_initialization_and_signal_ownership(
     """Task authority should move only after resident state is ready."""
     calls: list[str] = []
     lifecycle = Mock()
+    lifecycle.timings = run_model_module.PhaseTimings()
 
     def run() -> int:
         calls.append("run")

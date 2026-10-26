@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-23 00:10+0000\n"
+"POT-Creation-Date: 2026-10-24 00:09+0000\n"
 "PO-Revision-Date: 2026-06-11 04:01+0000\n"
 "Last-Translator: reducedradius <feixiang512@outlook.com>\n"
 "Language: zh_Hans\n"
@@ -21956,12 +21956,12 @@ msgid ""
 "subclasses to implement several abstract methods:"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:97
+#: ../../source/explanation-flower-strategy-abstraction.rst:98
 #, fuzzy
 msgid "Creating a new strategy"
 msgstr "server.strategy"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:99
+#: ../../source/explanation-flower-strategy-abstraction.rst:100
 msgid ""
 "You can customize an existing strategy (e.g., |fedavg_link|_) by "
 "overriding one or several of its methods. For full flexibility, you can "
@@ -21970,90 +21970,95 @@ msgid ""
 "implement the abstract methods:"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:127
+#: ../../source/explanation-flower-strategy-abstraction.rst:128
 msgid ""
 "The ``start`` method is already implemented in the base class and "
 "typically does not need to be overridden. It orchestrates the federated "
 "learning process by invoking the abstract methods in sequence."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:133
+#: ../../source/explanation-flower-strategy-abstraction.rst:134
 #, fuzzy
 msgid "Understand ``start`` method"
 msgstr ":code:`evaluate`方法"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:135
+#: ../../source/explanation-flower-strategy-abstraction.rst:136
 msgid "The ``start`` method of the ``Strategy`` base class follows this workflow:"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:137
+#: ../../source/explanation-flower-strategy-abstraction.rst:138
 msgid ""
 "Call ``evaluate_fn`` (if provided) to evaluate the initial model on the "
 "ServerApp side."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:139
+#: ../../source/explanation-flower-strategy-abstraction.rst:140
 msgid "Call ``configure_train`` to generate training messages for ClientApps."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:140
+#: ../../source/explanation-flower-strategy-abstraction.rst:141
 #, fuzzy
 msgid "Send training messages to ClientApps."
 msgstr "客户端"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:141
+#: ../../source/explanation-flower-strategy-abstraction.rst:142
 msgid ""
 "ClientApps run their ``@app.train()`` function and return training "
 "replies."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:142
+#: ../../source/explanation-flower-strategy-abstraction.rst:143
 msgid "Call ``aggregate_train`` to aggregate the training replies."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:143
+#: ../../source/explanation-flower-strategy-abstraction.rst:144
 msgid ""
 "Call ``configure_evaluate`` to generate evaluation messages for "
 "ClientApps."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:144
+#: ../../source/explanation-flower-strategy-abstraction.rst:145
 #, fuzzy
 msgid "Send evaluation messages to ClientApps."
 msgstr "客户端"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:145
+#: ../../source/explanation-flower-strategy-abstraction.rst:146
 msgid ""
 "ClientApps run their ``@app.evaluate()`` function and return evaluation "
 "replies."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:146
+#: ../../source/explanation-flower-strategy-abstraction.rst:147
 msgid "Call ``aggregate_evaluate`` to aggregate the evaluation replies."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:147
+#: ../../source/explanation-flower-strategy-abstraction.rst:148
 msgid ""
 "Call ``evaluate_fn`` (if provided) to evaluate the aggregated model on "
 "the ServerApp side."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:149
-#, fuzzy
-msgid "Repeat steps 2-10 for the specified number of rounds."
-msgstr "联邦平均动量策略。"
-
 #: ../../source/explanation-flower-strategy-abstraction.rst:150
 msgid ""
-"Return the final ``Result``, which contains the final model and metrics "
-"history."
+"Call ``should_stop`` (if provided) with the completed round number and "
+"accumulated ``Result``. If it returns ``True``, stop executing rounds"
 msgstr ""
 
 #: ../../source/explanation-flower-strategy-abstraction.rst:152
+msgid "Otherwise, repeat steps 2-11 up to ``num_rounds`` times"
+msgstr ""
+
+#: ../../source/explanation-flower-strategy-abstraction.rst:153
+msgid ""
+"Return the final ``Result``, which contains the final model and metrics "
+"history"
+msgstr ""
+
+#: ../../source/explanation-flower-strategy-abstraction.rst:155
 msgid "The following diagram illustrates the flow."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:156
+#: ../../source/explanation-flower-strategy-abstraction.rst:159
 msgid ""
 "The sequence diagram below shows the interaction between ``ServerApp``, "
 "``Strategy`` (inside ``ServerApp``), and ``ClientApp``. In reality, they "
@@ -22063,12 +22068,12 @@ msgid ""
 "Communication <ref-flower-network-communication>` guide."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:201
+#: ../../source/explanation-flower-strategy-abstraction.rst:204
 #, fuzzy
 msgid "The ``configure_train`` method"
 msgstr ":code:`configure_fit`方法"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:203
+#: ../../source/explanation-flower-strategy-abstraction.rst:206
 #, fuzzy
 msgid ""
 "The ``configure_train`` method is responsible for preparing the next "
@@ -22080,40 +22085,40 @@ msgstr ""
 "负责配置即将开始的一轮训练。*配置*在这里是什么意思？配置一轮训练意味着选择客户并决定向这些客户发送什么指令。:code:`configure_fit`"
 " 说明了这一点："
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:207
-#: ../../source/explanation-flower-strategy-abstraction.rst:249
-#: ../../source/explanation-flower-strategy-abstraction.rst:287
-#: ../../source/explanation-flower-strategy-abstraction.rst:330
+#: ../../source/explanation-flower-strategy-abstraction.rst:210
+#: ../../source/explanation-flower-strategy-abstraction.rst:252
+#: ../../source/explanation-flower-strategy-abstraction.rst:290
+#: ../../source/explanation-flower-strategy-abstraction.rst:333
 msgid "Here is the method signature:"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:217
-#: ../../source/explanation-flower-strategy-abstraction.rst:297
+#: ../../source/explanation-flower-strategy-abstraction.rst:220
+#: ../../source/explanation-flower-strategy-abstraction.rst:300
 #, fuzzy
 msgid "This method takes four arguments:"
 msgstr "这种方法是幂等的。"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:219
-#: ../../source/explanation-flower-strategy-abstraction.rst:263
-#: ../../source/explanation-flower-strategy-abstraction.rst:299
-#: ../../source/explanation-flower-strategy-abstraction.rst:344
+#: ../../source/explanation-flower-strategy-abstraction.rst:222
+#: ../../source/explanation-flower-strategy-abstraction.rst:266
+#: ../../source/explanation-flower-strategy-abstraction.rst:302
+#: ../../source/explanation-flower-strategy-abstraction.rst:347
 msgid "``server_round``: The current round number"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:220
+#: ../../source/explanation-flower-strategy-abstraction.rst:223
 #, fuzzy
 msgid "``arrays``: The current global model parameters"
 msgstr "当前（全局）模型参数。"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:221
+#: ../../source/explanation-flower-strategy-abstraction.rst:224
 msgid "``config``: A configuration dictionary for the round"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:222
+#: ../../source/explanation-flower-strategy-abstraction.rst:225
 msgid "``grid``: The object responsible for managing communication with clients"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:224
+#: ../../source/explanation-flower-strategy-abstraction.rst:227
 #, fuzzy
 msgid ""
 "The return value is an iterable of ``Message`` objects, where each "
@@ -22121,26 +22126,26 @@ msgid ""
 "typical implementation of ``configure_train`` will:"
 msgstr "返回值是一个元组列表，每个元组代表将发送到特定客户端的指令。策略实现通常在 :code:`configure_fit` 中执行以下步骤："
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:228
+#: ../../source/explanation-flower-strategy-abstraction.rst:231
 msgid ""
 "Use the ``grid`` to randomly sample a subset (or all) of the available "
 "clients"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:229
+#: ../../source/explanation-flower-strategy-abstraction.rst:232
 msgid ""
 "Create one ``Message`` per selected client, containing the global model "
 "parameters and configuration values"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:232
+#: ../../source/explanation-flower-strategy-abstraction.rst:235
 msgid ""
 "More advanced strategies can implement custom client selection logic by "
 "using the capabilities of ``grid``. A client only participates in a round"
 " if ``configure_train`` generates a message for its node ID."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:238
+#: ../../source/explanation-flower-strategy-abstraction.rst:241
 msgid ""
 "Because the return value is defined per client, strategies can easily "
 "implement heterogeneous configurations. For example, different clients "
@@ -22148,12 +22153,12 @@ msgid ""
 "customized training behaviors."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:244
+#: ../../source/explanation-flower-strategy-abstraction.rst:247
 #, fuzzy
 msgid "The ``aggregate_train`` method"
 msgstr ":code:`aggregate_fit` 方法"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:246
+#: ../../source/explanation-flower-strategy-abstraction.rst:249
 #, fuzzy
 msgid ""
 "The ``aggregate_train`` method is responsible for aggregating the "
@@ -22161,51 +22166,51 @@ msgid ""
 "``configure_train``."
 msgstr ":code:`aggregate_fit` 负责汇总在 :code:`configure_fit` 中选择并要求训练的客户端所返回的结果。"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:261
-#: ../../source/explanation-flower-strategy-abstraction.rst:342
+#: ../../source/explanation-flower-strategy-abstraction.rst:264
+#: ../../source/explanation-flower-strategy-abstraction.rst:345
 #, fuzzy
 msgid "This method takes two arguments:"
 msgstr "这种方法是幂等的。"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:264
+#: ../../source/explanation-flower-strategy-abstraction.rst:267
 #, fuzzy
 msgid ""
 "``replies``: An iterable of ``Message`` objects from the participating "
 "clients"
 msgstr "**replies** -- 从超级链接收到的回复信息的迭代。"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:266
+#: ../../source/explanation-flower-strategy-abstraction.rst:269
 msgid "It returns a tuple consisting of:"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:268
+#: ../../source/explanation-flower-strategy-abstraction.rst:271
 #, fuzzy
 msgid "``ArrayRecord``: The updated global model parameters"
 msgstr "``get_parameters``： 返回当前本地模型参数"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:269
+#: ../../source/explanation-flower-strategy-abstraction.rst:272
 msgid "``MetricRecord``: Aggregated training metrics (such as loss or accuracy)"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:271
+#: ../../source/explanation-flower-strategy-abstraction.rst:274
 msgid ""
 "If aggregation cannot be performed (e.g., if too many clients failed "
 "during the round), the method may decide to return ``(None, None)`` "
 "instead."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:276
+#: ../../source/explanation-flower-strategy-abstraction.rst:279
 msgid ""
 "You can use ``Message.has_error()`` to check if a reply contains an error"
 " and decide how to handle it during aggregation."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:281
+#: ../../source/explanation-flower-strategy-abstraction.rst:284
 #, fuzzy
 msgid "The ``configure_evaluate`` method"
 msgstr ":code:`configure_evaluate`方法"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:283
+#: ../../source/explanation-flower-strategy-abstraction.rst:286
 #, fuzzy
 msgid ""
 "The ``configure_evaluate`` method is responsible for preparing the next "
@@ -22217,60 +22222,60 @@ msgstr ""
 "负责配置下一轮评估。*配置*在这里是什么意思？配置一轮评估意味着选择客户端并决定向这些客户端发送什么指令。:code:`configure_evaluate`"
 " 说明了这一点："
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:300
+#: ../../source/explanation-flower-strategy-abstraction.rst:303
 #, fuzzy
 msgid "``arrays``: The current global model parameters to be evaluated"
 msgstr "当前（全局）模型参数。"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:301
+#: ../../source/explanation-flower-strategy-abstraction.rst:304
 msgid "``config``: A configuration dictionary for evaluation"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:302
+#: ../../source/explanation-flower-strategy-abstraction.rst:305
 msgid "``grid``: The object that manages communication with clients"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:304
+#: ../../source/explanation-flower-strategy-abstraction.rst:307
 msgid ""
 "The return value is an iterable of ``Message`` objects, one for each "
 "selected client. Each message typically contains the current global model"
 " parameters and any evaluation configuration."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:308
+#: ../../source/explanation-flower-strategy-abstraction.rst:311
 msgid "A typical implementation of ``configure_evaluate`` will:"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:310
+#: ../../source/explanation-flower-strategy-abstraction.rst:313
 msgid "Use ``grid`` to select a subset (or all) of the available clients"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:311
+#: ../../source/explanation-flower-strategy-abstraction.rst:314
 msgid ""
 "Create one ``Message`` per selected client containing the global model "
 "and evaluation configuration"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:314
+#: ../../source/explanation-flower-strategy-abstraction.rst:317
 msgid ""
 "As with training, more advanced strategies may apply custom client "
 "selection logic or send different evaluation configurations to different "
 "clients."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:319
+#: ../../source/explanation-flower-strategy-abstraction.rst:322
 msgid ""
 "Because each client receives its own message, strategies can implement "
 "heterogeneous evaluation setups. For example, some clients might evaluate"
 " on larger test sets, while others might use specialized metrics."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:325
+#: ../../source/explanation-flower-strategy-abstraction.rst:328
 #, fuzzy
 msgid "The ``aggregate_evaluate`` method"
 msgstr ":code:`aggregate_evaluate` 方法"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:327
+#: ../../source/explanation-flower-strategy-abstraction.rst:330
 #, fuzzy
 msgid ""
 "The ``aggregate_evaluate`` method is responsible for aggregating the "
@@ -22280,13 +22285,13 @@ msgstr ""
 ":code:`aggregate_evaluate` 负责汇总在 :code:`configure_evaluate` "
 "中选择并要求评估的客户端返回的结果。"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:345
+#: ../../source/explanation-flower-strategy-abstraction.rst:348
 msgid ""
 "``replies``: An iterable of ``Message`` objects returned by the clients "
 "after they executed evaluation"
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:348
+#: ../../source/explanation-flower-strategy-abstraction.rst:351
 msgid ""
 "It returns a single ``MetricRecord`` that represents the aggregated "
 "evaluation metrics across all participating clients. If aggregation "
@@ -22294,7 +22299,7 @@ msgid ""
 "missing metrics), the method may return ``None``."
 msgstr ""
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:354
+#: ../../source/explanation-flower-strategy-abstraction.rst:357
 msgid ""
 "As with training, ``Message.has_error()`` can be used to detect and "
 "handle client errors during aggregation."
@@ -35000,20 +35005,52 @@ msgstr ""
 
 #: ../../source/how-to-use-strategies.rst:281
 msgid ""
-"Finally, the last argument in ``start`` is named ``evaluate_fn`` and it "
-"allows passing to it a callback function to evaluate the aggregated model"
-" on some local data that the ``ServerApp`` might have access to. This "
-"callback is also useful if you want to save the global model at the end "
-"of every round (or every N rounds). Let's see what the signature of this "
-"callback is and how to use it:"
+"The ``evaluate_fn`` argument allows passing a callback function to "
+"evaluate the aggregated model on some local data that the ``ServerApp`` "
+"might have access to. This callback is also useful if you want to save "
+"the global model at the end of every round (or every N rounds). Let's see"
+" what the signature of this callback is and how to use it:"
 msgstr ""
 
-#: ../../source/how-to-use-strategies.rst:312
+#: ../../source/how-to-use-strategies.rst:311
 msgid ""
 "Take a look at the `quickstart-pytorch "
 "<https://github.com/flwrlabs/flower/blob/main/examples/quickstart-"
 "pytorch>`_ example on GitHub for a complete example using several of the "
 "concepts presented in this how-to guide."
+msgstr ""
+
+#: ../../source/how-to-use-strategies.rst:318
+msgid "Stop a strategy run early"
+msgstr ""
+
+#: ../../source/how-to-use-strategies.rst:320
+msgid ""
+"Pass a ``should_stop`` callback to ``start`` to stop before reaching "
+"``num_rounds``. The callback receives the completed round number and "
+"accumulated :class:`~flwr.serverapp.strategy.Result`. For example, stop "
+"when aggregated federated evaluation accuracy reaches 90%:"
+msgstr ""
+
+#: ../../source/how-to-use-strategies.rst:345
+msgid ""
+"The predicate runs once after each full round, including federated "
+"evaluation and any centralized evaluation. It does not run after the "
+"initial evaluation at round zero. Return ``True`` to stop and ``False`` "
+"to continue, and treat the results as read-only. When the predicate "
+"returns ``True``, no further round is dispatched. The returned ``Result``"
+" contains the current global model and all metrics collected so far, so "
+"the ServerApp can continue with saving the model or other application "
+"logic."
+msgstr ""
+
+#: ../../source/how-to-use-strategies.rst:352
+msgid ""
+"``num_rounds`` remains the maximum number of rounds. Without "
+"``should_stop``, all configured rounds run as before. Errors raised by "
+"the predicate propagate normally. Custom strategies that override "
+"``start`` must forward ``should_stop`` to the base implementation or "
+"invoke it in their own round loop."
 msgstr ""
 
 #: ../../source/index.rst:37
@@ -49408,8 +49445,8 @@ msgstr ""
 
 #: flwr.serverapp.strategy.strategy.Strategy.start:11 of
 #, fuzzy
-msgid "Number of federated learning rounds to execute."
-msgstr "使用联邦学习策略"
+msgid "Maximum number of federated learning rounds to execute."
+msgstr ""
 
 #: flwr.serverapp.strategy.strategy.Strategy.start:13 of
 msgid "Timeout in seconds for waiting for node responses."
@@ -49435,7 +49472,16 @@ msgid ""
 "Defaults to None."
 msgstr ""
 
-#: flwr.serverapp.strategy.strategy.Strategy.start:27 of
+#: flwr.serverapp.strategy.strategy.Strategy.start:26 of
+msgid ""
+"Optional predicate to determine whether to stop training early. Called at"
+" the end of each round with the round number and accumulated results. "
+"Return True to stop and return the model and metrics collected so far. "
+"Not called for round zero. Results must not be modified. Defaults to None"
+" (no early stopping)."
+msgstr ""
+
+#: flwr.serverapp.strategy.strategy.Strategy.start:33 of
 msgid ""
 "Results containing final model arrays and also training metrics, "
 "evaluation metrics and global evaluation metrics (if provided) from all "
@@ -89817,4 +89863,28 @@ msgstr ""
 #~ "which reply messages are to be "
 #~ "retrieved."
 #~ msgstr "要检索回复信息的信息 ID 的可迭代项。"
+
+#~ msgid "Repeat steps 2-10 for the specified number of rounds."
+#~ msgstr "联邦平均动量策略。"
+
+#~ msgid ""
+#~ "Return the final ``Result``, which "
+#~ "contains the final model and metrics "
+#~ "history."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Finally, the last argument in ``start``"
+#~ " is named ``evaluate_fn`` and it "
+#~ "allows passing to it a callback "
+#~ "function to evaluate the aggregated "
+#~ "model on some local data that the"
+#~ " ``ServerApp`` might have access to. "
+#~ "This callback is also useful if "
+#~ "you want to save the global model"
+#~ " at the end of every round (or"
+#~ " every N rounds). Let's see what "
+#~ "the signature of this callback is "
+#~ "and how to use it:"
+#~ msgstr ""
 

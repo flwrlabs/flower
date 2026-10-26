@@ -215,7 +215,10 @@ def test_invoke_model_provider_collects_stream_events(
     )
 
     assert result == {"id": "resp_1", "output_text": "hel"}
-    span.add_event.assert_called_once_with("provider.first_text")
+    assert [call.args[0] for call in span.add_event.call_args_list] == [
+        "provider.first_event",
+        "provider.first_text",
+    ]
     span.set_attribute.assert_any_call("flwr.model.first_text_ms", 250.0)
     assert streamed_events == [
         {"type": "response.created", "response": {"id": "resp_1"}},

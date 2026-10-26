@@ -422,6 +422,7 @@ def test_resident_accepts_before_task_input_and_output_capture(
     """Accept authority after Runtime setup and signals, before task work."""
     calls: list[str] = []
     lifecycle = Mock()
+    lifecycle.timings = run_agentapp_module.PhaseTimings()
 
     def run() -> int:
         calls.append("run")
