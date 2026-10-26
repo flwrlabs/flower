@@ -17,13 +17,14 @@
 
 import json
 import random
+from collections.abc import Iterable
 from logging import INFO
-from time import sleep
+from time import monotonic, sleep
 from typing import cast
 
 import numpy as np
 
-from flwr.app import Array, ArrayRecord, ConfigRecord, MetricRecord, RecordDict
+from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
 from flwr.common import NDArray
 from flwr.supercore import log
 
@@ -183,6 +184,61 @@ def sample_nodes(
     sampled_nodes = random.sample(all_nodes, sample_size)
 
     return sampled_nodes, all_nodes
+
+
+def send_and_receive(
+    grid: Grid, messages: Iterable[Message], timeout: float
+) -> list[Message]:
+    """Send messages and collect replies, skipping unavailable nodes.
+
+    Parameters
+    ----------
+    grid : Grid
+        The grid used to send messages, pull replies, and check node availability.
+    messages : Iterable[Message]
+        Messages to send to the selected nodes.
+    timeout : float
+        Maximum time in seconds to wait for replies after sending the messages.
+
+    Returns
+    -------
+    list[Message]
+        Replies received before completion, node unavailability, or timeout.
+    """
+    messages = list(messages)
+    sent_ids = {msg_id for msg_id in grid.push_messages(messages) if msg_id}
+    pending = {
+        msg.metadata.message_id: msg.metadata.dst_node_id
+        for msg in messages
+        if msg.metadata.message_id in sent_ids
+    }
+    del messages
+
+    deadline = monotonic() + timeout
+    replies: list[Message] = []
+    while pending and monotonic() < deadline:
+        pulled = list(grid.pull_messages(pending))
+        replies.extend(pulled)
+        for reply in pulled:
+            pending.pop(reply.metadata.reply_to_message_id, None)
+        if not pending:
+            break
+
+        unavailable_nodes = set(pending.values()) - set(grid.get_node_ids())
+        if unavailable_nodes:
+            log(INFO, "Skipping replies from unavailable nodes: %s", unavailable_nodes)
+            pending = {
+                msg_id: node_id
+                for msg_id, node_id in pending.items()
+                if node_id not in unavailable_nodes
+            }
+
+        remaining = deadline - monotonic()
+        if not pending or remaining <= 0:
+            break
+        sleep(min(1.0, remaining))
+
+    return replies
 
 
 # pylint: disable=too-many-return-statements

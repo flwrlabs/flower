@@ -23,11 +23,13 @@ from parameterized import parameterized
 
 from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
 from flwr.serverapp.exception import InconsistentMessageReplies
+from flwr.serverapp.grid import Grid
 
 from .strategy_utils import (
     aggregate_arrayrecords,
     aggregate_metricrecords,
     config_to_str,
+    send_and_receive,
     validate_message_reply_consistency,
 )
 
@@ -48,6 +50,36 @@ def test_config_to_str() -> None:
     config = ConfigRecord({"a": 123, "b": [1, 2, 3], "c": b"bytes"})
     expected_str = "{'a': 123, 'b': [1, 2, 3], 'c': <bytes>}"
     assert config_to_str(config) == expected_str
+
+
+@pytest.mark.parametrize("available_nodes", [[], [2]])
+def test_send_and_receive_with_missing_reply(
+    monkeypatch: pytest.MonkeyPatch, available_nodes: list[int]
+) -> None:
+    """Keep received replies, skipping unavailable nodes or timing out otherwise."""
+    messages: list[Message] = [
+        Mock(spec=Message, metadata=Mock(message_id=str(i), dst_node_id=node_id))
+        for i, node_id in enumerate([1, 2])
+    ]
+    reply = Mock(spec=Message, metadata=Mock(reply_to_message_id="0"))
+    grid = Mock(spec=Grid)
+    grid.push_messages.return_value = [msg.metadata.message_id for msg in messages]
+    grid.pull_messages.return_value = [reply]
+    grid.get_node_ids.return_value = available_nodes
+    sleep_mock = Mock()
+    monkeypatch.setattr("flwr.serverapp.strategy.strategy_utils.sleep", sleep_mock)
+    monkeypatch.setattr(
+        "flwr.serverapp.strategy.strategy_utils.monotonic",
+        Mock(side_effect=[0.0, 0.0, 0.5, 1.0]),
+    )
+
+    assert send_and_receive(grid, iter(messages), timeout=1.0) == [reply]
+    grid.push_messages.assert_called_once_with(messages)
+    grid.pull_messages.assert_called_once()
+    if available_nodes:
+        sleep_mock.assert_called_once_with(0.5)
+    else:
+        sleep_mock.assert_not_called()
 
 
 def test_arrayrecords_aggregation() -> None:
