@@ -203,6 +203,7 @@ class TestInMemoryGrid(unittest.TestCase):
             [msg.metadata.message_id for msg in message_res_list]
         )
 
+        msg_filter: list[str] | None
         for msg_filter in (None, []):
             with self.subTest(msg_filter=msg_filter):
                 self.grid.pull_messages(msg_filter)
