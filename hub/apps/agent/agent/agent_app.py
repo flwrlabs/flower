@@ -8,7 +8,7 @@ from flwr.agentapp import AgentApp, AgentSession
 from flwr.app import Context
 from openai import OpenAI
 
-from .active_context import (
+from .utils import (
     MODEL,
     compact_active_context_if_needed,
     construct_model_input,
