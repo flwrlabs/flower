@@ -565,13 +565,15 @@ def test_direct_response_accounts_each_round(
 
     def handle(request: httpx.Request) -> httpx.Response:
         assert request.headers["authorization"] == "Bearer provider-key"
+        if request.url.path == "/v1/responses":
+            return httpx.Response(307, headers={"location": "/v1/model-responses"})
         if not stream:
             return httpx.Response(200, json=body)
         # Event types come from SSE names. The final event has no blank separator.
         text = 'event: response.output_text.delta\ndata: {"delta":"Hi"}\n\n'
         text += f"event: response.completed\ndata: {json.dumps({'response': body})}"
         return httpx.Response(
-            200, headers={"content-type": "text/event-stream"}, text=text
+            200, headers={"content-type": "Text/Event-Stream; charset=utf-8"}, text=text
         )
 
     _mock_provider(monkeypatch, httpx.MockTransport(handle))
@@ -622,12 +624,7 @@ def test_direct_errors_never_fall_back(
     direct.create_task.assert_not_called()
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "stop,phase",
-    [("task", "opening"), ("disconnect", "streaming"), ("deadline", "streaming")],
-)
-async def test_direct_cancellation_closes_provider_and_releases_slot(
+async def _check_direct_cancellation(
     direct: Mock, monkeypatch: pytest.MonkeyPatch, stop: str, phase: str
 ) -> None:
     """Cancel quiet requests and restore their single available slot."""
@@ -685,3 +682,14 @@ async def test_direct_cancellation_closes_provider_and_releases_slot(
     async with asyncio.timeout(4):
         await asyncio.gather(response(scope, receive, AsyncMock()), trigger())
     assert closed.is_set() and not response.capacity.locked()
+
+
+@pytest.mark.parametrize(
+    "stop,phase",
+    [("task", "opening"), ("disconnect", "streaming"), ("deadline", "streaming")],
+)
+def test_direct_cancellation_closes_provider_and_releases_slot(
+    direct: Mock, monkeypatch: pytest.MonkeyPatch, stop: str, phase: str
+) -> None:
+    """Run cancellation coverage without requiring an async pytest plugin."""
+    asyncio.run(_check_direct_cancellation(direct, monkeypatch, stop, phase))

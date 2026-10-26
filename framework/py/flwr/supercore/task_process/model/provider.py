@@ -369,7 +369,9 @@ async def iter_model_provider_response(
         The response body, or individual SSE events through a terminal event.
     """
     url, headers = model_api_config()
-    async with httpx.AsyncClient(timeout=model_api_timeout()) as client:
+    async with httpx.AsyncClient(
+        timeout=model_api_timeout(), follow_redirects=True
+    ) as client:
         with trace_span("model.provider_http"):
             response = await client.send(
                 client.build_request("POST", url, headers=headers, json=request),
@@ -389,7 +391,10 @@ async def iter_model_provider_response(
                 await response.aread()
                 yield _ensure_json_object(response.json())
                 return
-            if _STREAM_CONTENT_TYPE not in response.headers.get("content-type", ""):
+            if (
+                _STREAM_CONTENT_TYPE
+                not in response.headers.get("content-type", "").lower()
+            ):
                 raise ModelProviderError(detail="Expected a text/event-stream response")
             async for event in _aiter_sse_events(response):
                 yield event
