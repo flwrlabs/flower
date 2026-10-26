@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower Docs\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-23 00:10+0000\n"
+"POT-Creation-Date: 2026-10-24 00:09+0000\n"
 "PO-Revision-Date: 2026-05-23 06:55+0000\n"
 "Last-Translator: lco <Leandro.COLLIER@student.umons.ac.be>\n"
 "Language: fr\n"
@@ -25432,11 +25432,11 @@ msgstr ""
 "La classe de base ``Strategy`` définit une méthode ``start`` et exige que"
 " les sous-classes implémentent plusieurs méthodes abstraites :"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:97
+#: ../../source/explanation-flower-strategy-abstraction.rst:98
 msgid "Creating a new strategy"
 msgstr "Créer une nouvelle stratégie"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:99
+#: ../../source/explanation-flower-strategy-abstraction.rst:100
 msgid ""
 "You can customize an existing strategy (e.g., |fedavg_link|_) by "
 "overriding one or several of its methods. For full flexibility, you can "
@@ -25451,7 +25451,7 @@ msgstr ""
 "définez simplement une classe qui dérive de ``Strategy`` et implémentez "
 "les méthodes abstraites :"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:127
+#: ../../source/explanation-flower-strategy-abstraction.rst:128
 msgid ""
 "The ``start`` method is already implemented in the base class and "
 "typically does not need to be overridden. It orchestrates the federated "
@@ -25462,15 +25462,15 @@ msgstr ""
 " d'apprentissage fédéré en invoquant les méthodes abstraites dans une "
 "séquence."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:133
+#: ../../source/explanation-flower-strategy-abstraction.rst:134
 msgid "Understand ``start`` method"
 msgstr "Comprenez la méthode ``start``"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:135
+#: ../../source/explanation-flower-strategy-abstraction.rst:136
 msgid "The ``start`` method of the ``Strategy`` base class follows this workflow:"
 msgstr "La méthode ``start`` de la classe de base ``Strategy`` suit ce workflow :"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:137
+#: ../../source/explanation-flower-strategy-abstraction.rst:138
 msgid ""
 "Call ``evaluate_fn`` (if provided) to evaluate the initial model on the "
 "ServerApp side."
@@ -25478,17 +25478,17 @@ msgstr ""
 "Appelez ``evaluate_fn`` (si fourni) pour évaluer le modèle initial sur le"
 " côté ServerApp. "
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:139
+#: ../../source/explanation-flower-strategy-abstraction.rst:140
 msgid "Call ``configure_train`` to generate training messages for ClientApps."
 msgstr ""
 "Appelez ``configure_train`` pour générer des messages d'entraînement pour"
 " les applications Client."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:140
+#: ../../source/explanation-flower-strategy-abstraction.rst:141
 msgid "Send training messages to ClientApps."
 msgstr "Envoyer des messages d'entraînement aux ClientApps."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:141
+#: ../../source/explanation-flower-strategy-abstraction.rst:142
 msgid ""
 "ClientApps run their ``@app.train()`` function and return training "
 "replies."
@@ -25496,11 +25496,11 @@ msgstr ""
 "Les ClientApps exécutent leur fonction ``@app.train()`` et retournent les"
 " réponses d'entraînement."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:142
+#: ../../source/explanation-flower-strategy-abstraction.rst:143
 msgid "Call ``aggregate_train`` to aggregate the training replies."
 msgstr "Appelez ``aggregate_train`` pour agréger les réponses d'entraînement."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:143
+#: ../../source/explanation-flower-strategy-abstraction.rst:144
 msgid ""
 "Call ``configure_evaluate`` to generate evaluation messages for "
 "ClientApps."
@@ -25508,11 +25508,11 @@ msgstr ""
 "Appelez ``configure_evaluate`` pour générer des messages d'évaluation "
 "pour les applications Client."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:144
+#: ../../source/explanation-flower-strategy-abstraction.rst:145
 msgid "Send evaluation messages to ClientApps."
 msgstr "Envoyer des messages d'évaluation aux ClientApps."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:145
+#: ../../source/explanation-flower-strategy-abstraction.rst:146
 msgid ""
 "ClientApps run their ``@app.evaluate()`` function and return evaluation "
 "replies."
@@ -25520,11 +25520,11 @@ msgstr ""
 "Les ClientApps exécutent leur fonction ``@app.evaluate()`` et retournent "
 "les réponses d'évaluation."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:146
+#: ../../source/explanation-flower-strategy-abstraction.rst:147
 msgid "Call ``aggregate_evaluate`` to aggregate the evaluation replies."
 msgstr "Appelez ``aggregate_evaluate`` pour agréger les réponses d'évaluation."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:147
+#: ../../source/explanation-flower-strategy-abstraction.rst:148
 msgid ""
 "Call ``evaluate_fn`` (if provided) to evaluate the aggregated model on "
 "the ServerApp side."
@@ -25532,23 +25532,28 @@ msgstr ""
 "Appelez ``evaluate_fn`` (si fourni) pour évaluer le modèle agrégé sur le "
 "côté ServerApp. "
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:149
-msgid "Repeat steps 2-10 for the specified number of rounds."
-msgstr "Répétez les étapes 2-10 pour le nombre spécifié de tours."
-
 #: ../../source/explanation-flower-strategy-abstraction.rst:150
 msgid ""
-"Return the final ``Result``, which contains the final model and metrics "
-"history."
+"Call ``should_stop`` (if provided) with the completed round number and "
+"accumulated ``Result``. If it returns ``True``, stop executing rounds"
 msgstr ""
-"Retournez le modèle final, qui contient le modèle final et l'historique "
-"des métriques."
 
 #: ../../source/explanation-flower-strategy-abstraction.rst:152
+msgid "Otherwise, repeat steps 2-11 up to ``num_rounds`` times"
+msgstr ""
+
+#: ../../source/explanation-flower-strategy-abstraction.rst:153
+#, fuzzy
+msgid ""
+"Return the final ``Result``, which contains the final model and metrics "
+"history"
+msgstr ""
+
+#: ../../source/explanation-flower-strategy-abstraction.rst:155
 msgid "The following diagram illustrates the flow."
 msgstr "Le diagramme suivant illustre le flux."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:156
+#: ../../source/explanation-flower-strategy-abstraction.rst:159
 msgid ""
 "The sequence diagram below shows the interaction between ``ServerApp``, "
 "``Strategy`` (inside ``ServerApp``), and ``ClientApp``. In reality, they "
@@ -25565,11 +25570,11 @@ msgstr ""
 "ce sujet dans le guide :doc:`Flower Network Communication <ref-flower-"
 "network-communication>`."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:201
+#: ../../source/explanation-flower-strategy-abstraction.rst:204
 msgid "The ``configure_train`` method"
 msgstr "La méthode ``configure_train``"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:203
+#: ../../source/explanation-flower-strategy-abstraction.rst:206
 msgid ""
 "The ``configure_train`` method is responsible for preparing the next "
 "round of training. But what does *configure* mean in this context? It "
@@ -25582,40 +25587,40 @@ msgstr ""
 "participer à le tour et décider quelles instructions ils devraient "
 "recevoir."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:207
-#: ../../source/explanation-flower-strategy-abstraction.rst:249
-#: ../../source/explanation-flower-strategy-abstraction.rst:287
-#: ../../source/explanation-flower-strategy-abstraction.rst:330
+#: ../../source/explanation-flower-strategy-abstraction.rst:210
+#: ../../source/explanation-flower-strategy-abstraction.rst:252
+#: ../../source/explanation-flower-strategy-abstraction.rst:290
+#: ../../source/explanation-flower-strategy-abstraction.rst:333
 msgid "Here is the method signature:"
 msgstr "Voici l'énoncé de la méthode :"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:217
-#: ../../source/explanation-flower-strategy-abstraction.rst:297
+#: ../../source/explanation-flower-strategy-abstraction.rst:220
+#: ../../source/explanation-flower-strategy-abstraction.rst:300
 msgid "This method takes four arguments:"
 msgstr "Cette méthode prend quatre arguments :"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:219
-#: ../../source/explanation-flower-strategy-abstraction.rst:263
-#: ../../source/explanation-flower-strategy-abstraction.rst:299
-#: ../../source/explanation-flower-strategy-abstraction.rst:344
+#: ../../source/explanation-flower-strategy-abstraction.rst:222
+#: ../../source/explanation-flower-strategy-abstraction.rst:266
+#: ../../source/explanation-flower-strategy-abstraction.rst:302
+#: ../../source/explanation-flower-strategy-abstraction.rst:347
 msgid "``server_round``: The current round number"
 msgstr "``server_round``: Le numéro actuel de tour"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:220
+#: ../../source/explanation-flower-strategy-abstraction.rst:223
 msgid "``arrays``: The current global model parameters"
 msgstr "``arrays``: Les paramètres du modèle global actuels"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:221
+#: ../../source/explanation-flower-strategy-abstraction.rst:224
 msgid "``config``: A configuration dictionary for the round"
 msgstr "``config``: Un dictionnaire de configuration pour le tour"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:222
+#: ../../source/explanation-flower-strategy-abstraction.rst:225
 msgid "``grid``: The object responsible for managing communication with clients"
 msgstr ""
 "``grid``: L'objet responsable de la gestion de la communication avec les "
 "clients"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:224
+#: ../../source/explanation-flower-strategy-abstraction.rst:227
 msgid ""
 "The return value is an iterable of ``Message`` objects, where each "
 "message contains the instructions to be sent to a specific client. A "
@@ -25625,7 +25630,7 @@ msgstr ""
 "message contient les instructions à envoyer à un client spécifique. Une "
 "mise en œuvre typique de ``configure_train`` sera : "
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:228
+#: ../../source/explanation-flower-strategy-abstraction.rst:231
 msgid ""
 "Use the ``grid`` to randomly sample a subset (or all) of the available "
 "clients"
@@ -25633,7 +25638,7 @@ msgstr ""
 "Utilisez le ``grid`` pour échantillonner aléatoirement un sous-ensemble "
 "(ou tous) des clients disponibles"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:229
+#: ../../source/explanation-flower-strategy-abstraction.rst:232
 msgid ""
 "Create one ``Message`` per selected client, containing the global model "
 "parameters and configuration values"
@@ -25641,7 +25646,7 @@ msgstr ""
 "Créez un ``Message`` par client sélectionné, contenant les paramètres du "
 "modèle global et les valeurs de configuration"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:232
+#: ../../source/explanation-flower-strategy-abstraction.rst:235
 msgid ""
 "More advanced strategies can implement custom client selection logic by "
 "using the capabilities of ``grid``. A client only participates in a round"
@@ -25652,7 +25657,7 @@ msgstr ""
 " Un client ne participe qu'à un tour si ``configure_train`` génère un "
 "message pour son ID de nœud."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:238
+#: ../../source/explanation-flower-strategy-abstraction.rst:241
 msgid ""
 "Because the return value is defined per client, strategies can easily "
 "implement heterogeneous configurations. For example, different clients "
@@ -25665,11 +25670,11 @@ msgstr ""
 "hyperparamètres différents, permettant des comportements d'entraînement "
 "hautement personnalisés."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:244
+#: ../../source/explanation-flower-strategy-abstraction.rst:247
 msgid "The ``aggregate_train`` method"
 msgstr "La méthode ``aggregate_train``"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:246
+#: ../../source/explanation-flower-strategy-abstraction.rst:249
 msgid ""
 "The ``aggregate_train`` method is responsible for aggregating the "
 "training results received from the clients selected in "
@@ -25679,12 +25684,12 @@ msgstr ""
 "résultats d'entraînement reçus des clients sélectionnés dans "
 "``configure_train``."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:261
-#: ../../source/explanation-flower-strategy-abstraction.rst:342
+#: ../../source/explanation-flower-strategy-abstraction.rst:264
+#: ../../source/explanation-flower-strategy-abstraction.rst:345
 msgid "This method takes two arguments:"
 msgstr "Cette méthode prend deux arguments :"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:264
+#: ../../source/explanation-flower-strategy-abstraction.rst:267
 msgid ""
 "``replies``: An iterable of ``Message`` objects from the participating "
 "clients"
@@ -25692,21 +25697,21 @@ msgstr ""
 "``replies``: Un itérateur de ``Message`` objets provenant des clients "
 "participants"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:266
+#: ../../source/explanation-flower-strategy-abstraction.rst:269
 msgid "It returns a tuple consisting of:"
 msgstr "Elle retourne un tuple composé de : "
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:268
+#: ../../source/explanation-flower-strategy-abstraction.rst:271
 msgid "``ArrayRecord``: The updated global model parameters"
 msgstr "``ArrayRecord``: Les paramètres du modèle global mis à jour"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:269
+#: ../../source/explanation-flower-strategy-abstraction.rst:272
 msgid "``MetricRecord``: Aggregated training metrics (such as loss or accuracy)"
 msgstr ""
 "``MetricRecord``: Les métriques d'entraînement agrégées (telles que la "
 "perte ou l'exactitude)"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:271
+#: ../../source/explanation-flower-strategy-abstraction.rst:274
 msgid ""
 "If aggregation cannot be performed (e.g., if too many clients failed "
 "during the round), the method may decide to return ``(None, None)`` "
@@ -25716,7 +25721,7 @@ msgstr ""
 "clients ont échoué pendant le tour), la méthode peut décider de retourner"
 " ``(None, None)`` au lieu."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:276
+#: ../../source/explanation-flower-strategy-abstraction.rst:279
 msgid ""
 "You can use ``Message.has_error()`` to check if a reply contains an error"
 " and decide how to handle it during aggregation."
@@ -25724,11 +25729,11 @@ msgstr ""
 "Vous pouvez utiliser ``Message.has_error()`` pour vérifier si une réponse"
 " contient une erreur et décider comment y réagir lors de l'agrégation."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:281
+#: ../../source/explanation-flower-strategy-abstraction.rst:284
 msgid "The ``configure_evaluate`` method"
 msgstr "La méthode ``configure_evaluate``"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:283
+#: ../../source/explanation-flower-strategy-abstraction.rst:286
 msgid ""
 "The ``configure_evaluate`` method is responsible for preparing the next "
 "round of evaluation. Similar to ``configure_train``, this involves "
@@ -25740,19 +25745,19 @@ msgstr ""
 "implique la sélection des clients qui devraient participer et la décision"
 " de ce qu'ils devraient recevoir en instructions pour l'évaluation."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:300
+#: ../../source/explanation-flower-strategy-abstraction.rst:303
 msgid "``arrays``: The current global model parameters to be evaluated"
 msgstr "``arrays``: Les paramètres du modèle global actuels à évaluer"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:301
+#: ../../source/explanation-flower-strategy-abstraction.rst:304
 msgid "``config``: A configuration dictionary for evaluation"
 msgstr "``config``: Un dictionnaire de configuration pour l'évaluation"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:302
+#: ../../source/explanation-flower-strategy-abstraction.rst:305
 msgid "``grid``: The object that manages communication with clients"
 msgstr "``grid``: L'objet qui gère la communication avec les clients"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:304
+#: ../../source/explanation-flower-strategy-abstraction.rst:307
 msgid ""
 "The return value is an iterable of ``Message`` objects, one for each "
 "selected client. Each message typically contains the current global model"
@@ -25762,17 +25767,17 @@ msgstr ""
 " sélectionné. Chaque message contient généralement les paramètres du "
 "modèle global actuels et toute configuration d'évaluation."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:308
+#: ../../source/explanation-flower-strategy-abstraction.rst:311
 msgid "A typical implementation of ``configure_evaluate`` will:"
 msgstr "Une mise en œuvre typique de ``configure_evaluate`` sera : "
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:310
+#: ../../source/explanation-flower-strategy-abstraction.rst:313
 msgid "Use ``grid`` to select a subset (or all) of the available clients"
 msgstr ""
 "Utilisez ``grid`` pour sélectionner un sous-ensemble (ou tous) des "
 "clients disponibles"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:311
+#: ../../source/explanation-flower-strategy-abstraction.rst:314
 msgid ""
 "Create one ``Message`` per selected client containing the global model "
 "and evaluation configuration"
@@ -25780,7 +25785,7 @@ msgstr ""
 "Créez un ``Message`` par client sélectionné contenant le modèle global et"
 " la configuration d'évaluation"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:314
+#: ../../source/explanation-flower-strategy-abstraction.rst:317
 msgid ""
 "As with training, more advanced strategies may apply custom client "
 "selection logic or send different evaluation configurations to different "
@@ -25790,7 +25795,7 @@ msgstr ""
 " une logique de sélection de client personnalisée ou envoyer différentes "
 "configurations d'évaluation à différents clients."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:319
+#: ../../source/explanation-flower-strategy-abstraction.rst:322
 msgid ""
 "Because each client receives its own message, strategies can implement "
 "heterogeneous evaluation setups. For example, some clients might evaluate"
@@ -25801,11 +25806,11 @@ msgstr ""
 "certains clients pourraient évaluer sur des jeux de test plus grands, "
 "tandis que d'autres utiliseraient des métriques spécialisées."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:325
+#: ../../source/explanation-flower-strategy-abstraction.rst:328
 msgid "The ``aggregate_evaluate`` method"
 msgstr "La méthode ``aggregate_evaluate``"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:327
+#: ../../source/explanation-flower-strategy-abstraction.rst:330
 msgid ""
 "The ``aggregate_evaluate`` method is responsible for aggregating the "
 "evaluation results received from the clients selected in "
@@ -25815,7 +25820,7 @@ msgstr ""
 "résultats d'évaluation reçus des clients sélectionnés dans "
 "``configure_evaluate``."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:345
+#: ../../source/explanation-flower-strategy-abstraction.rst:348
 msgid ""
 "``replies``: An iterable of ``Message`` objects returned by the clients "
 "after they executed evaluation"
@@ -25823,7 +25828,7 @@ msgstr ""
 "``replies``: Une itérable de ``Message`` objets retournés par les clients"
 " après qu'ils ont exécuté l'évaluation"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:348
+#: ../../source/explanation-flower-strategy-abstraction.rst:351
 msgid ""
 "It returns a single ``MetricRecord`` that represents the aggregated "
 "evaluation metrics across all participating clients. If aggregation "
@@ -25836,7 +25841,7 @@ msgstr ""
 "échecs des clients ou de métriques manquantes), la méthode peut retourner"
 " ``None``."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:354
+#: ../../source/explanation-flower-strategy-abstraction.rst:357
 msgid ""
 "As with training, ``Message.has_error()`` can be used to detect and "
 "handle client errors during aggregation."
@@ -41368,22 +41373,16 @@ msgstr ""
 "durée d'attente à 2 heures, nous ferions:"
 
 #: ../../source/how-to-use-strategies.rst:281
+#, fuzzy
 msgid ""
-"Finally, the last argument in ``start`` is named ``evaluate_fn`` and it "
-"allows passing to it a callback function to evaluate the aggregated model"
-" on some local data that the ``ServerApp`` might have access to. This "
-"callback is also useful if you want to save the global model at the end "
-"of every round (or every N rounds). Let's see what the signature of this "
-"callback is and how to use it:"
+"The ``evaluate_fn`` argument allows passing a callback function to "
+"evaluate the aggregated model on some local data that the ``ServerApp`` "
+"might have access to. This callback is also useful if you want to save "
+"the global model at the end of every round (or every N rounds). Let's see"
+" what the signature of this callback is and how to use it:"
 msgstr ""
-"Enfin, l'argument final dans ``start`` est nommé ``evaluate_fn`` et "
-"permet de passer une fonction callback pour évaluer le modèle agrégé sur "
-"des données locales que le ``ServerApp`` pourrait avoir accès. Cette "
-"fonctionnalité est également utile si vous souhaitez sauvegarder le "
-"modèle global à la fin de chaque tour (ou tous les N tours). Voyons ce "
-"que est la signature de cette fonction callback et comment l'utiliser :"
 
-#: ../../source/how-to-use-strategies.rst:312
+#: ../../source/how-to-use-strategies.rst:311
 msgid ""
 "Take a look at the `quickstart-pytorch "
 "<https://github.com/flwrlabs/flower/blob/main/examples/quickstart-"
@@ -41394,6 +41393,39 @@ msgstr ""
 "<https://github.com/flwrlabs/flower/blob/main/examples/quickstart-"
 "pytorch>`_ sur GitHub pour un exemple complet utilisant plusieurs des "
 "concepts présentés dans ce guide."
+
+#: ../../source/how-to-use-strategies.rst:318
+msgid "Stop a strategy run early"
+msgstr ""
+
+#: ../../source/how-to-use-strategies.rst:320
+msgid ""
+"Pass a ``should_stop`` callback to ``start`` to stop before reaching "
+"``num_rounds``. The callback receives the completed round number and "
+"accumulated :class:`~flwr.serverapp.strategy.Result`. For example, stop "
+"when aggregated federated evaluation accuracy reaches 90%:"
+msgstr ""
+
+#: ../../source/how-to-use-strategies.rst:345
+msgid ""
+"The predicate runs once after each full round, including federated "
+"evaluation and any centralized evaluation. It does not run after the "
+"initial evaluation at round zero. Return ``True`` to stop and ``False`` "
+"to continue, and treat the results as read-only. When the predicate "
+"returns ``True``, no further round is dispatched. The returned ``Result``"
+" contains the current global model and all metrics collected so far, so "
+"the ServerApp can continue with saving the model or other application "
+"logic."
+msgstr ""
+
+#: ../../source/how-to-use-strategies.rst:352
+msgid ""
+"``num_rounds`` remains the maximum number of rounds. Without "
+"``should_stop``, all configured rounds run as before. Errors raised by "
+"the predicate propagate normally. Custom strategies that override "
+"``start`` must forward ``should_stop`` to the base implementation or "
+"invoke it in their own round loop."
+msgstr ""
 
 #: ../../source/index.rst:37
 msgid "Tutorial"
@@ -55989,8 +56021,9 @@ msgstr ""
 "fédéré."
 
 #: flwr.serverapp.strategy.strategy.Strategy.start:11 of
-msgid "Number of federated learning rounds to execute."
-msgstr "Nombre de tours d'apprentissage fédéré à exécuter."
+#, fuzzy
+msgid "Maximum number of federated learning rounds to execute."
+msgstr ""
 
 #: flwr.serverapp.strategy.strategy.Strategy.start:13 of
 msgid "Timeout in seconds for waiting for node responses."
@@ -56024,7 +56057,16 @@ msgstr ""
 "MetricRecord ou None. Si fourni, sera appelé avant la première ronde et "
 "après chaque ronde. Par défaut à None."
 
-#: flwr.serverapp.strategy.strategy.Strategy.start:27 of
+#: flwr.serverapp.strategy.strategy.Strategy.start:26 of
+msgid ""
+"Optional predicate to determine whether to stop training early. Called at"
+" the end of each round with the round number and accumulated results. "
+"Return True to stop and return the model and metrics collected so far. "
+"Not called for round zero. Results must not be modified. Defaults to None"
+" (no early stopping)."
+msgstr ""
+
+#: flwr.serverapp.strategy.strategy.Strategy.start:33 of
 msgid ""
 "Results containing final model arrays and also training metrics, "
 "evaluation metrics and global evaluation metrics (if provided) from all "
@@ -67527,4 +67569,7 @@ msgstr ""
 #~ "Une itérable d'IDs de message pour "
 #~ "lesquels les réponses doivent être "
 #~ "récupérées."
+
+#~ msgid "Repeat steps 2-10 for the specified number of rounds."
+#~ msgstr "Répétez les étapes 2-10 pour le nombre spécifié de tours."
 

@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import nullcontext
 from typing import cast
 from unittest.mock import Mock
 
@@ -64,6 +65,8 @@ def test_handle_task_flushes_first_text_event_eagerly(
 ) -> None:
     """The first text event is persisted without waiting for a full batch."""
     stub = Mock()
+    spans = Mock(side_effect=lambda *_, **__: nullcontext())
+    monkeypatch.setattr(task, "trace_span", spans)
     monkeypatch.setattr(
         task, "_pull_model_request", Mock(return_value=_model_request())
     )
@@ -97,4 +100,13 @@ def test_handle_task_flushes_first_text_event_eagerly(
     assert [event.event for event in batches[0]] == [
         "response.created",
         first_text_event,
+    ]
+    assert [call.args[0] for call in spans.call_args_list] == [
+        "model.request_wait",
+        *(
+            ["model.first_output_publish"]
+            if first_text_event == "response.output_text.delta"
+            else []
+        ),
+        "model.response_publish",
     ]

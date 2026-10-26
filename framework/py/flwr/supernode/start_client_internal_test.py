@@ -21,6 +21,7 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
+from parameterized import parameterized
 
 from flwr.app import ArrayRecord, ConfigRecord, Context, Message, Metadata, RecordDict
 from flwr.app.message import make_message, remove_content_from_message
@@ -225,31 +226,55 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state.store_messages.assert_not_called()
         self.mock_confirm_message_received.assert_not_called()
 
-    def test_pull_and_store_message_marks_task_failed_if_object_pull_fails(
-        self,
+    @parameterized.expand([(True, False), (False, True), (True, True)])  # type: ignore
+    def test_pull_and_store_message_handles_failures(
+        self, pull_fails: bool, ack_fails: bool
     ) -> None:
-        """Test that object-pull failures clean up the message and fail the task."""
+        """Check pull-failure cleanup and propagation of ACK failures."""
         self._prepare_for_pull_and_store_message()
         fab_hash = "abc123"
         task_id = 123
         message_id = self.mock_receive.return_value[0].metadata.message_id
         self.mock_state.get_run.return_value = Mock(fab_hash=fab_hash)
         self.mock_state.create_task.return_value = task_id
-        self.mock_pull_object.side_effect = RuntimeError("error")
+        if pull_fails:
+            self.mock_pull_object.side_effect = RuntimeError("pull error")
+        if ack_fails:
+            self.mock_confirm_message_received.side_effect = RuntimeError("ACK error")
+        calls = Mock()
+        calls.attach_mock(self.mock_confirm_message_received, "ack")
+        calls.attach_mock(self.mock_state.cancel_messages, "cancel")
+        calls.attach_mock(self.mock_object_store.delete, "delete")
+        calls.attach_mock(self.mock_state.finish_task, "finish")
 
-        res = _pull_and_store_message(
-            state=self.mock_state,
-            object_store=self.mock_object_store,
-            node_config={},
-            receive=self.mock_receive,
-            get_run=self.mock_get_run,
-            get_fab=self.mock_get_fab,
-            pull_object=self.mock_pull_object,
-            confirm_message_received=self.mock_confirm_message_received,
-            trusted_entities={},
+        with (
+            pytest.raises(RuntimeError, match="ACK error")
+            if ack_fails
+            else nullcontext()
+        ):
+            res = _pull_and_store_message(
+                state=self.mock_state,
+                object_store=self.mock_object_store,
+                node_config={},
+                receive=self.mock_receive,
+                get_run=self.mock_get_run,
+                get_fab=self.mock_get_fab,
+                pull_object=self.mock_pull_object,
+                confirm_message_received=self.mock_confirm_message_received,
+                trusted_entities={},
+            )
+
+        self.mock_confirm_message_received.assert_called_once_with(
+            self.run_id, message_id
         )
+        if not pull_fails:
+            self.mock_state.cancel_messages.assert_not_called()
+            self.mock_object_store.delete.assert_not_called()
+            self.mock_state.finish_task.assert_not_called()
+            return
 
-        assert res is None
+        if not ack_fails:
+            assert res is None
         self.mock_state.create_task.assert_called_once_with(
             task_type=TaskType.CLIENT_APP,
             run_id=self.run_id,
@@ -262,9 +287,14 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state.finish_task.assert_called_once_with(
             task_id,
             sub_status=SubStatus.FAILED,
-            details="Pulling message objects failed: error",
+            details="Pulling message objects failed: pull error",
         )
-        self.mock_confirm_message_received.assert_not_called()
+        assert [call[0] for call in calls.mock_calls] == [
+            "cancel",
+            "delete",
+            "finish",
+            "ack",
+        ]
 
     def test_pull_and_store_message_with_unknown_run_id(self) -> None:
         """Test that a message of an unknown run ID is pulled and stored."""

@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import time
+from contextlib import nullcontext
 from typing import cast
 
 from flwr.common.serde import message_from_proto, message_to_proto
@@ -65,12 +66,21 @@ def handle_task(client: RuntimeHttpClient) -> None:
     # Stream events are exposed through Control.StreamRunEvents.
     events: list[TaskEvent] = []
     first_text_event_flushed = False
+    first_output_published = False
 
     def _flush_events() -> None:
         """Push buffered stream events."""
+        nonlocal first_output_published
         if not is_stream or not events:
             return
-        client.PushTaskEvents(PushTaskEventsRequest(events=events))
+        first_output = not first_output_published and any(
+            event.event == "response.output_text.delta" for event in events
+        )
+        with (
+            trace_span("model.first_output_publish") if first_output else nullcontext()
+        ):
+            client.PushTaskEvents(PushTaskEventsRequest(events=events))
+        first_output_published |= first_output
         events.clear()
 
     def _buffer_event(event: JSONObject) -> None:

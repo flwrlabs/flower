@@ -31,6 +31,7 @@ from flwr.supercore.json_message.connector_message import (
 )
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.usage import TaskUsageRecorder
+from flwr.supercore.tracing import trace_span
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_loads_object
 
@@ -46,7 +47,8 @@ def handle_task(
     client: RuntimeHttpClient,
 ) -> None:
     """Run one connector task request."""
-    request_message = _pull_connector_request(client)
+    with trace_span("connector.request_wait"):
+        request_message = _pull_connector_request(client)
     if request_message.metadata.src_task_id is None:
         raise RuntimeError("Connector request source task is not set.")
 
@@ -74,21 +76,23 @@ def handle_task(
         credentials: JSONObject | None = None
         config: JSONObject | None = None
         if uses_credentials:
-            connector = client.GetConnector(GetConnectorRequest())
+            with trace_span("connector.credentials"):
+                connector = client.GetConnector(GetConnectorRequest())
             if connector.connector_ref != connector_ref:
                 raise RuntimeError("Connector credentials could not be loaded.")
             credentials = _parse_connector_json(connector.credentials_json)
             config = _parse_connector_json(connector.config_json)
-        response = {
-            "output": invoke_connector(
-                tool_name=name,
-                arguments=cast(JSONObject, request_message.payload["arguments"]),
-                usage_recorder=TaskUsageRecorder(client),
-                credentials=credentials,
-                config=config,
-            ),
-            "error": None,
-        }
+        with trace_span("connector.invoke"):
+            response = {
+                "output": invoke_connector(
+                    tool_name=name,
+                    arguments=cast(JSONObject, request_message.payload["arguments"]),
+                    usage_recorder=TaskUsageRecorder(client),
+                    credentials=credentials,
+                    config=config,
+                ),
+                "error": None,
+            }
     except Exception as ex:  # pylint: disable=broad-exception-caught
         if uses_credentials:
             safe_error = ex if isinstance(ex, ConnectorApiError) else None
@@ -104,7 +108,8 @@ def handle_task(
     finally:
         # Push the response
         if response is not None:
-            _push_connector_response(response)
+            with trace_span("connector.response_publish"):
+                _push_connector_response(response)
 
     # Raise outside the except block so the secret-bearing exception is not retained
     # as context on the sanitized error.

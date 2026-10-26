@@ -91,7 +91,7 @@ from flwr.supercore.superexec.dependency_installer import (
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
-from flwr.supercore.tracing import flush_traces, trace_span
+from flwr.supercore.tracing import PhaseTimings, flush_traces, trace_span
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 from flwr.superlink.grid import HttpGrid
@@ -213,6 +213,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
         preloaded: PreloadedAgentApp | None,
     ) -> None:
         self._bootstrap_started = monotonic()
+        self.timings = PhaseTimings()
         self._runtime_api_address = runtime_api_address
         self._log_queue = log_queue
         self._token = token
@@ -221,12 +222,13 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
         self._certificates_path = certificates_path
         self._runtime_dependency_install = runtime_dependency_install
         self._preloaded = preloaded
-        self._grid = HttpGrid(
-            runtime_api_address=self._runtime_api_address,
-            insecure=self._insecure,
-            root_certificates=self._certificates,
-            token=self._token,
-        )
+        with self.timings.measure("task.runtime_client"):
+            self._grid = HttpGrid(
+                runtime_api_address=self._runtime_api_address,
+                insecure=self._insecure,
+                root_certificates=self._certificates,
+                token=self._token,
+            )
         self._log_uploader: threading.Thread | None = None
         self._hash_run_id: str | None = None
         self._outcome = (SubStatus.FAILED, "Task failed with unknown error.")
@@ -277,6 +279,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 initialization.set_attribute("flwr.run_id", str(run.run_id))
                 initialization.set_attribute("flwr.task_id", str(task_id))
 
+            self.timings.publish("task.bootstrap", self._trace_attributes)
             self._hash_run_id = get_sha256_hash(run.run_id)
 
             grid.set_run(run)
@@ -577,7 +580,8 @@ def _run_agentapp_task(  # pylint: disable=too-many-arguments,too-many-positiona
             exit_handlers=[lifecycle.finalize],
         )
     if on_started is not None:
-        on_started()
+        with lifecycle.timings.measure("task.accept"):
+            on_started()
     if resident:
         mirror_output_to_queue(log_queue)
     return lifecycle, lifecycle.run()

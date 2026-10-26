@@ -21,7 +21,7 @@ import json
 import os
 import time
 from collections.abc import AsyncGenerator, Iterator
-from contextlib import aclosing, contextmanager
+from contextlib import ExitStack, aclosing, contextmanager
 from dataclasses import dataclass
 from logging import ERROR
 from typing import cast
@@ -91,6 +91,7 @@ class _StreamProgress:
 
     complete: bool = False
     sequence_number: int = 0
+    first_text_seen: bool = False
 
 
 class _ResponsesError(Exception):
@@ -256,7 +257,9 @@ def _start_exchange(
     )
     request = make_json_message(ModelRequest, metadata=metadata, payload=payload)
     request.metadata.__dict__["_message_id"] = request.object_id
-    if not state.store_task_message(request):
+    with trace_span("model.request_publish"):
+        stored = state.store_task_message(request)
+    if not stored:
         state.finish_task(
             model_task_id, SubStatus.STOPPED, "Model request was not stored."
         )
@@ -319,11 +322,20 @@ async def _stream_response(
                 task,
                 model_payload,
             )
-            with trace_span("model.response_wait"):
+            with trace_span("model.response_wait"), ExitStack() as first_text_wait:
+                first_text = first_text_wait.enter_context(
+                    trace_span("model.first_text_wait")
+                )
+                first_text.set_attribute("flwr.model.first_text_seen", False)
+                first_text_recorded = False
                 async with aclosing(
                     _relay_model_events(state, exchange, progress)
                 ) as relay:
                     async for frame in relay:
+                        if progress.first_text_seen and not first_text_recorded:
+                            first_text.set_attribute("flwr.model.first_text_seen", True)
+                            first_text_wait.close()
+                            first_text_recorded = True
                         yield frame
         except _ResponsesError as err:
             yield _stream_error(err.message, err.code, progress.sequence_number)
@@ -367,6 +379,8 @@ async def _relay_model_events(
         )
         for event in events:
             cursor = event.id
+            if event.event == "response.output_text.delta":
+                progress.first_text_seen = True
             if event.event in _TERMINAL_EVENTS:
                 if response is None:
                     await _wait_for_terminal_reply(

@@ -39,7 +39,7 @@ from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.runtime.tracing import RuntimeTracingInterceptor
 from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import validate_and_resolve_root_certificates
-from flwr.supercore.tracing import flush_traces, trace_span
+from flwr.supercore.tracing import PhaseTimings, flush_traces, trace_span
 
 from .executor import LaunchResult, LaunchResultStatus, get_executor
 from .executor.config import ExecutorConfig
@@ -247,19 +247,34 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     # Start the main loop
     try:
         while True:
-            executor.reconcile()
-            supported_task_types, agentapp_fab_hashes = executor.get_eligible_capacity(
-                set(plugin.supported_task_types),
-                insecure=insecure,
-                root_certificates_path=root_certificates_path,
-            )
-            combined_res = client.AcquireTask(
-                AcquireTaskRequest(
-                    supported_task_types=supported_task_types,
-                    agentapp_fab_hashes=agentapp_fab_hashes,
+            timings = PhaseTimings()
+            with timings.measure("executor.reconcile"):
+                executor.reconcile()
+            with timings.measure("executor.capacity"):
+                supported_task_types, agentapp_fab_hashes = (
+                    executor.get_eligible_capacity(
+                        set(plugin.supported_task_types),
+                        insecure=insecure,
+                        root_certificates_path=root_certificates_path,
+                    )
                 )
-            )
+            with timings.measure("executor.claim"):
+                combined_res = client.AcquireTask(
+                    AcquireTaskRequest(
+                        supported_task_types=supported_task_types,
+                        agentapp_fab_hashes=agentapp_fab_hashes,
+                    )
+                )
             if combined_res.HasField("task") and combined_res.token:
+                # Idle polling must not generate an unbounded stream of spans.
+                timings.publish(
+                    "executor.acquire",
+                    {
+                        "flwr.component": "superexec",
+                        "flwr.task_id": str(combined_res.task.task_id),
+                        "flwr.run_id": str(combined_res.task.run_id),
+                    },
+                )
                 with trace_span(
                     "task.dispatch",
                     attributes={
