@@ -680,8 +680,12 @@ async def _check_direct_cancellation(
         elif stop == "disconnect":
             disconnected.set()
 
+    async def send(message: Message) -> None:
+        if stop == "deadline" and message["type"] == "http.response.body":
+            await anyio.sleep_forever()
+
     async with asyncio.timeout(4):
-        await asyncio.gather(response(scope, receive, AsyncMock()), trigger())
+        await asyncio.gather(response(scope, receive, send), trigger())
     assert closed.is_set() and not response.capacity.locked()
 
 

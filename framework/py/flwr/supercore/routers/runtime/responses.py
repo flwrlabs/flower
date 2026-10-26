@@ -305,7 +305,7 @@ class _DirectResponse(Response):
                         execution,
                     )
                     try:
-                        with anyio.fail_after(_model_response_timeout()):
+                        with anyio.fail_after(_model_response_timeout()) as timeout:
                             await self._execute(scope, receive, forward)
                     except _ResponsesError as err:
                         error = err
@@ -335,18 +335,21 @@ class _DirectResponse(Response):
                     409, "Model request cancelled.", "model_request_cancelled"
                 )
             if error is not None:
-                if self.started:
-                    await send(
-                        {
-                            "type": "http.response.body",
-                            "body": _stream_error(
-                                error.message, error.code, self.sequence
-                            ).encode(),
-                            "more_body": False,
-                        }
-                    )
-                else:
-                    await _error_response(error)(scope, receive, send)
+                with anyio.move_on_after(
+                    max(0.0, timeout.deadline - anyio.current_time())
+                ):
+                    if self.started:
+                        await send(
+                            {
+                                "type": "http.response.body",
+                                "body": _stream_error(
+                                    error.message, error.code, self.sequence
+                                ).encode(),
+                                "more_body": False,
+                            }
+                        )
+                    else:
+                        await _error_response(error)(scope, receive, send)
 
 
 async def _watch_direct_task(
