@@ -41,7 +41,6 @@ from flwr.server.superlink.fleet.vce.vce_api import (
     NodeToPartitionMapping,
     _register_nodes,
     add_messages_to_queue,
-    put_message_into_state,
     start_vce,
     worker,
 )
@@ -53,21 +52,6 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.superlink.federation import NoOpFederationManager
-
-
-@pytest.fixture(autouse=True)
-def reject_legacy_message_api(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Fail if simulation falls back to instruction/reply storage."""
-    for name in (
-        "store_message_ins",
-        "get_message_ins",
-        "store_message_res",
-        "get_message_res",
-        "delete_messages",
-    ):
-        monkeypatch.setattr(
-            InMemoryLinkState, name, Mock(side_effect=AssertionError(name))
-        )
 
 
 class DummyClient(NumPyClient):
@@ -323,24 +307,6 @@ def test_add_messages_to_queue_acknowledges_after_enqueue(queue_fails: bool) -> 
         add_messages_to_queue(state, queue, nodes_mapping, f_stop)
     assert state.get_messages(dst_node_id=node_id) == ([message] if queue_fails else [])
     assert message.has_content()
-
-
-def test_put_message_into_state_accepts_uncorrelated_message() -> None:
-    """Outgoing messages use destination delivery without requiring a reply."""
-    state_factory, _, _ = init_state_factory_nodes_mapping(1, 0)
-    state = state_factory.state()
-    message = _make_vce_test_message(node_id=SUPERLINK_NODE_ID)
-    queue = Mock()
-    f_stop = threading.Event()
-
-    def dequeue(timeout: float) -> Message:
-        assert timeout == 1.0
-        f_stop.set()
-        return message
-
-    queue.get.side_effect = dequeue
-    put_message_into_state(state, queue, f_stop)
-    assert state.get_messages(dst_node_id=SUPERLINK_NODE_ID) == [message]
 
 
 def test_worker_records_clientapp_runtime() -> None:

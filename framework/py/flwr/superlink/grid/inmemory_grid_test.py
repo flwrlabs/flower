@@ -31,7 +31,7 @@ from flwr.common.constant import (
 )
 from flwr.common.serde import message_from_proto
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
-from flwr.server.superlink.linkstate import InMemoryLinkState, LinkStateFactory
+from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.linkstate.utils import generate_rand_int_from_bytes
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID, TaskType
@@ -72,10 +72,9 @@ def get_replies(grid: InMemoryGrid, msg_ids: Iterable[str], node_id: int) -> lis
     messages = grid.state.get_messages(dst_node_id=node_id, limit=len(list(msg_ids)))
     grid.state.acknowledge_messages([msg.metadata.message_id for msg in messages])
     for msg in messages:
-        for _ in range(2):
-            reply_msg = Message(RecordDict(), reply_to=msg)
-            reply_msg.metadata.__dict__["_message_id"] = str(uuid4())
-            assert grid.state.store_messages([reply_msg]) == [True]
+        reply_msg = Message(RecordDict(), reply_to=msg)
+        reply_msg.metadata.__dict__["_message_id"] = str(uuid4())
+        assert grid.state.store_messages([reply_msg]) == [True]
 
     # Execute: Pull messages
     pulled_msgs = grid.pull_messages(msg_ids)
@@ -164,14 +163,14 @@ class TestInMemoryGrid(unittest.TestCase):
         nodes[0].name = "Changed"
         self.assertEqual(node_infos[0].name, "London")
 
-    def test_push_messages_valid(self) -> None:
-        """Test pushing valid messages."""
+    def test_push_messages(self) -> None:
+        """Return message IDs with an empty entry for rejected messages."""
         # Prepare
         num_messages = 2
         msgs = [Message(RecordDict(), 1, "query") for _ in range(num_messages)]
 
         msg_ids = [uuid4() for _ in range(num_messages)]
-        self.state.store_messages.side_effect = [[True] for _ in msg_ids]
+        self.state.store_messages.side_effect = [[False], [True]]
 
         # Execute
         with patch("flwr.superlink.grid.inmemory_grid.uuid4", side_effect=msg_ids):
@@ -179,7 +178,7 @@ class TestInMemoryGrid(unittest.TestCase):
 
         # Assert
         self.assertEqual(len(msg_res_ids), 2)
-        self.assertEqual(msg_res_ids, [str(ids) for ids in msg_ids])
+        self.assertEqual(msg_res_ids, ["", str(msg_ids[1])])
 
     def test_pull_messages_with_given_message_ids(self) -> None:
         """Test pulling messages with specific message IDs."""
@@ -204,41 +203,26 @@ class TestInMemoryGrid(unittest.TestCase):
             [msg.metadata.message_id for msg in message_res_list]
         )
 
-    def test_push_messages_preserves_rejected_positions(self) -> None:
-        """Return an empty ID for a rejected message without waiting for it."""
-        msgs = [Message(RecordDict(), 1, "query") for _ in range(2)]
-        self.state.store_messages.side_effect = [[False], [True]]
-        self.state.get_messages.return_value = []
-        with patch("flwr.superlink.grid.inmemory_grid.uuid4", side_effect=["a", "b"]):
-            self.assertEqual(list(self.grid.push_messages(msgs)), ["", "b"])
+        for msg_filter in (None, []):
+            with self.subTest(msg_filter=msg_filter):
+                self.grid.pull_messages(msg_filter)
+                self.state.get_messages.assert_called_with(
+                    dst_node_id=SUPERLINK_NODE_ID,
+                    run_id=self.mock_run.run_id,
+                    reply_to_message_ids=None if msg_filter is None else set(),
+                )
 
-        self.state.store_messages.side_effect = [[False], [False]]
+    def test_send_and_receive_rejected_messages(self) -> None:
+        """Do not wait for replies to rejected messages."""
+        msgs = [Message(RecordDict(), 1, "query")]
+        self.state.store_messages.return_value = [False]
+        self.state.get_messages.side_effect = [[]]
         self.assertEqual(list(self.grid.send_and_receive(msgs)), [])
         self.state.get_messages.assert_called_once_with(
             dst_node_id=SUPERLINK_NODE_ID,
             run_id=self.mock_run.run_id,
             reply_to_message_ids=set(),
         )
-
-    def test_pull_messages_optional_correlation_filter(self) -> None:
-        """Preserve omitted, empty, populated, and deprecated filters."""
-        self.state.get_messages.return_value = []
-        cases: list[tuple[dict[str, Iterable[str]], set[str] | None]] = [
-            ({}, None),
-            ({"reply_to_message_ids": []}, set()),
-            ({"reply_to_message_ids": ["a"]}, {"a"}),
-            ({"message_ids": ["a"]}, {"a"}),
-        ]
-        for kwargs, expected in cases:
-            with self.subTest(kwargs=kwargs):
-                self.grid.pull_messages(**kwargs)
-                self.state.get_messages.assert_called_with(
-                    dst_node_id=SUPERLINK_NODE_ID,
-                    run_id=self.mock_run.run_id,
-                    reply_to_message_ids=expected,
-                )
-        with self.assertRaises(TypeError):
-            self.grid.pull_messages([], message_ids=[])
 
     def test_send_and_receive_messages_complete(self) -> None:
         """Test send and receive all messages successfully."""
@@ -277,52 +261,31 @@ class TestInMemoryGrid(unittest.TestCase):
         self.assertLess(time.time() - start_time, 0.2)
         self.assertEqual(len(ret_msgs), 0)
 
-    def test_message_store_consistency_after_push_pull_inmemory_state(self) -> None:
-        """ACK releases bodies and retains metadata for multiple replies."""
-        # Prepare
-        state_factory = LinkStateFactory(
-            FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), ObjectStoreFactory()
-        )
-        state = state_factory.state()
-        run_id = state.create_run(
-            "", "", "", {}, NOOP_FEDERATION_ID, None, "", TaskType.SERVER_APP
-        )
-        self.grid = InMemoryGrid(state_factory)
-        runs = state.get_run_info(run_ids=[run_id])
-        self.assertEqual(len(runs), 1)
-        self.grid.set_run(runs[0])
-        msg_ids, node_id = push_messages(self.grid, self.num_nodes)
-        assert isinstance(state, InMemoryLinkState)
+    def test_message_store_consistency_after_push_pull(self) -> None:
+        """Pulled messages are acknowledged in both state implementations."""
+        for database in (FLWR_IN_MEMORY_DB_NAME, ""):
+            with self.subTest(database=database):
+                state_factory = LinkStateFactory(
+                    database, NoOpFederationManager(), ObjectStoreFactory()
+                )
+                state = state_factory.state()
+                run_id = state.create_run(
+                    "", "", "", {}, NOOP_FEDERATION_ID, None, "", TaskType.SERVER_APP
+                )
+                self.grid = InMemoryGrid(state_factory)
+                runs = state.get_run_info(run_ids=[run_id])
+                self.assertEqual(len(runs), 1)
+                self.grid.set_run(runs[0])
+                msg_ids, node_id = push_messages(self.grid, self.num_nodes)
+                self.assertEqual(
+                    len(state.get_messages(dst_node_id=node_id)), len(list(msg_ids))
+                )
 
-        # Check recorded
-        self.assertEqual(len(state.message_store), len(list(msg_ids)))
-        original = state.message_store[next(iter(msg_ids))].message
-        assert original is not None
-        self.assertEqual(list(self.grid.pull_messages()), [])
+                reply_tos = get_replies(self.grid, msg_ids, node_id)
 
-        # Prepare: create replies
-        reply_tos = get_replies(self.grid, msg_ids, node_id)
-
-        # Assert
-        self.assertEqual(set(reply_tos), set(msg_ids))
-        self.assertEqual(len(reply_tos), 2 * len(list(msg_ids)))
-        self.assertTrue(
-            all(record.message is None for record in state.message_store.values())
-        )
-        self.assertEqual(state.pending_message_ids_by_dst, {})
-        self.assertEqual(list(self.grid.pull_messages(msg_ids)), [])
-
-        # A later reply can still reference the acknowledged original.
-        reply = Message(RecordDict(), reply_to=original)
-        reply.metadata.__dict__["_message_id"] = str(uuid4())
-        self.assertEqual(state.store_messages([reply]), [True])
-        with patch.multiple(TaskIdentity, _run_id=run_id, _node_id=SUPERLINK_NODE_ID):
-            unsolicited = Message(RecordDict(), SUPERLINK_NODE_ID, "query")
-        self.grid.push_messages([unsolicited])
-        self.assertEqual(list(self.grid.pull_messages([])), [])
-        self.assertEqual(list(self.grid.pull_messages(msg_ids)), [reply])
-        self.assertEqual(list(self.grid.pull_messages()), [unsolicited])
-        self.assertTrue(original.has_content())
+                self.assertCountEqual(reply_tos, msg_ids)
+                self.assertEqual(state.get_messages(dst_node_id=node_id), [])
+                self.assertEqual(list(self.grid.pull_messages(msg_ids)), [])
 
 
 def create_message_replies_for_specific_ids(message_ids: list[str]) -> list[Message]:

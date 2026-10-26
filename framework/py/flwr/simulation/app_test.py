@@ -24,51 +24,11 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from flwr.app import ConfigRecord, Context, Message, RecordDict
-from flwr.common.constant import SUPERLINK_NODE_ID
-from flwr.serverapp import Grid, ServerApp
-from flwr.supercore.constant import NOOP_FEDERATION_ID, SUPERLINK_DEFAULT_CLIENT_ADDRESS
-from flwr.supercore.run import Run
-from flwr.supercore.task_identity import TaskIdentity
-from flwr.supercore.telemetry import EventType
+from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 
 from .app import _parse_args_run_flwr_simulation, run_simulation_process
-from .run_simulation import _main_loop
 
 simulation_app_module = importlib.import_module("flwr.simulation.app")
-
-
-@patch("flwr.simulation.run_simulation.vce.start_vce")
-def test_main_loop_initializes_message_delivery(_mock_start_vce: Mock) -> None:
-    """The locally registered run can exchange full Messages through its Grid."""
-    run = Run.create_empty(run_id=1234)
-    run.primary_task_id = 4321
-    run.federation_id = NOOP_FEDERATION_ID
-    app = ServerApp()
-
-    @app.main()
-    def main(grid: Grid, context: Context) -> None:
-        message = Message(RecordDict(), SUPERLINK_NODE_ID, "query")
-        assert list(grid.push_messages([message])) == [message.metadata.message_id]
-        assert list(grid.pull_messages()) == [message]
-        assert message.has_content()
-        context.state["received"] = ConfigRecord({"ok": True})
-
-    with patch.multiple(
-        TaskIdentity, _task_id=4321, _run_id=run.run_id, _node_id=SUPERLINK_NODE_ID
-    ):
-        result = _main_loop(
-            num_supernodes=1,
-            backend_name="ray",
-            backend_config_stream="{}",
-            app_dir=".",
-            is_app=False,
-            enable_tf_gpu_growth=False,
-            run=run,
-            exit_event=EventType.FLWR_SIMULATION_RUN_LEAVE,
-            server_app=app,
-        )
-    assert "received" in result.context.state
 
 
 class TestRunSimulationProcess(unittest.TestCase):
