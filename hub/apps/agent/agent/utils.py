@@ -36,11 +36,11 @@ def _filter_event_fields(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     if summaries:
                         output.append({"type": "reasoning", "summary": summaries})
                 elif item.get("type") == "message":
-                    content = [
-                        part["text"]
-                        for part in item.get("content", [])
-                        if part.get("text")
-                    ]
+                    content = []
+                    for part in item.get("content", []):
+                        text = part.get("text", part.get("refusal"))
+                        if isinstance(text, str) and text:
+                            content.append(text)
                     if content:
                         output.append(
                             {
