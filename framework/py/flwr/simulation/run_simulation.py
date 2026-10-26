@@ -301,7 +301,7 @@ def _main_loop(
         state.task_store[primary_task_id] = Task(
             task_id=primary_task_id,
             run_id=run.run_id,
-            status=TaskStatus(status=Status.PENDING),
+            status=TaskStatus(status=Status.RUNNING),
         )
 
         # Initialize Grid
