@@ -12,11 +12,25 @@ models for collaborative AI.
 The Flower Community includes researchers, engineers, students, professionals,
 academics, and other people building collaborative AI systems.
 
-.. button-link:: https://flower.ai/join-slack
-    :color: primary
-    :shadow:
+.. grid:: auto
+    :gutter: 2
+    :class-container: community-buttons
 
-    Join us on Slack
+    .. grid-item::
+
+        .. button-link:: https://flower.ai/join-slack
+            :color: primary
+            :shadow:
+
+            Join us on Slack
+
+    .. grid-item::
+
+        .. button-link:: https://discuss.flower.ai
+            :color: primary
+            :shadow:
+
+            Join us on Flower Discuss
 
 ***************
  Flower Models
