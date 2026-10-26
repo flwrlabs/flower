@@ -57,6 +57,10 @@ Endeavor is available in two operating modes:
     - - Access
       - Flower-managed API, or private deployment on infrastructure you control,
         available by request
+    - - API base URL (Flower-managed service)
+      - ``https://api.flower.ai/v1``
+    - - Model name (latest version)
+      - :substitution-code:`|endeavor_model|`
     - - Context window
       - 128,000 tokens in the supplied Codex configuration, with automatic compaction at
         96,000 tokens; the supported API limit varies by deployment. See :ref:`Context
