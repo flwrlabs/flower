@@ -558,6 +558,7 @@ def test_direct_response_accounts_each_round(
     """Preserve credentials and usage, including a terminal SSE event at EOF."""
     body: JSONObject = {
         "id": "resp_1",
+        "object": "response",
         "status": "completed",
         "output": [],
         "usage": {"input_tokens": 11, "output_tokens": 7},
@@ -598,19 +599,19 @@ def test_direct_response_accounts_each_round(
 
 
 @pytest.mark.parametrize(
-    "mode,status", [("http_error", 503), ("truncated", 200), ("full", 429)]
+    "mode,status",
+    [("http_error", 503), ("invalid_response", 502), ("truncated", 200), ("full", 429)],
 )
 def test_direct_errors_never_fall_back(
     direct: Mock, monkeypatch: pytest.MonkeyPatch, mode: str, status: int
 ) -> None:
     """Do not duplicate provider execution after a direct-path failure."""
-    response = (
-        httpx.Response(503, json={"error": "unavailable"})
-        if mode == "http_error"
-        else httpx.Response(
+    if mode in {"http_error", "invalid_response"}:
+        response = httpx.Response(503 if mode == "http_error" else 200, json={})
+    else:
+        response = httpx.Response(
             200, headers={"content-type": "text/event-stream"}, text="data: {}\n\n"
         )
-    )
     _mock_provider(monkeypatch, httpx.MockTransport(lambda _request: response))
     with _client(direct) as client:
         if mode == "full":
@@ -618,7 +619,7 @@ def test_direct_errors_never_fall_back(
         result = client.post(
             "/v1/runtime/responses",
             headers={"Authorization": "Bearer task-token"},
-            json=_stream_request() | {"stream": mode != "http_error"},
+            json=_stream_request() | {"stream": mode in {"truncated", "full"}},
         )
         assert result.status_code == status and "error" in result.text
     direct.create_task.assert_not_called()

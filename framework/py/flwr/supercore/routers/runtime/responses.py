@@ -269,6 +269,7 @@ class _DirectResponse(Response):
                 else:
                     async for item in events:
                         response = item
+                    ModelResponse.validate_payload(response)
                     _raise_for_failed_response(response)
                     await JSONResponse(response)(scope, receive, send)
 
