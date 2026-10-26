@@ -426,9 +426,6 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             )
             for obj_id in list(obj_contents.keys()):
                 object_store.put(obj_id, obj_contents.pop(obj_id))
-
-            # Confirm that the message was received
-            confirm_message_received(run_id, message.metadata.message_id)
             log(INFO, "Received successfully")
         except Exception as err:  # pylint: disable=broad-except
             log(
@@ -445,6 +442,9 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                 details=f"Pulling message objects failed: {err}",
             )
             return None
+        finally:
+            # ACK terminal failures too, so they do not block later messages.
+            confirm_message_received(run_id, message.metadata.message_id)
 
     except RunNotRunningException:
         if message is None:
