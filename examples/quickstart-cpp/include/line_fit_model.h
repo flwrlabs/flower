@@ -5,6 +5,7 @@
 #ifndef FLOWER_CPP_LINE_FIT_MODEL_H
 #define FLOWER_CPP_LINE_FIT_MODEL_H
 
+#include <tuple>
 #include <vector>
 
 #include "linear_algebra_util.h"
