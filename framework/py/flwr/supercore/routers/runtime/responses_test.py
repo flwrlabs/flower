@@ -657,6 +657,7 @@ async def _check_direct_cancellation(
     monkeypatch.setattr(
         responses, "_model_response_timeout", lambda: 0.05 if stop == "deadline" else 3
     )
+    monkeypatch.setattr(responses, "_DIRECT_ERROR_DELIVERY_TIMEOUT", 0.05)
     app = FastAPI()
     app.state.direct_model_capacity = asyncio.Semaphore(1)
     scope: Scope = {"type": "http", "app": app, "asgi": {"spec_version": "2.4"}}
@@ -669,7 +670,7 @@ async def _check_direct_cancellation(
         Request(scope, receive),
         direct,
         direct.get_task_by_token.return_value,
-        _stream_request(),
+        _stream_request() | {"stream": phase != "opening"},
     )
 
     async def trigger() -> None:
@@ -680,18 +681,31 @@ async def _check_direct_cancellation(
         elif stop == "disconnect":
             disconnected.set()
 
+    messages: list[Message] = []
+
     async def send(message: Message) -> None:
-        if stop == "deadline" and message["type"] == "http.response.body":
+        await anyio.sleep(0)
+        if phase == "blocked" and message["type"] == "http.response.body":
             await anyio.sleep_forever()
+        messages.append(message)
 
     async with asyncio.timeout(4):
         await asyncio.gather(response(scope, receive, send), trigger())
     assert closed.is_set() and not response.capacity.locked()
+    if stop == "deadline" and phase != "blocked":
+        assert any(b"model_response_timeout" in m.get("body", b"") for m in messages)
+        assert messages[0]["status"] == (504 if phase == "opening" else 200)
 
 
 @pytest.mark.parametrize(
     "stop,phase",
-    [("task", "opening"), ("disconnect", "streaming"), ("deadline", "streaming")],
+    [
+        ("task", "opening"),
+        ("disconnect", "streaming"),
+        ("deadline", "opening"),
+        ("deadline", "streaming"),
+        ("deadline", "blocked"),
+    ],
 )
 def test_direct_cancellation_closes_provider_and_releases_slot(
     direct: Mock, monkeypatch: pytest.MonkeyPatch, stop: str, phase: str

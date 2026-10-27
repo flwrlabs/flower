@@ -93,6 +93,8 @@ _TERMINAL_EVENTS = frozenset(
 # pylint: disable-next=fixme
 # TODO: Tune this provisional per-process limit with DEV load tests before rollout.
 _DIRECT_MODEL_CONCURRENCY = 8
+# Allow final errors to reach clients without indefinitely retaining a blocked slot.
+_DIRECT_ERROR_DELIVERY_TIMEOUT = 1.0
 _POLL_INTERVAL = 0.25
 _DEFAULT_MODEL_RESPONSE_TIMEOUT = 900.0
 _DEFAULT_MODEL_TASK_LAUNCH_TIMEOUT = 300.0
@@ -305,7 +307,7 @@ class _DirectResponse(Response):
                         execution,
                     )
                     try:
-                        with anyio.fail_after(_model_response_timeout()) as timeout:
+                        with anyio.fail_after(_model_response_timeout()):
                             await self._execute(scope, receive, forward)
                     except _ResponsesError as err:
                         error = err
@@ -335,9 +337,7 @@ class _DirectResponse(Response):
                     409, "Model request cancelled.", "model_request_cancelled"
                 )
             if error is not None:
-                with anyio.move_on_after(
-                    max(0.0, timeout.deadline - anyio.current_time())
-                ):
+                with anyio.move_on_after(_DIRECT_ERROR_DELIVERY_TIMEOUT):
                     if self.started:
                         await send(
                             {
