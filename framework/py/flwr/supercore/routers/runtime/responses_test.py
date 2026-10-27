@@ -18,6 +18,7 @@
 import asyncio
 import json
 from collections.abc import AsyncIterator
+from threading import Event
 from typing import cast
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -731,3 +732,49 @@ def test_direct_cancellation_closes_provider_and_releases_slot(
 ) -> None:
     """Run cancellation coverage without requiring an async pytest plugin."""
     asyncio.run(_check_direct_cancellation(direct, monkeypatch, stop, phase))
+
+
+def test_direct_timeout_releases_slot_while_usage_write_finishes(
+    direct: Mock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Do not wait for a stalled usage write after the response deadline."""
+    release, finished = Event(), Event()
+
+    def store_usage(*_args: object) -> None:
+        release.wait()
+        finished.set()
+
+    direct.add_task_usage.side_effect = store_usage
+    monkeypatch.setattr(responses, "_model_response_timeout", lambda: 0.05)
+    _mock_provider(
+        monkeypatch,
+        httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200,
+                json={"object": "response", "usage": {"input_tokens": 1}},
+            )
+        ),
+    )
+
+    async def check() -> None:
+        app = FastAPI()
+        app.state.direct_model_capacity = asyncio.Semaphore(1)
+        scope: Scope = {"type": "http", "app": app}
+        response = _DirectResponse(
+            Request(scope, AsyncMock(return_value={"type": "http.request"})),
+            direct,
+            direct.get_task_by_token.return_value,
+            _stream_request() | {"stream": False},
+        )
+        send = AsyncMock()
+        try:
+            async with asyncio.timeout(2):
+                await response(scope, AsyncMock(), send)
+            assert not response.capacity.locked() and not finished.is_set()
+            assert send.call_args_list[0].args[0]["status"] == 504
+            direct.add_task_usage.assert_called_once()
+        finally:
+            release.set()
+        assert await anyio.to_thread.run_sync(finished.wait, 1)
+
+    asyncio.run(check())

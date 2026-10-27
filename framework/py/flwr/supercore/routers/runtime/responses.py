@@ -249,10 +249,13 @@ class _DirectResponse(Response):
                         response, provider=cast(str, self.payload["model"])
                     )
                     if usage is not None:
-                        with CancelScope(shield=True):
-                            await run_in_threadpool(
-                                self.state.add_task_usage, self.task.task_id, usage
-                            )
+                        # Cancellation stops waiting, not the in-flight usage write.
+                        await anyio.to_thread.run_sync(
+                            self.state.add_task_usage,
+                            self.task.task_id,
+                            usage,
+                            abandon_on_cancel=True,
+                        )
                         usage_recorded = True
                 yield event
 
