@@ -35,6 +35,9 @@
     :func: _parse_args_run_supernode
     :prog: flower-supernode
 
+    Passing a positional argument prefixed with `@` will read in the remainder
+    as a file and parse arguments from there.
+
 *******************
  Advanced Commands
 *******************
