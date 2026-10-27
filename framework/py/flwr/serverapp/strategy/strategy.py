@@ -159,7 +159,7 @@ class Strategy(ABC):
             Maximum number of federated learning rounds to execute.
         timeout : float (default: 3600)
             Timeout in seconds for waiting for node responses. Outstanding responses
-            from nodes that become unavailable are skipped.
+            from nodes that become unavailable are replaced with error replies.
         train_config : ConfigRecord, optional
             Configuration to be sent to nodes during training rounds.
             If unset, an empty ConfigRecord will be used.

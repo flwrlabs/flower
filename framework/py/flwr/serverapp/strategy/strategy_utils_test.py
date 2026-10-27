@@ -22,8 +22,10 @@ import pytest
 from parameterized import parameterized
 
 from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
+from flwr.common.constant import ErrorCode
 from flwr.serverapp.exception import InconsistentMessageReplies
 from flwr.serverapp.grid import Grid
+from flwr.supercore.task_identity import TaskIdentity
 
 from .strategy_utils import (
     aggregate_arrayrecords,
@@ -56,12 +58,17 @@ def test_config_to_str() -> None:
 def test_send_and_receive_with_missing_reply(
     monkeypatch: pytest.MonkeyPatch, available_nodes: list[int]
 ) -> None:
-    """Keep received replies, skipping unavailable nodes or timing out otherwise."""
+    """Keep replies, generating errors for unavailable nodes or timing out otherwise."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 123)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 456)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 789)
     messages: list[Message] = [
-        Mock(spec=Message, metadata=Mock(message_id=str(i), dst_node_id=node_id))
-        for i, node_id in enumerate([1, 2])
+        Message(RecordDict(), dst_node_id=node_id, message_type="train")
+        for node_id in [1, 2, 2]
     ]
-    reply = Mock(spec=Message, metadata=Mock(reply_to_message_id="0"))
+    for i, msg in enumerate(messages):
+        msg.metadata.__dict__["_message_id"] = str(i)
+    reply = Message(RecordDict(), reply_to=messages[0])
     grid = Mock(spec=Grid)
     grid.push_messages.return_value = [msg.metadata.message_id for msg in messages]
     grid.pull_messages.return_value = [reply]
@@ -73,12 +80,21 @@ def test_send_and_receive_with_missing_reply(
         Mock(side_effect=[0.0, 0.0, 0.5, 1.0]),
     )
 
-    assert send_and_receive(grid, iter(messages), timeout=1.0) == [reply]
+    replies = send_and_receive(grid, iter(messages), timeout=1.0)
+    assert replies[0] is reply
     grid.push_messages.assert_called_once_with(messages)
     grid.pull_messages.assert_called_once()
     if available_nodes:
+        assert replies == [reply]
         sleep_mock.assert_called_once_with(0.5)
     else:
+        assert len(replies) == len(messages)
+        for error_reply, msg in zip(replies[1:], messages[1:], strict=True):
+            assert error_reply.has_error()
+            assert error_reply.error.code == ErrorCode.NODE_UNAVAILABLE
+            assert error_reply.error.reason == "The destination node is unavailable."
+            assert error_reply.metadata.reply_to_message_id == msg.metadata.message_id
+            assert error_reply.metadata.src_node_id == msg.metadata.dst_node_id
         sleep_mock.assert_not_called()
 
 

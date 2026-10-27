@@ -24,8 +24,18 @@ from typing import cast
 
 import numpy as np
 
-from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
+from flwr.app import (
+    Array,
+    ArrayRecord,
+    ConfigRecord,
+    Error,
+    Message,
+    MetricRecord,
+    RecordDict,
+)
+from flwr.app.message import remove_content_from_message
 from flwr.common import NDArray
+from flwr.common.constant import ErrorCode
 from flwr.supercore import log
 
 from ..exception import InconsistentMessageReplies
@@ -189,7 +199,7 @@ def sample_nodes(
 def send_and_receive(
     grid: Grid, messages: Iterable[Message], timeout: float
 ) -> list[Message]:
-    """Send messages and collect replies, skipping unavailable nodes.
+    """Send messages and collect replies, generating errors for unavailable nodes.
 
     Parameters
     ----------
@@ -203,12 +213,12 @@ def send_and_receive(
     Returns
     -------
     list[Message]
-        Replies received before completion, node unavailability, or timeout.
+        Received replies and generated error replies for unavailable nodes.
     """
     messages = list(messages)
     sent_ids = {msg_id for msg_id in grid.push_messages(messages) if msg_id}
     pending = {
-        msg.metadata.message_id: msg.metadata.dst_node_id
+        msg.metadata.message_id: remove_content_from_message(msg)
         for msg in messages
         if msg.metadata.message_id in sent_ids
     }
@@ -224,14 +234,14 @@ def send_and_receive(
         if not pending:
             break
 
-        unavailable_nodes = set(pending.values()) - set(grid.get_node_ids())
-        if unavailable_nodes:
-            log(INFO, "Skipping replies from unavailable nodes: %s", unavailable_nodes)
-            pending = {
-                msg_id: node_id
-                for msg_id, node_id in pending.items()
-                if node_id not in unavailable_nodes
-            }
+        available_nodes = set(grid.get_node_ids())
+        for msg_id, msg in list(pending.items()):
+            if msg.metadata.dst_node_id not in available_nodes:
+                error = Error(
+                    ErrorCode.NODE_UNAVAILABLE, "The destination node is unavailable."
+                )
+                replies.append(Message(error, reply_to=msg))
+                del pending[msg_id]
 
         remaining = deadline - monotonic()
         if not pending or remaining <= 0:
