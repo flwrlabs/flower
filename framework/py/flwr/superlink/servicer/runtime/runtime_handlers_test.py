@@ -27,6 +27,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
+import pytest
 from parameterized import parameterized
 
 from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
@@ -114,48 +115,59 @@ def test_get_nodes_returns_metadata() -> None:
     )
 
 
-def test_raise_if_false() -> None:
-    """."""
-    # Prepare
-    validation_error = False
-    detail = "test"
-
-    try:
-        # Execute
-        runtime_handlers._raise_if(  # pylint: disable=protected-access
-            validation_error=validation_error,
-            request_name="DummyRequest",
-            detail=detail,
-        )
-
-        # Assert
-        assert True
-    except ValueError as err:
-        raise AssertionError() from err
-    except Exception as err:
-        raise AssertionError() from err
+def test_push_empty_messages_returns_empty_response() -> None:
+    """An empty push is a no-op and does not open an upload session."""
+    state = Mock(spec=LinkState)
+    response = runtime_handlers.push_messages(
+        PushAppMessagesRequest(), state, Task(run_id=1)
+    )
+    assert response == PushAppMessagesResponse()
+    state.start_session.assert_not_called()
+    state.store_message_and_object_tree.assert_not_called()
 
 
-def test_raise_if_true() -> None:
-    """."""
-    # Prepare
-    validation_error = True
-    detail = "test"
+@pytest.mark.parametrize("tree_count", [0, 2])
+def test_push_messages_rejects_mismatched_tree_count(tree_count: int) -> None:
+    """Message/tree count mismatches are parameter errors, not auth failures."""
+    message = create_ins_message(src_node_id=SUPERLINK_NODE_ID, dst_node_id=2, run_id=1)
+    state = Mock(spec=LinkState)
+    request = PushAppMessagesRequest(
+        messages_list=[message], message_object_trees=[ObjectTree()] * tree_count
+    )
+    with pytest.raises(FlowerError) as error:
+        runtime_handlers.push_messages(request, state, Task(run_id=1))
+    assert error.value.code == ApiErrorCode.RUNTIME_INVALID_MESSAGE_COUNT
+    state.start_session.assert_not_called()
 
-    try:
-        # Execute
-        runtime_handlers._raise_if(  # pylint: disable=protected-access
-            validation_error=validation_error,
-            request_name="DummyRequest",
-            detail=detail,
-        )
 
-        # Assert
-        raise AssertionError()
-    except ValueError as err:
-        assert str(err) == "Malformed DummyRequest: test"
-    except Exception as err:
-        raise AssertionError() from err
+@pytest.mark.parametrize(
+    "source,run_id", [(SUPERLINK_NODE_ID + 1, 1), (SUPERLINK_NODE_ID, 2)]
+)
+def test_push_messages_rejects_identity_mismatch(source: int, run_id: int) -> None:
+    """Source and run mismatches use the same generic authentication error."""
+    message = create_ins_message(src_node_id=source, dst_node_id=2, run_id=run_id)
+    state = Mock(spec=LinkState)
+    request = PushAppMessagesRequest(
+        messages_list=[message], message_object_trees=[ObjectTree()]
+    )
+    with pytest.raises(FlowerError) as error:
+        runtime_handlers.push_messages(request, state, Task(run_id=1))
+    assert error.value.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
+    assert error.value.public_details is None
+    state.store_message_and_object_tree.assert_not_called()
+
+
+def test_ack_rejects_run_id_mismatch() -> None:
+    """An ACK for another run cannot release message bodies."""
+    state = Mock(spec=LinkState)
+    request = ConfirmMessageReceivedRequest(
+        node=Node(node_id=SUPERLINK_NODE_ID), run_id=2
+    )
+    with pytest.raises(FlowerError) as error:
+        runtime_handlers.confirm_message_received(request, state, Task(run_id=1))
+    assert error.value.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
+    assert error.value.public_details is None
+    state.acknowledge_messages.assert_not_called()
 
 
 def test_get_run_series_events_uses_authenticated_task_series() -> None:
@@ -703,23 +715,25 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             messages_list=[message_1, message_2],
             message_object_trees=[object_tree_1, object_tree_2],
         )
-        original_store_message_ins = self.state.store_message_ins
+        original_store_message = self.state.store_message_and_object_tree
         primary_task_id = self._primary_task_id(run_id)
         call_count = 0
 
-        def store_message_ins_and_finish_run(message: Message) -> str | None:
+        def store_message_and_finish_run(
+            message: Message, tree: ObjectTree, session_id: str
+        ) -> tuple[bool, list[str]]:
             nonlocal call_count
             call_count += 1
-            message_id = original_store_message_ins(message)
+            results = original_store_message(message, tree, session_id)
             if call_count == 1:
                 assert self.state.finish_task(primary_task_id, SubStatus.COMPLETED, "")
-            return message_id
+            return results
 
         # Execute
         with patch.object(
             self.state,
-            "store_message_ins",
-            side_effect=store_message_ins_and_finish_run,
+            "store_message_and_object_tree",
+            side_effect=store_message_and_finish_run,
         ):
             response = runtime_handlers.push_messages(
                 request, self.state, self._auth_task
@@ -755,15 +769,14 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
                 src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
             )
         )
-        # pylint: disable-next=W0212
-        message_ins.metadata._message_id = message_ins.object_id  # type: ignore
-        msg_id = self.state.store_message_ins(message=message_ins)
-        msg_ = self.state.get_message_ins(node_id=self.node_id, limit=1)[0]
+        message_ins.metadata.__dict__["_message_id"] = message_ins.object_id
+        assert self.state.store_messages([message_ins]) == [True]
+        msg_id = message_ins.metadata.message_id
+        msg_ = self.state.get_messages(dst_node_id=self.node_id, limit=1)[0]
 
         reply_msg = Message(RecordDict(), reply_to=msg_)
-        # pylint: disable-next=W0212
-        reply_msg.metadata._message_id = reply_msg.object_id  # type: ignore
-        self.state.store_message_res(message=reply_msg)
+        reply_msg.metadata.__dict__["_message_id"] = reply_msg.object_id
+        self.state.store_messages([reply_msg])
 
         # Register response in ObjectStore (so pulling message request can be completed)
         obj_ids_registered: list[str] = []
@@ -797,8 +810,8 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             # Ins message was deleted
             assert self.state.num_message_ins() == 0
 
-    def test_pull_messages_rejects_message_from_another_run(self) -> None:
-        """Reject message IDs not owned by the authenticated run."""
+    def test_pull_messages_filters_message_from_another_run(self) -> None:
+        """Correlation filters cannot leak messages from another run."""
         other_run_id = self.state.create_run(
             "", "", "", {}, NOOP_FEDERATION_ID, None, "", TaskType.SERVER_APP
         )
@@ -810,16 +823,18 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
                 run_id=other_run_id,
             )
         )
-        message_id = self.state.store_message_ins(message)
-        assert message_id
+        assert self.state.store_messages([message]) == [True]
+        message_id = message.metadata.message_id
 
         request = PullAppMessagesRequest(
             reply_to_message_ids=StringList(vals=[message_id])
         )
-        with self.assertRaisesRegex(ValueError, "contains invalid IDs"):
-            runtime_handlers.pull_messages(request, self.state, self._auth_task)
-
-        assert self.state.num_message_ins() == 1
+        response = runtime_handlers.pull_messages(request, self.state, self._auth_task)
+        assert not response.messages_list
+        assert (
+            len(self.state.get_messages(dst_node_id=self.node_id, run_id=other_run_id))
+            == 1
+        )
 
     @parameterized.expand(
         [
@@ -829,10 +844,10 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             (None, Error(code=0)),
         ]
     )  # type: ignore
-    def test_successful_pull_messages_deletes_messages_in_linkstate(
+    def test_successful_pull_messages_keeps_pending_until_ack(
         self, content: RecordDict | None, error: Error | None
     ) -> None:
-        """Test `PullMessages` deletes messages from LinkState."""
+        """A pull keeps deliveries pending until receipt is acknowledged."""
         # Prepare
         run_id = self._auth_run_id
 
@@ -842,11 +857,11 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
                 src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
             )
         )
-        # pylint: disable-next=W0212
-        message_ins.metadata._message_id = message_ins.object_id  # type: ignore
+        message_ins.metadata.__dict__["_message_id"] = message_ins.object_id
 
-        msg_id = self.state.store_message_ins(message=message_ins)
-        msg_ = self.state.get_message_ins(node_id=self.node_id, limit=1)[0]
+        assert self.state.store_messages([message_ins]) == [True]
+        msg_id = message_ins.metadata.message_id
+        msg_ = self.state.get_messages(dst_node_id=self.node_id, limit=1)[0]
 
         if content is not None:
             reply_msg = Message(content, reply_to=msg_)
@@ -854,10 +869,9 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             assert error is not None
             reply_msg = Message(error, reply_to=msg_)
 
-        # pylint: disable-next=W0212
-        reply_msg.metadata._message_id = reply_msg.object_id  # type: ignore
+        reply_msg.metadata.__dict__["_message_id"] = reply_msg.object_id
 
-        self.state.store_message_res(message=reply_msg)
+        self.state.store_messages([reply_msg])
         # Register response in ObjectStore (so pulling message request can be completed)
         self.store.preregister(run_id, get_object_tree(reply_msg))
         request = PullAppMessagesRequest(
@@ -867,10 +881,12 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         # Execute
         response = runtime_handlers.pull_messages(request, self.state, self._auth_task)
 
-        # Assert
-        assert isinstance(response, PullAppMessagesResponse)
-        assert self.state.num_message_ins() == 0
-        assert self.state.num_message_res() == 0
+        assert len(response.messages_list) == 1
+        assert len(self.state.get_messages(dst_node_id=SUPERLINK_NODE_ID)) == 1
+        assert len(self.state.get_messages(dst_node_id=self.node_id)) == 1
+        self.state.acknowledge_messages([reply_msg.metadata.message_id])
+        assert self.state.get_messages(dst_node_id=SUPERLINK_NODE_ID) == []
+        assert self.store.get(reply_msg.metadata.message_id) is None
 
     def test_push_object_successful(self) -> None:
         """Test `PushObject`."""
@@ -904,7 +920,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         req = PushObjectRequest(node=Node(node_id=123), run_id=run_id)
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.push_object(req, self.state, self._auth_task)
-        assert error.exception.code == ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID
+        assert error.exception.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
 
         # Prepare
         obj = ConfigRecord({"a": 123, "b": [4, 5, 6]})
@@ -986,7 +1002,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         req = PullObjectRequest(node=Node(node_id=123), run_id=run_id)
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.pull_object(req, self.state, self._auth_task)
-        assert error.exception.code == ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID
+        assert error.exception.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
 
         # Attempt pulling object that doesn't exist
         req = PullObjectRequest(
@@ -999,7 +1015,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
     def test_confirm_message_received_successful(self) -> None:
         """Test `ConfirmMessageReceived` success."""
         # Prepare
-        run_id = self._create_dummy_run()
+        run_id = self._auth_run_id
         proto = create_ins_message(
             src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
         )
@@ -1007,6 +1023,9 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         message_res = Message(
             RecordDict({"cfg": ConfigRecord({"key": "value"})}), reply_to=message_ins
         )
+
+        message_res.metadata.__dict__["_message_id"] = message_res.object_id
+        assert self.state.store_messages([message_ins, message_res]) == [True, True]
 
         # Prepare: Save reply message in ObjectStore
         all_objects = get_all_nested_objects(message_res)
@@ -1019,7 +1038,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
 
         # Execute: Confirm message received
         request = ConfirmMessageReceivedRequest(
-            node=Node(node_id=self.node_id),
+            node=Node(node_id=SUPERLINK_NODE_ID),
             run_id=run_id,
             message_object_id=message_res.object_id,
         )

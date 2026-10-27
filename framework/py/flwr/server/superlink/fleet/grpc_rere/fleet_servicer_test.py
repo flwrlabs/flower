@@ -29,6 +29,7 @@ from flwr.common.constant import (
     NOOP_ACCOUNT_NAME,
     NOOP_FLWR_AID,
     SUPERLINK_NODE_ID,
+    Status,
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
@@ -59,10 +60,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
-from flwr.server.superlink.linkstate.linkstate_test import (
-    create_ins_message,
-    create_res_message,
-)
+from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.utils import _STATUS_TO_MSG
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
@@ -344,8 +342,8 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
                 src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
             )
         )
-        self.state.store_message_ins(message_ins)
-        pulled_ins = self.state.get_message_ins(node_id=node_id, limit=1)[0]
+        self.state.store_messages([message_ins])
+        pulled_ins = self.state.get_messages(dst_node_id=node_id, limit=1)[0]
         message = Message(RecordDict(), reply_to=pulled_ins)
         # pylint: disable-next=W0212
         message.metadata._message_id = message.object_id  # type: ignore
@@ -379,20 +377,23 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         requested_object_ids = set(response.objects_to_push)
         assert expected_object_ids == requested_object_ids
 
-    def _assert_push_messages_not_allowed(self, node_id: int, run_id: int) -> None:
-        """Assert `PushMessages` not allowed."""
-        msg_proto = create_res_message(
+    def _assert_push_messages_policy(self, node_id: int, run_id: int) -> None:
+        """Only accepted message headers preregister their objects."""
+        msg_proto = create_ins_message(
             src_node_id=node_id, dst_node_id=SUPERLINK_NODE_ID, run_id=run_id
         )
         request = PushMessagesRequest(
-            node=Node(node_id=node_id), messages_list=[msg_proto]
+            node=Node(node_id=node_id),
+            messages_list=[msg_proto],
+            message_object_trees=[get_object_tree(message_from_proto(msg_proto))],
         )
-
-        with self.assertRaises(grpc.RpcError) as e:
-            self._push_messages.with_call(request=request)
-        assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
-        flower_error = _flower_error_from_rpc_error(e.exception)
-        assert flower_error.code == ApiErrorCode.FLEET_RUN_STATUS_NOT_ALLOWED
+        response = self._push_messages(request=request)
+        finished = (
+            self.state.get_run_info(run_ids=[run_id])[0].status.status
+            == Status.FINISHED
+        )
+        assert bool(response.objects_to_push) == (not finished)
+        assert (msg_proto.metadata.message_id in self.store) == (not finished)
 
     @parameterized.expand(
         [
@@ -411,7 +412,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         self._transition_run_status(run_id, num_transitions)
 
         # Execute & Assert
-        self._assert_push_messages_not_allowed(node_id, run_id)
+        self._assert_push_messages_policy(node_id, run_id)
 
     @parameterized.expand(
         [
@@ -437,7 +438,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         )
         # pylint: disable-next=W0212
         message_ins.metadata._message_id = message_ins.object_id  # type: ignore
-        self.state.store_message_ins(message=message_ins)
+        self.state.store_messages([message_ins])
         obj_ids_registered: list[str] = []
         if register_in_store:
             obj_ids_registered = self.store.preregister(
@@ -762,13 +763,15 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         run_id = self._create_dummy_run()
 
         # Prepare: Create a message
-        msg_proto = create_res_message(
+        msg_proto = create_ins_message(
             src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
         )
         message = message_from_proto(msg_proto)
         # pylint: disable-next=E1137
         message.content["test_config"] = ConfigRecord({"a": 123, "b": [4, 5, 6]})
         message.metadata.__dict__["_message_id"] = message.object_id
+
+        assert self.state.store_messages([message]) == [True]
 
         # Prepare: Store message in ObjectStore
         all_objects = get_all_nested_objects(message)

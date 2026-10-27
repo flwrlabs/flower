@@ -368,6 +368,12 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_403_FORBIDDEN,
         public_message="Failed to get FAB.",
     ),
+    ApiErrorCode.FLEET_MESSAGE_SOURCE_NODE_ID_MISMATCH: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Message source node ID does not match the authenticated "
+        "SuperNode.",
+    ),
     ApiErrorCode.RUNTIME_CONNECTOR_CREDENTIALS_NOT_AVAILABLE: ApiErrorSpec(
         status_code=StatusCode.PERMISSION_DENIED,
         http_status_code=status.HTTP_403_FORBIDDEN,

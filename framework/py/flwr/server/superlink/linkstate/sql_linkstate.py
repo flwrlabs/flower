@@ -61,6 +61,7 @@ from flwr.supercore.corestate.utils import timestamp_to_iso, validate_task_event
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.state.schema.corestate_models import Message as MessageModel
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
@@ -221,14 +222,17 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
         """Store a Message and preregister its ObjectTree."""
-        with self.session():
-            if message.metadata.reply_to_message_id:
-                stored = self.store_message_res(message) is not None
-            else:
-                stored = self.store_message_ins(message) is not None
-
-            if not stored:
+        with self.session() as session:
+            if not self.store_messages([message])[0]:
                 return False, []
+
+            # Retries must not re-upload the body of an already cleared message.
+            if session.scalar(
+                select(MessageModel.cleared).where(
+                    MessageModel.message_id == message.metadata.message_id
+                )
+            ):
+                return True, []
 
             missing_objects = self.preregister_object_tree(object_tree, session_id)
             return True, missing_objects
@@ -644,19 +648,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 )
             )
 
-    def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
-        """Delete Messages belonging to an expired push session."""
-        if not message_object_ids:
-            return
-
-        with self.session() as session:
-            self.delete_messages(message_object_ids)
-            session.execute(
-                delete(MessageResModel).where(
-                    MessageResModel.message_id.in_(message_object_ids)
-                )
-            )
-
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
         sint64_run_id = uint64_to_int64(run_id)
@@ -1028,7 +1019,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 )
                 if primary_task_type == TaskType.AGENT_APP and user_prompt is not None:
                     message = create_user_prompt_message(run_id, user_prompt)
-                    self.store_message_ins(message)
+                    self.store_messages([message])
                     self._store_generated_message(message)
                 if initial_task_event is not None:
                     initial_task_event.run_id = run_id

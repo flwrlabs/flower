@@ -561,11 +561,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
             )
 
-            # Delete expired object trees and their message metadata.
+            # Delete expired object trees and cancel their pending messages.
             if message_object_ids:
                 for message_object_id in message_object_ids:
                     self.object_store.delete(message_object_id)
-                self._on_push_session_expired(message_object_ids)
+                self.cancel_messages(message_ids=message_object_ids)
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""

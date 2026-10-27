@@ -189,14 +189,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
         """Store a Message and preregister its ObjectTree."""
-        with self.lock:
-            if message.metadata.reply_to_message_id:
-                stored = self.store_message_res(message) is not None
-            else:
-                stored = self.store_message_ins(message) is not None
-
-            if not stored:
+        # Policy lookups must precede these locks, including during run creation.
+        if not self._check_message_policy([message])[0]:
+            return False, []
+        with self._lock_object_push_sessions, self.lock_message_store:
+            if not InMemoryCoreState.store_messages(self, [message])[0]:
                 return False, []
+
+            if self.message_store[message.metadata.message_id].message is None:
+                return True, []
 
             missing_objects = self.preregister_object_tree(object_tree, session_id)
             return True, missing_objects
@@ -443,17 +444,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         message_id
                     )
                     del self.message_res_store[message_res_id]
-
-    def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
-        """Delete Messages belonging to an expired push session."""
-        with self.lock:
-            self.delete_messages(message_object_ids)
-            for message_id in message_object_ids:
-                message_res = self.message_res_store.pop(message_id, None)
-                if message_res is not None:
-                    self.message_ins_id_to_message_res_id.pop(
-                        message_res.metadata.reply_to_message_id, None
-                    )
 
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
@@ -759,7 +749,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             )
             if primary_task_type == TaskType.AGENT_APP and user_prompt is not None:
                 message = create_user_prompt_message(run_id, user_prompt)
-                self.store_message_ins(message)
+                self.store_messages([message])
                 self._store_generated_message(message)
             if initial_task_event is not None:
                 initial_task_event.id = self._next_task_event_id

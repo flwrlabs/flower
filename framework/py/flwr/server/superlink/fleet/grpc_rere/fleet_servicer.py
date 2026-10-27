@@ -173,5 +173,4 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         return fleet_handlers.confirm_message_received(
             request=request,
             state=self.state_factory.state(),
-            store=self.objectstore_factory.store(),
         )

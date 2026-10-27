@@ -53,16 +53,6 @@ class InMemoryGrid(Grid):
         self.pull_interval = pull_interval
         self.node = Node(node_id=SUPERLINK_NODE_ID)
 
-    def _check_message(self, message: Message) -> None:
-        # Check if the message is valid
-        if not (
-            message.metadata.message_id != ""
-            and message.metadata.reply_to_message_id == ""
-            and message.metadata.ttl > 0
-            and message.metadata.delivered_at == ""
-        ):
-            raise ValueError(f"Invalid message: {message}")
-
     def set_run(self, run: Run) -> None:
         """Initialize the run."""
         if not isinstance(run, Run):
@@ -115,10 +105,10 @@ class InMemoryGrid(Grid):
         """
         msg_ids: list[str] = []
         for msg in messages:
+            if msg.metadata.ttl <= 0:
+                raise ValueError("Message TTL must be greater than zero.")
             # Populate message ID
             msg.metadata.__dict__["_message_id"] = str(uuid4())
-            # Check message
-            self._check_message(msg)
             # Store in state
             msg_id = self.state.store_message_ins(msg)
             if msg_id:
