@@ -29,6 +29,7 @@ from .fedadam import FedAdam
 from .fedavg import FedAvg
 from .fedavgm import FedAvgM
 from .fedmedian import FedMedian
+from .fedmom import FedMom
 from .fedprox import FedProx
 from .fedtrimmedavg import FedTrimmedAvg
 from .fedxgb_bagging import FedXgbBagging
@@ -51,6 +52,7 @@ __all__ = [
     "FedAvg",
     "FedAvgM",
     "FedMedian",
+    "FedMom",
     "FedProx",
     "FedTrimmedAvg",
     "FedXgbBagging",
