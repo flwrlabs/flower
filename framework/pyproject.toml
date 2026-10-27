@@ -1,5 +1,5 @@
 [build-system]
-requires = ["uv-build>=0.12.20,<0.13"]
+requires = ["uv-build>=0.13.5,<0.14"]
 build-backend = "uv_build"
 
 [project]
@@ -23,7 +23,6 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python",
@@ -145,7 +144,7 @@ dev = [
     "beautysh==6.4.2",
     "twine==6.2.0",
     "types-PyYAML>=6.0.2,<7.0.0",
-    "pyroma==4.2",
+    "pyroma==4.3.3",
     "check-wheel-contents==0.6.3",
     "GitPython==3.1.50",
     "licensecheck==2025.1.0",
