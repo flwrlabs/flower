@@ -33,6 +33,7 @@ import time
 from collections.abc import AsyncGenerator, Iterator
 from contextlib import ExitStack, aclosing, contextmanager
 from dataclasses import dataclass
+from functools import partial
 from logging import ERROR
 from time import monotonic
 from typing import cast
@@ -369,7 +370,9 @@ async def _watch_direct_task(
 ) -> None:
     """Stop a quiet provider after task completion or client disconnect."""
     while True:
-        tasks = await run_in_threadpool(state.get_tasks, task_ids=[task.task_id])
+        tasks = await anyio.to_thread.run_sync(
+            partial(state.get_tasks, task_ids=[task.task_id]), abandon_on_cancel=True
+        )
         if (
             not tasks
             or tasks[0].status.status == Status.FINISHED

@@ -738,14 +738,22 @@ def test_direct_timeout_releases_slot_while_usage_write_finishes(
     direct: Mock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Do not wait for a stalled usage write after the response deadline."""
-    release, finished = Event(), Event()
+    release, finished, status_waiting = Event(), Event(), Event()
 
     def store_usage(*_args: object) -> None:
-        release.wait()
+        release.wait(3)
         finished.set()
 
+    def get_tasks(**_kwargs: object) -> list[Task]:
+        if direct.add_task_usage.called:
+            status_waiting.set()
+            release.wait(3)
+        return [direct.get_task_by_token.return_value]
+
     direct.add_task_usage.side_effect = store_usage
-    monkeypatch.setattr(responses, "_model_response_timeout", lambda: 0.05)
+    direct.get_tasks.side_effect = get_tasks
+    monkeypatch.setattr(responses, "_model_response_timeout", lambda: 0.25)
+    monkeypatch.setattr(responses, "_POLL_INTERVAL", 0.01)
     _mock_provider(
         monkeypatch,
         httpx.MockTransport(
@@ -771,6 +779,7 @@ def test_direct_timeout_releases_slot_while_usage_write_finishes(
             async with asyncio.timeout(2):
                 await response(scope, AsyncMock(), send)
             assert not response.capacity.locked() and not finished.is_set()
+            assert status_waiting.is_set()
             assert send.call_args_list[0].args[0]["status"] == 504
             direct.add_task_usage.assert_called_once()
         finally:
