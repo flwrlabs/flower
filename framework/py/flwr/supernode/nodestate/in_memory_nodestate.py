@@ -102,10 +102,12 @@ class InMemoryNodeState(
     ) -> tuple[bool, list[str]]:
         """Store a Message and preregister its ObjectTree."""
         # Always acquire the push-session lock before the message-store lock
-        with self._lock_object_push_sessions, self.lock_msg_store:
-            stored = self.store_message(message) is not None
-            if not stored:
+        with self._lock_object_push_sessions, self.lock_message_store:
+            if not self.store_messages([message])[0]:
                 return False, []
+
+            if self.message_store[message.metadata.message_id].message is None:
+                return True, []
 
             missing_objects = self.preregister_object_tree(object_tree, session_id)
             return True, missing_objects
@@ -282,13 +284,10 @@ class InMemoryNodeState(
         """Remove time entries older than MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS."""
         with self.lock_time_store:
             cutoff = now().timestamp() - MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS
-            # Find message IDs for entries that have a finishing_at time
-            # before the cutoff, and those that don't exist in msg_store
             to_delete = [
                 msg_id
                 for msg_id, entry in self.time_store.items()
-                if (entry.finished_at and entry.finished_at < cutoff)
-                or msg_id not in self.msg_store
+                if entry.finished_at and entry.finished_at < cutoff
             ]
 
             # Delete the identified entries

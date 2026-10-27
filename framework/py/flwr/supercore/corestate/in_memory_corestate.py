@@ -146,7 +146,7 @@ class InMemoryCoreState(
         self._object_store = object_store
         self.message_store: dict[str, MessageRecord] = {}
         self.pending_message_ids_by_dst: dict[int, set[str]] = {}
-        self.lock_message_store = Lock()
+        self.lock_message_store = RLock()
         self.fab_store: dict[str, Fab] = {}
         self.lock_fab_store = Lock()
         self.federation_app_store: dict[tuple[str, str], FederationAppRecord] = {}
@@ -181,7 +181,7 @@ class InMemoryCoreState(
         self.task_usage_store: dict[int, TaskUsageRecord] = {}
         self.lock_task_usage_store = Lock()
         self._next_task_usage_id = 1
-        self.lock_task_store = Lock()
+        self.lock_task_store = RLock()
         self.task_message_store: dict[str, Message] = {}
         self.lock_task_message_store = Lock()
         self.task_event_store: dict[int, list[TaskEvent]] = {}
@@ -471,11 +471,11 @@ class InMemoryCoreState(
                 if self._object_push_session_by_root.get(object_id) == session_id:
                     del self._object_push_session_by_root[object_id]
 
-        # Delete expired object trees and their message metadata
+        # Delete expired object trees and cancel their pending messages
         if cleanup_messages and session.root_object_ids:
             for object_id in session.root_object_ids:
                 self.object_store.delete(object_id)
-            self._on_push_session_expired(session.root_object_ids)
+            self.cancel_messages(message_ids=session.root_object_ids)
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""

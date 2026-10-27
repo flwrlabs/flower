@@ -28,7 +28,7 @@ import unittest
 from abc import abstractmethod
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 from unittest.mock import Mock, PropertyMock, patch
 from uuid import uuid4
 
@@ -77,6 +77,7 @@ from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import get_object_tree
+from flwr.supercore.inflatable.inflatable_utils import pull_and_inflate_object_from_tree
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.supercore.state.schema.corestate_models import (
@@ -114,6 +115,96 @@ class StateTest(CoreStateTest):
         """Create a P-384 public key for node creation."""
         _, public_key = generate_key_pairs()
         return public_key_to_bytes(public_key)
+
+    def test_store_messages_policy_results_keep_input_order(self) -> None:
+        """Reject individual endpoints without rejecting the rest of a batch."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        messages = [
+            create_ins_message_obj(SUPERLINK_NODE_ID, dst, run_id)
+            for dst in (2, 3, SUPERLINK_NODE_ID)
+        ]
+        with patch.object(
+            state.federation_manager,
+            "filter_nodes",
+            return_value={SUPERLINK_NODE_ID, 2},
+        ):
+            assert state.store_messages(messages) == [True, False, True]
+        assert [
+            msg.metadata.message_id for msg in state.get_messages(dst_node_id=2)
+        ] == [messages[0].metadata.message_id]
+        assert state.get_messages(dst_node_id=3) == []
+
+    def test_policy_rejection_does_not_register_objects(self) -> None:
+        """Rejected messages never acquire body roots or upload reservations."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        message = create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, 0)
+        with patch.object(state, "preregister_object_tree") as preregister:
+            assert state.store_message_and_object_tree(
+                message, get_object_tree(message), state.start_session(run_id)
+            ) == (False, [])
+            preregister.assert_not_called()
+        assert message.metadata.message_id not in state.object_store
+
+    def test_get_messages_policy_applies_after_limit(self) -> None:
+        """Cancel a rejected candidate without fetching another to fill the limit."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        messages = [
+            create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, run_id)
+            for _ in range(2)
+        ]
+        assert state.store_messages(messages) == [True, True]
+        with patch.object(
+            state, "_check_message_policy", return_value=[False]
+        ) as policy:
+            assert state.get_messages(dst_node_id=SUPERLINK_NODE_ID, limit=1) == []
+        assert len(policy.call_args.args[0]) == 1
+        assert [
+            msg.metadata.message_id
+            for msg in state.get_messages(dst_node_id=SUPERLINK_NODE_ID)
+        ] == [messages[1].metadata.message_id]
+
+    def test_get_messages_policy_error_does_not_cancel(self) -> None:
+        """An operational policy failure propagates without ending delivery."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        message = create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, run_id)
+        assert state.store_messages([message]) == [True]
+        with (
+            patch.object(state, "get_run_info", side_effect=RuntimeError("lookup")),
+            patch.object(
+                state, "cancel_messages", wraps=state.cancel_messages
+            ) as cancel,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "lookup"):
+                state.get_messages(dst_node_id=SUPERLINK_NODE_ID)
+            cancel.assert_not_called()
+        assert len(state.get_messages(dst_node_id=SUPERLINK_NODE_ID)) == 1
+
+    @parameterized.expand([(False,), (True,)])  # type: ignore
+    def test_duplicate_object_tree_does_not_restore_cleared_message(
+        self, acknowledge: bool
+    ) -> None:
+        """Duplicate uploads cannot recreate bodies after ACK or cancellation."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        message = create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, run_id)
+        tree = get_object_tree(message)
+        stored, _ = state.store_message_and_object_tree(
+            message, tree, state.start_session(run_id)
+        )
+        assert stored
+        if acknowledge:
+            state.acknowledge_messages([message.metadata.message_id])
+        else:
+            state.cancel_messages(message_ids=[message.metadata.message_id])
+        assert state.store_message_and_object_tree(
+            message, tree, state.start_session(run_id)
+        ) == (True, [])
+        assert state.object_store.get(message.metadata.message_id) is None
+        assert state.get_messages(dst_node_id=SUPERLINK_NODE_ID) == []
 
     def test_check_message_policy_empty_batch(self) -> None:
         """Skip all lookups for an empty batch."""
@@ -365,11 +456,17 @@ class StateTest(CoreStateTest):
             user_prompt=user_prompt,
         )
 
-        messages = state.get_message_ins(SUPERLINK_NODE_ID, limit=None, run_id=run_id)
+        messages = state.get_messages(dst_node_id=SUPERLINK_NODE_ID, run_id=run_id)
 
         assert len(messages) == expected_messages
         if messages:
-            message = messages[0]
+            message = pull_and_inflate_object_from_tree(
+                state.object_store.get_object_tree(messages[0].metadata.message_id),
+                lambda obj_id: cast(bytes, state.object_store.get(obj_id)),
+                lambda _: None,
+                return_type=Message,
+            )
+            message.metadata.__dict__["_message_id"] = messages[0].metadata.message_id
             assert user_prompt is not None
             assert message.metadata.run_id == run_id
             assert message.metadata.src_node_id == SUPERLINK_NODE_ID
@@ -536,23 +633,12 @@ class StateTest(CoreStateTest):
     def test_store_messages_rejects_stopped_run(self) -> None:
         """Messages cannot be stored after a run is stopped."""
         state = self.state_factory()
-        node_id = create_dummy_node(state)
         run_id = create_dummy_run(state)
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-        self.assertIsNotNone(state.store_message_ins(message=msg))
-        pulled = state.get_message_ins(node_id=node_id, limit=1)[0]
-        reply_msg = Message(RecordDict(), reply_to=pulled)
-
-        self.assertTrue(state.stop_run(run_id))
-
-        self.assertIsNone(state.store_message_ins(message=msg))
-        self.assertIsNone(state.store_message_res(message=reply_msg))
-        self.assertEqual(state.num_message_ins(), 0)
-        self.assertEqual(state.num_message_res(), 0)
+        msg = create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, run_id)
+        assert state.store_messages([msg]) == [True]
+        assert state.stop_run(run_id)
+        assert state.store_messages([msg]) == [False]
+        assert state.get_messages(dst_node_id=SUPERLINK_NODE_ID) == []
 
     def test_cleanup_run(self) -> None:
         """Test cleanup of run-scoped messages and objects."""
@@ -574,7 +660,7 @@ class StateTest(CoreStateTest):
 
         state.cleanup_run(run_id)
 
-        self.assertEqual(state.num_message_ins(), 0)
+        self.assertEqual(state.get_messages(dst_node_id=node_id), [])
         self.assertFalse(msg.metadata.message_id in state.object_store)
         self.assertFalse(
             state.store_object(run_id, session_id, msg.metadata.message_id, b"content")
@@ -1068,7 +1154,7 @@ class StateTest(CoreStateTest):
         assert stored
         assert msg.metadata.message_id in missing_objects
         assert msg.metadata.message_id in state.object_store
-        message_ins_list = state.get_message_ins(node_id=node_id, limit=1)
+        message_ins_list = state.get_messages(dst_node_id=node_id, limit=1)
         assert len(message_ins_list) == 1
         assert message_ins_list[0].metadata.message_id == msg.metadata.message_id
 
@@ -1083,9 +1169,10 @@ class StateTest(CoreStateTest):
                 src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
             )
         )
-        ins_msg_id = state.store_message_ins(msg)
+        assert state.store_messages([msg]) == [True]
+        ins_msg_id = msg.metadata.message_id
         assert ins_msg_id
-        ins_msg = state.get_message_ins(node_id=node_id, limit=1)[0]
+        ins_msg = state.get_messages(dst_node_id=node_id, limit=1)[0]
         res_msg = Message(RecordDict(), reply_to=ins_msg)
         # pylint: disable-next=W0212
         res_msg.metadata._message_id = res_msg.object_id  # type: ignore
@@ -1100,7 +1187,11 @@ class StateTest(CoreStateTest):
         assert stored
         assert res_msg.metadata.message_id in missing_objects
         assert res_msg.metadata.message_id in state.object_store
-        replies = state.get_message_res({ins_msg_id}, run_id)
+        replies = state.get_messages(
+            dst_node_id=SUPERLINK_NODE_ID,
+            run_id=run_id,
+            reply_to_message_ids={ins_msg_id},
+        )
         assert len(replies) == 1
         assert replies[0].metadata.message_id == res_msg.metadata.message_id
 
@@ -1278,17 +1369,11 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 3
         assert state.num_message_res() == 2
 
-        state._on_push_session_expired(  # pylint: disable=protected-access
-            {msg_res_0.metadata.message_id}
-        )
-        assert state.num_message_ins() == 3
-        assert state.num_message_res() == 1
-
         state.delete_messages({msg_id_0})
         assert state.num_message_ins() == 2
         assert state.num_message_res() == 1
 
-        state._on_push_session_expired({msg_id_1})  # pylint: disable=protected-access
+        state.delete_messages({msg_id_1})
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 0
 

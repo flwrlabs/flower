@@ -30,6 +30,7 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 
@@ -79,7 +80,7 @@ def test_pull_messages() -> None:
     state.create_node.assert_not_called()
     state.delete_node.assert_not_called()
     state.store_message_ins.assert_not_called()
-    state.get_message_ins.assert_called_once()
+    state.get_messages.assert_called_once()
     state.store_message_res.assert_not_called()
     state.get_message_res.assert_not_called()
     state.store_traffic.assert_not_called()
@@ -104,7 +105,7 @@ def test_pull_messages_records_traffic_when_messages_found() -> None:
     )
     request = PullMessagesRequest(node=Node(node_id=2345))
     state = MagicMock()
-    state.get_message_ins.return_value = [msg]
+    state.get_messages.return_value = [msg]
     store = MagicMock()
     store.get_object_tree.return_value = {}
 
@@ -112,7 +113,7 @@ def test_pull_messages_records_traffic_when_messages_found() -> None:
     pull_messages(request=request, state=state, store=store)
 
     # Assert
-    state.get_message_ins.assert_called_once()
+    state.get_messages.assert_called_once()
     store.get_object_tree.assert_called_once_with("msg-234")
     state.store_traffic.assert_called_once()
     # Verify store_traffic was called with run_id=123, bytes_sent > 0, bytes_recv=0
@@ -122,7 +123,8 @@ def test_pull_messages_records_traffic_when_messages_found() -> None:
     assert call_args[1]["bytes_recv"] > 0
 
 
-def test_push_messages() -> None:
+@pytest.mark.parametrize("stored", [False, True])
+def test_push_messages(stored: bool) -> None:
     """Test push_messages."""
     # Prepare
     msg = make_message(
@@ -131,8 +133,8 @@ def test_push_messages() -> None:
             run_id=123,
             message_id="",
             group_id="",
-            src_node_id=0,
-            dst_node_id=0,
+            src_node_id=123,
+            dst_node_id=1,
             reply_to_message_id="",
             created_at=now().timestamp(),
             ttl=123,
@@ -140,14 +142,19 @@ def test_push_messages() -> None:
         ),
     )
 
+    msg.metadata.__dict__["_message_id"] = msg.object_id
     object_tree = ObjectTree(object_id="object-id")
     request = PushMessagesRequest(
+        node=Node(node_id=123),
         messages_list=[message_to_proto(msg)],
         message_object_trees=[object_tree],
     )
     state = MagicMock()
     state.start_session.return_value = "session-id"
-    state.store_message_and_object_tree.return_value = (True, ["object-id"])
+    state.store_message_and_object_tree.return_value = (
+        stored,
+        ["object-id"] if stored else [],
+    )
 
     # Execute
     response = push_messages(request=request, state=state)
@@ -164,4 +171,21 @@ def test_push_messages() -> None:
     assert state.store_message_and_object_tree.call_args.args[2] == "session-id"
     assert response.session_id == "session-id"
     state.get_message_res.assert_not_called()
-    state.store_traffic.assert_called_once()
+    assert not response.results
+    assert list(response.objects_to_push) == (["object-id"] if stored else [])
+    assert state.store_traffic.call_count == int(stored)
+
+
+def test_push_messages_binds_authenticated_source() -> None:
+    """A SuperNode cannot submit another node's Messages."""
+    message = create_task_message(node_id=42)
+    state = MagicMock()
+    request = PushMessagesRequest(
+        node=Node(node_id=43),
+        messages_list=[message_to_proto(message)],
+        message_object_trees=[ObjectTree(object_id=message.metadata.message_id)],
+    )
+    with pytest.raises(FlowerError) as error:
+        push_messages(request, state)
+    assert error.value.code == ApiErrorCode.FLEET_MESSAGE_SOURCE_NODE_ID_MISMATCH
+    state.store_message_and_object_tree.assert_not_called()

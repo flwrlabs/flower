@@ -771,8 +771,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         tasks = self.state.get_tasks()
         series = self.state.get_run_series(series_ids=[response.series_id])
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
-        prompt_msgs = self.state.get_message_ins(
-            SUPERLINK_NODE_ID, limit=None, run_id=response.run_id
+        prompt_msgs = self.state.get_messages(
+            dst_node_id=SUPERLINK_NODE_ID, run_id=response.run_id
         )
 
         self.assertEqual(len(runs), 1)

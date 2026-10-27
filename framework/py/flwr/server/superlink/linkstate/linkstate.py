@@ -16,7 +16,7 @@
 
 
 import abc
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from typing import Literal
 
 from flwr.app import Context, Message, RecordDict
@@ -84,6 +84,42 @@ class LinkState(CoreState):  # pylint: disable=R0904
             node_ids = {message.metadata.src_node_id, message.metadata.dst_node_id}
             results.append(node_ids <= federation_nodes[run.federation_id])
         return results
+
+    def store_messages(self, messages: Sequence[Message]) -> list[bool]:
+        """Store messages allowed by run and federation policy in input order."""
+        # Concrete LinkStates put their CoreState implementation next in the MRO.
+        allowed = self._check_message_policy(messages)
+        results = iter(
+            super().store_messages(  # type: ignore[safe-super]
+                [msg for msg, ok in zip(messages, allowed, strict=True) if ok]
+            )
+        )
+        return [next(results) if ok else False for ok in allowed]
+
+    def get_messages(
+        self,
+        *,
+        dst_node_id: int,
+        run_id: int | None = None,
+        reply_to_message_ids: Collection[str] | None = None,
+        limit: int | None = None,
+    ) -> list[Message]:
+        """Get candidates, cancelling policy rejections without refilling the batch."""
+        messages = super().get_messages(  # type: ignore[safe-super]
+            dst_node_id=dst_node_id,
+            run_id=run_id,
+            reply_to_message_ids=reply_to_message_ids,
+            limit=limit,
+        )
+        allowed = self._check_message_policy(messages)
+        rejected_ids = [
+            msg.metadata.message_id
+            for msg, ok in zip(messages, allowed, strict=True)
+            if not ok
+        ]
+        if rejected_ids:
+            self.cancel_messages(message_ids=rejected_ids)
+        return [msg for msg, ok in zip(messages, allowed, strict=True) if ok]
 
     @abc.abstractmethod
     def store_message_ins(self, message: Message) -> str | None:
@@ -209,7 +245,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
 
     def cleanup_run(self, run_id: int) -> None:
         """Clean up run-scoped messages and objects."""
-        self.delete_messages(self.get_message_ids_from_run_id(run_id))
+        self.cancel_messages(run_id=run_id)
         self.object_store.delete_objects_in_run(run_id)
         self.delete_sessions_in_run(run_id)
 
@@ -385,7 +421,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         initial_task_event : TaskEvent | None (default: None)
             Event to store atomically before the pending primary task is visible.
         user_prompt : str | None (default: None)
-            User prompt to store as an instruction Message for an AgentApp run.
+            User prompt to store as a Message for an AgentApp run.
             Ignored for other primary task types and when `None`.
 
         Returns

@@ -489,8 +489,8 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             run.series_id,
             "Hello",
         )
-        messages = self.state.get_message_ins(
-            self.state.get_node_id(), limit=None, run_id=response.run_id
+        messages = self.state.get_messages(
+            dst_node_id=self.state.get_node_id(), run_id=response.run_id
         )
         agent_record = messages[0].content[AGENT_MESSAGE_CONTENT_RECORD_KEY]
         prompt = agent_record[AGENT_MESSAGE_TEXT_KEY]
