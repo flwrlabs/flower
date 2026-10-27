@@ -600,7 +600,14 @@ def test_direct_response_accounts_each_round(
 
 @pytest.mark.parametrize(
     "mode,status",
-    [("http_error", 503), ("invalid_response", 502), ("truncated", 200), ("full", 429)],
+    [
+        ("http_error", 503),
+        ("invalid_response", 502),
+        ("missing_terminal", 200),
+        ("invalid_terminal", 200),
+        ("truncated", 200),
+        ("full", 429),
+    ],
 )
 def test_direct_errors_never_fall_back(
     direct: Mock, monkeypatch: pytest.MonkeyPatch, mode: str, status: int
@@ -608,6 +615,15 @@ def test_direct_errors_never_fall_back(
     """Do not duplicate provider execution after a direct-path failure."""
     if mode in {"http_error", "invalid_response"}:
         response = httpx.Response(503 if mode == "http_error" else 200, json={})
+    elif mode in {"missing_terminal", "invalid_terminal"}:
+        event: JSONObject = {"type": "response.completed"}
+        if mode == "invalid_terminal":
+            event = {"type": "response.incomplete", "response": {"object": "invalid"}}
+        response = httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            text=f"data: {json.dumps(event)}\n\n",
+        )
     else:
         response = httpx.Response(
             200, headers={"content-type": "text/event-stream"}, text="data: {}\n\n"
@@ -619,9 +635,13 @@ def test_direct_errors_never_fall_back(
         result = client.post(
             "/v1/runtime/responses",
             headers={"Authorization": "Bearer task-token"},
-            json=_stream_request() | {"stream": mode in {"truncated", "full"}},
+            json=_stream_request()
+            | {"stream": mode not in {"http_error", "invalid_response"}},
         )
         assert result.status_code == status and "error" in result.text
+        assert "event: response.completed\n" not in result.text
+        assert "event: response.incomplete\n" not in result.text
+    direct.add_task_usage.assert_not_called()
     direct.create_task.assert_not_called()
 
 

@@ -231,6 +231,15 @@ class _DirectResponse(Response):
                     )
                     provider.add_event("provider.first_text")
                 response = event.get("response", event)
+                if self.payload.get("stream") is True and event.get("type") in {
+                    "response.completed",
+                    "response.incomplete",
+                }:
+                    if "response" not in event or not isinstance(response, dict):
+                        raise ValueError(
+                            "Terminal model event requires a response object."
+                        )
+                    ModelResponse.validate_payload(response)
                 terminal = (
                     self.payload.get("stream") is not True
                     or event.get("type") in _TERMINAL_EVENTS
