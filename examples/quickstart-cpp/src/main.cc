@@ -5,7 +5,7 @@ int main(int argc, char **argv) {
   if (argc != 3) {
     std::cout << "Client takes 2 mandatory arguments as follows: " << std::endl;
     std::cout << "./client  CLIENT_ID  SERVER_URL" << std::endl;
-    std::cout << "Example: ./flwr_client 0 '127.0.0.1:8080'" << std::endl;
+    std::cout << "Example: ./flower-supernode 0 '127.0.0.1:9092'" << std::endl;
     return 0;
   }
 
