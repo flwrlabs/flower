@@ -3,8 +3,7 @@
 import torch
 from flwr.app import ArrayRecord, Context, Message, MetricRecord, RecordDict
 from flwr.clientapp import ClientApp
-
-from pytorch_example.task import Net, load_data
+from pytorch_example.task import NUM_CLASSES, Net, load_data
 from pytorch_example.task import test as test_fn
 from pytorch_example.task import train as train_fn
 
@@ -88,7 +87,7 @@ def evaluate(msg: Message, context: Context):
     _, valloader = load_data(partition_id, num_partitions)
 
     # Call the evaluation function
-    eval_loss, eval_acc = test_fn(
+    eval_loss, eval_results = test_fn(
         model,
         valloader,
         device,
@@ -97,9 +96,14 @@ def evaluate(msg: Message, context: Context):
     # Construct and return reply Message
     metrics = {
         "eval_loss": eval_loss,
-        "eval_acc": eval_acc,
+        "eval_acc": eval_results["accuracy"],
+        "eval_acc_top3": eval_results["top3_accuracy"],
         "num-examples": len(valloader.dataset),
     }
+    for class_idx in range(NUM_CLASSES):
+        metrics[f"eval_acc_class_{class_idx}"] = eval_results[
+            f"class_accuracy_{class_idx}"
+        ]
     metric_record = MetricRecord(metrics)
     content = RecordDict({"metrics": metric_record})
     return Message(content=content, reply_to=msg)
