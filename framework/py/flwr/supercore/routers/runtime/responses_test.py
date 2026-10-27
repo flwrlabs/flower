@@ -13,11 +13,17 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for the Runtime Responses endpoint."""
+# pylint: disable=redefined-outer-name
 
 import asyncio
+import json
+from collections.abc import AsyncIterator
+from threading import Event
+from typing import cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import anyio
+import httpx
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
@@ -37,7 +43,9 @@ from flwr.supercore.json_message.base import make_json_message
 from flwr.supercore.json_message.model_message import ModelResponse
 from flwr.supercore.typing import JSONObject
 
+from . import responses
 from .responses import (
+    _DirectResponse,
     _Exchange,
     _model_response_timeout,
     _ResponsesError,
@@ -138,8 +146,12 @@ def test_responses_requires_bearer_authentication(
     assert response.json()["error"]["code"] == "invalid_api_key"
 
 
-def test_responses_returns_correlated_model_response() -> None:
-    """Recheck and claim the direct reply after its child task finishes."""
+@pytest.mark.parametrize("direct_models", ["", "other-model"])
+def test_responses_returns_correlated_model_response(
+    monkeypatch: pytest.MonkeyPatch, direct_models: str
+) -> None:
+    """Recheck and claim the reply for default and unlisted-model execution."""
+    monkeypatch.setenv("FLWR_RUNTIME_MODEL_DIRECT_MODELS", direct_models)
     state = _state()
     state.get_task_message.side_effect = [
         [],
@@ -515,3 +527,263 @@ def test_responses_does_not_start_model_task_before_stream_iteration() -> None:
     asyncio.run(disconnect_before_streaming())
 
     state.create_task.assert_not_called()
+
+
+@pytest.fixture
+def direct(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    """Enable one model without changing task authentication."""
+    monkeypatch.setenv("FLWR_RUNTIME_MODEL_DIRECT_MODELS", "model")
+    monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "http://provider/v1/responses")
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", "provider-key")
+    state = _state()
+    state.get_tasks.return_value = [state.get_task_by_token.return_value]
+    return state
+
+
+def _mock_provider(
+    monkeypatch: pytest.MonkeyPatch,
+    transport: httpx.AsyncBaseTransport,
+) -> None:
+    """Exercise real HTTP/SSE parsing with an in-memory transport."""
+    client = httpx.AsyncClient
+    monkeypatch.setattr(
+        "flwr.supercore.task_process.model.provider.httpx.AsyncClient",
+        lambda **kwargs: client(transport=transport, **kwargs),
+    )
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_direct_response_accounts_each_round(
+    direct: Mock, monkeypatch: pytest.MonkeyPatch, stream: bool
+) -> None:
+    """Preserve credentials and usage, including a terminal SSE event at EOF."""
+    body: JSONObject = {
+        "id": "resp_1",
+        "object": "response",
+        "status": "completed",
+        "output": [],
+        "usage": {"input_tokens": 11, "output_tokens": 7},
+    }
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        assert request.headers["authorization"] == "Bearer provider-key"
+        if request.url.path == "/v1/responses":
+            return httpx.Response(307, headers={"location": "/v1/model-responses"})
+        if not stream:
+            return httpx.Response(200, json=body)
+        # Event types come from SSE names. The final event has no blank separator.
+        text = 'event: response.output_text.delta\ndata: {"delta":"Hi"}\n\n'
+        text += f"event: response.completed\ndata: {json.dumps({'response': body})}"
+        return httpx.Response(
+            200, headers={"content-type": "Text/Event-Stream; charset=utf-8"}, text=text
+        )
+
+    _mock_provider(monkeypatch, httpx.MockTransport(handle))
+    with _client(direct) as client:
+        for _ in range(2):
+            result = client.post(
+                "/v1/runtime/responses",
+                headers={"Authorization": "Bearer task-token"},
+                json=_stream_request() | {"stream": stream},
+            )
+            assert result.status_code == 200
+            if stream:
+                assert "event: response.completed\n" in result.text
+            else:
+                assert result.json() == body
+    assert direct.add_task_usage.call_count == 2
+    for call in direct.add_task_usage.call_args_list:
+        task_id, usage = call.args
+        assert task_id == 123 and usage.provider == "model"
+        assert (usage.input_tokens, usage.output_tokens) == (11, 7)
+    direct.create_task.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "mode,status",
+    [
+        ("http_error", 503),
+        ("invalid_response", 502),
+        ("missing_terminal", 200),
+        ("invalid_terminal", 200),
+        ("truncated", 200),
+        ("full", 429),
+    ],
+)
+def test_direct_errors_never_fall_back(
+    direct: Mock, monkeypatch: pytest.MonkeyPatch, mode: str, status: int
+) -> None:
+    """Do not duplicate provider execution after a direct-path failure."""
+    if mode in {"http_error", "invalid_response"}:
+        response = httpx.Response(503 if mode == "http_error" else 200, json={})
+    elif mode in {"missing_terminal", "invalid_terminal"}:
+        event: JSONObject = {"type": "response.completed"}
+        if mode == "invalid_terminal":
+            event = {"type": "response.incomplete", "response": {"object": "invalid"}}
+        response = httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            text=f"data: {json.dumps(event)}\n\n",
+        )
+    else:
+        response = httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, text="data: {}\n\n"
+        )
+    _mock_provider(monkeypatch, httpx.MockTransport(lambda _request: response))
+    with _client(direct) as client:
+        if mode == "full":
+            cast(FastAPI, client.app).state.direct_model_capacity = asyncio.Semaphore(0)
+        result = client.post(
+            "/v1/runtime/responses",
+            headers={"Authorization": "Bearer task-token"},
+            json=_stream_request()
+            | {"stream": mode not in {"http_error", "invalid_response"}},
+        )
+        assert result.status_code == status and "error" in result.text
+        assert "event: response.completed\n" not in result.text
+        assert "event: response.incomplete\n" not in result.text
+    direct.add_task_usage.assert_not_called()
+    direct.create_task.assert_not_called()
+
+
+async def _check_direct_cancellation(
+    direct: Mock, monkeypatch: pytest.MonkeyPatch, stop: str, phase: str
+) -> None:
+    """Cancel quiet requests and restore their single available slot."""
+    entered, closed, disconnected = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    class QuietStream(httpx.AsyncByteStream):
+        """Keep the body idle until upstream cleanup."""
+
+        async def __aiter__(self) -> AsyncIterator[bytes]:
+            entered.set()
+            await anyio.sleep_forever()
+            yield b""
+
+        async def aclose(self) -> None:
+            closed.set()
+
+    async def handle(_request: httpx.Request) -> httpx.Response:
+        if phase == "opening":
+            try:
+                entered.set()
+                await anyio.sleep_forever()
+            finally:
+                closed.set()
+        return httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, stream=QuietStream()
+        )
+
+    _mock_provider(monkeypatch, httpx.MockTransport(handle))
+    monkeypatch.setattr(
+        responses, "_model_response_timeout", lambda: 0.05 if stop == "deadline" else 3
+    )
+    monkeypatch.setattr(responses, "_DIRECT_ERROR_DELIVERY_TIMEOUT", 0.05)
+    scope: Scope = {"type": "http", "app": FastAPI(), "asgi": {"spec_version": "2.4"}}
+    scope["app"].state.direct_model_capacity = asyncio.Semaphore(1)
+
+    async def receive() -> Message:
+        await disconnected.wait()
+        return {"type": "http.disconnect"}
+
+    response = _DirectResponse(
+        Request(scope, receive),
+        direct,
+        direct.get_task_by_token.return_value,
+        _stream_request() | {"stream": phase != "opening"},
+    )
+
+    async def trigger() -> None:
+        await entered.wait()
+        assert response.capacity.locked()
+        if stop == "task":
+            direct.get_tasks.return_value = []
+        elif stop == "disconnect":
+            disconnected.set()
+
+    messages: list[Message] = []
+
+    async def send(message: Message) -> None:
+        await anyio.sleep(0)
+        if phase == "blocked" and message["type"] == "http.response.body":
+            await anyio.sleep_forever()
+        messages.append(message)
+
+    async with asyncio.timeout(4):
+        await asyncio.gather(response(scope, receive, send), trigger())
+    assert closed.is_set() and not response.capacity.locked()
+    if stop == "deadline" and phase != "blocked":
+        assert any(b"model_response_timeout" in m.get("body", b"") for m in messages)
+        assert messages[0]["status"] == (504 if phase == "opening" else 200)
+
+
+@pytest.mark.parametrize(
+    "stop,phase",
+    [
+        ("task", "opening"),
+        ("disconnect", "streaming"),
+        ("deadline", "opening"),
+        ("deadline", "streaming"),
+        ("deadline", "blocked"),
+    ],
+)
+def test_direct_cancellation_closes_provider_and_releases_slot(
+    direct: Mock, monkeypatch: pytest.MonkeyPatch, stop: str, phase: str
+) -> None:
+    """Run cancellation coverage without requiring an async pytest plugin."""
+    asyncio.run(_check_direct_cancellation(direct, monkeypatch, stop, phase))
+
+
+def test_direct_timeout_releases_slot_while_usage_write_finishes(
+    direct: Mock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Do not wait for a stalled usage write after the response deadline."""
+    release, finished, status_waiting = Event(), Event(), Event()
+
+    def store_usage(*_args: object) -> None:
+        release.wait(3)
+        finished.set()
+
+    def get_tasks(**_kwargs: object) -> list[Task]:
+        if direct.add_task_usage.called:
+            status_waiting.set()
+            release.wait(3)
+        return [direct.get_task_by_token.return_value]
+
+    direct.add_task_usage.side_effect = store_usage
+    direct.get_tasks.side_effect = get_tasks
+    monkeypatch.setattr(responses, "_model_response_timeout", lambda: 0.25)
+    monkeypatch.setattr(responses, "_POLL_INTERVAL", 0.01)
+    _mock_provider(
+        monkeypatch,
+        httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200,
+                json={"object": "response", "usage": {"input_tokens": 1}},
+            )
+        ),
+    )
+
+    async def check() -> None:
+        app = FastAPI()
+        app.state.direct_model_capacity = asyncio.Semaphore(1)
+        scope: Scope = {"type": "http", "app": app}
+        response = _DirectResponse(
+            Request(scope, AsyncMock(return_value={"type": "http.request"})),
+            direct,
+            direct.get_task_by_token.return_value,
+            _stream_request() | {"stream": False},
+        )
+        send = AsyncMock()
+        try:
+            async with asyncio.timeout(2):
+                await response(scope, AsyncMock(), send)
+            assert not response.capacity.locked() and not finished.is_set()
+            assert status_waiting.is_set()
+            assert send.call_args_list[0].args[0]["status"] == 504
+            direct.add_task_usage.assert_called_once()
+        finally:
+            release.set()
+        assert await anyio.to_thread.run_sync(finished.wait, 1)
+
+    asyncio.run(check())

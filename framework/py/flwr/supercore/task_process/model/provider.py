@@ -19,11 +19,14 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncGenerator, Callable, Iterator
+from itertools import chain
 from time import monotonic
 from typing import cast
 
+import httpx
 import requests
+from anyio import CancelScope
 
 from flwr.supercore.task_process.usage import (
     TaskUsageRecorder,
@@ -76,21 +79,14 @@ def model_api_timeout() -> float:
     return max(1.0, timeout)
 
 
-def invoke_model_provider(
-    request: JSONObject,
-    *,
-    usage_recorder: TaskUsageRecorder,
-    on_stream_event: Callable[[JSONObject], None] | None = None,
-) -> JSONObject:
-    """Invoke the configured Open Responses-compatible model provider.
+def model_api_config() -> tuple[str, dict[str, str]]:
+    """Resolve the same endpoint and credentials for workers and direct calls.
 
-    Control flow:
-    1. Read API key, endpoint, and timeout settings from the environment.
-    2. Copy the request payload to avoid mutating the caller's object.
-    3. Send the request through one provider path that handles normal and
-       streaming responses.
+    Returns
+    -------
+    tuple[str, dict[str, str]]
+        The configured Responses URL and HTTP request headers.
     """
-    # Resolve provider configuration from environment variables.
     api_key = os.getenv("FLWR_MODEL_API_KEY", "").strip()
     responses_url = os.getenv("FLWR_MODEL_API_ENDPOINT", "").strip()
     if not responses_url:
@@ -106,10 +102,27 @@ def invoke_model_provider(
     if not api_key and responses_url == DEFAULT_MODEL_API_ENDPOINT:
         raise RuntimeError("Model API key is not set (FLWR_MODEL_API_KEY).")
 
-    # Build request metadata once, then execute the shared provider path.
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
+    return responses_url, headers
+
+
+def invoke_model_provider(
+    request: JSONObject,
+    *,
+    usage_recorder: TaskUsageRecorder,
+    on_stream_event: Callable[[JSONObject], None] | None = None,
+) -> JSONObject:
+    """Invoke the configured Open Responses-compatible model provider.
+
+    Control flow:
+    1. Read API key, endpoint, and timeout settings from the environment.
+    2. Copy the request payload to avoid mutating the caller's object.
+    3. Send the request through one provider path that handles normal and
+       streaming responses.
+    """
+    responses_url, headers = model_api_config()
     with trace_span("model.provider", attributes={"flwr.component": "model"}) as span:
         started_at = monotonic()
         if isinstance(request.get("model"), str):
@@ -221,25 +234,7 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
         )
 
     last_event: JSONObject | None = None
-    for event_name, data in _iter_sse_events(response):
-        if data.strip() == "[DONE]":
-            continue
-
-        # Each SSE data payload is an Open Responses stream event object.
-        try:
-            payload = json.loads(data)
-        except json.JSONDecodeError as exc:
-            raise ModelProviderError(
-                detail=data,
-                message="Model provider stream returned invalid JSON event",
-            ) from exc
-        event = _ensure_json_object(payload)
-
-        # Some providers put the event type in the SSE event name instead of JSON.
-        if event_name is not None and not isinstance(event.get("type"), str):
-            event = dict(event)
-            event["type"] = event_name
-
+    for event in _iter_sse_events(response):
         last_event = event
         if on_stream_event is not None:
             on_stream_event(event)
@@ -304,36 +299,112 @@ def _provider_from_request(request: JSONObject) -> str:
     return _DEFAULT_PROVIDER
 
 
-def _iter_sse_events(response: requests.Response) -> Iterator[tuple[str | None, str]]:
-    event_name: str | None = None
-    data_lines: list[str] = []
+class _ModelEventDecoder:
+    """Decode provider SSE fields and JSON identically on both transports."""
 
-    for raw_line in response.iter_lines():
-        line = raw_line.decode("utf-8")
+    def __init__(self) -> None:
+        self.event_name: str | None = None
+        self.data: list[str] = []
 
-        # A blank line terminates one SSE event.
-        if not line:
-            if data_lines:
-                yield event_name, "\n".join(data_lines)
-                event_name = None
-                data_lines = []
-            continue
-
-        # Lines starting with ":" are SSE comments or keepalives.
-        if line.startswith(":"):
-            continue
-
-        # The event name is optional; data lines carry the event payload.
+    def feed(self, line: str) -> JSONObject | None:
+        """Consume a line, or flush pending data with an empty line at EOF."""
         if line.startswith("event:"):
-            event_name = line.removeprefix("event:").strip() or None
-            continue
-        if line.startswith("data:"):
+            self.event_name = line.removeprefix("event:").strip() or None
+        elif line.startswith("data:"):
             data = line.removeprefix("data:")
+            self.data.append(data[1:] if data.startswith(" ") else data)
+        elif not line and self.data:
+            encoded = "\n".join(self.data)
+            name, self.event_name = self.event_name, None
+            self.data.clear()
+            if encoded.strip() == "[DONE]":
+                return None
+            try:
+                event = _ensure_json_object(json.loads(encoded))
+            except json.JSONDecodeError as exc:
+                raise ModelProviderError(
+                    detail=encoded,
+                    message="Model provider stream returned invalid JSON event",
+                ) from exc
+            if name is not None and not isinstance(event.get("type"), str):
+                event["type"] = name
+            return event
+        return None
 
-            # SSE allows one optional space after the field separator.
-            if data.startswith(" "):
-                data = data[1:]
-            data_lines.append(data)
 
-    if data_lines:
-        yield event_name, "\n".join(data_lines)
+def _iter_sse_events(response: requests.Response) -> Iterator[JSONObject]:
+    decoder = _ModelEventDecoder()
+    for raw_line in chain(response.iter_lines(), [b""]):
+        event = decoder.feed(raw_line.decode("utf-8"))
+        if event is not None:
+            yield event
+
+
+async def _aiter_sse_events(
+    response: httpx.Response,
+) -> AsyncGenerator[JSONObject, None]:
+    decoder = _ModelEventDecoder()
+    async for line in response.aiter_lines():
+        event = decoder.feed(line)
+        if event is not None:
+            yield event
+    event = decoder.feed("")
+    if event is not None:
+        yield event
+
+
+async def iter_model_provider_response(
+    request: JSONObject,
+) -> AsyncGenerator[JSONObject, None]:
+    """Yield JSON or SSE objects from the configured provider without blocking.
+
+    Parameters
+    ----------
+    request : JSONObject
+        A validated Responses request, including its streaming preference.
+
+    Yields
+    ------
+    JSONObject
+        The response body, or individual SSE events through a terminal event.
+    """
+    url, headers = model_api_config()
+    async with httpx.AsyncClient(
+        timeout=model_api_timeout(), follow_redirects=True
+    ) as client:
+        with trace_span("model.provider_http"):
+            response = await client.send(
+                client.build_request("POST", url, headers=headers, json=request),
+                stream=True,
+            )
+        try:
+            if response.status_code >= 400:
+                await response.aread()
+                try:
+                    detail = cast(JSONValue, response.json())
+                except ValueError:
+                    detail = response.text
+                raise ModelProviderError(
+                    detail=detail, status_code=response.status_code
+                )
+            if request.get("stream") is not True:
+                await response.aread()
+                yield _ensure_json_object(response.json())
+                return
+            if (
+                _STREAM_CONTENT_TYPE
+                not in response.headers.get("content-type", "").lower()
+            ):
+                raise ModelProviderError(detail="Expected a text/event-stream response")
+            async for event in _aiter_sse_events(response):
+                yield event
+                if event.get("type") in (
+                    _TERMINAL_SUCCESS_EVENTS | _TERMINAL_FAILURE_EVENTS
+                ):
+                    return
+            raise ModelProviderError(
+                detail="Model stream ended before a terminal event"
+            )
+        finally:
+            with CancelScope(shield=True):
+                await response.aclose()

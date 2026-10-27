@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Open Responses-compatible Runtime endpoint."""
+"""Open Responses-compatible Runtime endpoint.
+
+``FLWR_RUNTIME_MODEL_DIRECT_MODELS`` is an opt-in, comma-separated model list.
+Those models call ``FLWR_MODEL_API_ENDPOINT`` using ``FLWR_MODEL_API_KEY`` in
+this API process, with no child MODEL task. Unlisted models retain task execution.
+An empty list disables the bypass. The endpoint must be the inference endpoint,
+not this Runtime route. Keep these settings and credentials on the server.
+
+Direct calls have eight slots per API process and use the existing provider and
+Runtime response timeouts. Full capacity returns 429 rather than switching paths.
+"""
 
 from __future__ import annotations
 
@@ -23,13 +33,19 @@ import time
 from collections.abc import AsyncGenerator, Iterator
 from contextlib import ExitStack, aclosing, contextmanager
 from dataclasses import dataclass
+from functools import partial
 from logging import ERROR
+from time import monotonic
 from typing import cast
 
+import anyio
+import httpx
 from anyio import CancelScope
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
+from starlette.requests import ClientDisconnect
+from starlette.types import Message, Receive, Scope, Send
 
 from flwr.app.constants import DEFAULT_TTL
 from flwr.app.message_type import MessageType
@@ -46,7 +62,12 @@ from flwr.supercore.error import FlowerError
 from flwr.supercore.json_message.base import make_json_message
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.servicer.runtime import runtime_handlers
-from flwr.supercore.tracing import trace_span
+from flwr.supercore.task_process.model.provider import (
+    ModelProviderError,
+    iter_model_provider_response,
+)
+from flwr.supercore.task_process.usage import task_usage_from_open_response
+from flwr.supercore.tracing import TraceSpan, trace_span
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 
@@ -70,6 +91,11 @@ _SUPPORTED_FIELDS = frozenset(
 _TERMINAL_EVENTS = frozenset(
     {"error", "response.completed", "response.failed", "response.incomplete"}
 )
+# pylint: disable-next=fixme
+# TODO: Tune this provisional per-process limit with DEV load tests before rollout.
+_DIRECT_MODEL_CONCURRENCY = 8
+# Allow final errors to reach clients without indefinitely retaining a blocked slot.
+_DIRECT_ERROR_DELIVERY_TIMEOUT = 1.0
 _POLL_INTERVAL = 0.25
 _DEFAULT_MODEL_RESPONSE_TIMEOUT = 900.0
 _DEFAULT_MODEL_TASK_LAUNCH_TIMEOUT = 300.0
@@ -109,11 +135,16 @@ async def create_runtime_response(
     request: Request,
     state: RuntimeStateDependency,
 ) -> Response:
-    """Create a model response through a child model task."""
+    """Create a model response directly or through a child model task."""
     try:
         task = await run_in_threadpool(_authenticate, request, state)
         payload = await _read_request_payload(request)
         model_payload = _normalize_model_request_payload(payload)
+        direct_models = os.getenv("FLWR_RUNTIME_MODEL_DIRECT_MODELS", "").split(",")
+        if model_payload["model"] in {
+            model.strip() for model in direct_models if model.strip()
+        }:
+            return _DirectResponse(request, state, task, model_payload)
         if model_payload.get("stream") is True:
             return StreamingResponse(
                 _stream_response(state, task, model_payload),
@@ -140,7 +171,7 @@ async def create_runtime_response(
 
 
 @contextmanager
-def _trace_model_exchange(task: Task) -> Iterator[None]:
+def _trace_model_exchange(task: Task, path: str = "task") -> Iterator[None]:
     """Measure the Runtime round trip, including asynchronous model waiting."""
     with trace_span(
         "model.round_trip",
@@ -148,9 +179,208 @@ def _trace_model_exchange(task: Task) -> Iterator[None]:
             "flwr.component": "superlink",
             "flwr.run_id": str(task.run_id),
             "flwr.task_id": str(task.task_id),
+            "flwr.model.execution_path": path,
         },
     ):
         yield
+
+
+class _DirectResponse(Response):
+    """Own a direct provider call for the full HTTP response lifetime."""
+
+    def __init__(
+        self,
+        request: Request,
+        state: CoreState,
+        task: Task,
+        payload: JSONObject,
+    ) -> None:
+        super().__init__()
+        self.request, self.state, self.task = request, state, task
+        self.payload = payload
+        self.capacity: asyncio.Semaphore = getattr(
+            request.app.state, "direct_model_capacity", None
+        ) or asyncio.Semaphore(_DIRECT_MODEL_CONCURRENCY)
+        request.app.state.direct_model_capacity = self.capacity
+        self.started = False
+        self.sequence = 0
+
+    async def _frames(
+        self, events: AsyncGenerator[JSONObject, None]
+    ) -> AsyncGenerator[str, None]:
+        async for event in events:
+            name = event.get("type")
+            if not isinstance(name, str):
+                raise _ResponsesError(
+                    502, "Invalid model event.", "invalid_model_event"
+                )
+            sequence = event.get("sequence_number")
+            if isinstance(sequence, int):
+                self.sequence = sequence + 1
+            yield _sse_frame(
+                TaskEvent(event=name, data=strict_json_dumps(event, compact=True))
+            )
+
+    async def _events(self, provider: TraceSpan) -> AsyncGenerator[JSONObject, None]:
+        started, first_text, usage_recorded = monotonic(), False, False
+        async with aclosing(iter_model_provider_response(self.payload)) as events:
+            async for event in events:
+                if not first_text and event.get("type") == "response.output_text.delta":
+                    first_text = True
+                    provider.set_attribute(
+                        "flwr.model.first_text_ms", (monotonic() - started) * 1000
+                    )
+                    provider.add_event("provider.first_text")
+                response = event.get("response", event)
+                if self.payload.get("stream") is True and event.get("type") in {
+                    "response.completed",
+                    "response.incomplete",
+                }:
+                    if "response" not in event or not isinstance(response, dict):
+                        raise ValueError(
+                            "Terminal model event requires a response object."
+                        )
+                    ModelResponse.validate_payload(response)
+                terminal = (
+                    self.payload.get("stream") is not True
+                    or event.get("type") in _TERMINAL_EVENTS
+                )
+                if terminal and not usage_recorded and isinstance(response, dict):
+                    usage = task_usage_from_open_response(
+                        response, provider=cast(str, self.payload["model"])
+                    )
+                    if usage is not None:
+                        # Cancellation stops waiting, not the in-flight usage write.
+                        await anyio.to_thread.run_sync(
+                            self.state.add_task_usage,
+                            self.task.task_id,
+                            usage,
+                            abandon_on_cancel=True,
+                        )
+                        usage_recorded = True
+                yield event
+
+    async def _execute(self, scope: Scope, receive: Receive, send: Send) -> None:
+        attributes = {
+            "flwr.run_id": str(self.task.run_id),
+            "flwr.task_id": str(self.task.task_id),
+            "flwr.model.name": cast(str, self.payload["model"]),
+        }
+        with (
+            _trace_model_exchange(self.task, "direct"),
+            trace_span("model.provider", attributes=attributes) as provider,
+        ):
+            async with aclosing(self._events(provider)) as events:
+                if self.payload.get("stream") is True:
+                    async with aclosing(self._frames(events)) as frames:
+                        await StreamingResponse(
+                            frames,
+                            media_type="text/event-stream",
+                            headers={
+                                "Cache-Control": "no-cache",
+                                "X-Accel-Buffering": "no",
+                            },
+                        )(scope, receive, send)
+                else:
+                    async for item in events:
+                        response = item
+                    ModelResponse.validate_payload(response)
+                    _raise_for_failed_response(response)
+                    await JSONResponse(response)(scope, receive, send)
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if self.capacity.locked():
+            await _error_response(
+                _ResponsesError(
+                    429, "Direct model capacity is full.", "rate_limit_exceeded"
+                )
+            )(scope, receive, send)
+            return
+        error = None
+        completed = False
+
+        async def forward(message: Message) -> None:
+            nonlocal completed
+            if message["type"] == "http.response.start":
+                self.started = True
+            if message["type"] == "http.response.body" and not message.get(
+                "more_body", False
+            ):
+                completed = True
+            await send(message)
+
+        async with self.capacity:
+            with CancelScope() as execution:
+                async with anyio.create_task_group() as group:
+                    group.start_soon(
+                        _watch_direct_task,
+                        self.request,
+                        self.state,
+                        self.task,
+                        execution,
+                    )
+                    try:
+                        with anyio.fail_after(_model_response_timeout()):
+                            await self._execute(scope, receive, forward)
+                    except _ResponsesError as err:
+                        error = err
+                    except (ModelProviderError, httpx.HTTPError, ValueError) as err:
+                        error = _ResponsesError(
+                            getattr(err, "status_code", None) or 502,
+                            str(err),
+                            "model_provider_error",
+                        )
+                    except TimeoutError:
+                        error = _ResponsesError(
+                            504, "Model response timed out.", "model_response_timeout"
+                        )
+                    except (ClientDisconnect, OSError):
+                        return
+                    except Exception as err:  # pylint: disable=broad-exception-caught
+                        log(ERROR, "Direct model request failed", exc_info=err)
+                        error = _ResponsesError(
+                            500, "Internal server error.", "internal_error"
+                        )
+                    finally:
+                        group.cancel_scope.cancel()
+            if completed:
+                return
+            if execution.cancel_called:
+                error = _ResponsesError(
+                    409, "Model request cancelled.", "model_request_cancelled"
+                )
+            if error is not None:
+                with anyio.move_on_after(_DIRECT_ERROR_DELIVERY_TIMEOUT):
+                    if self.started:
+                        await send(
+                            {
+                                "type": "http.response.body",
+                                "body": _stream_error(
+                                    error.message, error.code, self.sequence
+                                ).encode(),
+                                "more_body": False,
+                            }
+                        )
+                    else:
+                        await _error_response(error)(scope, receive, send)
+
+
+async def _watch_direct_task(
+    request: Request, state: CoreState, task: Task, scope: CancelScope
+) -> None:
+    """Stop a quiet provider after task completion or client disconnect."""
+    while True:
+        tasks = await anyio.to_thread.run_sync(
+            partial(state.get_tasks, task_ids=[task.task_id]), abandon_on_cancel=True
+        )
+        if (
+            not tasks
+            or tasks[0].status.status == Status.FINISHED
+            or await request.is_disconnected()
+        ):
+            scope.cancel()
+            return
+        await anyio.sleep(_POLL_INTERVAL)
 
 
 def _authenticate(request: Request, state: CoreState) -> Task:
