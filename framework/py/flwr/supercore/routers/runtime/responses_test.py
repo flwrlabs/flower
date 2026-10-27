@@ -658,9 +658,8 @@ async def _check_direct_cancellation(
         responses, "_model_response_timeout", lambda: 0.05 if stop == "deadline" else 3
     )
     monkeypatch.setattr(responses, "_DIRECT_ERROR_DELIVERY_TIMEOUT", 0.05)
-    app = FastAPI()
-    app.state.direct_model_capacity = asyncio.Semaphore(1)
-    scope: Scope = {"type": "http", "app": app, "asgi": {"spec_version": "2.4"}}
+    scope: Scope = {"type": "http", "app": FastAPI(), "asgi": {"spec_version": "2.4"}}
+    scope["app"].state.direct_model_capacity = asyncio.Semaphore(1)
 
     async def receive() -> Message:
         await disconnected.wait()
