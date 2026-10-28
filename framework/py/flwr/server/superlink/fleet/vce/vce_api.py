@@ -174,9 +174,10 @@ def add_messages_to_queue(
     """Put Messages in the queue from the LinkState."""
     while not f_stop.is_set():
         for node_id in nodes_mapping.keys():
-            message_ins_list = state.get_message_ins(node_id=node_id, limit=1)
-            for msg in message_ins_list:
+            messages = state.get_messages(dst_node_id=node_id, limit=1)
+            for msg in messages:
                 queue.put(msg)
+                state.acknowledge_messages([msg.metadata.message_id])
         f_stop.wait(0.1)
 
 
@@ -187,7 +188,7 @@ def put_message_into_state(
     while not f_stop.is_set():
         try:
             message_reply = queue.get(timeout=1.0)
-            state.store_message_res(message_reply)
+            state.store_messages([message_reply])
         except Empty:
             # queue is empty when timeout was triggered
             pass
