@@ -685,7 +685,16 @@ def test_dependency_restart_precedes_initial_prompt(
         return tmp_path, None, "app:agent"
 
     monkeypatch.setattr(lifecycle, "_prepare_task_app", prepare)
-    restart = Mock(side_effect=SystemExit(0))
+    stop_uploader = Mock()
+    monkeypatch.setattr(run_agentapp_module, "stop_log_uploader", stop_uploader)
+
+    def assert_stopped_before_restart(*_args: object) -> None:
+        stop_uploader.assert_called_once_with(
+            lifecycle._log_queue, lifecycle._log_uploader
+        )
+        raise SystemExit(0)
+
+    restart = Mock(side_effect=assert_stopped_before_restart)
     prompt = Mock()
     monkeypatch.setattr(run_agentapp_module, "_restart_with_runtime_env", restart)
     monkeypatch.setattr(run_agentapp_module, "pull_prompt", prompt)

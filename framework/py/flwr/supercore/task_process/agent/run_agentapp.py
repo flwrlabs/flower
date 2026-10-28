@@ -321,6 +321,8 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             ):
                 app_path, agent_app, agent_app_attr = self._prepare_task_app(fab, run)
                 if self._runtime_env_dir is not None and not runtime_ready:
+                    if self._log_uploader is not None:
+                        stop_log_uploader(self._log_queue, self._log_uploader)
                     _restart_with_runtime_env(self._runtime_env_dir, res, self._token)
 
                 # Initialize the AgentApp session
