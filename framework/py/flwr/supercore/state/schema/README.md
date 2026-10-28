@@ -10,6 +10,13 @@
         layout: elk
 ---
 erDiagram
+  agent {
+    BIGINT agent_id PK
+    VARCHAR flwr_aid
+    VARCHAR name
+    TEXT role
+  }
+
   automation {
     INTEGER automation_id PK
     TIMESTAMP created_at
