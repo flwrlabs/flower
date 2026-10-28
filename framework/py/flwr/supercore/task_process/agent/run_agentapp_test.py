@@ -908,7 +908,12 @@ _restart_with_runtime_env(
     assert not runtime.exists()
 
 
-def test_restart_supervisor_forwards_termination(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "signum",
+    [signal.SIGINT, signal.SIGTERM]
+    + ([signal.SIGQUIT] if hasattr(signal, "SIGQUIT") else []),
+)
+def test_restart_supervisor_forwards_termination(tmp_path: Path, signum: int) -> None:
     """Terminating the supervisor must terminate its AgentApp child too."""
     child = tmp_path / "child.py"
     ready = tmp_path / "ready"
@@ -918,14 +923,20 @@ def test_restart_supervisor_forwards_termination(tmp_path: Path) -> None:
         "def stop(*_args):\n"
         "    Path(sys.argv[2]).touch()\n"
         "    sys.exit(0)\n"
-        "signal.signal(signal.SIGTERM, stop)\n"
+        "signal.signal(int(sys.argv[3]), stop)\n"
         "Path(sys.argv[1]).touch()\n"
         "while True: time.sleep(0.01)\n"
     )
     (tmp_path / "restart.json").write_text(
         json.dumps(
             {
-                "args": [sys.executable, str(child), str(ready), str(stopped)],
+                "args": [
+                    sys.executable,
+                    str(child),
+                    str(ready),
+                    str(stopped),
+                    str(signum),
+                ],
                 "pythonpath": sys.path,
             }
         )
@@ -942,7 +953,7 @@ def test_restart_supervisor_forwards_termination(tmp_path: Path) -> None:
                     break
                 threading.Event().wait(0.01)
             assert ready.exists()
-            process.send_signal(signal.SIGTERM)
+            process.send_signal(signum)
             assert process.wait(timeout=10) == 0
         finally:
             if process.poll() is None:

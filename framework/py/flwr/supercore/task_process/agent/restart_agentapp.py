@@ -34,9 +34,11 @@ def main() -> int:
         def forward_signal(signum: int, _frame: FrameType | None) -> None:
             process.send_signal(signum)
 
+        supported_signals = [signal.SIGINT, signal.SIGTERM]
+        if hasattr(signal, "SIGQUIT"):
+            supported_signals.append(signal.SIGQUIT)
         handlers = {
-            sig: signal.signal(sig, forward_signal)
-            for sig in (signal.SIGINT, signal.SIGTERM)
+            sig: signal.signal(sig, forward_signal) for sig in supported_signals
         }
         try:
             returncode = process.wait()
