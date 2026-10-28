@@ -21,6 +21,7 @@ import builtins
 import collections.abc
 import flwr.proto.fab_pb2
 import flwr.proto.federation_config_pb2
+import flwr.proto.file_pb2
 import flwr.proto.message_pb2
 import flwr.proto.node_pb2
 import flwr.proto.recorddict_pb2
@@ -655,27 +656,6 @@ class AcquireTaskResponse(google.protobuf.message.Message):
 global___AcquireTaskResponse = AcquireTaskResponse
 
 @typing.final
-class FileMetadata(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KEY_FIELD_NUMBER: builtins.int
-    REVISION_FIELD_NUMBER: builtins.int
-    SIZE_BYTES_FIELD_NUMBER: builtins.int
-    key: builtins.str
-    revision: builtins.int
-    size_bytes: builtins.int
-    def __init__(
-        self,
-        *,
-        key: builtins.str = ...,
-        revision: builtins.int = ...,
-        size_bytes: builtins.int = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["key", b"key", "revision", b"revision", "size_bytes", b"size_bytes"]) -> None: ...
-
-global___FileMetadata = FileMetadata
-
-@typing.final
 class PutFileRequest(google.protobuf.message.Message):
     """PutFile messages"""
 
@@ -737,17 +717,16 @@ global___GetFileRequest = GetFileRequest
 class GetFileResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    DATA_FIELD_NUMBER: builtins.int
-    REVISION_FIELD_NUMBER: builtins.int
-    data: builtins.bytes
-    revision: builtins.int
+    FILE_FIELD_NUMBER: builtins.int
+    @property
+    def file(self) -> flwr.proto.file_pb2.File: ...
     def __init__(
         self,
         *,
-        data: builtins.bytes = ...,
-        revision: builtins.int = ...,
+        file: flwr.proto.file_pb2.File | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["data", b"data", "revision", b"revision"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["file", b"file"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["file", b"file"]) -> None: ...
 
 global___GetFileResponse = GetFileResponse
 
@@ -786,11 +765,11 @@ class ListFilesResponse(google.protobuf.message.Message):
     next_start_after: builtins.str
     """Last returned key if more results exist; empty otherwise."""
     @property
-    def files(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FileMetadata]: ...
+    def files(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.file_pb2.FileMetadata]: ...
     def __init__(
         self,
         *,
-        files: collections.abc.Iterable[global___FileMetadata] | None = ...,
+        files: collections.abc.Iterable[flwr.proto.file_pb2.FileMetadata] | None = ...,
         next_start_after: builtins.str = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["files", b"files", "next_start_after", b"next_start_after"]) -> None: ...
