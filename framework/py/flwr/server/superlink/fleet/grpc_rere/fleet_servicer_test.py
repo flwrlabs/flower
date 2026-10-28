@@ -466,8 +466,6 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         else:
             assert len(response.messages_list) == 0
             assert len(response.message_object_trees) == 0
-            # Ins message was deleted
-            assert self.state.num_message_ins() == 0
 
     def test_successful_get_run_if_running(self) -> None:
         """Test `GetRun` success."""

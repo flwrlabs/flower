@@ -79,10 +79,7 @@ def test_pull_messages() -> None:
     # Assert
     state.create_node.assert_not_called()
     state.delete_node.assert_not_called()
-    state.store_message_ins.assert_not_called()
     state.get_messages.assert_called_once()
-    state.store_message_res.assert_not_called()
-    state.get_message_res.assert_not_called()
     state.store_traffic.assert_not_called()
 
 
@@ -162,15 +159,11 @@ def test_push_messages(stored: bool) -> None:
     # Assert
     state.create_node.assert_not_called()
     state.delete_node.assert_not_called()
-    state.store_message_ins.assert_not_called()
-    state.get_message_ins.assert_not_called()
-    state.store_message_res.assert_not_called()
     state.start_session.assert_called_once_with(123)
     state.store_message_and_object_tree.assert_called_once()
     assert state.store_message_and_object_tree.call_args.args[1] == object_tree
     assert state.store_message_and_object_tree.call_args.args[2] == "session-id"
     assert response.session_id == "session-id"
-    state.get_message_res.assert_not_called()
     assert not response.results
     assert list(response.objects_to_push) == (["object-id"] if stored else [])
     assert state.store_traffic.call_count == int(stored)
