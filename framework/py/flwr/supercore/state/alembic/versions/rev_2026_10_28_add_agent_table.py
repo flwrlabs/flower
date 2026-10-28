@@ -23,6 +23,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
+from flwr.supercore.state.schema.types import UTCDateTime
+
 # pylint: disable=no-member
 
 # revision identifiers, used by Alembic.
@@ -46,6 +48,8 @@ def upgrade() -> None:
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("role", sa.Text(), nullable=False),
         sa.Column("flwr_aid", sa.String(), nullable=False),
+        sa.Column("created_at", UTCDateTime(), nullable=False),
+        sa.Column("updated_at", UTCDateTime(), nullable=False),
         sa.PrimaryKeyConstraint("agent_id"),
         sqlite_autoincrement=True,
     )

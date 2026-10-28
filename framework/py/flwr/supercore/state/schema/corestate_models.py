@@ -161,6 +161,8 @@ class Agent(FlwrBase):
     name: Mapped[str] = mapped_column(String, nullable=False)
     role: Mapped[str] = mapped_column(Text, nullable=False)
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
 class RunSeries(FlwrBase):

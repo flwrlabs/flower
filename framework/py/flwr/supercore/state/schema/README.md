@@ -12,9 +12,11 @@
 erDiagram
   agent {
     BIGINT agent_id PK
+    TIMESTAMP created_at
     VARCHAR flwr_aid
     VARCHAR name
     TEXT role
+    TIMESTAMP updated_at
   }
 
   automation {
