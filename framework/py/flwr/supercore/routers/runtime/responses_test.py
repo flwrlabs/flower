@@ -20,7 +20,7 @@ import json
 from collections.abc import AsyncIterator
 from threading import Event
 from typing import cast
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import anyio
 import httpx
@@ -36,7 +36,7 @@ from flwr.supercore.dependencies.runtime import get_runtime_state
 from flwr.supercore.typing import JSONObject
 
 from . import responses
-from .responses import ModelResponse, router
+from .responses import ModelResponse, _ResponsesError, router
 
 
 def _client(state: Mock) -> TestClient:
@@ -118,6 +118,9 @@ def test_model_response_accounts_each_round(
     state: Mock, monkeypatch: pytest.MonkeyPatch, stream: bool
 ) -> None:
     """Preserve credentials and usage, including a terminal SSE event at EOF."""
+    backend = MagicMock()
+    monkeypatch.setenv("FLWR_TRACING_ENABLED", "1")
+    monkeypatch.setattr("flwr.supercore.tracing._load_backend", lambda: backend)
     body: JSONObject = {
         "id": "resp_1",
         "object": "response",
@@ -152,6 +155,8 @@ def test_model_response_accounts_each_round(
                 assert "event: response.completed\n" in result.text
             else:
                 assert result.json() == body
+    attributes = backend.trace_span.return_value.__enter__.return_value.set_attribute
+    assert all(call.args[0] != "error.type" for call in attributes.call_args_list)
     assert state.add_task_usage.call_count == 2
     for call in state.add_task_usage.call_args_list:
         task_id, usage = call.args
@@ -233,6 +238,8 @@ async def _check_model_cancellation(
                 await anyio.sleep_forever()
             finally:
                 closed.set()
+        if phase == "json_blocked":
+            return httpx.Response(200, json={"object": "response", "output": []})
         return httpx.Response(
             200, headers={"content-type": "text/event-stream"}, stream=QuietStream()
         )
@@ -253,7 +260,7 @@ async def _check_model_cancellation(
         Request(scope, receive),
         state,
         state.get_task_by_token.return_value,
-        _stream_request() | {"stream": phase != "opening"},
+        _stream_request() | {"stream": phase not in {"opening", "json_blocked"}},
     )
 
     async def trigger() -> None:
@@ -268,14 +275,24 @@ async def _check_model_cancellation(
 
     async def send(message: Message) -> None:
         await anyio.sleep(0)
-        if phase == "blocked" and message["type"] == "http.response.body":
+        if (
+            phase in {"blocked", "json_blocked"}
+            and message["type"] == "http.response.body"
+        ):
+            entered.set()
             await anyio.sleep_forever()
         messages.append(message)
 
     async with asyncio.timeout(4):
-        await asyncio.gather(response(scope, receive, send), trigger())
-    assert closed.is_set() and not response.capacity.locked()
-    if stop == "deadline" and phase != "blocked":
+        if phase == "json_blocked":
+            with pytest.raises(_ResponsesError, match="Model response timed out"):
+                await asyncio.gather(response(scope, receive, send), trigger())
+            assert [message["type"] for message in messages] == ["http.response.start"]
+        else:
+            await asyncio.gather(response(scope, receive, send), trigger())
+            assert closed.is_set()
+    assert not response.capacity.locked()
+    if stop == "deadline" and phase not in {"blocked", "json_blocked"}:
         assert any(b"model_response_timeout" in m.get("body", b"") for m in messages)
         assert messages[0]["status"] == (504 if phase == "opening" else 200)
 
@@ -288,6 +305,7 @@ async def _check_model_cancellation(
         ("deadline", "opening"),
         ("deadline", "streaming"),
         ("deadline", "blocked"),
+        ("deadline", "json_blocked"),
     ],
 )
 def test_model_cancellation_closes_provider_and_releases_slot(

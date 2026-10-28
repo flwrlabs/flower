@@ -227,6 +227,9 @@ class ModelResponse(Response):
                         500, "Internal server error.", "internal_error"
                     )
                 if error is not None and not complete:
+                    if started and self.payload.get("stream") is not True:
+                        # Abort committed JSON so the server closes the connection.
+                        raise error
                     with anyio.move_on_after(_ERROR_DELIVERY_TIMEOUT):
                         if started:
                             await send(

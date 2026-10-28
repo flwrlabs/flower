@@ -165,6 +165,10 @@ class EventType(str, Enum):
     FLWR_CONNECTOR_RUN_ENTER = auto()
     FLWR_CONNECTOR_RUN_LEAVE = auto()
 
+    # Deprecated compatibility values for the removed flwr-model CLI.
+    FLWR_MODEL_RUN_ENTER = auto()
+    FLWR_MODEL_RUN_LEAVE = auto()
+
     # --- Simulation Runtime -----------------------------------------------------------
 
     # Python API: `run_simulation`

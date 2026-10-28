@@ -198,6 +198,9 @@ async def iter_model_provider_response(
                     if event["type"] in TERMINAL_EVENTS:
                         return
                 raise ModelProviderError("Model stream ended before a terminal event.")
+            except GeneratorExit:
+                # Callers close the iterator after consuming a JSON response.
+                return
             finally:
                 with CancelScope(shield=True):
                     await response.aclose()
