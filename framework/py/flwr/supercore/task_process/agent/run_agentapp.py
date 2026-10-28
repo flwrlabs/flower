@@ -16,6 +16,8 @@
 
 
 import hashlib
+import hmac
+import json
 import os
 import signal
 import sys
@@ -95,7 +97,7 @@ from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.supercore.tracing import PhaseTimings, flush_traces, trace_span
 from flwr.supercore.typing import JSONObject
-from flwr.supercore.utils import strict_json_dumps
+from flwr.supercore.utils import get_flwr_home, strict_json_dumps
 from flwr.superlink.grid import HttpGrid
 
 from .grid import RuntimeAgentGrid
@@ -112,17 +114,22 @@ _SSL_CERT_FILE_ENV = "SSL_CERT_FILE"
 _RUNTIME_ENV = "FLWR_AGENTAPP_RUNTIME_ENV"
 
 
-def _restart_with_runtime_env(
-    runtime_env_dir: Path, task_input: PullTaskInputResponse, token: str
+def _restart_with_runtime_env(  # pylint: disable=too-many-arguments
+    runtime_env_dir: Path,
+    task_input: PullTaskInputResponse,
+    token: str,
+    *,
+    runtime_api_address: str,
+    insecure: bool,
+    certificates_path: str | None,
 ) -> None:
-    """Restart with app dependencies available before framework imports."""
-    input_path = runtime_env_dir / "task-input.pb"
-    descriptor = os.open(input_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    """Restart under a host-only supervisor before importing app dependencies."""
+    payload = task_input.SerializeToString()
+    descriptor = os.open(
+        runtime_env_dir / "task-input.pb", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600
+    )
     with os.fdopen(descriptor, "wb") as input_file:
-        input_file.write(task_input.SerializeToString())
-    environ = os.environ.copy()
-    environ[_RUNTIME_ENV] = str(runtime_env_dir)
-    environ["PYTHONPATH"] = os.pathsep.join(sys.path)
+        input_file.write(payload)
     args = [sys.executable, *sys.orig_argv[1:]]
     if "--token-stdin" in args:
         with NamedTemporaryFile(
@@ -131,7 +138,50 @@ def _restart_with_runtime_env(
             token_file.write(token)
         args.remove("--token-stdin")
         args.extend(["--token-file", token_file.name])
-    os.execve(sys.executable, args, environ)
+    state = {
+        "args": args,
+        "pythonpath": sys.path,
+        "token": token,
+        "signature": hmac.digest(token.encode(), payload, "sha256").hex(),
+        "runtime_api_address": runtime_api_address,
+        "insecure": insecure,
+        "certificates_path": certificates_path,
+    }
+    descriptor = os.open(
+        runtime_env_dir / "restart.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600
+    )
+    with os.fdopen(descriptor, "w", encoding="utf-8") as state_file:
+        json.dump(state, state_file)
+    environ = os.environ.copy()
+    environ[_RUNTIME_ENV] = str(runtime_env_dir)
+    bootstrap = Path(__file__).with_name("restart_agentapp.py")
+    os.execve(sys.executable, [sys.executable, str(bootstrap)], environ)
+
+
+def _recover_failed_restart(runtime_env_dir: Path) -> None:
+    """Report bootstrap failure using the host's working Flower installation."""
+    # pylint: disable=protected-access
+    state = json.loads((runtime_env_dir / "restart.json").read_text())
+    lifecycle = _AgentAppTaskLifecycle(
+        runtime_api_address=state["runtime_api_address"],
+        log_queue=Queue(),
+        token=state["token"],
+        insecure=state["insecure"],
+        certificates=validate_and_resolve_root_certificates(
+            state["certificates_path"], state["insecure"]
+        ),
+        certificates_path=state["certificates_path"],
+        runtime_dependency_install=True,
+        preloaded=None,
+    )
+    response = lifecycle._pull_task_input()
+    lifecycle._context = context_from_proto(response.context)
+    lifecycle._outcome = (
+        SubStatus.FAILED,
+        "AgentApp could not start with its installed dependencies. "
+        "See executor logs for the import error.",
+    )
+    lifecycle.finalize()
 
 
 @dataclass(frozen=True)
@@ -323,7 +373,14 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 if self._runtime_env_dir is not None and not runtime_ready:
                     if self._log_uploader is not None:
                         stop_log_uploader(self._log_queue, self._log_uploader)
-                    _restart_with_runtime_env(self._runtime_env_dir, res, self._token)
+                    _restart_with_runtime_env(
+                        self._runtime_env_dir,
+                        res,
+                        self._token,
+                        runtime_api_address=self._runtime_api_address,
+                        insecure=self._insecure,
+                        certificates_path=self._certificates_path,
+                    )
 
                 # Initialize the AgentApp session
                 with trace_span("agentapp.session"):
@@ -416,10 +473,21 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
         runtime_env = os.environ.pop(_RUNTIME_ENV, None)
         if runtime_env is None:
             return self._grid._runtime_client.PullTaskInput(PullTaskInputRequest())
-        self._runtime_env_dir = Path(runtime_env)
-        input_path = self._runtime_env_dir / "task-input.pb"
-        response = PullTaskInputResponse.FromString(input_path.read_bytes())
+        runtime_env_dir = Path(runtime_env).resolve()
+        expected_parent = (get_flwr_home() / "runtime-envs").resolve()
+        if runtime_env_dir.parent != expected_parent:
+            raise ValueError("Restart environment is outside the runtime directory.")
+        input_path = runtime_env_dir / "task-input.pb"
+        payload = input_path.read_bytes()
+        state = json.loads((runtime_env_dir / "restart.json").read_text())
+        signature = hmac.digest(self._token.encode(), payload, "sha256").hex()
+        if not hmac.compare_digest(signature, state["signature"]):
+            raise ValueError("Restart input authentication failed.")
+        response = PullTaskInputResponse.FromString(payload)
+        if runtime_env_dir.name != str(response.run.run_id):
+            raise ValueError("Restart environment does not match the claimed run.")
         input_path.unlink()
+        self._runtime_env_dir = runtime_env_dir
         return response
 
     def _prepare_task_app(

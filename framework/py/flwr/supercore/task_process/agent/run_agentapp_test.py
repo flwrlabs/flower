@@ -17,17 +17,21 @@
 # pylint: disable=protected-access
 
 import hashlib
+import hmac
 import importlib
+import json
 import os
 import signal
 import subprocess
 import sys
 import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from queue import Queue
 from unittest.mock import Mock, patch
 
 import pytest
+from google.protobuf.message import DecodeError
 
 from flwr.agentapp import AgentApp, LoadAgentAppError
 from flwr.app import ConfigRecord, Message, RecordDict
@@ -35,6 +39,10 @@ from flwr.common.constant import (
     FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
     FLWR_TASK_TOKEN_LENGTH,
     SubStatus,
+)
+from flwr.proto.runtime_pb2 import (  # pylint: disable=no-name-in-module
+    PullTaskInputResponse,
+    PushTaskOutputRequest,
 )
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
@@ -583,9 +591,9 @@ def test_run_agentapp_keeps_cold_process_behavior(
 def test_restart_loads_app_dependencies_before_cached_modules(tmp_path: Path) -> None:
     """Restart discards cached dependencies and restores input without reclaiming it."""
     base = tmp_path / "base"
-    runtime = tmp_path / "runtime"
+    runtime = tmp_path / "runtime-envs" / "123"
     base.mkdir()
-    runtime.mkdir()
+    runtime.mkdir(parents=True)
     (base / "cached_dependency.py").write_text("version = 'old'\n")
     (runtime / "cached_dependency.py").write_text("Converter = object\n")
     (runtime / "app_dependency.py").write_text(
@@ -605,6 +613,7 @@ from unittest.mock import Mock, patch
 from flwr.proto.runtime_pb2 import PullTaskInputResponse
 module = importlib.import_module('flwr.supercore.task_process.agent.run_agentapp')
 base, runtime = map(Path, sys.argv[1:])
+os.environ['FLWR_HOME'] = str(runtime.parent.parent)
 if module._RUNTIME_ENV not in os.environ:
     sys.path.insert(0, str(base))
     import cached_dependency
@@ -616,11 +625,13 @@ if module._RUNTIME_ENV not in os.environ:
     else:
         raise AssertionError('Expected the cached-module import failure')
     module._restart_with_runtime_env(
-        runtime, PullTaskInputResponse(task_id=123), 'token'
+        runtime, PullTaskInputResponse(task_id=123, run={'run_id': 123}), 'token',
+        runtime_api_address='localhost:9092', insecure=True, certificates_path=None,
     )
     raise AssertionError('Restart returned')
 
 assert stat.S_IMODE((runtime / 'task-input.pb').stat().st_mode) == 0o600
+assert stat.S_IMODE((runtime / 'restart.json').stat().st_mode) == 0o600
 with patch.object(module, 'HttpGrid') as grid:
     lifecycle = module._AgentAppTaskLifecycle(
         runtime_api_address='localhost:9092', log_queue=Queue(), token='token',
@@ -688,7 +699,7 @@ def test_dependency_restart_precedes_initial_prompt(
     stop_uploader = Mock()
     monkeypatch.setattr(run_agentapp_module, "stop_log_uploader", stop_uploader)
 
-    def assert_stopped_before_restart(*_args: object) -> None:
+    def assert_stopped_before_restart(*_args: object, **_kwargs: object) -> None:
         stop_uploader.assert_called_once_with(
             lifecycle._log_queue, lifecycle._log_uploader
         )
@@ -702,7 +713,12 @@ def test_dependency_restart_precedes_initial_prompt(
         lifecycle.run()
     grid._runtime_client.PullTaskInput.assert_called_once()
     restart.assert_called_once_with(
-        tmp_path, grid._runtime_client.PullTaskInput.return_value, "task-token"
+        tmp_path,
+        grid._runtime_client.PullTaskInput.return_value,
+        "task-token",
+        runtime_api_address="runtime.example:9092",
+        insecure=True,
+        certificates_path=None,
     )
     prompt.assert_not_called()
 
@@ -723,16 +739,18 @@ from unittest.mock import patch
 from flwr.proto.runtime_pb2 import PullTaskInputResponse
 cli = importlib.import_module('flwr.supercore.cli.flwr_agentapp')
 module = importlib.import_module('flwr.supercore.task_process.agent.run_agentapp')
-runtime = Path(__file__).parent / 'runtime'
+os.environ['FLWR_HOME'] = str(Path(__file__).parent)
+runtime = Path(__file__).parent / 'runtime-envs' / '123'
 
 def run_agentapp(**kwargs):
     assert kwargs['runtime_dependency_install'] is True
     token = kwargs['token']
     if module._RUNTIME_ENV not in os.environ:
         assert sys.stdin.closed
-        runtime.mkdir()
+        runtime.mkdir(parents=True)
         module._restart_with_runtime_env(
-            runtime, PullTaskInputResponse(task_id=123), token
+            runtime, PullTaskInputResponse(task_id=123, run={'run_id': 123}), token,
+            runtime_api_address='localhost:9092', insecure=True, certificates_path=None,
         )
         raise AssertionError('Restart returned')
     assert '--token-stdin' not in sys.argv
@@ -780,3 +798,153 @@ with (
     assert result.stdout.count(FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT) == 1
     assert "Stdin-authenticated CLI restart: PASS" in result.stdout
     assert token not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "case", ["outside", "missing", "malformed", "signature", "run"]
+)
+def test_invalid_restart_state_never_owns_cleanup(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, case: str
+) -> None:
+    """An inherited restart variable must not authorize deleting unverified files."""
+    directory = tmp_path / "runtime-envs" / "123"
+    if case == "outside":
+        directory = tmp_path / "unrelated"
+    directory.mkdir(parents=True)
+    marker = directory / "keep.txt"
+    marker.write_text("keep")
+    response = PullTaskInputResponse()
+    response.run.run_id = 456 if case == "run" else 123
+    payload = response.SerializeToString()
+    if case == "malformed":
+        payload = b"invalid protobuf"
+    if case != "missing":
+        (directory / "task-input.pb").write_bytes(payload)
+    signature = hmac.digest(b"token", payload, "sha256").hex()
+    (directory / "restart.json").write_text(
+        json.dumps({"signature": "invalid" if case == "signature" else signature})
+    )
+    monkeypatch.setenv("FLWR_HOME", str(tmp_path))
+    monkeypatch.setenv(run_agentapp_module._RUNTIME_ENV, str(directory))
+    monkeypatch.setattr(run_agentapp_module, "HttpGrid", Mock())
+    lifecycle = _AgentAppTaskLifecycle(
+        runtime_api_address="localhost:9092",
+        log_queue=Queue(),
+        token="token",
+        insecure=True,
+        certificates=None,
+        certificates_path=None,
+        runtime_dependency_install=True,
+        preloaded=None,
+    )
+    with pytest.raises((ValueError, OSError, DecodeError)):
+        lifecycle._pull_task_input()
+    assert lifecycle._runtime_env_dir is None
+    lifecycle.finalize()
+    assert marker.read_text() == "keep"
+
+
+def test_incompatible_dependency_reports_failure_from_host(tmp_path: Path) -> None:
+    """A real HTTP failure output and cleanup survive app bootstrap import errors."""
+    outputs: list[PushTaskOutputRequest] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        """Receive only the already-claimed task's failure output."""
+
+        def do_POST(self) -> None:  # pylint: disable=invalid-name
+            """Record the task output and acknowledge it."""
+            assert self.path == "/v1/runtime/push-task-output"
+            payload = self.rfile.read(int(self.headers["Content-Length"]))
+            outputs.append(PushTaskOutputRequest.FromString(payload))
+            self.send_response(200)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    runtime = tmp_path / "runtime-envs" / "123"
+    runtime.mkdir(parents=True)
+    (runtime / "httpx.py").write_text("raise ImportError('incompatible app httpx')\n")
+    probe = tmp_path / "failure_probe.py"
+    probe.write_text(
+        """
+import os
+import sys
+from pathlib import Path
+from flwr.proto.runtime_pb2 import PullTaskInputResponse
+from flwr.supercore.task_process.agent.run_agentapp import _restart_with_runtime_env
+runtime = Path(sys.argv[1])
+os.environ['FLWR_HOME'] = str(runtime.parent.parent)
+sys.path.insert(0, str(runtime))
+_restart_with_runtime_env(
+    runtime, PullTaskInputResponse(task_id=1, run={'run_id': 123}), 'token',
+    runtime_api_address=sys.argv[2], insecure=True, certificates_path=None,
+)
+"""
+    )
+    with HTTPServer(("127.0.0.1", 0), Handler) as server:
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(probe),
+                    str(runtime),
+                    f"127.0.0.1:{server.server_port}",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env={**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)},
+                check=False,
+            )
+        finally:
+            server.shutdown()
+            thread.join()
+    assert result.returncode != 0
+    assert "incompatible app httpx" in result.stderr
+    assert len(outputs) == 1
+    assert outputs[0].sub_status == SubStatus.FAILED
+    assert "installed dependencies" in outputs[0].details
+    assert not runtime.exists()
+
+
+def test_restart_supervisor_forwards_termination(tmp_path: Path) -> None:
+    """Terminating the supervisor must terminate its AgentApp child too."""
+    child = tmp_path / "child.py"
+    ready = tmp_path / "ready"
+    stopped = tmp_path / "stopped"
+    child.write_text(
+        "import signal, sys, time\nfrom pathlib import Path\n"
+        "def stop(*_args):\n"
+        "    Path(sys.argv[2]).touch()\n"
+        "    sys.exit(0)\n"
+        "signal.signal(signal.SIGTERM, stop)\n"
+        "Path(sys.argv[1]).touch()\n"
+        "while True: time.sleep(0.01)\n"
+    )
+    (tmp_path / "restart.json").write_text(
+        json.dumps(
+            {
+                "args": [sys.executable, str(child), str(ready), str(stopped)],
+                "pythonpath": sys.path,
+            }
+        )
+    )
+    assert run_agentapp_module.__file__ is not None
+    bootstrap = Path(run_agentapp_module.__file__).with_name("restart_agentapp.py")
+    with subprocess.Popen(
+        [sys.executable, str(bootstrap)],
+        env={**os.environ, run_agentapp_module._RUNTIME_ENV: str(tmp_path)},
+    ) as process:
+        try:
+            for _ in range(1000):
+                if ready.exists():
+                    break
+                threading.Event().wait(0.01)
+            assert ready.exists()
+            process.send_signal(signal.SIGTERM)
+            assert process.wait(timeout=10) == 0
+        finally:
+            if process.poll() is None:
+                process.kill()
+    assert stopped.exists()
