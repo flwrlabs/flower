@@ -23,6 +23,8 @@ from typing import Any
 from unittest.mock import patch
 
 import grpc
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from parameterized import parameterized
 
 from flwr.common.constant import (
@@ -207,6 +209,60 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
             now()
             - datetime.timedelta(seconds=TIMESTAMP_TOLERANCE + SYSTEM_TIME_TOLERANCE)
         ).isoformat()
+        signature = sign_message(self.node_sk, timestamp.encode("ascii"))
+        return [
+            (PUBLIC_KEY_HEADER, self.node_pk_bytes),
+            (SIGNATURE_HEADER, signature),
+            (TIMESTAMP_HEADER, timestamp),
+        ]
+
+    def _make_metadata_with_malformed_public_key(self) -> list[Any]:
+        """Create metadata with a malformed (non-PEM) public key."""
+        timestamp = now().isoformat()
+        signature = sign_message(self.node_sk, timestamp.encode("ascii"))
+        return [
+            (PUBLIC_KEY_HEADER, b"not-a-valid-pem-public-key"),
+            (SIGNATURE_HEADER, signature),
+            (TIMESTAMP_HEADER, timestamp),
+        ]
+
+    def _make_metadata_with_malformed_timestamp(self) -> list[Any]:
+        """Create metadata with a malformed (non-ISO) timestamp."""
+        # Sign the malformed timestamp so it passes signature verification and
+        # reaches the timestamp parsing step.
+        timestamp = "not-a-valid-timestamp"
+        signature = sign_message(self.node_sk, timestamp.encode("ascii"))
+        return [
+            (PUBLIC_KEY_HEADER, self.node_pk_bytes),
+            (SIGNATURE_HEADER, signature),
+            (TIMESTAMP_HEADER, timestamp),
+        ]
+
+    def _make_metadata_with_wrong_key_type(self) -> list[Any]:
+        """Create metadata with a well-formed PEM key of the wrong type (RSA)."""
+        # An RSA key is valid PEM, so it loads successfully and reaches
+        # verify_signature, which expects an EC key.
+        rsa_pk = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048
+        ).public_key()
+        rsa_pk_bytes = rsa_pk.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        timestamp = now().isoformat()
+        signature = sign_message(self.node_sk, timestamp.encode("ascii"))
+        return [
+            (PUBLIC_KEY_HEADER, rsa_pk_bytes),
+            (SIGNATURE_HEADER, signature),
+            (TIMESTAMP_HEADER, timestamp),
+        ]
+
+    def _make_metadata_with_offset_naive_timestamp(self) -> list[Any]:
+        """Create metadata with an ISO but offset-naive timestamp."""
+        # An offset-naive timestamp parses with fromisoformat but cannot be
+        # subtracted from the timezone-aware current time; sign it so it reaches
+        # the timestamp comparison step.
+        timestamp = now().replace(tzinfo=None).isoformat()
         signature = sign_message(self.node_sk, timestamp.encode("ascii"))
         return [
             (PUBLIC_KEY_HEADER, self.node_pk_bytes),
@@ -409,6 +465,46 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
         # Execute & Assert
         with self.assertRaises(grpc.RpcError) as cm:
             rpc(self, self._make_metadata_with_invalid_timestamp())
+        assert cm.exception.code() == grpc.StatusCode.UNAUTHENTICATED
+
+    @parameterized.expand(rpcs)  # type: ignore
+    def test_unsuccessful_rpc_with_malformed_public_key(
+        self, rpc: Callable[[Any, list[Any]], Any]
+    ) -> None:
+        """Test that malformed public key bytes are rejected, not crashed on."""
+        # Execute & Assert
+        with self.assertRaises(grpc.RpcError) as cm:
+            rpc(self, self._make_metadata_with_malformed_public_key())
+        assert cm.exception.code() == grpc.StatusCode.UNAUTHENTICATED
+
+    @parameterized.expand(rpcs)  # type: ignore
+    def test_unsuccessful_rpc_with_malformed_timestamp(
+        self, rpc: Callable[[Any, list[Any]], Any]
+    ) -> None:
+        """Test that a malformed (non-ISO) timestamp is rejected, not crashed on."""
+        # Execute & Assert
+        with self.assertRaises(grpc.RpcError) as cm:
+            rpc(self, self._make_metadata_with_malformed_timestamp())
+        assert cm.exception.code() == grpc.StatusCode.UNAUTHENTICATED
+
+    @parameterized.expand(rpcs)  # type: ignore
+    def test_unsuccessful_rpc_with_wrong_key_type(
+        self, rpc: Callable[[Any, list[Any]], Any]
+    ) -> None:
+        """Test that a wrong-type (non-EC) public key is rejected, not crashed on."""
+        # Execute & Assert
+        with self.assertRaises(grpc.RpcError) as cm:
+            rpc(self, self._make_metadata_with_wrong_key_type())
+        assert cm.exception.code() == grpc.StatusCode.UNAUTHENTICATED
+
+    @parameterized.expand(rpcs)  # type: ignore
+    def test_unsuccessful_rpc_with_offset_naive_timestamp(
+        self, rpc: Callable[[Any, list[Any]], Any]
+    ) -> None:
+        """Test that an offset-naive timestamp is rejected, not crashed on."""
+        # Execute & Assert
+        with self.assertRaises(grpc.RpcError) as cm:
+            rpc(self, self._make_metadata_with_offset_naive_timestamp())
         assert cm.exception.code() == grpc.StatusCode.UNAUTHENTICATED
 
 
