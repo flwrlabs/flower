@@ -18,6 +18,7 @@
 import hashlib
 import os
 import signal
+import sys
 import threading
 from collections.abc import Callable, Iterator
 from concurrent.futures import Future
@@ -107,6 +108,21 @@ from .session import (
 _RUNTIME_API_KEY_ENV = "FLWR_RUNTIME_API_KEY"
 _RUNTIME_BASE_URL_ENV = "FLWR_RUNTIME_BASE_URL"
 _SSL_CERT_FILE_ENV = "SSL_CERT_FILE"
+_RUNTIME_ENV = "FLWR_AGENTAPP_RUNTIME_ENV"
+
+
+def _restart_with_runtime_env(
+    runtime_env_dir: Path, task_input: PullTaskInputResponse
+) -> None:
+    """Restart with app dependencies available before framework imports."""
+    input_path = runtime_env_dir / "task-input.pb"
+    descriptor = os.open(input_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "wb") as input_file:
+        input_file.write(task_input.SerializeToString())
+    environ = os.environ.copy()
+    environ[_RUNTIME_ENV] = str(runtime_env_dir)
+    environ["PYTHONPATH"] = os.pathsep.join(sys.path)
+    os.execve(sys.executable, [sys.executable, *sys.orig_argv[1:]], environ)
 
 
 @dataclass(frozen=True)
@@ -262,9 +278,8 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 self._heartbeat_sender.start()
 
                 log(DEBUG, "[flwr-agentapp] Pull task input")
-                res: PullTaskInputResponse = grid._runtime_client.PullTaskInput(
-                    PullTaskInputRequest()
-                )
+                res = self._pull_task_input()
+                runtime_ready = self._runtime_env_dir is not None
 
                 self._context = context_from_proto(res.context)
                 run = run_from_proto(res.run)
@@ -295,6 +310,10 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 "agentapp.prepare",
                 attributes=self._trace_attributes,
             ):
+                app_path, agent_app, agent_app_attr = self._prepare_task_app(fab, run)
+                if self._runtime_env_dir is not None and not runtime_ready:
+                    _restart_with_runtime_env(self._runtime_env_dir, res)
+
                 # Initialize the AgentApp session
                 with trace_span("agentapp.session"):
                     prompt, instruction_metadata = pull_prompt(grid)
@@ -328,7 +347,6 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                         grid=agent_grid,
                     )
 
-                app_path, agent_app, agent_app_attr = self._prepare_task_app(fab, run)
                 self._context.run_config = get_fused_config_from_dir(
                     app_path, run.override_config
                 )
@@ -382,6 +400,17 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
 
         return exit_code
 
+    def _pull_task_input(self) -> PullTaskInputResponse:
+        """Restore claimed input after restart, or claim the task once."""
+        runtime_env = os.environ.pop(_RUNTIME_ENV, None)
+        if runtime_env is None:
+            return self._grid._runtime_client.PullTaskInput(PullTaskInputRequest())
+        self._runtime_env_dir = Path(runtime_env)
+        input_path = self._runtime_env_dir / "task-input.pb"
+        response = PullTaskInputResponse.FromString(input_path.read_bytes())
+        input_path.unlink()
+        return response
+
     def _prepare_task_app(
         self, fab: Fab, run: Run
     ) -> tuple[Path, AgentApp | None, str | None]:
@@ -400,7 +429,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             install_from_fab(fab.content, skip_prompt=True)
         fab_id, fab_version = get_fab_metadata(fab.content)
         app_path = get_project_dir(fab_id, fab_version, fab.hash_str)
-        if self._runtime_dependency_install:
+        if self._runtime_dependency_install and self._runtime_env_dir is None:
             log(DEBUG, "[flwr-agentapp] Installing app dependencies.")
             with trace_span("agentapp.dependencies"):
                 self._runtime_env_dir = install_app_dependencies(
@@ -418,7 +447,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                     },
                 )
         else:
-            log(DEBUG, "[flwr-agentapp] Runtime dependency installation is disabled.")
+            log(DEBUG, "[flwr-agentapp] Using existing runtime dependencies.")
 
         config = get_project_config(app_path)
         agent_app_attr = config["tool"]["flwr"]["app"]["components"]["agentapp"]

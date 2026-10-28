@@ -20,6 +20,8 @@ import hashlib
 import importlib
 import os
 import signal
+import subprocess
+import sys
 import threading
 from pathlib import Path
 from queue import Queue
@@ -572,3 +574,119 @@ def test_run_agentapp_keeps_cold_process_behavior(
             "success": False,
         },
     )
+
+
+def test_restart_loads_app_dependencies_before_cached_modules(tmp_path: Path) -> None:
+    """Restart discards cached dependencies and restores input without reclaiming it."""
+    base = tmp_path / "base"
+    runtime = tmp_path / "runtime"
+    base.mkdir()
+    runtime.mkdir()
+    (base / "cached_dependency.py").write_text("version = 'old'\n")
+    (runtime / "cached_dependency.py").write_text("Converter = object\n")
+    (runtime / "app_dependency.py").write_text(
+        "from cached_dependency import Converter\n"
+    )
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        """
+import importlib
+import os
+import stat
+import sys
+from pathlib import Path
+from queue import Queue
+from unittest.mock import Mock, patch
+
+from flwr.proto.runtime_pb2 import PullTaskInputResponse
+module = importlib.import_module('flwr.supercore.task_process.agent.run_agentapp')
+base, runtime = map(Path, sys.argv[1:])
+if module._RUNTIME_ENV not in os.environ:
+    sys.path.insert(0, str(base))
+    import cached_dependency
+    sys.path.insert(0, str(runtime))
+    try:
+        import app_dependency
+    except ImportError as error:
+        assert 'Converter' in str(error)
+    else:
+        raise AssertionError('Expected the cached-module import failure')
+    module._restart_with_runtime_env(runtime, PullTaskInputResponse(task_id=123))
+    raise AssertionError('Restart returned')
+
+assert stat.S_IMODE((runtime / 'task-input.pb').stat().st_mode) == 0o600
+with patch.object(module, 'HttpGrid') as grid:
+    lifecycle = module._AgentAppTaskLifecycle(
+        runtime_api_address='localhost:9092', log_queue=Queue(), token='token',
+        insecure=True, certificates=None, certificates_path=None,
+        runtime_dependency_install=True, preloaded=None,
+    )
+    response = lifecycle._pull_task_input()
+    assert response.task_id == 123
+    assert lifecycle._runtime_env_dir == runtime
+    grid.return_value._runtime_client.PullTaskInput.assert_not_called()
+assert module._RUNTIME_ENV not in os.environ
+assert not (runtime / 'task-input.pb').exists()
+import app_dependency
+assert app_dependency.Converter is object
+lifecycle.finalize()
+lifecycle.finalize()
+grid.return_value._runtime_client.PushTaskOutput.assert_called_once()
+assert not runtime.exists()
+print('Fresh dependency imports and one-time task input: PASS')
+"""
+    )
+    result = subprocess.run(
+        [sys.executable, str(probe), str(base), str(runtime)],
+        check=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)},
+        timeout=60,
+    )
+    assert "Fresh dependency imports and one-time task input: PASS" in result.stdout
+
+
+def test_dependency_restart_precedes_initial_prompt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Do not consume a chat prompt before restarting into installed dependencies."""
+    grid = Mock()
+    monkeypatch.setattr(run_agentapp_module, "HttpGrid", Mock(return_value=grid))
+    monkeypatch.setattr(run_agentapp_module, "HeartbeatSender", Mock())
+    monkeypatch.setattr(run_agentapp_module, "start_log_uploader", Mock())
+    monkeypatch.setattr(
+        run_agentapp_module, "context_from_proto", Mock(return_value=Mock(node_id=0))
+    )
+    monkeypatch.setattr(
+        run_agentapp_module, "run_from_proto", Mock(return_value=Run.create_empty(1))
+    )
+    monkeypatch.setattr(run_agentapp_module, "fab_from_proto", Mock())
+    monkeypatch.delenv(run_agentapp_module._RUNTIME_ENV, raising=False)
+    lifecycle = _AgentAppTaskLifecycle(
+        runtime_api_address="runtime.example:9092",
+        log_queue=Queue(),
+        token="task-token",
+        insecure=True,
+        certificates=None,
+        certificates_path=None,
+        runtime_dependency_install=True,
+        preloaded=None,
+    )
+
+    def prepare(_fab: Fab, _run: Run) -> tuple[Path, None, str]:
+        lifecycle._runtime_env_dir = tmp_path
+        return tmp_path, None, "app:agent"
+
+    monkeypatch.setattr(lifecycle, "_prepare_task_app", prepare)
+    restart = Mock(side_effect=SystemExit(0))
+    prompt = Mock()
+    monkeypatch.setattr(run_agentapp_module, "_restart_with_runtime_env", restart)
+    monkeypatch.setattr(run_agentapp_module, "pull_prompt", prompt)
+    with pytest.raises(SystemExit):
+        lifecycle.run()
+    grid._runtime_client.PullTaskInput.assert_called_once()
+    restart.assert_called_once_with(
+        tmp_path, grid._runtime_client.PullTaskInput.return_value
+    )
+    prompt.assert_not_called()
