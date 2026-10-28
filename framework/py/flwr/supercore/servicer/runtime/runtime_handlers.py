@@ -29,8 +29,14 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
+    DeleteFileRequest,
+    DeleteFileResponse,
     GetCompactedContextsRequest,
     GetCompactedContextsResponse,
+    GetFileRequest,
+    GetFileResponse,
+    ListFilesRequest,
+    ListFilesResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
     PushTaskEventsRequest,
@@ -39,6 +45,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskMessageResponse,
     PutCompactedContextRequest,
     PutCompactedContextResponse,
+    PutFileRequest,
+    PutFileResponse,
     RecordTaskUsageRequest,
     RecordTaskUsageResponse,
     SendTaskHeartbeatRequest,
@@ -268,6 +276,30 @@ def push_logs(
     merged_logs = "".join(request.logs)
     state.add_task_log(task.task_id, merged_logs)
     return PushLogsResponse()
+
+
+def put_file(request: PutFileRequest, state: CoreState, task: Task) -> PutFileResponse:
+    """Store a file."""
+    raise NotImplementedError
+
+
+def get_file(request: GetFileRequest, state: CoreState, task: Task) -> GetFileResponse:
+    """Get a file."""
+    raise NotImplementedError
+
+
+def list_files(
+    request: ListFilesRequest, state: CoreState, task: Task
+) -> ListFilesResponse:
+    """List file metadata."""
+    raise NotImplementedError
+
+
+def delete_file(
+    request: DeleteFileRequest, state: CoreState, task: Task
+) -> DeleteFileResponse:
+    """Delete a file."""
+    raise NotImplementedError
 
 
 def _validate_create_task_request(

@@ -35,14 +35,20 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
+    DeleteFileRequest,
+    DeleteFileResponse,
     GetCompactedContextsRequest,
     GetCompactedContextsResponse,
     GetConnectorRequest,
     GetConnectorResponse,
+    GetFileRequest,
+    GetFileResponse,
     GetNodesRequest,
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    ListFilesRequest,
+    ListFilesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -59,6 +65,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputResponse,
     PutCompactedContextRequest,
     PutCompactedContextResponse,
+    PutFileRequest,
+    PutFileResponse,
     RecordTaskUsageRequest,
     RecordTaskUsageResponse,
     SendTaskHeartbeatRequest,
@@ -277,4 +285,40 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/GetConnector",
             request=request,
             response_type=GetConnectorResponse,
+        )
+
+    def PutFile(self, request: PutFileRequest) -> PutFileResponse:
+        """Store a file."""
+        return self._unary_unary(
+            path="/v1/runtime/put-file",
+            rpc_method="/flwr.proto.Runtime/PutFile",
+            request=request,
+            response_type=PutFileResponse,
+        )
+
+    def GetFile(self, request: GetFileRequest) -> GetFileResponse:
+        """Get a file."""
+        return self._unary_unary(
+            path="/v1/runtime/get-file",
+            rpc_method="/flwr.proto.Runtime/GetFile",
+            request=request,
+            response_type=GetFileResponse,
+        )
+
+    def ListFiles(self, request: ListFilesRequest) -> ListFilesResponse:
+        """List file metadata."""
+        return self._unary_unary(
+            path="/v1/runtime/list-files",
+            rpc_method="/flwr.proto.Runtime/ListFiles",
+            request=request,
+            response_type=ListFilesResponse,
+        )
+
+    def DeleteFile(self, request: DeleteFileRequest) -> DeleteFileResponse:
+        """Delete a file."""
+        return self._unary_unary(
+            path="/v1/runtime/delete-file",
+            rpc_method="/flwr.proto.Runtime/DeleteFile",
+            request=request,
+            response_type=DeleteFileResponse,
         )
