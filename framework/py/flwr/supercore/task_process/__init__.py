@@ -19,10 +19,12 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .agent import run_agentapp
     from .connector import run_connector
+    from .model import run_model
 
 __all__ = [
     "run_agentapp",
     "run_connector",
+    "run_model",
 ]
 
 
@@ -37,6 +39,10 @@ def __getattr__(name: str) -> Any:
         from .connector import run_connector  # pylint: disable=import-outside-toplevel
 
         value = run_connector
+    elif name == "run_model":
+        from .model import run_model  # pylint: disable=import-outside-toplevel
+
+        value = run_model
     else:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     globals()[name] = value

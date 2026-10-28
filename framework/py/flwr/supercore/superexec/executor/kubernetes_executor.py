@@ -44,6 +44,8 @@ from flwr.supercore.warm_executor_constants import (
     WARM_EXECUTOR_BUSY_FILE,
     WARM_EXECUTOR_READY_DIRECTORY,
     WARM_EXECUTOR_READY_FILE,
+    WARM_MODEL_EXECUTOR_MODULE,
+    WARM_MODEL_EXECUTOR_SOCKET,
 )
 
 from .types import ExecutionSpec, LaunchResult
@@ -110,6 +112,7 @@ _RESERVED_TASKEXECUTOR_VOLUME_MOUNT_PATHS = frozenset(
         WARM_EXECUTOR_READY_FILE,
         WARM_AGENTAPP_EXECUTOR_SOCKET,
         WARM_CONNECTOR_EXECUTOR_SOCKET,
+        WARM_MODEL_EXECUTOR_SOCKET,
         WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH,
         WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH,
     }
@@ -313,7 +316,7 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
             for pool in self.warm_executor_pools
         ):
             raise ValueError(
-                "warm executor pools support only AgentApp and Connector tasks."
+                "warm executor pools support only AgentApp, Model, and Connector tasks."
             )
         if self.warm_executor_owner and not _is_dns_label(self.warm_executor_owner):
             raise ValueError("warm_executor_owner must be a DNS label.")
@@ -908,6 +911,8 @@ def _warm_executor_command(pool_key: WarmExecutorPoolKey) -> list[str]:
         ]
     if pool_key.task_type == TaskType.CONNECTOR:
         return ["python", "-m", WARM_CONNECTOR_EXECUTOR_MODULE, "serve"]
+    if pool_key.task_type == TaskType.MODEL:
+        return ["python", "-m", WARM_MODEL_EXECUTOR_MODULE, "serve"]
     return ["python", "-m", WARM_EXECUTOR_MODULE]
 
 

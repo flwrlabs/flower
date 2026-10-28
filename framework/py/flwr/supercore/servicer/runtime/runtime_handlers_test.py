@@ -215,7 +215,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Prepare
         self.state.create_task.return_value = 456
         request = CreateTaskRequest(
-            type=TaskType.SIMULATION,
+            type=TaskType.MODEL,
             model_ref="models/abc",
         )
 
@@ -228,7 +228,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         # Assert
         self.state.create_task.assert_called_once_with(
-            task_type=TaskType.SIMULATION,
+            task_type=TaskType.MODEL,
             run_id=123,
             fab_hash=None,
             model_ref="models/abc",
@@ -242,7 +242,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         """CreateTask should allow app tasks to request task creation."""
         # Prepare
         self.state.create_task.return_value = 456
-        request = CreateTaskRequest(type=TaskType.SIMULATION, model_ref="model")
+        request = CreateTaskRequest(type=TaskType.MODEL, model_ref="model")
 
         for requesting_task_type in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
             self.state.create_task.reset_mock()
@@ -257,7 +257,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
 
                 # Assert
                 self.state.create_task.assert_called_once_with(
-                    task_type=TaskType.SIMULATION,
+                    task_type=TaskType.MODEL,
                     run_id=123,
                     fab_hash=None,
                     model_ref="model",
@@ -341,7 +341,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         with self.assertRaises(RuntimeError) as err:
             runtime_handlers.create_task(
-                CreateTaskRequest(type=TaskType.SIMULATION, model_ref="model"),
+                CreateTaskRequest(type=TaskType.MODEL, model_ref="model"),
                 self.state,
                 Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
             )
@@ -352,7 +352,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             "Run 123 not found. create_task requires an existing run.",
         )
         self.state.create_task.assert_called_once_with(
-            task_type=TaskType.SIMULATION,
+            task_type=TaskType.MODEL,
             run_id=123,
             fab_hash=None,
             model_ref="model",
@@ -371,11 +371,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             ),
             (
                 CreateTaskRequest(type=TaskType.MODEL),
-                "Invalid task type: flwr-model",
-            ),
-            (
-                CreateTaskRequest(type=TaskType.MODEL, model_ref="model"),
-                "Invalid task type: flwr-model",
+                "Task type 'flwr-model' requires model_ref.",
             ),
             (
                 CreateTaskRequest(type=TaskType.CONNECTOR),
@@ -404,7 +400,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Prepare
         self.state.create_task.return_value = None
         request = CreateTaskRequest(
-            type=TaskType.SIMULATION,
+            type=TaskType.MODEL,
             model_ref="models/abc",
         )
 
@@ -627,7 +623,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                 # Execute
                 with self.assertRaises(FlowerError) as error:
                     runtime_handlers.create_task(
-                        CreateTaskRequest(type=TaskType.SIMULATION, model_ref="model"),
+                        CreateTaskRequest(type=TaskType.MODEL, model_ref="model"),
                         self.state,
                         Mock(run_id=123, type=requesting_task_type),
                     )

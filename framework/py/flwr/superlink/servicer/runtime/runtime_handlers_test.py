@@ -575,7 +575,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
     def test_create_task_uses_authenticated_run_id(self) -> None:
         """CreateTask should create tasks for the authenticated run."""
         response = core_runtime_handlers.create_task(
-            CreateTaskRequest(type=TaskType.SIMULATION, model_ref="models/abc"),
+            CreateTaskRequest(type=TaskType.MODEL, model_ref="models/abc"),
             self.state,
             self._auth_task,
         )
@@ -583,7 +583,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         assert response.HasField("task_id")
         task = self.state.get_tasks(task_ids=[response.task_id])[0]
         assert task.run_id == self._auth_run_id
-        assert task.type == TaskType.SIMULATION
+        assert task.type == TaskType.MODEL
         assert task.model_ref == "models/abc"
 
     def test_start_automation_enriches_connector_ids(self) -> None:

@@ -22,7 +22,7 @@ from typing import ClassVar
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
-from flwr.supercore.constant import TASK_TYPE_TO_COMMAND, TaskType
+from flwr.supercore.constant import TaskType
 from flwr.supercore.superexec.executor import ExecutionSpec, Executor, LaunchResult
 
 from .exec_plugin import ExecPlugin
@@ -128,6 +128,6 @@ class AutoExecPlugin(BaseExecPlugin):
 
     suppress_output = True
     visible_output_task_types = frozenset(
-        {TaskType.AGENT_APP, TaskType.CLIENT_APP, TaskType.CONNECTOR}
+        {TaskType.AGENT_APP, TaskType.CLIENT_APP, TaskType.CONNECTOR, TaskType.MODEL}
     )
-    supported_task_types = frozenset(TASK_TYPE_TO_COMMAND)
+    supported_task_types = frozenset(TaskType)
