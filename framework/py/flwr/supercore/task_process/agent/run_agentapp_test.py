@@ -31,7 +31,11 @@ import pytest
 
 from flwr.agentapp import AgentApp, LoadAgentAppError
 from flwr.app import ConfigRecord, Message, RecordDict
-from flwr.common.constant import SubStatus
+from flwr.common.constant import (
+    FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
+    FLWR_TASK_TOKEN_LENGTH,
+    SubStatus,
+)
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
@@ -611,7 +615,9 @@ if module._RUNTIME_ENV not in os.environ:
         assert 'Converter' in str(error)
     else:
         raise AssertionError('Expected the cached-module import failure')
-    module._restart_with_runtime_env(runtime, PullTaskInputResponse(task_id=123))
+    module._restart_with_runtime_env(
+        runtime, PullTaskInputResponse(task_id=123), 'token'
+    )
     raise AssertionError('Restart returned')
 
 assert stat.S_IMODE((runtime / 'task-input.pb').stat().st_mode) == 0o600
@@ -687,6 +693,81 @@ def test_dependency_restart_precedes_initial_prompt(
         lifecycle.run()
     grid._runtime_client.PullTaskInput.assert_called_once()
     restart.assert_called_once_with(
-        tmp_path, grid._runtime_client.PullTaskInput.return_value
+        tmp_path, grid._runtime_client.PullTaskInput.return_value, "task-token"
     )
     prompt.assert_not_called()
+
+
+def test_restart_preserves_stdin_cli_token(tmp_path: Path) -> None:
+    """Preserve stdin authentication privately and acknowledge startup only once."""
+    probe = tmp_path / "stdin_probe.py"
+    probe.write_text(
+        """
+import importlib
+import os
+import stat
+import sys
+from pathlib import Path
+from queue import Queue
+from unittest.mock import patch
+
+from flwr.proto.runtime_pb2 import PullTaskInputResponse
+cli = importlib.import_module('flwr.supercore.cli.flwr_agentapp')
+module = importlib.import_module('flwr.supercore.task_process.agent.run_agentapp')
+runtime = Path(__file__).parent / 'runtime'
+
+def run_agentapp(**kwargs):
+    assert kwargs['runtime_dependency_install'] is True
+    token = kwargs['token']
+    if module._RUNTIME_ENV not in os.environ:
+        assert sys.stdin.closed
+        runtime.mkdir()
+        module._restart_with_runtime_env(
+            runtime, PullTaskInputResponse(task_id=123), token
+        )
+        raise AssertionError('Restart returned')
+    assert '--token-stdin' not in sys.argv
+    assert token not in '\\0'.join(sys.orig_argv)
+    token_path = Path(sys.argv[sys.argv.index('--token-file') + 1])
+    assert stat.S_IMODE(token_path.stat().st_mode) == 0o600
+    assert token_path.read_text() == token
+    with patch.object(module, 'HttpGrid') as grid:
+        lifecycle = module._AgentAppTaskLifecycle(
+            runtime_api_address=kwargs['runtime_api_address'], log_queue=Queue(),
+            token=token, insecure=True, certificates=None, certificates_path=None,
+            runtime_dependency_install=True, preloaded=None,
+        )
+        assert lifecycle._pull_task_input().task_id == 123
+        grid.return_value._runtime_client.PullTaskInput.assert_not_called()
+        lifecycle.finalize()
+        grid.return_value._runtime_client.PushTaskOutput.assert_called_once()
+    assert not runtime.exists()
+    print('Stdin-authenticated CLI restart: PASS')
+
+with (
+    patch.object(cli, 'run_agentapp', run_agentapp),
+    patch.object(cli, 'mirror_output_to_queue'),
+    patch.object(cli, 'restore_output'),
+):
+    cli.flwr_agentapp()
+"""
+    )
+    token = "ab" * FLWR_TASK_TOKEN_LENGTH
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(probe),
+            "--token-stdin",
+            "--insecure",
+            "--allow-runtime-dependency-installation",
+        ],
+        input=f"{token}\n",
+        check=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)},
+        timeout=60,
+    )
+    assert result.stdout.count(FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT) == 1
+    assert "Stdin-authenticated CLI restart: PASS" in result.stdout
+    assert token not in result.stdout + result.stderr

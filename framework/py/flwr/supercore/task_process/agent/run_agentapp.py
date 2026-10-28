@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
+from tempfile import NamedTemporaryFile
 from time import monotonic
 from types import FrameType
 from typing import Any, cast
@@ -112,7 +113,7 @@ _RUNTIME_ENV = "FLWR_AGENTAPP_RUNTIME_ENV"
 
 
 def _restart_with_runtime_env(
-    runtime_env_dir: Path, task_input: PullTaskInputResponse
+    runtime_env_dir: Path, task_input: PullTaskInputResponse, token: str
 ) -> None:
     """Restart with app dependencies available before framework imports."""
     input_path = runtime_env_dir / "task-input.pb"
@@ -122,7 +123,15 @@ def _restart_with_runtime_env(
     environ = os.environ.copy()
     environ[_RUNTIME_ENV] = str(runtime_env_dir)
     environ["PYTHONPATH"] = os.pathsep.join(sys.path)
-    os.execve(sys.executable, [sys.executable, *sys.orig_argv[1:]], environ)
+    args = [sys.executable, *sys.orig_argv[1:]]
+    if "--token-stdin" in args:
+        with NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=runtime_env_dir, delete=False
+        ) as token_file:
+            token_file.write(token)
+        args.remove("--token-stdin")
+        args.extend(["--token-file", token_file.name])
+    os.execve(sys.executable, args, environ)
 
 
 @dataclass(frozen=True)
@@ -312,7 +321,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             ):
                 app_path, agent_app, agent_app_attr = self._prepare_task_app(fab, run)
                 if self._runtime_env_dir is not None and not runtime_ready:
-                    _restart_with_runtime_env(self._runtime_env_dir, res)
+                    _restart_with_runtime_env(self._runtime_env_dir, res, self._token)
 
                 # Initialize the AgentApp session
                 with trace_span("agentapp.session"):
