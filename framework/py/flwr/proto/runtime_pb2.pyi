@@ -653,3 +653,177 @@ class AcquireTaskResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["task", b"task", "token", b"token"]) -> None: ...
 
 global___AcquireTaskResponse = AcquireTaskResponse
+
+@typing.final
+class FileMetadata(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KEY_FIELD_NUMBER: builtins.int
+    REVISION_FIELD_NUMBER: builtins.int
+    SIZE_BYTES_FIELD_NUMBER: builtins.int
+    key: builtins.str
+    revision: builtins.int
+    size_bytes: builtins.int
+    def __init__(
+        self,
+        *,
+        key: builtins.str = ...,
+        revision: builtins.int = ...,
+        size_bytes: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["key", b"key", "revision", b"revision", "size_bytes", b"size_bytes"]) -> None: ...
+
+global___FileMetadata = FileMetadata
+
+@typing.final
+class PutFileRequest(google.protobuf.message.Message):
+    """PutFile messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KEY_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    EXPECTED_REVISION_FIELD_NUMBER: builtins.int
+    key: builtins.str
+    data: builtins.bytes
+    expected_revision: builtins.int
+    """Absent means create-only"""
+    def __init__(
+        self,
+        *,
+        key: builtins.str = ...,
+        data: builtins.bytes = ...,
+        expected_revision: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_expected_revision", b"_expected_revision", "expected_revision", b"expected_revision"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_expected_revision", b"_expected_revision", "data", b"data", "expected_revision", b"expected_revision", "key", b"key"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_expected_revision", b"_expected_revision"]) -> typing.Literal["expected_revision"] | None: ...
+
+global___PutFileRequest = PutFileRequest
+
+@typing.final
+class PutFileResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    REVISION_FIELD_NUMBER: builtins.int
+    revision: builtins.int
+    def __init__(
+        self,
+        *,
+        revision: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["revision", b"revision"]) -> None: ...
+
+global___PutFileResponse = PutFileResponse
+
+@typing.final
+class GetFileRequest(google.protobuf.message.Message):
+    """GetFile messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KEY_FIELD_NUMBER: builtins.int
+    key: builtins.str
+    def __init__(
+        self,
+        *,
+        key: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["key", b"key"]) -> None: ...
+
+global___GetFileRequest = GetFileRequest
+
+@typing.final
+class GetFileResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    REVISION_FIELD_NUMBER: builtins.int
+    data: builtins.bytes
+    revision: builtins.int
+    def __init__(
+        self,
+        *,
+        data: builtins.bytes = ...,
+        revision: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "revision", b"revision"]) -> None: ...
+
+global___GetFileResponse = GetFileResponse
+
+@typing.final
+class ListFilesRequest(google.protobuf.message.Message):
+    """ListFiles messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PREFIX_FIELD_NUMBER: builtins.int
+    START_AFTER_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
+    prefix: builtins.str
+    start_after: builtins.str
+    """Empty means start from beginning."""
+    limit: builtins.int
+    def __init__(
+        self,
+        *,
+        prefix: builtins.str = ...,
+        start_after: builtins.str = ...,
+        limit: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_limit", b"_limit", "limit", b"limit"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_limit", b"_limit", "limit", b"limit", "prefix", b"prefix", "start_after", b"start_after"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+
+global___ListFilesRequest = ListFilesRequest
+
+@typing.final
+class ListFilesResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FILES_FIELD_NUMBER: builtins.int
+    NEXT_START_AFTER_FIELD_NUMBER: builtins.int
+    next_start_after: builtins.str
+    """Last returned key if more results exist; empty otherwise."""
+    @property
+    def files(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FileMetadata]: ...
+    def __init__(
+        self,
+        *,
+        files: collections.abc.Iterable[global___FileMetadata] | None = ...,
+        next_start_after: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["files", b"files", "next_start_after", b"next_start_after"]) -> None: ...
+
+global___ListFilesResponse = ListFilesResponse
+
+@typing.final
+class DeleteFileRequest(google.protobuf.message.Message):
+    """DeleteFile messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KEY_FIELD_NUMBER: builtins.int
+    EXPECTED_REVISION_FIELD_NUMBER: builtins.int
+    key: builtins.str
+    expected_revision: builtins.int
+    """Must match the current revision."""
+    def __init__(
+        self,
+        *,
+        key: builtins.str = ...,
+        expected_revision: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["expected_revision", b"expected_revision", "key", b"key"]) -> None: ...
+
+global___DeleteFileRequest = DeleteFileRequest
+
+@typing.final
+class DeleteFileResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___DeleteFileResponse = DeleteFileResponse
