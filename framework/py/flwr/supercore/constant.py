@@ -254,7 +254,7 @@ class TaskType(StrEnum):
     CLIENT_APP = "flwr-clientapp"
     SIMULATION = "flwr-simulation"
     AGENT_APP = "flwr-agentapp"
-    MODEL = "flwr-model"
+    MODEL = "flwr-model"  # Retained for decoding historical persisted tasks
     CONNECTOR = "flwr-connector"
 
 
@@ -262,7 +262,6 @@ TASK_TYPE_TO_APPIO_API_ADDRESS_ARG: dict[TaskType, str] = {
     TaskType.AGENT_APP: "--runtime-api-address",
     TaskType.CLIENT_APP: "--runtime-api-address",
     TaskType.CONNECTOR: "--runtime-api-address",
-    TaskType.MODEL: "--runtime-api-address",
     TaskType.SERVER_APP: "--runtime-api-address",
     TaskType.SIMULATION: "--runtime-api-address",
 }
@@ -270,7 +269,6 @@ TASK_TYPE_TO_COMMAND: dict[TaskType, str] = {
     TaskType.AGENT_APP: "flwr-agentapp",
     TaskType.CLIENT_APP: "flwr-clientapp",
     TaskType.CONNECTOR: "flwr-connector",
-    TaskType.MODEL: "flwr-model",
     TaskType.SERVER_APP: "flwr-serverapp",
     TaskType.SIMULATION: "flwr-simulation",
 }
@@ -288,7 +286,6 @@ TASK_TYPES_REQUIRING_FAB_HASH: frozenset[TaskType] = frozenset(
         TaskType.AGENT_APP,
     }
 )
-TASK_TYPES_REQUIRING_MODEL_REF: frozenset[TaskType] = frozenset({TaskType.MODEL})
 TASK_TYPES_REQUIRING_CONNECTOR_REF: frozenset[TaskType] = frozenset(
     {TaskType.CONNECTOR}
 )
