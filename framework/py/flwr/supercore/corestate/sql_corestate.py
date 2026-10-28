@@ -61,6 +61,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartRunRequest,
 )
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
@@ -566,6 +567,26 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 for message_object_id in message_object_ids:
                     self.object_store.delete(message_object_id)
                 self.cancel_messages(message_ids=message_object_ids)
+
+    def put_file(
+        self, scope: str, key: str, data: bytes, expected_revision: int | None
+    ) -> int:
+        """Create or update a file with a revision precondition."""
+        raise NotImplementedError
+
+    def get_file(self, scope: str, key: str) -> File | None:
+        """Return the current file, or None if absent or deleted."""
+        raise NotImplementedError
+
+    def list_files(
+        self, scope: str, prefix: str = "", start_after: str = "", limit: int = 100
+    ) -> Sequence[FileMetadata]:
+        """List live file metadata in lexicographic key order."""
+        raise NotImplementedError
+
+    def delete_file(self, scope: str, key: str, expected_revision: int) -> None:
+        """Delete a file with a matching revision, preserving revision history."""
+        raise NotImplementedError
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
