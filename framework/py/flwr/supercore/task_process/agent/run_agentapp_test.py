@@ -913,18 +913,32 @@ _restart_with_runtime_env(
     [signal.SIGINT, signal.SIGTERM]
     + ([signal.SIGQUIT] if hasattr(signal, "SIGQUIT") else []),
 )
-def test_restart_supervisor_forwards_termination(tmp_path: Path, signum: int) -> None:
-    """Terminating the supervisor must terminate its AgentApp child too."""
+@pytest.mark.parametrize(
+    "group_signal",
+    [
+        False,
+        pytest.param(
+            True,
+            marks=pytest.mark.skipif(os.name != "posix", reason="POSIX process groups"),
+        ),
+    ],
+)
+def test_restart_supervisor_forwards_termination(
+    tmp_path: Path, signum: int, group_signal: bool
+) -> None:
+    """Forward PID and group signals once, allowing the child to finalize."""
     child = tmp_path / "child.py"
     ready = tmp_path / "ready"
     stopped = tmp_path / "stopped"
     child.write_text(
-        "import signal, sys, time\nfrom pathlib import Path\n"
-        "def stop(*_args):\n"
+        "import os, signal, sys, time\nfrom pathlib import Path\n"
+        "def stop(signum, _frame):\n"
+        "    signal.signal(signum, signal.SIG_DFL)\n"
+        "    time.sleep(0.1)\n"
         "    Path(sys.argv[2]).touch()\n"
         "    sys.exit(0)\n"
         "signal.signal(int(sys.argv[3]), stop)\n"
-        "Path(sys.argv[1]).touch()\n"
+        "Path(sys.argv[1]).write_text(str(os.getpid()))\n"
         "while True: time.sleep(0.01)\n"
     )
     (tmp_path / "restart.json").write_text(
@@ -946,6 +960,7 @@ def test_restart_supervisor_forwards_termination(tmp_path: Path, signum: int) ->
     with subprocess.Popen(
         [sys.executable, str(bootstrap)],
         env={**os.environ, run_agentapp_module._RUNTIME_ENV: str(tmp_path)},
+        start_new_session=os.name == "posix",
     ) as process:
         try:
             for _ in range(1000):
@@ -953,9 +968,15 @@ def test_restart_supervisor_forwards_termination(tmp_path: Path, signum: int) ->
                     break
                 threading.Event().wait(0.01)
             assert ready.exists()
-            process.send_signal(signum)
+            if os.name == "posix":
+                assert os.getpgid(int(ready.read_text())) != os.getpgid(process.pid)
+            if group_signal:
+                os.killpg(process.pid, signum)
+            else:
+                process.send_signal(signum)
             assert process.wait(timeout=10) == 0
         finally:
             if process.poll() is None:
-                process.kill()
+                process.terminate()
+                process.wait(timeout=10)
     assert stopped.exists()

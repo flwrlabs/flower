@@ -29,10 +29,15 @@ def main() -> int:
     state = json.loads((runtime_env_dir / "restart.json").read_text())
     environ = os.environ.copy()
     environ["PYTHONPATH"] = os.pathsep.join(state["pythonpath"])
-    with subprocess.Popen(state["args"], env=environ) as process:
+    with subprocess.Popen(
+        state["args"], env=environ, start_new_session=os.name == "posix"
+    ) as process:
 
         def forward_signal(signum: int, _frame: FrameType | None) -> None:
-            process.send_signal(signum)
+            if os.name == "posix":
+                os.killpg(process.pid, signum)
+            else:
+                process.send_signal(signum)
 
         supported_signals = [signal.SIGINT, signal.SIGTERM]
         if hasattr(signal, "SIGQUIT"):
