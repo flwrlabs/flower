@@ -12,7 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Utility functions for differential privacy."""
+"""Utility functions for differential privacy.
+
+Notes
+-----
+DP operations (clipping and Gaussian noise addition) strictly operate on floating-point
+arrays. Non-floating point arrays (such as integer tracking counters like
+`BatchNorm.num_batches_tracked`) are excluded from norm calculation, clipping, and
+noise addition to maintain counter integrity. Any private, sensitive, or data-dependent
+state must not be stored as unclipped integer buffers without explicit DP protection.
+"""
 
 
 from logging import WARNING
@@ -35,7 +44,11 @@ CLIENTS_DISCREPANCY_WARNING = (
 
 def get_norm(input_arrays: NDArrays) -> float:
     """Compute the L2 norm of the flattened input."""
-    array_norms = [np.linalg.norm(array.flat) for array in input_arrays]
+    float_arrays = [
+        array for array in input_arrays if np.issubdtype(array.dtype, np.floating)
+    ]
+    arrays_to_norm = float_arrays if float_arrays else input_arrays
+    array_norms = [np.linalg.norm(array.flat) for array in arrays_to_norm]
     # pylint: disable=consider-using-generator
     return float(np.sqrt(sum([norm**2 for norm in array_norms])))
 
@@ -43,6 +56,8 @@ def get_norm(input_arrays: NDArrays) -> float:
 def add_gaussian_noise_inplace(input_arrays: NDArrays, std_dev: float) -> None:
     """Add Gaussian noise to each element of the input arrays."""
     for array in input_arrays:
+        if not np.issubdtype(array.dtype, np.floating):
+            continue
         noise = np.random.normal(0, std_dev, array.shape).astype(array.dtype)
         array += noise
 
@@ -53,9 +68,12 @@ def clip_inputs_inplace(input_arrays: NDArrays, clipping_norm: float) -> None:
     FlatClip method of the paper: https://arxiv.org/abs/1710.06963
     """
     input_norm = get_norm(input_arrays)
+    if input_norm == 0.0:
+        return
     scaling_factor = min(1, clipping_norm / input_norm)
     for array in input_arrays:
-        array *= scaling_factor
+        if np.issubdtype(array.dtype, np.floating):
+            array *= scaling_factor
 
 
 def compute_stdv(
@@ -88,9 +106,12 @@ def adaptive_clip_inputs_inplace(input_arrays: NDArrays, clipping_norm: float) -
     FlatClip method of the paper: https://arxiv.org/abs/1710.06963
     """
     input_norm = get_norm(input_arrays)
+    if input_norm == 0.0:
+        return False
     scaling_factor = min(1, clipping_norm / input_norm)
     for array in input_arrays:
-        array *= scaling_factor
+        if np.issubdtype(array.dtype, np.floating):
+            array *= scaling_factor
     return scaling_factor < 1
 
 
