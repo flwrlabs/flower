@@ -579,7 +579,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         raise NotImplementedError
 
     def list_files(
-        self, scope: str, prefix: str = "", start_after: str = "", limit: int = 100
+        self, scope: str, prefix: str, start_after: str, limit: int | None
     ) -> Sequence[FileMetadata]:
         """List live file metadata in lexicographic key order."""
         raise NotImplementedError

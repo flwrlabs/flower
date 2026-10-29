@@ -47,13 +47,7 @@ from ..object_store import ObjectStore
 
 
 class CoreState(ABC):  # pylint: disable=R0904
-    """Abstract base class for core state.
-
-    File storage treats scope as an opaque string; CoreState does not resolve
-    ownership or handle authentication. Revisions are positive, monotonically
-    increasing integers for each (scope, key) pair, including across deletion
-    and recreation.
-    """
+    """Abstract base class for core state."""
 
     @abstractmethod
     def get_node_id(self) -> int:
@@ -145,6 +139,11 @@ class CoreState(ABC):  # pylint: disable=R0904
     ) -> int:
         """Create or update a file with a revision precondition.
 
+        File storage treats scope as an opaque string; CoreState does not resolve
+        ownership or handle authentication. Revisions are positive, monotonically
+        increasing integers for each (scope, key) pair, including across deletion
+        and recreation.
+
         Parameters
         ----------
         scope : str
@@ -182,7 +181,7 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def list_files(
-        self, scope: str, prefix: str = "", start_after: str = "", limit: int = 100
+        self, scope: str, prefix: str, start_after: str, limit: int | None
     ) -> Sequence[FileMetadata]:
         """List live file metadata in lexicographic key order.
 
@@ -190,12 +189,12 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         scope : str
             Opaque file namespace.
-        prefix : str, (default: "")
+        prefix : str
             Include only files whose keys start with this prefix.
-        start_after : str, (default: "")
+        start_after : str
             Exclusive cursor; include only keys greater than this value.
-        limit : int, (default: 100)
-            Maximum number of files to return.
+        limit : int | None
+            Maximum number of files to return. If None, no limit is applied.
 
         Returns
         -------
