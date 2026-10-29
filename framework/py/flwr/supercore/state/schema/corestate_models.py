@@ -162,7 +162,7 @@ class Agent(FlwrBase):
         nullable=False,
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
-    title: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     app_spec: Mapped[str] = mapped_column(String, nullable=False)
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)

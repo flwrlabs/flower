@@ -17,7 +17,7 @@ erDiagram
     TEXT description "nullable"
     VARCHAR flwr_aid
     VARCHAR name
-    VARCHAR title
+    VARCHAR title "nullable"
     TIMESTAMP updated_at
   }
 
