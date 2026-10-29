@@ -183,10 +183,22 @@ class WarmExecutorUnavailable(RuntimeError):
 
 
 @dataclass
+class PendingWarmExecutor:
+    """Keep one creation identity until it is observed, claimed or rejected."""
+
+    key: WarmExecutorPoolKey
+    executor_id: str
+    retry_at: float = 0.0
+    may_exist: bool = False
+
+
+@dataclass
 class WarmExecutorPoolState:
     """Coordinate dispatch reservations with maintenance and shutdown."""
 
     busy_pods: set[str] = field(default_factory=set)
+    consumed_pods: set[str] = field(default_factory=set)
+    pending_creations: dict[str, PendingWarmExecutor] = field(default_factory=dict)
     retiring_pods: dict[str, WarmExecutorPoolKey | None] = field(default_factory=dict)
     closed: bool = False
     lock: threading.RLock = field(default_factory=threading.RLock)

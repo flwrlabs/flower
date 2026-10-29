@@ -28,6 +28,7 @@ from .kubernetes_resources import WarmExecutorResources
 from .types import ExecutionSpec, LaunchResult
 from .warm_executor_dispatch import WarmExecutorDispatcher
 from .warm_executor_pool import (
+    PendingWarmExecutor,
     WarmExecutorPoolConfig,
     WarmExecutorPoolKey,
     WarmExecutorPoolState,
@@ -51,7 +52,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
     def __init__(
         self,
         resources: WarmExecutorResources,
-        active_pod_count: Callable[[], int],
+        active_pod_count: Callable[[set[str]], int],
         *,
         request_maintenance: Callable[[], None] | None = None,
         sweep_completed_pods: Callable[[], None] | None = None,
@@ -66,7 +67,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
         self._busy_pods = self._state.busy_pods
         self._retiring_pods = self._state.retiring_pods
         self._pool_creation_not_before: dict[WarmExecutorPoolKey, float] = {}
-        self._pending_creations: dict[str, tuple[WarmExecutorPoolKey, float]] = {}
+        self._pending_creations = self._state.pending_creations
         self._cleanup_started = False
         self._maintenance_started_at = config.monotonic()
         self._maintenance_lock = threading.Lock()
@@ -132,7 +133,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             now = self._config.monotonic()
             deadlines = [
                 *self._pool_creation_not_before.values(),
-                *(retry_at for _, retry_at in self._pending_creations.values()),
+                *(pending.retry_at for pending in self._pending_creations.values()),
             ]
             # Already-attempted deadlines must not spin when capacity stays full.
             delays = [
@@ -145,10 +146,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
     def pending_pod_names(self) -> set[str]:
         """Count unobserved creations against foreground admission capacity."""
         with self._lock:
-            return {
-                self._resources.pod_name(executor_id)
-                for executor_id in self._pending_creations
-            }
+            return set(self._pending_creations)
 
     def stop(self) -> None:
         """Stop new dispatch and creation without waiting for Kubernetes I/O."""
@@ -163,19 +161,25 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             self._state.closed = True
             self._cleanup_started = True
             busy_pods = self._busy_pods.copy()
+            consumed_pods = self._state.consumed_pods.copy()
         with self._maintenance_lock:
             pods = self._resources.list_owned()
             pending_names = self.pending_pod_names()
         if pods is None:
             pods = []
-        observed_names = {_object_name(pod) for pod in pods}
+        observed_names = {
+            name for pod in pods if (name := _object_name(pod)) is not None
+        }
         for pod in pods:
             pod_name = _object_name(pod)
             if (
                 pod_name is not None
                 and pod_name not in busy_pods
                 and (
-                    not is_consumed_warm_executor(pod)
+                    (
+                        not is_consumed_warm_executor(pod)
+                        and pod_name not in consumed_pods
+                    )
                     or self._resources.consumed_has_finished(pod)
                 )
             ):
@@ -197,23 +201,24 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
         pods = self._resources.list_owned()
         if pods is None:
             return
-        observed_names = {_object_name(pod) for pod in pods}
+        observed_names = {
+            name for pod in pods if (name := _object_name(pod)) is not None
+        }
         with self._lock:
-            for executor_id in tuple(self._pending_creations):
-                if self._resources.pod_name(executor_id) in observed_names:
-                    self._pending_creations.pop(executor_id)
+            for pod_name in observed_names:
+                self._pending_creations.pop(pod_name, None)
             pending = [
-                (executor_id, retry_at)
-                for executor_id, (key, retry_at) in self._pending_creations.items()
-                if key == pool.key
+                (pod_name, creation)
+                for pod_name, creation in self._pending_creations.items()
+                if creation.key == pool.key
             ]
-        for executor_id, retry_at in pending:
-            if self._config.monotonic() >= retry_at:
+        for pod_name, creation in pending:
+            if self._config.monotonic() >= creation.retry_at:
                 if not self._has_creation_capacity(
                     reserved_pod_capacity, reusing_pending=True
                 ):
                     continue
-                self._create_pending_pod(pool.key, executor_id)
+                self._create_pending_pod(pod_name)
         with self._lock:
             if self._state.closed or pool.key in self._retiring_pods.values():
                 return
@@ -222,9 +227,14 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
                 for pod in pods
                 if self._resources.is_active(pod, pool.key)
                 and _object_name(pod) not in self._busy_pods
+                and _object_name(pod) not in self._state.consumed_pods
                 and not is_consumed_warm_executor(pod)
             )
-        pods_to_create = max(pool.size - compatible_count - len(pending), 0)
+            pending_count = sum(
+                creation.key == pool.key
+                for creation in self._pending_creations.values()
+            )
+        pods_to_create = max(pool.size - compatible_count - pending_count, 0)
         for index in range(pods_to_create):
             # Foreground cold launches may consume headroom during a slow create.
             if not self._has_creation_capacity(reserved_pod_capacity):
@@ -235,8 +245,11 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
                     return
                 if index == 0 and pool.key.fab_hash is not None:
                     self._delay_pool_creation(pool.key)
-                self._pending_creations[executor_id] = (pool.key, 0.0)
-            if not self._create_pending_pod(pool.key, executor_id):
+                pod_name = self._resources.pod_name(executor_id)
+                self._pending_creations[pod_name] = PendingWarmExecutor(
+                    pool.key, executor_id
+                )
+            if not self._create_pending_pod(pod_name):
                 return
 
     def _has_creation_capacity(
@@ -246,13 +259,12 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
         with self._lock:
             if self._state.closed:
                 return False
-            pending_count = len(self._pending_creations) - int(reusing_pending)
+            pending_names = set(self._pending_creations)
         if self._config.active_pod_budget is None:
             return True
         try:
-            return self._config.active_pod_budget > (
-                self._active_pod_count() + reserved_pod_capacity + pending_count
-            )
+            required = self._active_pod_count(pending_names) + reserved_pod_capacity
+            return required + int(not reusing_pending) <= self._config.active_pod_budget
         except Exception:  # pylint: disable=broad-exception-caught
             log(
                 WARNING,
@@ -261,23 +273,40 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             )
             return False
 
-    def _create_pending_pod(self, key: WarmExecutorPoolKey, executor_id: str) -> bool:
-        """Retry an uncertain creation with the same Pod identity."""
+    def _create_pending_pod(self, pod_name: str) -> bool:
+        """Retry possibly accepted creations without resurrecting claimed workers."""
+        with self._lock:
+            pending = self._pending_creations.get(pod_name)
+            if pending is None or self._state.closed:
+                return False
         try:
-            self._resources.create(key, executor_id)
-        except Exception:  # pylint: disable=broad-exception-caught
+            self._resources.create(pending.key, pending.executor_id)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             with self._lock:
-                self._pending_creations[executor_id] = (
-                    key,
-                    self._config.monotonic() + _WARM_EXECUTOR_CREATION_RETRY_SECONDS,
-                )
+                if self._pending_creations.get(pod_name) is pending:
+                    retry_at = (
+                        self._config.monotonic() + _WARM_EXECUTOR_CREATION_RETRY_SECONDS
+                    )
+                    if (
+                        self._resources.is_definite_rejection(exc)
+                        and not pending.may_exist
+                    ):
+                        self._pending_creations.pop(pod_name)
+                        self._pool_creation_not_before[pending.key] = max(
+                            self._pool_creation_not_before.get(pending.key, retry_at),
+                            retry_at,
+                        )
+                    else:
+                        pending.may_exist = True
+                        pending.retry_at = retry_at
             log(WARNING, "Failed to create a warm TaskExecutor Pod.", exc_info=True)
             return False
         with self._lock:
-            self._pending_creations[executor_id] = (
-                key,
-                self._config.monotonic() + _WARM_EXECUTOR_CREATION_CONFIRM_SECONDS,
-            )
+            if self._pending_creations.get(pod_name) is pending:
+                pending.may_exist = True
+                pending.retry_at = (
+                    self._config.monotonic() + _WARM_EXECUTOR_CREATION_CONFIRM_SECONDS
+                )
         return True
 
     def _delay_pool_creation(self, key: WarmExecutorPoolKey) -> None:
@@ -319,13 +348,16 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
                 ),
                 None,
             )
-            if pod_name is not None and is_consumed_warm_executor(pod):
+            with self._lock:
+                consumed = pod_name in self._state.consumed_pods
+            if pod_name is not None and (is_consumed_warm_executor(pod) or consumed):
                 with self._lock:
                     busy = pod_name in self._busy_pods
                 if not busy and self._resources.consumed_has_finished(pod):
                     self._retire_idle_pod(
                         pod_name,
                         retiring_pool.key if retiring_pool is not None else None,
+                        confirmed_finished=True,
                     )
                 continue
             with self._lock:
@@ -375,17 +407,24 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
     def _release_pod(self, pod_name: str) -> None:
         with self._lock:
             self._busy_pods.discard(pod_name)
+            self._state.consumed_pods.discard(pod_name)
+            self._pending_creations.pop(pod_name, None)
             self._retiring_pods.pop(pod_name, None)
 
     def _retire_idle_pod(
-        self, pod_name: str, key: WarmExecutorPoolKey | None = None
+        self,
+        pod_name: str,
+        key: WarmExecutorPoolKey | None = None,
+        *,
+        confirmed_finished: bool = False,
     ) -> None:
-        """Retire an idle Pod only if dispatch has not claimed it meanwhile."""
+        """Retire an idle snapshot only if it cannot hide an unconfirmed task."""
         with self._lock:
             if (
                 self._state.closed
                 or pod_name in self._busy_pods
                 or pod_name in self._retiring_pods
+                or (pod_name in self._state.consumed_pods and not confirmed_finished)
             ):
                 return
             self._retiring_pods[pod_name] = key

@@ -49,7 +49,7 @@ class KubernetesExecutor:  # pylint: disable=too-many-instance-attributes
         self._warm_executor_pool_manager = (
             WarmExecutorPoolManager(
                 WarmExecutorResources(client, config, exec_client, probe_client),
-                lambda: self._active_pod_count(include_pending=False),
+                self._resources.active_pod_count,
                 sweep_completed_pods=self._sweep_completed_pods_if_due,
             )
             if config.warm_executor_owner

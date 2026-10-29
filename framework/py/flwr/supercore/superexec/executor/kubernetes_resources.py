@@ -1286,6 +1286,20 @@ class WarmExecutorResources:
         exec_client: KubernetesClient | None = None,
         probe_client: KubernetesClient | None = None,
     ) -> None:
+        transports = [
+            getattr(api, "api_client", api)
+            for api in (client, exec_client, probe_client)
+        ]
+        if config.warm_executor_owner and (
+            exec_client is None
+            or probe_client is None
+            or any(
+                a is b for i, a in enumerate(transports) for b in transports[i + 1 :]
+            )
+        ):
+            raise ValueError(
+                "Warm executors need independent REST, dispatch and probe transports."
+            )
         self._client = client
         self.config = config
         self._exec_client = exec_client or client
@@ -1295,6 +1309,11 @@ class WarmExecutorResources:
             threading.Lock() if probe_client is not None else self._exec_client_lock
         )
         self._lifecycle_lock = threading.RLock()
+
+    @staticmethod
+    def is_definite_rejection(exc: Exception) -> bool:
+        """Return whether submission was rejected before creating a resource."""
+        return _is_definite_pod_rejection(exc)
 
     @staticmethod
     def pod_name(executor_id: str) -> str:

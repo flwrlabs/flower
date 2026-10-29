@@ -516,6 +516,7 @@ class WarmExecutorDispatcher:
         return (
             pod_name is not None
             and pod_name not in self._busy_pods
+            and pod_name not in self._state.consumed_pods
             and pod_name not in self._retiring_pods
             and not is_consumed_warm_executor(pod)
             and self._resources.has_configuration(pod, key)
@@ -537,6 +538,8 @@ class WarmExecutorDispatcher:
                     except WarmExecutorUnavailable:
                         self._retire_unavailable_pod(pod_name, pool.key)
                         raise
+                    self._state.consumed_pods.add(pod_name)
+                    self._state.pending_creations.pop(pod_name, None)
                     self._busy_pods.add(pod_name)
                     return pool, pod_name
         return None
@@ -592,6 +595,8 @@ class WarmExecutorDispatcher:
     def _release_pod(self, pod_name: str) -> None:
         with self._lock:
             self._busy_pods.discard(pod_name)
+            self._state.consumed_pods.discard(pod_name)
+            self._state.pending_creations.pop(pod_name, None)
             self._retiring_pods.pop(pod_name, None)
 
     def _retire_unavailable_pod(self, pod_name: str, key: WarmExecutorPoolKey) -> None:

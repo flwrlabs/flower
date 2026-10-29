@@ -247,8 +247,8 @@ def test_exact_agentapp_pool_falls_back_to_ready_generic_pool(
     generic_pod = _ready_warm_pod(generic_key, config, name="generic-ready")
     client.list_namespaced_pod.return_value = {"items": [generic_pod]}
     manager = maintenance.WarmExecutorPoolManager(  # pylint: disable=protected-access
-        kube_resources.WarmExecutorResources(client, config),
-        lambda: 0,
+        _warm_resources(client, config),
+        len,
         request_maintenance=Mock(),
     )
     dispatch = Mock()
@@ -284,7 +284,7 @@ def test_launch_capacity_retry_preserves_task_fab_hash(
         warm_executor_owner="superexec-a",
         warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
     )
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = _executor(client=client, config=config)
     manager = Mock()
     manager.launch.side_effect = [None, LaunchResult.accepted()]
     wait_for_capacity = Mock(return_value=True)
@@ -308,6 +308,28 @@ def test_launch_capacity_retry_preserves_task_fab_hash(
     client.create_namespaced_pod.assert_not_called()
 
 
+@pytest.mark.parametrize("sharing", ["missing", "rest", "exec", "api-client"])
+def test_warm_executor_requires_independent_transports(sharing: str) -> None:
+    """Manual warm construction must not share REST and WebSocket transports."""
+    client, dispatch, probe = Mock(), Mock(), Mock()
+    if sharing == "rest":
+        dispatch = client
+    elif sharing == "exec":
+        probe = dispatch
+    elif sharing == "api-client":
+        shared_transport = object()
+        dispatch, probe = Mock(api_client=shared_transport), Mock(
+            api_client=shared_transport
+        )
+    with pytest.raises(ValueError, match="independent"):
+        KubernetesExecutor(
+            client=client,
+            config=_executor_config(warm_executor_owner="superexec-a"),
+            exec_client=None if sharing == "missing" else dispatch,
+            probe_client=probe,
+        )
+
+
 def test_kubernetes_executor_config_preserves_positional_callback_binding() -> None:
     """New options must not change existing positional callback arguments."""
     assert list(signature(KubernetesExecutorConfig).parameters)[-3:] == [
@@ -316,6 +338,25 @@ def test_kubernetes_executor_config_preserves_positional_callback_binding() -> N
         "log_warm_executor_output",
     ]
     assert not KubernetesExecutorConfig("namespace", "image").log_warm_executor_output
+
+
+def _executor(
+    *, client: Mock, config: KubernetesExecutorConfig, exec_client: Mock | None = None
+) -> KubernetesExecutor:
+    """Construct an executor with independent fake REST and exec transports."""
+    return KubernetesExecutor(
+        client=client,
+        config=config,
+        exec_client=exec_client or Mock(),
+        probe_client=Mock(),
+    )
+
+
+def _warm_resources(
+    client: Mock, config: KubernetesExecutorConfig
+) -> kube_resources.WarmExecutorResources:
+    """Construct warm resources with independent fake transports."""
+    return kube_resources.WarmExecutorResources(client, config, Mock(), Mock())
 
 
 def _ready_warm_pod(
@@ -554,7 +595,7 @@ def test_launch_warm_executor_is_inert_and_becomes_ready() -> None:
     )
     pool_key = _warm_executor_pool_key()
 
-    kube_resources.WarmExecutorResources(client, config).create(pool_key, "executor123")
+    _warm_resources(client, config).create(pool_key, "executor123")
 
     client.create_namespaced_pod.assert_called_once()
     client.create_namespaced_secret.assert_called_once()
@@ -684,6 +725,7 @@ def test_warm_launch_defers_replenishment(
     tracing = Mock(side_effect=lambda *_: nullcontext(span))
     monkeypatch.setattr(warm_executor_dispatch, "trace_span", tracing)
     client = Mock()
+    exec_client = Mock()
     pool_key = _warm_executor_pool_key(
         task_type=task_type, runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
@@ -709,10 +751,10 @@ def test_warm_launch_defers_replenishment(
         return SimpleNamespace(start=lambda: started.append((target, args)))
 
     monkeypatch.setattr(threading, "Thread", _thread)
-    executor = KubernetesExecutor(
+    executor = _executor(
         client=client,
         config=config,
-        exec_client=client,
+        exec_client=exec_client,
     )
     suppress_output = task_type == TaskType.AGENT_APP
 
@@ -751,7 +793,7 @@ def test_warm_launch_defers_replenishment(
         TaskType.CONNECTOR: WARM_CONNECTOR_EXECUTOR_MODULE,
         TaskType.MODEL: WARM_MODEL_EXECUTOR_MODULE,
     }.get(task_type)
-    assert stream.call_args.args[0] is client.connect_get_namespaced_pod_exec
+    assert stream.call_args.args[0] is exec_client.connect_get_namespaced_pod_exec
     assert stream.call_args.kwargs["container"] == "taskexecutor"
     expected_dispatch_command = (
         ["python", "-m", worker_module, "dispatch"]
@@ -806,7 +848,7 @@ def test_launch_falls_back_to_cold_pod_when_no_ready_warm_pod_exists(
         warm_executor_owner="superexec-a",
         warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
     )
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = _executor(client=client, config=config)
 
     result = executor.launch(_execution_spec(task_type=task_type, insecure=True))
 
@@ -830,7 +872,7 @@ def test_launch_falls_back_to_cold_pod_when_warm_pods_cannot_be_listed() -> None
         warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
     )
 
-    result = KubernetesExecutor(client=client, config=config).launch(
+    result = _executor(client=client, config=config).launch(
         _execution_spec(task_type=TaskType.AGENT_APP, insecure=True)
     )
 
@@ -864,7 +906,7 @@ def test_launch_retires_warm_pod_when_consumption_cannot_be_persisted(
             raise _KubernetesApiError(500, "error")
 
     client.delete_namespaced_pod.side_effect = _delete_pod
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = _executor(client=client, config=config)
 
     result = executor.launch(
         _execution_spec(task_type=TaskType.AGENT_APP, insecure=True)
@@ -920,7 +962,7 @@ def test_launch_retires_warm_pod_when_dispatch_cannot_open(
         "import_module",
         Mock(return_value=SimpleNamespace(stream=Mock(side_effect=RuntimeError))),
     )
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = _executor(client=client, config=config)
 
     result = executor.launch(_execution_spec(task_type=task_type, insecure=True))
 
@@ -977,7 +1019,7 @@ def test_launch_preserves_outcome_when_cleanup_thread_cannot_start(
         "Thread",
         lambda **_kwargs: SimpleNamespace(start=_raise_runtime_error),
     )
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = _executor(client=client, config=config)
 
     result = executor.launch(
         _execution_spec(task_type=TaskType.AGENT_APP, insecure=True)
@@ -1231,16 +1273,19 @@ def test_disconnected_warm_stream_does_not_kill_an_unconfirmed_task(
     """A missing exit status leaves retirement to process-aware reconciliation."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
-    pool_key = _warm_executor_pool_key()
+    pool_key = _warm_executor_pool_key(
+        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    )
     config = _executor_config(
         warm_executor_owner="superexec-a",
         warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
     )
     pool = maintenance.WarmExecutorPoolManager(  # pylint: disable=protected-access
-        kube_resources.WarmExecutorResources(client, config),
-        lambda: 0,
+        _warm_resources(client, config),
+        len,
         request_maintenance=Mock(),
     )
+    pool._state.consumed_pods.add("consumed")  # pylint: disable=protected-access
     pool._busy_pods.add("consumed")  # pylint: disable=protected-access
     dispatch = Mock()
     dispatch.wait_for_close.return_value = False
@@ -1251,6 +1296,11 @@ def test_disconnected_warm_stream_does_not_kill_an_unconfirmed_task(
         "consumed", pool_key, dispatch
     )
 
+    client.list_namespaced_pod.return_value = {
+        "items": [_ready_warm_pod(pool_key, config, name="consumed")]
+    }
+    assert not pool.has_ready_pod(pool_key.task_type)
+    pool._retire_idle_pod("consumed", pool_key)  # pylint: disable=protected-access
     client.delete_namespaced_pod.assert_not_called()
     assert "consumed" not in pool._busy_pods  # pylint: disable=protected-access
     dispatch.close.assert_called_once_with()
@@ -1308,8 +1358,8 @@ def test_warm_pool_replaces_consumed_pod_and_cleans_up_idle_pods() -> None:
     )
     request_maintenance = Mock()
     pool = maintenance.WarmExecutorPoolManager(  # pylint: disable=protected-access
-        kube_resources.WarmExecutorResources(client, config),
-        lambda: 0,
+        _warm_resources(client, config),
+        len,
         request_maintenance=request_maintenance,
     )
     client.reset_mock()
@@ -1370,8 +1420,8 @@ def test_fab_specific_pool_creation_is_rate_limited() -> None:
         monotonic=lambda: now[0],
     )
     pool = maintenance.WarmExecutorPoolManager(  # pylint: disable=protected-access
-        kube_resources.WarmExecutorResources(client, config),
-        lambda: 0,
+        _warm_resources(client, config),
+        len,
         request_maintenance=Mock(),
     )
     client.reset_mock()
@@ -1391,12 +1441,46 @@ def test_fab_specific_pool_creation_is_rate_limited() -> None:
     client.list_namespaced_pod.return_value = {
         "items": [_ready_warm_pod(pool_key, config, name=created_name)]
     }
-    pool.ensure_capacity()
+    dispatcher = pool._dispatcher  # pylint: disable=protected-access
+    with pool._lock:  # pylint: disable=protected-access
+        # pylint: disable-next=protected-access
+        claimed = dispatcher._take_ready_pod(config.warm_executor_pools)
+    assert claimed is not None
+    assert not pool.pending_pod_names()
     client.list_namespaced_pod.return_value = {"items": []}
 
     pool.ensure_capacity()
 
     assert client.create_namespaced_pod.call_count == 2
+
+
+@pytest.mark.parametrize("status", [403, 429, 503])
+def test_rejected_warm_creation_does_not_reserve_capacity(status: int) -> None:
+    """Definite rejection releases capacity, while uncertain creation retains it."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    client.list_namespaced_secret.return_value = {"items": []}
+    client.create_namespaced_pod.side_effect = _KubernetesApiError(status, "rejected")
+    now = [0.0]
+    key = _warm_executor_pool_key(runtime_image="ghcr.io/flwrlabs/taskexecutor:dev")
+    config = _executor_config(
+        warm_executor_owner="superexec-a",
+        active_pod_budget=2,
+        warm_executor_pools=(WarmExecutorPoolConfig(key=key, size=1),),
+        monotonic=lambda: now[0],
+    )
+    pool = maintenance.WarmExecutorPoolManager(
+        _warm_resources(client, config),
+        kube_resources.KubernetesTaskResources(client, config).active_pod_count,
+    )
+    pool.ensure_capacity(reserved_pod_capacity=1)
+    assert len(pool.pending_pod_names()) == int(status == 503)
+    if status == 503:
+        # A later rejection cannot disprove an earlier possibly accepted create.
+        now[0] = 5.0
+        client.create_namespaced_pod.side_effect = _KubernetesApiError(403, "rejected")
+        pool.ensure_capacity(reserved_pod_capacity=1)
+        assert len(pool.pending_pod_names()) == 1
 
 
 def test_failed_warm_creation_retries_on_idle_with_same_pod_identity(
@@ -1426,7 +1510,7 @@ def test_failed_warm_creation_retries_on_idle_with_same_pod_identity(
         warm_executor_owner="superexec-a",
         warm_executor_pools=(WarmExecutorPoolConfig(key=key, size=1),),
     )
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = _executor(client=client, config=config)
     executor.reconcile()
     assert created.wait(2)
     executor.close()
@@ -1455,8 +1539,8 @@ def test_warm_pool_preserves_surviving_tasks_until_their_processes_exit(
         warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
     )
     pool = maintenance.WarmExecutorPoolManager(  # pylint: disable=protected-access
-        kube_resources.WarmExecutorResources(client, config),
-        lambda: 0,
+        _warm_resources(client, config),
+        len,
         request_maintenance=Mock(),
     )
     consumed_pod = _ready_warm_pod(pool_key, config, name="consumed")
@@ -1499,8 +1583,8 @@ def test_warm_pool_preserves_surviving_tasks_until_their_processes_exit(
     client.delete_namespaced_pod.reset_mock()
     config = _executor_config(warm_executor_owner="superexec-a")
     pool = maintenance.WarmExecutorPoolManager(  # pylint: disable=protected-access
-        kube_resources.WarmExecutorResources(client, config),
-        lambda: 0,
+        _warm_resources(client, config),
+        len,
         request_maintenance=Mock(),
     )
     pool.ensure_capacity()
@@ -1522,7 +1606,7 @@ def test_disabled_warm_pools_retire_owned_pods() -> None:
     retired = threading.Event()
     client.delete_namespaced_pod.side_effect = lambda **_kwargs: retired.set()
 
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = _executor(client=client, config=config)
     client.delete_namespaced_pod.assert_not_called()
     executor.reconcile()
     assert retired.wait(2)
@@ -1551,8 +1635,8 @@ def test_warm_pool_retirement_does_not_block_other_pools() -> None:
         ),
     )
     pool = maintenance.WarmExecutorPoolManager(  # pylint: disable=protected-access
-        kube_resources.WarmExecutorResources(client, config),
-        lambda: 0,
+        _warm_resources(client, config),
+        len,
         request_maintenance=Mock(),
     )
     client.reset_mock()
@@ -1601,7 +1685,8 @@ def test_warm_pool_reserves_capacity_for_cold_fallback() -> None:
         warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
     )
     pool = maintenance.WarmExecutorPoolManager(  # pylint: disable=protected-access
-        kube_resources.WarmExecutorResources(client, config), lambda: 2
+        _warm_resources(client, config),
+        lambda pending: 2 + len(pending),
     )
     client.reset_mock()
 
@@ -1618,7 +1703,8 @@ def test_warm_pool_replaces_missing_pod_with_reserved_cold_capacity(
 ) -> None:
     """A cold reservation still leaves capacity for a missing warm Pod."""
     client = Mock()
-    client.list_namespaced_pod.return_value = {"items": []}
+    pods: list[dict[str, Any]] = []
+    client.list_namespaced_pod.side_effect = lambda *_args, **_kwargs: {"items": pods}
     pool_key = _warm_executor_pool_key(
         runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
@@ -1627,14 +1713,18 @@ def test_warm_pool_replaces_missing_pod_with_reserved_cold_capacity(
         warm_executor_owner="superexec-a",
         warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=2),),
     )
-    active_count = [0]
 
-    def _create_pod(*_args: object) -> None:
-        active_count[0] = active_after_creation
+    def _create_pod(_namespace: str, pod: object) -> None:
+        pods.append(_as_dict(pod))
+        pods.extend(
+            _pod("Running", name=f"cold-{i}") for i in range(active_after_creation)
+        )
 
     client.create_namespaced_pod.side_effect = _create_pod
-    pool = maintenance.WarmExecutorPoolManager(  # pylint: disable=protected-access
-        kube_resources.WarmExecutorResources(client, config), lambda: active_count[0]
+    resources = _warm_resources(client, config)
+    pool = maintenance.WarmExecutorPoolManager(
+        resources,
+        kube_resources.KubernetesTaskResources(client, config).active_pod_count,
     )
     client.reset_mock()
 
@@ -1666,7 +1756,7 @@ def test_reconciliation_refills_after_terminating_pods_release_capacity() -> Non
             WarmExecutorPoolConfig(key=_warm_executor_pool_key(), size=1),
         ),
     )
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = _executor(client=client, config=config)
     created = threading.Event()
     client.create_namespaced_pod.side_effect = lambda *_args: created.set()
     client.create_namespaced_pod.assert_not_called()
@@ -1693,8 +1783,8 @@ def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
         warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
     )
     pool = maintenance.WarmExecutorPoolManager(  # pylint: disable=protected-access
-        kube_resources.WarmExecutorResources(client, config),
-        lambda: 0,
+        _warm_resources(client, config),
+        len,
         request_maintenance=Mock(),
     )
     obsolete_pod = _ready_warm_pod(
@@ -1780,7 +1870,7 @@ def test_launch_retries_warm_dispatch_after_readiness_recovers_at_the_budget(
 
     client.list_namespaced_pod.side_effect = _list_pods
     client.list_namespaced_secret.return_value = {"items": []}
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = _executor(client=client, config=config)
 
     executor.wait_for_capacity(TaskType.AGENT_APP, insecure=True)
 
@@ -1841,7 +1931,7 @@ def test_wait_for_capacity_reserves_cold_capacity_for_task_specific_ca() -> None
     sleep.side_effect = _release_capacity
     client.list_namespaced_pod.side_effect = _list_pods
     client.list_namespaced_secret.return_value = {"items": []}
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = _executor(client=client, config=config)
 
     executor.wait_for_capacity(
         TaskType.AGENT_APP,
@@ -1885,7 +1975,7 @@ def test_combined_acquisition_filters_to_ready_warm_pools_at_budget() -> None:
 
     client.list_namespaced_pod.side_effect = _list_pods
     client.list_namespaced_secret.return_value = {"items": []}
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = _executor(client=client, config=config)
     supported = {TaskType.AGENT_APP, TaskType.MODEL, TaskType.SERVER_APP}
 
     assert executor.get_eligible_capacity(supported, insecure=True) == (
@@ -1904,7 +1994,7 @@ def test_combined_acquisition_returns_no_eligibility_at_budget() -> None:
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": [_pod("Running")]}
     sleep = Mock()
-    executor = KubernetesExecutor(
+    executor = _executor(
         client=client,
         config=_executor_config(active_pod_budget=1, sleep=sleep),
     )
@@ -1952,7 +2042,7 @@ def test_slow_warm_creation_does_not_block_ready_dispatch(
         assert release_creation.wait(5)
 
     client.create_namespaced_pod.side_effect = _slow_create
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = _executor(client=client, config=config)
     manager = executor._warm_executor_pool_manager  # pylint: disable=protected-access
     assert manager is not None
     dispatch = Mock()
@@ -2011,7 +2101,7 @@ def test_cold_fallback_does_not_reconcile_while_waiting_for_capacity(
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     client.list_namespaced_secret.return_value = {"items": []}
-    executor = KubernetesExecutor(
+    executor = _executor(
         client=client,
         config=_executor_config(active_pod_budget=budget, sleep=Mock()),
     )
@@ -2040,7 +2130,7 @@ def test_active_budget_counts_surviving_owned_pods_after_labels_change() -> None
         {"items": [_pod("Running", name="current")]},
         {"items": [_pod("Running", name="current"), _pod("Running", name="old")]},
     ]
-    executor = KubernetesExecutor(
+    executor = _executor(
         client=client, config=_executor_config(warm_executor_owner="superexec-a")
     )
 
@@ -2069,7 +2159,7 @@ def test_wait_for_capacity_reserves_space_for_a_cold_task() -> None:
 
     client.list_namespaced_pod.side_effect = _list_pods
     client.list_namespaced_secret.return_value = {"items": []}
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = _executor(client=client, config=config)
     client.create_namespaced_pod.reset_mock()
     active_pod_count = 2
 
@@ -2198,7 +2288,7 @@ def test_sweeper_waits_for_pod_creation(warm: bool) -> None:
     client.list_namespaced_secret.side_effect = _list_secrets
     client.create_namespaced_secret.side_effect = _create_secret
     client.create_namespaced_pod.side_effect = _create_pod
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = _executor(client=client, config=config)
     manager = executor._warm_executor_pool_manager  # pylint: disable=protected-access
     assert manager is not None
     creator = threading.Thread(
@@ -2714,7 +2804,7 @@ def test_wait_for_capacity_returns_below_budget_without_sleeping() -> None:
         sleep=sleep,
     )
 
-    KubernetesExecutor(client=client, config=config).wait_for_capacity()
+    _executor(client=client, config=config).wait_for_capacity()
 
     assert client.list_namespaced_pod.call_count == 2
     client.list_namespaced_secret.assert_called_once()
@@ -2739,7 +2829,7 @@ def test_wait_for_capacity_sleeps_and_polls_again_at_budget() -> None:
         sleep=sleep,
     )
 
-    KubernetesExecutor(client=client, config=config).wait_for_capacity()
+    _executor(client=client, config=config).wait_for_capacity()
 
     assert client.list_namespaced_pod.call_count == 4
     assert client.list_namespaced_secret.call_count == 2
@@ -2768,7 +2858,7 @@ def test_wait_for_capacity_sweeps_after_waiting_for_capacity_to_open() -> None:
         sleep=sleep,
     )
 
-    KubernetesExecutor(client=client, config=config).wait_for_capacity()
+    _executor(client=client, config=config).wait_for_capacity()
 
     assert client.list_namespaced_pod.call_count == 4
     assert client.list_namespaced_secret.call_count == 2
@@ -2806,7 +2896,7 @@ def test_wait_for_capacity_counts_pending_running_and_terminating_active_pods() 
         sleep=sleep,
     )
 
-    KubernetesExecutor(client=client, config=config).wait_for_capacity()
+    _executor(client=client, config=config).wait_for_capacity()
 
     sleep.assert_called_once_with(1.0)
 
@@ -2831,7 +2921,7 @@ def test_wait_for_capacity_ignores_terminal_pods_even_when_terminating() -> None
         sleep=sleep,
     )
 
-    KubernetesExecutor(client=client, config=config).wait_for_capacity()
+    _executor(client=client, config=config).wait_for_capacity()
 
     sleep.assert_not_called()
 
@@ -2849,7 +2939,7 @@ def test_wait_for_capacity_sweeps_terminal_pods_before_capacity_check() -> None:
     }
     config = _executor_config(resource_pool="gpu-pool", active_pod_budget=1)
 
-    KubernetesExecutor(client=client, config=config).wait_for_capacity()
+    _executor(client=client, config=config).wait_for_capacity()
 
     client.delete_namespaced_pod.assert_called_once_with(
         name=_POD_NAME,
@@ -2871,7 +2961,7 @@ def test_wait_for_capacity_throttles_completed_pod_sweeps() -> None:
         active_pod_budget=1,
         monotonic=Mock(side_effect=[0.0, COMPLETED_POD_SWEEP_INTERVAL_SECONDS - 1.0]),
     )
-    executor = KubernetesExecutor(client=client, config=config)
+    executor = _executor(client=client, config=config)
 
     executor.wait_for_capacity()
     executor.wait_for_capacity()
@@ -3078,7 +3168,7 @@ def test_launch_submits_secret_before_pod_and_returns_accepted(
         kube_resources, "_new_launch_attempt_id", Mock(return_value=_LAUNCH_ATTEMPT_ID)
     )
 
-    result = KubernetesExecutor(client=client, config=config).launch(spec)
+    result = _executor(client=client, config=config).launch(spec)
 
     runtime_root_certificates = _appio_root_certificates(spec, config)
     secret = _as_dict(
@@ -3108,7 +3198,7 @@ def test_launch_generates_distinct_object_names_for_same_task(
         "_new_launch_attempt_id",
         Mock(side_effect=[_LAUNCH_ATTEMPT_ID, _NEXT_LAUNCH_ATTEMPT_ID]),
     )
-    executor = KubernetesExecutor(client=client, config=_executor_config())
+    executor = _executor(client=client, config=_executor_config())
     spec = _execution_spec()
 
     first_result = executor.launch(spec)
@@ -3148,7 +3238,7 @@ def test_launch_returns_capacity_rejected_if_secret_create_hits_quota() -> None:
         403, "exceeded quota: object-counts"
     )
 
-    result = KubernetesExecutor(client=client, config=_executor_config()).launch(
+    result = _executor(client=client, config=_executor_config()).launch(
         _execution_spec()
     )
 
@@ -3170,7 +3260,7 @@ def test_launch_deletes_new_secret_if_pod_create_is_rate_limited(
         kube_resources, "_new_launch_attempt_id", Mock(return_value=_LAUNCH_ATTEMPT_ID)
     )
 
-    result = KubernetesExecutor(client=client, config=_executor_config()).launch(
+    result = _executor(client=client, config=_executor_config()).launch(
         _execution_spec()
     )
 
@@ -3198,7 +3288,7 @@ def test_launch_delete_failure_does_not_mask_pod_rejection(
         kube_resources, "_new_launch_attempt_id", Mock(return_value=_LAUNCH_ATTEMPT_ID)
     )
 
-    result = KubernetesExecutor(client=client, config=_executor_config()).launch(
+    result = _executor(client=client, config=_executor_config()).launch(
         _execution_spec()
     )
 
@@ -3216,7 +3306,7 @@ def test_launch_returns_failed_for_clear_non_capacity_failure() -> None:
         401, "unauthorized"
     )
 
-    result = KubernetesExecutor(client=client, config=_executor_config()).launch(
+    result = _executor(client=client, config=_executor_config()).launch(
         _execution_spec()
     )
 
@@ -3232,7 +3322,7 @@ def test_launch_returns_unknown_for_ambiguous_server_failure() -> None:
         503, "service unavailable"
     )
 
-    result = KubernetesExecutor(client=client, config=_executor_config()).launch(
+    result = _executor(client=client, config=_executor_config()).launch(
         _execution_spec()
     )
 
@@ -3247,7 +3337,7 @@ def test_launch_returns_failed_if_root_certificates_file_cannot_be_read() -> Non
     """Test launch fails before submission if spec root certificates cannot be read."""
     client = Mock()
 
-    result = KubernetesExecutor(
+    result = _executor(
         client=client, config=_executor_config(runtime_root_certificates=None)
     ).launch(_execution_spec(root_certificates_path="/missing/appio-ca.pem"))
 
