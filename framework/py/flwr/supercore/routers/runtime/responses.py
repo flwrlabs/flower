@@ -16,19 +16,18 @@
 
 Inference runs in this API process using FLWR_MODEL_API_ENDPOINT and its
 server-side FLWR_MODEL_API_KEY. Usage belongs to the authenticated AgentApp.
-A response owns its capacity slot, provider and task watcher until HTTP delivery
-ends, including cancellation and the bounded final-error delivery allowance.
+Upstream SSE bytes are forwarded unchanged. Standard responses own HTTP delivery,
+with a request deadline and cancellation when the AgentApp task ends.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
-from collections.abc import AsyncGenerator
-from contextlib import aclosing
+from contextlib import AsyncExitStack, aclosing
 from functools import partial
 from logging import ERROR
+from time import monotonic
 from typing import cast
 
 import anyio
@@ -38,7 +37,7 @@ from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
-from starlette.types import Message, Receive, Scope, Send
+from starlette.types import Receive, Scope, Send
 
 from flwr.common.constant import Status
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
@@ -47,15 +46,15 @@ from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.dependencies.runtime import RuntimeStateDependency
 from flwr.supercore.model_provider import (
-    TERMINAL_EVENTS,
     ModelProviderError,
-    iter_model_provider_response,
+    model_provider_response,
+    stream_model_provider_response,
     validate_model_request,
+    validate_model_response,
 )
 from flwr.supercore.task_process.usage import task_usage_from_open_response
-from flwr.supercore.tracing import trace_span
+from flwr.supercore.tracing import TraceSpan, trace_span
 from flwr.supercore.typing import JSONObject
-from flwr.supercore.utils import strict_json_dumps
 
 router = APIRouter(prefix="/v1/runtime", tags=["Runtime"])
 _SUPPORTED_FIELDS = frozenset(
@@ -73,10 +72,6 @@ _SUPPORTED_FIELDS = frozenset(
         "text",
     }
 )
-# pylint: disable-next=fixme
-# TODO: Tune this provisional per-process limit with hosted load tests.
-_MODEL_CONCURRENCY = 8
-_ERROR_DELIVERY_TIMEOUT = 1.0
 _POLL_INTERVAL = 0.25
 _DEFAULT_MODEL_RESPONSE_TIMEOUT = 900.0
 _MODEL_RESPONSE_TIMEOUT_ENV = "FLWR_MODEL_RESPONSE_TIMEOUT"
@@ -109,180 +104,140 @@ async def create_runtime_response(
 
 
 class ModelResponse(Response):
-    """Keep provider execution and HTTP delivery within the same cancellation scope."""
+    """Delegate HTTP delivery while bounding inference and watching task lifetime."""
 
     def __init__(
         self, request: Request, state: CoreState, task: Task, payload: JSONObject
     ) -> None:
         super().__init__()
+        self._listening_for_disconnect = False
         self.request, self.state, self.task, self.payload = (
             request,
             state,
             task,
             payload,
         )
-        self.sequence = 0
-        self.capacity: asyncio.Semaphore = getattr(
-            request.app.state, "model_response_capacity", None
-        ) or asyncio.Semaphore(_MODEL_CONCURRENCY)
-        request.app.state.model_response_capacity = self.capacity
 
-    async def _events(self) -> AsyncGenerator[JSONObject, None]:
-        usage_recorded = False
-        async with aclosing(iter_model_provider_response(self.payload)) as events:
-            async for event in events:
-                sequence = event.get("sequence_number")
-                if isinstance(sequence, int):
-                    self.sequence = sequence + 1
-                terminal = (
-                    self.payload.get("stream") is not True
-                    or event.get("type") in TERMINAL_EVENTS
-                )
-                response = event.get("response", event)
-                if terminal and not usage_recorded and isinstance(response, dict):
-                    usage = task_usage_from_open_response(
-                        response, provider=cast(str, self.payload["model"])
+    async def _record_usage(self, response: JSONObject) -> None:
+        usage = task_usage_from_open_response(
+            response, provider=cast(str, self.payload["model"])
+        )
+        if usage is not None:
+            await anyio.to_thread.run_sync(
+                self.state.add_task_usage,
+                self.task.task_id,
+                usage,
+                abandon_on_cancel=True,
+            )
+
+    async def _prepare_response(
+        self, resources: AsyncExitStack, span: TraceSpan, started: float
+    ) -> Response:
+        upstream = await resources.enter_async_context(
+            model_provider_response(self.payload)
+        )
+        if self.payload.get("stream") is True:
+            body = await resources.enter_async_context(
+                aclosing(
+                    stream_model_provider_response(
+                        upstream, self._record_usage, span, started
                     )
-                    if usage is not None:
-                        # The usage write can finish in its thread after cancellation.
-                        await anyio.to_thread.run_sync(
-                            self.state.add_task_usage,
-                            self.task.task_id,
-                            usage,
-                            abandon_on_cancel=True,
-                        )
-                        usage_recorded = True
-                yield event
+                )
+            )
+            return StreamingResponse(
+                body,
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "X-Accel-Buffering": "no",
+                },
+            )
+        await upstream.aread()
+        body_json = validate_model_response(upstream.json())
+        _raise_for_failed_response(body_json)
+        await self._record_usage(body_json)
+        return JSONResponse(body_json)
 
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """Run and deliver inference while holding one capacity slot."""
-        if self.capacity.locked():
-            await _error_response(
-                _ResponsesError(429, "Model capacity is full.", "rate_limit_exceeded")
-            )(scope, receive, send)
-            return
-        started, complete = False, False
-        error: _ResponsesError | None = None
-
-        async def forward(message: Message) -> None:
-            nonlocal started, complete
-            await send(message)
-            if message["type"] == "http.response.start":
-                started = True
-            if message["type"] == "http.response.body" and not message.get(
-                "more_body", False
-            ):
-                complete = True
-
+    async def _deliver(self, scope: Scope, receive: Receive, send: Send) -> None:
         attributes = {
             "flwr.component": "superlink",
             "flwr.run_id": str(self.task.run_id),
             "flwr.task_id": str(self.task.task_id),
             "flwr.model.execution_path": "direct",
         }
-        async with self.capacity:
-            with trace_span("model.round_trip", attributes=attributes):
-                try:
-                    with CancelScope() as execution:
-                        async with anyio.create_task_group() as group:
-                            group.start_soon(
-                                _watch_task,
-                                self.request,
-                                self.state,
-                                self.task,
-                                execution,
-                            )
-                            try:
-                                with anyio.fail_after(_model_response_timeout()):
-                                    await self._deliver(scope, receive, forward)
-                            except _ResponsesError as exc:
-                                error = exc
-                            except (
-                                ModelProviderError,
-                                httpx.HTTPError,
-                                ValueError,
-                            ) as exc:
-                                error = _ResponsesError(
-                                    getattr(exc, "status_code", None) or 502,
-                                    str(exc),
-                                    "model_provider_error",
-                                )
-                            except TimeoutError:
-                                error = _ResponsesError(
-                                    504,
-                                    "Model response timed out.",
-                                    "model_response_timeout",
-                                )
-                            except (ClientDisconnect, OSError):
-                                return
-                            finally:
-                                group.cancel_scope.cancel()
-                    if execution.cancel_called and not complete:
-                        error = _ResponsesError(
-                            409, "Model request cancelled.", "model_request_cancelled"
-                        )
-                except Exception:  # pylint: disable=broad-exception-caught
-                    log(ERROR, "Model request failed", exc_info=True)
-                    error = _ResponsesError(
-                        500, "Internal server error.", "internal_error"
-                    )
-                if error is not None and not complete:
-                    if started and self.payload.get("stream") is not True:
-                        # Abort committed JSON so the server closes the connection.
-                        raise error
-                    with anyio.move_on_after(_ERROR_DELIVERY_TIMEOUT):
-                        if started:
-                            await send(
-                                {
-                                    "type": "http.response.body",
-                                    "body": _stream_error(
-                                        error.message, error.code, self.sequence
-                                    ).encode(),
-                                    "more_body": False,
-                                }
-                            )
-                        else:
-                            await _error_response(error)(scope, receive, send)
-
-    async def _deliver(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """Deliver either the JSON response or the provider event stream."""
-        async with aclosing(self._events()) as events:
-            if self.payload.get("stream") is True:
-                frames = (_sse_frame(event) async for event in events)
-                async with aclosing(frames):
-                    stream = StreamingResponse(
-                        frames,
-                        media_type="text/event-stream",
-                        headers={
-                            "Cache-Control": "no-cache",
-                            "X-Accel-Buffering": "no",
-                        },
-                    )
-                    # The task watcher handles disconnects. Keep provider iteration
-                    # and cleanup in this task, including on older ASGI versions.
-                    await stream.stream_response(send)
-            else:
-                response = await anext(events)
-                _raise_for_failed_response(response)
-                await JSONResponse(response)(scope, receive, send)
-
-
-async def _watch_task(
-    request: Request, state: CoreState, task: Task, scope: CancelScope
-) -> None:
-    """Cancel a quiet provider when its task finishes or the client disconnects."""
-    while True:
-        tasks = await anyio.to_thread.run_sync(
-            partial(state.get_tasks, task_ids=[task.task_id]), abandon_on_cancel=True
-        )
-        if (
-            not tasks
-            or tasks[0].status.status == Status.FINISHED
-            or await request.is_disconnected()
+        with (
+            trace_span("model.round_trip", attributes=attributes),
+            trace_span(
+                "model.provider",
+                attributes={"flwr.model.name": str(self.payload["model"])},
+            ) as span,
         ):
-            scope.cancel()
-            return
-        await anyio.sleep(_POLL_INTERVAL)
+            started = monotonic()
+            deadline = anyio.current_time() + _model_response_timeout()
+            async with AsyncExitStack() as resources:
+                try:
+                    # Preparation and delivery share one overall deadline.
+                    with anyio.fail_after(max(0, deadline - anyio.current_time())):
+                        response = await self._prepare_response(
+                            resources, span, started
+                        )
+                except _ResponsesError as error:
+                    response = _error_response(error)
+                except (ModelProviderError, httpx.HTTPError, ValueError) as error:
+                    response = _error_response(
+                        _ResponsesError(
+                            getattr(error, "status_code", None) or 502,
+                            str(error),
+                            "model_provider_error",
+                        )
+                    )
+                except RuntimeError:
+                    log(ERROR, "Model response preparation failed", exc_info=True)
+                    response = _error_response(
+                        _ResponsesError(500, "Internal server error.", "internal_error")
+                    )
+                try:
+                    # All delivery shares the request deadline, including errors.
+                    with anyio.fail_after(max(0, deadline - anyio.current_time())):
+                        version = scope.get("asgi", {}).get("spec_version", "2.0")
+                        # Older ASGI streams have their own disconnect listener.
+                        self._listening_for_disconnect = isinstance(
+                            response, StreamingResponse
+                        ) and tuple(map(int, version.split("."))) < (2, 4)
+                        await response(scope, receive, send)
+                finally:
+                    with CancelScope(shield=True):
+                        await resources.aclose()
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Close upstream resources on disconnect, task termination or deadline."""
+        async with anyio.create_task_group() as group:
+            group.start_soon(self._watch_task, group.cancel_scope)
+            try:
+                await self._deliver(scope, receive, send)
+            except ClientDisconnect:
+                pass
+            finally:
+                group.cancel_scope.cancel()
+
+    async def _watch_task(self, scope: CancelScope) -> None:
+        """Cancel quiet inference on task completion or an HTTP disconnect."""
+        while True:
+            tasks = await anyio.to_thread.run_sync(
+                partial(self.state.get_tasks, task_ids=[self.task.task_id]),
+                abandon_on_cancel=True,
+            )
+            if (
+                not tasks
+                or tasks[0].status.status == Status.FINISHED
+                or (
+                    not self._listening_for_disconnect
+                    and await self.request.is_disconnected()
+                )
+            ):
+                scope.cancel()
+                return
+            await anyio.sleep(_POLL_INTERVAL)
 
 
 def _authenticate(request: Request, state: CoreState) -> Task:
@@ -369,23 +324,6 @@ def _response_error_message(response: JSONObject) -> str:
     if isinstance(error, dict) and isinstance(error.get("message"), str):
         return cast(str, error["message"])
     return "Model request failed."
-
-
-def _sse_frame(event: JSONObject) -> str:
-    """Encode a validated provider event as one SSE frame."""
-    return f"event: {event['type']}\ndata: {strict_json_dumps(event, compact=True)}\n\n"
-
-
-def _stream_error(message: str, code: str, sequence_number: int) -> str:
-    """Encode a terminal Responses error event."""
-    data: JSONObject = {
-        "type": "error",
-        "code": code,
-        "message": message,
-        "param": None,
-        "sequence_number": sequence_number,
-    }
-    return _sse_frame(data)
 
 
 def _error_response(error: _ResponsesError) -> JSONResponse:

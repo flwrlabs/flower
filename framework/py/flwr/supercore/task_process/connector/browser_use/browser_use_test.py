@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from collections.abc import AsyncGenerator
 from types import ModuleType, SimpleNamespace
 from typing import Any, cast
 from unittest.mock import Mock
@@ -161,12 +160,12 @@ def test_flower_responses_chat_model_invokes_model_provider(
     provider_response["usage"] = {"input_tokens": 3, "output_tokens": 2}
     provider = Mock(return_value=provider_response)
 
-    async def responses(payload: JSONObject) -> AsyncGenerator[JSONObject, None]:
-        yield provider(payload)
+    async def responses(payload: JSONObject) -> JSONObject:
+        return cast(JSONObject, provider(payload))
 
     monkeypatch.setattr(
         "flwr.supercore.task_process.connector.browser_use.browser_use."
-        "iter_model_provider_response",
+        "invoke_model_provider",
         responses,
     )
     browser_use_module = ModuleType("browser_use")

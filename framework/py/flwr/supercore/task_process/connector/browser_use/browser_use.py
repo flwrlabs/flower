@@ -18,7 +18,6 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import aclosing
 from typing import Any, cast
 
 from browser_use import Agent, BrowserProfile
@@ -28,7 +27,7 @@ from browser_use.llm.schema import SchemaOptimizer
 from browser_use.llm.views import ChatInvokeCompletion
 from pydantic import BaseModel
 
-from flwr.supercore.model_provider import iter_model_provider_response
+from flwr.supercore.model_provider import invoke_model_provider
 from flwr.supercore.task_process.usage import (
     TaskUsageRecorder,
     task_usage_from_open_response,
@@ -174,8 +173,7 @@ class FlowerResponsesChatModel(BaseChatModel):
                 }
             }
 
-        async with aclosing(iter_model_provider_response(request)) as events:
-            response = await anext(events)
+        response = await invoke_model_provider(request)
         usage = task_usage_from_open_response(response, provider=self.model)
         if usage is not None:
             await asyncio.to_thread(self._usage_recorder.record, usage)
