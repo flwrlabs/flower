@@ -84,6 +84,7 @@ from flwr.supercore.constant import (
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
+from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
 from flwr.supercore.state.schema.corestate_models import Automation as AutomationModel
 from flwr.supercore.state.schema.corestate_models import (
     CompactedContext as CompactedContextModel,
@@ -121,7 +122,11 @@ from flwr.supercore.state.schema.corestate_models import TaskLogsTable
 from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
-from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
+from flwr.supercore.typing import (
+    AgentRecord,
+    ConnectorOAuthSessionRecord,
+    ConnectorRecord,
+)
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
@@ -566,6 +571,45 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 for message_object_id in message_object_ids:
                     self.object_store.delete(message_object_id)
                 self.cancel_messages(message_ids=message_object_ids)
+
+    def create_agent(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        flwr_aid: str,
+        name: str,
+        app_spec: str,
+        title: str | None = None,
+        description: str | None = None,
+    ) -> AgentRecord | None:
+        """Create and return an account's agent."""
+        if not flwr_aid or not name or not app_spec:
+            return None
+        created_at = now()
+        model = AgentModel(
+            name=name,
+            title=title,
+            description=description,
+            app_spec=app_spec,
+            flwr_aid=flwr_aid,
+            created_at=created_at,
+            updated_at=created_at,
+        )
+        with self.session() as session:
+            session.add(model)
+            session.flush()
+            return _agent_from_model(model)
+
+    def list_agents(self, flwr_aid: str) -> Sequence[AgentRecord]:
+        """List an account's agents in ascending agent ID order."""
+        if not flwr_aid:
+            return []
+        stmt = (
+            select(AgentModel)
+            .where(AgentModel.flwr_aid == flwr_aid)
+            .order_by(AgentModel.agent_id)
+        )
+        with self.session() as session:
+            return [_agent_from_model(model) for model in session.scalars(stmt)]
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
@@ -2142,6 +2186,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .returning(NonceStoreModel.nonce)
             )
             return session.scalar(stmt) is not None
+
+
+def _agent_from_model(model: AgentModel) -> AgentRecord:
+    """Convert an agent ORM model to an agent record."""
+    return AgentRecord(
+        agent_id=model.agent_id,
+        name=model.name,
+        title=model.title,
+        description=model.description,
+        app_spec=model.app_spec,
+        flwr_aid=model.flwr_aid,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+    )
 
 
 def _connector_oauth_session_from_model(

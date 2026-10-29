@@ -39,7 +39,11 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     no_object_id_recompute,
 )
-from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
+from flwr.supercore.typing import (
+    AgentRecord,
+    ConnectorOAuthSessionRecord,
+    ConnectorRecord,
+)
 
 from ..constant import AutomationStatus
 from ..object_store import ObjectStore
@@ -131,6 +135,53 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
         """Remove an object push session and optionally its messages."""
+
+    @abstractmethod
+    def create_agent(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        flwr_aid: str,
+        name: str,
+        app_spec: str,
+        title: str | None = None,
+        description: str | None = None,
+    ) -> AgentRecord | None:
+        """Create an agent owned by a Flower account.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the agent.
+        name : str
+            Agent display name. Duplicate names are allowed.
+        app_spec : str
+            AgentApp specification with an optional version.
+        title : str | None, (default: None)
+            Optional label for the agent's job.
+        description : str | None, (default: None)
+            Optional standing instructions for the agent.
+
+        Returns
+        -------
+        AgentRecord | None
+            The agent with a generated ID and matching UTC creation and update
+            timestamps, or None if the account ID, name, or app specification is empty.
+        """
+
+    @abstractmethod
+    def list_agents(self, flwr_aid: str) -> Sequence[AgentRecord]:
+        """List an account's agents in ascending agent ID order.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the agents.
+
+        Returns
+        -------
+        Sequence[AgentRecord]
+            Agents belonging to the account, or an empty sequence if none exist.
+        """
 
     @abstractmethod
     def store_fab(self, fab: Fab) -> str:
