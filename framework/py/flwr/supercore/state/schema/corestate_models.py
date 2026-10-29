@@ -144,7 +144,11 @@ class Message(FlwrBase):
 
 
 class Agent(FlwrBase):
-    """Represent a persistent agent owned by a Flower account."""
+    """Represent a persistent agent owned by a Flower account.
+
+    A null ``fab_hash`` follows the latest available version of ``app_id``;
+    a non-null hash pins the agent to that FAB.
+    """
 
     __tablename__ = "agent"
     __table_args__ = (
@@ -159,7 +163,9 @@ class Agent(FlwrBase):
         nullable=False,
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
-    role: Mapped[str] = mapped_column(Text, nullable=False)
+    instructions: Mapped[str] = mapped_column(Text, nullable=False)
+    app_id: Mapped[str] = mapped_column(String, nullable=False)
+    fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
