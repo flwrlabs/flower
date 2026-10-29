@@ -140,7 +140,9 @@ if $RUN_FULL_TEST; then
 fi
 
 echo "- licensecheck: start"
-python -m licensecheck --fail-licenses gpl --zero
+# Newer licensecheck needs Python 3.12+ and Rich 15; isolate it from Flower.
+python -m uv tool run --python '>=3.12' \
+    licensecheck==2026.0.8 --fail-licenses gpl --zero
 echo "- licensecheck: done"
 
 echo "- All license checks passed"
