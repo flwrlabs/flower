@@ -14,7 +14,7 @@ erDiagram
     BIGINT agent_id PK
     VARCHAR app_spec
     TIMESTAMP created_at
-    TEXT description
+    TEXT description "nullable"
     VARCHAR flwr_aid
     VARCHAR name
     VARCHAR title

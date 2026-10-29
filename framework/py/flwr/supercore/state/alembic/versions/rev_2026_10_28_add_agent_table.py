@@ -47,7 +47,7 @@ def upgrade() -> None:
         ),
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("title", sa.String(), nullable=False),
-        sa.Column("description", sa.Text(), nullable=False),
+        sa.Column("description", sa.Text(), nullable=True),
         sa.Column("app_spec", sa.String(), nullable=False),
         sa.Column("flwr_aid", sa.String(), nullable=False),
         sa.Column("created_at", UTCDateTime(), nullable=False),
