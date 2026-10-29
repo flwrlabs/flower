@@ -148,7 +148,6 @@ dev = [
     "pyroma==4.2",
     "check-wheel-contents==0.6.3",
     "GitPython==3.1.50",
-    "licensecheck==2025.1.0",
     "pre-commit==3.5.0",
     "sphinx-substitution-extensions==2022.2.16",
     "sphinxext-opengraph==0.9.1",
@@ -160,6 +159,8 @@ dev = [
 
 [tool.uv]
 default-groups = ["dev"]
+# shortcut: dp-accounting caps attrs<24; remove when upstream relaxes the bound.
+override-dependencies = ["attrs>=24.1.0"]
 
 [tool.uv.sources]
 devtool = { path = "../dev", editable = true }
