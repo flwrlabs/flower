@@ -184,7 +184,9 @@ service Control {
 
 message AgentConfig {
   string name = 1;
-  string role = 2;
+  optional string description = 2;
+  optional string title = 3;
+  string app_spec = 4;
 }
 message Agent {
   uint64 id = 1;
