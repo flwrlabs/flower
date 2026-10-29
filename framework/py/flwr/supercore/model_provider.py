@@ -18,21 +18,22 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import AsyncGenerator
+import re
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from time import monotonic
 from typing import cast
 
 import httpx
 from anyio import CancelScope
 
-from flwr.supercore.tracing import trace_span
+from flwr.supercore.tracing import TraceSpan, trace_span
 from flwr.supercore.typing import JSONObject, JSONValue
 
 DEFAULT_MODEL_API_ENDPOINT = "https://api.flower.ai/v1/responses"
 DEFAULT_MODEL_API_TIMEOUT = 600.0
-TERMINAL_EVENTS = frozenset(
-    {"error", "response.completed", "response.failed", "response.incomplete"}
-)
+_TERMINAL_EVENTS = ("response.completed", "response.failed", "response.incomplete")
+_SSE_LINE = re.compile(rb"\r\n|\n|\r(?!$)")
 
 
 class ModelProviderError(RuntimeError):
@@ -117,90 +118,108 @@ def validate_model_response(payload: object) -> JSONObject:
     return cast(JSONObject, payload)
 
 
-def _decode_event(data: list[str], name: str | None) -> JSONObject | None:
-    encoded = "\n".join(data)
-    if encoded.strip() == "[DONE]":
-        return None
-    event = json.loads(encoded)
+@asynccontextmanager
+async def model_provider_response(
+    payload: JSONObject,
+) -> AsyncGenerator[httpx.Response, None]:
+    """Open the upstream response and close it on completion or cancellation."""
+    url, headers = model_api_config()
+    async with httpx.AsyncClient(
+        timeout=model_api_timeout(), follow_redirects=True
+    ) as client:
+        with trace_span("model.provider_http"):
+            response = await client.send(
+                client.build_request("POST", url, headers=headers, json=payload),
+                stream=True,
+            )
+        try:
+            if response.status_code >= 400:
+                await response.aread()
+                try:
+                    detail = cast(JSONValue, response.json())
+                except ValueError:
+                    detail = response.text
+                raise ModelProviderError(detail, response.status_code)
+            if payload.get("stream") is True and "text/event-stream" not in (
+                response.headers.get("content-type", "").lower()
+            ):
+                raise ModelProviderError("Expected a text/event-stream response.")
+            yield response
+        finally:
+            with CancelScope(shield=True):
+                await response.aclose()
+
+
+async def invoke_model_provider(payload: JSONObject) -> JSONObject:
+    """Read one non-streaming response for internal callers such as Browser Use."""
+    with trace_span(
+        "model.provider", attributes={"flwr.model.name": str(payload["model"])}
+    ):
+        async with model_provider_response(payload) as response:
+            await response.aread()
+            return validate_model_response(response.json())
+
+
+def _observed_event(data: list[bytes], name: str) -> JSONObject:
+    """Inspect accounting and timing metadata without validating the relayed stream."""
+    if name == "response.output_text.delta":
+        return {"type": name}
+    if name and name not in _TERMINAL_EVENTS:
+        return {}
+    try:
+        event = json.loads(b"\n".join(data))
+    except (ValueError, UnicodeDecodeError):
+        return {}
     if not isinstance(event, dict):
-        raise ValueError("Model provider returned a non-object event.")
-    if name and not isinstance(event.get("type"), str):
-        event["type"] = name
-    event_type = event.get("type")
-    if not isinstance(event_type, str) or "\n" in event_type or "\r" in event_type:
-        raise ValueError("Model provider returned an invalid event type.")
-    if event_type in {"response.completed", "response.incomplete"}:
-        validate_model_response(event.get("response"))
+        return {}
+    event.setdefault("type", name)
     return cast(JSONObject, event)
 
 
-async def _stream_events(response: httpx.Response) -> AsyncGenerator[JSONObject, None]:
-    data: list[str] = []
-    name: str | None = None
-    async for line in response.aiter_lines():
-        if line.startswith("event:"):
-            name = line[6:].strip() or None
-        elif line.startswith("data:"):
-            data.append(line[6:] if line.startswith("data: ") else line[5:])
-        elif not line:
-            if data:
-                event = _decode_event(data, name)
-                if event is not None:
-                    yield event
-            data, name = [], None
+async def stream_model_provider_response(
+    response: httpx.Response,
+    record_usage: Callable[[JSONObject], Awaitable[None]],
+    span: TraceSpan,
+    started: float,
+) -> AsyncGenerator[bytes, None]:
+    """Forward upstream bytes unchanged, observing only usage and first text."""
+    buffer, name = b"", ""
+    data: list[bytes] = []
+    first_text, usage_recorded = False, False
+
+    async def observe() -> None:
+        nonlocal first_text, usage_recorded
+        event = _observed_event(data, name)
+        if not first_text and event.get("type") == "response.output_text.delta":
+            first_text = True
+            span.set_attribute(
+                "flwr.model.first_text_ms", (monotonic() - started) * 1000
+            )
+            span.add_event("provider.first_text")
+        body = event.get("response")
+        if (
+            not usage_recorded
+            and event.get("type") in _TERMINAL_EVENTS
+            and isinstance(body, dict)
+        ):
+            await record_usage(body)
+            usage_recorded = True
+
+    async for chunk in response.aiter_bytes():
+        buffer += chunk
+        while match := _SSE_LINE.search(buffer):
+            line, buffer = buffer[: match.start()], buffer[match.end() :]
+            if not line:
+                await observe()
+                data, name = [], ""
+            elif line.startswith(b"data:"):
+                value = line[5:]
+                data.append(value[1:] if value.startswith(b" ") else value)
+            elif line.startswith(b"event:"):
+                name = line[6:].strip().decode("utf-8", errors="replace")
+        yield chunk
+    # Some providers omit the final blank separator.
+    if buffer.startswith(b"data:"):
+        data.append(buffer[5:].lstrip(b" "))
     if data:
-        event = _decode_event(data, name)
-        if event is not None:
-            yield event
-
-
-async def iter_model_provider_response(
-    payload: JSONObject,
-) -> AsyncGenerator[JSONObject, None]:
-    """Yield the JSON response or validated provider SSE events through completion."""
-    url, headers = model_api_config()
-    attributes = {"flwr.model.name": cast(str, payload["model"])}
-    with trace_span("model.provider", attributes=attributes) as span:
-        started, first_text = monotonic(), False
-        async with httpx.AsyncClient(
-            timeout=model_api_timeout(), follow_redirects=True
-        ) as client:
-            with trace_span("model.provider_http"):
-                response = await client.send(
-                    client.build_request("POST", url, headers=headers, json=payload),
-                    stream=True,
-                )
-            try:
-                if response.status_code >= 400:
-                    await response.aread()
-                    try:
-                        detail = cast(JSONValue, response.json())
-                    except ValueError:
-                        detail = response.text
-                    raise ModelProviderError(detail, response.status_code)
-                if payload.get("stream") is not True:
-                    await response.aread()
-                    yield validate_model_response(response.json())
-                    return
-                if (
-                    "text/event-stream"
-                    not in response.headers.get("content-type", "").lower()
-                ):
-                    raise ModelProviderError("Expected a text/event-stream response.")
-                async for event in _stream_events(response):
-                    if not first_text and event["type"] == "response.output_text.delta":
-                        first_text = True
-                        span.set_attribute(
-                            "flwr.model.first_text_ms", (monotonic() - started) * 1000
-                        )
-                        span.add_event("provider.first_text")
-                    yield event
-                    if event["type"] in TERMINAL_EVENTS:
-                        return
-                raise ModelProviderError("Model stream ended before a terminal event.")
-            except GeneratorExit:
-                # Callers close the iterator after consuming a JSON response.
-                return
-            finally:
-                with CancelScope(shield=True):
-                    await response.aclose()
+        await observe()
