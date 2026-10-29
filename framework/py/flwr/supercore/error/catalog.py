@@ -458,7 +458,7 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
     ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT: ApiErrorSpec(
         status_code=StatusCode.ABORTED,
         http_status_code=status.HTTP_409_CONFLICT,
-        public_message="The file could not be saved because it already exists, "
-        "is missing, or has a different revision than expected.",
+        public_message="The file operation could not be completed because it "
+        "already exists, is missing, or has a different revision than expected.",
     ),
 }

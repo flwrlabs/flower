@@ -218,6 +218,13 @@ class CoreState(ABC):  # pylint: disable=R0904
             The current live file revision, which must match for deletion to
             succeed. After deletion, the file is excluded from reads and lists,
             but its revision history is retained.
+
+        Raises
+        ------
+        FlowerError
+            With code ``ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT`` if the file
+            is absent or deleted, or its current revision does not match
+            expected_revision.
         """
 
     @abstractmethod
