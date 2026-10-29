@@ -1,0 +1,33 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+name: Framework Labs Test Dispatch
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "framework/py/**"
+      - "framework/proto/**"
+      - "framework/pyproject.toml"
+      - "framework/uv.lock"
+
+permissions: {}
+
+jobs:
+  dispatch:
+    name: Dispatch Labs framework tests
+    if: ${{ github.repository == 'flwrlabs/flower' }}
+    runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ secrets.FLWRMACHINE_TOKEN }}
+    steps:
+      - name: Create repository dispatch event
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "Missing required secret: FLWRMACHINE_TOKEN" >&2
+            exit 1
+          fi
+
+          gh api \
+            /repos/flwrlabs/labs/dispatches \
+            -f event_type=flower-framework-main-updated
