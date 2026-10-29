@@ -12,12 +12,12 @@
 erDiagram
   agent {
     BIGINT agent_id PK
-    VARCHAR app_id
+    VARCHAR app_spec
     TIMESTAMP created_at
-    VARCHAR fab_hash "nullable"
+    TEXT description
     VARCHAR flwr_aid
-    TEXT instructions
     VARCHAR name
+    VARCHAR title
     TIMESTAMP updated_at
   }
 
