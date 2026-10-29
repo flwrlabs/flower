@@ -903,6 +903,8 @@ def test_launch_retires_warm_pod_when_dispatch_cannot_open(
 ) -> None:
     """An unavailable warm Pod must not remain reusable before cold fallback."""
     client = Mock()
+    deleted = threading.Event()
+    client.delete_namespaced_pod.side_effect = lambda **_kwargs: deleted.set()
     pool_key = _warm_executor_pool_key(
         task_type=task_type, runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
@@ -923,6 +925,7 @@ def test_launch_retires_warm_pod_when_dispatch_cannot_open(
     result = executor.launch(_execution_spec(task_type=task_type, insecure=True))
 
     assert result.status == LaunchResultStatus.ACCEPTED
+    assert deleted.wait(2)
     client.delete_namespaced_pod.assert_called_once_with(
         name=warm_pod["metadata"]["name"],
         namespace="flower-system",
@@ -930,6 +933,8 @@ def test_launch_retires_warm_pod_when_dispatch_cannot_open(
     )
     cold_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
     assert cold_pod["spec"]["containers"][0]["command"] == [task_command]
+
+    executor.close()
 
 
 @pytest.mark.parametrize(
