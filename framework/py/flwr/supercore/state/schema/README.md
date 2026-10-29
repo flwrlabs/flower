@@ -97,36 +97,6 @@ erDiagram
     DOUBLE ttl
   }
 
-  message_ins {
-    BIGINT run_id FK "nullable"
-    BLOB content "nullable"
-    FLOAT created_at "nullable"
-    VARCHAR delivered_at "nullable"
-    BIGINT dst_node_id "nullable"
-    BLOB error "nullable"
-    VARCHAR group_id "nullable"
-    VARCHAR message_id UK "nullable"
-    VARCHAR message_type "nullable"
-    VARCHAR reply_to_message_id "nullable"
-    BIGINT src_node_id "nullable"
-    FLOAT ttl "nullable"
-  }
-
-  message_res {
-    BIGINT run_id FK "nullable"
-    BLOB content "nullable"
-    FLOAT created_at "nullable"
-    VARCHAR delivered_at "nullable"
-    BIGINT dst_node_id "nullable"
-    BLOB error "nullable"
-    VARCHAR group_id "nullable"
-    VARCHAR message_id UK "nullable"
-    VARCHAR message_type "nullable"
-    VARCHAR reply_to_message_id "nullable"
-    BIGINT src_node_id "nullable"
-    FLOAT ttl "nullable"
-  }
-
   node {
     FLOAT heartbeat_interval "nullable"
     VARCHAR last_activated_at "nullable"
@@ -290,8 +260,6 @@ erDiagram
   }
 
   message ||--o{ message : reply_to_message_id
-  run ||--o{ message_ins : run_id
-  run ||--o{ message_res : run_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
   object_push_sessions ||--o| object_push_session_pending : session_id

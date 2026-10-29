@@ -16,9 +16,7 @@
 
 
 from abc import abstractmethod
-from collections.abc import Sequence
 
-from flwr.app import Message
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.run import Run
 
@@ -29,78 +27,6 @@ class NodeState(CoreState):
     @abstractmethod
     def set_node_id(self, node_id: int) -> None:
         """Set the node ID."""
-
-    @abstractmethod
-    def store_message(self, message: Message) -> str | None:
-        """Store a message.
-
-        Parameters
-        ----------
-        message : Message
-            The message to store.
-
-        Returns
-        -------
-        Optional[str]
-            The object ID of the stored message, or None if storage failed.
-        """
-
-    @abstractmethod
-    def get_messages_legacy(
-        self,
-        *,
-        run_ids: Sequence[int] | None = None,
-        is_reply: bool | None = None,
-        limit: int | None = None,
-    ) -> Sequence[Message]:
-        """Retrieve messages based on the specified filters.
-
-        If a filter is set to None, it is ignored.
-        If multiple filters are provided, they are combined using AND logic.
-
-        Parameters
-        ----------
-        run_ids : Optional[Sequence[int]] (default: None)
-            Sequence of run IDs to filter by. If a sequence is provided,
-            it is treated as an OR condition.
-        is_reply : Optional[bool] (default: None)
-            If True, filter for reply messages; if False, filter for non-reply
-            (instruction) messages.
-        limit : Optional[int] (default: None)
-            Maximum number of messages to return. If None, no limit is applied.
-
-        Returns
-        -------
-        Sequence[Message]
-            A sequence of messages matching the specified filters.
-
-        Notes
-        -----
-        **IMPORTANT:** Retrieved messages will **NOT** be returned again by subsequent
-        calls to this method, even if the filters match them.
-        """
-
-    @abstractmethod
-    def delete_messages(
-        self,
-        *,
-        message_ids: Sequence[str] | None = None,
-    ) -> None:
-        """Delete messages based on the specified filters.
-
-        If a filter is set to None, it is ignored.
-        If multiple filters are provided, they are combined using AND logic.
-
-        Parameters
-        ----------
-        message_ids : Optional[Sequence[str]] (default: None)
-            Sequence of message (object) IDs to filter by. If a sequence is provided,
-            it is treated as an OR condition.
-
-        Notes
-        -----
-        **IMPORTANT:** **All messages** will be deleted if no filters are provided.
-        """
 
     @abstractmethod
     def store_run(self, run: Run) -> None:
