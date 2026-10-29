@@ -155,6 +155,13 @@ class CoreState(ABC):  # pylint: disable=R0904
         -------
         int
             The new revision ID.
+
+        Raises
+        ------
+        FlowerError
+            With code ``ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT`` if a live
+            file exists for a create-only write, or if an update has no live
+            file or its current revision does not match expected_revision.
         """
 
     @abstractmethod

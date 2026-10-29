@@ -455,4 +455,9 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_409_CONFLICT,
         public_message="Compacted context already exists for this event in the series.",
     ),
+    ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT: ApiErrorSpec(
+        status_code=StatusCode.ABORTED,
+        http_status_code=status.HTTP_409_CONFLICT,
+        public_message="File revision precondition failed.",
+    ),
 }
