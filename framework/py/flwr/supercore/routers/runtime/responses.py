@@ -191,24 +191,20 @@ class ModelResponse(Response):
                             "model_provider_error",
                         )
                     )
-                except TimeoutError:
+                except RuntimeError:
+                    log(ERROR, "Model response preparation failed", exc_info=True)
                     response = _error_response(
-                        _ResponsesError(
-                            504, "Model response timed out.", "model_response_timeout"
-                        )
+                        _ResponsesError(500, "Internal server error.", "internal_error")
                     )
                 try:
-                    # After headers, failures terminate the standard response.
-                    if response.status_code >= 400:
+                    # All delivery shares the request deadline, including errors.
+                    with anyio.fail_after(max(0, deadline - anyio.current_time())):
+                        version = scope.get("asgi", {}).get("spec_version", "2.0")
+                        # Older ASGI streams have their own disconnect listener.
+                        self._listening_for_disconnect = isinstance(
+                            response, StreamingResponse
+                        ) and tuple(map(int, version.split("."))) < (2, 4)
                         await response(scope, receive, send)
-                    else:
-                        with anyio.fail_after(max(0, deadline - anyio.current_time())):
-                            # Older ASGI streams have their own disconnect listener.
-                            version = scope.get("asgi", {}).get("spec_version", "2.0")
-                            self._listening_for_disconnect = isinstance(
-                                response, StreamingResponse
-                            ) and tuple(map(int, version.split("."))) < (2, 4)
-                            await response(scope, receive, send)
                 finally:
                     with CancelScope(shield=True):
                         await resources.aclose()

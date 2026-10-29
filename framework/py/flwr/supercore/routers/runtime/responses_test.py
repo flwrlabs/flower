@@ -175,12 +175,21 @@ def test_model_response_accounts_each_round(
     [
         ("http_error", 503),
         ("invalid_response", 502),
+        ("missing_key", 500),
+        ("invalid_endpoint", 500),
     ],
 )
 def test_model_errors_never_fall_back(
     state: Mock, monkeypatch: pytest.MonkeyPatch, mode: str, status: int
 ) -> None:
-    """Do not duplicate provider execution after a state-path failure."""
+    """Return JSON errors without duplicating inference or exposing configuration."""
+    if mode == "missing_key":
+        monkeypatch.setenv(
+            "FLWR_MODEL_API_ENDPOINT", "https://api.flower.ai/v1/responses"
+        )
+        monkeypatch.delenv("FLWR_MODEL_API_KEY", raising=False)
+    elif mode == "invalid_endpoint":
+        monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "http://provider/v1")
     response = httpx.Response(503 if mode == "http_error" else 200, json={})
     _mock_provider(monkeypatch, httpx.MockTransport(lambda _request: response))
     with _client(state) as client:
@@ -190,6 +199,8 @@ def test_model_errors_never_fall_back(
             json=_stream_request() | {"stream": False},
         )
         assert result.status_code == status and "error" in result.text
+        if status == 500:
+            assert result.json()["error"]["message"] == "Internal server error."
         assert "event: response.completed\n" not in result.text
         assert "event: response.incomplete\n" not in result.text
     state.add_task_usage.assert_not_called()
@@ -224,8 +235,11 @@ async def _check_model_cancellation(  # pylint: disable=too-many-locals
                 await anyio.sleep_forever()
             finally:
                 closed.set()
-        if phase == "json_blocked":
-            return httpx.Response(200, json={"object": "response", "output": []})
+        if phase in {"json_blocked", "error_blocked"}:
+            return httpx.Response(
+                503 if phase == "error_blocked" else 200,
+                json={"object": "response", "output": []},
+            )
         return httpx.Response(
             200, headers={"content-type": "text/event-stream"}, stream=QuietStream()
         )
@@ -248,7 +262,8 @@ async def _check_model_cancellation(  # pylint: disable=too-many-locals
         Request(scope, receive),
         state,
         state.get_task_by_token.return_value,
-        _stream_request() | {"stream": phase not in {"opening", "json_blocked"}},
+        _stream_request()
+        | {"stream": phase not in {"opening", "json_blocked", "error_blocked"}},
     )
 
     async def trigger() -> None:
@@ -263,7 +278,7 @@ async def _check_model_cancellation(  # pylint: disable=too-many-locals
     async def send(message: Message) -> None:
         await anyio.sleep(0)
         if (
-            phase in {"blocked", "json_blocked"}
+            phase in {"blocked", "json_blocked", "error_blocked"}
             and message["type"] == "http.response.body"
         ):
             entered.set()
@@ -271,17 +286,15 @@ async def _check_model_cancellation(  # pylint: disable=too-many-locals
         messages.append(message)
 
     async with asyncio.timeout(4):
-        if stop == "deadline" and phase != "opening":
-            # Standard responses abort after headers have been committed.
+        if stop == "deadline":
+            # Expiry aborts delivery without an additional error grace period.
             with pytest.raises(ExceptionGroup) as error:
                 await asyncio.gather(response(scope, receive, send), trigger())
             assert any(isinstance(exc, TimeoutError) for exc in error.value.exceptions)
         else:
             await asyncio.gather(response(scope, receive, send), trigger())
-    if phase != "json_blocked":
+    if phase not in {"json_blocked", "error_blocked"}:
         assert closed.is_set()
-    if stop == "deadline" and phase == "opening":
-        assert messages[0]["status"] == 504
     assert not any(b"event: error" in message.get("body", b"") for message in messages)
 
 
@@ -297,6 +310,7 @@ async def _check_model_cancellation(  # pylint: disable=too-many-locals
         ("deadline", "streaming", "2.4"),
         ("deadline", "blocked", "2.4"),
         ("deadline", "json_blocked", "2.4"),
+        ("deadline", "error_blocked", "2.4"),
     ],
 )
 def test_model_cancellation_closes_provider(
