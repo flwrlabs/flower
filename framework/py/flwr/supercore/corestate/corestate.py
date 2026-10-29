@@ -139,11 +139,6 @@ class CoreState(ABC):  # pylint: disable=R0904
     ) -> int:
         """Create or update a file with a revision precondition.
 
-        File storage treats scope as an opaque string; CoreState does not resolve
-        ownership or handle authentication. Revisions are positive, monotonically
-        increasing integers for each (scope, key) pair, including across deletion
-        and recreation.
-
         Parameters
         ----------
         scope : str
@@ -159,7 +154,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         Returns
         -------
         int
-            The new revision, greater than any previous revision for this file.
+            The new revision ID.
         """
 
     @abstractmethod
