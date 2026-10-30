@@ -71,6 +71,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
     Connector,
+    CreateAgentRequest,
+    CreateAgentResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
@@ -83,6 +85,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
     ListAppAssociationsRequest,
     ListAppAssociationsResponse,
     ListAppsRequest,
@@ -189,6 +193,52 @@ from flwr.superlink.federation.typing import Federation as FederationInfo
 from flwr.superlink.run_source import RunSource
 
 from .conversation_title import start_title_generation
+
+
+class InvalidAgentRequestError(FlowerError):
+    """Exception raised when an agent request is invalid."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            ApiErrorCode.INVALID_AGENT_REQUEST, reason, public_details=reason
+        )
+
+
+def create_agent(
+    request: CreateAgentRequest, account: AccountInfo, state: LinkState
+) -> CreateAgentResponse:
+    """Create an agent owned by the authenticated account."""
+    log(INFO, "ControlServicer.CreateAgent")
+    if not request.HasField("config"):
+        raise InvalidAgentRequestError("Agent configuration is required.")
+    config = request.config
+    if not config.name.strip():
+        raise InvalidAgentRequestError("Agent name must be nonempty.")
+    if config.HasField("title") and not config.title:
+        raise InvalidAgentRequestError("Agent title must be nonempty when provided.")
+    if config.HasField("description") and not config.description:
+        raise InvalidAgentRequestError(
+            "Agent description must be nonempty when provided."
+        )
+    try:
+        parse_app_spec(config.app_spec)
+    except ValueError as exc:
+        raise InvalidAgentRequestError(str(exc)) from exc
+
+    agent = state.create_agent(flwr_aid=account.flwr_aid, config=config)
+    if agent is None:
+        raise InvalidAgentRequestError(
+            "Unable to create agent with the supplied values."
+        )
+    return CreateAgentResponse(agent=agent)
+
+
+def list_agents(
+    _request: ListAgentsRequest, account: AccountInfo, state: LinkState
+) -> ListAgentsResponse:
+    """List agents owned by the authenticated account."""
+    log(INFO, "ControlServicer.ListAgents")
+    return ListAgentsResponse(agents=state.list_agents(account.flwr_aid))
 
 
 class InvalidConnectorRequestError(FlowerError):
