@@ -37,7 +37,19 @@ copyright = f"{datetime.date.today().year} Flower Labs GmbH"
 author = "The Flower Authors"
 
 # The full version, including alpha/beta/rc tags
-release = "0.2.0"
+release = "0.3.0"
+
+# Change this value when the latest Endeavor model changes.
+endeavor_version = "1.1"
+endeavor_model = f"flwrlabs/endeavor-{endeavor_version}"
+rst_prolog = f"""
+.. |endeavor_version| replace:: {endeavor_version}
+.. |endeavor_model| replace:: {endeavor_model}
+"""
+html_context = {
+    "endeavor_version": endeavor_version,
+    "endeavor_model": endeavor_model,
+}
 
 
 # -- General configuration ---------------------------------------------------
@@ -54,6 +66,7 @@ extensions = [
     "sphinxarg.ext",
     "myst_parser",
     "sphinx_copybutton",
+    "sphinx_substitution_extensions",
     "sphinx_design",
     "sphinxcontrib.mermaid",
     "sphinx_reredirects",
