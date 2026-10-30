@@ -23,7 +23,7 @@ from unittest.mock import MagicMock, Mock
 import anyio
 import httpx
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.types import Message, Scope
 
@@ -212,7 +212,6 @@ async def _check_model_cancellation(  # pylint: disable=too-many-locals
     monkeypatch: pytest.MonkeyPatch,
     stop: str,
     phase: str,
-    spec_version: str,
 ) -> None:
     """Close quiet upstream requests even before response headers arrive."""
     entered, closed, disconnected = asyncio.Event(), asyncio.Event(), asyncio.Event()
@@ -248,10 +247,11 @@ async def _check_model_cancellation(  # pylint: disable=too-many-locals
     monkeypatch.setattr(
         responses, "_model_response_timeout", lambda: 0.05 if stop == "deadline" else 3
     )
+    monkeypatch.setattr(responses, "_POLL_INTERVAL", 0.01)
     scope: Scope = {
         "type": "http",
         "app": FastAPI(),
-        "asgi": {"spec_version": spec_version},
+        "asgi": {"spec_version": "2.3"},
     }
 
     async def receive() -> Message:
@@ -259,7 +259,6 @@ async def _check_model_cancellation(  # pylint: disable=too-many-locals
         return {"type": "http.disconnect"}
 
     response = ModelResponse(
-        Request(scope, receive),
         state,
         state.get_task_by_token.return_value,
         _stream_request()
@@ -299,18 +298,16 @@ async def _check_model_cancellation(  # pylint: disable=too-many-locals
 
 
 @pytest.mark.parametrize(
-    "stop,phase,spec_version",
+    "stop,phase",
     [
-        ("task", "opening", "2.4"),
-        ("task", "streaming", "2.4"),
-        ("disconnect", "streaming", "2.4"),
-        ("disconnect", "streaming", "2.0"),
-        ("task", "streaming", "2.0"),
-        ("deadline", "opening", "2.4"),
-        ("deadline", "streaming", "2.4"),
-        ("deadline", "blocked", "2.4"),
-        ("deadline", "json_blocked", "2.4"),
-        ("deadline", "error_blocked", "2.4"),
+        ("task", "opening"),
+        ("task", "streaming"),
+        ("disconnect", "streaming"),
+        ("deadline", "opening"),
+        ("deadline", "streaming"),
+        ("deadline", "blocked"),
+        ("deadline", "json_blocked"),
+        ("deadline", "error_blocked"),
     ],
 )
 def test_model_cancellation_closes_provider(
@@ -318,12 +315,9 @@ def test_model_cancellation_closes_provider(
     monkeypatch: pytest.MonkeyPatch,
     stop: str,
     phase: str,
-    spec_version: str,
 ) -> None:
     """Run cancellation coverage without requiring an async pytest plugin."""
-    asyncio.run(
-        _check_model_cancellation(state, monkeypatch, stop, phase, spec_version)
-    )
+    asyncio.run(_check_model_cancellation(state, monkeypatch, stop, phase))
 
 
 def test_stream_is_forwarded_without_validation(

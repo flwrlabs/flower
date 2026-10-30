@@ -72,7 +72,7 @@ _SUPPORTED_FIELDS = frozenset(
         "text",
     }
 )
-_POLL_INTERVAL = 0.25
+_POLL_INTERVAL = 1.0
 _DEFAULT_MODEL_RESPONSE_TIMEOUT = 900.0
 _MODEL_RESPONSE_TIMEOUT_ENV = "FLWR_MODEL_RESPONSE_TIMEOUT"
 
@@ -93,7 +93,7 @@ async def create_runtime_response(
     try:
         task = await run_in_threadpool(_authenticate, request, state)
         payload = _normalize_model_request_payload(await _read_request_payload(request))
-        return ModelResponse(request, state, task, payload)
+        return ModelResponse(state, task, payload)
     except _ResponsesError as error:
         return _error_response(error)
     except Exception:  # pylint: disable=broad-exception-caught
@@ -106,17 +106,9 @@ async def create_runtime_response(
 class ModelResponse(Response):
     """Delegate HTTP delivery while bounding inference and watching task lifetime."""
 
-    def __init__(
-        self, request: Request, state: CoreState, task: Task, payload: JSONObject
-    ) -> None:
+    def __init__(self, state: CoreState, task: Task, payload: JSONObject) -> None:
         super().__init__()
-        self._listening_for_disconnect = False
-        self.request, self.state, self.task, self.payload = (
-            request,
-            state,
-            task,
-            payload,
-        )
+        self.state, self.task, self.payload = state, task, payload
 
     async def _record_usage(self, response: JSONObject) -> None:
         usage = task_usage_from_open_response(
@@ -199,11 +191,6 @@ class ModelResponse(Response):
                 try:
                     # All delivery shares the request deadline, including errors.
                     with anyio.fail_after(max(0, deadline - anyio.current_time())):
-                        version = scope.get("asgi", {}).get("spec_version", "2.0")
-                        # Older ASGI streams have their own disconnect listener.
-                        self._listening_for_disconnect = isinstance(
-                            response, StreamingResponse
-                        ) and tuple(map(int, version.split("."))) < (2, 4)
                         await response(scope, receive, send)
                 finally:
                     with CancelScope(shield=True):
@@ -221,20 +208,15 @@ class ModelResponse(Response):
                 group.cancel_scope.cancel()
 
     async def _watch_task(self, scope: CancelScope) -> None:
-        """Cancel quiet inference on task completion or an HTTP disconnect."""
+        """Cancel inference when its task finishes."""
+        # pylint: disable-next=fixme
+        # TODO: Replace polling with task-termination events when available.
         while True:
             tasks = await anyio.to_thread.run_sync(
                 partial(self.state.get_tasks, task_ids=[self.task.task_id]),
                 abandon_on_cancel=True,
             )
-            if (
-                not tasks
-                or tasks[0].status.status == Status.FINISHED
-                or (
-                    not self._listening_for_disconnect
-                    and await self.request.is_disconnected()
-                )
-            ):
+            if not tasks or tasks[0].status.status == Status.FINISHED:
                 scope.cancel()
                 return
             await anyio.sleep(_POLL_INTERVAL)
