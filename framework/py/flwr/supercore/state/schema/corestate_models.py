@@ -184,7 +184,7 @@ class RunSeries(FlwrBase):
 
 
 class Conversation(FlwrBase):
-    """Represent a user-owned conversation backed by one agent run series."""
+    """Represent a conversation, its creator, and its current backing series."""
 
     __tablename__ = "conversation"
     __table_args__ = (Index("idx_conversation_flwr_aid", "flwr_aid"),)
@@ -199,6 +199,35 @@ class Conversation(FlwrBase):
     title: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+class ConversationParticipant(FlwrBase):
+    """Represent one user or agent participating in a conversation."""
+
+    __tablename__ = "conversation_participant"
+    __table_args__ = (
+        CheckConstraint(
+            "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
+            "(flwr_aid IS NULL AND agent_id IS NOT NULL)",
+            name="ck_conversation_participant_identity",
+        ),
+        UniqueConstraint("conversation_id", "flwr_aid"),
+        UniqueConstraint("conversation_id", "agent_id"),
+        Index("idx_conversation_participant_flwr_aid", "flwr_aid"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
+    conversation_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("conversation.conversation_id"), nullable=False
+    )
+    flwr_aid: Mapped[str | None] = mapped_column(String, nullable=True)
+    agent_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("agent.agent_id"), nullable=True
+    )
 
 
 class SeriesContext(FlwrBase):

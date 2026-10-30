@@ -65,7 +65,13 @@ service Control {
   rpc ListRunSeriesEvents(ListRunSeriesEventsRequest)
       returns (ListRunSeriesEventsResponse) {}
 
-  // Manage user-owned conversations backed by agent run series
+  // Create an agent owned by the authenticated account
+  rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse) {}
+
+  // List agents owned by the authenticated account
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse) {}
+
+  // Manage conversations with explicit user and agent participants
   rpc CreateConversation(CreateConversationRequest)
       returns (CreateConversationResponse) {}
   rpc ListConversations(ListConversationsRequest)
@@ -182,6 +188,23 @@ service Control {
       returns (stream StreamRunEventsResponse) {}
 }
 
+message AgentConfig {
+  string name = 1;
+  optional string description = 2;
+  optional string title = 3;
+  string app_spec = 4;
+}
+message Agent {
+  uint64 id = 1;
+  AgentConfig config = 2;
+  string created_at = 3;
+  string updated_at = 4;
+}
+message CreateAgentRequest { AgentConfig config = 1; }
+message CreateAgentResponse { Agent agent = 1; }
+message ListAgentsRequest {}
+message ListAgentsResponse { repeated Agent agents = 1; }
+
 message StartRunRequest {
   Fab fab = 1;
   map<string, Scalar> override_config = 2;
@@ -248,12 +271,20 @@ message ListRunsResponse {
   string now = 2;
 }
 
+message ConversationParticipant {
+  oneof participant {
+    string flwr_aid = 1;
+    uint64 agent_id = 2;
+  }
+}
+
 message Conversation {
   uint64 conversation_id = 1;
   string federation_id = 2;
   string title = 3;
   string created_at = 4;
   string updated_at = 5;
+  repeated ConversationParticipant participants = 6;
 }
 
 message CreateConversationRequest { string federation = 1; }

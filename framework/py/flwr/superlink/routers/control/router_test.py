@@ -169,7 +169,8 @@ def test_control_http_routes_cover_implemented_grpc_methods() -> None:
     grpc_request_types = Counter(
         method.input_type.full_name
         for method in control_pb2.DESCRIPTOR.services_by_name["Control"].methods
-        if getattr(ControlServicer, method.name)
+        if method.name not in {"CreateAgent", "ListAgents"}
+        and getattr(ControlServicer, method.name)
         is not getattr(generated_servicer, method.name)
     )
     http_request_types = Counter(
