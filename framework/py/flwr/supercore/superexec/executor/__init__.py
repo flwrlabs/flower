@@ -15,8 +15,8 @@
 """Executor abstractions and implementations for SuperExec."""
 
 from .factory import get_executor
-from .kubernetes_executor import (
-    KubernetesExecutor,
+from .kubernetes_executor import KubernetesExecutor
+from .kubernetes_resources import (
     KubernetesExecutorConfig,
     create_incluster_kubernetes_client,
 )

@@ -20,7 +20,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from .kubernetes_executor import (
+from .kubernetes_resources import (
     create_incluster_kubernetes_client,
     create_incluster_kubernetes_clients,
 )
@@ -60,7 +60,7 @@ def test_create_incluster_kubernetes_clients_use_separate_api_instances(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test WebSocket exec receives an API client separate from cleanup calls."""
-    api_clients = [Mock(), Mock()]
+    api_clients = [Mock(), Mock(), Mock()]
     client_module = Mock()
     config_module = Mock()
     client_module.CoreV1Api.side_effect = api_clients
@@ -70,11 +70,12 @@ def test_create_incluster_kubernetes_clients_use_separate_api_instances(
     }
     monkeypatch.setattr(importlib, "import_module", modules.__getitem__)
 
-    client, exec_client = create_incluster_kubernetes_clients()
+    client, exec_client, probe_client = create_incluster_kubernetes_clients()
 
     assert client is api_clients[0]
     assert exec_client is api_clients[1]
-    assert client is not exec_client
+    assert probe_client is api_clients[2]
+    assert len({id(client), id(exec_client), id(probe_client)}) == 3
     config_module.load_incluster_config.assert_called_once_with()
 
 
