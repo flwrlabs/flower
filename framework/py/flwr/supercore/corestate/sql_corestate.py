@@ -45,6 +45,7 @@ from flwr.app import Context, Message, RecordDict
 from flwr.app.message import make_message
 from flwr.app.metadata import Metadata
 from flwr.common.constant import (
+    CONVERSATION_ID_NUM_BYTES,
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
@@ -58,6 +59,7 @@ from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AppInfo,
     Automation,
+    Conversation,
     StartRunRequest,
 )
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
@@ -91,6 +93,9 @@ from flwr.supercore.state.schema.corestate_models import (
 from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
 from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
+)
+from flwr.supercore.state.schema.corestate_models import (
+    Conversation as ConversationModel,
 )
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
@@ -1019,6 +1024,54 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .returning(ConnectorOAuthSessionModel.oauth_session_id)
             )
             return updated_oauth_session_id is not None
+
+    def create_conversation(self, *, flwr_aid: str, federation_id: str) -> Conversation:
+        """Create an untitled conversation and empty agent run series atomically."""
+        conversation_id = generate_rand_int_from_bytes(CONVERSATION_ID_NUM_BYTES)
+        series_id = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
+        created_at = now()
+        with self.session() as session:
+            session.execute(
+                insert(RunSeriesModel).values(
+                    series_id=uint64_to_int64(series_id),
+                    federation_id=federation_id,
+                    is_agent=True,
+                    description=None,
+                    created_at=created_at,
+                    updated_at=created_at,
+                )
+            )
+            model = session.scalars(
+                insert(ConversationModel)
+                .values(
+                    conversation_id=uint64_to_int64(conversation_id),
+                    flwr_aid=flwr_aid,
+                    series_id=uint64_to_int64(series_id),
+                    title="",
+                    created_at=created_at,
+                    updated_at=created_at,
+                )
+                .returning(ConversationModel)
+            ).one()
+            return _conversation_from_model(model, federation_id)
+
+    def get_conversations(
+        self, flwr_aid: str, federation_ids: Sequence[str] | None = None
+    ) -> Sequence[Conversation]:
+        """Return owned conversations, newest metadata update first."""
+        query = (
+            select(ConversationModel, RunSeriesModel.federation_id)
+            .join(
+                RunSeriesModel, ConversationModel.series_id == RunSeriesModel.series_id
+            )
+            .where(ConversationModel.flwr_aid == flwr_aid)
+            .order_by(ConversationModel.updated_at.desc())
+            .execution_options(populate_existing=True)
+        )
+        if federation_ids is not None:
+            query = query.where(RunSeriesModel.federation_id.in_(federation_ids))
+        with self.session() as session:
+            return [_conversation_from_model(*row) for row in session.execute(query)]
 
     def get_run_series(  # pylint: disable=R0913,R0914
         self,
@@ -2277,6 +2330,19 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
         description=row["description"],
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
+    )
+
+
+def _conversation_from_model(
+    model: ConversationModel, federation_id: str
+) -> Conversation:
+    """Convert owned conversation metadata to its API representation."""
+    return Conversation(
+        conversation_id=int64_to_uint64(model.conversation_id),
+        federation_id=federation_id,
+        title=model.title,
+        created_at=model.created_at.isoformat(),
+        updated_at=model.updated_at.isoformat(),
     )
 
 

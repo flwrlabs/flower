@@ -25,6 +25,7 @@ from flwr.app import Context, Message
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AppInfo,
     Automation,
+    Conversation,
     StartRunRequest,
 )
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -524,6 +525,16 @@ class CoreState(ABC):  # pylint: disable=R0904
             stored and a list of object IDs that still need to be pushed. If
             storing the Message fails, returns `(False, [])`.
         """
+
+    @abstractmethod
+    def create_conversation(self, *, flwr_aid: str, federation_id: str) -> Conversation:
+        """Create an untitled conversation and empty agent run series atomically."""
+
+    @abstractmethod
+    def get_conversations(
+        self, flwr_aid: str, federation_ids: Sequence[str] | None = None
+    ) -> Sequence[Conversation]:
+        """List owned conversations, newest first, optionally filtered by federation."""
 
     @abstractmethod
     def get_run_series(  # pylint: disable=too-many-arguments
