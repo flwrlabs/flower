@@ -1,90 +1,26 @@
 """floco: A Flower Baseline."""
 
-import copy
-from logging import WARNING
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from collections.abc import Iterable
+from logging import INFO
 
 import numpy as np
-from numpy import ndarray
-from sklearn import decomposition
-
+from flwr.app import MessageType
 from flwr.common import (
-    Context,
-    EvaluateIns,
-    FitIns,
-    FitRes,
-    GetPropertiesIns,
-    MetricsAggregationFn,
-    NDArrays,
-    Parameters,
-    Scalar,
-    logger,
+    ArrayRecord,
+    ConfigRecord,
+    Message,
+    MetricRecord,
+    RecordDict,
+    log,
     ndarray_to_bytes,
-    ndarrays_to_parameters,
-    parameters_to_ndarrays,
 )
-from flwr.server.client_manager import ClientManager
-from flwr.server.client_proxy import ClientProxy
-from flwr.server.strategy import FedAvg
-from flwr.server.strategy.aggregate import aggregate, aggregate_inplace
-
-
-# pylint: disable=too-many-arguments
-class CustomFedAvg(FedAvg):
-    """Custom Federated Averaging strategy that stores and sends context object."""
-
-    def __init__(
-        self,
-        *,
-        fraction_fit: float = 1.0,
-        fraction_evaluate: float = 1.0,
-        min_fit_clients: int = 2,
-        min_evaluate_clients: int = 2,
-        min_available_clients: int = 2,
-        evaluate_fn: Optional[
-            Callable[
-                [int, NDArrays, Dict[str, Scalar], Context],
-                Optional[Tuple[float, Dict[str, Scalar]]],
-            ]
-        ] = None,
-        on_fit_config_fn: Optional[Callable[[int], Dict[str, Scalar]]] = None,
-        on_evaluate_config_fn: Optional[Callable[[int], Dict[str, Scalar]]] = None,
-        accept_failures: bool = True,
-        initial_parameters: Parameters,
-        fit_metrics_aggregation_fn: Optional[MetricsAggregationFn] = None,
-        evaluate_metrics_aggregation_fn: Optional[MetricsAggregationFn] = None,
-        context: Context,
-    ) -> None:
-        super().__init__(
-            fraction_fit=fraction_fit,
-            fraction_evaluate=fraction_evaluate,
-            min_fit_clients=min_fit_clients,
-            min_evaluate_clients=min_evaluate_clients,
-            min_available_clients=min_available_clients,
-            on_fit_config_fn=on_fit_config_fn,
-            on_evaluate_config_fn=on_evaluate_config_fn,
-            accept_failures=accept_failures,
-            initial_parameters=initial_parameters,
-            fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
-            evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
-        )
-        # Custom evaluation function that allows to send context object.
-        self.eval_fn = evaluate_fn
-        self.context = context
-
-    def evaluate(
-        self, server_round: int, parameters: Parameters
-    ) -> Optional[Tuple[float, Dict[str, Scalar]]]:
-        """Evaluate model parameters using an evaluation function."""
-        if self.eval_fn is None:
-            # No evaluation function provided
-            return None
-        parameters_ndarrays = parameters_to_ndarrays(parameters)
-        eval_res = self.eval_fn(server_round, parameters_ndarrays, {}, self.context)
-        if eval_res is None:
-            return None
-
-        return eval_res
+from flwr.server import Grid
+from flwr.serverapp.strategy import FedAvg
+from flwr.serverapp.strategy.strategy_utils import (
+    aggregate_arrayrecords,
+    sample_nodes,
+)
+from sklearn import decomposition
 
 
 class Floco(FedAvg):
@@ -94,298 +30,214 @@ class Floco(FedAvg):
 
     Parameters
     ----------
-    fraction_fit : float, optional
-        Fraction of clients used during training. In case `min_fit_clients`
-        is larger than `fraction_fit * available_clients`, `min_fit_clients`
-        will still be sampled. Defaults to 1.0.
+    fraction_train : float, optional
+        Fraction of nodes used during training. Defaults to 1.0.
     fraction_evaluate : float, optional
-        Fraction of clients used during validation. In case `min_evaluate_clients`
-        is larger than `fraction_evaluate * available_clients`,
-        `min_evaluate_clients` will still be sampled. Defaults to 1.0.
-    min_fit_clients : int, optional
-        Minimum number of clients used during training. Defaults to 2.
-    min_evaluate_clients : int, optional
-        Minimum number of clients used during validation. Defaults to 2.
-    min_available_clients : int, optional
-        Minimum number of total clients in the system. Defaults to 2.
-    evaluate_fn: Optional[
-        Callable[
-            [int, NDArrays, Dict[str, Scalar]],
-            Optional[Tuple[float, Dict[str, Scalar]]],
-        ]
-    ]
-        Optional function used for validation. Defaults to None.
-    on_fit_config_fn : Callable[[int], Dict[str, Scalar]], optional
-        Function used to configure training. Defaults to None.
-    on_evaluate_config_fn : Callable[[int], Dict[str, Scalar]], optional
-        Function used to configure validation. Defaults to None.
-    accept_failures : bool, optional
-        Whether or not accept rounds containing failures. Defaults to True.
-    initial_parameters : Parameters, optional
-        Initial global model parameters.
-    fit_metrics_aggregation_fn : Optional[MetricsAggregationFn]
-        Metrics aggregation function, optional.
-    evaluate_metrics_aggregation_fn : Optional[MetricsAggregationFn]
-        Metrics aggregation function, optional.
-    tau: int = 0
+        Fraction of nodes used during validation. Defaults to 1.0.
+    min_train_nodes : int, optional
+        Minimum number of nodes used during training. Defaults to 2.
+    min_evaluate_nodes : int, optional
+        Minimum number of nodes used during validation. Defaults to 2.
+    min_available_nodes : int, optional
+        Minimum number of total nodes in the system. Defaults to 2.
+    tau : int
         Round at which to start projection.
-    rho: float = 1.0
+    rho : float
         Radius of the ball around each projected client parameters
         from which models are sampled.
-    endpoints: int = 1
+    endpoints : int
         Number of endpoints of the solution simplex.
     """
 
-    # pylint: disable=too-many-arguments,too-many-instance-attributes, line-too-long
     def __init__(
         self,
         *,
-        fraction_fit: float = 1.0,
+        fraction_train: float = 1.0,
         fraction_evaluate: float = 1.0,
-        min_fit_clients: int = 2,
-        min_evaluate_clients: int = 2,
-        min_available_clients: int = 2,
-        evaluate_fn: Optional[
-            Callable[
-                [int, NDArrays, Dict[str, Scalar], Context],
-                Optional[Tuple[float, Dict[str, Scalar]]],
-            ]
-        ] = None,
-        on_fit_config_fn: Optional[Callable[[int], Dict[str, Scalar]]] = None,
-        on_evaluate_config_fn: Optional[Callable[[int], Dict[str, Scalar]]] = None,
-        accept_failures: bool = True,
-        initial_parameters: Parameters,
-        fit_metrics_aggregation_fn: Optional[MetricsAggregationFn] = None,
-        evaluate_metrics_aggregation_fn: Optional[MetricsAggregationFn] = None,
-        context: Context,
+        min_train_nodes: int = 2,
+        min_evaluate_nodes: int = 2,
+        min_available_nodes: int = 2,
         tau: int = 0,
         rho: float = 1.0,
         endpoints: int = 1,
+        **kwargs,
     ) -> None:
         super().__init__(
-            fraction_fit=fraction_fit,
+            fraction_train=fraction_train,
             fraction_evaluate=fraction_evaluate,
-            min_fit_clients=min_fit_clients,
-            min_evaluate_clients=min_evaluate_clients,
-            min_available_clients=min_available_clients,
-            on_fit_config_fn=on_fit_config_fn,
-            on_evaluate_config_fn=on_evaluate_config_fn,
-            accept_failures=accept_failures,
-            initial_parameters=initial_parameters,
-            fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
-            evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
+            min_train_nodes=min_train_nodes,
+            min_evaluate_nodes=min_evaluate_nodes,
+            min_available_nodes=min_available_nodes,
+            **kwargs,
         )
         self.tau = tau
         self.rho = rho
         self.endpoints = endpoints
-        self.last_selected_partition_ids: List[int] = []
-        self.client_cid_to_partition_id: Dict = {}
-        self.projected_clients: List = [ndarray]
-        self.client_subregion_parameters: Dict = {}
-        self.client_gradients: Dict = {}
-        self.num_collected_client_gradients: int = 0
-        self.context = context
-        # Custom evaluation function that allows to send context object.
-        self.eval_fn = evaluate_fn
-        # Needed to compute pseudo gradients.
-        self.initial_parameters: Parameters = initial_parameters
+        # node_id -> pseudo-gradient
+        self.client_gradients: dict[int, np.ndarray] = {}
+        # node_id -> simplex projection coordinates
+        self.client_subregion_parameters: dict[int, np.ndarray] = {}
+        # Track which node_ids were sampled with the regular fraction
+        self.last_selected_node_ids: list[int] = []
+        # Store arrays from previous round for pseudo-gradient computation
+        self.initial_arrays: ArrayRecord | None = None
 
-    def initialize_parameters(
-        self, client_manager: ClientManager
-    ) -> Optional[Parameters]:
-        """Initialize global model parameters."""
-        return self.initial_parameters
-
-    def evaluate(
-        self, server_round: int, parameters: Parameters
-    ) -> Optional[Tuple[float, Dict[str, Scalar]]]:
-        """Evaluate model parameters using an evaluation function."""
-        if self.eval_fn is None:
-            # No evaluation function provided
-            return None
-        parameters_ndarrays = parameters_to_ndarrays(parameters)
-        eval_res = self.eval_fn(
-            server_round,
-            parameters_ndarrays,
-            {
-                "center": ndarray_to_bytes(
-                    np.array([1 / self.endpoints for _ in range(self.endpoints)])
-                ),
-                "radius": self.rho,
-                "endpoints": self.endpoints,
-            },
-            self.context,
-        )
-        if eval_res is None:
-            return None
-
-        return eval_res
-
-    def configure_fit(
-        self, server_round: int, parameters: Parameters, client_manager: ClientManager
-    ) -> List[Tuple[ClientProxy, FitIns]]:
+    def configure_train(
+        self, server_round: int, arrays: ArrayRecord, config: ConfigRecord, grid: Grid
+    ) -> Iterable[Message]:
         """Configure the next round of training."""
-        config = {}
-        if self.on_fit_config_fn is not None:
-            # Custom fit config function provided
-            config = self.on_fit_config_fn(server_round)
-        config["server_round"] = server_round
-        fit_ins = FitIns(parameters, config)
-        # Sample clients
-        sample_size, min_num_clients = self.num_fit_clients(
-            client_manager.num_available()
-        )
-        clients = client_manager.sample(
-            num_clients=sample_size, min_num_clients=min_num_clients
-        )
-        self.last_selected_partition_ids = [
-            int(
-                client.get_properties(
-                    ins=GetPropertiesIns({}), group_id=server_round, timeout=30
-                ).properties["partition-id"]
-            )
-            for client in clients
-        ]
-        if (server_round + 1) == self.tau:  # Round before projection
-            regular_fraction_fit = self.fraction_fit
-            self.fraction_fit = 1.0
-            sample_size, min_num_clients = self.num_fit_clients(
-                client_manager.num_available()
-            )
-            self.num_collected_client_gradients = sample_size
-            self.fraction_fit = regular_fraction_fit
-            clients = client_manager.sample(  # Sample all clients to get gradients
-                num_clients=sample_size, min_num_clients=min_num_clients
-            )
-            # Create client cid to partition id mapping
-            for client in clients:
-                self.client_cid_to_partition_id[client.cid] = client.get_properties(
-                    ins=GetPropertiesIns({}), group_id=server_round, timeout=30
-                ).properties["partition-id"]
+        if self.fraction_train == 0.0:
+            return []
 
-        elif server_round == self.tau:  # Round of projection
-            # Get client gradients
-            self.projected_clients = project_clients(
-                self.client_gradients, self.endpoints
-            )
+        # Compute regular sample size
+        all_node_ids = list(grid.get_node_ids())
+        num_nodes = int(len(all_node_ids) * self.fraction_train)
+        sample_size = max(num_nodes, self.min_train_nodes)
+
+        # Sample nodes for the regular round
+        node_ids, _ = sample_nodes(grid, self.min_available_nodes, sample_size)
+        self.last_selected_node_ids = list(node_ids)
+
+        if (server_round + 1) == self.tau:
+            # Round before projection: sample ALL nodes to get gradients
+            all_sample_size = max(len(all_node_ids), self.min_available_nodes)
+            node_ids, _ = sample_nodes(grid, self.min_available_nodes, all_sample_size)
+
+        elif server_round == self.tau:
+            # Round of projection: compute projections from collected gradients
+            projected = project_clients(self.client_gradients, self.endpoints)
             self.client_subregion_parameters = dict(
-                zip(
-                    np.arange(self.num_collected_client_gradients),
-                    self.projected_clients,
-                )
+                zip(sorted(self.client_gradients.keys()), projected)
             )
+
+        config["server-round"] = server_round
+
         if server_round >= self.tau:
-            fit_ins_all_clients = []
-            for client in clients:
-                tmp_client_partition_id = self.client_cid_to_partition_id[client.cid]
-                tmp_client_config = copy.deepcopy(config)
-                tmp_client_config["center"] = ndarray_to_bytes(
-                    self.client_subregion_parameters[tmp_client_partition_id]
+            # Per-node messages with unique subregion parameters
+            messages = []
+            for node_id in node_ids:
+                node_config = ConfigRecord(dict(config))
+                if node_id in self.client_subregion_parameters:
+                    node_config["center"] = ndarray_to_bytes(
+                        self.client_subregion_parameters[node_id]
+                    )
+                    node_config["radius"] = self.rho
+                record = RecordDict(
+                    {self.arrayrecord_key: arrays, self.configrecord_key: node_config}
                 )
-                tmp_client_config["radius"] = self.rho
-                tmp_fit_ins = FitIns(parameters, tmp_client_config)
-                fit_ins_all_clients.append((client, tmp_fit_ins))
-            return fit_ins_all_clients
-        # Return client/config pairs
-        return [(client, fit_ins) for client in clients]
+                messages.append(
+                    Message(
+                        content=record,
+                        message_type=MessageType.TRAIN,
+                        dst_node_id=node_id,
+                    )
+                )
+            log(INFO, "configure_train: Sent %s messages (round %s)", len(messages), server_round)
+            return messages
+
+        # Before projection: uniform messages
+        record = RecordDict(
+            {self.arrayrecord_key: arrays, self.configrecord_key: config}
+        )
+        log(INFO, "configure_train: Sampled %s nodes (round %s)", len(node_ids), server_round)
+        return self._construct_messages(record, node_ids, MessageType.TRAIN)
+
+    def aggregate_train(
+        self,
+        server_round: int,
+        replies: Iterable[Message],
+    ) -> tuple[ArrayRecord | None, MetricRecord | None]:
+        """Aggregate training results."""
+        valid_replies, _ = self._check_and_log_replies(replies, is_train=True)
+
+        if not valid_replies:
+            return None, None
+
+        if (server_round + 1) == self.tau:
+            # Compute pseudo-gradients from all clients
+            filtered_replies = []
+            for msg in valid_replies:
+                node_id = msg.metadata.src_node_id
+                received_arrays = next(iter(msg.content.array_records.values()))
+                # Compute pseudo-gradient: diff between initial and received
+                if self.initial_arrays is not None:
+                    client_grads = []
+                    keys = list(received_arrays.keys())
+                    for key in keys[-self.endpoints:]:
+                        init_arr = self.initial_arrays[key].numpy().flatten()
+                        recv_arr = received_arrays[key].numpy().flatten()
+                        client_grads.append(init_arr - recv_arr)
+                    self.client_gradients[node_id] = np.concatenate(client_grads)
+
+                # Only keep regularly-sampled nodes for aggregation
+                if node_id in self.last_selected_node_ids:
+                    filtered_replies.append(msg)
+
+            self.client_gradients = {
+                k: self.client_gradients[k]
+                for k in sorted(self.client_gradients.keys())
+            }
+            valid_replies = filtered_replies
+
+        if not valid_replies:
+            return None, None
+
+        reply_contents = [msg.content for msg in valid_replies]
+
+        # Aggregate ArrayRecords
+        arrays = aggregate_arrayrecords(reply_contents, self.weighted_by_key)
+
+        # Aggregate MetricRecords
+        metrics = self.train_metrics_aggr_fn(reply_contents, self.weighted_by_key)
+
+        # Store for next round's gradient computation
+        self.initial_arrays = arrays
+
+        return arrays, metrics
 
     def configure_evaluate(
-        self, server_round: int, parameters: Parameters, client_manager: ClientManager
-    ) -> list[tuple[ClientProxy, EvaluateIns]]:
+        self, server_round: int, arrays: ArrayRecord, config: ConfigRecord, grid: Grid
+    ) -> Iterable[Message]:
         """Configure the next round of evaluation."""
-        # Do not configure federated evaluation if fraction eval is 0.
         if self.fraction_evaluate == 0.0:
             return []
 
-        # Parameters and config
-        config = {}
-        if self.on_evaluate_config_fn is not None:
-            # Custom evaluation config function provided
-            config = self.on_evaluate_config_fn(server_round)
-        evaluate_ins = EvaluateIns(parameters, config)
-        config["server_round"] = server_round
-        # Sample clients
-        sample_size, min_num_clients = self.num_evaluation_clients(
-            client_manager.num_available()
-        )
-        clients = client_manager.sample(
-            num_clients=sample_size, min_num_clients=min_num_clients
-        )
+        # Sample nodes
+        num_nodes = int(len(list(grid.get_node_ids())) * self.fraction_evaluate)
+        sample_size = max(num_nodes, self.min_evaluate_nodes)
+        node_ids, _ = sample_nodes(grid, self.min_available_nodes, sample_size)
+
+        config["server-round"] = server_round
 
         if server_round >= self.tau:
-            eval_ins_all_clients = []
-            for client in clients:
-                tmp_client_partition_id = self.client_cid_to_partition_id[client.cid]
-                tmp_client_config = copy.deepcopy(config)
-                tmp_client_config["center"] = ndarray_to_bytes(
-                    self.client_subregion_parameters[tmp_client_partition_id]
+            # Per-node messages with unique subregion parameters
+            messages = []
+            for node_id in node_ids:
+                node_config = ConfigRecord(dict(config))
+                if node_id in self.client_subregion_parameters:
+                    node_config["center"] = ndarray_to_bytes(
+                        self.client_subregion_parameters[node_id]
+                    )
+                    node_config["radius"] = self.rho
+                record = RecordDict(
+                    {self.arrayrecord_key: arrays, self.configrecord_key: node_config}
                 )
-                tmp_client_config["radius"] = self.rho
-                tmp_eval_ins = EvaluateIns(parameters, tmp_client_config)
-                eval_ins_all_clients.append((client, tmp_eval_ins))
-            return eval_ins_all_clients
+                messages.append(
+                    Message(
+                        content=record,
+                        message_type=MessageType.EVALUATE,
+                        dst_node_id=node_id,
+                    )
+                )
+            log(INFO, "configure_evaluate: Sent %s messages (round %s)", len(messages), server_round)
+            return messages
 
-        # Return client/config pairs
-        return [(client, evaluate_ins) for client in clients]
-
-    def aggregate_fit(
-        self,
-        server_round: int,
-        results: List[Tuple[ClientProxy, FitRes]],
-        failures: List[Union[Tuple[ClientProxy, FitRes], BaseException]],
-    ) -> Tuple[Optional[Parameters], Dict[str, Scalar]]:
-        """Aggregate fit results using weighted average."""
-        if not results:
-            return None, {}
-        # Do not aggregate if there are failures and failures are not accepted
-        if not self.accept_failures and failures:
-            return None, {}
-        if (server_round + 1) == self.tau:  # All clients results are collected
-            # Save client gradients for projection
-            new_results = []
-            for client, fit_res in results:
-                tmp_client_partition_id = self.client_cid_to_partition_id[client.cid]
-                w = parameters_to_ndarrays(fit_res.parameters)
-                init_ndarrays = parameters_to_ndarrays(self.initial_parameters)
-                client_grads = [
-                    init_ndarrays[-i].flatten() - w[-i].flatten()
-                    for i in range(1, self.endpoints + 1)
-                ]  # Get pseudo gradients
-                client_grads = np.concatenate(client_grads)
-                self.client_gradients[tmp_client_partition_id] = client_grads
-                self.client_gradients = {
-                    k: self.client_gradients[k]
-                    for k in sorted(self.client_gradients.keys())
-                }
-                if tmp_client_partition_id in self.last_selected_partition_ids:
-                    # Only select the clients that were sampled
-                    new_results.append((client, fit_res))
-            results = new_results
-        if self.inplace:
-            # Does in-place weighted average of results
-            aggregated_ndarrays = aggregate_inplace(results)
-        else:
-            # Convert results
-            weights_results = [
-                (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
-                for _, fit_res in results
-            ]
-            aggregated_ndarrays = aggregate(weights_results)
-        parameters_aggregated = ndarrays_to_parameters(aggregated_ndarrays)
-        self.initial_parameters = parameters_aggregated
-        # Aggregate custom metrics if aggregation fn was provided
-        metrics_aggregated = {}
-        if self.fit_metrics_aggregation_fn:
-            fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
-            metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
-        elif server_round == 1:  # Only log this warning once
-            logger.log(WARNING, "No fit_metrics_aggregation_fn provided")
-        return parameters_aggregated, metrics_aggregated
-
-    def aggregate_evaluate(self, server_round, results, failures):
-        """Aggregate results from federated evaluation."""
-        loss, metrics = super().aggregate_evaluate(server_round, results, failures)
-        return loss, metrics
+        # Before projection: uniform messages
+        record = RecordDict(
+            {self.arrayrecord_key: arrays, self.configrecord_key: config}
+        )
+        log(INFO, "configure_evaluate: Sampled %s nodes (round %s)", len(node_ids), server_round)
+        return self._construct_messages(record, node_ids, MessageType.EVALUATE)
 
 
 def project_clients(client_gradients, endpoints):

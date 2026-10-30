@@ -2,9 +2,11 @@
 
 from typing import Optional, Union
 
-import datasets
 import numpy as np
 from flwr_datasets.partitioner.partitioner import Partitioner
+
+import datasets
+
 
 # pylint: disable=R0902, R0912, R0914
 
