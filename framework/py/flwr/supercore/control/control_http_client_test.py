@@ -29,6 +29,8 @@ _UNARY_UNARY_ENDPOINTS = (
     "stop-automation",
     "list-runs",
     "list-run-series",
+    "create-conversation",
+    "list-conversations",
     "get-run-series",
     "update-run-series-description",
     "list-run-series-events",
