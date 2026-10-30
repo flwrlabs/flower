@@ -70,6 +70,15 @@ erDiagram
     VARCHAR state
   }
 
+  conversation {
+    BIGINT conversation_id PK
+    BIGINT series_id FK
+    TIMESTAMP created_at
+    VARCHAR flwr_aid
+    VARCHAR title
+    TIMESTAMP updated_at
+  }
+
   fab {
     VARCHAR fab_hash PK
     BLOB content
@@ -270,6 +279,7 @@ erDiagram
     VARCHAR usage_type
   }
 
+  run_series ||--o| conversation : series_id
   message ||--o{ message : reply_to_message_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
