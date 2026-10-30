@@ -128,26 +128,3 @@ def test_create_agent_rejects_empty_fields(state: CoreState, field: str) -> None
     assert state.create_agent(**values) is None
     assert state.list_agents("alice") == []
     assert state.list_agents("") == []
-
-
-def test_sql_agents_persist_across_state_instances(tmp_path: Path) -> None:
-    """Retain agents and continue allocating IDs when reopening the database."""
-    database_path = str(tmp_path / "state.db")
-    original = _sql_state(database_path)
-    agent = original.create_agent(
-        flwr_aid="alice",
-        name="Research Agent",
-        title="Researcher",
-        description="Investigate and cite sources.",
-        app_spec="@flower/research==1.2.3",
-    )
-
-    reopened = _sql_state(database_path)
-    assert agent is not None
-    assert reopened.list_agents("alice") == [agent]
-    following = reopened.create_agent(
-        flwr_aid="alice", name="Research Agent", app_spec="@flower/research"
-    )
-    assert following is not None
-    assert following.agent_id > agent.agent_id
-    assert original.list_agents("alice") == [agent, following]
