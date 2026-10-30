@@ -163,6 +163,7 @@ class InMemoryCoreState(
 ):  # pylint: disable=R0904,too-many-instance-attributes
     """In-memory CoreState implementation."""
 
+    # pylint: disable-next=too-many-statements
     def __init__(self, object_store: ObjectStore) -> None:
         self._object_store = object_store
         self.file_store: dict[tuple[str, str], FileRecord] = {}
