@@ -17,10 +17,10 @@
 
 from unittest.mock import Mock
 
+from flwr.cli.stop import _list_run_ids
 from flwr.common.constant import Status
 from flwr.proto.control_pb2 import ListRunsResponse
 from flwr.proto.run_pb2 import Run, RunStatus
-from flwr.cli.stop import _list_run_ids
 
 
 def _run(run_id: int, status: str, pending_at: str) -> Run:
