@@ -71,6 +71,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
     Connector,
+    CreateConversationRequest,
+    CreateConversationResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
@@ -91,6 +93,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAutomationsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
+    ListConversationsRequest,
+    ListConversationsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -1270,6 +1274,40 @@ def list_runs(
     return ListRunsResponse(
         run_dict={run.run_id: run_to_proto(run) for run in runs},
         now=now().isoformat(),
+    )
+
+
+def create_conversation(
+    request: CreateConversationRequest, account: AccountInfo, state: LinkState
+) -> CreateConversationResponse:
+    """Create an owned conversation without starting a run."""
+    state.federation_manager.ensure_default_federations_exist(flwr_aid=account.flwr_aid)
+    federation_id = _resolve_federation_id(
+        state, account.account_name, request.federation
+    )
+    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    conversation = state.create_conversation(
+        flwr_aid=account.flwr_aid, federation_id=federation_id
+    )
+    return CreateConversationResponse(conversation=conversation)
+
+
+def list_conversations(
+    request: ListConversationsRequest, account: AccountInfo, state: LinkState
+) -> ListConversationsResponse:
+    """List only owned conversations in accessible federations."""
+    if request.HasField("federation_id"):
+        _validate_federation_membership_in_request(
+            state, account.flwr_aid, request.federation_id
+        )
+        federation_ids = [request.federation_id]
+    else:
+        federation_ids = [
+            federation.id
+            for federation in state.federation_manager.get_federations(account.flwr_aid)
+        ]
+    return ListConversationsResponse(
+        conversations=state.get_conversations(account.flwr_aid, federation_ids)
     )
 
 

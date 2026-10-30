@@ -44,6 +44,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CompleteConnectorOAuthRequest,
     CompleteConnectorOAuthResponse,
     Connector,
+    CreateConversationRequest,
+    CreateConversationResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -52,6 +54,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
+    ListConversationsRequest,
+    ListConversationsResponse,
     ListRunsRequest,
     ListRunsResponse,
     PullArtifactsRequest,
@@ -67,12 +71,15 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
+from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.supercore.auth.typing import (
     AccountAuthCredentials,
     AccountAuthLoginDetails,
     AccountInfo,
 )
+from flwr.supercore.constant import NOOP_FEDERATION_ID
 from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
@@ -87,6 +94,7 @@ from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
+from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
 from flwr.superlink.routers.control.router import add_app as add_app_route
 from flwr.superlink.routers.control.router import router
@@ -96,6 +104,116 @@ from flwr.superlink.servicer.control.control_servicer import ControlServicer
 
 _ACCOUNT = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
 CONNECTOR_FEDERATION_ID = "@bob/fed-a"
+
+
+@pytest.fixture(name="conversation_client")
+def create_conversation_client() -> tuple[TestClient, LinkState]:
+    """Use real conversation persistence with the authenticated Control stack."""
+    state = InMemoryLinkState(NoOpFederationManager(), ObjectStoreFactory().store())
+    app = _create_app()
+    app.dependency_overrides[get_linkstate] = lambda: state
+    return (
+        TestClient(
+            app,
+            headers={
+                "authorization": "Bearer access-token",
+                "content-type": PROTOBUF_MEDIA_TYPE,
+            },
+        ),
+        state,
+    )
+
+
+def test_conversation_create_and_list(
+    conversation_client: tuple[TestClient, LinkState],
+) -> None:
+    """Create and list owned conversation metadata without starting work."""
+    client, state = conversation_client
+    response = client.post(
+        "/v1/control/create-conversation",
+        content=CreateConversationRequest().SerializeToString(),
+    )
+    assert response.status_code == 200
+    conversation = CreateConversationResponse.FromString(response.content).conversation
+    assert conversation.title == ""
+    assert conversation.federation_id == NOOP_FEDERATION_ID
+    assert not state.get_tasks()
+
+    state.create_conversation(
+        flwr_aid="another-owner", federation_id=NOOP_FEDERATION_ID
+    )
+    listed = client.post(
+        "/v1/control/list-conversations",
+        content=ListConversationsRequest().SerializeToString(),
+    )
+    assert listed.status_code == 200
+    assert list(ListConversationsResponse.FromString(listed.content).conversations) == [
+        conversation
+    ]
+
+
+def test_conversation_list_filters_current_federation_access(
+    conversation_client: tuple[TestClient, LinkState],
+) -> None:
+    """Lists restrict metadata to the owner and currently accessible federations."""
+    client, state = conversation_client
+    state.create_conversation(
+        flwr_aid="another-owner", federation_id=NOOP_FEDERATION_ID
+    )
+    own = state.create_conversation(
+        flwr_aid=_ACCOUNT.flwr_aid, federation_id=NOOP_FEDERATION_ID
+    )
+    state.create_conversation(flwr_aid=_ACCOUNT.flwr_aid, federation_id="inaccessible")
+    response = client.post(
+        "/v1/control/list-conversations",
+        content=ListConversationsRequest(
+            federation_id=NOOP_FEDERATION_ID
+        ).SerializeToString(),
+    )
+    assert response.status_code == 200
+    assert list(
+        ListConversationsResponse.FromString(response.content).conversations
+    ) == [own]
+
+    with patch.object(state.federation_manager, "has_member", return_value=False):
+        response = client.post(
+            "/v1/control/list-conversations",
+            content=ListConversationsRequest(
+                federation_id=NOOP_FEDERATION_ID
+            ).SerializeToString(),
+        )
+        assert response.status_code == 412
+        assert response.json()["code"] == ApiErrorCode.FEDERATION_NOT_FOUND
+
+    with patch.object(state.federation_manager, "get_federations", return_value=[]):
+        response = client.post(
+            "/v1/control/list-conversations",
+            content=ListConversationsRequest().SerializeToString(),
+        )
+        assert response.status_code == 200
+        assert not ListConversationsResponse.FromString(response.content).conversations
+
+
+def test_conversation_starts_untitled_and_rejects_invalid_federation(
+    conversation_client: tuple[TestClient, LinkState],
+) -> None:
+    """Creation leaves the title empty and rejects inaccessible federations."""
+    client, state = conversation_client
+    response = client.post(
+        "/v1/control/create-conversation",
+        content=CreateConversationRequest().SerializeToString(),
+    )
+    assert response.status_code == 200
+    assert (
+        CreateConversationResponse.FromString(response.content).conversation.title == ""
+    )
+    invalid = client.post(
+        "/v1/control/create-conversation",
+        content=CreateConversationRequest(federation="missing").SerializeToString(),
+    )
+    assert invalid.status_code == 412
+    assert invalid.json()["code"] == ApiErrorCode.FEDERATION_NOT_FOUND
+    assert len(state.get_run_series()) == 1
 
 
 def _create_app(authn_plugin: Mock | None = None) -> FastAPI:

@@ -34,6 +34,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
+    CreateConversationRequest,
+    CreateConversationResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
@@ -54,6 +56,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAutomationsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
+    ListConversationsRequest,
+    ListConversationsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -119,10 +123,6 @@ from .control_handlers import _resolve_federation_id
 # pylint: disable=too-many-public-methods
 class ControlServicer(control_pb2_grpc.ControlServicer):
     """Control API servicer."""
-
-    # Keep proto-only RPC additions callable but unimplemented until integration.
-    CreateConversation = control_pb2_grpc.ControlServicer.CreateConversation
-    ListConversations = control_pb2_grpc.ControlServicer.ListConversations
 
     def __init__(  # pylint: disable=R0913, R0917
         self,
@@ -199,6 +199,22 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     ) -> UpdateRunSeriesDescriptionResponse:
         """Update a run series description."""
         return control_handlers.update_run_series_description(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def CreateConversation(
+        self, request: CreateConversationRequest, context: grpc.ServicerContext
+    ) -> CreateConversationResponse:
+        """Create an owned conversation."""
+        return control_handlers.create_conversation(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def ListConversations(
+        self, request: ListConversationsRequest, context: grpc.ServicerContext
+    ) -> ListConversationsResponse:
+        """List owned conversations."""
+        return control_handlers.list_conversations(
             request, _get_account(), self.linkstate_factory.state()
         )
 
