@@ -19,10 +19,8 @@ import hashlib
 import json
 import secrets
 from collections.abc import Callable, Collection, Sequence
-from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from logging import ERROR
-from threading import RLock
 from typing import Any, Literal, cast
 from uuid import uuid4
 
@@ -163,8 +161,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def __init__(self, database_path: str, object_store: ObjectStore) -> None:
         super().__init__(database_path)
         self._object_store = object_store
-        # In-memory SQLite shares one connection across threads.
-        self._file_lock = RLock() if self._is_in_memory_sqlite else nullcontext()
 
     def dialect_insert(self, table: Any) -> SQLiteInsert | PostgresInsert:
         """Return a dialect-specific insert statement for CoreState upserts."""
@@ -584,7 +580,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self, scope: str, key: str, data: bytes, expected_revision: int | None
     ) -> int:
         """Create or update a file with a revision precondition."""
-        with self._file_lock, self.session() as session:
+        with self.session() as session:
             if expected_revision is None:
                 stmt = self.dialect_insert(FileModel).values(
                     scope=scope,
@@ -633,7 +629,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def get_file(self, scope: str, key: str) -> File | None:
         """Return the current file, or None if absent or deleted."""
-        with self._file_lock, self.session() as session:
+        with self.session() as session:
             row = session.execute(
                 select(
                     FileModel.latest_revision,
@@ -674,7 +670,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if start_after:
             stmt = stmt.where(FileModel.key > start_after)
         stmt = stmt.order_by(FileModel.key).limit(limit)
-        with self._file_lock, self.session() as session:
+        with self.session() as session:
             return [
                 FileMetadata(
                     key=row.key, revision=row.latest_revision, size_bytes=row.size_bytes
@@ -684,7 +680,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def delete_file(self, scope: str, key: str, expected_revision: int) -> None:
         """Delete a file with a matching revision, preserving revision history."""
-        with self._file_lock, self.session() as session:
+        with self.session() as session:
             revision = session.scalar(
                 update(FileModel)
                 .where(
