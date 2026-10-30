@@ -43,8 +43,6 @@ from flwr.supercore.warm_executor_constants import (
     WARM_EXECUTOR_BUSY_FILE,
     WARM_EXECUTOR_READY_DIRECTORY,
     WARM_EXECUTOR_READY_FILE,
-    WARM_MODEL_EXECUTOR_MODULE,
-    WARM_MODEL_EXECUTOR_SOCKET,
 )
 
 from . import kubernetes_resources as kube_resources
@@ -131,12 +129,9 @@ def _warm_executor_pool_key(**overrides: Any) -> WarmExecutorPoolKey:
     return WarmExecutorPoolKey(**base)
 
 
-@pytest.mark.parametrize("task_type", [TaskType.MODEL, TaskType.CONNECTOR])
-def test_kubernetes_executor_config_allows_model_and_connector_pools(
-    task_type: TaskType,
-) -> None:
-    """Trusted Model and Connector pools should pass executor validation."""
-    pool_key = _warm_executor_pool_key(task_type=task_type)
+def test_kubernetes_executor_config_allows_connector_pools() -> None:
+    """Trusted Connector pools should pass executor validation."""
+    pool_key = _warm_executor_pool_key(task_type=TaskType.CONNECTOR)
 
     config = _executor_config(
         warm_executor_owner="superexec-a",
@@ -150,7 +145,7 @@ def test_kubernetes_executor_config_rejects_unsupported_warm_pool() -> None:
     """Task types without a shared token handoff should remain unavailable."""
     pool_key = _warm_executor_pool_key(task_type=TaskType.SERVER_APP)
 
-    with pytest.raises(ValueError, match="only AgentApp, Model, and Connector"):
+    with pytest.raises(ValueError, match="only AgentApp and Connector"):
         _executor_config(
             warm_executor_owner="superexec-a",
             warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
@@ -167,7 +162,7 @@ def test_fab_specific_agentapp_pool_validates_identity_and_path() -> None:
         _warm_executor_pool_key(fab_hash=_FAB_HASH, fab_path="agent.fab")
     with pytest.raises(ValueError, match="Only AgentApp"):
         _warm_executor_pool_key(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.CONNECTOR,
             fab_hash=_FAB_HASH,
             fab_path="/apps/agent.fab",
         )
@@ -671,7 +666,7 @@ def test_launch_warm_executor_is_inert_and_becomes_ready() -> None:
     assert is_warm_executor_ready(pod, pool_key)
 
     incompatible_keys = (
-        _warm_executor_pool_key(task_type=TaskType.MODEL),
+        _warm_executor_pool_key(task_type=TaskType.CONNECTOR),
         _warm_executor_pool_key(runtime_image="taskexecutor:other"),
     )
     assert not any(is_warm_executor_ready(pod, key) for key in incompatible_keys)
@@ -708,7 +703,6 @@ def test_launch_warm_executor_is_inert_and_becomes_ready() -> None:
     ("task_type", "task_command"),
     [
         (TaskType.AGENT_APP, "flwr-agentapp"),
-        (TaskType.MODEL, "flwr-model"),
         (TaskType.CONNECTOR, "flwr-connector"),
     ],
 )
@@ -791,7 +785,6 @@ def test_warm_launch_defers_replenishment(
     client.create_namespaced_pod.assert_not_called()
     worker_module = {
         TaskType.CONNECTOR: WARM_CONNECTOR_EXECUTOR_MODULE,
-        TaskType.MODEL: WARM_MODEL_EXECUTOR_MODULE,
     }.get(task_type)
     assert stream.call_args.args[0] is exec_client.connect_get_namespaced_pod_exec
     assert stream.call_args.kwargs["container"] == "taskexecutor"
@@ -829,7 +822,6 @@ def test_warm_launch_defers_replenishment(
 @pytest.mark.parametrize(
     ("task_type", "task_command"),
     [
-        (TaskType.MODEL, "flwr-model"),
         (TaskType.CONNECTOR, "flwr-connector"),
     ],
 )
@@ -934,7 +926,6 @@ def test_launch_retires_warm_pod_when_consumption_cannot_be_persisted(
 @pytest.mark.parametrize(
     ("task_type", "task_command"),
     [
-        (TaskType.MODEL, "flwr-model"),
         (TaskType.CONNECTOR, "flwr-connector"),
     ],
 )
@@ -1617,11 +1608,11 @@ def test_disabled_warm_pools_retire_owned_pods() -> None:
 
 
 def test_warm_pool_retirement_does_not_block_other_pools() -> None:
-    """A failed Model retirement should not block Connector capacity."""
+    """A failed AgentApp retirement should not block Connector capacity."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
-    model_pool_key = _warm_executor_pool_key(
-        task_type=TaskType.MODEL, runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+    agentapp_pool_key = _warm_executor_pool_key(
+        task_type=TaskType.AGENT_APP, runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
     connector_pool_key = _warm_executor_pool_key(
         task_type=TaskType.CONNECTOR,
@@ -1630,7 +1621,7 @@ def test_warm_pool_retirement_does_not_block_other_pools() -> None:
     config = _executor_config(
         warm_executor_owner="superexec-a",
         warm_executor_pools=(
-            WarmExecutorPoolConfig(key=model_pool_key, size=1),
+            WarmExecutorPoolConfig(key=agentapp_pool_key, size=1),
             WarmExecutorPoolConfig(key=connector_pool_key, size=1),
         ),
     )
@@ -1645,7 +1636,7 @@ def test_warm_pool_retirement_does_not_block_other_pools() -> None:
 
     pool._dispatcher._wait_for_task_and_replace(  # pylint: disable=protected-access
         "consumed",
-        model_pool_key,
+        agentapp_pool_key,
         warm_executor_dispatch.KubernetesWarmExecutorDispatch(_WarmExecResponse(False)),
     )
 
@@ -1654,7 +1645,7 @@ def test_warm_pool_retirement_does_not_block_other_pools() -> None:
     client.create_namespaced_pod.assert_not_called()
 
     client.list_namespaced_pod.return_value = {
-        "items": [_ready_warm_pod(model_pool_key, config, name="consumed")]
+        "items": [_ready_warm_pod(agentapp_pool_key, config, name="consumed")]
     }
     pool.ensure_capacity()
 
@@ -1776,7 +1767,7 @@ def test_warm_pool_reconciles_obsolete_and_excess_idle_pods() -> None:
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     pool_key = _warm_executor_pool_key(
-        task_type=TaskType.MODEL, runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
+        task_type=TaskType.CONNECTOR, runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
     config = _executor_config(
         warm_executor_owner="superexec-a",
@@ -1946,7 +1937,7 @@ def test_combined_acquisition_filters_to_ready_warm_pools_at_budget() -> None:
     """At the Pod budget, only ready generic types and exact FABs are claimable."""
     client = Mock()
     generic_key = _warm_executor_pool_key(
-        task_type=TaskType.MODEL,
+        task_type=TaskType.CONNECTOR,
         runtime_image="ghcr.io/flwrlabs/taskexecutor:dev",
     )
     exact_key = _warm_executor_pool_key(
@@ -1963,7 +1954,7 @@ def test_combined_acquisition_filters_to_ready_warm_pools_at_budget() -> None:
         ),
     )
     warm_pods = [
-        _ready_warm_pod(generic_key, config, name="model"),
+        _ready_warm_pod(generic_key, config, name="connector"),
         _ready_warm_pod(exact_key, config, name="agent"),
     ]
     active_pod_count = 3
@@ -1976,10 +1967,10 @@ def test_combined_acquisition_filters_to_ready_warm_pools_at_budget() -> None:
     client.list_namespaced_pod.side_effect = _list_pods
     client.list_namespaced_secret.return_value = {"items": []}
     executor = _executor(client=client, config=config)
-    supported = {TaskType.AGENT_APP, TaskType.MODEL, TaskType.SERVER_APP}
+    supported = {TaskType.AGENT_APP, TaskType.CONNECTOR, TaskType.SERVER_APP}
 
     assert executor.get_eligible_capacity(supported, insecure=True) == (
-        {TaskType.MODEL},
+        {TaskType.CONNECTOR},
         {_FAB_HASH},
     )
     active_pod_count = 2
@@ -1999,7 +1990,7 @@ def test_combined_acquisition_returns_no_eligibility_at_budget() -> None:
         config=_executor_config(active_pod_budget=1, sleep=sleep),
     )
 
-    assert executor.get_eligible_capacity({TaskType.MODEL}) == (set(), set())
+    assert executor.get_eligible_capacity({TaskType.CONNECTOR}) == (set(), set())
     sleep.assert_not_called()
 
 
@@ -2163,7 +2154,7 @@ def test_wait_for_capacity_reserves_space_for_a_cold_task() -> None:
     client.create_namespaced_pod.reset_mock()
     active_pod_count = 2
 
-    executor.wait_for_capacity(TaskType.MODEL)
+    executor.wait_for_capacity(TaskType.CONNECTOR)
 
     client.create_namespaced_pod.assert_not_called()
     sleep.assert_not_called()
@@ -2453,7 +2444,10 @@ def test_build_taskexecutor_pod_includes_configured_volumes() -> None:
         (
             {
                 "volume_mounts": [
-                    {"name": "model-socket", "mountPath": WARM_MODEL_EXECUTOR_SOCKET}
+                    {
+                        "name": "connector-socket",
+                        "mountPath": WARM_CONNECTOR_EXECUTOR_SOCKET,
+                    }
                 ]
             },
             "mount path",

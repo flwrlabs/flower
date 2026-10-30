@@ -22,6 +22,8 @@ from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.protobuf.client import ProtobufClient
 
 _UNARY_UNARY_ENDPOINTS = (
+    "create-agent",
+    "list-agents",
     "start-run",
     "stop-run",
     "start-automation",

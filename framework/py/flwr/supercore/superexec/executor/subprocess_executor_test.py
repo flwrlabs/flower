@@ -120,10 +120,9 @@ def test_launch_suppresses_output_when_requested() -> None:
         (TaskType.SERVER_APP, "flwr-serverapp"),
         (TaskType.SIMULATION, "flwr-simulation"),
         (TaskType.AGENT_APP, "flwr-agentapp"),
-        (TaskType.MODEL, "flwr-model"),
         (TaskType.CONNECTOR, "flwr-connector"),
     ],
-    ids=["serverapp", "simulation", "agentapp", "model", "connector"],
+    ids=["serverapp", "simulation", "agentapp", "connector"],
 )
 def test_launch_renders_runtime_api_task_args(
     task_type: TaskType, command: str
