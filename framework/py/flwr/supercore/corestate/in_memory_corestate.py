@@ -43,6 +43,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AppInfo,
     Automation,
     Conversation,
+    ConversationParticipant,
     StartRunRequest,
 )
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -133,7 +134,7 @@ class ObjectPushSession:
 
 @dataclass
 class ConversationRecord:
-    """Store conversation metadata, owner, and internal backing series."""
+    """Store conversation metadata, creator, and internal backing series."""
 
     flwr_aid: str
     series_id: int
@@ -839,7 +840,9 @@ class InMemoryCoreState(
         return True
 
     def create_conversation(self, *, flwr_aid: str, federation_id: str) -> Conversation:
-        """Create an untitled conversation and empty agent run series atomically."""
+        """Create a conversation, its backing series, and creator participation."""
+        if not flwr_aid:
+            raise ValueError("Conversation creator must be nonempty")
         with self.lock_run_series_store:
             conversation_id = generate_rand_int_from_bytes(CONVERSATION_ID_NUM_BYTES)
             if conversation_id in self.conversation_store:
@@ -853,6 +856,7 @@ class InMemoryCoreState(
                 federation_id=federation_id,
                 created_at=timestamp,
                 updated_at=timestamp,
+                participants=[ConversationParticipant(flwr_aid=flwr_aid)],
             )
             self.run_series_store[series_id] = RunSeries(
                 series_id=series_id,
@@ -866,15 +870,43 @@ class InMemoryCoreState(
             )
             return conversation
 
+    def add_conversation_participant(
+        self, conversation_id: int, participant: ConversationParticipant
+    ) -> bool:
+        """Enroll a participant without duplicating existing membership."""
+        if not (participant.flwr_aid or participant.agent_id):
+            return False
+        with self.lock_run_series_store:
+            record = self.conversation_store.get(conversation_id)
+            if record is None:
+                return False
+            if participant not in record.conversation.participants:
+                record.conversation.participants.append(participant)
+                record.conversation.updated_at = now().isoformat()
+            return True
+
+    def remove_conversation_participant(
+        self, conversation_id: int, participant: ConversationParticipant
+    ) -> bool:
+        """Remove a participant and update conversation metadata on a change."""
+        with self.lock_run_series_store:
+            record = self.conversation_store.get(conversation_id)
+            if record is None or participant not in record.conversation.participants:
+                return False
+            record.conversation.participants.remove(participant)
+            record.conversation.updated_at = now().isoformat()
+            return True
+
     def get_conversations(
         self, flwr_aid: str, federation_ids: Sequence[str] | None = None
     ) -> Sequence[Conversation]:
-        """Return owned conversations, newest metadata update first."""
+        """Return participating conversations, newest metadata update first."""
+        viewer = ConversationParticipant(flwr_aid=flwr_aid)
         with self.lock_run_series_store:
             conversations = [
                 record.conversation
                 for record in self.conversation_store.values()
-                if record.flwr_aid == flwr_aid
+                if viewer in record.conversation.participants
                 and (
                     federation_ids is None
                     or record.conversation.federation_id in federation_ids
