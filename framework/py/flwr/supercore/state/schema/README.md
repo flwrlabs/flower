@@ -90,6 +90,22 @@ erDiagram
     TIMESTAMP updated_at
   }
 
+  file {
+    VARCHAR key PK
+    VARCHAR scope PK
+    BOOLEAN is_deleted
+    BIGINT latest_revision
+    BIGINT size_bytes
+  }
+
+  file_revision {
+    VARCHAR key PK
+    BIGINT revision PK
+    VARCHAR scope PK
+    TIMESTAMP created_at
+    BLOB data
+  }
+
   message {
     VARCHAR message_id PK
     VARCHAR reply_to_message_id FK "nullable"

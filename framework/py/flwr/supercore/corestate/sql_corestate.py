@@ -85,6 +85,7 @@ from flwr.supercore.constant import (
     AutomationStatus,
 )
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
@@ -99,6 +100,10 @@ from flwr.supercore.state.schema.corestate_models import (
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
     FederationApp as FederationAppModel,
+)
+from flwr.supercore.state.schema.corestate_models import File as FileModel
+from flwr.supercore.state.schema.corestate_models import (
+    FileRevision as FileRevisionModel,
 )
 from flwr.supercore.state.schema.corestate_models import Message as MessageModel
 from flwr.supercore.state.schema.corestate_models import NonceStore as NonceStoreModel
@@ -575,21 +580,123 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self, scope: str, key: str, data: bytes, expected_revision: int | None
     ) -> int:
         """Create or update a file with a revision precondition."""
-        raise NotImplementedError
+        with self.session() as session:
+            if expected_revision is None:
+                stmt = self.dialect_insert(FileModel).values(
+                    scope=scope,
+                    key=key,
+                    latest_revision=1,
+                    is_deleted=False,
+                    size_bytes=len(data),
+                )
+                revision = session.scalar(
+                    stmt.on_conflict_do_update(
+                        index_elements=[FileModel.scope, FileModel.key],
+                        set_={
+                            "latest_revision": FileModel.latest_revision + 1,
+                            "is_deleted": False,
+                            "size_bytes": len(data),
+                        },
+                        where=FileModel.is_deleted.is_(True),
+                    ).returning(FileModel.latest_revision)
+                )
+            else:
+                revision = session.scalar(
+                    update(FileModel)
+                    .where(
+                        FileModel.scope == scope,
+                        FileModel.key == key,
+                        FileModel.is_deleted.is_(False),
+                        FileModel.latest_revision == expected_revision,
+                    )
+                    .values(
+                        latest_revision=FileModel.latest_revision + 1,
+                        size_bytes=len(data),
+                    )
+                    .returning(FileModel.latest_revision)
+                )
+            if revision is None:
+                raise FlowerError(
+                    ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT,
+                    "File revision precondition failed.",
+                )
+            session.execute(
+                insert(FileRevisionModel).values(
+                    scope=scope, key=key, revision=revision, data=data, created_at=now()
+                )
+            )
+            return revision
 
     def get_file(self, scope: str, key: str) -> File | None:
         """Return the current file, or None if absent or deleted."""
-        raise NotImplementedError
+        with self.session() as session:
+            row = session.execute(
+                select(
+                    FileModel.latest_revision,
+                    FileModel.size_bytes,
+                    FileRevisionModel.data,
+                )
+                .join(
+                    FileRevisionModel,
+                    (FileRevisionModel.scope == FileModel.scope)
+                    & (FileRevisionModel.key == FileModel.key)
+                    & (FileRevisionModel.revision == FileModel.latest_revision),
+                )
+                .where(
+                    FileModel.scope == scope,
+                    FileModel.key == key,
+                    FileModel.is_deleted.is_(False),
+                )
+            ).one_or_none()
+            if row is None:
+                return None
+            return File(
+                metadata=FileMetadata(
+                    key=key, revision=row.latest_revision, size_bytes=row.size_bytes
+                ),
+                data=row.data,
+            )
 
     def list_files(
         self, scope: str, prefix: str, start_after: str, limit: int | None
     ) -> Sequence[FileMetadata]:
         """List live file metadata in lexicographic key order."""
-        raise NotImplementedError
+        stmt = select(
+            FileModel.key, FileModel.latest_revision, FileModel.size_bytes
+        ).where(FileModel.scope == scope, FileModel.is_deleted.is_(False))
+        if prefix:
+            # LIKE is case-insensitive on SQLite and interprets wildcard characters.
+            stmt = stmt.where(func.substr(FileModel.key, 1, len(prefix)) == prefix)
+        if start_after:
+            stmt = stmt.where(FileModel.key > start_after)
+        stmt = stmt.order_by(FileModel.key).limit(limit)
+        with self.session() as session:
+            return [
+                FileMetadata(
+                    key=row.key, revision=row.latest_revision, size_bytes=row.size_bytes
+                )
+                for row in session.execute(stmt)
+            ]
 
     def delete_file(self, scope: str, key: str, expected_revision: int) -> None:
         """Delete a file with a matching revision, preserving revision history."""
-        raise NotImplementedError
+        with self.session() as session:
+            revision = session.scalar(
+                update(FileModel)
+                .where(
+                    FileModel.scope == scope,
+                    FileModel.key == key,
+                    FileModel.is_deleted.is_(False),
+                    FileModel.latest_revision == expected_revision,
+                )
+                .values(is_deleted=True)
+                .returning(FileModel.latest_revision)
+            )
+            if revision is None:
+                raise FlowerError(
+                    ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT,
+                    "File revision precondition failed.",
+                )
 
     def create_agent(
         self,
