@@ -44,6 +44,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CompleteConnectorOAuthRequest,
     CompleteConnectorOAuthResponse,
     Connector,
+    Conversation,
+    ConversationParticipant,
     CreateConversationRequest,
     CreateConversationResponse,
     DisconnectConnectorRequest,
@@ -127,7 +129,7 @@ def create_conversation_client() -> tuple[TestClient, LinkState]:
 def test_conversation_create_and_list(
     conversation_client: tuple[TestClient, LinkState],
 ) -> None:
-    """Create and list owned conversation metadata without starting work."""
+    """Create and list a conversation with the caller enrolled and no work started."""
     client, state = conversation_client
     response = client.post(
         "/v1/control/create-conversation",
@@ -137,6 +139,9 @@ def test_conversation_create_and_list(
     conversation = CreateConversationResponse.FromString(response.content).conversation
     assert conversation.title == ""
     assert conversation.federation_id == NOOP_FEDERATION_ID
+    assert list(conversation.participants) == [
+        ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)
+    ]
     assert not state.get_tasks()
 
     state.create_conversation(
@@ -155,7 +160,7 @@ def test_conversation_create_and_list(
 def test_conversation_list_filters_current_federation_access(
     conversation_client: tuple[TestClient, LinkState],
 ) -> None:
-    """Lists restrict metadata to the owner and currently accessible federations."""
+    """Lists require participation and current federation access."""
     client, state = conversation_client
     state.create_conversation(
         flwr_aid="another-owner", federation_id=NOOP_FEDERATION_ID
@@ -192,6 +197,52 @@ def test_conversation_list_filters_current_federation_access(
         )
         assert response.status_code == 200
         assert not ListConversationsResponse.FromString(response.content).conversations
+
+
+def test_shared_conversation_requires_participation_and_federation_access(
+    conversation_client: tuple[TestClient, LinkState],
+) -> None:
+    """Participants can read another user's conversation while access remains valid."""
+    client, state = conversation_client
+    shared = state.create_conversation(
+        flwr_aid="alice", federation_id=NOOP_FEDERATION_ID
+    )
+    request = ListConversationsRequest(federation_id=NOOP_FEDERATION_ID)
+
+    def listed() -> list[Conversation]:
+        response = client.post(
+            "/v1/control/list-conversations", content=request.SerializeToString()
+        )
+        assert response.status_code == 200
+        return list(
+            ListConversationsResponse.FromString(response.content).conversations
+        )
+
+    assert not listed()
+    participant = ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)
+    assert state.add_conversation_participant(shared.conversation_id, participant)
+    assert listed() == [shared]
+    assert list(listed()[0].participants) == [
+        ConversationParticipant(flwr_aid="alice"),
+        participant,
+    ]
+
+    with patch.object(state.federation_manager, "has_member", return_value=False):
+        response = client.post(
+            "/v1/control/list-conversations", content=request.SerializeToString()
+        )
+        assert response.status_code == 412
+        assert response.json()["code"] == ApiErrorCode.FEDERATION_NOT_FOUND
+
+    with patch.object(state.federation_manager, "get_federations", return_value=[]):
+        response = client.post(
+            "/v1/control/list-conversations",
+            content=ListConversationsRequest().SerializeToString(),
+        )
+        assert not ListConversationsResponse.FromString(response.content).conversations
+
+    assert state.remove_conversation_participant(shared.conversation_id, participant)
+    assert not listed()
 
 
 def test_conversation_starts_untitled_and_rejects_invalid_federation(
@@ -287,7 +338,8 @@ def test_control_http_routes_cover_implemented_grpc_methods() -> None:
     grpc_request_types = Counter(
         method.input_type.full_name
         for method in control_pb2.DESCRIPTOR.services_by_name["Control"].methods
-        if getattr(ControlServicer, method.name)
+        if method.name not in {"CreateAgent", "ListAgents"}
+        and getattr(ControlServicer, method.name)
         is not getattr(generated_servicer, method.name)
     )
     http_request_types = Counter(

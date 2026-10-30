@@ -34,6 +34,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
+    CreateAgentRequest,
+    CreateAgentResponse,
     CreateConversationRequest,
     CreateConversationResponse,
     CreateFederationRequest,
@@ -48,6 +50,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
     ListAppAssociationsRequest,
     ListAppAssociationsResponse,
     ListAppsRequest,
@@ -138,6 +142,22 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self.artifact_provider = artifact_provider
         self.fleet_api_type = fleet_api_type
 
+    def CreateAgent(
+        self, request: CreateAgentRequest, context: grpc.ServicerContext
+    ) -> CreateAgentResponse:
+        """Report that agent creation is not implemented yet."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ListAgents(
+        self, request: ListAgentsRequest, context: grpc.ServicerContext
+    ) -> ListAgentsResponse:
+        """Report that agent listing is not implemented yet."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def StartRun(
         self, request: StartRunRequest, context: grpc.ServicerContext
     ) -> StartRunResponse:
@@ -205,7 +225,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     def CreateConversation(
         self, request: CreateConversationRequest, context: grpc.ServicerContext
     ) -> CreateConversationResponse:
-        """Create an owned conversation."""
+        """Create a conversation and enroll the authenticated account."""
         return control_handlers.create_conversation(
             request, _get_account(), self.linkstate_factory.state()
         )
@@ -213,7 +233,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     def ListConversations(
         self, request: ListConversationsRequest, context: grpc.ServicerContext
     ) -> ListConversationsResponse:
-        """List owned conversations."""
+        """List conversations the authenticated account participates in."""
         return control_handlers.list_conversations(
             request, _get_account(), self.linkstate_factory.state()
         )

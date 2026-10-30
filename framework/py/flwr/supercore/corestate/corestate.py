@@ -26,6 +26,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AppInfo,
     Automation,
     Conversation,
+    ConversationParticipant,
     StartRunRequest,
 )
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -528,13 +529,30 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def create_conversation(self, *, flwr_aid: str, federation_id: str) -> Conversation:
-        """Create an untitled conversation and empty agent run series atomically."""
+        """Create an untitled conversation and enroll its creator atomically."""
+
+    @abstractmethod
+    def add_conversation_participant(
+        self, conversation_id: int, participant: ConversationParticipant
+    ) -> bool:
+        """Enroll a user or agent in an existing conversation.
+
+        Existing membership succeeds without changing metadata. Callers authorize
+        assignment before calling this persistence operation. Invalid identities
+        and unknown conversations return False.
+        """
+
+    @abstractmethod
+    def remove_conversation_participant(
+        self, conversation_id: int, participant: ConversationParticipant
+    ) -> bool:
+        """Remove a participant, returning whether membership existed."""
 
     @abstractmethod
     def get_conversations(
         self, flwr_aid: str, federation_ids: Sequence[str] | None = None
     ) -> Sequence[Conversation]:
-        """List owned conversations, newest first, optionally filtered by federation."""
+        """List a user's conversations, optionally filtered by federation."""
 
     @abstractmethod
     def get_run_series(  # pylint: disable=too-many-arguments

@@ -60,6 +60,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AppInfo,
     Automation,
     Conversation,
+    ConversationParticipant,
     StartRunRequest,
 )
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
@@ -96,6 +97,9 @@ from flwr.supercore.state.schema.corestate_models import (
 )
 from flwr.supercore.state.schema.corestate_models import (
     Conversation as ConversationModel,
+)
+from flwr.supercore.state.schema.corestate_models import (
+    ConversationParticipant as ConversationParticipantModel,
 )
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
@@ -1026,7 +1030,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return updated_oauth_session_id is not None
 
     def create_conversation(self, *, flwr_aid: str, federation_id: str) -> Conversation:
-        """Create an untitled conversation and empty agent run series atomically."""
+        """Create a conversation, its backing series, and creator participation."""
+        if not flwr_aid:
+            raise ValueError("Conversation creator must be nonempty")
         conversation_id = generate_rand_int_from_bytes(CONVERSATION_ID_NUM_BYTES)
         series_id = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
         created_at = now()
@@ -1053,25 +1059,122 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
                 .returning(ConversationModel)
             ).one()
-            return _conversation_from_model(model, federation_id)
+            session.execute(
+                insert(ConversationParticipantModel).values(
+                    conversation_id=model.conversation_id, flwr_aid=flwr_aid
+                )
+            )
+            conversation = _conversation_from_model(model, federation_id)
+            conversation.participants.add(flwr_aid=flwr_aid)
+            return conversation
+
+    def add_conversation_participant(
+        self, conversation_id: int, participant: ConversationParticipant
+    ) -> bool:
+        """Enroll a participant without duplicating existing membership."""
+        if not (participant.flwr_aid or participant.agent_id):
+            return False
+        field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
+        identity = participant.flwr_aid or uint64_to_int64(participant.agent_id)
+        try:
+            with self.session() as session:
+                model = session.get(ConversationModel, uint64_to_int64(conversation_id))
+                if model is None:
+                    return False
+                stmt = (
+                    self.dialect_insert(ConversationParticipantModel)
+                    .values(conversation_id=model.conversation_id, **{field: identity})
+                    .on_conflict_do_nothing(index_elements=["conversation_id", field])
+                    .returning(ConversationParticipantModel.id)
+                )
+                if session.scalar(stmt) is not None:
+                    session.execute(
+                        update(ConversationModel)
+                        .where(
+                            ConversationModel.conversation_id == model.conversation_id
+                        )
+                        .values(updated_at=now())
+                    )
+                return True
+        except IntegrityError:
+            return False
+
+    def remove_conversation_participant(
+        self, conversation_id: int, participant: ConversationParticipant
+    ) -> bool:
+        """Remove a participant and update conversation metadata on a change."""
+        if not (participant.flwr_aid or participant.agent_id):
+            return False
+        field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
+        identity = participant.flwr_aid or uint64_to_int64(participant.agent_id)
+        with self.session() as session:
+            removed = session.scalar(
+                delete(ConversationParticipantModel)
+                .where(
+                    ConversationParticipantModel.conversation_id
+                    == uint64_to_int64(conversation_id),
+                    getattr(ConversationParticipantModel, field) == identity,
+                )
+                .returning(ConversationParticipantModel.id)
+            )
+            if removed is None:
+                return False
+            session.execute(
+                update(ConversationModel)
+                .where(
+                    ConversationModel.conversation_id
+                    == uint64_to_int64(conversation_id)
+                )
+                .values(updated_at=now())
+            )
+            return True
 
     def get_conversations(
         self, flwr_aid: str, federation_ids: Sequence[str] | None = None
     ) -> Sequence[Conversation]:
-        """Return owned conversations, newest metadata update first."""
+        """Return participating conversations, newest metadata update first."""
         query = (
             select(ConversationModel, RunSeriesModel.federation_id)
             .join(
                 RunSeriesModel, ConversationModel.series_id == RunSeriesModel.series_id
             )
-            .where(ConversationModel.flwr_aid == flwr_aid)
+            .where(
+                ConversationModel.conversation_id.in_(
+                    select(ConversationParticipantModel.conversation_id).where(
+                        ConversationParticipantModel.flwr_aid == flwr_aid
+                    )
+                )
+            )
             .order_by(ConversationModel.updated_at.desc())
             .execution_options(populate_existing=True)
         )
         if federation_ids is not None:
             query = query.where(RunSeriesModel.federation_id.in_(federation_ids))
         with self.session() as session:
-            return [_conversation_from_model(*row) for row in session.execute(query)]
+            conversations = {
+                model.conversation_id: _conversation_from_model(model, federation_id)
+                for model, federation_id in session.execute(query)
+            }
+            if not conversations:
+                return []
+            participants = session.scalars(
+                select(ConversationParticipantModel)
+                .where(
+                    ConversationParticipantModel.conversation_id.in_(
+                        list(conversations)
+                    )
+                )
+                .order_by(ConversationParticipantModel.id)
+            )
+            for participant in participants:
+                conversation = conversations[participant.conversation_id]
+                if participant.flwr_aid is not None:
+                    conversation.participants.add(flwr_aid=participant.flwr_aid)
+                else:
+                    conversation.participants.add(
+                        agent_id=int64_to_uint64(cast(int, participant.agent_id))
+                    )
+            return list(conversations.values())
 
     def get_run_series(  # pylint: disable=R0913,R0914
         self,
@@ -2336,7 +2439,7 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
 def _conversation_from_model(
     model: ConversationModel, federation_id: str
 ) -> Conversation:
-    """Convert owned conversation metadata to its API representation."""
+    """Convert conversation metadata to its API representation."""
     return Conversation(
         conversation_id=int64_to_uint64(model.conversation_id),
         federation_id=federation_id,

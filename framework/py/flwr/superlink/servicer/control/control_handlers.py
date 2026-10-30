@@ -1280,7 +1280,7 @@ def list_runs(
 def create_conversation(
     request: CreateConversationRequest, account: AccountInfo, state: LinkState
 ) -> CreateConversationResponse:
-    """Create an owned conversation without starting a run."""
+    """Create a conversation and enroll its creator without starting a run."""
     state.federation_manager.ensure_default_federations_exist(flwr_aid=account.flwr_aid)
     federation_id = _resolve_federation_id(
         state, account.account_name, request.federation
@@ -1295,7 +1295,7 @@ def create_conversation(
 def list_conversations(
     request: ListConversationsRequest, account: AccountInfo, state: LinkState
 ) -> ListConversationsResponse:
-    """List only owned conversations in accessible federations."""
+    """List participating conversations in currently accessible federations."""
     if request.HasField("federation_id"):
         _validate_federation_membership_in_request(
             state, account.flwr_aid, request.federation_id

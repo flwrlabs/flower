@@ -184,7 +184,7 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
     def CreateConversation(
         self, request: CreateConversationRequest
     ) -> CreateConversationResponse:
-        """Create an owned conversation."""
+        """Create a conversation and enroll the authenticated account."""
         return self._unary_unary(
             path="/v1/control/create-conversation",
             rpc_method="/flwr.proto.Control/CreateConversation",
@@ -195,7 +195,7 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
     def ListConversations(
         self, request: ListConversationsRequest
     ) -> ListConversationsResponse:
-        """List owned conversations."""
+        """List conversations the authenticated account participates in."""
         return self._unary_unary(
             path="/v1/control/list-conversations",
             rpc_method="/flwr.proto.Control/ListConversations",

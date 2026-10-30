@@ -186,7 +186,7 @@ def create_conversation(
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> CreateConversationResponse:
-    """Create an owned conversation."""
+    """Create a conversation and enroll the authenticated account."""
     return control_handlers.create_conversation(request, account, linkstate)
 
 
@@ -196,7 +196,7 @@ def list_conversations(
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> ListConversationsResponse:
-    """List owned conversations."""
+    """List conversations the authenticated account participates in."""
     return control_handlers.list_conversations(request, account, linkstate)
 
 
