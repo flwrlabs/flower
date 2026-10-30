@@ -40,7 +40,6 @@ def upgrade() -> None:
     op.create_table(
         "conversation",
         sa.Column("conversation_id", sa.BigInteger(), nullable=False),
-        sa.Column("flwr_aid", sa.String(), nullable=False),
         sa.Column("series_id", sa.BigInteger(), nullable=False),
         sa.Column("title", sa.String(), nullable=False),
         sa.Column("created_at", UTCDateTime(), nullable=False),
@@ -52,9 +51,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("conversation_id"),
         sa.UniqueConstraint("series_id"),
     )
-    with op.batch_alter_table("conversation", schema=None) as batch_op:
-        batch_op.create_index("idx_conversation_flwr_aid", ["flwr_aid"], unique=False)
-
     op.create_table(
         "conversation_participant",
         sa.Column(
@@ -92,8 +88,5 @@ def downgrade() -> None:
         batch_op.drop_index("idx_conversation_participant_flwr_aid")
 
     op.drop_table("conversation_participant")
-    with op.batch_alter_table("conversation", schema=None) as batch_op:
-        batch_op.drop_index("idx_conversation_flwr_aid")
-
     op.drop_table("conversation")
     # ### end Alembic commands ###
