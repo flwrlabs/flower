@@ -140,9 +140,10 @@ class ObjectPushSession:
 
 @dataclass
 class ConversationRecord:
-    """Store conversation metadata alongside its owning account."""
+    """Store conversation metadata, owner, and internal backing series."""
 
     flwr_aid: str
+    series_id: int
     conversation: Conversation
 
 
@@ -981,7 +982,6 @@ class InMemoryCoreState(
             timestamp = now().isoformat()
             conversation = Conversation(
                 conversation_id=conversation_id,
-                series_id=series_id,
                 federation_id=federation_id,
                 created_at=timestamp,
                 updated_at=timestamp,
@@ -994,7 +994,7 @@ class InMemoryCoreState(
             )
             self.agent_run_series_ids.add(series_id)
             self.conversation_store[conversation.conversation_id] = ConversationRecord(
-                flwr_aid, conversation
+                flwr_aid=flwr_aid, series_id=series_id, conversation=conversation
             )
             return deepcopy(conversation)
 
