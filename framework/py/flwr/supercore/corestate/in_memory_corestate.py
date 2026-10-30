@@ -494,7 +494,7 @@ class InMemoryCoreState(
         description: str | None = None,
     ) -> AgentRecord | None:
         """Create and return an account's agent."""
-        if not flwr_aid or not name or not app_spec:
+        if not flwr_aid or not name or not app_spec or title == "" or description == "":
             return None
         with self.lock_agent_store:
             self.agent_id_counter += 1

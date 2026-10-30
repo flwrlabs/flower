@@ -157,15 +157,15 @@ class CoreState(ABC):  # pylint: disable=R0904
         app_spec : str
             AgentApp specification with an optional version.
         title : str | None, (default: None)
-            Optional label for the agent's job.
+            Optional label for the agent's job. Must be nonempty when provided.
         description : str | None, (default: None)
-            Optional standing instructions for the agent.
+            Optional standing instructions. Must be nonempty when provided.
 
         Returns
         -------
         AgentRecord | None
             The agent with a generated ID and matching UTC creation and update
-            timestamps, or None if the account ID, name, or app specification is empty.
+            timestamps, or None if any provided string is empty.
         """
 
     @abstractmethod
