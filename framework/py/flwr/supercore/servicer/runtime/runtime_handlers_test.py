@@ -216,7 +216,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.state.create_task.return_value = 456
         request = CreateTaskRequest(
             type=TaskType.SIMULATION,
-            model_ref="models/abc",
+            fab_hash="fab-hash",
         )
 
         # Execute
@@ -230,8 +230,8 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.state.create_task.assert_called_once_with(
             task_type=TaskType.SIMULATION,
             run_id=123,
-            fab_hash=None,
-            model_ref="models/abc",
+            fab_hash="fab-hash",
+            model_ref=None,
             connector_ref=None,
             connector_id=None,
             requesting_task_id=789,
@@ -242,7 +242,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         """CreateTask should allow app tasks to request task creation."""
         # Prepare
         self.state.create_task.return_value = 456
-        request = CreateTaskRequest(type=TaskType.SIMULATION, model_ref="model")
+        request = CreateTaskRequest(type=TaskType.SIMULATION, fab_hash="fab-hash")
 
         for requesting_task_type in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
             self.state.create_task.reset_mock()
@@ -259,8 +259,8 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                 self.state.create_task.assert_called_once_with(
                     task_type=TaskType.SIMULATION,
                     run_id=123,
-                    fab_hash=None,
-                    model_ref="model",
+                    fab_hash="fab-hash",
+                    model_ref=None,
                     connector_ref=None,
                     connector_id=None,
                     requesting_task_id=789,
@@ -341,7 +341,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         with self.assertRaises(RuntimeError) as err:
             runtime_handlers.create_task(
-                CreateTaskRequest(type=TaskType.SIMULATION, model_ref="model"),
+                CreateTaskRequest(type=TaskType.SIMULATION, fab_hash="fab-hash"),
                 self.state,
                 Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
             )
@@ -354,8 +354,8 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.state.create_task.assert_called_once_with(
             task_type=TaskType.SIMULATION,
             run_id=123,
-            fab_hash=None,
-            model_ref="model",
+            fab_hash="fab-hash",
+            model_ref=None,
             connector_ref=None,
             connector_id=None,
             requesting_task_id=789,
@@ -368,14 +368,6 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             (
                 CreateTaskRequest(type=TaskType.SERVER_APP),
                 "Task type 'flwr-serverapp' requires fab_hash.",
-            ),
-            (
-                CreateTaskRequest(type="flwr-model"),
-                "Invalid task type: flwr-model",
-            ),
-            (
-                CreateTaskRequest(type="flwr-model", model_ref="model"),
-                "Invalid task type: flwr-model",
             ),
             (
                 CreateTaskRequest(type=TaskType.CONNECTOR),
@@ -405,7 +397,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.state.create_task.return_value = None
         request = CreateTaskRequest(
             type=TaskType.SIMULATION,
-            model_ref="models/abc",
+            fab_hash="fab-hash",
         )
 
         # Execute
@@ -627,7 +619,9 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                 # Execute
                 with self.assertRaises(FlowerError) as error:
                     runtime_handlers.create_task(
-                        CreateTaskRequest(type=TaskType.SIMULATION, model_ref="model"),
+                        CreateTaskRequest(
+                            type=TaskType.SIMULATION, fab_hash="fab-hash"
+                        ),
                         self.state,
                         Mock(run_id=123, type=requesting_task_type),
                     )

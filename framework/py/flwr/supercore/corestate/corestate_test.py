@@ -1357,16 +1357,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(automation.federation, "@me/fed-b")
 
     def test_create_and_get_task(self) -> None:
-        """Test storing and retrieving a historical Model task."""
+        """Test creating and retrieving a task."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
 
         task_id = state.create_task(
-            task_type="flwr-model",
+            task_type=TaskType.CONNECTOR,
             run_id=run_id,
             fab_hash=None,
-            model_ref="model://test",
-            connector_ref=None,
+            connector_ref="web_search",
         )
         assert task_id is not None
         tasks = state.get_tasks(task_ids=[task_id])
@@ -1374,15 +1373,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(tasks), 1)
         task = tasks[0]
         self.assertEqual(task.task_id, task_id)
-        self.assertEqual(task.type, "flwr-model")
+        self.assertEqual(task.type, TaskType.CONNECTOR)
         self.assertEqual(task.run_id, run_id)
         self.assertEqual(
             task.status,
             TaskStatus(status=Status.PENDING, sub_status="", details=""),
         )
-        self.assertEqual(task.model_ref, "model://test")
         self.assertFalse(task.HasField("fab_hash"))
-        self.assertFalse(task.HasField("connector_ref"))
+        self.assertEqual(task.connector_ref, "web_search")
         self.assertFalse(task.HasField("connector_id"))
         self.assertTrue(task.pending_at)
         self.assertEqual(task.starting_at, "")
@@ -1783,7 +1781,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
     def test_expired_starting_task_token_revives_task_to_pending(self) -> None:
         """Expired STARTING task claims should make tasks pending again."""
-        # Prepare: create and claim a model task.
+        # Prepare: create and claim a connector task.
         state = self.state_factory()
         fixed_now = now()
         run_id = self.task_run_id(state)
