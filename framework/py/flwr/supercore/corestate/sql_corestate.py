@@ -1051,7 +1051,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 insert(ConversationModel)
                 .values(
                     conversation_id=uint64_to_int64(conversation_id),
-                    flwr_aid=flwr_aid,
                     series_id=uint64_to_int64(series_id),
                     title="",
                     created_at=created_at,
