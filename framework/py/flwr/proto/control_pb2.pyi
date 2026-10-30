@@ -398,13 +398,11 @@ class Conversation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     CONVERSATION_ID_FIELD_NUMBER: builtins.int
-    SERIES_ID_FIELD_NUMBER: builtins.int
     FEDERATION_ID_FIELD_NUMBER: builtins.int
     TITLE_FIELD_NUMBER: builtins.int
     CREATED_AT_FIELD_NUMBER: builtins.int
     UPDATED_AT_FIELD_NUMBER: builtins.int
     conversation_id: builtins.int
-    series_id: builtins.int
     federation_id: builtins.str
     title: builtins.str
     created_at: builtins.str
@@ -413,13 +411,12 @@ class Conversation(google.protobuf.message.Message):
         self,
         *,
         conversation_id: builtins.int = ...,
-        series_id: builtins.int = ...,
         federation_id: builtins.str = ...,
         title: builtins.str = ...,
         created_at: builtins.str = ...,
         updated_at: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["conversation_id", b"conversation_id", "created_at", b"created_at", "federation_id", b"federation_id", "series_id", b"series_id", "title", b"title", "updated_at", b"updated_at"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["conversation_id", b"conversation_id", "created_at", b"created_at", "federation_id", b"federation_id", "title", b"title", "updated_at", b"updated_at"]) -> None: ...
 
 global___Conversation = Conversation
 

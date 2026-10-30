@@ -250,11 +250,10 @@ message ListRunsResponse {
 
 message Conversation {
   uint64 conversation_id = 1;
-  uint64 series_id = 2;
-  string federation_id = 3;
-  string title = 4;
-  string created_at = 5;
-  string updated_at = 6;
+  string federation_id = 2;
+  string title = 3;
+  string created_at = 4;
+  string updated_at = 5;
 }
 
 message CreateConversationRequest { string federation = 1; }
