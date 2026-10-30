@@ -17,7 +17,6 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
 from typing import TypeAlias
 
 from flwr.supercore.constant import RunTime
@@ -26,20 +25,6 @@ JSONScalar: TypeAlias = bool | float | int | str | None
 JSONArray: TypeAlias = Sequence["JSONValue"]
 JSONValue: TypeAlias = JSONScalar | dict[str, "JSONValue"] | JSONArray
 JSONObject: TypeAlias = dict[str, JSONValue]
-
-
-@dataclass(frozen=True)
-class AgentRecord:  # pylint: disable=too-many-instance-attributes
-    """Persisted agent configuration and account ownership."""
-
-    agent_id: int
-    name: str
-    title: str | None
-    description: str | None
-    app_spec: str
-    flwr_aid: str
-    created_at: datetime
-    updated_at: datetime
 
 
 @dataclass(frozen=True)

@@ -23,6 +23,8 @@ from typing import Literal
 
 from flwr.app import Context, Message
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
     AppInfo,
     Automation,
     StartRunRequest,
@@ -39,11 +41,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     no_object_id_recompute,
 )
-from flwr.supercore.typing import (
-    AgentRecord,
-    ConnectorOAuthSessionRecord,
-    ConnectorRecord,
-)
+from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..constant import AutomationStatus
 from ..object_store import ObjectStore
@@ -137,39 +135,33 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Remove an object push session and optionally its messages."""
 
     @abstractmethod
-    def create_agent(  # pylint: disable=too-many-arguments
+    def create_agent(
         self,
         *,
         flwr_aid: str,
-        name: str,
-        app_spec: str,
-        title: str | None = None,
-        description: str | None = None,
-    ) -> AgentRecord | None:
+        config: AgentConfig,
+    ) -> Agent | None:
         """Create an agent owned by a Flower account.
 
         Parameters
         ----------
         flwr_aid : str
             Account ID owning the agent.
-        name : str
-            Agent display name. Duplicate names are allowed.
-        app_spec : str
-            AgentApp specification with an optional version.
-        title : str | None, (default: None)
-            Optional label for the agent's job. Must be nonempty when provided.
-        description : str | None, (default: None)
-            Optional standing instructions. Must be nonempty when provided.
+        config : AgentConfig
+            Agent name, app specification, and optional title and description.
+            Duplicate names are allowed. Optional fields must be nonempty when set.
 
         Returns
         -------
-        AgentRecord | None
+        Agent | None
             The agent with a generated ID and matching UTC creation and update
-            timestamps, or None if any provided string is empty.
+            timestamps as ISO-formatted strings, or None if the account ID, a
+            required configuration field, or a set optional field is empty.
+            Ownership is stored separately and is not part of the returned message.
         """
 
     @abstractmethod
-    def list_agents(self, flwr_aid: str) -> Sequence[AgentRecord]:
+    def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
         """List an account's agents in ascending agent ID order.
 
         Parameters
@@ -179,7 +171,7 @@ class CoreState(ABC):  # pylint: disable=R0904
 
         Returns
         -------
-        Sequence[AgentRecord]
+        Sequence[Agent]
             Agents belonging to the account, or an empty sequence if none exist.
         """
 

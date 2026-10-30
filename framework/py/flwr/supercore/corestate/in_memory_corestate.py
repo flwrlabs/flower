@@ -39,6 +39,8 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
     AppInfo,
     Automation,
     StartRunRequest,
@@ -62,11 +64,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
-from flwr.supercore.typing import (
-    AgentRecord,
-    ConnectorOAuthSessionRecord,
-    ConnectorRecord,
-)
+from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -151,7 +149,7 @@ class InMemoryCoreState(
         self.message_store: dict[str, MessageRecord] = {}
         self.pending_message_ids_by_dst: dict[int, set[str]] = {}
         self.lock_message_store = RLock()
-        self.agent_store: dict[int, AgentRecord] = {}
+        self.agent_store: dict[str, dict[int, Agent]] = {}
         self.agent_id_counter = 0
         self.lock_agent_store = Lock()
         self.fab_store: dict[str, Fab] = {}
@@ -484,46 +482,39 @@ class InMemoryCoreState(
                 self.object_store.delete(object_id)
             self.cancel_messages(message_ids=session.root_object_ids)
 
-    def create_agent(  # pylint: disable=too-many-arguments
+    def create_agent(
         self,
         *,
         flwr_aid: str,
-        name: str,
-        app_spec: str,
-        title: str | None = None,
-        description: str | None = None,
-    ) -> AgentRecord | None:
+        config: AgentConfig,
+    ) -> Agent | None:
         """Create and return an account's agent."""
-        if not flwr_aid or not name or not app_spec or title == "" or description == "":
+        if not flwr_aid or not config.name or not config.app_spec:
+            return None
+        if (config.HasField("title") and not config.title) or (
+            config.HasField("description") and not config.description
+        ):
             return None
         with self.lock_agent_store:
             self.agent_id_counter += 1
-            created_at = now()
-            agent = AgentRecord(
-                agent_id=self.agent_id_counter,
-                name=name,
-                title=title,
-                description=description,
-                app_spec=app_spec,
-                flwr_aid=flwr_aid,
+            created_at = now().isoformat()
+            agent = Agent(
+                id=self.agent_id_counter,
+                config=config,
                 created_at=created_at,
                 updated_at=created_at,
             )
-            self.agent_store[agent.agent_id] = agent
+            self.agent_store.setdefault(flwr_aid, {})[agent.id] = agent
             return agent
 
-    def list_agents(self, flwr_aid: str) -> Sequence[AgentRecord]:
+    def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
         """List an account's agents in ascending agent ID order."""
         if not flwr_aid:
             return []
         with self.lock_agent_store:
             return sorted(
-                (
-                    agent
-                    for agent in self.agent_store.values()
-                    if agent.flwr_aid == flwr_aid
-                ),
-                key=lambda agent: agent.agent_id,
+                self.agent_store.get(flwr_aid, {}).values(),
+                key=lambda agent: agent.id,
             )
 
     def store_fab(self, fab: Fab) -> str:
