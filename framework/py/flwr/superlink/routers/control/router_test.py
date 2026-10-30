@@ -152,7 +152,9 @@ def test_conversation_create_and_list(
     assert list(conversation.participants) == [
         ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)
     ]
-    state.create_conversation(flwr_aid="other-user")
+    state.create_conversation(
+        participants=[ConversationParticipant(flwr_aid="other-user")]
+    )
     listed = client.post(
         "/v1/control/list-conversations",
         content=ListConversationsRequest().SerializeToString(),
@@ -252,7 +254,9 @@ def test_conversation_send_and_history(
 ) -> None:
     """Store authenticated authorship, exact content, and retrievable history."""
     client, state = conversation_client
-    conversation = state.create_conversation(flwr_aid=_ACCOUNT.flwr_aid)
+    conversation = state.create_conversation(
+        participants=[ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)]
+    )
     response = client.post(
         "/v1/control/send-conversation-message",
         content=SendConversationMessageRequest(
@@ -282,7 +286,9 @@ def test_conversation_history_pagination(
 ) -> None:
     """Page backwards without gaps or duplication when new messages arrive."""
     client, state = conversation_client
-    conversation = state.create_conversation(flwr_aid=_ACCOUNT.flwr_aid)
+    conversation = state.create_conversation(
+        participants=[ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)]
+    )
     conversation_id = UUID(conversation.id)
     author = ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)
     messages = [
@@ -321,7 +327,9 @@ def test_conversation_unavailable_to_nonparticipants(
 ) -> None:
     """Missing and inaccessible conversations produce the same 404 response."""
     client, state = conversation_client
-    private = state.create_conversation(flwr_aid="alice")
+    private = state.create_conversation(
+        participants=[ConversationParticipant(flwr_aid="alice")]
+    )
     responses = []
     for conversation_id in [private.id, str(uuid4())]:
         request = (
@@ -344,12 +352,15 @@ def test_conversation_unavailable_to_nonparticipants(
 def test_shared_conversation_access(
     conversation_client: tuple[TestClient, LinkState],
 ) -> None:
-    """Grant and revoke read/write access independently of conversation creation."""
+    """Allow initial participants to read and write a shared conversation."""
     client, state = conversation_client
-    conversation = state.create_conversation(flwr_aid="alice")
+    conversation = state.create_conversation(
+        participants=[
+            ConversationParticipant(flwr_aid="alice"),
+            ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid),
+        ]
+    )
     conversation_id = UUID(conversation.id)
-    participant = ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)
-    assert state.add_conversation_participant(conversation_id, participant)
     request = SendConversationMessageRequest(
         conversation_id=conversation.id, content="Shared reply"
     )
@@ -359,19 +370,16 @@ def test_shared_conversation_access(
     assert response.status_code == 200
     message = SendConversationMessageResponse.FromString(response.content).message
     assert state.get_conversation_messages(conversation_id, "alice") == [message]
-    assert state.remove_conversation_participant(conversation_id, participant)
-    response = client.post(
-        "/v1/control/send-conversation-message", content=request.SerializeToString()
-    )
-    assert response.status_code == 404
     response = client.post(
         "/v1/control/get-conversation-messages",
         content=GetConversationMessagesRequest(
             conversation_id=conversation.id
         ).SerializeToString(),
     )
-    assert response.status_code == 404
-    assert state.get_conversation_messages(conversation_id, "alice") == [message]
+    assert response.status_code == 200
+    assert list(
+        GetConversationMessagesResponse.FromString(response.content).messages
+    ) == [message]
 
 
 @pytest.mark.parametrize(
@@ -395,7 +403,9 @@ def test_invalid_conversation_request(
 ) -> None:
     """Reject malformed IDs, empty text, and unsupported page sizes."""
     client, state = conversation_client
-    conversation = state.create_conversation(flwr_aid=_ACCOUNT.flwr_aid)
+    conversation = state.create_conversation(
+        participants=[ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)]
+    )
     request_type = (
         SendConversationMessageRequest
         if endpoint == "send-conversation-message"

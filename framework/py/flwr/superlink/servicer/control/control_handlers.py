@@ -1337,7 +1337,10 @@ def create_conversation(
         )
     try:
         conversation = state.create_conversation(
-            flwr_aid=account.flwr_aid, participants=request.participants
+            participants=[
+                ConversationParticipant(flwr_aid=account.flwr_aid),
+                *request.participants,
+            ]
         )
     except ValueError as exc:
         raise InvalidConversationRequestError(str(exc)) from exc
