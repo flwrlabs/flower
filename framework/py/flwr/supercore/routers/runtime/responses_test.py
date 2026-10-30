@@ -25,6 +25,7 @@ import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import SQLAlchemyError
 from starlette.types import Message, Scope
 
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
@@ -183,12 +184,13 @@ def test_model_response_accounts_usage_and_preserves_output(
         ("invalid_response", 502),
         ("missing_key", 500),
         ("invalid_endpoint", 500),
+        ("usage_error", 500),
     ],
 )
 def test_model_errors_return_json(
     state: Mock, monkeypatch: pytest.MonkeyPatch, mode: str, status: int
 ) -> None:
-    """Return provider/configuration errors without recording usage."""
+    """Return provider, configuration and accounting failures as JSON errors."""
     if mode == "missing_key":
         monkeypatch.setenv(
             "FLWR_MODEL_API_ENDPOINT", "https://api.flower.ai/v1/responses"
@@ -197,6 +199,11 @@ def test_model_errors_return_json(
     elif mode == "invalid_endpoint":
         monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "http://provider/v1")
     response = httpx.Response(503 if mode == "http_error" else 200, json={})
+    if mode == "usage_error":
+        state.add_task_usage.side_effect = SQLAlchemyError("Usage store unavailable")
+        response = httpx.Response(
+            200, json={"object": "response", "usage": {"input_tokens": 1}}
+        )
     _mock_provider(monkeypatch, httpx.MockTransport(lambda _request: response))
     with _client(state) as client:
         result = client.post(
@@ -208,7 +215,7 @@ def test_model_errors_return_json(
         assert "error" in result.json()
         if status == 500:
             assert result.json()["error"]["message"] == "Internal server error."
-    state.add_task_usage.assert_not_called()
+    assert state.add_task_usage.call_count == (1 if mode == "usage_error" else 0)
 
 
 async def _check_model_cancellation(

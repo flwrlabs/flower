@@ -115,12 +115,23 @@ class ModelResponse(Response):
             response, provider=cast(str, self.payload["model"])
         )
         if usage is not None:
-            await anyio.to_thread.run_sync(
-                self.state.add_task_usage,
-                self.task.task_id,
-                usage,
-                abandon_on_cancel=True,
-            )
+            try:
+                await anyio.to_thread.run_sync(
+                    self.state.add_task_usage,
+                    self.task.task_id,
+                    usage,
+                    abandon_on_cancel=True,
+                )
+            except Exception as error:  # pylint: disable=broad-exception-caught
+                log(
+                    ERROR,
+                    "Failed to record usage for task %s",
+                    self.task.task_id,
+                    exc_info=True,
+                )
+                raise _ResponsesError(
+                    500, "Internal server error.", "internal_error"
+                ) from error
 
     async def _prepare_response(
         self, resources: AsyncExitStack, span: TraceSpan, started: float
