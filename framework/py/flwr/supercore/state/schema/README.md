@@ -70,6 +70,21 @@ erDiagram
     VARCHAR state
   }
 
+  conversation {
+    BIGINT conversation_id PK
+    BIGINT series_id FK
+    TIMESTAMP created_at
+    VARCHAR title
+    TIMESTAMP updated_at
+  }
+
+  conversation_participant {
+    BIGINT id PK
+    BIGINT agent_id FK "nullable"
+    BIGINT conversation_id FK
+    VARCHAR flwr_aid "nullable"
+  }
+
   fab {
     VARCHAR fab_hash PK
     BLOB content
@@ -270,6 +285,9 @@ erDiagram
     VARCHAR usage_type
   }
 
+  run_series ||--o| conversation : series_id
+  conversation ||--o{ conversation_participant : conversation_id
+  agent ||--o{ conversation_participant : agent_id
   message ||--o{ message : reply_to_message_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
