@@ -1055,25 +1055,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             ).one()
             return _conversation_from_model(model, federation_id)
 
-    def get_conversation(
-        self, conversation_id: int, flwr_aid: str
-    ) -> Conversation | None:
-        """Return a conversation only when it belongs to the specified account."""
-        query = (
-            select(ConversationModel, RunSeriesModel.federation_id)
-            .join(
-                RunSeriesModel, ConversationModel.series_id == RunSeriesModel.series_id
-            )
-            .where(
-                ConversationModel.conversation_id == uint64_to_int64(conversation_id),
-                ConversationModel.flwr_aid == flwr_aid,
-            )
-            .execution_options(populate_existing=True)
-        )
-        with self.session() as session:
-            row = session.execute(query).first()
-            return _conversation_from_model(*row) if row is not None else None
-
     def get_conversations(
         self, flwr_aid: str, federation_ids: Sequence[str] | None = None
     ) -> Sequence[Conversation]:
@@ -1084,34 +1065,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 RunSeriesModel, ConversationModel.series_id == RunSeriesModel.series_id
             )
             .where(ConversationModel.flwr_aid == flwr_aid)
-            .order_by(
-                ConversationModel.updated_at.desc(),
-                case((ConversationModel.conversation_id < 0, 1), else_=0).desc(),
-                ConversationModel.conversation_id.desc(),
-            )
+            .order_by(ConversationModel.updated_at.desc())
             .execution_options(populate_existing=True)
         )
         if federation_ids is not None:
             query = query.where(RunSeriesModel.federation_id.in_(federation_ids))
         with self.session() as session:
             return [_conversation_from_model(*row) for row in session.execute(query)]
-
-    def set_conversation_title(
-        self, conversation_id: int, flwr_aid: str, title: str
-    ) -> Conversation | None:
-        """Rename an owned conversation, returning None if it is inaccessible."""
-        with self.session() as session:
-            session.execute(
-                update(ConversationModel)
-                .where(
-                    ConversationModel.conversation_id
-                    == uint64_to_int64(conversation_id),
-                    ConversationModel.flwr_aid == flwr_aid,
-                    ConversationModel.title != title,
-                )
-                .values(title=title, updated_at=now())
-            )
-            return self.get_conversation(conversation_id, flwr_aid)
 
     def get_run_series(  # pylint: disable=R0913,R0914
         self,

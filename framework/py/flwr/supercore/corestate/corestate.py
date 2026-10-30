@@ -531,26 +531,10 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Create an untitled conversation and empty agent run series atomically."""
 
     @abstractmethod
-    def get_conversation(
-        self, conversation_id: int, flwr_aid: str
-    ) -> Conversation | None:
-        """Return a conversation only when it belongs to the specified account."""
-
-    @abstractmethod
     def get_conversations(
         self, flwr_aid: str, federation_ids: Sequence[str] | None = None
     ) -> Sequence[Conversation]:
-        """Return owned conversations, newest metadata update first.
-
-        An omitted federation filter includes all federations; an empty filter
-        returns no conversations. Activity within a run does not update metadata.
-        """
-
-    @abstractmethod
-    def set_conversation_title(
-        self, conversation_id: int, flwr_aid: str, title: str
-    ) -> Conversation | None:
-        """Rename an owned conversation, returning None if it is inaccessible."""
+        """List owned conversations, newest first, optionally filtered by federation."""
 
     @abstractmethod
     def get_run_series(  # pylint: disable=too-many-arguments

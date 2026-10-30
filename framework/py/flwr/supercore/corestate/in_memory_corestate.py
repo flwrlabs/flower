@@ -864,17 +864,7 @@ class InMemoryCoreState(
             self.conversation_store[conversation.conversation_id] = ConversationRecord(
                 flwr_aid=flwr_aid, series_id=series_id, conversation=conversation
             )
-            return deepcopy(conversation)
-
-    def get_conversation(
-        self, conversation_id: int, flwr_aid: str
-    ) -> Conversation | None:
-        """Return a conversation only when it belongs to the specified account."""
-        with self.lock_run_series_store:
-            record = self.conversation_store.get(conversation_id)
-            if record is None or record.flwr_aid != flwr_aid:
-                return None
-            return deepcopy(record.conversation)
+            return conversation
 
     def get_conversations(
         self, flwr_aid: str, federation_ids: Sequence[str] | None = None
@@ -890,26 +880,8 @@ class InMemoryCoreState(
                     or record.conversation.federation_id in federation_ids
                 )
             ]
-            return deepcopy(
-                sorted(
-                    conversations,
-                    key=lambda item: (item.updated_at, item.conversation_id),
-                    reverse=True,
-                )
-            )
-
-    def set_conversation_title(
-        self, conversation_id: int, flwr_aid: str, title: str
-    ) -> Conversation | None:
-        """Rename an owned conversation, returning None if it is inaccessible."""
-        with self.lock_run_series_store:
-            record = self.conversation_store.get(conversation_id)
-            if record is None or record.flwr_aid != flwr_aid:
-                return None
-            if record.conversation.title != title:
-                record.conversation.title = title
-                record.conversation.updated_at = now().isoformat()
-            return deepcopy(record.conversation)
+            conversations.sort(key=lambda item: item.updated_at, reverse=True)
+            return conversations
 
     def get_run_series(  # pylint: disable=too-many-arguments
         self,
