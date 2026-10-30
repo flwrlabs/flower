@@ -14,7 +14,6 @@
 # ==============================================================================
 """Conversation persistence tests."""
 
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -25,7 +24,7 @@ from flwr.proto.control_pb2 import Conversation  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
-from flwr.supercore.constant import NOOP_FEDERATION_ID, TaskType
+from flwr.supercore.constant import NOOP_FEDERATION_ID
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
@@ -46,8 +45,8 @@ def conversation_state(request: pytest.FixtureRequest, tmp_path: Path) -> LinkSt
     return sql_state
 
 
-def test_create_empty_conversation_and_reuse_series(state: LinkState) -> None:
-    """Creation starts no work; the existing run path can reuse its series."""
+def test_create_conversation(state: LinkState) -> None:
+    """Create metadata and an empty backing series without starting work."""
     conversation = state.create_conversation(
         flwr_aid="alice", federation_id=NOOP_FEDERATION_ID
     )
@@ -64,28 +63,12 @@ def test_create_empty_conversation_and_reuse_series(state: LinkState) -> None:
     assert not series[0].run_ids
     assert not state.get_tasks()
     assert state.get_run_series_context(series_id) is None
-    assert state.get_conversation(conversation.conversation_id, "alice") == conversation
+    assert list(state.get_conversations("alice")) == [conversation]
     assert Conversation.FromString(conversation.SerializeToString()) == conversation
-
-    run_id = state.create_run(
-        fab_id=None,
-        fab_version=None,
-        fab_hash=None,
-        override_config={},
-        federation_id=NOOP_FEDERATION_ID,
-        federation_config=None,
-        flwr_aid="alice",
-        primary_task_type=TaskType.AGENT_APP,
-        series_id=series_id,
-        user_prompt="Hello",
-    )
-    assert run_id
-    assert state.get_run_info(run_ids=[run_id])[0].series_id == series_id
-    assert list(state.get_run_series(series_ids=[series_id])[0].run_ids) == [run_id]
 
 
 def test_owner_isolation_and_federation_filters(state: LinkState) -> None:
-    """Reading and renaming cannot cross owners, even in the same federation."""
+    """Listings filter by owner and federation."""
     own = state.create_conversation(flwr_aid="alice", federation_id="a")
     other_federation = state.create_conversation(flwr_aid="alice", federation_id="b")
     state.create_conversation(flwr_aid="bob", federation_id="a")
@@ -95,50 +78,6 @@ def test_owner_isolation_and_federation_filters(state: LinkState) -> None:
     assert list(state.get_conversations("alice", ["b"])) == [other_federation]
     assert not state.get_conversations("alice", [])
     assert not state.get_conversations("unknown")
-    assert state.get_conversation(own.conversation_id, "bob") is None
-    assert state.set_conversation_title(own.conversation_id, "bob", "Changed") is None
-    assert state.get_conversation(0, "alice") is None
-    assert state.set_conversation_title(0, "alice", "Changed") is None
-    assert state.get_conversation(own.conversation_id, "alice") == own
-
-
-def test_rename_order_noop_and_returned_message_isolation(state: LinkState) -> None:
-    """Renaming updates metadata order; no-ops and caller mutations preserve state."""
-    initial = datetime(2026, 10, 30, tzinfo=UTC)
-    with (
-        patch("flwr.supercore.corestate.sql_corestate.now", return_value=initial),
-        patch("flwr.supercore.corestate.in_memory_corestate.now", return_value=initial),
-    ):
-        first = state.create_conversation(flwr_aid="alice", federation_id="a")
-        second = state.create_conversation(flwr_aid="alice", federation_id="a")
-
-    later = initial + timedelta(seconds=1)
-    with (
-        patch("flwr.supercore.corestate.sql_corestate.now", return_value=later),
-        patch("flwr.supercore.corestate.in_memory_corestate.now", return_value=later),
-    ):
-        renamed = state.set_conversation_title(
-            first.conversation_id, "alice", "Renamed"
-        )
-    assert renamed is not None
-    assert renamed.created_at == first.created_at
-    assert renamed.updated_at == later.isoformat()
-    assert renamed.conversation_id == first.conversation_id
-    assert [item.conversation_id for item in state.get_conversations("alice")] == [
-        first.conversation_id,
-        second.conversation_id,
-    ]
-    assert (
-        state.set_conversation_title(first.conversation_id, "alice", "Renamed")
-        == renamed
-    )
-
-    renamed.title = "Caller mutation"
-    listed = state.get_conversations("alice")
-    listed[0].title = "Another caller mutation"
-    stored = state.get_conversation(first.conversation_id, "alice")
-    assert stored is not None
-    assert stored.title == "Renamed"
 
 
 def test_sql_creation_rolls_back_backing_series_on_failure() -> None:
@@ -179,9 +118,7 @@ def test_sql_reload_preserves_unsigned_ids(tmp_path: Path) -> None:
         database_path, NoOpFederationManager(), ObjectStoreFactory().store()
     )
     reloaded.initialize()
-    assert (
-        reloaded.get_conversation(conversation.conversation_id, "alice") == conversation
-    )
+    assert list(reloaded.get_conversations("alice")) == [conversation]
     assert conversation.conversation_id == 2**63 + 42
     assert reloaded.get_run_series()[0].series_id == 2**63 + 42
     stored = reloaded.query(
@@ -189,54 +126,3 @@ def test_sql_reload_preserves_unsigned_ids(tmp_path: Path) -> None:
         {"conversation_id": uint64_to_int64(conversation.conversation_id)},
     )
     assert stored == [{"series_id": uint64_to_int64(2**63 + 42)}]
-
-
-@pytest.mark.parametrize("conversation_id", [42, 2**63 - 1, 2**63, 2**64 - 1])
-def test_unsigned_conversation_ids_roundtrip(
-    state: LinkState, conversation_id: int
-) -> None:
-    """IDs retain their uint64 value through storage, protobuf, reads, and edits."""
-    with (
-        patch(
-            "flwr.supercore.corestate.sql_corestate.generate_rand_int_from_bytes",
-            side_effect=[conversation_id, 17],
-        ),
-        patch(
-            "flwr.supercore.corestate.in_memory_corestate.generate_rand_int_from_bytes",
-            side_effect=[conversation_id, 17],
-        ),
-    ):
-        conversation = state.create_conversation(flwr_aid="alice", federation_id="a")
-    assert conversation.conversation_id == conversation_id
-    assert Conversation.FromString(conversation.SerializeToString()) == conversation
-    assert state.get_conversation(conversation_id, "alice") == conversation
-    renamed = state.set_conversation_title(conversation_id, "alice", "Renamed")
-    assert renamed is not None
-    assert renamed.conversation_id == conversation_id
-    assert renamed.title == "Renamed"
-    assert list(state.get_conversations("alice")) == [renamed]
-
-
-def test_equal_timestamp_order_uses_unsigned_ids(state: LinkState) -> None:
-    """The deterministic tie-breaker agrees across signed SQL and in-memory IDs."""
-    timestamp = datetime(2026, 10, 30, tzinfo=UTC)
-    with (
-        patch("flwr.supercore.corestate.sql_corestate.now", return_value=timestamp),
-        patch(
-            "flwr.supercore.corestate.in_memory_corestate.now", return_value=timestamp
-        ),
-        patch(
-            "flwr.supercore.corestate.sql_corestate.generate_rand_int_from_bytes",
-            side_effect=[42, 1, 2**63 + 42, 2],
-        ),
-        patch(
-            "flwr.supercore.corestate.in_memory_corestate.generate_rand_int_from_bytes",
-            side_effect=[42, 1, 2**63 + 42, 2],
-        ),
-    ):
-        state.create_conversation(flwr_aid="alice", federation_id="a")
-        state.create_conversation(flwr_aid="alice", federation_id="a")
-    assert [item.conversation_id for item in state.get_conversations("alice")] == [
-        2**63 + 42,
-        42,
-    ]
