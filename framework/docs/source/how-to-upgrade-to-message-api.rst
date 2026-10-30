@@ -260,7 +260,7 @@ evaluation stages done at the ``ServerApp``.
 
         # Defined model to federate and extract parameters
         model = MyModel()
-        arrays = ArrayRecord(global_model.state_dict())
+        arrays = ArrayRecord(model.state_dict())
 
         # Instantiate strategy
         strategy = FedAvg(fraction_train=0.5)
