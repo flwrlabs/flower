@@ -484,7 +484,6 @@ class InMemoryCoreState(
 
     def create_agent(
         self,
-        *,
         flwr_aid: str,
         config: AgentConfig,
     ) -> Agent | None:

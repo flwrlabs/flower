@@ -572,7 +572,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def create_agent(
         self,
-        *,
         flwr_aid: str,
         config: AgentConfig,
     ) -> Agent | None:

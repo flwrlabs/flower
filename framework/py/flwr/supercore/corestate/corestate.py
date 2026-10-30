@@ -137,7 +137,6 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def create_agent(
         self,
-        *,
         flwr_aid: str,
         config: AgentConfig,
     ) -> Agent | None:
