@@ -64,6 +64,7 @@ from flwr.supercore.constant import (
     AutomationStatus,
 )
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
@@ -140,6 +141,23 @@ class MessageRecord:
     message: Message | None
 
 
+@dataclass
+class FileRecord:
+    """Retain the file head when its contents are deleted."""
+
+    latest_revision: int
+    is_deleted: bool
+    size_bytes: int
+
+
+@dataclass(frozen=True)
+class FileRevisionRecord:
+    """Retain immutable file contents and their creation time."""
+
+    data: bytes
+    created_at: datetime
+
+
 class InMemoryCoreState(
     CoreState
 ):  # pylint: disable=R0904,too-many-instance-attributes
@@ -147,6 +165,9 @@ class InMemoryCoreState(
 
     def __init__(self, object_store: ObjectStore) -> None:
         self._object_store = object_store
+        self.file_store: dict[tuple[str, str], FileRecord] = {}
+        self.file_revision_store: dict[tuple[str, str, int], FileRevisionRecord] = {}
+        self.lock_file_store = Lock()
         self.message_store: dict[str, MessageRecord] = {}
         self.pending_message_ids_by_dst: dict[int, set[str]] = {}
         self.lock_message_store = RLock()
@@ -487,21 +508,68 @@ class InMemoryCoreState(
         self, scope: str, key: str, data: bytes, expected_revision: int | None
     ) -> int:
         """Create or update a file with a revision precondition."""
-        raise NotImplementedError
+        with self.lock_file_store:
+            head = self.file_store.get((scope, key))
+            live_revision = (
+                head.latest_revision
+                if head is not None and not head.is_deleted
+                else None
+            )
+            if live_revision != expected_revision:
+                raise FlowerError(
+                    ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT,
+                    "File revision precondition failed.",
+                )
+            revision = head.latest_revision + 1 if head is not None else 1
+            self.file_revision_store[scope, key, revision] = FileRevisionRecord(
+                data=data, created_at=now()
+            )
+            self.file_store[scope, key] = FileRecord(revision, False, len(data))
+            return revision
 
     def get_file(self, scope: str, key: str) -> File | None:
         """Return the current file, or None if absent or deleted."""
-        raise NotImplementedError
+        with self.lock_file_store:
+            head = self.file_store.get((scope, key))
+            if head is None or head.is_deleted:
+                return None
+            return File(
+                metadata=FileMetadata(
+                    key=key, revision=head.latest_revision, size_bytes=head.size_bytes
+                ),
+                data=self.file_revision_store[scope, key, head.latest_revision].data,
+            )
 
     def list_files(
         self, scope: str, prefix: str, start_after: str, limit: int | None
     ) -> Sequence[FileMetadata]:
         """List live file metadata in lexicographic key order."""
-        raise NotImplementedError
+        with self.lock_file_store:
+            return [
+                FileMetadata(
+                    key=key, revision=head.latest_revision, size_bytes=head.size_bytes
+                )
+                for (file_scope, key), head in sorted(self.file_store.items())
+                if file_scope == scope
+                and not head.is_deleted
+                and key.startswith(prefix)
+                and (not start_after or key > start_after)
+            ][:limit]
 
     def delete_file(self, scope: str, key: str, expected_revision: int) -> None:
         """Delete a file with a matching revision, preserving revision history."""
-        raise NotImplementedError
+        with self.lock_file_store:
+            head = self.file_store.get((scope, key))
+            if (
+                head is None
+                or head.is_deleted
+                or head.latest_revision != expected_revision
+            ):
+                raise FlowerError(
+                    ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT,
+                    "File revision precondition failed.",
+                )
+            head.is_deleted = True
 
     def create_agent(
         self,

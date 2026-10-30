@@ -17,9 +17,11 @@
 
 # pylint: disable=too-many-lines
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from datetime import UTC, datetime, timedelta
 from operator import attrgetter
+from threading import Barrier
 from typing import Any, cast
 from unittest.mock import call, patch
 
@@ -262,6 +264,50 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             exc.exception.code, ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT
         )
         self.assertIsNone(state.get_file("scope", "file"))
+
+    @parameterized.expand(  # type: ignore
+        [("create",), ("update",), ("recreate",), ("delete",), ("update-delete",)]
+    )
+    def test_file_concurrent_mutations(self, operation: str) -> None:
+        """Only one concurrent operation can satisfy the same file precondition."""
+        state = self.state_factory()
+        expected_revision = None
+        if operation != "create":
+            expected_revision = state.put_file("scope", "file", b"old", None)
+        if operation == "recreate":
+            assert expected_revision is not None
+            state.delete_file("scope", "file", expected_revision)
+            expected_revision = None
+        barrier = Barrier(2)
+
+        def mutate(index: int) -> bool:
+            barrier.wait(timeout=10)
+            try:
+                if operation == "delete" or (
+                    operation == "update-delete" and index == 1
+                ):
+                    assert expected_revision is not None
+                    state.delete_file("scope", "file", expected_revision)
+                else:
+                    state.put_file(
+                        "scope", "file", str(index).encode(), expected_revision
+                    )
+                return True
+            except FlowerError as exc:
+                self.assertEqual(exc.code, ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT)
+                return False
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(mutate, range(2)))
+
+        self.assertEqual(sum(results), 1)
+        file = state.get_file("scope", "file")
+        if operation == "delete" or (operation == "update-delete" and results[1]):
+            self.assertIsNone(file)
+            self.assertEqual(list(state.list_files("scope", "", "", None)), [])
+        else:
+            assert file is not None
+            self.assertEqual(file.data, str(results.index(True)).encode())
 
     def test_files_are_isolated_by_scope(self) -> None:
         """Writing and deleting a key in one scope leaves another scope unchanged."""
