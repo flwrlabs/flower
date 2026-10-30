@@ -24,6 +24,7 @@ CORESTATE_TABLE_NAMES = {
     "file_revision",
     "message",
     "agent",
+    "conversation",
     "run_series",
     "compacted_contexts",
     "series_context",
