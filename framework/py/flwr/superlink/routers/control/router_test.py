@@ -35,7 +35,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.proto import control_pb2
+from flwr.proto import control_pb2, control_pb2_grpc
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddAppRequest,
     AddAppResponse,
@@ -92,6 +92,7 @@ from flwr.superlink.routers.control.router import add_app as add_app_route
 from flwr.superlink.routers.control.router import router
 from flwr.superlink.routers.control.router import start_run as start_run_route
 from flwr.superlink.servicer.control import control_handlers
+from flwr.superlink.servicer.control.control_servicer import ControlServicer
 
 _ACCOUNT = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
 CONNECTOR_FEDERATION_ID = "@bob/fed-a"
@@ -161,11 +162,15 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
         }
 
 
-def test_control_http_routes_cover_all_grpc_methods() -> None:
-    """Expose every Control gRPC request type plus HTTP-only token refresh."""
+def test_control_http_routes_cover_implemented_grpc_methods() -> None:
+    """Expose implemented Control gRPC requests plus HTTP-only token refresh."""
+    # Generated base methods return UNIMPLEMENTED until the RPC is wired up.
+    generated_servicer = control_pb2_grpc.ControlServicer
     grpc_request_types = Counter(
         method.input_type.full_name
         for method in control_pb2.DESCRIPTOR.services_by_name["Control"].methods
+        if getattr(ControlServicer, method.name)
+        is not getattr(generated_servicer, method.name)
     )
     http_request_types = Counter(
         request_type.DESCRIPTOR.full_name

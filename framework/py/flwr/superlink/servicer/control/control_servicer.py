@@ -120,6 +120,10 @@ from .control_handlers import _resolve_federation_id
 class ControlServicer(control_pb2_grpc.ControlServicer):
     """Control API servicer."""
 
+    # Keep proto-only RPC additions callable but unimplemented until integration.
+    CreateConversation = control_pb2_grpc.ControlServicer.CreateConversation
+    ListConversations = control_pb2_grpc.ControlServicer.ListConversations
+
     def __init__(  # pylint: disable=R0913, R0917
         self,
         linkstate_factory: LinkStateFactory,
