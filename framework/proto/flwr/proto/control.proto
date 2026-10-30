@@ -65,6 +65,12 @@ service Control {
   rpc ListRunSeriesEvents(ListRunSeriesEventsRequest)
       returns (ListRunSeriesEventsResponse) {}
 
+  // Create an agent owned by the authenticated account
+  rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse) {}
+
+  // List agents owned by the authenticated account
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse) {}
+
   // Get login details upon request
   rpc GetLoginDetails(GetLoginDetailsRequest)
       returns (GetLoginDetailsResponse) {}
@@ -175,6 +181,23 @@ service Control {
   rpc StreamRunEvents(StreamRunEventsRequest)
       returns (stream StreamRunEventsResponse) {}
 }
+
+message AgentConfig {
+  string name = 1;
+  optional string description = 2;
+  optional string title = 3;
+  string app_spec = 4;
+}
+message Agent {
+  uint64 id = 1;
+  AgentConfig config = 2;
+  string created_at = 3;
+  string updated_at = 4;
+}
+message CreateAgentRequest { AgentConfig config = 1; }
+message CreateAgentResponse { Agent agent = 1; }
+message ListAgentsRequest {}
+message ListAgentsResponse { repeated Agent agents = 1; }
 
 message StartRunRequest {
   Fab fab = 1;

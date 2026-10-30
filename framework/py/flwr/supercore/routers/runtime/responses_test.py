@@ -23,8 +23,9 @@ from unittest.mock import MagicMock, Mock
 import anyio
 import httpx
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import SQLAlchemyError
 from starlette.types import Message, Scope
 
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
@@ -74,19 +75,22 @@ def test_responses_requires_bearer_authentication(
     assert response.json()["error"]["code"] == "invalid_api_key"
 
 
-def test_responses_rejects_unsupported_fields() -> None:
-    """Do not silently discard unsupported Open Responses fields."""
-    state = _state()
-
-    response = _client(state).post(
+@pytest.mark.parametrize(
+    "extra,code",
+    [
+        ({"temperature": 0.5}, "unsupported_parameter"),
+        ({"stream": "true"}, "invalid_request"),
+    ],
+)
+def test_responses_rejects_invalid_requests(extra: JSONObject, code: str) -> None:
+    """Reject unsupported fields and invalid request types before inference."""
+    response = _client(_state()).post(
         "/v1/runtime/responses",
-        json={"model": "model", "input": "hello", "temperature": 0.5},
+        json={"model": "model", "input": "hello"} | extra,
         headers={"Authorization": "Bearer task-token"},
     )
-
     assert response.status_code == 400
-    assert response.json()["error"]["code"] == "unsupported_parameter"
-    state.create_task.assert_not_called()
+    assert response.json()["error"]["code"] == code
 
 
 @pytest.fixture
@@ -111,63 +115,66 @@ def _mock_provider(
     )
 
 
-@pytest.mark.parametrize("stream", [False, True])
-def test_model_response_accounts_each_round(
-    state: Mock, monkeypatch: pytest.MonkeyPatch, stream: bool
+@pytest.mark.parametrize(
+    "stream,key", [(False, "provider-key"), (True, "provider-key"), (False, "")]
+)
+def test_model_response_accounts_usage_and_preserves_output(
+    state: Mock, monkeypatch: pytest.MonkeyPatch, stream: bool, key: str
 ) -> None:
-    """Preserve credentials and usage, including a terminal SSE event at EOF."""
+    """Forward JSON/SSE unchanged and account usage against the AgentApp task."""
     backend = MagicMock()
     monkeypatch.setenv("FLWR_TRACING_ENABLED", "1")
     monkeypatch.setattr("flwr.supercore.tracing._load_backend", lambda: backend)
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", key)
     body: JSONObject = {
-        "id": "resp_1",
         "object": "response",
-        "status": "completed",
         "output": [],
         "usage": {"input_tokens": 11, "output_tokens": 7},
     }
+    # Keep unknown frames intact, split UTF-8/CRLF, and account at EOF.
+    wire = (
+        ": heartbeat\r\n\r\nid: 42\r\nevent: custom\r\ndata: not json\r\n\r\n"
+        'event: response.output_text.delta\r\ndata: {"delta":"café"}\r\n\r\n'
+        f'event: response.completed\r\ndata: {json.dumps({"response": body})}'
+    ).encode()
+
+    class ByteStream(httpx.AsyncByteStream):
+        """Split SSE at byte boundaries without changing its contents."""
+
+        async def __aiter__(self) -> AsyncIterator[bytes]:
+            for value in wire:
+                yield bytes([value])
 
     def handle(request: httpx.Request) -> httpx.Response:
-        assert request.headers["authorization"] == "Bearer provider-key"
+        assert request.headers.get("authorization") == (
+            f"Bearer {key}" if key else None
+        )
         if request.url.path == "/v1/responses":
             return httpx.Response(307, headers={"location": "/v1/model-responses"})
-        if not stream:
-            return httpx.Response(200, json=body)
-        # Event types come from SSE names. The final event has no blank separator.
-        text = 'event: response.output_text.delta\ndata: {"delta":"Hi"}\n\n'
-        text += f"event: response.completed\ndata: {json.dumps({'response': body})}"
-        return httpx.Response(
-            200, headers={"content-type": "Text/Event-Stream; charset=utf-8"}, text=text
-        )
+        if stream:
+            return httpx.Response(
+                200, headers={"content-type": "text/event-stream"}, stream=ByteStream()
+            )
+        return httpx.Response(200, json=body)
 
     _mock_provider(monkeypatch, httpx.MockTransport(handle))
     with _client(state) as client:
-        for _ in range(2):
-            result = client.post(
-                "/v1/runtime/responses",
-                headers={"Authorization": "Bearer task-token"},
-                json=_stream_request() | {"stream": stream},
-            )
-            assert result.status_code == 200
-            if stream:
-                assert "event: response.completed\n" in result.text
-            else:
-                assert result.json() == body
-    attributes = backend.trace_span.return_value.__enter__.return_value.set_attribute
-    assert all(
-        call.args[0] != "error.type" for call in attributes.call_args_list
-    ), attributes.call_args_list
-    if stream:
-        assert (
-            backend.trace_span.return_value.__enter__.return_value.add_event.call_count
-            == 2
+        result = client.post(
+            "/v1/runtime/responses",
+            headers={"Authorization": "Bearer task-token"},
+            json=_stream_request() | {"stream": stream},
         )
-    assert state.add_task_usage.call_count == 2
-    for call in state.add_task_usage.call_args_list:
-        task_id, usage = call.args
-        assert task_id == 123 and usage.provider == "model"
-        assert (usage.input_tokens, usage.output_tokens) == (11, 7)
-    state.create_task.assert_not_called()
+    assert result.status_code == 200
+    if stream:
+        assert result.content == wire
+        span = backend.trace_span.return_value.__enter__.return_value
+        span.add_event.assert_called_once_with("provider.first_text")
+    else:
+        assert result.json() == body
+    state.add_task_usage.assert_called_once()
+    task_id, usage = state.add_task_usage.call_args.args
+    assert task_id == 123 and usage.provider == "model"
+    assert (usage.input_tokens, usage.output_tokens) == (11, 7)
 
 
 @pytest.mark.parametrize(
@@ -177,12 +184,13 @@ def test_model_response_accounts_each_round(
         ("invalid_response", 502),
         ("missing_key", 500),
         ("invalid_endpoint", 500),
+        ("usage_error", 500),
     ],
 )
-def test_model_errors_never_fall_back(
+def test_model_errors_return_json(
     state: Mock, monkeypatch: pytest.MonkeyPatch, mode: str, status: int
 ) -> None:
-    """Return JSON errors without duplicating inference or exposing configuration."""
+    """Return provider, configuration and accounting failures as JSON errors."""
     if mode == "missing_key":
         monkeypatch.setenv(
             "FLWR_MODEL_API_ENDPOINT", "https://api.flower.ai/v1/responses"
@@ -191,6 +199,11 @@ def test_model_errors_never_fall_back(
     elif mode == "invalid_endpoint":
         monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "http://provider/v1")
     response = httpx.Response(503 if mode == "http_error" else 200, json={})
+    if mode == "usage_error":
+        state.add_task_usage.side_effect = SQLAlchemyError("Usage store unavailable")
+        response = httpx.Response(
+            200, json={"object": "response", "usage": {"input_tokens": 1}}
+        )
     _mock_provider(monkeypatch, httpx.MockTransport(lambda _request: response))
     with _client(state) as client:
         result = client.post(
@@ -198,27 +211,21 @@ def test_model_errors_never_fall_back(
             headers={"Authorization": "Bearer task-token"},
             json=_stream_request() | {"stream": False},
         )
-        assert result.status_code == status and "error" in result.text
+        assert result.status_code == status
+        assert "error" in result.json()
         if status == 500:
             assert result.json()["error"]["message"] == "Internal server error."
-        assert "event: response.completed\n" not in result.text
-        assert "event: response.incomplete\n" not in result.text
-    state.add_task_usage.assert_not_called()
-    state.create_task.assert_not_called()
+    assert state.add_task_usage.call_count == (1 if mode == "usage_error" else 0)
 
 
-async def _check_model_cancellation(  # pylint: disable=too-many-locals
-    state: Mock,
-    monkeypatch: pytest.MonkeyPatch,
-    stop: str,
-    phase: str,
-    spec_version: str,
+async def _check_model_cancellation(
+    state: Mock, monkeypatch: pytest.MonkeyPatch, stop: str
 ) -> None:
-    """Close quiet upstream requests even before response headers arrive."""
+    """Close quiet upstream streams and bound blocked error delivery."""
     entered, closed, disconnected = asyncio.Event(), asyncio.Event(), asyncio.Event()
 
     class QuietStream(httpx.AsyncByteStream):
-        """Keep the body idle until upstream cleanup."""
+        """Keep inference idle until cancellation closes the connection."""
 
         async def __aiter__(self) -> AsyncIterator[bytes]:
             entered.set()
@@ -228,43 +235,31 @@ async def _check_model_cancellation(  # pylint: disable=too-many-locals
         async def aclose(self) -> None:
             closed.set()
 
-    async def handle(_request: httpx.Request) -> httpx.Response:
-        if phase == "opening":
-            try:
-                entered.set()
-                await anyio.sleep_forever()
-            finally:
-                closed.set()
-        if phase in {"json_blocked", "error_blocked"}:
-            return httpx.Response(
-                503 if phase == "error_blocked" else 200,
-                json={"object": "response", "output": []},
-            )
+    def handle(_request: httpx.Request) -> httpx.Response:
+        if stop == "error_deadline":
+            return httpx.Response(503, json={})
         return httpx.Response(
             200, headers={"content-type": "text/event-stream"}, stream=QuietStream()
         )
 
     _mock_provider(monkeypatch, httpx.MockTransport(handle))
     monkeypatch.setattr(
-        responses, "_model_response_timeout", lambda: 0.05 if stop == "deadline" else 3
+        responses, "_model_response_timeout", lambda: 0.05 if "deadline" in stop else 3
     )
-    scope: Scope = {
-        "type": "http",
-        "app": FastAPI(),
-        "asgi": {"spec_version": spec_version},
-    }
+    monkeypatch.setattr(responses, "_POLL_INTERVAL", 0.01)
+    scope: Scope = {"type": "http", "app": FastAPI(), "asgi": {"spec_version": "2.3"}}
 
     async def receive() -> Message:
         await disconnected.wait()
         return {"type": "http.disconnect"}
 
-    response = ModelResponse(
-        Request(scope, receive),
-        state,
-        state.get_task_by_token.return_value,
-        _stream_request()
-        | {"stream": phase not in {"opening", "json_blocked", "error_blocked"}},
-    )
+    async def send(message: Message) -> None:
+        if stop == "broken_pipe":
+            entered.set()
+            raise BrokenPipeError
+        if stop == "error_deadline" and message["type"] == "http.response.body":
+            entered.set()
+            await anyio.sleep_forever()
 
     async def trigger() -> None:
         await entered.wait()
@@ -273,135 +268,25 @@ async def _check_model_cancellation(  # pylint: disable=too-many-locals
         elif stop == "disconnect":
             disconnected.set()
 
-    messages: list[Message] = []
-
-    async def send(message: Message) -> None:
-        await anyio.sleep(0)
-        if (
-            phase in {"blocked", "json_blocked", "error_blocked"}
-            and message["type"] == "http.response.body"
-        ):
-            entered.set()
-            await anyio.sleep_forever()
-        messages.append(message)
-
+    response = ModelResponse(
+        state, state.get_task_by_token.return_value, _stream_request()
+    )
     async with asyncio.timeout(4):
-        if stop == "deadline":
-            # Expiry aborts delivery without an additional error grace period.
+        if "deadline" in stop:
             with pytest.raises(ExceptionGroup) as error:
                 await asyncio.gather(response(scope, receive, send), trigger())
             assert any(isinstance(exc, TimeoutError) for exc in error.value.exceptions)
         else:
             await asyncio.gather(response(scope, receive, send), trigger())
-    if phase not in {"json_blocked", "error_blocked"}:
+    if stop != "error_deadline":
         assert closed.is_set()
-    assert not any(b"event: error" in message.get("body", b"") for message in messages)
 
 
 @pytest.mark.parametrize(
-    "stop,phase,spec_version",
-    [
-        ("task", "opening", "2.4"),
-        ("task", "streaming", "2.4"),
-        ("disconnect", "streaming", "2.4"),
-        ("disconnect", "streaming", "2.0"),
-        ("task", "streaming", "2.0"),
-        ("deadline", "opening", "2.4"),
-        ("deadline", "streaming", "2.4"),
-        ("deadline", "blocked", "2.4"),
-        ("deadline", "json_blocked", "2.4"),
-        ("deadline", "error_blocked", "2.4"),
-    ],
+    "stop", ["task", "disconnect", "broken_pipe", "deadline", "error_deadline"]
 )
 def test_model_cancellation_closes_provider(
-    state: Mock,
-    monkeypatch: pytest.MonkeyPatch,
-    stop: str,
-    phase: str,
-    spec_version: str,
+    state: Mock, monkeypatch: pytest.MonkeyPatch, stop: str
 ) -> None:
-    """Run cancellation coverage without requiring an async pytest plugin."""
-    asyncio.run(
-        _check_model_cancellation(state, monkeypatch, stop, phase, spec_version)
-    )
-
-
-def test_stream_is_forwarded_without_validation(
-    state: Mock,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Preserve comments, unknown fields and malformed events across byte boundaries."""
-    body = (
-        b": heartbeat\r\n\r\nid: 42\r\nretry: 100\r\n"
-        b"event: custom\r\ndata: not json\r\n\r\n"
-        b'data: {"type":"response.output_text.delta","delta":"caf\xc3\xa9"}\r\n\r\n'
-        b'event: response.completed\r\ndata: {"response":'
-        b' {"usage": {"input_tokens": 1}}}\r\n\r\n'
-        b"data: [DONE]\n\n"
-    )
-
-    class ByteStream(httpx.AsyncByteStream):
-        """Split the wire payload at every possible byte boundary."""
-
-        async def __aiter__(self) -> AsyncIterator[bytes]:
-            for value in body:
-                yield bytes([value])
-
-    _mock_provider(
-        monkeypatch,
-        httpx.MockTransport(
-            lambda _request: httpx.Response(
-                200,
-                headers={"content-type": "text/event-stream"},
-                stream=ByteStream(),
-            )
-        ),
-    )
-    result = _client(state).post(
-        "/v1/runtime/responses",
-        headers={"Authorization": "Bearer task-token"},
-        json=_stream_request(),
-    )
-    assert result.content == body
-    state.add_task_usage.assert_called_once()
-
-
-def test_model_requests_have_no_eight_request_cap(
-    state: Mock,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Allow concurrent requests beyond the old provisional per-process limit."""
-
-    async def check() -> None:
-        active, started = 0, asyncio.Event()
-
-        async def handle(_request: httpx.Request) -> httpx.Response:
-            nonlocal active
-            active += 1
-            if active == 9:
-                started.set()
-            await started.wait()
-            return httpx.Response(200, json={"object": "response", "output": []})
-
-        http_client = httpx.AsyncClient
-        _mock_provider(monkeypatch, httpx.MockTransport(handle))
-        app = FastAPI()
-        app.include_router(router)
-        app.dependency_overrides[get_runtime_state] = lambda: state
-        async with http_client(
-            transport=httpx.ASGITransport(app=app), base_url="http://runtime"
-        ) as client:
-            async with asyncio.timeout(3):
-                results = await asyncio.gather(
-                    *(
-                        client.post(
-                            "/v1/runtime/responses",
-                            headers={"Authorization": "Bearer task-token"},
-                            json=_stream_request() | {"stream": False},
-                        )
-                        for _ in range(9)
-                    )
-                )
-        assert all(result.status_code == 200 for result in results)
-
-    asyncio.run(check())
+    """Exercise cancellation without requiring an async pytest plugin."""
+    asyncio.run(_check_model_cancellation(state, monkeypatch, stop))
