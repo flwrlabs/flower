@@ -74,7 +74,6 @@ erDiagram
     BIGINT conversation_id PK
     BIGINT series_id FK
     TIMESTAMP created_at
-    VARCHAR flwr_aid
     VARCHAR title
     TIMESTAMP updated_at
   }
