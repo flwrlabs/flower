@@ -3,80 +3,19 @@
 from __future__ import annotations
 
 import os
-from typing import Any
 
 from flwr.agentapp import AgentApp, AgentSession
 from flwr.app import Context
 from openai import OpenAI
 
-MODEL = "openai/gpt-5.6-sol"
+from .utils import (
+    MODEL,
+    compact_active_context_if_needed,
+    construct_model_input,
+    get_active_context,
+)
 
 app = AgentApp()
-
-
-def _message_text(content: Any) -> str:
-    """Extract text from a trace message."""
-    if isinstance(content, str):
-        return content
-    parts = []
-    for part in content:
-        text = part.get("text", part.get("refusal"))
-        if isinstance(text, str):
-            parts.append(text)
-    return "\n".join(parts)
-
-
-def _conversation(agent: AgentSession, context: Context) -> list[dict[str, str]]:
-    """Rebuild user and assistant messages from this run series."""
-    run_order: list[int] = []
-    turns_by_run: dict[int, list[dict[str, str]]] = {}
-    assistant_parts_by_run: dict[int, list[str]] = {}
-    current_prompt_seen = False
-    for event in agent.events.get_trace():
-        run_id = event.get("run_id")
-        event_type = event.get("event")
-        data = event["data"]
-        if not isinstance(run_id, int):
-            continue
-
-        if event_type == "message" and data.get("role") == "user":
-            assistant_parts_by_run.pop(run_id, None)
-            text = _message_text(data["content"])
-            if run_id not in turns_by_run:
-                run_order.append(run_id)
-            turns_by_run[run_id] = [
-                {"type": "message", "role": "user", "content": text}
-            ]
-            current_prompt_seen |= (
-                run_id == context.run_id and text.strip() == agent.prompt.strip()
-            )
-        elif event_type in {
-            "response.output_text.delta",
-            "response.refusal.delta",
-        }:
-            delta = data.get("delta")
-            if isinstance(delta, str):
-                assistant_parts_by_run.setdefault(run_id, []).append(delta)
-        elif event_type == "response.completed":
-            assistant_parts = assistant_parts_by_run.pop(run_id, [])
-            turn = turns_by_run.get(run_id)
-            if assistant_parts and turn is not None:
-                turn.append(
-                    {
-                        "type": "message",
-                        "role": "assistant",
-                        "content": "".join(assistant_parts),
-                    }
-                )
-        elif event_type in {"error", "response.failed", "response.incomplete"}:
-            assistant_parts_by_run.pop(run_id, None)
-
-    messages = [message for run_id in run_order for message in turns_by_run[run_id]]
-    if not current_prompt_seen:
-        messages.append(
-            {"type": "message", "role": "user", "content": agent.prompt.strip()}
-        )
-    return messages
 
 
 @app.main()
@@ -89,9 +28,17 @@ def main(agent: AgentSession, context: Context) -> None:
         # Keep the client timeout above Runtime's total response deadline.
         timeout=float(os.getenv("FLWR_RUNTIME_API_TIMEOUT", "930.0")),
     )
+
+    active_context = get_active_context(agent, context.run_id)
+    compact_active_context_if_needed(agent, client, active_context)
+    agent.events.emit(
+        {"type": "active_context.created", "token_count": active_context.token_count}
+    )
+    input_items = construct_model_input(active_context, agent.prompt)
+
     stream = client.responses.create(
         model=MODEL,
-        input=_conversation(agent, context),
+        input=input_items,
         stream=True,
     )
 
