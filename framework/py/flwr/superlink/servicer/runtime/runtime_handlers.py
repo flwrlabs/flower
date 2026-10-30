@@ -134,7 +134,7 @@ def put_compacted_context(
     )
 
 
-def get_run_series_id(state: LinkState, task: Task) -> int:
+def _get_run_series_id(state: LinkState, task: Task) -> int:
     """Return the authenticated task's run series ID."""
     runs = state.get_run_info(run_ids=[task.run_id])
     run = runs[0] if runs else None

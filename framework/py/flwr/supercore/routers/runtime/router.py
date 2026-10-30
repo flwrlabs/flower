@@ -352,7 +352,7 @@ def get_nodes(
 
 
 @router.post("/put-file")
-def put_file(
+def put_file(  # pylint: disable=protected-access
     request: Annotated[PutFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
     handlers: RuntimeHandlersDependency,
@@ -360,12 +360,12 @@ def put_file(
 ) -> PutFileResponse:
     """Store a file."""
     return core_runtime_handlers.put_file(
-        request, state, handlers.get_run_series_id(state, task)
+        request, state, handlers._get_run_series_id(state, task)
     )
 
 
 @router.post("/get-file")
-def get_file(
+def get_file(  # pylint: disable=protected-access
     request: Annotated[GetFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
     handlers: RuntimeHandlersDependency,
@@ -373,12 +373,12 @@ def get_file(
 ) -> GetFileResponse:
     """Get a file."""
     return core_runtime_handlers.get_file(
-        request, state, handlers.get_run_series_id(state, task)
+        request, state, handlers._get_run_series_id(state, task)
     )
 
 
 @router.post("/list-files")
-def list_files(
+def list_files(  # pylint: disable=protected-access
     request: Annotated[ListFilesRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
     handlers: RuntimeHandlersDependency,
@@ -386,12 +386,12 @@ def list_files(
 ) -> ListFilesResponse:
     """List file metadata."""
     return core_runtime_handlers.list_files(
-        request, state, handlers.get_run_series_id(state, task)
+        request, state, handlers._get_run_series_id(state, task)
     )
 
 
 @router.post("/delete-file")
-def delete_file(
+def delete_file(  # pylint: disable=protected-access
     request: Annotated[DeleteFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
     handlers: RuntimeHandlersDependency,
@@ -399,5 +399,5 @@ def delete_file(
 ) -> DeleteFileResponse:
     """Delete a file."""
     return core_runtime_handlers.delete_file(
-        request, state, handlers.get_run_series_id(state, task)
+        request, state, handlers._get_run_series_id(state, task)
     )

@@ -69,7 +69,7 @@ from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_han
 from flwr.supernode.nodestate import NodeState
 
 
-def get_run_series_id(state: NodeState, task: Task) -> int:
+def _get_run_series_id(state: NodeState, task: Task) -> int:
     """Return the authenticated task's run series ID."""
     run = state.get_run(task.run_id)
     if run is None:

@@ -73,7 +73,7 @@ StateT_contra = TypeVar("StateT_contra", bound=CoreState, contravariant=True)
 class RuntimeHandlers(Protocol[StateT_contra]):
     """Component-specific handlers used by the shared Runtime API router."""
 
-    def get_run_series_id(self, state: StateT_contra, task: Task) -> int:
+    def _get_run_series_id(self, state: StateT_contra, task: Task) -> int:
         """Return the authenticated task's run series ID."""
 
     def acquire_task(
