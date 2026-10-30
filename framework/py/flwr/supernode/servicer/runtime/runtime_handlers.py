@@ -69,6 +69,16 @@ from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_han
 from flwr.supernode.nodestate import NodeState
 
 
+def get_run_series_id(state: NodeState, task: Task) -> int:
+    """Return the authenticated task's run series ID."""
+    run = state.get_run(task.run_id)
+    if run is None:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
+        )
+    return run.series_id
+
+
 def acquire_task(request: AcquireTaskRequest, state: NodeState) -> AcquireTaskResponse:
     """Acquire an eligible pending task."""
     return core_runtime_handlers.acquire_task(request, state)
