@@ -202,7 +202,7 @@ class ModelResponse(Response):
             group.start_soon(self._watch_task, group.cancel_scope)
             try:
                 await self._deliver(scope, receive, send)
-            except ClientDisconnect:
+            except (ClientDisconnect, ConnectionError):
                 pass
             finally:
                 group.cancel_scope.cancel()

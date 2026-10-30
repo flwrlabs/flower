@@ -247,6 +247,9 @@ async def _check_model_cancellation(
         return {"type": "http.disconnect"}
 
     async def send(message: Message) -> None:
+        if stop == "broken_pipe":
+            entered.set()
+            raise BrokenPipeError
         if stop == "error_deadline" and message["type"] == "http.response.body":
             entered.set()
             await anyio.sleep_forever()
@@ -272,7 +275,9 @@ async def _check_model_cancellation(
         assert closed.is_set()
 
 
-@pytest.mark.parametrize("stop", ["task", "disconnect", "deadline", "error_deadline"])
+@pytest.mark.parametrize(
+    "stop", ["task", "disconnect", "broken_pipe", "deadline", "error_deadline"]
+)
 def test_model_cancellation_closes_provider(
     state: Mock, monkeypatch: pytest.MonkeyPatch, stop: str
 ) -> None:
