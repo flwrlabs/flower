@@ -254,7 +254,6 @@ class TaskType(StrEnum):
     CLIENT_APP = "flwr-clientapp"
     SIMULATION = "flwr-simulation"
     AGENT_APP = "flwr-agentapp"
-    MODEL = "flwr-model"  # Retained for decoding historical persisted tasks
     CONNECTOR = "flwr-connector"
 
 
