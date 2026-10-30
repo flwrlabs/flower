@@ -56,6 +56,8 @@ from flwr.common.constant import (
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
     AppInfo,
     Automation,
     StartRunRequest,
@@ -84,6 +86,7 @@ from flwr.supercore.constant import (
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
+from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
 from flwr.supercore.state.schema.corestate_models import Automation as AutomationModel
 from flwr.supercore.state.schema.corestate_models import (
     CompactedContext as CompactedContextModel,
@@ -566,6 +569,45 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 for message_object_id in message_object_ids:
                     self.object_store.delete(message_object_id)
                 self.cancel_messages(message_ids=message_object_ids)
+
+    def create_agent(
+        self,
+        flwr_aid: str,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Create and return an account's agent."""
+        if not flwr_aid or not config.name or not config.app_spec:
+            return None
+        if (config.HasField("title") and not config.title) or (
+            config.HasField("description") and not config.description
+        ):
+            return None
+        created_at = now()
+        model = AgentModel(
+            name=config.name,
+            title=config.title if config.HasField("title") else None,
+            description=config.description if config.HasField("description") else None,
+            app_spec=config.app_spec,
+            flwr_aid=flwr_aid,
+            created_at=created_at,
+            updated_at=created_at,
+        )
+        with self.session() as session:
+            session.add(model)
+            session.flush()
+            return _agent_from_model(model)
+
+    def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
+        """List an account's agents in ascending agent ID order."""
+        if not flwr_aid:
+            return []
+        stmt = (
+            select(AgentModel)
+            .where(AgentModel.flwr_aid == flwr_aid)
+            .order_by(AgentModel.agent_id)
+        )
+        with self.session() as session:
+            return [_agent_from_model(model) for model in session.scalars(stmt)]
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
@@ -2142,6 +2184,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .returning(NonceStoreModel.nonce)
             )
             return session.scalar(stmt) is not None
+
+
+def _agent_from_model(model: AgentModel) -> Agent:
+    """Convert an agent ORM model to its protobuf message."""
+    return Agent(
+        id=model.agent_id,
+        config=AgentConfig(
+            name=model.name,
+            title=model.title,
+            description=model.description,
+            app_spec=model.app_spec,
+        ),
+        created_at=_timestamp_to_iso_assuming_utc(model.created_at),
+        updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),
+    )
 
 
 def _connector_oauth_session_from_model(

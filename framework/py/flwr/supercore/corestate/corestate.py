@@ -23,6 +23,8 @@ from typing import Literal
 
 from flwr.app import Context, Message
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
     AppInfo,
     Automation,
     StartRunRequest,
@@ -131,6 +133,46 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
         """Remove an object push session and optionally its messages."""
+
+    @abstractmethod
+    def create_agent(
+        self,
+        flwr_aid: str,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Create an agent owned by a Flower account.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the agent.
+        config : AgentConfig
+            Agent name, app specification, and optional title and description.
+            Duplicate names are allowed. Optional fields must be nonempty when set.
+
+        Returns
+        -------
+        Agent | None
+            The agent with a generated ID and matching UTC creation and update
+            timestamps as ISO-formatted strings, or None if the account ID, a
+            required configuration field, or a set optional field is empty.
+            Ownership is stored separately and is not part of the returned message.
+        """
+
+    @abstractmethod
+    def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
+        """List an account's agents in ascending agent ID order.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the agents.
+
+        Returns
+        -------
+        Sequence[Agent]
+            Agents belonging to the account, or an empty sequence if none exist.
+        """
 
     @abstractmethod
     def store_fab(self, fab: Fab) -> str:

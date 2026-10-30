@@ -39,6 +39,8 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
     AppInfo,
     Automation,
     StartRunRequest,
@@ -147,6 +149,9 @@ class InMemoryCoreState(
         self.message_store: dict[str, MessageRecord] = {}
         self.pending_message_ids_by_dst: dict[int, set[str]] = {}
         self.lock_message_store = RLock()
+        self.agent_store: dict[str, dict[int, Agent]] = {}
+        self.agent_id_counter = 0
+        self.lock_agent_store = Lock()
         self.fab_store: dict[str, Fab] = {}
         self.lock_fab_store = Lock()
         self.federation_app_store: dict[tuple[str, str], FederationAppRecord] = {}
@@ -476,6 +481,40 @@ class InMemoryCoreState(
             for object_id in session.root_object_ids:
                 self.object_store.delete(object_id)
             self.cancel_messages(message_ids=session.root_object_ids)
+
+    def create_agent(
+        self,
+        flwr_aid: str,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Create and return an account's agent."""
+        if not flwr_aid or not config.name or not config.app_spec:
+            return None
+        if (config.HasField("title") and not config.title) or (
+            config.HasField("description") and not config.description
+        ):
+            return None
+        with self.lock_agent_store:
+            self.agent_id_counter += 1
+            created_at = now().isoformat()
+            agent = Agent(
+                id=self.agent_id_counter,
+                config=config,
+                created_at=created_at,
+                updated_at=created_at,
+            )
+            self.agent_store.setdefault(flwr_aid, {})[agent.id] = agent
+            return agent
+
+    def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
+        """List an account's agents in ascending agent ID order."""
+        if not flwr_aid:
+            return []
+        with self.lock_agent_store:
+            return sorted(
+                self.agent_store.get(flwr_aid, {}).values(),
+                key=lambda agent: agent.id,
+            )
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
