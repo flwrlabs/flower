@@ -17,6 +17,13 @@
 
 from unittest.mock import Mock, patch
 
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
+    CreateAgentRequest,
+    ListAgentsRequest,
+)
+from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.interceptors import (
     RpcErrorTranslationServerInterceptor,
     RuntimeVersionServerInterceptor,
@@ -24,6 +31,31 @@ from flwr.supercore.interceptors import (
 from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
 
 from .control_grpc import run_control_api_grpc
+from .control_servicer import ControlServicer
+
+
+def test_agent_rpc_methods_use_authenticated_owner() -> None:
+    """Create and list through the shared handlers using the caller's account."""
+    factory = Mock()
+    state = factory.state.return_value
+    account = AccountInfo(flwr_aid="alice", account_name="alice")
+    config = AgentConfig(name="Research Agent", app_spec="@flower/research")
+    agent = Agent(id=42, config=config)
+    state.create_agent.return_value = agent
+    state.list_agents.return_value = [agent]
+    servicer = ControlServicer(factory, Mock(), NoOpControlAuthnPlugin())
+
+    with patch(
+        "flwr.superlink.servicer.control.control_servicer._get_account",
+        return_value=account,
+    ):
+        created = servicer.CreateAgent(CreateAgentRequest(config=config), Mock())
+        listed = servicer.ListAgents(ListAgentsRequest(), Mock())
+
+    assert created.agent == agent
+    assert listed.agents == [agent]
+    state.create_agent.assert_called_once_with(flwr_aid="alice", config=config)
+    state.list_agents.assert_called_once_with("alice")
 
 
 def test_run_control_api_grpc_adds_expected_interceptors() -> None:

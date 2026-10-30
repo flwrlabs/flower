@@ -141,18 +141,18 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     def CreateAgent(
         self, request: CreateAgentRequest, context: grpc.ServicerContext
     ) -> CreateAgentResponse:
-        """Report that agent creation is not implemented yet."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details("Method not implemented!")
-        raise NotImplementedError("Method not implemented!")
+        """Create an agent."""
+        return control_handlers.create_agent(
+            request, _get_account(), self.linkstate_factory.state()
+        )
 
     def ListAgents(
         self, request: ListAgentsRequest, context: grpc.ServicerContext
     ) -> ListAgentsResponse:
-        """Report that agent listing is not implemented yet."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details("Method not implemented!")
-        raise NotImplementedError("Method not implemented!")
+        """List agents."""
+        return control_handlers.list_agents(
+            request, _get_account(), self.linkstate_factory.state()
+        )
 
     def StartRun(
         self, request: StartRunRequest, context: grpc.ServicerContext
