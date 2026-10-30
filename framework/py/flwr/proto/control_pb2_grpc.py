@@ -89,6 +89,16 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsResponse.FromString,
                 _registered_method=True)
+        self.CreateConversation = channel.unary_unary(
+                '/flwr.proto.Control/CreateConversation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.CreateConversationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.CreateConversationResponse.FromString,
+                _registered_method=True)
+        self.ListConversations = channel.unary_unary(
+                '/flwr.proto.Control/ListConversations',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListConversationsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListConversationsResponse.FromString,
+                _registered_method=True)
         self.GetLoginDetails = channel.unary_unary(
                 '/flwr.proto.Control/GetLoginDetails',
                 request_serializer=flwr_dot_proto_dot_control__pb2.GetLoginDetailsRequest.SerializeToString,
@@ -312,6 +322,19 @@ class ControlServicer(object):
     def ListRunSeriesEvents(self, request, context):
         """List events for all runs in a run series
         """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateConversation(self, request, context):
+        """Manage user-owned conversations backed by agent run series
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListConversations(self, request, context):
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -580,6 +603,16 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.ListRunSeriesEvents,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsResponse.SerializeToString,
+            ),
+            'CreateConversation': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateConversation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.CreateConversationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.CreateConversationResponse.SerializeToString,
+            ),
+            'ListConversations': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListConversations,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListConversationsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListConversationsResponse.SerializeToString,
             ),
             'GetLoginDetails': grpc.unary_unary_rpc_method_handler(
                     servicer.GetLoginDetails,
@@ -1024,6 +1057,60 @@ class Control(object):
             '/flwr.proto.Control/ListRunSeriesEvents',
             flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateConversation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/CreateConversation',
+            flwr_dot_proto_dot_control__pb2.CreateConversationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.CreateConversationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListConversations(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListConversations',
+            flwr_dot_proto_dot_control__pb2.ListConversationsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListConversationsResponse.FromString,
             options,
             channel_credentials,
             insecure,

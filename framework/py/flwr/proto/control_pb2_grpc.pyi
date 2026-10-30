@@ -99,6 +99,17 @@ class ControlStub:
     ]
     """List events for all runs in a run series"""
 
+    CreateConversation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CreateConversationRequest,
+        flwr.proto.control_pb2.CreateConversationResponse,
+    ]
+    """Manage user-owned conversations backed by agent run series"""
+
+    ListConversations: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListConversationsRequest,
+        flwr.proto.control_pb2.ListConversationsResponse,
+    ]
+
     GetLoginDetails: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
         flwr.proto.control_pb2.GetLoginDetailsResponse,
@@ -344,6 +355,17 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.ListRunSeriesEventsResponse,
     ]
     """List events for all runs in a run series"""
+
+    CreateConversation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CreateConversationRequest,
+        flwr.proto.control_pb2.CreateConversationResponse,
+    ]
+    """Manage user-owned conversations backed by agent run series"""
+
+    ListConversations: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListConversationsRequest,
+        flwr.proto.control_pb2.ListConversationsResponse,
+    ]
 
     GetLoginDetails: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
@@ -612,6 +634,21 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.ListRunSeriesEventsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListRunSeriesEventsResponse]]:
         """List events for all runs in a run series"""
+
+    @abc.abstractmethod
+    def CreateConversation(
+        self,
+        request: flwr.proto.control_pb2.CreateConversationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.CreateConversationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.CreateConversationResponse]]:
+        """Manage user-owned conversations backed by agent run series"""
+
+    @abc.abstractmethod
+    def ListConversations(
+        self,
+        request: flwr.proto.control_pb2.ListConversationsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListConversationsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListConversationsResponse]]: ...
 
     @abc.abstractmethod
     def GetLoginDetails(

@@ -65,6 +65,12 @@ service Control {
   rpc ListRunSeriesEvents(ListRunSeriesEventsRequest)
       returns (ListRunSeriesEventsResponse) {}
 
+  // Manage user-owned conversations backed by agent run series
+  rpc CreateConversation(CreateConversationRequest)
+      returns (CreateConversationResponse) {}
+  rpc ListConversations(ListConversationsRequest)
+      returns (ListConversationsResponse) {}
+
   // Get login details upon request
   rpc GetLoginDetails(GetLoginDetailsRequest)
       returns (GetLoginDetailsResponse) {}
@@ -241,6 +247,21 @@ message ListRunsResponse {
   map<uint64, Run> run_dict = 1;
   string now = 2;
 }
+
+message Conversation {
+  uint64 conversation_id = 1;
+  uint64 series_id = 2;
+  string federation_id = 3;
+  string title = 4;
+  string created_at = 5;
+  string updated_at = 6;
+}
+
+message CreateConversationRequest { string federation = 1; }
+message CreateConversationResponse { Conversation conversation = 1; }
+
+message ListConversationsRequest { optional string federation_id = 1; }
+message ListConversationsResponse { repeated Conversation conversations = 1; }
 
 message ListRunSeriesRequest {
   optional string updated_before = 1;
