@@ -33,6 +33,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ConfigureSimulationFederationResponse,
     CreateAgentRequest,
     CreateAgentResponse,
+    CreateConversationRequest,
+    CreateConversationResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
@@ -55,6 +57,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAutomationsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
+    ListConversationsRequest,
+    ListConversationsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -197,6 +201,28 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/ListRuns",
             request=request,
             response_type=ListRunsResponse,
+        )
+
+    def CreateConversation(
+        self, request: CreateConversationRequest
+    ) -> CreateConversationResponse:
+        """Create an owned conversation."""
+        return self._unary_unary(
+            path="/v1/control/create-conversation",
+            rpc_method="/flwr.proto.Control/CreateConversation",
+            request=request,
+            response_type=CreateConversationResponse,
+        )
+
+    def ListConversations(
+        self, request: ListConversationsRequest
+    ) -> ListConversationsResponse:
+        """List owned conversations."""
+        return self._unary_unary(
+            path="/v1/control/list-conversations",
+            rpc_method="/flwr.proto.Control/ListConversations",
+            request=request,
+            response_type=ListConversationsResponse,
         )
 
     def ListRunSeries(self, request: ListRunSeriesRequest) -> ListRunSeriesResponse:

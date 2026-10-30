@@ -36,6 +36,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ConfigureSimulationFederationResponse,
     CreateAgentRequest,
     CreateAgentResponse,
+    CreateConversationRequest,
+    CreateConversationResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
@@ -58,6 +60,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAutomationsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
+    ListConversationsRequest,
+    ListConversationsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -107,7 +111,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UpdateRunSeriesDescriptionRequest,
     UpdateRunSeriesDescriptionResponse,
 )
-from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.protobuf.routing import ProtobufRoute
@@ -196,6 +199,26 @@ def list_runs(
 ) -> ListRunsResponse:
     """List runs."""
     return control_handlers.list_runs(request, account, linkstate)
+
+
+@router.post("/create-conversation")
+def create_conversation(
+    request: Annotated[CreateConversationRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> CreateConversationResponse:
+    """Create an owned conversation."""
+    return control_handlers.create_conversation(request, account, linkstate)
+
+
+@router.post("/list-conversations")
+def list_conversations(
+    request: Annotated[ListConversationsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListConversationsResponse:
+    """List owned conversations."""
+    return control_handlers.list_conversations(request, account, linkstate)
 
 
 @router.post("/list-run-series")
