@@ -147,7 +147,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
     def test_acquire_task_returns_empty_when_queue_is_empty(self) -> None:
         """An empty queue must not claim a task."""
         response = runtime_handlers.acquire_task(
-            AcquireTaskRequest(supported_task_types=[TaskType.MODEL]),
+            AcquireTaskRequest(supported_task_types=[TaskType.CONNECTOR]),
             self.state,
         )
 
@@ -158,15 +158,15 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
     def test_acquire_task_retries_after_lost_claim_race(self) -> None:
         """A contender should try the next eligible task after losing a claim."""
         tasks = [
-            Task(task_id=1, type=TaskType.MODEL),
+            Task(task_id=1, type=TaskType.CONNECTOR),
             Task(task_id=2, type=TaskType.CLIENT_APP),
-            Task(task_id=3, type=TaskType.MODEL),
+            Task(task_id=3, type=TaskType.CONNECTOR),
         ]
         self.state.get_tasks.return_value = tasks
         self.state.claim_task.side_effect = [None, "task-token"]
 
         response = runtime_handlers.acquire_task(
-            AcquireTaskRequest(supported_task_types=[TaskType.MODEL]), self.state
+            AcquireTaskRequest(supported_task_types=[TaskType.CONNECTOR]), self.state
         )
 
         self.assertEqual(response.task, tasks[2])
@@ -180,7 +180,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         """A FAB-specific warm slot must not claim an unrelated AgentApp."""
         tasks = [
             Task(task_id=1, type=TaskType.AGENT_APP, fab_hash="other"),
-            Task(task_id=2, type=TaskType.MODEL),
+            Task(task_id=2, type=TaskType.CONNECTOR),
             Task(task_id=3, type=TaskType.AGENT_APP, fab_hash="ready"),
         ]
         self.state.get_tasks.return_value = tasks
@@ -370,11 +370,11 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                 "Task type 'flwr-serverapp' requires fab_hash.",
             ),
             (
-                CreateTaskRequest(type=TaskType.MODEL),
+                CreateTaskRequest(type="flwr-model"),
                 "Invalid task type: flwr-model",
             ),
             (
-                CreateTaskRequest(type=TaskType.MODEL, model_ref="model"),
+                CreateTaskRequest(type="flwr-model", model_ref="model"),
                 "Invalid task type: flwr-model",
             ),
             (
@@ -544,7 +544,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
     def test_record_task_usage_stores_usage_for_authenticated_metered_task(
         self,
     ) -> None:
-        """RecordTaskUsage should store usage for model and connector tasks."""
+        """RecordTaskUsage should store usage for the authenticated AgentApp."""
         usage = TaskUsage(
             usage_type="model_inference",
             provider="openai/gpt-test",
@@ -557,7 +557,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         response = runtime_handlers.record_task_usage(
             request,
             self.state,
-            Task(task_id=123, run_id=789, type=TaskType.MODEL),
+            Task(task_id=123, run_id=789, type=TaskType.AGENT_APP),
         )
 
         self.state.add_task_usage.assert_called_once_with(123, usage)

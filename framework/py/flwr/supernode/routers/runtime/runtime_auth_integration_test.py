@@ -115,7 +115,7 @@ def test_runtime_flower_error_is_translated(
 ) -> None:
     """Translate a handler FlowerError into its configured HTTP status."""
     response = _post(
-        client, "create-task", CreateTaskRequest(type=TaskType.MODEL), token=valid_token
+        client, "create-task", CreateTaskRequest(type="flwr-model"), token=valid_token
     )
 
     assert response.status_code == 412

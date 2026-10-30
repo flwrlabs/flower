@@ -323,7 +323,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         tasks = [
             Task(task_id=100, run_id=10, type=TaskType.AGENT_APP),
             Task(task_id=101, run_id=11, type=TaskType.AGENT_APP),
-            Task(task_id=102, run_id=10, type=TaskType.MODEL),
+            Task(task_id=102, run_id=10, type=TaskType.CONNECTOR),
             Task(task_id=103, run_id=12, type=TaskType.AGENT_APP),
         ]
         expected_events = [

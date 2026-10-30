@@ -144,7 +144,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             for run_id in run_ids
         ]
         child_task_id = self.state.create_task(
-            task_type=TaskType.MODEL, run_id=run_ids[0]
+            task_type=TaskType.CONNECTOR, run_id=run_ids[0]
         )
         assert child_task_id is not None
         self._create_dummy_run_series(10, run_ids)
