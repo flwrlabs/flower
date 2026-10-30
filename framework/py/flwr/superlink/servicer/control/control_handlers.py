@@ -208,7 +208,6 @@ def create_agent(
     request: CreateAgentRequest, account: AccountInfo, state: LinkState
 ) -> CreateAgentResponse:
     """Create an agent owned by the authenticated account."""
-    log(INFO, "ControlServicer.CreateAgent")
     if not request.HasField("config"):
         raise InvalidAgentRequestError("Agent configuration is required.")
     config = request.config
@@ -237,7 +236,6 @@ def list_agents(
     _request: ListAgentsRequest, account: AccountInfo, state: LinkState
 ) -> ListAgentsResponse:
     """List agents owned by the authenticated account."""
-    log(INFO, "ControlServicer.ListAgents")
     return ListAgentsResponse(agents=state.list_agents(account.flwr_aid))
 
 
