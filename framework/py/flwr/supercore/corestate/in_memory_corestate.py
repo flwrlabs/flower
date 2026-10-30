@@ -141,9 +141,8 @@ class ObjectPushSession:
 
 @dataclass
 class ConversationRecord:
-    """Store conversation metadata, creator, and internal backing series."""
+    """Store conversation metadata and internal backing series."""
 
-    flwr_aid: str
     series_id: int
     conversation: Conversation
 
@@ -998,7 +997,7 @@ class InMemoryCoreState(
             )
             self.agent_run_series_ids.add(series_id)
             self.conversation_store[conversation.conversation_id] = ConversationRecord(
-                flwr_aid=flwr_aid, series_id=series_id, conversation=conversation
+                series_id=series_id, conversation=conversation
             )
             return conversation
 
