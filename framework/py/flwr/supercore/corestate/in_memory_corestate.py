@@ -30,6 +30,7 @@ from uuid import uuid4
 from flwr.app import Context, Message
 from flwr.app.metadata import Metadata
 from flwr.common.constant import (
+    CONVERSATION_ID_NUM_BYTES,
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
@@ -41,6 +42,7 @@ from flwr.common.constant import (
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AppInfo,
     Automation,
+    Conversation,
     StartRunRequest,
 )
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -130,6 +132,14 @@ class ObjectPushSession:
 
 
 @dataclass
+class ConversationRecord:
+    """Store conversation metadata alongside its owning account."""
+
+    flwr_aid: str
+    conversation: Conversation
+
+
+@dataclass
 class MessageRecord:
     """Retain metadata after releasing the pending Message reference."""
 
@@ -161,6 +171,7 @@ class InMemoryCoreState(
         self.nonce_store: dict[tuple[str, str], float] = {}
         self.lock_nonce_store = Lock()
         self.run_series_store: dict[int, RunSeries] = {}
+        self.conversation_store: dict[int, ConversationRecord] = {}
         self.agent_run_series_ids: set[int] = set()
         self.lock_run_series_store = Lock()
         self.run_series_context_store: dict[int, Context] = {}
@@ -825,6 +836,80 @@ class InMemoryCoreState(
                 session, completed_at=completed_at.isoformat()
             )
         return True
+
+    def create_conversation(self, *, flwr_aid: str, federation_id: str) -> Conversation:
+        """Create an untitled conversation and empty agent run series atomically."""
+        with self.lock_run_series_store:
+            conversation_id = generate_rand_int_from_bytes(CONVERSATION_ID_NUM_BYTES)
+            if conversation_id in self.conversation_store:
+                raise ValueError("Conversation ID already exists")
+            series_id = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
+            if series_id in self.run_series_store:
+                raise ValueError("Run series ID already exists")
+            timestamp = now().isoformat()
+            conversation = Conversation(
+                conversation_id=conversation_id,
+                series_id=series_id,
+                federation_id=federation_id,
+                created_at=timestamp,
+                updated_at=timestamp,
+            )
+            self.run_series_store[series_id] = RunSeries(
+                series_id=series_id,
+                federation=federation_id,
+                created_at=timestamp,
+                updated_at=timestamp,
+            )
+            self.agent_run_series_ids.add(series_id)
+            self.conversation_store[conversation.conversation_id] = ConversationRecord(
+                flwr_aid, conversation
+            )
+            return deepcopy(conversation)
+
+    def get_conversation(
+        self, conversation_id: int, flwr_aid: str
+    ) -> Conversation | None:
+        """Return a conversation only when it belongs to the specified account."""
+        with self.lock_run_series_store:
+            record = self.conversation_store.get(conversation_id)
+            if record is None or record.flwr_aid != flwr_aid:
+                return None
+            return deepcopy(record.conversation)
+
+    def get_conversations(
+        self, flwr_aid: str, federation_ids: Sequence[str] | None = None
+    ) -> Sequence[Conversation]:
+        """Return owned conversations, newest metadata update first."""
+        with self.lock_run_series_store:
+            conversations = [
+                record.conversation
+                for record in self.conversation_store.values()
+                if record.flwr_aid == flwr_aid
+                and (
+                    federation_ids is None
+                    or record.conversation.federation_id in federation_ids
+                )
+            ]
+            return deepcopy(
+                sorted(
+                    conversations,
+                    key=lambda item: (item.updated_at, item.conversation_id),
+                    reverse=True,
+                )
+            )
+
+    def set_conversation_title(
+        self, conversation_id: int, flwr_aid: str, title: str
+    ) -> Conversation | None:
+        """Rename an owned conversation, returning None if it is inaccessible."""
+        with self.lock_run_series_store:
+            record = self.conversation_store.get(conversation_id)
+            if record is None or record.flwr_aid != flwr_aid:
+                return None
+            if record.conversation.title != title:
+                record.conversation.title = title
+                record.conversation.updated_at = now().isoformat()
+            return deepcopy(record.conversation)
 
     def get_run_series(  # pylint: disable=too-many-arguments
         self,
