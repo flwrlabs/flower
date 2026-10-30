@@ -89,6 +89,16 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsResponse.FromString,
                 _registered_method=True)
+        self.CreateAgent = channel.unary_unary(
+                '/flwr.proto.Control/CreateAgent',
+                request_serializer=flwr_dot_proto_dot_control__pb2.CreateAgentRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.CreateAgentResponse.FromString,
+                _registered_method=True)
+        self.ListAgents = channel.unary_unary(
+                '/flwr.proto.Control/ListAgents',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListAgentsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListAgentsResponse.FromString,
+                _registered_method=True)
         self.CreateConversation = channel.unary_unary(
                 '/flwr.proto.Control/CreateConversation',
                 request_serializer=flwr_dot_proto_dot_control__pb2.CreateConversationRequest.SerializeToString,
@@ -326,8 +336,22 @@ class ControlServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateAgent(self, request, context):
+        """Create an agent owned by the authenticated account
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListAgents(self, request, context):
+        """List agents owned by the authenticated account
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def CreateConversation(self, request, context):
-        """Manage user-owned conversations backed by agent run series
+        """Manage conversations with explicit user and agent participants
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -603,6 +627,16 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.ListRunSeriesEvents,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsResponse.SerializeToString,
+            ),
+            'CreateAgent': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateAgent,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.CreateAgentRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.CreateAgentResponse.SerializeToString,
+            ),
+            'ListAgents': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListAgents,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListAgentsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListAgentsResponse.SerializeToString,
             ),
             'CreateConversation': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateConversation,
@@ -1057,6 +1091,60 @@ class Control(object):
             '/flwr.proto.Control/ListRunSeriesEvents',
             flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.ListRunSeriesEventsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateAgent(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/CreateAgent',
+            flwr_dot_proto_dot_control__pb2.CreateAgentRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.CreateAgentResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListAgents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListAgents',
+            flwr_dot_proto_dot_control__pb2.ListAgentsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListAgentsResponse.FromString,
             options,
             channel_credentials,
             insecure,

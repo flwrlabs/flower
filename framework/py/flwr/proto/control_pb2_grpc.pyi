@@ -99,11 +99,23 @@ class ControlStub:
     ]
     """List events for all runs in a run series"""
 
+    CreateAgent: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CreateAgentRequest,
+        flwr.proto.control_pb2.CreateAgentResponse,
+    ]
+    """Create an agent owned by the authenticated account"""
+
+    ListAgents: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAgentsRequest,
+        flwr.proto.control_pb2.ListAgentsResponse,
+    ]
+    """List agents owned by the authenticated account"""
+
     CreateConversation: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.CreateConversationRequest,
         flwr.proto.control_pb2.CreateConversationResponse,
     ]
-    """Manage user-owned conversations backed by agent run series"""
+    """Manage conversations with explicit user and agent participants"""
 
     ListConversations: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ListConversationsRequest,
@@ -356,11 +368,23 @@ class ControlAsyncStub:
     ]
     """List events for all runs in a run series"""
 
+    CreateAgent: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CreateAgentRequest,
+        flwr.proto.control_pb2.CreateAgentResponse,
+    ]
+    """Create an agent owned by the authenticated account"""
+
+    ListAgents: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAgentsRequest,
+        flwr.proto.control_pb2.ListAgentsResponse,
+    ]
+    """List agents owned by the authenticated account"""
+
     CreateConversation: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.CreateConversationRequest,
         flwr.proto.control_pb2.CreateConversationResponse,
     ]
-    """Manage user-owned conversations backed by agent run series"""
+    """Manage conversations with explicit user and agent participants"""
 
     ListConversations: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ListConversationsRequest,
@@ -636,12 +660,28 @@ class ControlServicer(metaclass=abc.ABCMeta):
         """List events for all runs in a run series"""
 
     @abc.abstractmethod
+    def CreateAgent(
+        self,
+        request: flwr.proto.control_pb2.CreateAgentRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.CreateAgentResponse, collections.abc.Awaitable[flwr.proto.control_pb2.CreateAgentResponse]]:
+        """Create an agent owned by the authenticated account"""
+
+    @abc.abstractmethod
+    def ListAgents(
+        self,
+        request: flwr.proto.control_pb2.ListAgentsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListAgentsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAgentsResponse]]:
+        """List agents owned by the authenticated account"""
+
+    @abc.abstractmethod
     def CreateConversation(
         self,
         request: flwr.proto.control_pb2.CreateConversationRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.CreateConversationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.CreateConversationResponse]]:
-        """Manage user-owned conversations backed by agent run series"""
+        """Manage conversations with explicit user and agent participants"""
 
     @abc.abstractmethod
     def ListConversations(
