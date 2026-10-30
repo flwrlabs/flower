@@ -2379,7 +2379,6 @@ def _conversation_from_model(
     """Convert owned conversation metadata to its API representation."""
     return Conversation(
         conversation_id=int64_to_uint64(model.conversation_id),
-        series_id=int64_to_uint64(model.series_id),
         federation_id=federation_id,
         title=model.title,
         created_at=model.created_at.isoformat(),

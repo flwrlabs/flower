@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Conversation persistence and compatibility tests."""
+"""Conversation persistence tests."""
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -27,6 +27,7 @@ from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkStat
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
 from flwr.supercore.constant import NOOP_FEDERATION_ID, TaskType
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
 
 
@@ -51,12 +52,18 @@ def test_create_empty_conversation_and_reuse_series(state: LinkState) -> None:
         flwr_aid="alice", federation_id=NOOP_FEDERATION_ID
     )
     assert conversation.title == ""
-    series = state.get_run_series(series_ids=[conversation.series_id], is_agent=True)
+    series = state.get_run_series(is_agent=True)
     assert len(series) == 1
+    series_id = series[0].series_id
+    if isinstance(state, InMemoryLinkState):
+        assert (
+            state.conversation_store[conversation.conversation_id].series_id
+            == series_id
+        )
     assert series[0].federation == NOOP_FEDERATION_ID
     assert not series[0].run_ids
     assert not state.get_tasks()
-    assert state.get_run_series_context(conversation.series_id) is None
+    assert state.get_run_series_context(series_id) is None
     assert state.get_conversation(conversation.conversation_id, "alice") == conversation
     assert Conversation.FromString(conversation.SerializeToString()) == conversation
 
@@ -69,14 +76,12 @@ def test_create_empty_conversation_and_reuse_series(state: LinkState) -> None:
         federation_config=None,
         flwr_aid="alice",
         primary_task_type=TaskType.AGENT_APP,
-        series_id=conversation.series_id,
+        series_id=series_id,
         user_prompt="Hello",
     )
     assert run_id
-    assert state.get_run_info(run_ids=[run_id])[0].series_id == conversation.series_id
-    assert list(
-        state.get_run_series(series_ids=[conversation.series_id])[0].run_ids
-    ) == [run_id]
+    assert state.get_run_info(run_ids=[run_id])[0].series_id == series_id
+    assert list(state.get_run_series(series_ids=[series_id])[0].run_ids) == [run_id]
 
 
 def test_owner_isolation_and_federation_filters(state: LinkState) -> None:
@@ -118,7 +123,7 @@ def test_rename_order_noop_and_returned_message_isolation(state: LinkState) -> N
     assert renamed is not None
     assert renamed.created_at == first.created_at
     assert renamed.updated_at == later.isoformat()
-    assert renamed.series_id == first.series_id
+    assert renamed.conversation_id == first.conversation_id
     assert [item.conversation_id for item in state.get_conversations("alice")] == [
         first.conversation_id,
         second.conversation_id,
@@ -143,10 +148,11 @@ def test_sql_creation_rolls_back_backing_series_on_failure() -> None:
     )
     sql_state.initialize()
     original = sql_state.create_conversation(flwr_aid="alice", federation_id="a")
+    series_id = sql_state.get_run_series()[0].series_id
     with (
         patch(
             "flwr.supercore.corestate.sql_corestate.generate_rand_int_from_bytes",
-            side_effect=[original.conversation_id, original.series_id ^ 1],
+            side_effect=[original.conversation_id, series_id ^ 1],
         ),
         pytest.raises(IntegrityError),
     ):
@@ -176,8 +182,13 @@ def test_sql_reload_preserves_unsigned_ids(tmp_path: Path) -> None:
     assert (
         reloaded.get_conversation(conversation.conversation_id, "alice") == conversation
     )
-    assert conversation.series_id == 2**63 + 42
     assert conversation.conversation_id == 2**63 + 42
+    assert reloaded.get_run_series()[0].series_id == 2**63 + 42
+    stored = reloaded.query(
+        "SELECT series_id FROM conversation WHERE conversation_id = :conversation_id",
+        {"conversation_id": uint64_to_int64(conversation.conversation_id)},
+    )
+    assert stored == [{"series_id": uint64_to_int64(2**63 + 42)}]
 
 
 @pytest.mark.parametrize("conversation_id", [42, 2**63 - 1, 2**63, 2**64 - 1])
