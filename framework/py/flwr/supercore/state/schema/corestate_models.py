@@ -143,6 +143,33 @@ class Message(FlwrBase):
     cancelled_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
 
 
+class Agent(FlwrBase):
+    """Represent a persistent agent owned by a Flower account.
+
+    ``app_spec`` identifies the AgentApp and an optional version.
+    """
+
+    __tablename__ = "agent"
+    __table_args__ = (
+        Index("idx_agent_flwr_aid", "flwr_aid"),
+        {"sqlite_autoincrement": True},
+    )
+
+    agent_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    app_spec: Mapped[str] = mapped_column(String, nullable=False)
+    flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
 class RunSeries(FlwrBase):
     """Represent a run series."""
 
