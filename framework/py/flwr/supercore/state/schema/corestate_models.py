@@ -184,15 +184,13 @@ class RunSeries(FlwrBase):
 
 
 class Conversation(FlwrBase):
-    """Represent a conversation, its creator, and its current backing series."""
+    """Represent a conversation and its current backing series."""
 
     __tablename__ = "conversation"
-    __table_args__ = (Index("idx_conversation_flwr_aid", "flwr_aid"),)
 
     conversation_id: Mapped[int] = mapped_column(
         BigInteger, primary_key=True, nullable=False
     )
-    flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
     series_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("run_series.series_id"), unique=True, nullable=False
     )
