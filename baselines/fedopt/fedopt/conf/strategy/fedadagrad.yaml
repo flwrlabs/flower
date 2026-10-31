@@ -1,0 +1,6 @@
+---
+_target_: flwr.server.strategy.FedAdagrad
+fraction_fit: 0.2
+fraction_evaluate: 0.0
+eta: 0.1
+tau: 0.01
