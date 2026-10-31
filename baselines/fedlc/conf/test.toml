@@ -1,0 +1,4 @@
+feature-extractor = "clip_vit"
+feature-extractor-name = "openai/clip-vit-base-patch32"
+image-input-size = 224
+hidden-dimension = 768
