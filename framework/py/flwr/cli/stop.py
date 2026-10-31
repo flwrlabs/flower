@@ -94,16 +94,23 @@ def stop(  # pylint: disable=R0914
                     param_hint="RUN_ID",
                 )
 
-            for selected_run_id in run_ids:
-                typer.secho(
-                    f"✋ Stopping run ID {selected_run_id}...",
-                    fg=typer.colors.GREEN,
-                )
-                _stop_run(
-                    stub=control_client,
-                    run_id=selected_run_id,
-                    is_json=is_json and len(run_ids) == 1,
-                )
+            if run_id == "all":
+                failures = _stop_all_runs(control_client, run_ids)
+                if failures:
+                    raise click.ClickException(
+                        "Some runs couldn't be stopped: " + "; ".join(failures)
+                    )
+            else:
+                for selected_run_id in run_ids:
+                    typer.secho(
+                        f"✋ Stopping run ID {selected_run_id}...",
+                        fg=typer.colors.GREEN,
+                    )
+                    _stop_run(
+                        stub=control_client,
+                        run_id=selected_run_id,
+                        is_json=is_json,
+                    )
             if is_json and len(run_ids) > 1:
                 print_json_to_stdout(
                     {
@@ -143,7 +150,24 @@ def _list_run_ids(
         if len(page) < _RUNS_PAGE_SIZE:
             break
         skip += len(page)
-    return run_ids
+    # Offset pagination can expose the same run on adjacent pages if new runs
+    # are inserted while the history is being listed.
+    return list(dict.fromkeys(run_ids))
+
+
+def _stop_all_runs(stub: ControlHttpClient, run_ids: list[int]) -> list[str]:
+    """Attempt every selected run and return errors for runs that failed."""
+    failures = []
+    for run_id in run_ids:
+        typer.secho(
+            f"✋ Stopping run ID {run_id}...",
+            fg=typer.colors.GREEN,
+        )
+        try:
+            _stop_run(stub=stub, run_id=run_id, is_json=False)
+        except click.ClickException as exc:
+            failures.append(f"run {run_id}: {exc.format_message()}")
+    return failures
 
 
 def _stop_run(stub: ControlHttpClient, run_id: int, is_json: bool) -> None:
