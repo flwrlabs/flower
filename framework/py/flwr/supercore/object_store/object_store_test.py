@@ -492,6 +492,22 @@ class SqlPersistentObjectStoreTestMixin(unittest.TestCase):
 
         store._lock_objectstore_mutation.assert_called_once_with()
 
+    def test_mutation_session_locks_each_database(self) -> None:
+        """Ensure nested mutations acquire a lock for each database."""
+        store = self.object_store_factory()
+        with tempfile.TemporaryDirectory() as database_dir:
+            second_store = SqlObjectStore(f"{database_dir}/second.db")
+            second_store.initialize()
+            store._lock_objectstore_mutation = Mock()  # type: ignore[method-assign]
+            second_store._lock_objectstore_mutation = Mock()  # type: ignore[method-assign]
+
+            with store._mutation_session():  # pylint: disable=protected-access
+                with second_store._mutation_session():  # pylint: disable=protected-access
+                    pass
+
+            store._lock_objectstore_mutation.assert_called_once_with()
+            second_store._lock_objectstore_mutation.assert_called_once_with()
+
     # pylint: enable=protected-access
 
     def test_concurrent_preregister_and_run_cleanup(self) -> None:
