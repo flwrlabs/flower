@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-24 00:09+0000\n"
+"POT-Creation-Date: 2026-10-31 00:05+0000\n"
 "PO-Revision-Date: 2026-05-23 06:54+0000\n"
 "Last-Translator: Gustavo Bertoli <gubertoli@gmail.com>\n"
 "Language: pt_BR\n"
@@ -33202,26 +33202,11 @@ msgstr ""
 #: flwr.app.message.message.Message.create_error_reply:5
 #: flwr.app.message.message.Message.create_reply:9 of
 msgid ""
-"Time-to-live for this message in seconds. If unset, it will be set based "
-"on the remaining time for the received message before it expires. This "
-"follows the equation:  ttl = msg.meta.ttl - (reply.meta.created_at - "
-"msg.meta.created_at)"
+"Time-to-live for this reply in seconds, independent of the original "
+"message's TTL. If unset, defaults to 43,200 seconds (12 hours)."
 msgstr ""
 
-#: flwr.app.message.message.Message.create_error_reply:5
-#: flwr.app.message.message.Message.create_reply:9 of
-msgid ""
-"Time-to-live for this message in seconds. If unset, it will be set based "
-"on the remaining time for the received message before it expires. This "
-"follows the equation:"
-msgstr ""
-
-#: flwr.app.message.message.Message.create_error_reply:9
-#: flwr.app.message.message.Message.create_reply:13 of
-msgid "ttl = msg.meta.ttl - (reply.meta.created_at - msg.meta.created_at)"
-msgstr ""
-
-#: flwr.app.message.message.Message.create_error_reply:12 of
+#: flwr.app.message.message.Message.create_error_reply:9 of
 msgid "**message** -- A Message containing only the relevant error and metadata."
 msgstr ""
 
@@ -33236,7 +33221,7 @@ msgstr ""
 msgid "The content for the reply message."
 msgstr ""
 
-#: flwr.app.message.message.Message.create_reply:16 of
+#: flwr.app.message.message.Message.create_reply:13 of
 msgid "A new `Message` instance representing the reply."
 msgstr ""
 
@@ -33331,17 +33316,6 @@ msgstr ""
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`created_at <flwr.app.Metadata.created_at>`\\"
-msgstr ""
-
-#: flwr.app.Metadata.created_at:1:<autosummary>:1 of
-msgid ":py:obj:`delivered_at <flwr.app.Metadata.delivered_at>`\\"
-msgstr ""
-
-#: flwr.app.Metadata.created_at:1:<autosummary>:1
-#: flwr.app.Metadata.delivered_at:1
-#: flwr.common.Metadata.created_at:1:<autosummary>:1
-#: flwr.common.Metadata.delivered_at:1 of
-msgid "Unix timestamp when the message was delivered."
 msgstr ""
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
@@ -36155,18 +36129,6 @@ msgstr ""
 
 #: flwr.common.EventType.capitalize:1:<autosummary>:1 of
 msgid ""
-":py:obj:`FLWR_MODEL_RUN_ENTER "
-"<flwr.common.EventType.FLWR_MODEL_RUN_ENTER>`\\"
-msgstr ""
-
-#: flwr.common.EventType.capitalize:1:<autosummary>:1 of
-msgid ""
-":py:obj:`FLWR_MODEL_RUN_LEAVE "
-"<flwr.common.EventType.FLWR_MODEL_RUN_LEAVE>`\\"
-msgstr ""
-
-#: flwr.common.EventType.capitalize:1:<autosummary>:1 of
-msgid ""
 ":py:obj:`FLWR_CONNECTOR_RUN_ENTER "
 "<flwr.common.EventType.FLWR_CONNECTOR_RUN_ENTER>`\\"
 msgstr ""
@@ -36175,6 +36137,18 @@ msgstr ""
 msgid ""
 ":py:obj:`FLWR_CONNECTOR_RUN_LEAVE "
 "<flwr.common.EventType.FLWR_CONNECTOR_RUN_LEAVE>`\\"
+msgstr ""
+
+#: flwr.common.EventType.capitalize:1:<autosummary>:1 of
+msgid ""
+":py:obj:`FLWR_MODEL_RUN_ENTER "
+"<flwr.common.EventType.FLWR_MODEL_RUN_ENTER>`\\"
+msgstr ""
+
+#: flwr.common.EventType.capitalize:1:<autosummary>:1 of
+msgid ""
+":py:obj:`FLWR_MODEL_RUN_LEAVE "
+"<flwr.common.EventType.FLWR_MODEL_RUN_LEAVE>`\\"
 msgstr ""
 
 #: flwr.common.EventType.capitalize:1:<autosummary>:1 of
@@ -36807,10 +36781,6 @@ msgstr ""
 
 #: flwr.common.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`created_at <flwr.common.Metadata.created_at>`\\"
-msgstr ""
-
-#: flwr.common.Metadata.created_at:1:<autosummary>:1 of
-msgid ":py:obj:`delivered_at <flwr.common.Metadata.delivered_at>`\\"
 msgstr ""
 
 #: flwr.common.Metadata.created_at:1:<autosummary>:1 of
@@ -42898,22 +42868,24 @@ msgid "Maximum number of federated learning rounds to execute."
 msgstr ""
 
 #: flwr.serverapp.strategy.strategy.Strategy.start:13 of
-msgid "Timeout in seconds for waiting for node responses."
+msgid ""
+"Timeout in seconds for waiting for node responses. Outstanding responses "
+"from nodes that become unavailable are replaced with error replies."
 msgstr ""
 
-#: flwr.serverapp.strategy.strategy.Strategy.start:15 of
+#: flwr.serverapp.strategy.strategy.Strategy.start:16 of
 msgid ""
 "Configuration to be sent to nodes during training rounds. If unset, an "
 "empty ConfigRecord will be used."
 msgstr ""
 
-#: flwr.serverapp.strategy.strategy.Strategy.start:18 of
+#: flwr.serverapp.strategy.strategy.Strategy.start:19 of
 msgid ""
 "Configuration to be sent to nodes during evaluation rounds. If unset, an "
 "empty ConfigRecord will be used."
 msgstr ""
 
-#: flwr.serverapp.strategy.strategy.Strategy.start:21 of
+#: flwr.serverapp.strategy.strategy.Strategy.start:22 of
 msgid ""
 "Optional function for centralized evaluation of the global model. Takes "
 "server round number and array record, returns a MetricRecord or None. If "
@@ -42921,7 +42893,7 @@ msgid ""
 "Defaults to None."
 msgstr ""
 
-#: flwr.serverapp.strategy.strategy.Strategy.start:26 of
+#: flwr.serverapp.strategy.strategy.Strategy.start:27 of
 msgid ""
 "Optional predicate to determine whether to stop training early. Called at"
 " the end of each round with the round number and accumulated results. "
@@ -42930,7 +42902,7 @@ msgid ""
 " (no early stopping)."
 msgstr ""
 
-#: flwr.serverapp.strategy.strategy.Strategy.start:33 of
+#: flwr.serverapp.strategy.strategy.Strategy.start:34 of
 msgid ""
 "Results containing final model arrays and also training metrics, "
 "evaluation metrics and global evaluation metrics (if provided) from all "
@@ -93605,5 +93577,35 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Number of federated learning rounds to execute."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Time-to-live for this message in"
+#~ " seconds. If unset, it will be "
+#~ "set based on the remaining time "
+#~ "for the received message before it "
+#~ "expires. This follows the equation:  ttl"
+#~ " = msg.meta.ttl - (reply.meta.created_at -"
+#~ " msg.meta.created_at)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Time-to-live for this message in"
+#~ " seconds. If unset, it will be "
+#~ "set based on the remaining time "
+#~ "for the received message before it "
+#~ "expires. This follows the equation:"
+#~ msgstr ""
+
+#~ msgid "ttl = msg.meta.ttl - (reply.meta.created_at - msg.meta.created_at)"
+#~ msgstr ""
+
+#~ msgid ":py:obj:`delivered_at <flwr.app.Metadata.delivered_at>`\\"
+#~ msgstr ""
+
+#~ msgid "Unix timestamp when the message was delivered."
+#~ msgstr ""
+
+#~ msgid "Timeout in seconds for waiting for node responses."
 #~ msgstr ""
 
