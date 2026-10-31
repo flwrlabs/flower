@@ -1,0 +1,9 @@
+_target_: fedmix.strategy.FedMix # strategy same as FedMix, client is different
+fraction_fit: 0.000001
+fraction_evaluate: 0.0
+min_fit_clients: 15
+min_evaluate_clients: 0
+min_available_clients: 15
+
+mixup_ratio: 0.1
+lr_decay_after_each_round: 0.999

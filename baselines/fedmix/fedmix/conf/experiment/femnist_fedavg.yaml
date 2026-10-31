@@ -1,0 +1,16 @@
+# @package _global_
+defaults:
+  - override /dataset: femnist
+  - override /strategy: fedavg
+  - override /model: lenet
+
+num_clients: 100
+clients_per_round: 10
+num_rounds: 200
+
+strategy:
+  min_fit_clients: ${clients_per_round}
+  min_available_clients: ${clients_per_round}
+
+client:
+  num_epochs: 10

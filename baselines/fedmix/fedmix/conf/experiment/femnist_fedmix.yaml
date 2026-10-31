@@ -1,0 +1,17 @@
+# @package _global_
+defaults:
+  - override /dataset: femnist
+  - override /strategy: fedmix
+  - override /model: lenet
+
+num_clients: 100
+clients_per_round: 10
+num_rounds: 200
+
+strategy:
+  mixup_ratio: 0.2
+  min_fit_clients: ${clients_per_round}
+  min_available_clients: ${clients_per_round}
+
+client:
+  num_epochs: 10
