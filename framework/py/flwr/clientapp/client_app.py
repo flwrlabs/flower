@@ -397,6 +397,13 @@ class LoadClientAppError(Exception):
     """Error when trying to load `ClientApp`."""
 
 
+def format_load_client_app_error_reason(ex: LoadClientAppError) -> str:
+    """Format the error reason string for a LoadClientAppError."""
+    prefix = "An exception was raised when attempting to load `ClientApp`"
+    exc_msg = str(ex)
+    return f"{prefix}: {exc_msg}" if exc_msg else prefix
+
+
 def _get_decorator(
     app: ClientApp, category: str, action: str, mods: list[Mod] | None
 ) -> Callable[[ClientAppCallable], ClientAppCallable]:
