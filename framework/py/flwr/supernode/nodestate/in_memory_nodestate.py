@@ -15,36 +15,20 @@
 """In-memory NodeState implementation."""
 
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from logging import ERROR
-from threading import Lock, RLock
+from threading import Lock
 
-from flwr.app import Error, Message
-from flwr.common.constant import ErrorCode, SubStatus
+from flwr.app import Message
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
-from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS, TaskType
+from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.date import now
 from flwr.supercore.object_store import ObjectStore
 from flwr.supercore.run import Run
 
 from .nodestate import NodeState
-
-CLIENT_APP_CRASHED_ERROR = Error(
-    ErrorCode.CLIENT_APP_CRASHED, "ClientApp stopped responding."
-)
-AGENT_APP_FAILED_ERROR = Error(ErrorCode.UNKNOWN, "AgentApp failed before replying.")
-
-
-@dataclass
-class MessageEntry:
-    """Data class to represent a message entry."""
-
-    message: Message
-    is_retrieved: bool = False
 
 
 @dataclass
@@ -64,9 +48,6 @@ class InMemoryNodeState(
         super().__init__(object_store)
         # Store node_id
         self.node_id: int | None = None
-        # Store Object ID to MessageEntry mapping
-        self.msg_store: dict[str, MessageEntry] = {}
-        self.lock_msg_store = RLock()
         # Store run ID to Run mapping
         self.run_store: dict[int, Run] = {}
         self.lock_run_store = Lock()
@@ -84,93 +65,20 @@ class InMemoryNodeState(
             raise ValueError("Node ID not set")
         return self.node_id
 
-    def store_message(self, message: Message) -> str | None:
-        """Store a message."""
-        # No need to check for expired task claims here. The Runtime servicer
-        # verifies the authenticated task token before storing messages.
-        with self.lock_msg_store:
-            msg_id = message.metadata.message_id
-            if msg_id == "":
-                return None
-            if msg_id in self.msg_store:
-                return msg_id
-            self.msg_store[msg_id] = MessageEntry(message=message)
-            return msg_id
-
     def store_message_and_object_tree(
         self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
         """Store a Message and preregister its ObjectTree."""
         # Always acquire the push-session lock before the message-store lock
-        with self._lock_object_push_sessions, self.lock_msg_store:
-            stored = self.store_message(message) is not None
-            if not stored:
+        with self._lock_object_push_sessions, self.lock_message_store:
+            if not self.store_messages([message])[0]:
                 return False, []
+
+            if self.message_store[message.metadata.message_id].message is None:
+                return True, []
 
             missing_objects = self.preregister_object_tree(object_tree, session_id)
             return True, missing_objects
-
-    def get_messages_legacy(
-        self,
-        *,
-        run_ids: Sequence[int] | None = None,
-        is_reply: bool | None = None,
-        limit: int | None = None,
-    ) -> Sequence[Message]:
-        """Retrieve messages based on the specified filters."""
-        with self.lock_task_store:
-            self._cleanup_expired_task_tokens_locked()
-
-        selected_messages: list[Message] = []
-        with self.lock_msg_store:
-            # Iterate through all messages in the store
-            for object_id in list(self.msg_store.keys()):
-                entry = self.msg_store[object_id]
-                message = entry.message
-
-                # Skip messages that have already been retrieved
-                if entry.is_retrieved:
-                    continue
-
-                # Skip messages whose run_id doesn't match the filter
-                if run_ids is not None:
-                    if message.metadata.run_id not in run_ids:
-                        continue
-
-                # If is_reply filter is set, filter for reply/non-reply messages
-                if is_reply is not None:
-                    is_reply_message = message.metadata.reply_to_message_id != ""
-                    # XOR logic to filter mismatched types (reply vs non-reply)
-                    if is_reply ^ is_reply_message:
-                        continue
-
-                # Add the message to the result set
-                selected_messages.append(message)
-
-                # Mark the message as retrieved
-                entry.is_retrieved = True
-
-                # Stop if the number of collected messages reaches the limit
-                if limit is not None and len(selected_messages) >= limit:
-                    break
-
-        return selected_messages
-
-    def delete_messages(
-        self,
-        *,
-        message_ids: Sequence[str] | None = None,
-    ) -> None:
-        """Delete messages based on the specified filters."""
-        with self.lock_msg_store:
-            if message_ids is None:
-                # If no message IDs are provided, clear the entire store
-                self.msg_store.clear()
-                return
-
-            # Remove specified messages from the store
-            for msg_id in message_ids:
-                self.msg_store.pop(msg_id, None)
 
     def store_run(self, run: Run) -> None:
         """Store a run."""
@@ -181,59 +89,6 @@ class InMemoryNodeState(
         """Retrieve a run by its ID."""
         with self.lock_run_store:
             return self.run_store.get(run_id)
-
-    def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
-        """Finish a task and reply if its AgentApp failed."""
-        finished = super().finish_task(task_id, sub_status, details)
-        if finished and sub_status == SubStatus.FAILED:
-            tasks = self.get_tasks(task_ids=[task_id])
-            if tasks and tasks[0].type == TaskType.AGENT_APP:
-                self._store_error_replies({tasks[0].run_id}, AGENT_APP_FAILED_ERROR)
-        return finished
-
-    def _store_error_replies(self, run_ids: set[int], error: Error) -> None:
-        """Insert error replies for retrieved messages associated with run IDs."""
-        with self.lock_msg_store:
-            replied_ids = {
-                entry.message.metadata.reply_to_message_id
-                for entry in self.msg_store.values()
-                if entry.message.metadata.reply_to_message_id
-            }
-            messages_to_reply: list[Message] = []
-            for entry in self.msg_store.values():
-                msg = entry.message
-                if (
-                    msg.metadata.run_id in run_ids
-                    and entry.is_retrieved
-                    and not msg.metadata.reply_to_message_id
-                    and msg.metadata.message_id not in replied_ids
-                ):
-                    messages_to_reply.append(msg)
-
-            # Create and store error replies for each message
-            for msg in messages_to_reply:
-                error_reply = Message(error, reply_to=msg)
-
-                # Insert objects of the error reply into the object store
-                error_reply.metadata.__dict__["_message_id"] = error_reply.object_id
-                self._store_generated_message(error_reply)
-
-                # Store the error reply message
-                self.record_message_processing_end(msg.metadata.message_id)
-                self.store_message(error_reply)
-
-    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
-        """Insert error replies for messages associated with expired task tokens."""
-        client_run_ids = {
-            task.run_id for task in tasks if task.type == TaskType.CLIENT_APP
-        }
-        agent_run_ids = {
-            task.run_id for task in tasks if task.type == TaskType.AGENT_APP
-        }
-        if client_run_ids:
-            self._store_error_replies(client_run_ids, CLIENT_APP_CRASHED_ERROR)
-        if agent_run_ids:
-            self._store_error_replies(agent_run_ids, AGENT_APP_FAILED_ERROR)
 
     def record_message_processing_start(self, message_id: str) -> None:
         """Record the start time of message processing based on the message ID."""
@@ -282,13 +137,10 @@ class InMemoryNodeState(
         """Remove time entries older than MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS."""
         with self.lock_time_store:
             cutoff = now().timestamp() - MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS
-            # Find message IDs for entries that have a finishing_at time
-            # before the cutoff, and those that don't exist in msg_store
             to_delete = [
                 msg_id
                 for msg_id, entry in self.time_store.items()
-                if (entry.finished_at and entry.finished_at < cutoff)
-                or msg_id not in self.msg_store
+                if entry.finished_at and entry.finished_at < cutoff
             ]
 
             # Delete the identified entries

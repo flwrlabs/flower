@@ -25,6 +25,8 @@ from unittest.mock import Mock
 
 import pytest
 
+from flwr.supercore.typing import JSONObject
+
 from ..definition import ConnectorExecutionContext
 from . import invoke_browser_use_provider
 from .browser_use import FlowerResponsesChatModel
@@ -137,7 +139,7 @@ def test_invoke_browser_use_provider_uses_flower_headless(
 )
 def test_flower_responses_chat_model_invokes_model_provider(
     monkeypatch: pytest.MonkeyPatch,
-    provider_response: dict[str, object],
+    provider_response: JSONObject,
 ) -> None:
     """FlowerResponsesChatModel should send Browser Use messages to Responses."""
 
@@ -155,10 +157,16 @@ def test_flower_responses_chat_model_invokes_model_provider(
             self.usage = usage
             self.stop_reason = stop_reason
 
-    invoke_model_provider = Mock(return_value=provider_response)
+    provider_response["usage"] = {"input_tokens": 3, "output_tokens": 2}
+    provider = Mock(return_value=provider_response)
+
+    async def responses(payload: JSONObject) -> JSONObject:
+        return cast(JSONObject, provider(payload))
+
     monkeypatch.setattr(
-        "flwr.supercore.task_process.connector.browser_use.browser_use.invoke_model_provider",
-        invoke_model_provider,
+        "flwr.supercore.task_process.connector.browser_use.browser_use."
+        "invoke_model_provider",
+        responses,
     )
     browser_use_module = ModuleType("browser_use")
     llm_module = ModuleType("browser_use.llm")
@@ -190,7 +198,10 @@ def test_flower_responses_chat_model_invokes_model_provider(
     )
 
     assert result.completion == "Click the first link."
-    invoke_model_provider.assert_called_once_with(
+    usage_recorder.record.assert_called_once()
+    usage = usage_recorder.record.call_args.args[0]
+    assert (usage.provider, usage.input_tokens, usage.output_tokens) == ("gpt-5", 3, 2)
+    provider.assert_called_once_with(
         {
             "model": "gpt-5",
             "input": [
@@ -199,5 +210,4 @@ def test_flower_responses_chat_model_invokes_model_provider(
             ],
             "stream": False,
         },
-        usage_recorder=usage_recorder,
     )

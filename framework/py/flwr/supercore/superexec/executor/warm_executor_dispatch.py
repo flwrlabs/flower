@@ -39,7 +39,6 @@ from flwr.supercore.warm_executor_constants import (
     WARM_AGENTAPP_EXECUTOR_MODULE,
     WARM_CONNECTOR_EXECUTOR_MODULE,
     WARM_EXECUTOR_BUSY_FILE,
-    WARM_MODEL_EXECUTOR_MODULE,
 )
 
 from .types import ExecutionSpec, LaunchResult
@@ -340,8 +339,6 @@ def warm_executor_command(
         worker_module = WARM_AGENTAPP_EXECUTOR_MODULE
     elif spec.task_type == TaskType.CONNECTOR:
         worker_module = WARM_CONNECTOR_EXECUTOR_MODULE
-    elif spec.task_type == TaskType.MODEL:
-        worker_module = WARM_MODEL_EXECUTOR_MODULE
     if worker_module is not None:
         command = [
             "python",

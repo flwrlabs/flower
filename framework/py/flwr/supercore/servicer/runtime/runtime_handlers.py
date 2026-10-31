@@ -29,8 +29,14 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
+    DeleteFileRequest,
+    DeleteFileResponse,
     GetCompactedContextsRequest,
     GetCompactedContextsResponse,
+    GetFileRequest,
+    GetFileResponse,
+    ListFilesRequest,
+    ListFilesResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
     PushTaskEventsRequest,
@@ -39,6 +45,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskMessageResponse,
     PutCompactedContextRequest,
     PutCompactedContextResponse,
+    PutFileRequest,
+    PutFileResponse,
     RecordTaskUsageRequest,
     RecordTaskUsageResponse,
     SendTaskHeartbeatRequest,
@@ -47,10 +55,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import (
+    TASK_TYPE_TO_COMMAND,
     TASK_TYPES_ALLOWED_TO_CREATE_TASKS,
     TASK_TYPES_REQUIRING_CONNECTOR_REF,
     TASK_TYPES_REQUIRING_FAB_HASH,
-    TASK_TYPES_REQUIRING_MODEL_REF,
     TaskType,
 )
 from flwr.supercore.corestate import CoreState
@@ -270,6 +278,30 @@ def push_logs(
     return PushLogsResponse()
 
 
+def put_file(request: PutFileRequest, state: CoreState, task: Task) -> PutFileResponse:
+    """Store a file."""
+    raise NotImplementedError
+
+
+def get_file(request: GetFileRequest, state: CoreState, task: Task) -> GetFileResponse:
+    """Get a file."""
+    raise NotImplementedError
+
+
+def list_files(
+    request: ListFilesRequest, state: CoreState, task: Task
+) -> ListFilesResponse:
+    """List file metadata."""
+    raise NotImplementedError
+
+
+def delete_file(
+    request: DeleteFileRequest, state: CoreState, task: Task
+) -> DeleteFileResponse:
+    """Delete a file."""
+    raise NotImplementedError
+
+
 def _validate_create_task_request(
     request: CreateTaskRequest,
     requesting_task: Task,
@@ -282,7 +314,7 @@ def _validate_create_task_request(
             f"Task type '{requesting_task.type}' is not allowed to create tasks.",
         )
 
-    if request.type not in set(TaskType):
+    if request.type not in TASK_TYPE_TO_COMMAND:
         raise FlowerError(
             ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
             f"Invalid task type: {request.type}",
@@ -292,12 +324,6 @@ def _validate_create_task_request(
         raise FlowerError(
             ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
             f"Task type '{request.type}' requires fab_hash.",
-        )
-
-    if request.type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
-            f"Task type '{request.type}' requires model_ref.",
         )
 
     if request.type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not connector_ref:

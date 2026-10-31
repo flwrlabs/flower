@@ -552,4 +552,4 @@ def validate_replies(
         if strict:
             return False
 
-    return True
+    return num_replies_with_content > 0

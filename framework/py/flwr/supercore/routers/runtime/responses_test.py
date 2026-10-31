@@ -13,52 +13,29 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for the Runtime Responses endpoint."""
+# pylint: disable=redefined-outer-name
 
 import asyncio
-from unittest.mock import AsyncMock, Mock, patch
+import json
+from collections.abc import AsyncIterator
+from unittest.mock import MagicMock, Mock
 
 import anyio
+import httpx
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from starlette.responses import StreamingResponse
+from sqlalchemy.exc import SQLAlchemyError
 from starlette.types import Message, Scope
 
-from flwr.app.constants import DEFAULT_TTL
-from flwr.app.message_type import MessageType
-from flwr.app.metadata import Metadata
-from flwr.common.constant import Status, SubStatus
-from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate import CoreState
-from flwr.supercore.date import now
 from flwr.supercore.dependencies.runtime import get_runtime_state
-from flwr.supercore.json_message.base import make_json_message
-from flwr.supercore.json_message.model_message import ModelResponse
 from flwr.supercore.typing import JSONObject
 
-from .responses import (
-    _Exchange,
-    _model_response_timeout,
-    _ResponsesError,
-    _sse_frame,
-    _stream_response,
-    _wait_for_response,
-    router,
-)
-
-
-def test_model_response_timeout_uses_configured_timeout(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Use the Runtime response timeout independently of provider settings."""
-    monkeypatch.delenv("FLWR_MODEL_RESPONSE_TIMEOUT", raising=False)
-
-    assert _model_response_timeout() == 900.0
-
-    monkeypatch.setenv("FLWR_MODEL_RESPONSE_TIMEOUT", "1800")
-
-    assert _model_response_timeout() == 1800.0
+from . import responses
+from .responses import ModelResponse, router
 
 
 def _client(state: Mock) -> TestClient:
@@ -70,50 +47,10 @@ def _client(state: Mock) -> TestClient:
 
 def _state() -> Mock:
     state = Mock(spec=CoreState)
-    state.get_node_id.return_value = 789
     state.get_task_by_token.return_value = Task(
         task_id=123, run_id=789, type=TaskType.AGENT_APP
     )
-    state.create_task.return_value = 456
-    state.store_task_message.return_value = True
     return state
-
-
-def _reply(request_message_id: str) -> ModelResponse:
-    metadata = Metadata(
-        run_id=789,
-        message_id="response-message-id",
-        src_node_id=789,
-        dst_node_id=789,
-        reply_to_message_id=request_message_id,
-        group_id="",
-        created_at=now().timestamp(),
-        ttl=DEFAULT_TTL,
-        message_type=MessageType.QUERY,
-        src_task_id=456,
-        dst_task_id=123,
-    )
-    return make_json_message(
-        ModelResponse,
-        metadata=metadata,
-        payload={
-            "object": "response",
-            "id": "resp_1",
-            "status": "completed",
-            "output": [],
-        },
-    )
-
-
-def _event(event_id: int, event: str, data: str | None = None) -> TaskEvent:
-    """Create one child model task event."""
-    return TaskEvent(
-        id=event_id,
-        run_id=789,
-        task_id=456,
-        event=event,
-        data=data or f'{{"type":"{event}"}}',
-    )
 
 
 def _stream_request() -> JSONObject:
@@ -138,380 +75,218 @@ def test_responses_requires_bearer_authentication(
     assert response.json()["error"]["code"] == "invalid_api_key"
 
 
-def test_responses_returns_correlated_model_response() -> None:
-    """Recheck and claim the direct reply after its child task finishes."""
-    state = _state()
-    state.get_task_message.side_effect = [
-        [],
-        [_reply("request-message-id")],
-    ]
-    state.get_tasks.return_value = [
-        Task(task_id=456, status=TaskStatus(status=Status.FINISHED))
-    ]
-
-    response = _client(state).post(
+@pytest.mark.parametrize(
+    "extra,code",
+    [
+        ({"temperature": 0.5}, "unsupported_parameter"),
+        ({"stream": "true"}, "invalid_request"),
+    ],
+)
+def test_responses_rejects_invalid_requests(extra: JSONObject, code: str) -> None:
+    """Reject unsupported fields and invalid request types before inference."""
+    response = _client(_state()).post(
         "/v1/runtime/responses",
-        json={"model": "model", "input": "hello"},
+        json={"model": "model", "input": "hello"} | extra,
         headers={"Authorization": "Bearer task-token"},
     )
-
-    assert response.status_code == 200
-    assert response.json()["id"] == "resp_1"
-    request = state.store_task_message.call_args.args[0]
-    assert request.metadata.src_task_id == 123
-    assert request.metadata.dst_task_id == 456
-    assert request.metadata.src_node_id == 789
-    assert request.metadata.dst_node_id == 789
-    assert state.get_task_message.call_count == 2
-    state.get_task_message.assert_called_with(
-        dst_task_ids=[123],
-        src_task_ids=[456],
-        limit=1,
-        order_by="created_at",
-    )
-
-
-def test_responses_rejects_unsupported_fields() -> None:
-    """Do not silently discard unsupported Open Responses fields."""
-    state = _state()
-
-    response = _client(state).post(
-        "/v1/runtime/responses",
-        json={"model": "model", "input": "hello", "temperature": 0.5},
-        headers={"Authorization": "Bearer task-token"},
-    )
-
     assert response.status_code == 400
-    assert response.json()["error"]["code"] == "unsupported_parameter"
-    state.create_task.assert_not_called()
+    assert response.json()["error"]["code"] == code
 
 
-def test_responses_streams_only_child_task_events() -> None:
-    """Relay ordered child-task events and consume the final reply."""
+@pytest.fixture
+def state(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    """Configure inference without changing task authentication."""
+    monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "http://provider/v1/responses")
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", "provider-key")
     state = _state()
-    state.get_task_events.return_value = [
-        _event(1, "response.created", '{\n  "type": "response.created"\n}'),
-        _event(2, "response.completed"),
-    ]
-    state.get_task_message.side_effect = lambda **_: [
-        _reply(state.store_task_message.call_args.args[0].metadata.message_id)
-    ]
+    state.get_tasks.return_value = [state.get_task_by_token.return_value]
+    return state
 
-    with patch("flwr.supercore.routers.runtime.responses.trace_span") as trace:
-        response = _client(state).post(
-            "/v1/runtime/responses",
-            json={"model": "model", "input": "hello", "stream": True},
-            headers={"Authorization": "Bearer task-token"},
-        )
-    assert [call.args[0] for call in trace.call_args_list] == [
-        "model.round_trip",
-        "model.create",
-        "model.request_publish",
-        "model.response_wait",
-        "model.first_text_wait",
-    ]
 
-    assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/event-stream")
-    assert response.text == (
-        "event: response.created\n"
-        "data: {\n"
-        'data:   "type": "response.created"\n'
-        "data: }\n\n"
-        'event: response.completed\ndata: {"type":"response.completed"}\n\n'
-    )
-    state.get_task_events.assert_called_once_with(
-        task_ids=[456], after_task_event_id=None
+def _mock_provider(
+    monkeypatch: pytest.MonkeyPatch,
+    transport: httpx.AsyncBaseTransport,
+) -> None:
+    """Exercise real HTTP/SSE parsing with an in-memory transport."""
+    client = httpx.AsyncClient
+    monkeypatch.setattr(
+        "flwr.supercore.model_provider.httpx.AsyncClient",
+        lambda **kwargs: client(transport=transport, **kwargs),
     )
 
 
 @pytest.mark.parametrize(
-    "event_name",
-    ["response.created\ninjected", "response.created\rinjected"],
+    "stream,key", [(False, "provider-key"), (True, "provider-key"), (False, "")]
 )
-def test_sse_frame_rejects_event_name_line_breaks(event_name: str) -> None:
-    """Reject event names that could inject an SSE field or frame."""
-    with pytest.raises(_ResponsesError) as exc_info:
-        _sse_frame(TaskEvent(event=event_name, data="{}"))
-
-    assert exc_info.value.status_code == 502
-    assert exc_info.value.code == "invalid_model_event"
-
-
-def test_responses_waits_for_reply_before_terminal_event() -> None:
-    """Consume the final reply before exposing its terminal stream event."""
-    state = _state()
-    state.get_task_events.return_value = [
-        _event(
-            1,
-            "response.output_text.delta",
-            '{"type":"response.output_text.delta","delta":"x"}',
-        ),
-        _event(2, "response.completed"),
-    ]
-    state.get_task_message.side_effect = [[], [_reply("request-message-id")]]
-    state.get_tasks.return_value = [
-        Task(task_id=456, status=TaskStatus(status=Status.RUNNING))
-    ]
-
-    response = _client(state).post(
-        "/v1/runtime/responses",
-        json={"model": "model", "input": "hello", "stream": True},
-        headers={"Authorization": "Bearer task-token"},
-    )
-
-    assert "event: response.output_text.delta" in response.text
-    assert "event: response.completed" in response.text
-    assert "event: error" not in response.text
-    assert state.get_task_message.call_count == 2
-
-
-def test_responses_reports_missing_terminal_event() -> None:
-    """Fail when the model reply has no matching terminal stream event."""
-    state = _state()
-    state.get_task_events.return_value = [
-        _event(
-            1,
-            "response.output_text.delta",
-            '{"type":"response.output_text.delta","delta":"x"}',
-        )
-    ]
-    state.get_task_message.side_effect = lambda **_: [
-        _reply(state.store_task_message.call_args.args[0].metadata.message_id)
-    ]
-
-    response = _client(state).post(
-        "/v1/runtime/responses",
-        json={"model": "model", "input": "hello", "stream": True},
-        headers={"Authorization": "Bearer task-token"},
-    )
-
-    assert response.text.endswith(
-        "event: error\n"
-        'data: {"type":"error","code":"model_stream_failed",'
-        '"message":"Model stream ended before a terminal event.",'
-        '"param":null,"sequence_number":1}\n\n'
-    )
-
-
-def test_responses_maps_unexpected_errors() -> None:
-    """Return an OpenAI-style error envelope for unexpected failures."""
-    with patch(
-        "flwr.supercore.routers.runtime.responses._authenticate",
-        side_effect=RuntimeError("unexpected"),
-    ):
-        response = _client(_state()).post(
-            "/v1/runtime/responses",
-            json={"model": "model", "input": "hello"},
-            headers={"Authorization": "Bearer task-token"},
-        )
-
-    assert response.status_code == 500
-    assert response.json()["error"] == {
-        "message": "Internal server error.",
-        "type": "server_error",
-        "param": None,
-        "code": "internal_error",
+def test_model_response_accounts_usage_and_preserves_output(
+    state: Mock, monkeypatch: pytest.MonkeyPatch, stream: bool, key: str
+) -> None:
+    """Forward JSON/SSE unchanged and account usage against the AgentApp task."""
+    backend = MagicMock()
+    monkeypatch.setenv("FLWR_TRACING_ENABLED", "1")
+    monkeypatch.setattr("flwr.supercore.tracing._load_backend", lambda: backend)
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", key)
+    body: JSONObject = {
+        "object": "response",
+        "output": [],
+        "usage": {"input_tokens": 11, "output_tokens": 7},
     }
+    # Keep unknown frames intact, split UTF-8/CRLF, and account at EOF.
+    wire = (
+        ": heartbeat\r\n\r\nid: 42\r\nevent: custom\r\ndata: not json\r\n\r\n"
+        'event: response.output_text.delta\r\ndata: {"delta":"café"}\r\n\r\n'
+        f'event: response.completed\r\ndata: {json.dumps({"response": body})}'
+    ).encode()
 
+    class ByteStream(httpx.AsyncByteStream):
+        """Split SSE at byte boundaries without changing its contents."""
 
-def test_responses_stops_and_drains_when_response_wait_is_cancelled() -> None:
-    """Stop the child task and drain its reply when response waiting is cancelled."""
-    state = _state()
-    state.get_task_message.return_value = []
-    state.get_tasks.return_value = [Task(task_id=456)]
+        async def __aiter__(self) -> AsyncIterator[bytes]:
+            for value in wire:
+                yield bytes([value])
 
-    async def wait_until_polled() -> None:
-        while not state.get_tasks.called:
-            await asyncio.sleep(0)
-
-    async def cancel_response_wait() -> None:
-        request = Mock(spec=Request)
-        request.is_disconnected = AsyncMock(return_value=False)
-        exchange = _Exchange(
-            agent_task_id=123,
-            model_task_id=456,
+    def handle(request: httpx.Request) -> httpx.Response:
+        assert request.headers.get("authorization") == (
+            f"Bearer {key}" if key else None
         )
-        with patch("flwr.supercore.routers.runtime.responses._POLL_INTERVAL", new=10):
-            response_wait = asyncio.create_task(
-                _wait_for_response(request, state, exchange)
+        if request.url.path == "/v1/responses":
+            return httpx.Response(307, headers={"location": "/v1/model-responses"})
+        if stream:
+            return httpx.Response(
+                200, headers={"content-type": "text/event-stream"}, stream=ByteStream()
             )
-            await asyncio.wait_for(wait_until_polled(), timeout=1)
-            response_wait.cancel()
-            with pytest.raises(asyncio.CancelledError):
-                await response_wait
+        return httpx.Response(200, json=body)
 
-    asyncio.run(cancel_response_wait())
+    _mock_provider(monkeypatch, httpx.MockTransport(handle))
+    with _client(state) as client:
+        result = client.post(
+            "/v1/runtime/responses",
+            headers={"Authorization": "Bearer task-token"},
+            json=_stream_request() | {"stream": stream},
+        )
+    assert result.status_code == 200
+    if stream:
+        assert result.content == wire
+        span = backend.trace_span.return_value.__enter__.return_value
+        span.add_event.assert_called_once_with("provider.first_text")
+    else:
+        assert result.json() == body
+    state.add_task_usage.assert_called_once()
+    task_id, usage = state.add_task_usage.call_args.args
+    assert task_id == 123 and usage.provider == "model"
+    assert (usage.input_tokens, usage.output_tokens) == (11, 7)
 
-    state.finish_task.assert_called_once_with(
-        456, SubStatus.STOPPED, "Responses request ended early."
+
+@pytest.mark.parametrize(
+    "mode,status",
+    [
+        ("http_error", 503),
+        ("invalid_response", 502),
+        ("missing_key", 500),
+        ("invalid_endpoint", 500),
+        ("usage_error", 500),
+    ],
+)
+def test_model_errors_return_json(
+    state: Mock, monkeypatch: pytest.MonkeyPatch, mode: str, status: int
+) -> None:
+    """Return provider, configuration and accounting failures as JSON errors."""
+    if mode == "missing_key":
+        monkeypatch.setenv(
+            "FLWR_MODEL_API_ENDPOINT", "https://api.flower.ai/v1/responses"
+        )
+        monkeypatch.delenv("FLWR_MODEL_API_KEY", raising=False)
+    elif mode == "invalid_endpoint":
+        monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "http://provider/v1")
+    response = httpx.Response(503 if mode == "http_error" else 200, json={})
+    if mode == "usage_error":
+        state.add_task_usage.side_effect = SQLAlchemyError("Usage store unavailable")
+        response = httpx.Response(
+            200, json={"object": "response", "usage": {"input_tokens": 1}}
+        )
+    _mock_provider(monkeypatch, httpx.MockTransport(lambda _request: response))
+    with _client(state) as client:
+        result = client.post(
+            "/v1/runtime/responses",
+            headers={"Authorization": "Bearer task-token"},
+            json=_stream_request() | {"stream": False},
+        )
+        assert result.status_code == status
+        assert "error" in result.json()
+        if status == 500:
+            assert result.json()["error"]["message"] == "Internal server error."
+    assert state.add_task_usage.call_count == (1 if mode == "usage_error" else 0)
+
+
+async def _check_model_cancellation(
+    state: Mock, monkeypatch: pytest.MonkeyPatch, stop: str
+) -> None:
+    """Close quiet upstream streams and bound blocked error delivery."""
+    entered, closed, disconnected = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    class QuietStream(httpx.AsyncByteStream):
+        """Keep inference idle until cancellation closes the connection."""
+
+        async def __aiter__(self) -> AsyncIterator[bytes]:
+            entered.set()
+            await anyio.sleep_forever()
+            yield b""
+
+        async def aclose(self) -> None:
+            closed.set()
+
+    def handle(_request: httpx.Request) -> httpx.Response:
+        if stop == "error_deadline":
+            return httpx.Response(503, json={})
+        return httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, stream=QuietStream()
+        )
+
+    _mock_provider(monkeypatch, httpx.MockTransport(handle))
+    monkeypatch.setattr(
+        responses, "_model_response_timeout", lambda: 0.05 if "deadline" in stop else 3
     )
-    assert state.get_task_message.call_count == 2
+    monkeypatch.setattr(responses, "_POLL_INTERVAL", 0.01)
+    scope: Scope = {"type": "http", "app": FastAPI(), "asgi": {"spec_version": "2.3"}}
 
+    async def receive() -> Message:
+        await disconnected.wait()
+        return {"type": "http.disconnect"}
 
-def test_responses_stops_and_drains_when_client_disconnects() -> None:
-    """Stop the child task and drain its reply when the client disconnects."""
-    state = _state()
-    state.get_task_message.return_value = []
-    request = Mock(spec=Request)
-    request.is_disconnected = AsyncMock(return_value=True)
+    async def send(message: Message) -> None:
+        if stop == "broken_pipe":
+            entered.set()
+            raise BrokenPipeError
+        if stop == "error_deadline" and message["type"] == "http.response.body":
+            entered.set()
+            await anyio.sleep_forever()
 
-    async def wait_for_response() -> None:
-        exchange = _Exchange(
-            agent_task_id=123,
-            model_task_id=456,
-        )
-        with pytest.raises(_ResponsesError) as exc_info:
-            await _wait_for_response(request, state, exchange)
-        assert exc_info.value.code == "client_disconnected"
+    async def trigger() -> None:
+        await entered.wait()
+        if stop == "task":
+            state.get_tasks.return_value = []
+        elif stop == "disconnect":
+            disconnected.set()
 
-    asyncio.run(wait_for_response())
-
-    state.finish_task.assert_called_once_with(
-        456, SubStatus.STOPPED, "Responses request ended early."
+    response = ModelResponse(
+        state, state.get_task_by_token.return_value, _stream_request()
     )
-    state.get_task_message.assert_called_once_with(
-        dst_task_ids=[123],
-        src_task_ids=[456],
-        limit=1,
-        order_by="created_at",
-    )
+    async with asyncio.timeout(4):
+        if "deadline" in stop:
+            with pytest.raises(ExceptionGroup) as error:
+                await asyncio.gather(response(scope, receive, send), trigger())
+            assert any(isinstance(exc, TimeoutError) for exc in error.value.exceptions)
+        else:
+            await asyncio.gather(response(scope, receive, send), trigger())
+    if stop != "error_deadline":
+        assert closed.is_set()
 
 
-def test_responses_times_out_if_model_task_is_not_launched() -> None:
-    """Stop waiting when no executor launches the child model task."""
-    state = _state()
-    state.get_task_message.return_value = []
-    state.get_tasks.return_value = [
-        Task(
-            task_id=456,
-            status=TaskStatus(status=Status.PENDING),
-        )
-    ]
-    request = Mock(spec=Request)
-    request.is_disconnected = AsyncMock(return_value=False)
-
-    async def wait_for_response() -> None:
-        exchange = _Exchange(
-            agent_task_id=123,
-            model_task_id=456,
-        )
-        with patch(
-            "flwr.supercore.routers.runtime.responses._model_task_launch_timeout",
-            return_value=0.0,
-        ):
-            with pytest.raises(_ResponsesError) as exc_info:
-                await _wait_for_response(request, state, exchange)
-        assert exc_info.value.status_code == 504
-        assert exc_info.value.code == "model_task_launch_timeout"
-
-    asyncio.run(wait_for_response())
-
-    state.finish_task.assert_called_once_with(
-        456, SubStatus.STOPPED, "Responses request ended early."
-    )
-
-
-def test_responses_times_out_if_running_model_task_does_not_respond() -> None:
-    """Stop waiting when a running model task does not produce a response."""
-    state = _state()
-    state.get_task_message.return_value = []
-    state.get_tasks.return_value = [
-        Task(
-            task_id=456,
-            status=TaskStatus(status=Status.RUNNING),
-        )
-    ]
-    request = Mock(spec=Request)
-    request.is_disconnected = AsyncMock(return_value=False)
-
-    async def wait_for_response() -> None:
-        exchange = _Exchange(
-            agent_task_id=123,
-            model_task_id=456,
-        )
-        with patch(
-            "flwr.supercore.routers.runtime.responses._model_response_timeout",
-            return_value=0.0,
-        ):
-            with pytest.raises(_ResponsesError) as exc_info:
-                await _wait_for_response(request, state, exchange)
-        assert exc_info.value.status_code == 504
-        assert exc_info.value.code == "model_response_timeout"
-
-    asyncio.run(wait_for_response())
-
-    state.finish_task.assert_called_once_with(
-        456, SubStatus.STOPPED, "Responses request ended early."
-    )
-
-
-def test_responses_stops_and_drains_when_stream_task_group_is_cancelled() -> None:
-    """Shield child-task cleanup from stream task-group cancellation."""
-    state = _state()
-    state.get_task_events.return_value = []
-    state.get_task_message.return_value = []
-    state.get_tasks.return_value = [
-        Task(task_id=456, status=TaskStatus(status=Status.RUNNING))
-    ]
-
-    async def wait_until_polled() -> None:
-        while not state.get_tasks.called:
-            await asyncio.sleep(0)
-
-    async def cancel_stream() -> None:
-        stream = _stream_response(
-            state,
-            state.get_task_by_token.return_value,
-            _stream_request(),
-        )
-
-        async def consume_stream() -> None:
-            await anext(stream)
-
-        with patch("flwr.supercore.routers.runtime.responses._POLL_INTERVAL", new=10):
-            async with anyio.create_task_group() as task_group:
-                task_group.start_soon(consume_stream)
-                await asyncio.wait_for(wait_until_polled(), timeout=1)
-                task_group.cancel_scope.cancel()
-
-    asyncio.run(cancel_stream())
-
-    state.finish_task.assert_called_once_with(
-        456, SubStatus.STOPPED, "Responses stream ended early."
-    )
-    assert state.get_task_message.call_count == 2
-
-
-def test_responses_does_not_start_model_task_before_stream_iteration() -> None:
-    """Do not create a model task if the client disconnects before iteration."""
-    state = _state()
-    response_started = anyio.Event()
-
-    async def disconnect_before_streaming() -> None:
-        response = StreamingResponse(
-            _stream_response(
-                state,
-                state.get_task_by_token.return_value,
-                _stream_request(),
-            )
-        )
-
-        async def receive() -> Message:
-            await response_started.wait()
-            return {"type": "http.disconnect"}
-
-        async def send(message: Message) -> None:
-            if message["type"] == "http.response.start":
-                response_started.set()
-                await anyio.sleep_forever()
-
-        scope: Scope = {
-            "type": "http",
-            "asgi": {"version": "3.0", "spec_version": "2.3"},
-        }
-        await response(scope, receive, send)
-
-    asyncio.run(disconnect_before_streaming())
-
-    state.create_task.assert_not_called()
+@pytest.mark.parametrize(
+    "stop", ["task", "disconnect", "broken_pipe", "deadline", "error_deadline"]
+)
+def test_model_cancellation_closes_provider(
+    state: Mock, monkeypatch: pytest.MonkeyPatch, stop: str
+) -> None:
+    """Exercise cancellation without requiring an async pytest plugin."""
+    asyncio.run(_check_model_cancellation(state, monkeypatch, stop))

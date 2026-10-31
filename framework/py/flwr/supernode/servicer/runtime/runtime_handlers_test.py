@@ -19,7 +19,7 @@ from unittest.mock import Mock
 
 from parameterized import parameterized
 
-from flwr.app import Context
+from flwr.app import Context, RecordDict
 from flwr.app.message import make_message
 from flwr.common.constant import SubStatus
 from flwr.common.serde import context_to_proto, message_to_proto
@@ -208,7 +208,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
 
     def test_pull_messages_returns_empty_response(self) -> None:
         """PullMessages should return an empty response when none is available."""
-        self.state.get_messages_legacy.return_value = []
+        self.state.get_messages.return_value = []
         task = Task(run_id=61016)
 
         response = runtime_handlers.pull_messages(
@@ -248,6 +248,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         message = make_message(
             metadata=self.maker.metadata(), content=self.maker.recorddict(1, 1, 1)
         )
+        self.state.get_node_id.return_value = message.metadata.src_node_id
         object_tree = get_object_tree(message)
         request = PushAppMessagesRequest(
             messages_list=[message_to_proto(message)],
@@ -275,6 +276,21 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         self.assertEqual(list(response.message_ids), [message.metadata.message_id])
         self.assertEqual(list(response.objects_to_push), ["object-id"])
         self.assertEqual(response.session_id, "session-id")
+
+    def test_push_messages_rejects_mismatched_source(self) -> None:
+        """The authenticated task cannot submit messages from another node."""
+        message = make_message(metadata=self.maker.metadata(), content=RecordDict())
+        self.state.get_node_id.return_value = message.metadata.src_node_id + 1
+        request = PushAppMessagesRequest(
+            messages_list=[message_to_proto(message)],
+            message_object_trees=[get_object_tree(message)],
+        )
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.push_messages(
+                request, self.state, Task(run_id=message.metadata.run_id)
+            )
+        assert error.exception.code == ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID
+        self.state.start_session.assert_not_called()
 
     def test_push_messages_rejects_mismatched_run_id(self) -> None:
         """PushMessages should reject messages from another run."""

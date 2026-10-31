@@ -36,7 +36,6 @@ from flwr.app.message import (
     remove_content_from_message,
 )
 from flwr.app.metadata import Metadata
-from flwr.common.constant import MESSAGE_TTL_TOLERANCE
 from flwr.common.serde import message_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.supercore.date import now
@@ -169,9 +168,6 @@ def test_create_reply(
     if reply_ttl:
         # Ensure the TTL is the one specify upon reply creation
         assert reply_message.metadata.ttl == reply_ttl
-    else:
-        # Ensure reply ttl is lower (since it uses remaining time left)
-        assert message.metadata.ttl > reply_message.metadata.ttl
 
     assert message.metadata.src_node_id == reply_message.metadata.dst_node_id
     assert message.metadata.dst_node_id == reply_message.metadata.src_node_id
@@ -223,38 +219,6 @@ def test_repr(cls: type, kwargs: dict[str, Any]) -> None:
 
     # Assert
     assert str(actual) == str(expected)
-
-
-@pytest.mark.parametrize(
-    "message_creation_fn,initial_ttl,reply_ttl,expected_reply_ttl",
-    [
-        # Case where the reply_ttl is larger than the allowed TTL
-        (create_message_with_content, 20, 30, 20),
-        (create_message_with_error, 20, 30, 20),
-        # Case where the reply_ttl is within the allowed range
-        (create_message_with_content, 20, 10, 10),
-        (create_message_with_error, 20, 10, 10),
-    ],
-)
-def test_reply_ttl_limitation(
-    message_creation_fn: Callable[[float], Message],
-    initial_ttl: float,
-    reply_ttl: float,
-    expected_reply_ttl: float,
-) -> None:
-    """Test that the reply TTL does not exceed the allowed TTL."""
-    message = message_creation_fn(initial_ttl)
-
-    if message.has_error():
-        dummy_error = Error(code=0, reason="test error")
-        reply_message = Message(dummy_error, reply_to=message, ttl=reply_ttl)
-    else:
-        reply_message = Message(RecordDict(), reply_to=message, ttl=reply_ttl)
-
-    assert reply_message.metadata.ttl - expected_reply_ttl <= MESSAGE_TTL_TOLERANCE, (
-        f"Expected TTL to be <= {expected_reply_ttl}, "
-        f"but got {reply_message.metadata.ttl}"
-    )
 
 
 @pytest.mark.parametrize(
@@ -336,10 +300,6 @@ def test_create_reply_message_success(
     assert reply.metadata.reply_to_message_id == msg.metadata.message_id
     assert reply.metadata.group_id == msg.metadata.group_id
     assert current_time < reply.metadata.created_at < now().timestamp()
-    assert (
-        reply.metadata.created_at + reply.metadata.ttl
-        <= msg.metadata.created_at + msg.metadata.ttl
-    )
     assert reply.metadata.message_type == msg.metadata.message_type
     assert reply.metadata.message_id == ""  # Should be unset
     if isinstance(content_or_error, RecordDict):

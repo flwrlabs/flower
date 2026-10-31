@@ -19,6 +19,7 @@ package flwr.proto;
 
 import "flwr/proto/fab.proto";
 import "flwr/proto/federation_config.proto";
+import "flwr/proto/file.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/node.proto";
 import "flwr/proto/recorddict.proto";
@@ -149,3 +150,37 @@ message AcquireTaskResponse {
   Task task = 1;
   string token = 2;
 }
+
+// PutFile messages
+message PutFileRequest {
+  string key = 1;
+  bytes data = 2;
+  // Absent means create-only
+  optional uint64 expected_revision = 3;
+}
+message PutFileResponse { uint64 revision = 1; }
+
+// GetFile messages
+message GetFileRequest { string key = 1; }
+message GetFileResponse { File file = 1; }
+
+// ListFiles messages
+message ListFilesRequest {
+  string prefix = 1;
+  // Empty means start from beginning.
+  string start_after = 2;
+  optional uint32 limit = 3;
+}
+message ListFilesResponse {
+  repeated FileMetadata files = 1;
+  // Last returned key if more results exist; empty otherwise.
+  string next_start_after = 2;
+}
+
+// DeleteFile messages
+message DeleteFileRequest {
+  string key = 1;
+  // Must match the current revision.
+  uint64 expected_revision = 2;
+}
+message DeleteFileResponse {}

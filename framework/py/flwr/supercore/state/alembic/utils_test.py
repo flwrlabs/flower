@@ -351,6 +351,130 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
+    def test_legacy_message_migration(self) -> None:  # pylint: disable=too-many-locals
+        """Copy metadata while preserving bodies, IDs, and delivery outcomes."""
+        engine = self.create_engine("legacy_messages.db")
+        try:
+            self.upgrade_to_revision(engine, "d9bd9d502cf9")
+            metadata = MetaData()
+            metadata.reflect(engine)
+            original, reply, message, objects = (
+                metadata.tables[name]
+                for name in ("message_ins", "message_res", "message", "objects")
+            )
+            cases = (
+                ("unpulled", "", None, False),
+                ("null-delivered", None, None, False),
+                ("unpulled-empty-root", "", b"", False),
+                ("pulled-empty-root", "pulled", b"", False),
+                ("pulled-body", "pulled", b"body", False),
+                ("pulled-missing-root", "pulled", None, True),
+            )
+            rows = [
+                {
+                    "message_id": message_id,
+                    "run_id": -1,
+                    "src_node_id": -2,
+                    "dst_node_id": 1,
+                    "reply_to_message_id": "",
+                    "group_id": "group",
+                    "created_at": 1.0,
+                    "ttl": 2.0,
+                    "message_type": "query",
+                    "delivered_at": delivered_at,
+                    "content": b"legacy body",
+                    "error": None,
+                }
+                for message_id, delivered_at, _, _ in cases
+            ]
+            with engine.begin() as connection:
+                connection.execute(text("PRAGMA foreign_keys=ON"))
+                connection.execute(
+                    metadata.tables["run"].insert(),
+                    {"run_id": -1, "primary_task_id": 1},
+                )
+                connection.execute(original.insert(), rows)
+                connection.execute(
+                    reply.insert(),
+                    dict(rows[0], message_id="reply", reply_to_message_id="unpulled"),
+                )
+                connection.execute(
+                    objects.insert(),
+                    [
+                        {"object_id": message_id, "content": content, "is_available": 0}
+                        for message_id, _, content, _ in cases
+                        if content is not None
+                    ],
+                )
+                old_rows = connection.execute(original.select()).all()
+                old_objects = connection.execute(objects.select()).all()
+
+            self.upgrade_to_revision(engine, "4c9b3f185c5b")
+
+            with engine.connect() as connection:
+                migrated = {
+                    row["message_id"]: dict(row)
+                    for row in connection.execute(message.select()).mappings()
+                }
+                self.assertEqual(connection.execute(original.select()).all(), old_rows)
+                self.assertEqual(
+                    connection.execute(objects.select()).all(), old_objects
+                )
+                self.assertEqual(len(connection.execute(reply.select()).all()), 1)
+            self.assertEqual(len(migrated), len(rows) + 1)
+            for message_id, _, _, cleared in cases:
+                with self.subTest(message_id=message_id):
+                    row = migrated[message_id]
+                    self.assertEqual(row["run_id"], -1)
+                    self.assertEqual(row["src_node_id"], -2)
+                    self.assertEqual(row["dst_node_id"], 1)
+                    self.assertIsNone(row["reply_to_message_id"])
+                    self.assert_timestamp_equal(
+                        row["expires_at"], "1970-01-01 00:00:03"
+                    )
+                    self.assertIsNone(row["cancelled_at"])
+                    self.assertEqual(row["cleared"], cleared)
+                    self.assertIsNone(row["src_task_id"])
+                    self.assertIsNone(row["dst_task_id"])
+                    self.assertIsNone(row["acknowledged_at"])
+            self.assertEqual(migrated["reply"]["reply_to_message_id"], "unpulled")
+            self.assertFalse(migrated["reply"]["cleared"])
+
+            with engine.begin() as connection:
+                connection.execute(
+                    message.update()
+                    .where(message.c.message_id == "unpulled")
+                    .values(cleared=True)
+                )
+            migrated["unpulled"]["cleared"] = True
+            self.downgrade_to_revision(engine, "d9bd9d502cf9")
+            with engine.connect() as connection:
+                self.assertEqual(
+                    len(connection.execute(message.select()).all()), len(rows) + 1
+                )
+            self.upgrade_to_revision(engine, "4c9b3f185c5b")
+            with engine.connect() as connection:
+                self.assertEqual(
+                    {
+                        row["message_id"]: row
+                        for row in connection.execute(message.select()).mappings()
+                    },
+                    migrated,
+                )
+
+            self.downgrade_to_revision(engine, "d9bd9d502cf9")
+            with engine.begin() as connection:
+                connection.execute(message.update().values(reply_to_message_id=None))
+                connection.execute(message.delete())
+                connection.execute(
+                    reply.insert(),
+                    dict(rows[0], message_id="orphan", reply_to_message_id="missing"),
+                )
+            with self.assertRaisesRegex(ValueError, "Missing original message missing"):
+                self.upgrade_to_revision(engine, "4c9b3f185c5b")
+        finally:
+            engine.dispose()
+
     def test_automation_timestamp_migration_normalizes_sqlite_text(self) -> None:
         """Ensure legacy SQLite automation timestamps use ORM-compatible text."""
         engine = self.create_engine("automation_timestamp_normalization.db")

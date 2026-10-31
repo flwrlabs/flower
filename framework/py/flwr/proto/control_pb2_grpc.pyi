@@ -99,6 +99,18 @@ class ControlStub:
     ]
     """List events for all runs in a run series"""
 
+    CreateAgent: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CreateAgentRequest,
+        flwr.proto.control_pb2.CreateAgentResponse,
+    ]
+    """Create an agent owned by the authenticated account"""
+
+    ListAgents: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAgentsRequest,
+        flwr.proto.control_pb2.ListAgentsResponse,
+    ]
+    """List agents owned by the authenticated account"""
+
     GetLoginDetails: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
         flwr.proto.control_pb2.GetLoginDetailsResponse,
@@ -344,6 +356,18 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.ListRunSeriesEventsResponse,
     ]
     """List events for all runs in a run series"""
+
+    CreateAgent: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CreateAgentRequest,
+        flwr.proto.control_pb2.CreateAgentResponse,
+    ]
+    """Create an agent owned by the authenticated account"""
+
+    ListAgents: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAgentsRequest,
+        flwr.proto.control_pb2.ListAgentsResponse,
+    ]
+    """List agents owned by the authenticated account"""
 
     GetLoginDetails: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
@@ -612,6 +636,22 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.ListRunSeriesEventsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListRunSeriesEventsResponse]]:
         """List events for all runs in a run series"""
+
+    @abc.abstractmethod
+    def CreateAgent(
+        self,
+        request: flwr.proto.control_pb2.CreateAgentRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.CreateAgentResponse, collections.abc.Awaitable[flwr.proto.control_pb2.CreateAgentResponse]]:
+        """Create an agent owned by the authenticated account"""
+
+    @abc.abstractmethod
+    def ListAgents(
+        self,
+        request: flwr.proto.control_pb2.ListAgentsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListAgentsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAgentsResponse]]:
+        """List agents owned by the authenticated account"""
 
     @abc.abstractmethod
     def GetLoginDetails(

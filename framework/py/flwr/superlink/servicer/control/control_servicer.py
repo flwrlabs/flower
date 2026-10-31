@@ -34,6 +34,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
+    CreateAgentRequest,
+    CreateAgentResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
@@ -46,6 +48,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
     ListAppAssociationsRequest,
     ListAppAssociationsResponse,
     ListAppsRequest,
@@ -133,6 +137,22 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self.authn_plugin = authn_plugin
         self.artifact_provider = artifact_provider
         self.fleet_api_type = fleet_api_type
+
+    def CreateAgent(
+        self, request: CreateAgentRequest, context: grpc.ServicerContext
+    ) -> CreateAgentResponse:
+        """Create an agent."""
+        return control_handlers.create_agent(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def ListAgents(
+        self, request: ListAgentsRequest, context: grpc.ServicerContext
+    ) -> ListAgentsResponse:
+        """List agents."""
+        return control_handlers.list_agents(
+            request, _get_account(), self.linkstate_factory.state()
+        )
 
     def StartRun(
         self, request: StartRunRequest, context: grpc.ServicerContext

@@ -22,10 +22,9 @@ from typing import cast
 
 import httpx
 
-from flwr.app import Message, Metadata, RecordDict
-from flwr.app.error import Error
-from flwr.app.message import make_message, remove_content_from_message
-from flwr.common.constant import CLIENT_OCTET, SUPERLINK_NODE_ID, ErrorCode
+from flwr.app import Message, RecordDict
+from flwr.app.message import remove_content_from_message
+from flwr.common.constant import CLIENT_OCTET, SUPERLINK_NODE_ID
 from flwr.common.serde import message_to_proto
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -42,8 +41,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.serverapp.grid import Grid
 from flwr.supercore import log
-from flwr.supercore.constant import SUPERLINK_UVICORN_DEFAULT_PORT, SYSTEM_MESSAGE_TYPE
-from flwr.supercore.date import now
+from flwr.supercore.constant import SUPERLINK_UVICORN_DEFAULT_PORT
 from flwr.supercore.inflatable.inflatable_object import (
     InflatableObject,
     get_all_nested_objects,
@@ -195,11 +193,6 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
             self._connect()
         return cast(RuntimeHttpClient, self._client)
 
-    def _check_message(self, message: Message) -> None:
-        # Check if the message is valid
-        if not (message.metadata.message_id != "" and message.metadata.ttl > 0):
-            raise ValueError(f"Invalid message: {message}")
-
     def create_message(  # pylint: disable=too-many-arguments,R0917
         self,
         content: RecordDict,
@@ -273,6 +266,7 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
         # Construct Messages
         run_id = cast(Run, self._run).run_id
         message_ids: list[str] = []
+        messages = list(messages)
         if not messages:
             return message_ids
         try:
@@ -280,8 +274,13 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
                 for msg in messages:
                     # Populate message ID
                     msg.metadata.__dict__["_message_id"] = msg.object_id
-                    # Check message
-                    self._check_message(msg)
+                    if (
+                        msg.metadata.src_node_id != self.node.node_id
+                        or msg.metadata.run_id != run_id
+                    ):
+                        raise ValueError(
+                            "Message source or run does not match this Grid."
+                        )
                 # Try pushing messages and their objects
                 message_ids = self._try_push_messages(run_id, messages)
 
@@ -291,11 +290,11 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
                 return []
             raise
 
-        if None in message_ids:
+        if "" in message_ids:
             log(
                 WARNING,
                 "Not all messages could be pushed to the SuperLink. The returned "
-                "list has `None` for those messages (the order is preserved as "
+                "list has an empty ID for those messages (the order is preserved as "
                 "passed to `push_messages`). This could be due to a malformed "
                 "message.",
             )
@@ -348,43 +347,17 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
                         ),
                     )
                 except ObjectPullError as e:
-                    # Return an error message if an object is missing or remains
-                    # unavailable after all pull attempts.
-                    inflated_msgs.append(
-                        make_message(
-                            metadata=Metadata(
-                                run_id=run_id,
-                                message_id="",
-                                src_node_id=self.node.node_id,
-                                dst_node_id=self.node.node_id,
-                                message_type=SYSTEM_MESSAGE_TYPE,
-                                group_id="",
-                                ttl=0,
-                                reply_to_message_id=msg_proto.metadata.reply_to_message_id,
-                                created_at=now().timestamp(),
-                            ),
-                            error=Error(
-                                code=ErrorCode.MESSAGE_UNAVAILABLE,
-                                reason=(
-                                    "Reply message objects are unavailable. The "
-                                    "sender may not have completed the upload before "
-                                    "the object-push session expired. "
-                                    f"{e}"
-                                ),
-                            ),
-                        )
-                    )
+                    log(ERROR, "Message %s objects unavailable: %s", msg_id, e)
                     continue
 
-                # Confirm that the message has been received
                 self._runtime_client.ConfirmMessageReceived(
                     ConfirmMessageReceivedRequest(
                         node=self.node, run_id=run_id, message_object_id=msg_id
                     )
                 )
-                message = cast(
-                    Message, inflate_object_from_contents(msg_id, all_object_contents)
-                )
+                message = inflate_object_from_contents(msg_id, all_object_contents)
+                if not isinstance(message, Message):
+                    raise TypeError("Received object is not a Message.")
                 message.metadata.__dict__["_message_id"] = msg_id
                 inflated_msgs.append(message)
 
@@ -409,7 +382,7 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
         received or the specified timeout duration is exceeded.
         """
         # Push messages
-        msg_ids = set(self.push_messages(messages))
+        msg_ids = {msg_id for msg_id in self.push_messages(messages) if msg_id}
         del messages
 
         # Pull messages

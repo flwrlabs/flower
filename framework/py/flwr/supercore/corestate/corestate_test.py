@@ -88,6 +88,17 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         mock_datetime.now.side_effect = timestamps
         return stack
 
+    def _patch_message_time(self, current: datetime) -> ExitStack:
+        """Freeze message lifecycle clocks without replacing datetime's type."""
+        stack = ExitStack()
+        for module in (
+            "flwr.supercore.corestate.in_memory_corestate",
+            "flwr.supercore.corestate.sql_corestate",
+            "flwr.supercore.corestate.utils",
+        ):
+            stack.enter_context(patch(f"{module}.now", return_value=current))
+        return stack
+
     def assert_message_metadata_equal(
         self, actual: list[Message], expected: list[Message]
     ) -> None:
@@ -190,14 +201,13 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         tied.sort(key=lambda msg: msg.metadata.message_id)
 
         # Prepare: Freeze time and store Messages out of retrieval order.
-        with patch("datetime.datetime") as mock_datetime:
-            mock_datetime.now.return_value = current
+        with self._patch_message_time(current):
             self.assertEqual(
                 state.store_messages([tied[1], expired, tied[0], first]), [True] * 4
             )
 
-            # Execute: Advance time past the oldest Message's TTL.
-            mock_datetime.now.return_value = current + timedelta(seconds=2)
+        # Execute: Advance time past the oldest Message's TTL.
+        with self._patch_message_time(current + timedelta(seconds=2)):
 
             # Execute & Assert: Limited reads return the same first two live Messages.
             for _ in range(2):
@@ -942,8 +952,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         run_id = self.task_run_id(state)
         object_id = "a" * 64
         created_at = datetime(2026, 1, 1, tzinfo=UTC)
-        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
-            mock_datetime.now.return_value = created_at
+        with self._patch_message_time(created_at):
             session_ids = []
             for root_object_id in ("b" * 64, "c" * 64):
                 session_id = state.start_session(run_id)
@@ -958,14 +967,13 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         expired_at = created_at + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1)
         with (
-            patch("flwr.supercore.date.datetime.datetime") as mock_datetime,
+            self._patch_message_time(expired_at),
             patch.object(
                 state,
                 "_cleanup_push_session",
                 wraps=state._cleanup_push_session,  # pylint: disable=W0212
             ) as cleanup_session,
         ):
-            mock_datetime.now.return_value = expired_at
             self.assertIsNone(state.get_object(run_id, "unknown-object-id"))
             cleanup_session.assert_not_called()
             self.assertIsNone(state.get_object(run_id, object_id))

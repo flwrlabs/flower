@@ -26,7 +26,7 @@ from flwr.supercore import log
 
 from ..grid import Grid
 from .result import Result
-from .strategy_utils import log_strategy_start_info
+from .strategy_utils import log_strategy_start_info, send_and_receive
 
 
 class Strategy(ABC):
@@ -158,7 +158,8 @@ class Strategy(ABC):
         num_rounds : int (default: 3)
             Maximum number of federated learning rounds to execute.
         timeout : float (default: 3600)
-            Timeout in seconds for waiting for node responses.
+            Timeout in seconds for waiting for node responses. Outstanding responses
+            from nodes that become unavailable are replaced with error replies.
         train_config : ConfigRecord, optional
             Configuration to be sent to nodes during training rounds.
             If unset, an empty ConfigRecord will be used.
@@ -215,7 +216,8 @@ class Strategy(ABC):
 
             # Call strategy to configure training round
             # Send messages and wait for replies
-            train_replies = grid.send_and_receive(
+            train_replies = send_and_receive(
+                grid=grid,
                 messages=self.configure_train(
                     current_round,
                     arrays,
@@ -245,7 +247,8 @@ class Strategy(ABC):
 
             # Call strategy to configure evaluation round
             # Send messages and wait for replies
-            evaluate_replies = grid.send_and_receive(
+            evaluate_replies = send_and_receive(
+                grid=grid,
                 messages=self.configure_evaluate(
                     current_round,
                     arrays,

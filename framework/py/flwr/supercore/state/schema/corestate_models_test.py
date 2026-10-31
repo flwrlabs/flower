@@ -21,6 +21,7 @@ CORESTATE_TABLE_NAMES = {
     "nonce_store",
     "fab",
     "message",
+    "agent",
     "run_series",
     "compacted_contexts",
     "series_context",

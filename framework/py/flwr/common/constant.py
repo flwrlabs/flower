@@ -117,9 +117,6 @@ GRPC_ADAPTER_METADATA_SHOULD_EXIT_KEY = "should-exit"
 GRPC_ADAPTER_METADATA_MESSAGE_MODULE_KEY = "grpc-message-module"
 GRPC_ADAPTER_METADATA_MESSAGE_QUALNAME_KEY = "grpc-message-qualname"
 
-# Message TTL
-MESSAGE_TTL_TOLERANCE = 1e-1
-
 # Isolation modes
 ISOLATION_MODE_SUBPROCESS = "subprocess"
 ISOLATION_MODE_PROCESS = "process"
@@ -202,12 +199,9 @@ class ErrorCode:
     UNKNOWN = 0
     LOAD_CLIENT_APP_EXCEPTION = 1
     CLIENT_APP_RAISED_EXCEPTION = 2
-    MESSAGE_UNAVAILABLE = 3
-    REPLY_MESSAGE_UNAVAILABLE = 4
     NODE_UNAVAILABLE = 5
     MOD_FAILED_PRECONDITION = 6
     INVALID_FAB = 7
-    CLIENT_APP_CRASHED = 8
 
     def __new__(cls) -> ErrorCode:
         """Prevent instantiation."""
