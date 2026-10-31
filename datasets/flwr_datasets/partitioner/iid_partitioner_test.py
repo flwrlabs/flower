@@ -16,6 +16,7 @@
 
 
 import unittest
+from collections import Counter
 
 from parameterized import parameterized
 
@@ -23,7 +24,12 @@ from datasets import Dataset
 from flwr_datasets.partitioner.iid_partitioner import IidPartitioner
 
 
-def _dummy_setup(num_partitions: int, num_rows: int) -> tuple[Dataset, IidPartitioner]:
+def _dummy_setup(
+    num_partitions: int,
+    num_rows: int,
+    shuffle: bool = False,
+    seed: int | None = 42,
+) -> tuple[Dataset, IidPartitioner]:
     """Create a dummy dataset and partitioner based on given arguments.
 
     The partitioner has automatically the dataset assigned to it.
@@ -33,7 +39,9 @@ def _dummy_setup(num_partitions: int, num_rows: int) -> tuple[Dataset, IidPartit
         "labels": [i % 2 for i in range(num_rows)],
     }
     dataset = Dataset.from_dict(data)
-    partitioner = IidPartitioner(num_partitions=num_partitions)
+    partitioner = IidPartitioner(
+        num_partitions=num_partitions, shuffle=shuffle, seed=seed
+    )
     partitioner.dataset = dataset
     return dataset, partitioner
 
@@ -188,6 +196,65 @@ class TestIidPartitioner(unittest.TestCase):
         dataset, partitioner = _dummy_setup(num_partitions, num_rows)
         # After setting, it should return the dataset
         self.assertEqual(partitioner.dataset, dataset)
+
+    def test_shuffle_false_preserves_contiguous_shards(self) -> None:
+        """Test that the default behavior keeps contiguous shards."""
+        dataset, partitioner = _dummy_setup(num_partitions=2, num_rows=10)
+
+        partition = partitioner.load_partition(1)
+
+        self.assertEqual(partition["features"], dataset["features"][5:10])
+
+    def test_shuffle_true_breaks_sorted_label_blocks(self) -> None:
+        """Test that shuffling avoids homogeneous shards for sorted labels."""
+        dataset = Dataset.from_dict(
+            {
+                "features": list(range(200)),
+                "labels": [0] * 100 + [1] * 100,
+            }
+        )
+        partitioner = IidPartitioner(num_partitions=2, shuffle=True, seed=42)
+        partitioner.dataset = dataset
+
+        for partition_id in range(2):
+            counts = Counter(partitioner.load_partition(partition_id)["labels"])
+            self.assertGreater(counts[0], 0)
+            self.assertGreater(counts[1], 0)
+
+    def test_shuffle_true_is_deterministic_with_fixed_seed(self) -> None:
+        """Test that shuffling is deterministic given a fixed seed."""
+        _, partitioner_1 = _dummy_setup(
+            num_partitions=4, num_rows=40, shuffle=True, seed=123
+        )
+        _, partitioner_2 = _dummy_setup(
+            num_partitions=4, num_rows=40, shuffle=True, seed=123
+        )
+
+        partition_1 = partitioner_1.load_partition(0)["features"]
+        partition_2 = partitioner_2.load_partition(0)["features"]
+
+        self.assertEqual(partition_1, partition_2)
+
+    def test_shuffle_true_with_no_seed_uses_consistent_partitioning(self) -> None:
+        """Test that seed=None shuffles once and then reuses the same ordering."""
+        num_partitions = 4
+        num_rows = 40
+        _, partitioner = _dummy_setup(
+            num_partitions=num_partitions,
+            num_rows=num_rows,
+            shuffle=True,
+            seed=None,
+        )
+
+        first_partition = partitioner.load_partition(0)["features"]
+        repeated_first_partition = partitioner.load_partition(0)["features"]
+        all_features = []
+        for partition_id in range(num_partitions):
+            all_features.extend(partitioner.load_partition(partition_id)["features"])
+
+        self.assertEqual(first_partition, repeated_first_partition)
+        self.assertEqual(len(all_features), len(set(all_features)))
+        self.assertEqual(sorted(all_features), list(range(num_rows)))
 
 
 if __name__ == "__main__":
