@@ -78,7 +78,6 @@ def test_list_run_ids_all_paginates_and_filters_active() -> None:
     assert stub.ListRuns.call_args_list[1].kwargs["request"].skip == 20
 
 
-
 def test_list_run_ids_all_deduplicates_runs_across_pages() -> None:
     """Runs repeated across offset-paginated pages should be returned once."""
     stub = Mock()
