@@ -58,6 +58,6 @@ class ODLinear(nn.Linear):
         :param out_dim: The output dimension.
         :return: The slice of weights and bias.
         """
-        weight_slice = self.weight[:in_dim, :out_dim]
+        weight_slice = self.weight[:out_dim, :in_dim]
         bias_slice = self.bias[:out_dim] if self.bias is not None else None
         return weight_slice, bias_slice
