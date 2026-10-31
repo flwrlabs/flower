@@ -17,7 +17,11 @@
 
 from unittest.mock import Mock
 
-from flwr.cli.stop import _list_run_ids
+import click
+import pytest
+
+import flwr.cli.stop as stop_module
+from flwr.cli.stop import _list_run_ids, _stop_all_runs
 from flwr.common.constant import Status
 from flwr.proto.control_pb2 import ListRunsResponse
 from flwr.proto.run_pb2 import Run, RunStatus
@@ -72,3 +76,44 @@ def test_list_run_ids_all_paginates_and_filters_active() -> None:
     assert set(run_ids) == set(range(1, 22, 2)) | {21, 22}
     assert stub.ListRuns.call_count == 2
     assert stub.ListRuns.call_args_list[1].kwargs["request"].skip == 20
+
+
+
+def test_list_run_ids_all_deduplicates_runs_across_pages() -> None:
+    """Runs repeated across offset-paginated pages should be returned once."""
+    stub = Mock()
+    first_page = {
+        run_id: _run(run_id, Status.RUNNING, f"2026-01-{run_id:02d}T00:00:00+00:00")
+        for run_id in range(20, 0, -1)
+    }
+    second_page = {
+        19: _run(19, Status.RUNNING, "2026-01-19T00:00:00+00:00"),
+        21: _run(21, Status.PENDING, "2026-01-21T00:00:00+00:00"),
+    }
+    stub.ListRuns.side_effect = [
+        ListRunsResponse(run_dict=first_page),
+        ListRunsResponse(run_dict=second_page),
+    ]
+
+    run_ids = _list_run_ids(stub, active_only=True)
+
+    assert run_ids.count(19) == 1
+    assert run_ids == list(range(20, 0, -1)) + [21]
+
+
+def test_stop_all_runs_continues_after_a_run_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failure for one run must not prevent attempts to stop later runs."""
+    stub = Mock()
+    attempted: list[int] = []
+
+    def stop_run(*, stub: Mock, run_id: int, is_json: bool) -> None:
+        attempted.append(run_id)
+        if run_id == 2:
+            raise click.ClickException("Run 2 already finished.")
+
+    monkeypatch.setattr(stop_module, "_stop_run", stop_run)
+
+    failures = _stop_all_runs(stub, [1, 2, 3])
+
+    assert attempted == [1, 2, 3]
+    assert failures == ["run 2: Run 2 already finished."]
