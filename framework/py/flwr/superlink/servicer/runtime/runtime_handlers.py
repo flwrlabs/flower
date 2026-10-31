@@ -134,6 +134,17 @@ def put_compacted_context(
     )
 
 
+def _get_run_series_id(state: LinkState, task: Task) -> int:
+    """Resolve the authenticated task's series ID for temporary file scoping."""
+    runs = state.get_run_info(run_ids=[task.run_id])
+    run = runs[0] if runs else None
+    if run is None:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
+        )
+    return run.series_id
+
+
 def acquire_task(request: AcquireTaskRequest, state: LinkState) -> AcquireTaskResponse:
     """Process due automations, then acquire an eligible pending task."""
     process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)

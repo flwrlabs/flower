@@ -352,40 +352,52 @@ def get_nodes(
 
 
 @router.post("/put-file")
-def put_file(
+def put_file(  # pylint: disable=protected-access
     request: Annotated[PutFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> PutFileResponse:
     """Store a file."""
-    return core_runtime_handlers.put_file(request, state, task)
+    return core_runtime_handlers.put_file(
+        request, state, handlers._get_run_series_id(state, task)
+    )
 
 
 @router.post("/get-file")
-def get_file(
+def get_file(  # pylint: disable=protected-access
     request: Annotated[GetFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> GetFileResponse:
     """Get a file."""
-    return core_runtime_handlers.get_file(request, state, task)
+    return core_runtime_handlers.get_file(
+        request, state, handlers._get_run_series_id(state, task)
+    )
 
 
 @router.post("/list-files")
-def list_files(
+def list_files(  # pylint: disable=protected-access
     request: Annotated[ListFilesRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> ListFilesResponse:
     """List file metadata."""
-    return core_runtime_handlers.list_files(request, state, task)
+    return core_runtime_handlers.list_files(
+        request, state, handlers._get_run_series_id(state, task)
+    )
 
 
 @router.post("/delete-file")
-def delete_file(
+def delete_file(  # pylint: disable=protected-access
     request: Annotated[DeleteFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> DeleteFileResponse:
     """Delete a file."""
-    return core_runtime_handlers.delete_file(request, state, task)
+    return core_runtime_handlers.delete_file(
+        request, state, handlers._get_run_series_id(state, task)
+    )
