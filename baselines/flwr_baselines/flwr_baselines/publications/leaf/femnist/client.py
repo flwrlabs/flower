@@ -18,7 +18,7 @@ def get_parameters(net: torch.nn.Module) -> NDArrays:
 def set_parameters(net: torch.nn.Module, parameters: NDArrays) -> None:
     """Set parameters to a PyTorch network."""
     params_dict = zip(net.state_dict().keys(), parameters)
-    state_dict = dict({k: torch.Tensor(v) for k, v in params_dict})
+    state_dict = dict({k: torch.from_numpy(v) for k, v in params_dict})
     # ignore argument type because Dict keeps order in the supported python versions
     net.load_state_dict(state_dict, strict=True)  # type: ignore
 
