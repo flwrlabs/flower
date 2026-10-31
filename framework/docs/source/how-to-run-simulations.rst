@@ -234,6 +234,12 @@ resources available in your system. If your system has:
 - 10x CPUs but 0x GPUs: you won't be able to run the simulation since not even the
   resources for a single ``ClientApp`` can be met.
 
+.. note::
+
+    On AMD GPUs, Ray requires additional configuration before it can detect the GPUs at
+    all. If a run fails with ``ActorPool is empty`` despite your ML framework reporting
+    a usable GPU, see :doc:`how-to-run-simulations-on-amd-gpus`.
+
 A generalization of this is given by the following equation. It gives the maximum number
 of ``ClientApps`` that can be executed in parallel on available CPU cores (SYS_CPUS) and
 VRAM (SYS_GPUS).
@@ -333,7 +339,7 @@ need to run the command ``ray stop`` in each node's terminal (including the head
 
 .. dropdown:: Can I run multiple simulations on the same machine?
 
-    Yes, but bear in mind that each simulation isn't aware of the resource usage of the other. If your simulations make use of GPUs, consider setting the ``CUDA_VISIBLE_DEVICES`` environment variable to make each simulation use a different set of the available GPUs. Export such an environment variable before starting |flwr_run_link|_.
+    Yes, but bear in mind that each simulation isn't aware of the resource usage of the other. If your simulations make use of GPUs, consider setting the ``CUDA_VISIBLE_DEVICES`` environment variable (``HIP_VISIBLE_DEVICES`` on AMD GPUs) to make each simulation use a different set of the available GPUs. Export such an environment variable before starting |flwr_run_link|_.
 
 .. dropdown:: Do the CPU/GPU resources set for each ``ClientApp`` restrict how much compute/memory these make use of?
 

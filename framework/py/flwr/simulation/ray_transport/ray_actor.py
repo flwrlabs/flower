@@ -15,6 +15,7 @@
 """Ray-based Flower Actor and ActorPool implementation."""
 
 
+import os
 import threading
 from abc import ABC
 from collections.abc import Callable
@@ -90,6 +91,13 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
     client.
     """
     total_num_actors = 0
+    # Bound before the loop: `ray.nodes()` can return no usable node (empty list, or
+    # every node reporting empty resources), and both are read in the error path below.
+    num_cpus: int | float = 0
+    num_gpus: int | float = 0
+    # `num_gpus` above only retains the last node's value, so it cannot answer "does
+    # this cluster have a GPU at all?". Track that separately across every node.
+    cluster_num_gpus: int | float = 0
 
     # We calculate the number of actors that fit in a node per node basis. This is
     # the right way of doing it otherwise situations like the following arise: imagine
@@ -110,6 +118,7 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
         # e.g.: node without GPU; head node set up not to run tasks (zero resources)
         num_cpus = node_resources.get("CPU", 0)
         num_gpus = node_resources.get("GPU", 0)
+        cluster_num_gpus = max(cluster_num_gpus, num_gpus)
         num_actors = int(num_cpus / client_resources["num_cpus"])
 
         # If a GPU is present and client resources do require one
@@ -124,15 +133,54 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
         total_num_actors += num_actors
 
     if total_num_actors == 0:
-        log(
-            WARNING,
-            "The ActorPool is empty. The system (CPUs=%s, GPUs=%s) "
-            "does not meet the criteria to host at least one client with resources:"
-            " %s. Lowering these resources could help.",
-            num_cpus,
-            num_gpus,
-            client_resources,
-        )
+        requested_gpus = client_resources.get("num_gpus", 0)
+        if requested_gpus > 0 and not cluster_num_gpus:
+            # No node in the cluster reported a GPU while each client asks for a
+            # fraction of one. Only `num_gpus=0` is satisfiable here, so the generic
+            # "lower your resources" advice does not describe the fix. Zero advertised
+            # GPUs does not by itself mean discovery failed, though: `ray.init()` can
+            # be configured (e.g. `--init-args-num-gpus 0`) to hide GPUs that are
+            # otherwise healthy, and that must not be reported as a discovery failure.
+            # A cluster that does have a GPU somewhere, just not enough of one, falls
+            # through to the generic warning instead.
+            log(
+                WARNING,
+                "Ray reports no GPU resources (GPUs=%s) but each client requests "
+                "num_gpus=%s, which no node can satisfy. This does not by itself mean "
+                "GPU discovery failed: the cluster may have no GPU, or Ray's GPU "
+                "resources may have been limited deliberately (for example "
+                "`--init-args-num-gpus 0`). Set `num_gpus=0` if no GPU is expected, "
+                "otherwise review that limit before suspecting discovery. Compare "
+                "what Ray actually detects with "
+                '`python -c "import ray; ray.init(); print(ray.cluster_resources())"`. '
+                "Note that an ML framework reporting a usable GPU (for instance "
+                "`torch.cuda.is_available()` returning True) does not imply Ray found "
+                "one -- they discover devices independently.",
+                cluster_num_gpus,
+                requested_gpus,
+            )
+            if os.path.exists("/dev/kfd"):
+                log(
+                    WARNING,
+                    "The ROCm kernel driver is loaded (/dev/kfd exists), so an AMD "
+                    "GPU is likely present on this host. If Ray's GPU resources were "
+                    "not limited deliberately, check that Ray can enumerate it: Ray "
+                    "finds AMD GPUs by opening `$ROCM_PATH/lib/librocm_smi64.so` "
+                    "(ROCM_PATH defaults to /opt/rocm) under that *unversioned* name. "
+                    "Ensure ROCM_PATH points at a ROCm root containing the "
+                    "`librocm_smi64.so` symlink rather than only a versioned "
+                    "`librocm_smi64.so.<N>`.",
+                )
+        else:
+            log(
+                WARNING,
+                "The ActorPool is empty. The system (CPUs=%s, GPUs=%s) "
+                "does not meet the criteria to host at least one client with resources:"
+                " %s. Lowering these resources could help.",
+                num_cpus,
+                num_gpus,
+                client_resources,
+            )
         raise ValueError(
             "ActorPool is empty. Stopping Simulation. "
             "Check `num_cpus` and/or `num_gpus` passed to the simulation engine"
