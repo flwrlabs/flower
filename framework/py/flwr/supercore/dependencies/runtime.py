@@ -74,7 +74,7 @@ class RuntimeHandlers(Protocol[StateT_contra]):
     """Component-specific handlers used by the shared Runtime API router."""
 
     def _get_run_series_id(self, state: StateT_contra, task: Task) -> int:
-        """Return the authenticated task's run series ID."""
+        """Resolve the authenticated task's series ID for temporary file scoping."""
 
     def acquire_task(
         self, request: AcquireTaskRequest, state: StateT_contra

@@ -135,7 +135,7 @@ def put_compacted_context(
 
 
 def _get_run_series_id(state: LinkState, task: Task) -> int:
-    """Return the authenticated task's run series ID."""
+    """Resolve the authenticated task's series ID for temporary file scoping."""
     runs = state.get_run_info(run_ids=[task.run_id])
     run = runs[0] if runs else None
     if run is None:

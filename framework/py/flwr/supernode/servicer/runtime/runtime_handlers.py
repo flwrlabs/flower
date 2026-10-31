@@ -70,7 +70,7 @@ from flwr.supernode.nodestate import NodeState
 
 
 def _get_run_series_id(state: NodeState, task: Task) -> int:
-    """Return the authenticated task's run series ID."""
+    """Resolve the authenticated task's series ID for temporary file scoping."""
     run = state.get_run(task.run_id)
     if run is None:
         raise FlowerError(
