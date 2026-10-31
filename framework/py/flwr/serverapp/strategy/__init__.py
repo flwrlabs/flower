@@ -30,6 +30,7 @@ from .fedavg import FedAvg
 from .fedavgm import FedAvgM
 from .fedmedian import FedMedian
 from .fedprox import FedProx
+from .meamed import MeaMed
 from .fedtrimmedavg import FedTrimmedAvg
 from .fedxgb_bagging import FedXgbBagging
 from .fedxgb_cyclic import FedXgbCyclic
@@ -57,6 +58,7 @@ __all__ = [
     "FedXgbCyclic",
     "FedYogi",
     "Krum",
+    "MeaMed",
     "MultiKrum",
     "QFedAvg",
     "Result",
