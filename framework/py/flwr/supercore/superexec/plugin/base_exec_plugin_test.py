@@ -18,24 +18,24 @@ from typing import cast
 from unittest.mock import Mock, patch
 
 from flwr.supercore.constant import TaskType
-from flwr.supercore.run import Run
 from flwr.supercore.superexec.executor import ExecutionSpec
-from flwr.supercore.superexec.plugin.base_exec_plugin import BaseExecPlugin
-from flwr.supercore.superexec.plugin.clientapp_exec_plugin import ClientAppExecPlugin
-
-from .serverapp_exec_plugin import ServerAppExecPlugin
-
-
-def _get_run(_: int) -> Run:
-    """Return a minimal dummy run."""
-    return Run.create_empty(run_id=1)
+from flwr.supercore.superexec.plugin.base_exec_plugin import (
+    AutoExecPlugin,
+    BaseExecPlugin,
+)
 
 
-def _get_task(*, task_id: int = 1, task_type: str = TaskType.CLIENT_APP) -> Mock:
+def _get_task(
+    *,
+    task_id: int = 1,
+    task_type: str = TaskType.CLIENT_APP,
+    fab_hash: str | None = None,
+) -> Mock:
     """Return a minimal dummy task-like object."""
     task = Mock()
     task.task_id = task_id
     task.type = task_type
+    task.fab_hash = fab_hash
     return task
 
 
@@ -44,80 +44,26 @@ def _execution_spec_from_executor(executor: Mock) -> ExecutionSpec:
     return cast(ExecutionSpec, executor.launch.call_args.args[0])
 
 
-def test_clientapp_launch_delegates_default_stdio_spec() -> None:
-    """ClientApp launch should delegate a spec with default stdio behavior."""
+def test_default_plugin_uses_task_type() -> None:
+    """Default plugin should pass task type and FAB identity to the executor."""
     executor = Mock()
-    plugin = ClientAppExecPlugin(
-        appio_api_address="127.0.0.1:9094",
+    plugin = AutoExecPlugin(
+        runtime_api_address="127.0.0.1:9091",
         insecure=True,
         root_certificates_path=None,
-        get_run=_get_run,
-        executor=executor,
-    )
-
-    plugin.launch_task(token="token", task=_get_task())
-
-    spec = _execution_spec_from_executor(executor)
-    assert spec.task_type == TaskType.CLIENT_APP
-    assert spec.suppress_output is False
-
-
-def test_clientapp_launch_ignores_unsupported_task_type() -> None:
-    """ClientApp launch should ignore unsupported task types."""
-    executor = Mock()
-    plugin = ClientAppExecPlugin(
-        appio_api_address="127.0.0.1:9094",
-        insecure=True,
-        root_certificates_path=None,
-        get_run=_get_run,
         executor=executor,
     )
 
     plugin.launch_task(
-        token="token", task=_get_task(task_id=5, task_type=TaskType.SERVER_APP)
+        token="token",
+        task=_get_task(task_type=TaskType.AGENT_APP, fab_hash="fab-hash"),
     )
 
-    executor.launch.assert_not_called()
-
-
-def test_serverapp_launch_delegates_suppressed_stdio_spec() -> None:
-    """ServerApp launch should delegate a spec that suppresses output."""
-    executor = Mock()
-    plugin = ServerAppExecPlugin(
-        appio_api_address="127.0.0.1:9092",
-        insecure=True,
-        root_certificates_path=None,
-        get_run=_get_run,
-        executor=executor,
-    )
-
-    plugin.launch_task(
-        token="token", task=_get_task(task_id=5, task_type=TaskType.SERVER_APP)
-    )
+    executor.launch.assert_called_once()
 
     spec = _execution_spec_from_executor(executor)
-    assert spec.task_type == TaskType.SERVER_APP
-    assert spec.suppress_output is True
-
-
-def test_simulation_launch_delegates_simulation_task_type() -> None:
-    """Simulation launch should delegate a spec with the simulation task type."""
-    executor = Mock()
-    plugin = ServerAppExecPlugin(
-        appio_api_address="127.0.0.1:9092",
-        insecure=True,
-        root_certificates_path=None,
-        get_run=_get_run,
-        executor=executor,
-    )
-
-    plugin.launch_task(
-        token="token", task=_get_task(task_id=5, task_type=TaskType.SIMULATION)
-    )
-
-    spec = _execution_spec_from_executor(executor)
-    assert spec.task_type == TaskType.SIMULATION
-    assert spec.suppress_output is True
+    assert spec.task_type == TaskType.AGENT_APP
+    assert spec.fab_hash == "fab-hash"
 
 
 class DummyExecPlugin(BaseExecPlugin):
@@ -130,10 +76,9 @@ def test_launch_task_forwards_runtime_dependency_install_flag() -> None:
     """Ensure execution spec forwards runtime install flag."""
     executor = Mock()
     plugin = DummyExecPlugin(
-        appio_api_address="127.0.0.1:9091",
+        runtime_api_address="127.0.0.1:9091",
         insecure=True,
         root_certificates_path=None,
-        get_run=Mock(),
         runtime_dependency_install=True,
         executor=executor,
     )
@@ -154,49 +99,12 @@ def test_launch_task_skips_optional_runtime_flags_by_default() -> None:
     """Ensure execution spec omits optional runtime install flags by default."""
     executor = Mock()
     plugin = DummyExecPlugin(
-        appio_api_address="127.0.0.1:9091",
+        runtime_api_address="127.0.0.1:9091",
         insecure=True,
         root_certificates_path=None,
-        get_run=Mock(),
         executor=executor,
     )
 
     plugin.launch_task(token="token-123", task=_get_task(task_id=7))
 
     assert _execution_spec_from_executor(executor).runtime_dependency_install is False
-
-
-def test_clientapp_launch_forwards_root_certificate() -> None:
-    """ClientApp launch should forward the configured root certificate path."""
-    executor = Mock()
-    plugin = ClientAppExecPlugin(
-        appio_api_address="127.0.0.1:9094",
-        insecure=False,
-        root_certificates_path="/tmp/root.pem",
-        get_run=_get_run,
-        executor=executor,
-    )
-
-    plugin.launch_task(token="token", task=_get_task(task_id=7))
-
-    spec = _execution_spec_from_executor(executor)
-    assert spec.insecure is False
-    assert spec.root_certificates_path == "/tmp/root.pem"
-
-
-def test_clientapp_launch_omits_tls_flags_when_using_system_certificates() -> None:
-    """ClientApp launch should omit TLS inputs when relying on system certificates."""
-    executor = Mock()
-    plugin = ClientAppExecPlugin(
-        appio_api_address="127.0.0.1:9094",
-        insecure=False,
-        root_certificates_path=None,
-        get_run=_get_run,
-        executor=executor,
-    )
-
-    plugin.launch_task(token="token", task=_get_task(task_id=7))
-
-    spec = _execution_spec_from_executor(executor)
-    assert spec.insecure is False
-    assert spec.root_certificates_path is None

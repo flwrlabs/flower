@@ -120,7 +120,7 @@ Start the SuperNode:
 .. code-block:: shell
 
     $ flower-supernode \
-        --superlink fleet-supergrid.flower.ai:443 \
+        --superlink api.flower.ai:443 \
         --auth-supernode-private-key ~/supernodes_keys/supernode-1
 
 Keep this process running for as long as you want the SuperNode to remain connected.
@@ -147,7 +147,7 @@ key into the container, then pass the key path to ``flower-supernode``:
         -e FLWR_HOME=/tmp/flwr-home \
         -v "$HOME/supernodes_keys:/keys:ro" \
         flwr/supernode:|stable_flwr_version| \
-        --superlink fleet-supergrid.flower.ai:443 \
+        --superlink api.flower.ai:443 \
         --auth-supernode-private-key /keys/supernode-1
 
 .. dropdown:: Understand the command
@@ -164,7 +164,7 @@ key into the container, then pass the key path to ``flower-supernode``:
       SuperNode private key into the container as read-only. You may need to adjust
       the path if your key has a different name or is in a different location.
     * ``flwr/supernode:XYZ``: Use the official SuperNode Docker image.
-    * ``--superlink fleet-supergrid.flower.ai:443``: Connect the SuperNode to
+    * ``--superlink api.flower.ai:443``: Connect the SuperNode to
       SuperGrid.
     * ``--auth-supernode-private-key /keys/supernode-1``: Use the mounted private key
       to authenticate this SuperNode. You may need to adjust the path if your key has

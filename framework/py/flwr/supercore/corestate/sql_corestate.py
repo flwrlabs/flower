@@ -18,18 +18,30 @@
 import hashlib
 import json
 import secrets
-from collections.abc import Sequence
+from collections.abc import Callable, Collection, Sequence
 from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from sqlalchemy import MetaData, delete, func, or_, select, update
+from sqlalchemy import (
+    MetaData,
+    case,
+    delete,
+    exists,
+    func,
+    insert,
+    literal,
+    or_,
+    select,
+    update,
+)
+from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 
-from flwr.app import Context, Message
+from flwr.app import Context, Message, RecordDict
 from flwr.app.message import make_message
 from flwr.app.metadata import Metadata
 from flwr.common.constant import (
@@ -37,36 +49,59 @@ from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
     SERIES_ID_NUM_BYTES,
-    SUPERLINK_NODE_ID,
     TASK_ID_NUM_BYTES,
     Status,
     SubStatus,
 )
-from flwr.common.logger import log
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
-from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
+    AppInfo,
+    Automation,
+    StartRunRequest,
+)
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
-from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
+    CompactedContext,
+    RunSeries,
+)
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     Task,
     TaskEvent,
     TaskStatus,
     TaskUsage,
 )
-from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
+from flwr.supercore import log
+from flwr.supercore.constant import (
+    FLOWER_AGENT_APP_ID,
+    OBJECT_PUSH_SESSION_TTL_SECONDS,
+    AutomationStatus,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
+from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
+from flwr.supercore.state.schema.corestate_models import Automation as AutomationModel
+from flwr.supercore.state.schema.corestate_models import (
+    CompactedContext as CompactedContextModel,
+)
 from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
 from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
 )
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.state.schema.corestate_models import (
+    FederationApp as FederationAppModel,
+)
+from flwr.supercore.state.schema.corestate_models import Message as MessageModel
+from flwr.supercore.state.schema.corestate_models import NonceStore as NonceStoreModel
 from flwr.supercore.state.schema.corestate_models import (
     ObjectPushSession as ObjectPushSessionModel,
 )
@@ -86,11 +121,12 @@ from flwr.supercore.state.schema.corestate_models import (
 from flwr.supercore.state.schema.corestate_models import SeriesRuns as SeriesRunsModel
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
+from flwr.supercore.state.schema.corestate_models import TaskLogsTable
 from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
-from flwr.supercore.utils import build_sql_in_params, int64_to_uint64, uint64_to_int64
+from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -99,6 +135,7 @@ from .utils import (
     context_to_bytes,
     generate_rand_int_from_bytes,
     timestamp_to_iso,
+    validate_message_metadata,
     validate_task_event_data,
     validate_task_message,
 )
@@ -120,8 +157,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         super().__init__(database_path)
         self._object_store = object_store
 
-    def dialect_insert(self, table: Any) -> SQLiteInsert:
-        """Return a SQLite insert statement for CoreState upserts."""
+    def dialect_insert(self, table: Any) -> SQLiteInsert | PostgresInsert:
+        """Return a dialect-specific insert statement for CoreState upserts."""
         if self.database_backend == "sqlite":
             return sqlite_insert(table)
 
@@ -138,6 +175,171 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def object_store(self) -> ObjectStore:
         """Return the ObjectStore instance used by this CoreState."""
         return self._object_store
+
+    def store_messages(self, messages: Sequence[Message]) -> list[bool]:
+        """Store one or more Messages."""
+        results = []
+        with self.session() as session:
+            for message in messages:
+                # Validate each Message before attempting storage.
+                metadata = message.metadata
+                errors = validate_message_metadata(metadata)
+                if errors:
+                    log(ERROR, errors)
+                    results.append(False)
+                    continue
+
+                # Persist metadata; ObjectStore owns the message body.
+                stmt = self.dialect_insert(MessageModel).values(
+                    message_id=metadata.message_id,
+                    run_id=metadata.run_id,
+                    src_node_id=metadata.src_node_id,
+                    dst_node_id=metadata.dst_node_id,
+                    src_task_id=metadata.src_task_id,
+                    dst_task_id=metadata.dst_task_id,
+                    reply_to_message_id=metadata.reply_to_message_id or None,
+                    group_id=metadata.group_id,
+                    created_at=metadata.created_at,
+                    ttl=metadata.ttl,
+                    message_type=metadata.message_type,
+                    expires_at=datetime.fromtimestamp(
+                        metadata.created_at + metadata.ttl, tz=UTC
+                    ),
+                )
+
+                # Preserve the delivery state of an existing Message ID.
+                stmt = stmt.on_conflict_do_nothing(
+                    index_elements=[MessageModel.message_id]
+                )
+
+                # Isolate constraint failures so the remaining batch can proceed.
+                try:
+                    with session.begin_nested():
+                        session.execute(stmt)
+                    results.append(True)
+                except IntegrityError:
+                    results.append(False)
+        return results
+
+    def get_messages(
+        self,
+        *,
+        dst_node_id: int,
+        run_id: int | None = None,
+        reply_to_message_ids: Collection[str] | None = None,
+        limit: int | None = None,
+    ) -> list[Message]:
+        """Get pending Messages for the provided destination node ID."""
+        # Reject invalid limits.
+        if limit is not None and limit <= 0:
+            raise ValueError("`limit` must be greater than zero")
+
+        # Scope both expiration and retrieval to the destination and optional run.
+        current = now()
+        filters = [
+            MessageModel.dst_node_id == dst_node_id,
+            MessageModel.cleared.is_(False),
+        ]
+        if run_id is not None:
+            filters.append(MessageModel.run_id == run_id)
+        with self.session() as session:
+            # Clear expired deliveries while retaining their correlation metadata.
+            expired_ids = session.scalars(
+                update(MessageModel)
+                .where(*filters, MessageModel.expires_at <= current)
+                .values(cleared=True)
+                .returning(MessageModel.message_id)
+            ).all()
+
+            # Release expired body roots and their unreferenced descendants.
+            for message_id in expired_ids:
+                self.object_store.delete(message_id)
+
+            # Intersect live delivery candidates with any correlation filter.
+            stmt = select(MessageModel).where(
+                *filters, MessageModel.expires_at > current
+            )
+            if reply_to_message_ids is not None:
+                stmt = stmt.where(
+                    MessageModel.reply_to_message_id.in_(reply_to_message_ids)
+                )
+
+            # Apply a stable order before limiting the live results.
+            stmt = stmt.order_by(
+                MessageModel.created_at, MessageModel.message_id
+            ).limit(limit)
+
+            # Return metadata envelopes; recipients obtain bodies from ObjectStore.
+            return [
+                make_message(
+                    metadata=Metadata(
+                        message_id=row.message_id,
+                        run_id=row.run_id,
+                        src_node_id=row.src_node_id,
+                        dst_node_id=row.dst_node_id,
+                        src_task_id=row.src_task_id,
+                        dst_task_id=row.dst_task_id,
+                        reply_to_message_id=row.reply_to_message_id or "",
+                        group_id=row.group_id,
+                        created_at=row.created_at,
+                        ttl=row.ttl,
+                        message_type=row.message_type,
+                    ),
+                    content=RecordDict(),
+                )
+                for row in session.scalars(stmt)
+            ]
+
+    def acknowledge_messages(self, message_ids: Collection[str]) -> None:
+        """Acknowledge Messages based on the provided Message IDs."""
+        # Empty acknowledgments leave delivery state and objects untouched.
+        if not message_ids:
+            return
+
+        # Close only pending deliveries, preserving prior terminal timestamps.
+        stmt = (
+            update(MessageModel)
+            .where(
+                MessageModel.message_id.in_(message_ids),
+                MessageModel.cleared.is_(False),
+            )
+            .values(cleared=True, acknowledged_at=now())
+            .returning(MessageModel.message_id)
+        )
+        with self.session() as session:
+            # Release body roots while retaining metadata for future correlation.
+            acknowledged_ids = session.scalars(stmt).all()
+            for message_id in acknowledged_ids:
+                self.object_store.delete(message_id)
+
+    def cancel_messages(
+        self,
+        *,
+        message_ids: Collection[str] | None = None,
+        run_id: int | None = None,
+    ) -> None:
+        """Cancel pending Messages based on the specified filters."""
+        # Require an explicit scope to prevent accidental cancellation of all inboxes.
+        if message_ids is None and run_id is None:
+            raise ValueError("Either `message_ids` or `run_id` must be supplied")
+
+        # Intersect all supplied filters and leave prior terminal outcomes unchanged.
+        current = now()
+        stmt = update(MessageModel).where(MessageModel.cleared.is_(False))
+        if message_ids is not None:
+            stmt = stmt.where(MessageModel.message_id.in_(message_ids))
+        if run_id is not None:
+            stmt = stmt.where(MessageModel.run_id == run_id)
+        # Expired deliveries are cleared without relabelling them as cancelled.
+        stmt = stmt.values(
+            cleared=True,
+            cancelled_at=case((MessageModel.expires_at > current, current)),
+        ).returning(MessageModel.message_id)
+        with self.session() as session:
+            # Release body roots while retaining metadata for future correlation.
+            cancelled_ids = session.scalars(stmt).all()
+            for message_id in cancelled_ids:
+                self.object_store.delete(message_id)
 
     def start_session(self, run_id: int) -> str:
         """Start a run-scoped object push session."""
@@ -363,11 +565,70 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
             )
 
-            # Delete expired object trees and their message metadata.
+            # Delete expired object trees and cancel their pending messages.
             if message_object_ids:
                 for message_object_id in message_object_ids:
                     self.object_store.delete(message_object_id)
-                self._on_push_session_expired(message_object_ids)
+                self.cancel_messages(message_ids=message_object_ids)
+
+    def put_file(
+        self, scope: str, key: str, data: bytes, expected_revision: int | None
+    ) -> int:
+        """Create or update a file with a revision precondition."""
+        raise NotImplementedError
+
+    def get_file(self, scope: str, key: str) -> File | None:
+        """Return the current file, or None if absent or deleted."""
+        raise NotImplementedError
+
+    def list_files(
+        self, scope: str, prefix: str, start_after: str, limit: int | None
+    ) -> Sequence[FileMetadata]:
+        """List live file metadata in lexicographic key order."""
+        raise NotImplementedError
+
+    def delete_file(self, scope: str, key: str, expected_revision: int) -> None:
+        """Delete a file with a matching revision, preserving revision history."""
+        raise NotImplementedError
+
+    def create_agent(
+        self,
+        flwr_aid: str,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Create and return an account's agent."""
+        if not flwr_aid or not config.name or not config.app_spec:
+            return None
+        if (config.HasField("title") and not config.title) or (
+            config.HasField("description") and not config.description
+        ):
+            return None
+        created_at = now()
+        model = AgentModel(
+            name=config.name,
+            title=config.title if config.HasField("title") else None,
+            description=config.description if config.HasField("description") else None,
+            app_spec=config.app_spec,
+            flwr_aid=flwr_aid,
+            created_at=created_at,
+            updated_at=created_at,
+        )
+        with self.session() as session:
+            session.add(model)
+            session.flush()
+            return _agent_from_model(model)
+
+    def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
+        """List an account's agents in ascending agent ID order."""
+        if not flwr_aid:
+            return []
+        stmt = (
+            select(AgentModel)
+            .where(AgentModel.flwr_aid == flwr_aid)
+            .order_by(AgentModel.agent_id)
+        )
+        with self.session() as session:
+            return [_agent_from_model(model) for model in session.scalars(stmt)]
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
@@ -378,20 +639,87 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
         # Keep launch behavior: last write wins for metadata under the same
         # content hash.
-        self.query(
-            """
-            INSERT INTO fab (fab_hash, content, verifications)
-            VALUES (:fab_hash, :content, :verifications)
-            ON CONFLICT(fab_hash) DO UPDATE SET
-                content = excluded.content,
-                verifications = excluded.verifications
-            """,
-            {
-                "fab_hash": fab_hash,
-                "content": fab.content,
-                "verifications": json.dumps(fab.verifications),
+        stmt = self.dialect_insert(FabModel).values(
+            fab_hash=fab_hash,
+            content=fab.content,
+            verifications=json.dumps(fab.verifications),
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[FabModel.fab_hash],
+            set_={
+                "content": stmt.excluded.content,
+                "verifications": stmt.excluded.verifications,
             },
         )
+        with self.session() as session:
+            session.execute(stmt)
+        return fab_hash
+
+    def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        fab: Fab,
+        federation_id: str,
+        app_id: str,
+        app_type: str,
+        added_by: str,
+        is_hub_app: bool = False,
+        display_name: str | None = None,
+        description: str | None = None,
+        color: str | None = None,
+    ) -> str:
+        """Store a FAB and associate its app with a federation."""
+        if not all((federation_id, app_id, app_type, added_by)):
+            raise ValueError(
+                "Federation ID, app ID, app type, and added by are required"
+            )
+        fab_hash = hashlib.sha256(fab.content).hexdigest()
+        if fab.hash_str and fab.hash_str != fab_hash:
+            raise ValueError(
+                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+            )
+        fab_stmt = self.dialect_insert(FabModel).values(
+            fab_hash=fab_hash,
+            content=fab.content,
+            verifications=json.dumps(fab.verifications),
+        )
+        fab_stmt = fab_stmt.on_conflict_do_update(
+            index_elements=[FabModel.fab_hash],
+            set_={
+                "content": fab_stmt.excluded.content,
+                "verifications": fab_stmt.excluded.verifications,
+            },
+        )
+        app_stmt = self.dialect_insert(FederationAppModel).values(
+            federation_id=federation_id,
+            app_id=app_id,
+            fab_hash=fab_hash,
+            app_type=app_type,
+            is_hub_app=is_hub_app,
+            display_name=display_name,
+            description=description,
+            color=color,
+            added_by=added_by,
+            added_at=now(),
+            updated_at=now(),
+        )
+        app_stmt = app_stmt.on_conflict_do_update(
+            index_elements=[
+                FederationAppModel.federation_id,
+                FederationAppModel.app_id,
+            ],
+            set_={
+                "fab_hash": app_stmt.excluded.fab_hash,
+                "app_type": app_stmt.excluded.app_type,
+                "is_hub_app": app_stmt.excluded.is_hub_app,
+                "display_name": app_stmt.excluded.display_name,
+                "description": app_stmt.excluded.description,
+                "color": app_stmt.excluded.color,
+                "updated_at": app_stmt.excluded.updated_at,
+            },
+        )
+        with self.session() as session:
+            session.execute(fab_stmt)
+            session.execute(app_stmt)
         return fab_hash
 
     def get_fab(self, fab_hash: str) -> Fab | None:
@@ -408,99 +736,270 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 verifications=json.loads(row.verifications),
             )
 
-    def upsert_connector(
+    def get_app(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
+        """Return a FAB only when it matches the federation-app association."""
+        if not all((federation_id, app_id, fab_hash)):
+            return None
+        query = (
+            select(FabModel)
+            .join(
+                FederationAppModel,
+                FederationAppModel.fab_hash == FabModel.fab_hash,
+            )
+            .where(
+                FederationAppModel.federation_id == federation_id,
+                FederationAppModel.app_id == app_id,
+                FederationAppModel.fab_hash == fab_hash,
+            )
+        )
+        with self.session() as session:
+            row = session.scalar(query.execution_options(populate_existing=True))
+            if row is None:
+                return None
+            return Fab(
+                hash_str=row.fab_hash,
+                content=row.content,
+                verifications=json.loads(row.verifications),
+            )
+
+    def get_hub_app(
+        self, federation_id: str, app_id: str
+    ) -> tuple[Fab, datetime] | None:
+        """Return the cached Hub FAB and its last update time, if present."""
+        query = (
+            select(FabModel, FederationAppModel.updated_at)
+            .join(
+                FederationAppModel,
+                FederationAppModel.fab_hash == FabModel.fab_hash,
+            )
+            .where(
+                FederationAppModel.federation_id == federation_id,
+                FederationAppModel.app_id == app_id,
+                FederationAppModel.is_hub_app.is_(True),
+            )
+        )
+        with self.session() as session:
+            row = session.execute(query).one_or_none()
+            if row is None:
+                return None
+            fab, updated_at = row
+            return (
+                Fab(fab.fab_hash, fab.content, json.loads(fab.verifications)),
+                updated_at,
+            )
+
+    def update_hub_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        flwr_aid: str,
+        federation_id: str,
+        app_id: str,
+        previous_fab_hash: str,
+        fab_hash: str,
+        app_type: str,
+    ) -> bool:
+        """Update a Hub app if it still points to the previous FAB."""
+        stmt = (
+            update(FederationAppModel)
+            .where(
+                FederationAppModel.federation_id == federation_id,
+                FederationAppModel.app_id == app_id,
+                FederationAppModel.is_hub_app.is_(True),
+                FederationAppModel.fab_hash == previous_fab_hash,
+                exists().where(FabModel.fab_hash == fab_hash),
+            )
+            .values(fab_hash=fab_hash, app_type=app_type, updated_at=now())
+            .returning(FederationAppModel.app_id)
+        )
+        with self.session() as session:
+            return session.scalar(stmt) is not None
+
+    def list_apps(
+        self, federation_id: str, limit: int | None = None
+    ) -> Sequence[AppInfo]:
+        """List apps associated with a federation, newest first."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if not federation_id or limit == 0:
+            return []
+        query = (
+            select(
+                FederationAppModel.app_id,
+                FederationAppModel.fab_hash,
+                FederationAppModel.app_type,
+                FederationAppModel.is_hub_app,
+                FederationAppModel.display_name,
+                FederationAppModel.description,
+                FederationAppModel.color,
+            )
+            .where(FederationAppModel.federation_id == federation_id)
+            .order_by(
+                FederationAppModel.added_at.desc(),
+                FederationAppModel.app_id.desc(),
+            )
+        )
+        if limit is not None:
+            query = query.limit(limit)
+        with self.session() as session:
+            apps = session.execute(query).all()
+            return [
+                AppInfo(
+                    app_id=app.app_id,
+                    fab_hash=app.fab_hash,
+                    app_type=app.app_type,
+                    is_hub_app=app.is_hub_app,
+                    display_name=app.display_name,
+                    description=app.description,
+                    color=app.color,
+                )
+                for app in apps
+            ]
+
+    def list_app_associations(
+        self, app_id: str, federation_ids: Sequence[str]
+    ) -> Sequence[str]:
+        """List the provided federation IDs associated with an app."""
+        if not app_id or not federation_ids:
+            return []
+        if app_id == FLOWER_AGENT_APP_ID:
+            return list(federation_ids)
+        query = select(FederationAppModel.federation_id).where(
+            FederationAppModel.app_id == app_id,
+            FederationAppModel.federation_id.in_(federation_ids),
+        )
+        with self.session() as session:
+            return session.scalars(query).all()
+
+    def delete_app(self, federation_id: str, app_id: str) -> bool:
+        """Delete one federation-app association; its FAB remains in state."""
+        if not federation_id or not app_id:
+            return False
+        with self.session() as session:
+            deleted_app_id = session.scalar(
+                delete(FederationAppModel)
+                .where(
+                    FederationAppModel.federation_id == federation_id,
+                    FederationAppModel.app_id == app_id,
+                )
+                .returning(FederationAppModel.app_id)
+            )
+            return deleted_app_id is not None
+
+    def create_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        federation_id: str,
         connector_ref: str,
         credentials_json: str,
         config_json: str,
-    ) -> bool:
-        """Create or update a connector for an account."""
-        if not flwr_aid or not connector_ref:
-            return False
-        self.query(
-            """
-            INSERT INTO connector (
-                flwr_aid, connector_ref, credentials_json, config_json
+        created_by: str,
+    ) -> int | None:
+        """Create a connector for a federation."""
+        if not federation_id or not connector_ref or not created_by:
+            return None
+        stmt = (
+            insert(ConnectorModel)
+            .values(
+                federation_id=federation_id,
+                connector_ref=connector_ref,
+                credentials_json=credentials_json,
+                config_json=config_json,
+                created_at=now(),
+                created_by=created_by,
             )
-            VALUES (
-                :flwr_aid, :connector_ref, :credentials_json, :config_json
-            )
-            ON CONFLICT(flwr_aid, connector_ref) DO UPDATE SET
-                credentials_json = excluded.credentials_json,
-                config_json = excluded.config_json
-            """,
-            {
-                "flwr_aid": flwr_aid,
-                "connector_ref": connector_ref,
-                "credentials_json": credentials_json,
-                "config_json": config_json,
-            },
+            .returning(ConnectorModel.connector_id)
         )
-        return True
+        with self.session() as session:
+            return session.scalar(stmt)
 
-    def get_connector(
-        self, flwr_aid: str, connector_ref: str
-    ) -> ConnectorRecord | None:
-        """Return an account's connector, if present."""
-        if not flwr_aid or not connector_ref:
+    def get_connectors_by_ref(
+        self, federation_id: str, connector_ref: str
+    ) -> Sequence[ConnectorRecord]:
+        """Return a federation's connectors for one provider."""
+        if not federation_id or not connector_ref:
+            return []
+        stmt = select(ConnectorModel).where(
+            ConnectorModel.federation_id == federation_id,
+            ConnectorModel.connector_ref == connector_ref,
+        )
+        stmt = stmt.execution_options(populate_existing=True)
+        with self.session() as session:
+            rows = session.scalars(stmt.order_by(ConnectorModel.connector_id)).all()
+            return [_connector_from_model(row) for row in rows]
+
+    def get_connector_by_id(self, connector_id: int) -> ConnectorRecord | None:
+        """Return a connector by ID, if present."""
+        if connector_id <= 0:
             return None
         with self.session() as session:
-            row = session.get(
-                ConnectorModel,
-                (flwr_aid, connector_ref),
-                populate_existing=True,
-            )
+            row = session.get(ConnectorModel, connector_id)
             if row is None:
                 return None
-            return ConnectorRecord(
-                flwr_aid=row.flwr_aid,
-                connector_ref=row.connector_ref,
-                credentials_json=row.credentials_json,
-                config_json=row.config_json,
-            )
+            return _connector_from_model(row)
 
-    def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
-        """Delete an account's connector if it exists."""
-        if not flwr_aid or not connector_ref:
+    def update_connector_credentials(
+        self,
+        connector_id: int,
+        current_credentials: str,
+        update_credentials: Callable[[], str],
+    ) -> str | None:
+        """Serialize credential refresh and persist its result atomically."""
+        with self.session() as session:
+            # Lock before reading, including on SQLite where FOR UPDATE is ignored.
+            credentials_json = session.scalar(
+                update(ConnectorModel)
+                .where(ConnectorModel.connector_id == connector_id)
+                .values(credentials_json=ConnectorModel.credentials_json)
+                .returning(ConnectorModel.credentials_json)
+            )
+            if credentials_json is None:
+                return None
+            if credentials_json != current_credentials:
+                return credentials_json
+            credentials_json = update_credentials()
+            session.execute(
+                update(ConnectorModel)
+                .where(ConnectorModel.connector_id == connector_id)
+                .values(credentials_json=credentials_json)
+            )
+            return credentials_json
+
+    def delete_connector(self, federation_id: str, connector_id: int) -> bool:
+        """Delete a federation's connector if it exists."""
+        if not federation_id or connector_id <= 0:
             return False
         with self.session() as session:
-            deleted_connector_ref = session.scalar(
+            deleted_connector_id = session.scalar(
                 delete(ConnectorModel)
                 .where(
-                    ConnectorModel.flwr_aid == flwr_aid,
-                    ConnectorModel.connector_ref == connector_ref,
+                    ConnectorModel.federation_id == federation_id,
+                    ConnectorModel.connector_id == connector_id,
                 )
-                .returning(ConnectorModel.connector_ref)
+                .returning(ConnectorModel.connector_id)
             )
-            return deleted_connector_ref is not None
+            return deleted_connector_id is not None
 
-    def bind_connectors_to_run(
-        self, run_id: int, connector_refs: Sequence[str]
-    ) -> bool:
-        """Associate connector references with a run."""
-        if isinstance(connector_refs, str):
+    def bind_connectors_to_run(self, run_id: int, connector_ids: Sequence[int]) -> bool:
+        """Associate connector IDs with a run."""
+        if isinstance(connector_ids, (str, bytes)):
             return False
         stored_run_id = uint64_to_int64(run_id)
-        bound_refs = set(self.get_run_connector_refs(run_id))
+        bound_ids = set(self.get_run_connector_ids(run_id))
         run_connectors = [
-            RunConnectorModel(run_id=stored_run_id, connector_ref=connector_ref)
-            for connector_ref in dict.fromkeys(connector_refs)
-            if connector_ref not in bound_refs
+            RunConnectorModel(run_id=stored_run_id, connector_id=connector_id)
+            for connector_id in dict.fromkeys(connector_ids)
+            if connector_id not in bound_ids
         ]
         if run_connectors:
             with self.session() as session:
                 session.add_all(run_connectors)
         return True
 
-    def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
-        """Return connector references associated with a run."""
+    def get_run_connector_ids(self, run_id: int) -> Sequence[int]:
+        """Return connector IDs associated with a run."""
         with self.session() as session:
             return list(
                 session.scalars(
-                    select(RunConnectorModel.connector_ref)
+                    select(RunConnectorModel.connector_id)
                     .where(RunConnectorModel.run_id == uint64_to_int64(run_id))
-                    .order_by(RunConnectorModel.connector_ref)
+                    .order_by(RunConnectorModel.connector_id)
                 )
             )
 
@@ -508,6 +1007,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         oauth_session_id: str,
         flwr_aid: str,
+        federation_id: str,
         connector_ref: str,
         state: str,
         redirect_uri: str,
@@ -518,6 +1018,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if (
             not oauth_session_id
             or not flwr_aid
+            or not federation_id
             or not connector_ref
             or expires_at.utcoffset() is None
         ):
@@ -527,6 +1028,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         model = ConnectorOAuthSessionModel(
             oauth_session_id=oauth_session_id,
             flwr_aid=flwr_aid,
+            federation_id=federation_id,
             connector_ref=connector_ref,
             state=state,
             redirect_uri=redirect_uri,
@@ -581,11 +1083,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return updated_oauth_session_id is not None
 
-    def get_run_series(  # pylint: disable=R0914
+    def get_run_series(  # pylint: disable=R0913,R0914
         self,
         *,
         series_ids: Sequence[int] | None = None,
         federation_ids: Sequence[str] | None = None,
+        is_agent: bool | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
@@ -610,6 +1113,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             page_query = page_query.where(
                 RunSeriesModel.federation_id.in_(federation_ids)
             )
+        if is_agent is not None:
+            page_query = page_query.where(RunSeriesModel.is_agent.is_(is_agent))
         if updated_before is not None:
             page_query = page_query.where(
                 RunSeriesModel.updated_at < datetime.fromisoformat(updated_before)
@@ -647,6 +1152,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     )
         return list(series_by_id.values())
 
+    def set_run_series_description(self, series_id: int, description: str) -> None:
+        """Set the description of an existing RunSeries."""
+        normalized = description.strip()
+        if not normalized:
+            return
+        stmt = (
+            update(RunSeriesModel)
+            .where(RunSeriesModel.series_id == uint64_to_int64(series_id))
+            .values(description=normalized)
+        )
+        with self.session() as session:
+            session.execute(stmt)
+
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
         with self.session() as session:
@@ -659,73 +1177,115 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 return None
             return context_from_bytes(row.context)
 
+    def get_compacted_contexts(
+        self, series_id: int, limit: int = 1, before_context_id: int | None = None
+    ) -> Sequence[CompactedContext]:
+        """Return a series's summaries newest first, before an optional ID."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        query = select(CompactedContextModel).where(
+            CompactedContextModel.series_id == series_id
+        )
+        # Autoincremented context IDs cannot exceed the signed BIGINT range.
+        if before_context_id is not None:
+            query = query.where(CompactedContextModel.id < before_context_id)
+        query = query.order_by(CompactedContextModel.id.desc()).limit(limit)
+        with self.session() as session:
+            return [
+                _compacted_context_from_model(row) for row in session.scalars(query)
+            ]
+
+    def store_compacted_context(
+        self,
+        series_id: int,
+        through_event_id: int,
+        text: str,
+        token_count: int,
+    ) -> None:
+        """Store a new summary."""
+        stmt = (
+            self.dialect_insert(CompactedContextModel)
+            .values(
+                series_id=series_id,
+                through_event_id=through_event_id,
+                text=text,
+                token_count=token_count,
+                created_at=now(),
+            )
+            .on_conflict_do_nothing(
+                index_elements=[
+                    CompactedContextModel.series_id,
+                    CompactedContextModel.through_event_id,
+                ]
+            )
+            .returning(CompactedContextModel.id)
+        )
+        with self.session() as session:
+            if session.scalar(stmt) is None:
+                raise ValueError("Compacted context already exists for this event")
+
     def set_run_series_context(self, series_id: int, context: Context) -> None:
         """Set the shared Context for the specified RunSeries."""
         sint_series_id = uint64_to_int64(series_id)
         context_bytes = context_to_bytes(context)
-        self.query(
-            """
-            INSERT INTO series_context (series_id, context)
-            VALUES (:series_id, :context)
-            ON CONFLICT(series_id) DO UPDATE SET
-                context = excluded.context
-            """,
-            {"series_id": sint_series_id, "context": context_bytes},
+        stmt = self.dialect_insert(SeriesContextModel).values(
+            series_id=sint_series_id,
+            context=context_bytes,
         )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[SeriesContextModel.series_id],
+            set_={"context": stmt.excluded.context},
+        )
+        with self.session() as session:
+            session.execute(stmt)
 
-    def store_run_in_series(
+    def store_run_in_series(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         run_id: int,
         federation_id: str,
+        is_agent: bool,
         series_id: int | None,
         description: str | None = None,
     ) -> int | None:
         """Store a run in a run series and return the series ID."""
-        insert_query = """
-            INSERT INTO run_series
-            (series_id, federation_id, description, created_at, updated_at)
-            VALUES
-            (:series_id, :federation_id, :description, :created_at, :updated_at)
-            ON CONFLICT(series_id) DO NOTHING
-            RETURNING series_id
-        """
-
         try:
-            with self.session():
+            with self.session() as session:
                 if series_id is None:
                     # No series was provided, so create one before linking the run.
                     candidate = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
                     timestamp = now()
-                    rows = self.query(
-                        insert_query,
-                        {
-                            "series_id": uint64_to_int64(candidate),
-                            "federation_id": federation_id,
-                            "description": description,
-                            "created_at": timestamp,
-                            "updated_at": timestamp,
-                        },
+                    stmt = (
+                        self.dialect_insert(RunSeriesModel)
+                        .values(
+                            series_id=uint64_to_int64(candidate),
+                            federation_id=federation_id,
+                            is_agent=is_agent,
+                            description=description,
+                            created_at=timestamp,
+                            updated_at=timestamp,
+                        )
+                        .on_conflict_do_nothing(
+                            index_elements=[RunSeriesModel.series_id]
+                        )
+                        .returning(RunSeriesModel.series_id)
                     )
-                    if rows:
-                        resolved_series_id = candidate
-                    else:
+                    resolved_series_id = (
+                        candidate if session.scalar(stmt) is not None else None
+                    )
+                    if resolved_series_id is None:
                         return None
 
                 else:
-                    rows = self.query(
-                        """
-                        UPDATE run_series
-                        SET updated_at = :updated_at
-                        WHERE series_id = :series_id AND federation_id = :federation_id
-                        RETURNING series_id
-                        """,
-                        {
-                            "series_id": uint64_to_int64(series_id),
-                            "federation_id": federation_id,
-                            "updated_at": now(),
-                        },
+                    updated_series_id = session.scalar(
+                        update(RunSeriesModel)
+                        .where(
+                            RunSeriesModel.series_id == uint64_to_int64(series_id),
+                            RunSeriesModel.federation_id == federation_id,
+                        )
+                        .values(updated_at=now())
+                        .returning(RunSeriesModel.series_id)
                     )
-                    if not rows:
+                    if updated_series_id is None:
                         log(
                             ERROR,
                             "Run series %d not found in federation %r",
@@ -736,16 +1296,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     resolved_series_id = series_id
 
                 # Store the membership last so callers only receive linked series IDs.
-                self.query(
-                    """
-                    INSERT INTO series_runs (series_id, run_id)
-                    VALUES (:series_id, :run_id)
-                    """,
-                    {
-                        "series_id": uint64_to_int64(resolved_series_id),
-                        "run_id": uint64_to_int64(run_id),
-                    },
+                session.add(
+                    SeriesRunsModel(
+                        series_id=uint64_to_int64(resolved_series_id),
+                        run_id=uint64_to_int64(run_id),
+                    )
                 )
+                session.flush()
                 return resolved_series_id
         except IntegrityError:
             return None
@@ -762,55 +1319,30 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         max_runs: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
+        current = now()
+        stmt = (
+            insert(AutomationModel)
+            .values(
+                federation_id=federation_id,
+                status=AutomationStatus.ACTIVE,
+                series_id=uint64_to_int64(series_id),
+                flwr_aid=flwr_aid,
+                start_run_request=start_run_request.SerializeToString(),
+                created_at=current,
+                updated_at=current,
+                next_run_at=datetime.fromisoformat(next_run_at),
+                fixed_interval=fixed_interval,
+                remaining_runs=max_runs,
+                stopped_at=None,
+            )
+            .returning(AutomationModel)
+        )
         try:
-            with self.session():
-                current = now()
-                rows = self.query(
-                    """
-                    INSERT INTO automation (
-                        federation_id, status, series_id, flwr_aid,
-                        start_run_request,
-                        created_at, updated_at, next_run_at, fixed_interval,
-                        remaining_runs, stopped_at
-                    )
-                    VALUES (
-                        :federation_id, :status, :series_id, :flwr_aid,
-                        :start_run_request,
-                        :created_at, :updated_at, :next_run_at, :fixed_interval,
-                        :remaining_runs, :stopped_at
-                    )
-                    RETURNING *
-                    """,
-                    {
-                        "federation_id": federation_id,
-                        "status": AutomationStatus.ACTIVE,
-                        "series_id": uint64_to_int64(series_id),
-                        "flwr_aid": flwr_aid,
-                        "start_run_request": start_run_request.SerializeToString(),
-                        "created_at": current,
-                        "updated_at": current,
-                        "next_run_at": next_run_at,
-                        "fixed_interval": fixed_interval,
-                        "remaining_runs": max_runs,
-                        "stopped_at": None,
-                    },
-                )
+            with self.session() as session:
+                automation = session.scalars(stmt).one()
+                return _automation_from_model(automation)
         except IntegrityError as exc:
             raise ValueError(f"Could not store automation: {exc}") from exc
-
-        row = rows[0]
-        return Automation(
-            automation_id=row["automation_id"],
-            status=row["status"],
-            federation=row["federation_id"],
-            series_id=int64_to_uint64(row["series_id"]),
-            flwr_aid=row["flwr_aid"],
-            created_at=timestamp_to_iso(row["created_at"]),
-            updated_at=timestamp_to_iso(row["updated_at"]),
-            next_run_at=timestamp_to_iso(row["next_run_at"]),
-            fixed_interval=row["fixed_interval"],
-            remaining_runs=row["remaining_runs"],
-        )
 
     def claim_automation(
         self,
@@ -820,35 +1352,36 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         next_run_at: str | None,
     ) -> tuple[StartRunRequest, str] | None:
         """Claim an automation occurrence and return its unresolved run request."""
-        with self.session():
-            rows = self.query(
-                """
-                SELECT start_run_request, flwr_aid
-                FROM automation
-                WHERE automation_id = :automation_id
-                AND status = :active_status
-                AND start_run_request IS NOT NULL
-                AND next_run_at = :previous_next_run_at
-                AND (remaining_runs IS NULL OR remaining_runs > 0)
-                AND (:next_run_at IS NOT NULL OR remaining_runs <= 1)
-                """,
-                {
-                    "automation_id": automation_id,
-                    "active_status": AutomationStatus.ACTIVE,
-                    "previous_next_run_at": previous_next_run_at,
-                    "next_run_at": next_run_at,
-                },
-            )
-            if not rows or not self.advance_automation(
+        stored_automation_id = uint64_to_int64(automation_id)
+        query = select(
+            AutomationModel.start_run_request,
+            AutomationModel.flwr_aid,
+        ).where(
+            AutomationModel.automation_id == stored_automation_id,
+            AutomationModel.status == AutomationStatus.ACTIVE,
+            AutomationModel.start_run_request.is_not(None),
+            AutomationModel.next_run_at == datetime.fromisoformat(previous_next_run_at),
+            or_(
+                AutomationModel.remaining_runs.is_(None),
+                AutomationModel.remaining_runs > 0,
+            ),
+        )
+        if next_run_at is None:
+            query = query.where(AutomationModel.remaining_runs <= 1)
+
+        with self.session() as session:
+            row = session.execute(query).first()
+            if row is None or not self.advance_automation(
                 automation_id,
                 previous_next_run_at=previous_next_run_at,
                 next_run_at=next_run_at,
             ):
                 return None
 
+            start_run_request, flwr_aid = row
             request = StartRunRequest()
-            request.ParseFromString(rows[0]["start_run_request"])
-            return request, rows[0]["flwr_aid"]
+            request.ParseFromString(start_run_request)
+            return request, flwr_aid
 
     def list_automations(  # pylint: disable=too-many-arguments,too-many-locals,too-many-boolean-expressions
         self,
@@ -871,94 +1404,61 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         ):
             return []
 
-        conditions: list[str] = []
-        params: dict[str, Any] = {}
+        query = select(AutomationModel)
         if automation_ids is not None:
-            sint64_automation_ids = [
-                uint64_to_int64(automation_id) for automation_id in automation_ids
-            ]
-            placeholders, in_params = build_sql_in_params(
-                sint64_automation_ids, "automation_id"
-            )
-            conditions.append(f"automation_id IN ({placeholders})")
-            params.update(in_params)
-        if federations is not None:
-            placeholders, in_params = build_sql_in_params(federations, "federation_id")
-            conditions.append(f"federation_id IN ({placeholders})")
-            params.update(in_params)
-        if statuses is not None:
-            placeholders = ",".join(f":status_{i}" for i in range(len(statuses)))
-            conditions.append(f"status IN ({placeholders})")
-            params.update({f"status_{i}": status for i, status in enumerate(statuses)})
-        if due_before is not None:
-            conditions.append("next_run_at <= :due_before")
-            # Finite automations with no remaining runs are already claimed.
-            conditions.append("(remaining_runs IS NULL OR remaining_runs > 0)")
-            params["due_before"] = due_before.isoformat()
-
-        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        order_clause = "ORDER BY updated_at DESC, automation_id DESC"
-        if order_by == "next_run_at":
-            order_clause = "ORDER BY next_run_at ASC, automation_id ASC"
-
-        limit_clause = ""
-        if limit is not None:
-            limit_clause = "LIMIT :limit"
-            params["limit"] = limit
-
-        rows = self.query(
-            f"""
-            SELECT *
-            FROM automation
-            {where_clause}
-            {order_clause}
-            {limit_clause}
-            """,
-            params,
-        )
-        automations = []
-        for row in rows:
-            next_run_at = row["next_run_at"]
-            stopped_at = row["stopped_at"]
-            automations.append(
-                Automation(
-                    automation_id=row["automation_id"],
-                    status=row["status"],
-                    federation=row["federation_id"],
-                    series_id=int64_to_uint64(row["series_id"]),
-                    flwr_aid=row["flwr_aid"],
-                    created_at=timestamp_to_iso(row["created_at"]),
-                    updated_at=timestamp_to_iso(row["updated_at"]),
-                    next_run_at=timestamp_to_iso(next_run_at),
-                    fixed_interval=row["fixed_interval"],
-                    remaining_runs=row["remaining_runs"],
-                    stopped_at=timestamp_to_iso(stopped_at) if stopped_at else None,
+            query = query.where(
+                AutomationModel.automation_id.in_(
+                    [uint64_to_int64(automation_id) for automation_id in automation_ids]
                 )
             )
-        return automations
+        if federations is not None:
+            query = query.where(AutomationModel.federation_id.in_(federations))
+        if statuses is not None:
+            query = query.where(AutomationModel.status.in_(statuses))
+        if due_before is not None:
+            query = query.where(
+                AutomationModel.next_run_at <= due_before,
+                or_(
+                    AutomationModel.remaining_runs.is_(None),
+                    AutomationModel.remaining_runs > 0,
+                ),
+            )
+
+        if order_by == "next_run_at":
+            query = query.order_by(
+                AutomationModel.next_run_at.asc(), AutomationModel.automation_id.asc()
+            )
+        else:
+            query = query.order_by(
+                AutomationModel.updated_at.desc(), AutomationModel.automation_id.desc()
+            )
+        if limit is not None:
+            query = query.limit(limit)
+
+        with self.session() as session:
+            automations = session.scalars(
+                query.execution_options(populate_existing=True)
+            ).all()
+            return [_automation_from_model(model) for model in automations]
 
     def stop_automation(self, automation_id: int) -> bool:
         """Stop an active automation."""
         stopped_at = now()
-        rows = self.query(
-            """
-            UPDATE automation
-            SET status = :status,
-                updated_at = :updated_at,
-                stopped_at = :stopped_at
-            WHERE automation_id = :automation_id
-            AND status = :active_status
-            RETURNING automation_id
-            """,
-            {
-                "automation_id": uint64_to_int64(automation_id),
-                "status": AutomationStatus.STOPPED,
-                "updated_at": stopped_at,
-                "stopped_at": stopped_at,
-                "active_status": AutomationStatus.ACTIVE,
-            },
+        stmt = (
+            update(AutomationModel)
+            .where(
+                AutomationModel.automation_id == uint64_to_int64(automation_id),
+                AutomationModel.status == AutomationStatus.ACTIVE,
+            )
+            .values(
+                status=AutomationStatus.STOPPED,
+                updated_at=stopped_at,
+                stopped_at=stopped_at,
+            )
+            .returning(AutomationModel.automation_id)
         )
-        return bool(rows)
+        with self.session() as session:
+            return session.scalar(stmt) is not None
 
     def advance_automation(
         self,
@@ -969,40 +1469,49 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     ) -> bool:
         """Advance an active automation occurrence."""
         timestamp = now()
-        params: dict[str, Any] = {
-            "automation_id": automation_id,
-            "active_status": AutomationStatus.ACTIVE,
-            "updated_at": timestamp,
-            "previous_next_run_at": previous_next_run_at,
-            "next_run_at": next_run_at,
-        }
-
-        rows = self.query(
-            """
-            UPDATE automation
-            SET updated_at = :updated_at,
-                next_run_at = CASE
-                    WHEN remaining_runs IS NOT NULL AND remaining_runs <= 1
-                        THEN next_run_at
-                    ELSE :next_run_at
-                END,
-                remaining_runs = CASE
-                    WHEN remaining_runs IS NULL
-                        THEN NULL
-                    WHEN remaining_runs > 0
-                        THEN remaining_runs - 1
-                    ELSE 0
-                END
-            WHERE automation_id = :automation_id
-            AND status = :active_status
-            AND next_run_at = :previous_next_run_at
-            AND (remaining_runs IS NULL OR remaining_runs > 0)
-            AND (:next_run_at IS NOT NULL OR remaining_runs <= 1)
-            RETURNING automation_id
-            """,
-            params,
+        next_run_at_dt = (
+            datetime.fromisoformat(next_run_at) if next_run_at is not None else None
         )
-        return bool(rows)
+        stmt = (
+            update(AutomationModel)
+            .where(
+                AutomationModel.automation_id == uint64_to_int64(automation_id),
+                AutomationModel.status == AutomationStatus.ACTIVE,
+                AutomationModel.next_run_at
+                == datetime.fromisoformat(previous_next_run_at),
+                or_(
+                    AutomationModel.remaining_runs.is_(None),
+                    AutomationModel.remaining_runs > 0,
+                ),
+            )
+            .values(
+                updated_at=timestamp,
+                next_run_at=case(
+                    (
+                        AutomationModel.remaining_runs.is_not(None)
+                        & (AutomationModel.remaining_runs <= 1),
+                        AutomationModel.next_run_at,
+                    ),
+                    else_=literal(
+                        next_run_at_dt, type_=AutomationModel.next_run_at.type
+                    ),
+                ),
+                remaining_runs=case(
+                    (AutomationModel.remaining_runs.is_(None), None),
+                    (
+                        AutomationModel.remaining_runs > 0,
+                        AutomationModel.remaining_runs - 1,
+                    ),
+                    else_=0,
+                ),
+            )
+            .returning(AutomationModel.automation_id)
+        )
+        if next_run_at is None:
+            stmt = stmt.where(AutomationModel.remaining_runs <= 1)
+
+        with self.session() as session:
+            return session.scalar(stmt) is not None
 
     def finish_automation(
         self,
@@ -1011,45 +1520,34 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         status: Literal[AutomationStatus.COMPLETED, AutomationStatus.FAILED],
     ) -> bool:
         """Finish an active automation with a terminal status."""
-        completed_condition = ""
-        if status == AutomationStatus.COMPLETED:
-            completed_condition = "AND remaining_runs = 0"
-
-        rows = self.query(
-            f"""
-            UPDATE automation
-            SET status = :status,
-                updated_at = :updated_at
-            WHERE automation_id = :automation_id
-            AND status = :active_status
-            {completed_condition}
-            RETURNING automation_id
-            """,
-            {
-                "automation_id": automation_id,
-                "status": status,
-                "updated_at": now(),
-                "active_status": AutomationStatus.ACTIVE,
-            },
+        stmt = (
+            update(AutomationModel)
+            .where(
+                AutomationModel.automation_id == uint64_to_int64(automation_id),
+                AutomationModel.status == AutomationStatus.ACTIVE,
+            )
+            .values(status=status, updated_at=now())
+            .returning(AutomationModel.automation_id)
         )
-        return bool(rows)
+        if status == AutomationStatus.COMPLETED:
+            stmt = stmt.where(AutomationModel.remaining_runs == 0)
+
+        with self.session() as session:
+            return session.scalar(stmt) is not None
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""
         sint64_task_id = uint64_to_int64(task_id)
 
         try:
-            self.query(
-                """
-                INSERT INTO task_logs (timestamp, task_id, log)
-                VALUES (:current_ts, :task_id, :log)
-                """,
-                {
-                    "current_ts": now().timestamp(),
-                    "task_id": sint64_task_id,
-                    "log": log_message,
-                },
-            )
+            with self.session() as session:
+                session.execute(
+                    insert(TaskLogsTable).values(
+                        timestamp=now().timestamp(),
+                        task_id=sint64_task_id,
+                        log=log_message,
+                    )
+                )
         except IntegrityError:
             raise ValueError(f"Task {task_id} not found") from None
 
@@ -1059,22 +1557,27 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Get task logs for the specified `task_id`."""
         sint64_task_id = uint64_to_int64(task_id)
 
-        # We don't check if the task exists before querying logs
-        # because the task_id is validated by the authz layer
+        # We don't check if the task exists before querying logs because the Control API
+        # handler validates access to the associated run before reading logs.
 
         if after_timestamp is None:
             after_timestamp = 0.0
 
         # Polling is strict-after: entries at the checkpoint timestamp have
         # already been delivered.
-        rows = self.query(
-            """
-            SELECT log, timestamp FROM task_logs
-            WHERE task_id = :task_id AND timestamp > :after_timestamp
-            ORDER BY timestamp
-            """,
-            {"task_id": sint64_task_id, "after_timestamp": after_timestamp},
-        )
+        with self.session() as session:
+            rows = (
+                session.execute(
+                    select(TaskLogsTable.c.log, TaskLogsTable.c.timestamp)
+                    .where(
+                        TaskLogsTable.c.task_id == sint64_task_id,
+                        TaskLogsTable.c.timestamp > after_timestamp,
+                    )
+                    .order_by(TaskLogsTable.c.timestamp)
+                )
+                .mappings()
+                .all()
+            )
         latest_timestamp = rows[-1]["timestamp"] if rows else 0.0
         return "".join(row["log"] for row in rows), latest_timestamp
 
@@ -1085,57 +1588,57 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        connector_id: int | None = None,
         requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a task and return its ID."""
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
         sint64_task_id = uint64_to_int64(task_id)
 
-        insert_query = """
-            INSERT INTO task
-            (task_id, type, run_id, fab_hash, model_ref, connector_ref, token,
-             active_until, pending_at, starting_at, running_at, finished_at,
-             sub_status, details)
-            SELECT
-             :task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
-             :active_until, :pending_at, :starting_at, :running_at, :finished_at,
-             :sub_status, :details
-            WHERE CAST(:requesting_task_id AS BIGINT) IS NULL
-            OR EXISTS (
-                SELECT 1
-                FROM task
-                WHERE task_id = CAST(:requesting_task_id AS BIGINT)
-                AND finished_at IS NULL
+        task_values = select(
+            literal(sint64_task_id, type_=TaskModel.task_id.type),
+            literal(task_type, type_=TaskModel.type.type),
+            literal(uint64_to_int64(run_id), type_=TaskModel.run_id.type),
+            literal(fab_hash, type_=TaskModel.fab_hash.type),
+            literal(model_ref, type_=TaskModel.model_ref.type),
+            literal(connector_ref, type_=TaskModel.connector_ref.type),
+            literal(connector_id, type_=TaskModel.connector_id.type),
+            literal(now(), type_=TaskModel.pending_at.type),
+        )
+        if requesting_task_id is not None:
+            sint64_requesting_task_id = uint64_to_int64(requesting_task_id)
+            task_values = task_values.where(
+                select(TaskModel.task_id)
+                .where(
+                    TaskModel.task_id == sint64_requesting_task_id,
+                    TaskModel.finished_at.is_(None),
+                )
+                .exists()
             )
-            RETURNING task_id;
-        """
 
-        params = {
-            "task_id": sint64_task_id,
-            "type": task_type,
-            "run_id": uint64_to_int64(run_id),
-            "fab_hash": fab_hash,
-            "model_ref": model_ref,
-            "connector_ref": connector_ref,
-            "token": None,
-            "active_until": None,
-            "pending_at": now(),
-            "starting_at": None,
-            "running_at": None,
-            "finished_at": None,
-            "sub_status": "",
-            "details": "",
-            "requesting_task_id": (
-                uint64_to_int64(requesting_task_id)
-                if requesting_task_id is not None
-                else None
-            ),
-        }
+        insert_stmt = (
+            insert(TaskModel)
+            .from_select(
+                [
+                    TaskModel.task_id,
+                    TaskModel.type,
+                    TaskModel.run_id,
+                    TaskModel.fab_hash,
+                    TaskModel.model_ref,
+                    TaskModel.connector_ref,
+                    TaskModel.connector_id,
+                    TaskModel.pending_at,
+                ],
+                task_values,
+            )
+            .returning(TaskModel.task_id)
+        )
 
-        with self.session():
+        with self.session() as session:
             try:
-                rows = self.query(insert_query, params)
-                return task_id if rows else None
+                if session.scalar(insert_stmt) is None:
+                    return None
+                return task_id
             except IntegrityError:
                 return None
 
@@ -1170,7 +1673,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if run_ids is not None:
             if not run_ids:
                 return []
-            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
+            sint64_run_ids = [
+                uint64_to_int64(series_run_id) for series_run_id in run_ids
+            ]
             query = query.where(TaskModel.run_id.in_(sint64_run_ids))
 
         if statuses is not None:
@@ -1205,21 +1710,33 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
         """Record usage for the specified task."""
-        with self.session():
-            self.query(
-                """
-                INSERT INTO task_usage (
-                    run_id, task_id, input_tokens, output_tokens, total_tokens,
-                    usage_type, provider, created_at, reported_at
-                )
-                SELECT
-                    run_id, task_id, :input_tokens, :output_tokens,
-                    :total_tokens, :usage_type, :provider, :created_at, :reported_at
-                FROM task
-                WHERE task_id = :task_id
-                """,
-                _task_usage_to_row(task_id, usage),
-            )
+        sint64_task_id = uint64_to_int64(task_id)
+        usage_values = select(
+            TaskModel.run_id,
+            TaskModel.task_id,
+            literal(usage.input_tokens, type_=TaskUsageModel.input_tokens.type),
+            literal(usage.output_tokens, type_=TaskUsageModel.output_tokens.type),
+            literal(usage.total_tokens, type_=TaskUsageModel.total_tokens.type),
+            literal(usage.usage_type, type_=TaskUsageModel.usage_type.type),
+            literal(usage.provider, type_=TaskUsageModel.provider.type),
+            literal(now(), type_=TaskUsageModel.created_at.type),
+        ).where(TaskModel.task_id == sint64_task_id)
+        stmt = insert(TaskUsageModel).from_select(
+            [
+                TaskUsageModel.run_id,
+                TaskUsageModel.task_id,
+                TaskUsageModel.input_tokens,
+                TaskUsageModel.output_tokens,
+                TaskUsageModel.total_tokens,
+                TaskUsageModel.usage_type,
+                TaskUsageModel.provider,
+                TaskUsageModel.created_at,
+            ],
+            usage_values,
+        )
+
+        with self.session() as session:
+            session.execute(stmt)
 
     def get_task_usage(
         self,
@@ -1255,24 +1772,22 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         try:
             # The conditional UPDATE is the atomic claim: exactly one caller can
             # move a pending, unclaimed task to STARTING and attach a token.
-            rows = self.query(
-                f"""
-                UPDATE task
-                SET token = :token,
-                    active_until = :active_until,
-                    starting_at = :starting_at
-                WHERE task_id = :task_id AND token IS NULL
-                AND {STATUS_CONDITIONS[Status.PENDING]}
-                RETURNING task_id
-                """,
-                {
-                    "task_id": sint64_task_id,
-                    "token": token,
-                    "active_until": active_until,
-                    "starting_at": claimed_at,
-                },
-            )
-            if not rows:
+            with self.session() as session:
+                claimed_task_id = session.scalar(
+                    update(TaskModel)
+                    .where(
+                        TaskModel.task_id == sint64_task_id,
+                        TaskModel.token.is_(None),
+                        _task_status_filter(Status.PENDING),
+                    )
+                    .values(
+                        token=token,
+                        active_until=active_until,
+                        starting_at=claimed_at,
+                    )
+                    .returning(TaskModel.task_id)
+                )
+            if claimed_task_id is None:
                 return None
 
             return token
@@ -1284,7 +1799,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Move a task from starting to running."""
         # Expire non-responsive tasks before transitioning task status.
 
-        with self.session():
+        with self.session() as session:
             self._cleanup_expired_task_tokens()
             activated_at = now()
             active_until = activated_at + timedelta(
@@ -1292,20 +1807,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
 
             # Activation is a strict STARTING -> RUNNING transition.
-            rows = self.query(
-                f"""
-                UPDATE task
-                SET running_at = :running_at, active_until = :active_until
-                WHERE task_id = :task_id AND {STATUS_CONDITIONS[Status.STARTING]}
-                RETURNING task_id
-                """,
-                {
-                    "task_id": uint64_to_int64(task_id),
-                    "running_at": activated_at,
-                    "active_until": active_until,
-                },
+            activated_task_id = session.scalar(
+                update(TaskModel)
+                .where(
+                    TaskModel.task_id == uint64_to_int64(task_id),
+                    _task_status_filter(Status.STARTING),
+                )
+                .values(running_at=activated_at, active_until=active_until)
+                .returning(TaskModel.task_id)
             )
-        return len(rows) > 0
+        return activated_task_id is not None
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
@@ -1315,60 +1826,45 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return False
 
         sint64_task_id = uint64_to_int64(task_id)
-        with self.session():
+        with self.session() as session:
             self._cleanup_expired_task_tokens()
-            # FINISHED:COMPLETED is only valid from RUNNING.
-            completion_constraint = ""
-            if sub_status == SubStatus.COMPLETED:
-                completion_constraint = "AND running_at IS NOT NULL"
-
-            rows = self.query(
-                f"""
-                UPDATE task
-                SET finished_at = :finished_at,
-                    sub_status = :sub_status,
-                    details = :details,
-                    active_until = NULL,
-                    token = NULL
-                WHERE task_id = :task_id
-                AND finished_at IS NULL {completion_constraint}
-                RETURNING task_id
-                """,
-                {
-                    "task_id": sint64_task_id,
-                    "finished_at": now(),
-                    "sub_status": sub_status,
-                    "details": details,
-                },
+            query = update(TaskModel).where(
+                TaskModel.task_id == sint64_task_id,
+                TaskModel.finished_at.is_(None),
             )
-            if not rows:
-                return False
+            # FINISHED:COMPLETED is only valid from RUNNING.
+            if sub_status == SubStatus.COMPLETED:
+                query = query.where(TaskModel.running_at.is_not(None))
 
-            return True
+            finished_task_id = session.scalar(
+                query.values(
+                    finished_at=now(),
+                    sub_status=sub_status,
+                    details=details,
+                    active_until=None,
+                    token=None,
+                ).returning(TaskModel.task_id)
+            )
+            return finished_task_id is not None
 
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
         """Extend heartbeat state for the claimed task."""
         # Heartbeats are accepted only for active, unexpired task claims.
-        with self.session():
+        with self.session() as session:
             current = now()
             ttl = timedelta(seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL)
             self._cleanup_expired_task_tokens()
-            rows = self.query(
-                """
-                UPDATE task
-                SET active_until = :active_until
-                WHERE task_id = :task_id
-                AND active_until >= :current
-                AND finished_at IS NULL
-                RETURNING task_id
-                """,
-                {
-                    "task_id": uint64_to_int64(task_id),
-                    "current": current,
-                    "active_until": current + ttl,
-                },
+            acknowledged_task_id = session.scalar(
+                update(TaskModel)
+                .where(
+                    TaskModel.task_id == uint64_to_int64(task_id),
+                    TaskModel.active_until >= current,
+                    TaskModel.finished_at.is_(None),
+                )
+                .values(active_until=current + ttl)
+                .returning(TaskModel.task_id)
             )
-        return len(rows) > 0
+        return acknowledged_task_id is not None
 
     def get_task_by_token(self, token: str) -> Task | None:
         """Return the task associated with the task token, if valid."""
@@ -1388,43 +1884,81 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def store_task_message(self, message: Message) -> bool:
         """Store one task-addressed Message."""
-        if validate_task_message(message):
+        if validate_task_message(message, self.get_node_id()):
             return False
 
-        with self.session():
+        with self.session() as session:
             self._cleanup_expired_task_tokens()
-            message_dict = _task_message_to_row(message)
-            try:
-                inserted = self.query(
-                    """
-                    INSERT INTO task_message (
-                        message_id, run_id, src_task_id, dst_task_id,
-                        reply_to_message_id, created_at, ttl, message_type,
-                        content, error
-                    )
-                    SELECT
-                        :message_id, :run_id, :src_task_id, :dst_task_id,
-                        :reply_to_message_id, :created_at, :ttl, :message_type,
-                        :content, :error
-                    FROM task AS src
-                    JOIN task AS dst
-                        ON dst.task_id = :dst_task_id
-                    WHERE src.task_id = :src_task_id
-                        AND src.run_id = :run_id
-                        AND dst.run_id = :run_id
-                        AND dst.finished_at IS NULL
-                    RETURNING message_id
-                    """,
-                    message_dict,
+            metadata = message.metadata
+            stored_run_id = uint64_to_int64(metadata.run_id)
+            stored_src_task_id = uint64_to_int64(cast(int, metadata.src_task_id))
+            stored_dst_task_id = uint64_to_int64(cast(int, metadata.dst_task_id))
+            serialized_content = (
+                recorddict_to_proto(message.content).SerializeToString()
+                if message.has_content()
+                else None
+            )
+            serialized_error = (
+                error_to_proto(message.error).SerializeToString()
+                if message.has_error()
+                else None
+            )
+            src_task_exists = exists().where(
+                TaskModel.task_id == stored_src_task_id,
+                TaskModel.run_id == stored_run_id,
+            )
+            dst_task_exists = exists().where(
+                TaskModel.task_id == stored_dst_task_id,
+                TaskModel.run_id == stored_run_id,
+                TaskModel.finished_at.is_(None),
+            )
+            task_message_values = select(
+                literal(metadata.message_id, type_=TaskMessageModel.message_id.type),
+                literal(stored_run_id, type_=TaskMessageModel.run_id.type),
+                literal(stored_src_task_id, type_=TaskMessageModel.src_task_id.type),
+                literal(stored_dst_task_id, type_=TaskMessageModel.dst_task_id.type),
+                literal(
+                    metadata.reply_to_message_id,
+                    type_=TaskMessageModel.reply_to_message_id.type,
+                ),
+                literal(metadata.created_at, type_=TaskMessageModel.created_at.type),
+                literal(metadata.ttl, type_=TaskMessageModel.ttl.type),
+                literal(
+                    metadata.message_type, type_=TaskMessageModel.message_type.type
+                ),
+                literal(serialized_content, type_=TaskMessageModel.content.type),
+                literal(serialized_error, type_=TaskMessageModel.error.type),
+            ).where(src_task_exists, dst_task_exists)
+            stmt = (
+                insert(TaskMessageModel)
+                .from_select(
+                    [
+                        TaskMessageModel.message_id,
+                        TaskMessageModel.run_id,
+                        TaskMessageModel.src_task_id,
+                        TaskMessageModel.dst_task_id,
+                        TaskMessageModel.reply_to_message_id,
+                        TaskMessageModel.created_at,
+                        TaskMessageModel.ttl,
+                        TaskMessageModel.message_type,
+                        TaskMessageModel.content,
+                        TaskMessageModel.error,
+                    ],
+                    task_message_values,
                 )
+                .returning(TaskMessageModel.message_id)
+            )
+            try:
+                inserted_message_id = session.scalar(stmt)
             except IntegrityError:
                 return False
-            return bool(inserted)
+            return inserted_message_id is not None
 
     def get_task_message(
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
+        src_task_ids: Sequence[int] | None = None,
         limit: int | None = None,
         order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
@@ -1437,13 +1971,18 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return []
         if dst_task_ids is not None and not dst_task_ids:
             return []
+        if src_task_ids is not None and not src_task_ids:
+            return []
 
         with self.session():
             self._cleanup_expired_task_tokens()
             self._cleanup_invalid_task_messages()
-            rows = self._claim_task_message_models(dst_task_ids, order_by, limit)
+            rows = self._claim_task_message_models(
+                dst_task_ids, src_task_ids, order_by, limit
+            )
             snapshots = [_task_message_snapshot_from_model(row) for row in rows]
-        return [_task_message_from_snapshot(row) for row in snapshots]
+        node_id = self.get_node_id()
+        return [_task_message_from_snapshot(row, node_id) for row in snapshots]
 
     def store_task_events(
         self,
@@ -1460,7 +1999,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return False
 
         current = now()
-        params = [
+        event_rows = [
             {
                 "timestamp": current,
                 "run_id": uint64_to_int64(event.run_id),
@@ -1471,40 +2010,55 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             for event in events
         ]
 
-        with self.session():
-            self.query(
-                """
-                INSERT INTO task_event (timestamp, run_id, task_id, event, data)
-                VALUES (:timestamp, :run_id, :task_id, :event, :data)
-                """,
-                params,
-            )
+        with self.session() as session:
+            session.execute(insert(TaskEventModel), event_rows)
 
         return True
 
-    def get_task_events(
+    def get_task_events(  # pylint: disable=too-many-arguments
         self,
         *,
-        run_id: int | None = None,
+        run_ids: Sequence[int] | None = None,
+        task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
+        before_task_event_id: int | None = None,
+        event_types: Sequence[str] | None = None,
+        last_n: int | None = None,
     ) -> Sequence[TaskEvent]:
-        """Return task-produced run events after the cursor."""
+        """Return task-produced run events matching the filters."""
+        if last_n is not None and last_n < 0:
+            raise ValueError("last_n must be non-negative")
         cursor = after_task_event_id if after_task_event_id is not None else 0
-        query = (
-            select(TaskEventModel)
-            .where(TaskEventModel.id > cursor)
-            .order_by(TaskEventModel.id.asc())
+        query = select(TaskEventModel).where(TaskEventModel.id > cursor)
+        if before_task_event_id is not None:
+            query = query.where(TaskEventModel.id < before_task_event_id)
+        if event_types is not None:
+            query = query.where(TaskEventModel.event.in_(event_types))
+        if run_ids is not None:
+            if not run_ids:
+                return []
+            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
+            query = query.where(TaskEventModel.run_id.in_(sint64_run_ids))
+        if task_ids is not None:
+            if not task_ids:
+                return []
+            sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
+            query = query.where(TaskEventModel.task_id.in_(sint64_task_ids))
+        query = query.order_by(
+            TaskEventModel.id.desc() if last_n else TaskEventModel.id.asc()
         )
-        if run_id is not None:
-            query = query.where(TaskEventModel.run_id == uint64_to_int64(run_id))
-
+        if last_n:
+            query = query.limit(last_n)
         with self.session() as session:
-            rows = session.scalars(query).all()
+            rows = list(session.scalars(query).all())
+            if last_n:
+                rows.reverse()
             return [_task_event_from_model(row) for row in rows]
 
     def _claim_task_message_models(
         self,
         dst_task_ids: Sequence[int] | None,
+        src_task_ids: Sequence[int] | None,
         order_by: Literal["created_at"] | None,
         limit: int | None,
     ) -> list[TaskMessageModel]:
@@ -1515,6 +2069,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if dst_task_ids is not None:
             sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
             query = query.where(TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids))
+        if src_task_ids is not None:
+            sint64_src_task_ids = [uint64_to_int64(t) for t in src_task_ids]
+            query = query.where(TaskMessageModel.src_task_id.in_(sint64_src_task_ids))
         if order_by is not None:
             query = query.order_by(TaskMessageModel.created_at.asc())
         if limit is not None:
@@ -1541,6 +2098,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 delete_query = delete_query.where(
                     TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids)
                 )
+            if src_task_ids is not None:
+                sint64_src_task_ids = [uint64_to_int64(t) for t in src_task_ids]
+                delete_query = delete_query.where(
+                    TaskMessageModel.src_task_id.in_(sint64_src_task_ids)
+                )
 
         returning_query = delete_query.returning(TaskMessageModel)
         with self.session() as session:
@@ -1562,38 +2124,46 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         cases.
         """
         expired_at = now()
-        # Claims that never reached RUNNING are retryable launch failures.
-        self.query(
-            f"""
-            UPDATE task
-            SET token = NULL, active_until = NULL, starting_at = NULL,
-                sub_status = '', details = ''
-            WHERE token IS NOT NULL AND active_until < :current
-            AND {STATUS_CONDITIONS[Status.STARTING]}
-            """,
-            {"current": expired_at},
-        )
+        with self.session() as session:
+            # Claims that never reached RUNNING are retryable launch failures.
+            session.execute(
+                update(TaskModel)
+                .where(
+                    TaskModel.token.is_not(None),
+                    TaskModel.active_until < expired_at,
+                    _task_status_filter(Status.STARTING),
+                )
+                .values(
+                    token=None,
+                    active_until=None,
+                    starting_at=None,
+                    sub_status="",
+                    details="",
+                )
+            )
 
-        # Expired running task claims are terminal failures and lose their token.
-        rows = self.query(
-            f"""
-            UPDATE task
-            SET token = NULL, finished_at = active_until, active_until = NULL,
-                sub_status = :sub_status, details = :details
-            WHERE token IS NOT NULL AND active_until < :current
-            AND {STATUS_CONDITIONS[Status.RUNNING]}
-            RETURNING task_id, type, run_id, fab_hash, model_ref, connector_ref,
-                      pending_at, starting_at, running_at, finished_at,
-                      sub_status, details
-            """,
-            {
-                "current": expired_at,
-                "sub_status": SubStatus.FAILED,
-                "details": "No heartbeat received from the task",
-            },
-        )
-        if rows:
-            self._on_task_tokens_expired([task_from_row(row) for row in rows])
+            # Expired running task claims are terminal failures and lose their token.
+            expired_tasks = [
+                task_from_model(row)
+                for row in session.scalars(
+                    update(TaskModel)
+                    .where(
+                        TaskModel.token.is_not(None),
+                        TaskModel.active_until < expired_at,
+                        _task_status_filter(Status.RUNNING),
+                    )
+                    .values(
+                        token=None,
+                        finished_at=TaskModel.active_until,
+                        active_until=None,
+                        sub_status=SubStatus.FAILED,
+                        details="No heartbeat received from the task",
+                    )
+                    .returning(TaskModel)
+                ).all()
+            ]
+        if expired_tasks:
+            self._on_task_tokens_expired(expired_tasks)
 
     def _cleanup_invalid_task_messages(self) -> None:
         """Remove expired task Messages."""
@@ -1620,28 +2190,36 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Atomically reserve a nonce in a namespace."""
         if namespace == "" or nonce == "":
             return False
-        with self.session():
-            self.query(
-                """
-                DELETE FROM nonce_store
-                WHERE expires_at < :current
-                """,
-                {"current": now().timestamp()},
+        with self.session() as session:
+            session.execute(
+                delete(NonceStoreModel).where(
+                    NonceStoreModel.expires_at < now().timestamp()
+                )
             )
-            rows = self.query(
-                """
-                INSERT INTO nonce_store (namespace, nonce, expires_at)
-                VALUES (:namespace, :nonce, :expires_at)
-                ON CONFLICT(namespace, nonce) DO NOTHING
-                RETURNING nonce
-                """,
-                {
-                    "namespace": namespace,
-                    "nonce": nonce,
-                    "expires_at": expires_at,
-                },
+            stmt = (
+                self.dialect_insert(NonceStoreModel)
+                .values(namespace=namespace, nonce=nonce, expires_at=expires_at)
+                .on_conflict_do_nothing(
+                    index_elements=[NonceStoreModel.namespace, NonceStoreModel.nonce]
+                )
+                .returning(NonceStoreModel.nonce)
             )
-            return bool(rows)
+            return session.scalar(stmt) is not None
+
+
+def _agent_from_model(model: AgentModel) -> Agent:
+    """Convert an agent ORM model to its protobuf message."""
+    return Agent(
+        id=model.agent_id,
+        config=AgentConfig(
+            name=model.name,
+            title=model.title,
+            description=model.description,
+            app_spec=model.app_spec,
+        ),
+        created_at=_timestamp_to_iso_assuming_utc(model.created_at),
+        updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),
+    )
 
 
 def _connector_oauth_session_from_model(
@@ -1651,6 +2229,7 @@ def _connector_oauth_session_from_model(
     return ConnectorOAuthSessionRecord(
         oauth_session_id=model.oauth_session_id,
         flwr_aid=model.flwr_aid,
+        federation_id=model.federation_id,
         connector_ref=model.connector_ref,
         state=model.state,
         redirect_uri=model.redirect_uri,
@@ -1658,6 +2237,17 @@ def _connector_oauth_session_from_model(
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         expires_at=_timestamp_to_iso_assuming_utc(model.expires_at),
         completed_at=_timestamp_to_iso_assuming_utc(model.completed_at) or None,
+    )
+
+
+def _connector_from_model(model: ConnectorModel) -> ConnectorRecord:
+    """Convert a connector ORM model to a connector record."""
+    return ConnectorRecord(
+        connector_id=model.connector_id,
+        federation_id=model.federation_id,
+        connector_ref=model.connector_ref,
+        credentials_json=model.credentials_json,
+        config_json=model.config_json,
     )
 
 
@@ -1735,6 +2325,7 @@ def task_from_row(row: dict[str, Any]) -> Task:
         fab_hash=row["fab_hash"],
         model_ref=row["model_ref"],
         connector_ref=row["connector_ref"],
+        connector_id=row["connector_id"],
     )
 
 
@@ -1752,6 +2343,7 @@ def task_from_model(model: TaskModel) -> Task:
         fab_hash=model.fab_hash,
         model_ref=model.model_ref,
         connector_ref=model.connector_ref,
+        connector_id=model.connector_id,
     )
 
 
@@ -1760,7 +2352,7 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     return RunSeries(
         series_id=int64_to_uint64(row["series_id"]),
         federation=row["federation_id"],
-        description=row["description"] or "",
+        description=row["description"],
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
     )
@@ -1777,18 +2369,16 @@ def _run_series_from_model(model: RunSeriesModel) -> RunSeries:
     )
 
 
-def _task_usage_to_row(task_id: int, usage: TaskUsage) -> dict[str, Any]:
-    """Convert a TaskUsage proto to database row values."""
-    return {
-        "task_id": uint64_to_int64(task_id),
-        "input_tokens": usage.input_tokens,
-        "output_tokens": usage.output_tokens,
-        "total_tokens": usage.total_tokens,
-        "usage_type": usage.usage_type,
-        "provider": usage.provider,
-        "created_at": now(),
-        "reported_at": None,
-    }
+def _compacted_context_from_model(model: CompactedContextModel) -> CompactedContext:
+    """Convert a compacted context model to its proto representation."""
+    return CompactedContext(
+        id=model.id,
+        series_id=model.series_id,
+        through_event_id=model.through_event_id,
+        text=model.text,
+        token_count=model.token_count,
+        created_at=timestamp_to_iso(model.created_at),
+    )
 
 
 def _task_usage_from_model(model: TaskUsageModel) -> TaskUsage:
@@ -1814,28 +2404,21 @@ def _task_event_from_model(model: TaskEventModel) -> TaskEvent:
     )
 
 
-def _task_message_to_row(message: Message) -> dict[str, Any]:
-    """Convert a task-addressed Message to database row values."""
-    return {
-        "message_id": message.metadata.message_id,
-        "run_id": uint64_to_int64(message.metadata.run_id),
-        "src_task_id": uint64_to_int64(cast(int, message.metadata.src_task_id)),
-        "dst_task_id": uint64_to_int64(cast(int, message.metadata.dst_task_id)),
-        "reply_to_message_id": message.metadata.reply_to_message_id,
-        "created_at": message.metadata.created_at,
-        "ttl": message.metadata.ttl,
-        "message_type": message.metadata.message_type,
-        "content": (
-            recorddict_to_proto(message.content).SerializeToString()
-            if message.has_content()
-            else None
-        ),
-        "error": (
-            error_to_proto(message.error).SerializeToString()
-            if message.has_error()
-            else None
-        ),
-    }
+def _automation_from_model(model: AutomationModel) -> Automation:
+    """Convert an automation model to its proto representation."""
+    return Automation(
+        automation_id=model.automation_id,
+        status=model.status,
+        federation=model.federation_id,
+        series_id=int64_to_uint64(model.series_id),
+        flwr_aid=model.flwr_aid,
+        created_at=timestamp_to_iso(model.created_at),
+        updated_at=timestamp_to_iso(model.updated_at),
+        next_run_at=timestamp_to_iso(model.next_run_at),
+        fixed_interval=model.fixed_interval,
+        remaining_runs=model.remaining_runs,
+        stopped_at=timestamp_to_iso(model.stopped_at) if model.stopped_at else None,
+    )
 
 
 def _task_message_snapshot_from_model(model: TaskMessageModel) -> dict[str, Any]:
@@ -1854,7 +2437,7 @@ def _task_message_snapshot_from_model(model: TaskMessageModel) -> dict[str, Any]
     }
 
 
-def _task_message_from_snapshot(row: dict[str, Any]) -> Message:
+def _task_message_from_snapshot(row: dict[str, Any], node_id: int) -> Message:
     """Convert a claimed task_message snapshot to a Message."""
     content, error = None, None
     if row["content"] is not None:
@@ -1865,9 +2448,9 @@ def _task_message_from_snapshot(row: dict[str, Any]) -> Message:
     metadata = Metadata(
         run_id=int64_to_uint64(row["run_id"]),
         message_id=row["message_id"],
-        src_node_id=SUPERLINK_NODE_ID,
-        dst_node_id=SUPERLINK_NODE_ID,
-        reply_to_message_id=row["reply_to_message_id"] or "",
+        src_node_id=node_id,
+        dst_node_id=node_id,
+        reply_to_message_id=row["reply_to_message_id"],
         group_id="",  # Task messages don't have this field for now
         created_at=row["created_at"],
         ttl=row["ttl"],

@@ -1,0 +1,409 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Flower HTTP Grid."""
+
+
+import time
+from collections.abc import Iterable
+from logging import DEBUG, ERROR, WARNING
+from typing import cast
+
+import httpx
+
+from flwr.app import Message, RecordDict
+from flwr.app.message import remove_content_from_message
+from flwr.common.constant import CLIENT_OCTET, SUPERLINK_NODE_ID
+from flwr.common.serde import message_to_proto
+from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    ConfirmMessageReceivedRequest,
+)
+from flwr.proto.node_pb2 import Node, NodeInfo  # pylint: disable=E0611
+from flwr.proto.recorddict_pb2 import StringList  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    GetNodesRequest,
+    GetNodesResponse,
+    PullAppMessagesRequest,
+    PullAppMessagesResponse,
+    PushAppMessagesRequest,
+    PushAppMessagesResponse,
+)
+from flwr.serverapp.grid import Grid
+from flwr.supercore import log
+from flwr.supercore.constant import SUPERLINK_UVICORN_DEFAULT_PORT
+from flwr.supercore.inflatable.inflatable_object import (
+    InflatableObject,
+    get_all_nested_objects,
+    get_object_tree,
+    iterate_object_tree,
+    no_object_id_recompute,
+)
+from flwr.supercore.inflatable.inflatable_protobuf_utils import (
+    make_pull_object_fn_protobuf,
+    make_push_object_fn_protobuf,
+)
+from flwr.supercore.inflatable.inflatable_utils import (
+    ObjectPullError,
+    inflate_object_from_contents,
+    pull_objects,
+    push_objects,
+)
+from flwr.supercore.interceptors import (
+    RuntimeTokenHttpInterceptor,
+    RuntimeVersionHttpInterceptor,
+)
+from flwr.supercore.logger import warn_deprecated_feature
+from flwr.supercore.retry import make_simple_http_retry_invoker
+from flwr.supercore.run import Run
+from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.runtime.tracing import RuntimeTracingInterceptor
+
+_DEFAULT_RUNTIME_API_ADDRESS = f"{CLIENT_OCTET}:{SUPERLINK_UVICORN_DEFAULT_PORT}"
+
+ERROR_MESSAGE_PUSH_MESSAGES_PAYLOAD_TOO_LARGE = """
+
+[Grid.push_messages] HTTP payload too large:
+
+Consider reducing the number of messages pushed at once, or push messages
+individually, for example:
+
+> msgs = [msg1, msg2, msg3]
+> msg_ids = []
+> for msg in msgs:
+>     msg_id = grid.push_messages([msg])
+>     msg_ids.extend(msg_id)
+"""
+
+ERROR_MESSAGE_PULL_MESSAGES_PAYLOAD_TOO_LARGE = """
+
+[Grid.pull_messages] HTTP payload too large:
+
+Consider reducing the number of messages pulled at once, or pull messages
+individually, for example:
+
+> msgs_ids = [msg_id1, msg_id2, msg_id3]
+> msgs = []
+> for msg_id in msg_ids:
+>     msg = grid.pull_messages([msg_id])
+>     msgs.extend(msg)
+"""
+
+
+class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
+    """`HttpGrid` provides an interface to the Runtime API.
+
+    Parameters
+    ----------
+    runtime_api_address : str (default: "127.0.0.1:8000")
+        The address (URL, IPv6, IPv4) of the SuperLink Runtime API service.
+    insecure : bool (default: False)
+        If True, use plaintext (TLS disabled). If False, use TLS.
+    root_certificates : Optional[bytes] (default: None)
+        The PEM-encoded root certificates as a byte string.
+        Used only when `insecure` is False. If provided, these certificates are
+        used to verify the server certificate. If None, HTTPX's default trusted CA
+        bundle is used.
+    token : str
+        Executor token used for Runtime API authentication.
+    """
+
+    _deprecation_warning_logged = False
+
+    def __init__(  # pylint: disable=too-many-arguments
+        self,
+        runtime_api_address: str = _DEFAULT_RUNTIME_API_ADDRESS,
+        insecure: bool = False,
+        root_certificates: bytes | None = None,
+        *,
+        token: str,
+    ) -> None:
+        if token == "":
+            raise ValueError("`token` must be a non-empty string")
+        self._addr = runtime_api_address
+        self._insecure = insecure
+        self._cert = root_certificates
+        self._token = token
+        self._tracing = RuntimeTracingInterceptor()
+        self._run: Run | None = None
+        self._client: RuntimeHttpClient | None = None
+        self.node = Node(node_id=SUPERLINK_NODE_ID)
+        self._retry_invoker = make_simple_http_retry_invoker()
+        super().__init__()
+
+    @property
+    def _is_connected(self) -> bool:
+        """Check if connected to the Runtime API server."""
+        return self._client is not None
+
+    def _connect(self) -> None:
+        """Connect to the Runtime API."""
+        if self._is_connected:
+            log(WARNING, "Already connected")
+            return
+        self._client = RuntimeHttpClient.from_server_address(
+            server_address=self._addr,
+            insecure=self._insecure,
+            root_certificates=self._cert,
+            interceptors=[
+                self._tracing,
+                RuntimeVersionHttpInterceptor(component_name="flwr-serverapp"),
+                RuntimeTokenHttpInterceptor(token=self._token),
+            ],
+            retry_invoker=self._retry_invoker,
+        )
+        log(DEBUG, "[flwr-serverapp] Connected to %s", self._addr)
+
+    def _disconnect(self) -> None:
+        """Disconnect from the Runtime API."""
+        if not self._is_connected:
+            log(DEBUG, "Already disconnected")
+            return
+        client = cast(RuntimeHttpClient, self._client)
+        self._client = None
+        client.close()
+        log(DEBUG, "[flwr-serverapp] Disconnected")
+
+    def set_run(self, run: Run) -> None:
+        """Set the run."""
+        if not isinstance(run, Run):
+            run_type = type(run).__name__
+            raise TypeError(f"`run` must be an instance of Run, got {run_type}")
+        self._run = run
+
+    @property
+    def run(self) -> Run:
+        """Run information."""
+        return Run(**vars(self._run))
+
+    @property
+    def _runtime_client(self) -> RuntimeHttpClient:
+        """Runtime API client."""
+        if not self._is_connected:
+            self._connect()
+        return cast(RuntimeHttpClient, self._client)
+
+    def create_message(  # pylint: disable=too-many-arguments,R0917
+        self,
+        content: RecordDict,
+        message_type: str,
+        dst_node_id: int,
+        group_id: str,
+        ttl: float | None = None,
+    ) -> Message:
+        """Create a new message with specified parameters.
+
+        This method constructs a new `Message` with given content and metadata.
+        The `run_id` and `src_node_id` will be set automatically.
+        """
+        if not HttpGrid._deprecation_warning_logged:
+            HttpGrid._deprecation_warning_logged = True
+            warn_deprecated_feature(
+                "`Driver.create_message` / `Grid.create_message` is deprecated."
+                "Use `Message` constructor instead."
+            )
+        return Message(content, dst_node_id, message_type, ttl=ttl, group_id=group_id)
+
+    def get_node_ids(self) -> Iterable[int]:
+        """Get node IDs."""
+        return [node.node_id for node in self.get_nodes()]
+
+    def get_nodes(self) -> Iterable[NodeInfo]:
+        """Get nodes."""
+        # Call the Runtime API client
+        res: GetNodesResponse = self._runtime_client.GetNodes(GetNodesRequest())
+        return res.nodes
+
+    def _try_push_messages(self, run_id: int, messages: Iterable[Message]) -> list[str]:
+        """Push all messages and its associated objects."""
+        # Prepare all Messages to be sent in a single request
+        proto_messages = []
+        object_trees = []
+        all_objects: dict[str, InflatableObject] = {}
+        for msg in messages:
+            proto_messages.append(message_to_proto(remove_content_from_message(msg)))
+            all_objects.update(get_all_nested_objects(msg))
+            object_trees.append(get_object_tree(msg))
+            del msg
+
+        # Call the Runtime API client
+        res: PushAppMessagesResponse = self._runtime_client.PushMessages(
+            PushAppMessagesRequest(
+                messages_list=proto_messages,
+                message_object_trees=object_trees,
+            )
+        )
+
+        # Push objects
+        push_objects(
+            all_objects,
+            push_object_fn=make_push_object_fn_protobuf(
+                push_object_protobuf=self._runtime_client.PushObject,
+                node=self.node,
+                run_id=run_id,
+                session_id=res.session_id,
+            ),
+            object_ids_to_push=set(res.objects_to_push),
+        )
+        return cast(list[str], res.message_ids)
+
+    def push_messages(self, messages: Iterable[Message]) -> Iterable[str]:
+        """Push messages to specified node IDs.
+
+        This method takes an iterable of messages and sends each message
+        to the node specified in `dst_node_id`.
+        """
+        # Construct Messages
+        run_id = cast(Run, self._run).run_id
+        message_ids: list[str] = []
+        messages = list(messages)
+        if not messages:
+            return message_ids
+        try:
+            with no_object_id_recompute():
+                for msg in messages:
+                    # Populate message ID
+                    msg.metadata.__dict__["_message_id"] = msg.object_id
+                    if (
+                        msg.metadata.src_node_id != self.node.node_id
+                        or msg.metadata.run_id != run_id
+                    ):
+                        raise ValueError(
+                            "Message source or run does not match this Grid."
+                        )
+                # Try pushing messages and their objects
+                message_ids = self._try_push_messages(run_id, messages)
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == httpx.codes.REQUEST_ENTITY_TOO_LARGE:
+                log(ERROR, ERROR_MESSAGE_PUSH_MESSAGES_PAYLOAD_TOO_LARGE)
+                return []
+            raise
+
+        if "" in message_ids:
+            log(
+                WARNING,
+                "Not all messages could be pushed to the SuperLink. The returned "
+                "list has an empty ID for those messages (the order is preserved as "
+                "passed to `push_messages`). This could be due to a malformed "
+                "message.",
+            )
+
+        return message_ids
+
+    def pull_messages(
+        self,
+        reply_to_message_ids: Iterable[str] | None = None,
+        *,
+        message_ids: Iterable[str] | None = None,
+    ) -> Iterable[Message]:
+        """Pull messages with an optional correlation filter."""
+        if message_ids is not None:
+            if reply_to_message_ids is not None:
+                raise TypeError(
+                    "Specify only one of `reply_to_message_ids` and `message_ids`."
+                )
+            warn_deprecated_feature(
+                "`message_ids` is deprecated. Use `reply_to_message_ids` instead."
+            )
+            reply_to_message_ids = message_ids
+        run_id = cast(Run, self._run).run_id
+        try:
+            # Pull Messages
+            res: PullAppMessagesResponse = self._runtime_client.PullMessages(
+                PullAppMessagesRequest(
+                    reply_to_message_ids=(
+                        StringList(vals=reply_to_message_ids)
+                        if reply_to_message_ids is not None
+                        else None
+                    ),
+                )
+            )
+            # Pull Messages from store
+            inflated_msgs: list[Message] = []
+            for msg_proto, msg_tree in zip(
+                res.messages_list, res.message_object_trees, strict=True
+            ):
+                msg_id = msg_proto.metadata.message_id
+                try:
+                    all_object_contents = pull_objects(
+                        object_ids=[
+                            tree.object_id for tree in iterate_object_tree(msg_tree)
+                        ],
+                        pull_object_fn=make_pull_object_fn_protobuf(
+                            pull_object_protobuf=self._runtime_client.PullObject,
+                            node=self.node,
+                            run_id=run_id,
+                        ),
+                    )
+                except ObjectPullError as e:
+                    log(ERROR, "Message %s objects unavailable: %s", msg_id, e)
+                    continue
+
+                self._runtime_client.ConfirmMessageReceived(
+                    ConfirmMessageReceivedRequest(
+                        node=self.node, run_id=run_id, message_object_id=msg_id
+                    )
+                )
+                message = inflate_object_from_contents(msg_id, all_object_contents)
+                if not isinstance(message, Message):
+                    raise TypeError("Received object is not a Message.")
+                message.metadata.__dict__["_message_id"] = msg_id
+                inflated_msgs.append(message)
+
+            return inflated_msgs
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == httpx.codes.REQUEST_ENTITY_TOO_LARGE:
+                log(ERROR, ERROR_MESSAGE_PULL_MESSAGES_PAYLOAD_TOO_LARGE)
+                return []
+            raise
+
+    def send_and_receive(
+        self,
+        messages: Iterable[Message],
+        *,
+        timeout: float | None = None,
+    ) -> Iterable[Message]:
+        """Push messages to specified node IDs and pull the reply messages.
+
+        This method sends a list of messages to their destination node IDs and then
+        waits for the replies. It continues to pull replies until either all replies are
+        received or the specified timeout duration is exceeded.
+        """
+        # Push messages
+        msg_ids = {msg_id for msg_id in self.push_messages(messages) if msg_id}
+        del messages
+
+        # Pull messages
+        end_time = time.time() + (timeout if timeout is not None else 0.0)
+        ret: list[Message] = []
+        while timeout is None or time.time() < end_time:
+            res_msgs = self.pull_messages(msg_ids)
+            ret.extend(res_msgs)
+            msg_ids.difference_update(
+                {msg.metadata.reply_to_message_id for msg in res_msgs}
+            )
+            if len(msg_ids) == 0:
+                break
+            # Sleep
+            time.sleep(3)
+        return ret
+
+    def close(self) -> None:
+        """Disconnect from the SuperLink if connected."""
+        # Check if `connect` was called before
+        if not self._is_connected:
+            return
+        # Disconnect
+        self._disconnect()

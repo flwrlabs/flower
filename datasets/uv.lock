@@ -244,11 +244,11 @@ jupyter = [
 
 [[package]]
 name = "certifi"
-version = "2026.2.25"
+version = "2026.10.19"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/af/2d/7bf41579a8986e348fa033a31cdd0e4121114f6bce2457e8876010b092dd/certifi-2026.2.25.tar.gz", hash = "sha256:e887ab5cee78ea814d3472169153c2d12cd43b14bd03329a39a9c6e2e80bfba7", size = 155029, upload-time = "2026-02-25T02:54:17.342Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a6/bd/1436c50cc46699de0230fbaacc1d1de7bfec413176099949e9d5112e88f2/certifi-2026.10.19.tar.gz", hash = "sha256:035c1e85572b141bf1c3a3eff0e33a8eb74917522f2559075ff8d2fea780a1ae", size = 137598, upload-time = "2026-10-20T02:24:16.604Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9a/3c/c17fb3ca2d9c3acff52e30b309f538586f9f5b9c9cf454f3845fc9af4881/certifi-2026.2.25-py3-none-any.whl", hash = "sha256:027692e4402ad994f1c42e52a4997a9763c646b73e4096e4d5d6db8af1d6f0fa", size = 153684, upload-time = "2026-02-25T02:54:15.766Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/51/29046e48f693c54e5b7412216d447a1d8362c9653148d98c02cdf65fa733/certifi-2026.10.19-py3-none-any.whl", hash = "sha256:42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b", size = 136464, upload-time = "2026-10-20T02:24:15.072Z" },
 ]
 
 [[package]]
@@ -593,7 +593,7 @@ wheels = [
 
 [[package]]
 name = "flwr-datasets"
-version = "0.6.0"
+version = "0.6.1"
 source = { editable = "." }
 dependencies = [
     { name = "datasets" },
@@ -635,7 +635,7 @@ requires-dist = [
     { name = "matplotlib", specifier = ">=3.7.5,<4.0.0" },
     { name = "numpy", specifier = ">=1.26.0,<3.0.0" },
     { name = "pillow", marker = "extra == 'vision'", specifier = ">=12.2.0" },
-    { name = "rich", specifier = ">=13.5.0" },
+    { name = "rich", specifier = ">=14.0.0,<15.0.0" },
     { name = "seaborn", specifier = ">=0.13.0,<0.14.0" },
     { name = "torch", marker = "extra == 'audio'", specifier = ">=2.10.0" },
     { name = "torchcodec", marker = "extra == 'audio'", specifier = ">=0.7.0" },

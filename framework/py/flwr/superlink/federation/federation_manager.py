@@ -54,7 +54,7 @@ class FederationManager(ABC):
 
     @abstractmethod
     def filter_nodes(self, node_ids: set[int], federation_id: str) -> set[int]:
-        """Given a list of node IDs, return sublist with nodes in federation."""
+        """Return the subset of node IDs in the federation, including SuperLink."""
 
     @abstractmethod
     def has_node(self, node_id: int, federation_id: str) -> bool:
@@ -74,7 +74,8 @@ class FederationManager(ABC):
     def get_federations(self, flwr_aid: str) -> list[Federation]:
         """Get federations of which the account is a member.
 
-        Only the ID, description, and whether the federation is archived are returned.
+        Only summary information is returned. ``members`` may contain a bounded
+        preview, while ``member_count`` reports the total number of active members.
         """
 
     @abstractmethod
@@ -126,6 +127,27 @@ class FederationManager(ABC):
         FlowerError
             If the federation does not exist, the caller account is not a
             member, or the federation is not configured for simulation.
+        """
+
+    @abstractmethod
+    def set_icon_key(
+        self, flwr_aid: str, federation_id: str, icon_key: str | None
+    ) -> None:
+        """Set or clear the custom icon for a federation.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            The ID of the account setting the icon.
+        federation_id : str
+            The federation ID.
+        icon_key : str | None
+            The icon key to store, or ``None`` to clear the custom icon.
+
+        Raises
+        ------
+        FlowerError
+            If the federation does not exist or the caller is not its owner.
         """
 
     @abstractmethod

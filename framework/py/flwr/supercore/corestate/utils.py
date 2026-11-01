@@ -15,12 +15,12 @@
 """Utility functions for CoreState."""
 
 
-from datetime import datetime
+from datetime import UTC, datetime
 from os import urandom
 
 from flwr.app import Context, Message
+from flwr.app.metadata import Metadata
 from flwr.common import serde
-from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
 from flwr.supercore.date import now
 from flwr.supercore.utils import strict_json_loads
@@ -78,7 +78,27 @@ def validate_task_event_data(data: str) -> None:
         raise ValueError("Task event data must be a JSON object.")
 
 
-def validate_task_message(message: Message) -> list[str]:  # pylint: disable=R0912
+def validate_message_metadata(metadata: Metadata) -> list[str]:
+    """Validate destination-addressed Message metadata independently of its body."""
+    errors = []
+    if not metadata.message_id:
+        errors.append("empty `metadata.message_id`")
+    if metadata.created_at < _MIN_VALID_MESSAGE_CREATED_AT:
+        errors.append("`metadata.created_at` must be a valid Unix timestamp")
+    if metadata.ttl <= 0:
+        errors.append("`metadata.ttl` must be higher than zero")
+    try:
+        datetime.fromtimestamp(metadata.created_at + metadata.ttl, tz=UTC)
+    except (OverflowError, ValueError, OSError):
+        errors.append("Message expiration is outside the supported timestamp range")
+    if metadata.created_at + metadata.ttl <= now().timestamp():
+        errors.append("Message TTL has expired")
+    return errors
+
+
+def validate_task_message(
+    message: Message, node_id: int
+) -> list[str]:  # pylint: disable=R0912
     """Validate a task Message."""
     validation_errors = []
     metadata = message.metadata
@@ -100,15 +120,14 @@ def validate_task_message(message: Message) -> list[str]:  # pylint: disable=R09
             "`metadata.src_task_id` and `metadata.dst_task_id` must be different."
         )
 
-    # Temporary: task messages are only supported in SuperLink for now.
-    if metadata.src_node_id != SUPERLINK_NODE_ID:
+    if metadata.src_node_id != node_id:
         validation_errors.append(
-            f"`metadata.src_node_id` is not {SUPERLINK_NODE_ID} (SuperLink node ID)"
+            f"`metadata.src_node_id` does not match CoreState node ID {node_id}"
         )
 
-    if metadata.dst_node_id != SUPERLINK_NODE_ID:
+    if metadata.dst_node_id != node_id:
         validation_errors.append(
-            f"`metadata.dst_node_id` is not {SUPERLINK_NODE_ID} (SuperLink node ID)"
+            f"`metadata.dst_node_id` does not match CoreState node ID {node_id}"
         )
 
     if metadata.created_at < _MIN_VALID_MESSAGE_CREATED_AT:

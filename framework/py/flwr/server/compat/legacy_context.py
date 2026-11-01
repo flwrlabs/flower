@@ -52,4 +52,11 @@ class LegacyContext(Context):
         self.client_manager = client_manager
         self.history = History()
 
-        super().__init__(**vars(context))
+        super().__init__(
+            run_id=context.run_id,
+            node_id=context.node_id,
+            node_config=context.node_config,
+            state=context.state,
+            run_config=context.run_config,
+            series_id=context.series_id,
+        )

@@ -16,14 +16,15 @@
 
 
 import abc
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from typing import Literal
 
 from flwr.app import Context, Message, RecordDict
 from flwr.app.user_config import UserConfig
-from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import FederationManager
@@ -32,114 +33,97 @@ from flwr.superlink.federation import FederationManager
 class LinkState(CoreState):  # pylint: disable=R0904
     """Abstract LinkState."""
 
+    def get_node_id(self) -> int:
+        """Return the SuperLink node ID."""
+        return SUPERLINK_NODE_ID
+
     @property
     @abc.abstractmethod
     def federation_manager(self) -> FederationManager:
         """Return the FederationManager instance."""
 
-    @abc.abstractmethod
-    def store_message_ins(self, message: Message) -> str | None:
-        """Store one Message.
+    def _check_message_policy(self, messages: Sequence[Message]) -> list[bool]:
+        """Check run and federation policy in input order without changing state.
 
-        Usually, the ServerAppIo API calls this to schedule instructions.
-
-        Stores the value of the `message` in the link state and, if successful,
-        returns the `message_id` (str) of the `message`. If, for any reason,
-        storing the `message` fails, `None` is returned.
-
-        Constraints
-        -----------
-        `message.metadata.dst_node_id` MUST be set (not constant.SUPERLINK_NODE_ID)
-
-        If `message.metadata.run_id` is invalid, then
-        storing the `message` MUST fail.
+        Run and federation lookup errors propagate to the caller.
+        All run and membership lookups are scoped to this batch.
         """
+        # Avoid lookups when there are no messages to check.
+        if not messages:
+            return []
 
-    @abc.abstractmethod
-    def get_message_ins(self, node_id: int, limit: int | None) -> list[Message]:
-        """Get zero or more `Message` objects for the provided `node_id`.
+        # Fetch distinct runs once and retain only those that can exchange messages.
+        run_ids = sorted({message.metadata.run_id for message in messages})
+        runs = {
+            run.run_id: run
+            for run in self.get_run_info(run_ids=run_ids)
+            if run.status.status in (Status.PENDING, Status.STARTING, Status.RUNNING)
+        }
 
-        Usually, the Fleet API calls this for Nodes planning to work on one or more
-        Message.
+        # Merge node IDs by federation to share membership checks across runs.
+        federation_nodes: dict[str, set[int]] = {}
+        for message in messages:
+            if (run := runs.get(message.metadata.run_id)) is not None:
+                federation_nodes.setdefault(run.federation_id, set()).update(
+                    (message.metadata.src_node_id, message.metadata.dst_node_id)
+                )
 
-        Constraints
-        -----------
-        Retrieve all Message where the `message.metadata.dst_node_id` equals `node_id`.
+        # Filter node IDs once per federation, delegating SuperLink address rules.
+        for federation_id, node_ids in federation_nodes.items():
+            federation_nodes[federation_id] = self.federation_manager.filter_nodes(
+                node_ids, federation_id
+            )
 
-        If `limit` is not `None`, return, at most, `limit` number of `message`. If
-        `limit` is set, it has to be greater zero.
-        """
+        # Preserve input order and require both nodes to belong to the federation.
+        results: list[bool] = []
+        for message in messages:
+            run = runs.get(message.metadata.run_id)
+            if run is None:
+                results.append(False)
+                continue
+            node_ids = {message.metadata.src_node_id, message.metadata.dst_node_id}
+            results.append(node_ids <= federation_nodes[run.federation_id])
+        return results
 
-    @abc.abstractmethod
-    def store_message_res(self, message: Message) -> str | None:
-        """Store one Message.
+    def store_messages(self, messages: Sequence[Message]) -> list[bool]:
+        """Store messages allowed by run and federation policy in input order."""
+        # Concrete LinkStates put their CoreState implementation next in the MRO.
+        allowed = self._check_message_policy(messages)
+        results = iter(
+            super().store_messages(  # type: ignore[safe-super]
+                [msg for msg, ok in zip(messages, allowed, strict=True) if ok]
+            )
+        )
+        return [next(results) if ok else False for ok in allowed]
 
-        Usually, the Fleet API calls this for Nodes returning results.
-
-        Stores the Message and, if successful, returns the `message_id` (str) of
-        the `message`. If storing the `message` fails, `None` is returned.
-
-        Constraints
-        -----------
-        `message.metadata.dst_node_id` MUST be set (not constant.SUPERLINK_NODE_ID)
-
-        If `message.metadata.run_id` is invalid, then
-        storing the `message` MUST fail.
-        """
-
-    @abc.abstractmethod
-    def get_message_res(self, message_ids: set[str]) -> list[Message]:
-        """Get reply Messages for the given Message IDs.
-
-        This method is typically called by the ServerAppIo API to obtain
-        results (type Message) for previously scheduled instructions (type Message).
-        For each message_id passed, this method returns one of the following responses:
-
-        - An error Message if there was no message registered with such message IDs
-        or has expired.
-        - An error Message if the reply Message exists but has expired.
-        - The reply Message.
-        - Nothing if the Message with the passed message_id is still valid and waiting
-        for a reply Message.
-
-        Parameters
-        ----------
-        message_ids : set[str]
-            A set of Message IDs used to retrieve reply Messages responding to them.
-
-        Returns
-        -------
-        list[Message]
-            A list of reply Message responding to the given message IDs or Messages
-            carrying an Error.
-        """
-
-    @abc.abstractmethod
-    def num_message_ins(self) -> int:
-        """Calculate the number of Messages awaiting a reply."""
-
-    @abc.abstractmethod
-    def num_message_res(self) -> int:
-        """Calculate the number of reply Messages in store."""
-
-    @abc.abstractmethod
-    def delete_messages(self, message_ins_ids: set[str]) -> None:
-        """Delete a Message and its reply based on provided Message IDs.
-
-        Parameters
-        ----------
-        message_ins_ids : set[str]
-            A set of Message IDs. For each ID in the set, the corresponding
-            Message and its associated reply Message will be deleted.
-        """
-
-    @abc.abstractmethod
-    def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
-        """Get all instruction Message IDs for the given run_id."""
+    def get_messages(
+        self,
+        *,
+        dst_node_id: int,
+        run_id: int | None = None,
+        reply_to_message_ids: Collection[str] | None = None,
+        limit: int | None = None,
+    ) -> list[Message]:
+        """Get candidates, cancelling policy rejections without refilling the batch."""
+        messages = super().get_messages(  # type: ignore[safe-super]
+            dst_node_id=dst_node_id,
+            run_id=run_id,
+            reply_to_message_ids=reply_to_message_ids,
+            limit=limit,
+        )
+        allowed = self._check_message_policy(messages)
+        rejected_ids = [
+            msg.metadata.message_id
+            for msg, ok in zip(messages, allowed, strict=True)
+            if not ok
+        ]
+        if rejected_ids:
+            self.cancel_messages(message_ids=rejected_ids)
+        return [msg for msg, ok in zip(messages, allowed, strict=True) if ok]
 
     def cleanup_run(self, run_id: int) -> None:
         """Clean up run-scoped messages and objects."""
-        self.delete_messages(self.get_message_ids_from_run_id(run_id))
+        self.cancel_messages(run_id=run_id)
         self.object_store.delete_objects_in_run(run_id)
         self.delete_sessions_in_run(run_id)
 
@@ -152,12 +136,15 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
-    def create_node(
+    def create_node(  # pylint: disable=too-many-arguments
         self,
         owner_aid: str,
         owner_name: str,
         public_key: bytes,
         heartbeat_interval: float,
+        *,
+        location: str | None = None,
+        name: str | None = None,
     ) -> int:
         """Create, store in the link state, and return `node_id`."""
 
@@ -275,7 +262,9 @@ class LinkState(CoreState):  # pylint: disable=R0904
         primary_task_type: str,
         series_id: int | None = None,
         series_description: str | None = None,
-        connector_refs: Sequence[str] = (),
+        connector_ids: Sequence[int] = (),
+        initial_task_event: TaskEvent | None = None,
+        user_prompt: str | None = None,
     ) -> int:
         """Create a new run.
 
@@ -305,8 +294,13 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Optional description for a newly created run series. Ignored when
             `series_id` refers to an existing run series. `None` means no
             description was provided; an empty string is an explicit description.
-        connector_refs : Sequence[str] (default: ())
-            Connector references the run is allowed to invoke.
+        connector_ids : Sequence[int] (default: ())
+            Connector IDs the run is allowed to invoke.
+        initial_task_event : TaskEvent | None (default: None)
+            Event to store atomically before the pending primary task is visible.
+        user_prompt : str | None (default: None)
+            User prompt to store as a Message for an AgentApp run.
+            Ignored for other primary task types and when `None`.
 
         Returns
         -------
@@ -330,6 +324,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
+        skip: int = 0,
     ) -> Sequence[Run]:
         """Retrieve information about runs based on the specified filters.
 
@@ -353,6 +348,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Whether sorting should be in ascending order.
         limit : Optional[int] (default: None)
             Maximum number of runs to return. If `None`, no limit is applied.
+        skip : int (default: 0)
+            Number of matching runs to skip before applying the limit.
 
         Returns
         -------

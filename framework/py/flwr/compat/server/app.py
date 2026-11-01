@@ -19,16 +19,17 @@ import sys
 from logging import INFO
 
 from flwr.common.constant import FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS
-from flwr.common.logger import log, warn_deprecated_feature
 from flwr.server.client_manager import ClientManager
 from flwr.server.history import History
 from flwr.server.server import Server, init_defaults, run_fl
 from flwr.server.server_config import ServerConfig
 from flwr.server.strategy import Strategy
 from flwr.server.superlink.fleet.grpc_bidi.grpc_server import start_grpc_server
+from flwr.supercore import log
 from flwr.supercore.address import parse_address
 from flwr.supercore.exit import register_signal_handlers
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
+from flwr.supercore.logger import warn_deprecated_feature
 from flwr.supercore.telemetry import EventType, event
 
 

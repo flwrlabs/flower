@@ -17,7 +17,7 @@
 
 import unittest
 from itertools import product
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import numpy as np
 from parameterized import parameterized
@@ -36,6 +36,7 @@ from flwr.supercore.inflatable.inflatable_utils import (
     pull_objects,
     push_objects,
 )
+from flwr.supercore.task_identity import TaskIdentity
 
 from .inflatable_object import get_all_nested_objects
 from .inflatable_protobuf_utils import (
@@ -66,6 +67,11 @@ class TestInflatableStubHelpers(unittest.TestCase):  # pylint: disable=R0902
 
     def setUp(self) -> None:
         """Initialize mock stub and server interceptor."""
+        identity_patcher = patch.multiple(
+            TaskIdentity, _task_id=123, _run_id=456, _node_id=789
+        )
+        identity_patcher.start()
+        self.addCleanup(identity_patcher.stop)
         self.mock_store: dict[str, bytes] = {}
         self.mock_stub = Mock()
 

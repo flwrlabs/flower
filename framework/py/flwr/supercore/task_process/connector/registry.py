@@ -12,95 +12,144 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Connector registry."""
+"""Connector registry indexed by connector reference and tool name."""
 
-from collections.abc import Callable
+from copy import deepcopy
+from dataclasses import replace
 
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
-from . import automation, browser_use, web_fetch, web_search
-from .oauth import OAuthConnectorProvider
+from . import browser_use, filesystem, web_fetch, web_search
+from .automation import START_AUTOMATION_TOOL_NAME, make_start_automation_tool
+from .definition import ConnectorDefinition, ConnectorExecutionContext
+from .loader import load_oauth_connectors
+from .oauth import OAuthFlow
 
-ConnectorHandler = Callable[..., JSONValue]
-ConnectorToolFactory = Callable[[], JSONObject]
+_DISCOVERY_TOOL_SUFFIX = "__discover_tools"
 
-
-OAUTH_CONNECTOR_PROVIDERS: tuple[OAuthConnectorProvider, ...] = ()
-_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
-    web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
-    web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
-    browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
+CONNECTORS = (
+    web_search.CONNECTOR,
+    web_fetch.CONNECTOR,
+    browser_use.CONNECTOR,
+    filesystem.CONNECTOR,
+    *load_oauth_connectors(),
+)
+_CONNECTORS_BY_REF = {connector.ref: connector for connector in CONNECTORS}
+_CONNECTORS_BY_TOOL = {
+    name: connector for connector in CONNECTORS for name in connector.executors
 }
-# Concrete OAuth connector implementations populate these static registries.
-# A provider can expose multiple tool names under one connector ref (for example,
-# ``slack_search_messages`` maps to ``slack``).
-_CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {}
-_CREDENTIAL_CONNECTOR_REFS: dict[str, str] = {}
-_BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
-    automation.START_AUTOMATION_TOOL_NAME: automation.make_start_automation_tool,
-    web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.make_web_search_tool,
-    web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.make_web_fetch_tool,
-    browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.make_browser_use_tool,
+
+OAUTH_FLOWS: dict[str, OAuthFlow] = {
+    connector.ref: connector.oauth_flow
+    for connector in CONNECTORS
+    if connector.oauth_flow is not None
 }
 
 
 def invoke_connector(
-    name: str,
+    tool_name: str,
     arguments: JSONObject,
     usage_recorder: TaskUsageRecorder,
     credentials: JSONObject | None = None,
     config: JSONObject | None = None,
 ) -> JSONValue:
-    """Invoke one connector by name."""
-    handler = _CONNECTOR_HANDLERS.get(name)
-    if handler is not None:
-        return handler(**arguments, usage_recorder=usage_recorder)
-
-    handler = _CREDENTIAL_CONNECTOR_HANDLERS.get(name)
-    if handler is None:
-        raise ValueError(f"Unsupported connector '{name}'.")
-    if credentials is None or config is None:
+    """Invoke one connector tool by its model-facing name."""
+    connector = _resolve_connector(tool_name)
+    if connector is None:
+        raise ValueError(f"Unsupported connector '{tool_name}'.")
+    if connector.requires_credentials and (credentials is None or config is None):
         raise RuntimeError("Connector credentials are required.")
-    return handler(
-        **arguments,
-        credentials=credentials,
-        config=config,
+    context = ConnectorExecutionContext(
+        credentials=credentials or {},
+        config=config or {},
         usage_recorder=usage_recorder,
     )
+    if executor := connector.executors.get(tool_name):
+        return executor(arguments, context)
+    if connector.tool_source is not None:
+        if is_connector_discovery_tool(tool_name):
+            return [
+                action.tool(connector.ref)
+                for action in connector.tool_source.discover(context)
+            ]
+        return connector.tool_source.execute(
+            arguments,
+            replace(context, action_name=tool_name[len(connector.ref) + 1 :]),
+        )
+    raise ValueError(f"Unsupported connector '{tool_name}'.")
 
 
-def requires_connector_credentials(name: str) -> bool:
-    """Return whether a connector uses account-scoped credentials."""
-    return name in _CREDENTIAL_CONNECTOR_HANDLERS
+def requires_connector_credentials(tool_name: str) -> bool:
+    """Return whether a tool's connector uses federation-scoped credentials."""
+    connector = _resolve_connector(tool_name)
+    return connector is not None and connector.requires_credentials
 
 
-def get_connector_ref(name: str) -> str:
-    """Resolve a connector tool name to its OAuth connector reference."""
-    return _CREDENTIAL_CONNECTOR_REFS.get(name, name)
+def get_connector_ref(tool_name: str) -> str:
+    """Resolve a connector tool name to its connector reference."""
+    connector = _resolve_connector(tool_name)
+    return connector.ref if connector is not None else tool_name
 
 
-def get_builtin_connector_tools() -> list[JSONObject]:
-    """Return function tools for built-in connectors."""
-    return [make_tool() for make_tool in _BUILTIN_CONNECTOR_TOOL_FACTORIES.values()]
+def get_connector_tools(connector_ref: str) -> list[JSONObject]:
+    """Return model-facing tools for a connector or agent-handled automation."""
+    if connector_ref == START_AUTOMATION_TOOL_NAME:
+        return [make_start_automation_tool()]
+    connector = _CONNECTORS_BY_REF.get(connector_ref)
+    if connector is None:
+        raise ValueError(f"Unsupported connector '{connector_ref}'.")
+    return list(deepcopy(connector.tools))
 
 
-def get_builtin_connector_tool(name: str) -> JSONObject:
-    """Return the function tool for one built-in connector."""
-    make_tool = _BUILTIN_CONNECTOR_TOOL_FACTORIES.get(name)
-    if make_tool is None:
-        raise ValueError(f"Unsupported connector '{name}'.")
-    return make_tool()
+def get_connector_discovery_tool(connector_ref: str) -> str | None:
+    """Return the credential-bound operation for discovering a connector's actions."""
+    connector = _CONNECTORS_BY_REF.get(connector_ref)
+    if connector is not None and connector.tool_source is not None:
+        return f"{connector_ref}{_DISCOVERY_TOOL_SUFFIX}"
+    return None
 
 
-def get_oauth_connector_provider(connector_ref: str) -> OAuthConnectorProvider:
-    """Return the OAuth provider registered for a connector reference."""
-    for provider in OAUTH_CONNECTOR_PROVIDERS:
-        if provider.connector_ref == connector_ref:
-            return provider
-    raise ValueError(f"Unsupported OAuth connector '{connector_ref}'.")
+def is_connector_discovery_tool(tool_name: str) -> bool:
+    """Return whether a tool is a dynamic connector's discovery operation."""
+    if (connector := _resolve_connector(tool_name)) is None:
+        return False
+    return tool_name == get_connector_discovery_tool(connector.ref)
 
 
-def has_builtin_connector(name: str) -> bool:
-    """Return whether a built-in connector is registered."""
-    return name in _CONNECTOR_HANDLERS
+def is_dynamic_connector_tool(tool_name: str) -> bool:
+    """Return whether a non-static tool uses a dynamic connector source."""
+    if tool_name in _CONNECTORS_BY_TOOL or is_connector_discovery_tool(tool_name):
+        return False
+    return _resolve_connector(tool_name) is not None
+
+
+def _resolve_connector(tool_name: str) -> ConnectorDefinition | None:
+    """Resolve static tools first, then the most specific dynamic namespace."""
+    if connector := _CONNECTORS_BY_TOOL.get(tool_name):
+        return connector
+    connector_ref, separator, _ = tool_name.rpartition("_")
+    while separator:
+        connector = _CONNECTORS_BY_REF.get(connector_ref)
+        if (
+            connector is not None
+            and connector.tool_source is not None
+            and len(tool_name) > len(connector_ref) + 1
+        ):
+            return connector
+        connector_ref, separator, _ = connector_ref.rpartition("_")
+    return None
+
+
+def get_oauth_flow(connector_ref: str) -> OAuthFlow:
+    """Return the OAuth flow configured for a connector reference."""
+    flow = OAUTH_FLOWS.get(connector_ref)
+    if flow is None:
+        raise ValueError(f"Unsupported OAuth connector '{connector_ref}'.")
+    return flow
+
+
+def has_builtin_connector(connector_ref: str) -> bool:
+    """Return whether a reference identifies a connector without stored credentials."""
+    connector = _CONNECTORS_BY_REF.get(connector_ref)
+    return connector is not None and not connector.requires_credentials

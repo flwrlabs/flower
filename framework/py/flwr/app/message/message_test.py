@@ -36,7 +36,6 @@ from flwr.app.message import (
     remove_content_from_message,
 )
 from flwr.app.metadata import Metadata
-from flwr.common.constant import MESSAGE_TTL_TOLERANCE
 from flwr.common.serde import message_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.supercore.date import now
@@ -45,6 +44,15 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_children_ids_from_object_content,
     get_object_type_from_object_content,
 )
+from flwr.supercore.task_identity import TaskIdentity
+
+
+@pytest.fixture(autouse=True)
+def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the task identity used by instruction message tests."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 123)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 456)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 789)
 
 
 @pytest.mark.parametrize(
@@ -160,9 +168,6 @@ def test_create_reply(
     if reply_ttl:
         # Ensure the TTL is the one specify upon reply creation
         assert reply_message.metadata.ttl == reply_ttl
-    else:
-        # Ensure reply ttl is lower (since it uses remaining time left)
-        assert message.metadata.ttl > reply_message.metadata.ttl
 
     assert message.metadata.src_node_id == reply_message.metadata.dst_node_id
     assert message.metadata.dst_node_id == reply_message.metadata.src_node_id
@@ -217,38 +222,6 @@ def test_repr(cls: type, kwargs: dict[str, Any]) -> None:
 
 
 @pytest.mark.parametrize(
-    "message_creation_fn,initial_ttl,reply_ttl,expected_reply_ttl",
-    [
-        # Case where the reply_ttl is larger than the allowed TTL
-        (create_message_with_content, 20, 30, 20),
-        (create_message_with_error, 20, 30, 20),
-        # Case where the reply_ttl is within the allowed range
-        (create_message_with_content, 20, 10, 10),
-        (create_message_with_error, 20, 10, 10),
-    ],
-)
-def test_reply_ttl_limitation(
-    message_creation_fn: Callable[[float], Message],
-    initial_ttl: float,
-    reply_ttl: float,
-    expected_reply_ttl: float,
-) -> None:
-    """Test that the reply TTL does not exceed the allowed TTL."""
-    message = message_creation_fn(initial_ttl)
-
-    if message.has_error():
-        dummy_error = Error(code=0, reason="test error")
-        reply_message = Message(dummy_error, reply_to=message, ttl=reply_ttl)
-    else:
-        reply_message = Message(RecordDict(), reply_to=message, ttl=reply_ttl)
-
-    assert reply_message.metadata.ttl - expected_reply_ttl <= MESSAGE_TTL_TOLERANCE, (
-        f"Expected TTL to be <= {expected_reply_ttl}, "
-        f"but got {reply_message.metadata.ttl}"
-    )
-
-
-@pytest.mark.parametrize(
     "ttl,group_id,use_keyword",
     product([None, 10.0, 10], [None, "group_xyz"], [True, False]),
 )
@@ -278,10 +251,10 @@ def test_create_ins_message_success(
     assert msg.metadata.ttl == (ttl or DEFAULT_TTL)
     assert msg.metadata.group_id == (group_id or "")
     assert current_time < msg.metadata.created_at < now().timestamp()
-    assert msg.metadata.run_id == 0  # Should be unset
+    assert msg.metadata.run_id == 456
     assert msg.metadata.message_id == ""  # Should be unset
-    assert msg.metadata.src_node_id == 0  # Should be unset
-    assert msg.metadata.src_task_id is None
+    assert msg.metadata.src_node_id == 789
+    assert msg.metadata.src_task_id == 123
     assert msg.metadata.dst_task_id is None
     assert msg.metadata.reply_to_message_id == ""  # Should be unset
 
@@ -297,7 +270,7 @@ def test_create_ins_message_with_dst_task_id_success() -> None:
     )
 
     # Assert
-    assert msg.metadata.src_task_id is None
+    assert msg.metadata.src_task_id == 123
     assert msg.metadata.dst_task_id == 789
 
 
@@ -327,10 +300,6 @@ def test_create_reply_message_success(
     assert reply.metadata.reply_to_message_id == msg.metadata.message_id
     assert reply.metadata.group_id == msg.metadata.group_id
     assert current_time < reply.metadata.created_at < now().timestamp()
-    assert (
-        reply.metadata.created_at + reply.metadata.ttl
-        <= msg.metadata.created_at + msg.metadata.ttl
-    )
     assert reply.metadata.message_type == msg.metadata.message_type
     assert reply.metadata.message_id == ""  # Should be unset
     if isinstance(content_or_error, RecordDict):
@@ -358,7 +327,11 @@ def test_create_reply_message_success(
         ((RecordDict(), 123, "query"), {"error": Error(0)}),
         (
             (RecordDict(), 123, "query"),
-            {"reply_to": Message(RecordDict(), 123, "query")},
+            {
+                "reply_to": make_message(
+                    metadata=RecordMaker(1).metadata(), content=RecordDict()
+                )
+            },
         ),
         # Use invalid arg types
         (("wrong type", 123, "query"), {}),

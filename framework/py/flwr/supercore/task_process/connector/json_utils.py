@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Validation helpers shared by account-scoped connectors."""
+"""Validation helpers shared by federation-scoped connectors."""
 
 
 from collections.abc import Callable
@@ -33,6 +33,8 @@ def require_string(value: object, provider: str, name: str) -> str:
 def optional_string(value: object, provider: str, name: str) -> str | None:
     """Validate and normalize an optional connector argument."""
     if value is None:
+        return None
+    if isinstance(value, str) and not value.strip():
         return None
     return require_string(value, provider, name)
 

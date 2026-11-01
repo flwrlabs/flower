@@ -19,10 +19,50 @@
 
 ## Supported tags
 
+Starting with Flower 1.40.0, Alpine images use Alpine 3.23 and Python 3.13.
+Alpine 3.22 images are not built for new releases. The Alpine 3.22 tags below
+refer to earlier releases.
+
 - `unstable`
   - points to the last successful build of the `main` branch
-- `nightly`, `<version>.dev<YYYYMMDD>` e.g. `1.34.0.dev20260805`
+- `nightly`, `<version>.dev<YYYYMMDD>` e.g. `1.43.0.dev20261022`
   - uses Python 3.13 and Ubuntu 24.04
+- `1.42.0-py3.13-alpine3.23`
+- `1.42.0-py3.13-ubuntu24.04`
+- `1.42.0-py3.12-ubuntu24.04`
+- `1.42.0-py3.11-ubuntu24.04`
+- `1.41.0-py3.13-alpine3.23`
+- `1.41.0-py3.13-ubuntu24.04`
+- `1.41.0-py3.12-ubuntu24.04`
+- `1.41.0-py3.11-ubuntu24.04`
+- `1.40.0-py3.13-alpine3.23`
+- `1.40.0-py3.13-ubuntu24.04`
+- `1.40.0-py3.12-ubuntu24.04`
+- `1.40.0-py3.11-ubuntu24.04`
+- `1.39.0-py3.13-alpine3.22`
+- `1.39.0-py3.13-ubuntu24.04`
+- `1.39.0-py3.12-ubuntu24.04`
+- `1.39.0-py3.11-ubuntu24.04`
+- `1.38.0-py3.13-alpine3.22`
+- `1.38.0-py3.13-ubuntu24.04`
+- `1.38.0-py3.12-ubuntu24.04`
+- `1.38.0-py3.11-ubuntu24.04`
+- `1.37.0-py3.13-alpine3.22`
+- `1.37.0-py3.13-ubuntu24.04`
+- `1.37.0-py3.12-ubuntu24.04`
+- `1.37.0-py3.11-ubuntu24.04`
+- `1.36.0-py3.13-alpine3.22`
+- `1.36.0-py3.13-ubuntu24.04`
+- `1.36.0-py3.12-ubuntu24.04`
+- `1.36.0-py3.11-ubuntu24.04`
+- `1.35.0-py3.13-alpine3.22`
+- `1.35.0-py3.13-ubuntu24.04`
+- `1.35.0-py3.12-ubuntu24.04`
+- `1.35.0-py3.11-ubuntu24.04`
+- `1.34.0-py3.13-alpine3.22`
+- `1.34.0-py3.13-ubuntu24.04`
+- `1.34.0-py3.12-ubuntu24.04`
+- `1.34.0-py3.11-ubuntu24.04`
 - `1.33.0-py3.13-alpine3.22`
 - `1.33.0-py3.13-ubuntu24.04`
 - `1.33.0-py3.12-ubuntu24.04`

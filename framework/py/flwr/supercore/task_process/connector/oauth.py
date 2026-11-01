@@ -14,75 +14,41 @@
 # ==============================================================================
 """Provider-facing types and shared infrastructure for OAuth connector flows."""
 
+from __future__ import annotations
 
 import os
-from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from typing import Protocol, TypeVar, cast
+from math import isfinite
+from time import time
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlencode
 
 import requests
 
 from flwr.supercore.typing import JSONObject
 
+from .json_utils import required_string_field
 
-class OAuthConnectorProvider(Protocol):
-    """Provider operations required by OAuth connector flows."""
-
-    connector_ref: str
-    display_name: str
-    description: str
-
-    def resolve_redirect_uri(self, requested_redirect_uri: str) -> str:
-        """Validate and return the redirect URI to use for this OAuth flow."""
-
-    def build_authorization_url(
-        self,
-        *,
-        redirect_uri: str,
-        state: str,
-        pkce_challenge: str | None,
-    ) -> str:
-        """Return the provider authorization URL for a new OAuth session."""
-
-    def exchange_code(
-        self,
-        *,
-        code: str,
-        redirect_uri: str,
-        pkce_verifier: str | None,
-    ) -> tuple[JSONObject, JSONObject]:
-        """Exchange an authorization code for credentials and configuration."""
+if TYPE_CHECKING:
+    from .definition import ProviderDefinition
 
 
-OAuthProviderT = TypeVar("OAuthProviderT", bound="BaseOAuthProvider")
-
-
-def load_oauth_provider(
-    provider_type: type[OAuthProviderT],
-    *,
-    client_id_env: str,
-    client_secret_env: str,
-    redirect_uri_env: str,
-) -> OAuthProviderT:
-    """Construct a provider from its environment configuration."""
-    return provider_type(
-        client_id=os.getenv(client_id_env, ""),
-        client_secret=os.getenv(client_secret_env, ""),
-        redirect_uri=os.getenv(redirect_uri_env, ""),
-    )
-
-
-class BaseOAuthProvider(ABC):
-    """Implement the provider-independent OAuth authorization-code flow."""
-
-    display_name: str
-    authorize_url: str
-    error_type: type[RuntimeError]
+class OAuthFlow:
+    """Run OAuth from a provider's declarative configuration."""
 
     def __init__(
-        self, *, client_id: str, client_secret: str, redirect_uri: str
+        self,
+        provider: ProviderDefinition,
+        *,
+        client_id: str,
+        client_secret: str,
+        redirect_uri: str,
     ) -> None:
+        if provider.oauth is None:
+            raise ValueError(f"Provider '{provider.ref}' does not define OAuth.")
+        self.connector_ref = provider.ref
+        self.display_name = provider.display_name
+        self.description = provider.description
+        self._oauth = provider.oauth
         values = (client_id.strip(), client_secret.strip(), redirect_uri.strip())
         if not all(values):
             raise ValueError(f"{self.display_name} OAuth configuration is incomplete.")
@@ -101,13 +67,26 @@ class BaseOAuthProvider(ABC):
         state: str,
         pkce_challenge: str | None,
     ) -> str:
-        """Build a provider authorization URL."""
-        params = self.authorization_parameters(
-            redirect_uri=redirect_uri,
-            state=state,
-            pkce_challenge=pkce_challenge,
-        )
-        return f"{self.authorize_url}?{urlencode(params)}"
+        """Build an authorization URL from the provider definition."""
+        params = {
+            **self._oauth.authorization_params,
+            "client_id": self._client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "state": state,
+        }
+        if self._oauth.scopes:
+            params[self._oauth.scope_parameter] = self._oauth.scope_separator.join(
+                self._oauth.scopes
+            )
+        if self._oauth.use_pkce:
+            if not pkce_challenge:
+                raise ValueError(f"{self.display_name} OAuth requires PKCE.")
+            params.update(
+                code_challenge=pkce_challenge,
+                code_challenge_method="S256",
+            )
+        return f"{self._oauth.authorization_url}?{urlencode(params)}"
 
     def exchange_code(
         self,
@@ -116,53 +95,220 @@ class BaseOAuthProvider(ABC):
         redirect_uri: str,
         pkce_verifier: str | None,
     ) -> tuple[JSONObject, JSONObject]:
-        """Exchange a code and parse its JSON object response."""
+        """Exchange a code and extract standard credentials."""
         if not code:
             raise self._error("exchange failed")
-        try:
-            response = self.request_token(
-                code=code,
-                redirect_uri=redirect_uri,
-                pkce_verifier=pkce_verifier,
+        redirect_uri = self.resolve_redirect_uri(redirect_uri)
+        data = {
+            "code": code,
+            "grant_type": "authorization_code",
+            "redirect_uri": redirect_uri,
+        }
+        if self._oauth.use_pkce:
+            if not pkce_verifier:
+                raise self._error("exchange failed")
+            data["code_verifier"] = pkce_verifier
+        payload = self._request_token(data, failure="exchange failed")
+        credentials, config = self._parse_token_response(
+            payload, token_response_path=self._oauth.token_response_path
+        )
+        access_token = cast(str, credentials["access_token"])
+        name = self._connection_name(payload, access_token)
+        if name:
+            config["display_name"] = f"{self.display_name} · {name}"
+        return credentials, config
+
+    @staticmethod
+    def credentials_need_refresh(credentials: JSONObject) -> bool:
+        """Refresh only when the known expiry is within 60 seconds."""
+        if credentials.get("refresh_token") is None:
+            return False
+        expires_at = credentials.get("expires_at")
+        return (
+            isinstance(expires_at, (int, float))
+            and not isinstance(expires_at, bool)
+            and expires_at <= time() + 60
+        )
+
+    def refresh_credentials(self, credentials: JSONObject) -> JSONObject:
+        """Return fresh credentials, preserving or replacing the refresh token."""
+        if not self.credentials_need_refresh(credentials):
+            return credentials
+        refresh_token = credentials.get("refresh_token")
+        if not isinstance(refresh_token, str) or not refresh_token:
+            raise self._error("refresh failed")
+        payload = self._request_token(
+            {"grant_type": "refresh_token", "refresh_token": refresh_token},
+            failure="refresh failed",
+        )
+        tokens, _ = self._parse_token_response(payload)
+        refreshed = dict(credentials)
+        # An omitted lifetime must not reuse the previous access token's expiry.
+        refreshed.pop("expires_at", None)
+        refreshed.pop("expires_in", None)
+        refreshed.update(tokens)
+        return refreshed
+
+    def _request_token(self, data: dict[str, str], *, failure: str) -> JSONObject:
+        """Send a token request using the service's OAuth client configuration."""
+        data = {**self._oauth.token_params, **data}
+        auth = None
+        if self._oauth.token_auth_method == "client_secret_basic":
+            auth = (self._client_id, self._client_secret)
+        else:
+            data.update(
+                client_id=self._client_id,
+                client_secret=self._client_secret,
             )
-        except requests.RequestException:
-            raise self._error("exchange failed") from None
-        if response.status_code >= 400:
-            raise self._error("exchange failed")
         try:
-            payload = response.json()
+            if self._oauth.token_request_format == "json":
+                response = requests.post(
+                    self._oauth.token_url,
+                    auth=auth,
+                    headers=self._oauth.token_headers,
+                    json=data,
+                    timeout=30.0,
+                )
+            else:
+                response = requests.post(
+                    self._oauth.token_url,
+                    auth=auth,
+                    headers=self._oauth.token_headers,
+                    data=data,
+                    timeout=30.0,
+                )
+        except requests.RequestException:
+            raise self._error(failure) from None
+        if response.status_code >= 400:
+            raise self._error(failure)
+        try:
+            response_payload = response.json()
         except ValueError:
             raise self._error("returned an invalid response") from None
-        if not isinstance(payload, dict):
+        if not isinstance(response_payload, dict):
             raise self._error("returned an invalid response")
-        return self.parse_token_response(cast(JSONObject, payload))
+        return cast(JSONObject, response_payload)
+
+    def _connection_name(self, token_payload: JSONObject, access_token: str) -> str:
+        """Read the connection name from the token or provider identity."""
+        # Names can come from the token response or a separate lookup.
+        payload = token_payload
+        url = self._oauth.display_name_url
+        if url:
+            try:
+                response = requests.request(
+                    self._oauth.display_name_method,
+                    url,
+                    headers={
+                        **self._oauth.display_name_headers,
+                        "Authorization": f"Bearer {access_token}",
+                    },
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                identity_payload = response.json()
+            except (requests.RequestException, ValueError):
+                # A name lookup failure should not invalidate the OAuth connection.
+                return ""
+            if not isinstance(identity_payload, dict):
+                return ""
+            payload = cast(JSONObject, identity_payload)
+
+        if self._oauth.display_name_resolver is not None:
+            return self._oauth.display_name_resolver(payload)
+
+        names: list[str] = []
+        for field in self._oauth.display_name_fields:
+            value = payload.get(field)
+            if isinstance(value, str) and value.strip():
+                names.append(value.strip())
+        return " / ".join(names)
+
+    def _parse_token_response(
+        self, payload: JSONObject, *, token_response_path: tuple[str, ...] = ()
+    ) -> tuple[JSONObject, JSONObject]:
+        """Validate and extract credentials from a token response."""
+        if (
+            "error" in payload
+            or self._oauth.success_field
+            and payload.get(self._oauth.success_field) is not True
+        ):
+            raise self._error("exchange failed")
+        token_payload = payload
+        for key in token_response_path:
+            value = token_payload.get(key)
+            if not isinstance(value, dict):
+                raise self._error("returned an invalid response")
+            token_payload = value
+        if "error" in token_payload:
+            raise self._error("exchange failed")
+        self._validate_token_permissions(token_payload)
+        credentials: JSONObject = {
+            "access_token": required_string_field(
+                token_payload, "access_token", error=self._error
+            )
+        }
+        for key in ("refresh_token", "expires_in", "token_type"):
+            value = token_payload.get(key)
+            if isinstance(value, (str, int)) and not isinstance(value, bool):
+                credentials[key] = value
+        expires_in = credentials.get("expires_in")
+        if isinstance(expires_in, (str, int)):
+            try:
+                lifetime = float(expires_in)
+            except ValueError:
+                raise self._error("returned an invalid response") from None
+            if not isfinite(lifetime) or lifetime < 0:
+                raise self._error("returned an invalid response")
+            credentials["expires_at"] = time() + lifetime
+        config: JSONObject = {}
+        for key in self._oauth.config_fields:
+            value = token_payload.get(key)
+            if isinstance(value, (str, int, float, bool)):
+                config[key] = value
+        return credentials, config
+
+    def _validate_token_permissions(self, token_payload: JSONObject) -> None:
+        """Require the configured scope and token-type policy."""
+        scope = token_payload.get("scope")
+        if scope is not None:
+            if not isinstance(scope, str):
+                raise self._error("returned an invalid response")
+            granted = {
+                item.strip()
+                for item in scope.split(self._oauth.scope_separator)
+                if item.strip()
+            }
+            configured = set(self._oauth.scopes)
+            if not configured.issubset(granted):
+                raise self._error("returned insufficient permissions")
+            if not self._oauth.allow_additional_scopes and not granted.issubset(
+                configured
+            ):
+                raise self._error("returned unsupported permissions")
+        token_type = token_payload.get("token_type")
+        if self._oauth.expected_token_type is not None and (
+            not isinstance(token_type, str)
+            or token_type.lower() != self._oauth.expected_token_type.lower()
+        ):
+            raise self._error("returned unsupported token type")
 
     def _error(self, detail: str) -> RuntimeError:
-        """Build a provider-specific secret-safe error."""
-        return self.error_type(f"{self.display_name} OAuth {detail}.")
+        """Build a provider-labelled, secret-safe OAuth error."""
+        return RuntimeError(f"{self.display_name} OAuth {detail}.")
 
-    @abstractmethod
-    def authorization_parameters(
-        self,
-        *,
-        redirect_uri: str,
-        state: str,
-        pkce_challenge: str | None,
-    ) -> Mapping[str, str]:
-        """Return provider-specific authorization parameters."""
 
-    @abstractmethod
-    def request_token(
-        self,
-        *,
-        code: str,
-        redirect_uri: str,
-        pkce_verifier: str | None,
-    ) -> requests.Response:
-        """Send the provider-specific token request."""
-
-    @abstractmethod
-    def parse_token_response(
-        self, payload: JSONObject
-    ) -> tuple[JSONObject, JSONObject]:
-        """Parse provider-specific credentials and configuration."""
+def load_oauth_flow(provider: ProviderDefinition) -> OAuthFlow | None:
+    """Return an OAuth flow loaded from its environment, if configured."""
+    if provider.oauth is None:
+        return None
+    oauth = provider.oauth
+    names = (oauth.client_id_env, oauth.client_secret_env, oauth.redirect_uri_env)
+    if not any(os.getenv(name, "").strip() for name in names):
+        return None
+    return OAuthFlow(
+        provider,
+        client_id=os.getenv(names[0], ""),
+        client_secret=os.getenv(names[1], ""),
+        redirect_uri=os.getenv(names[2], ""),
+    )

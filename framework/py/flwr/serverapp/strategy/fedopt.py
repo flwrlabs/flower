@@ -23,7 +23,8 @@ from logging import INFO
 import numpy as np
 
 from flwr.app import ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
-from flwr.common import NDArray, log
+from flwr.common import NDArray
+from flwr.supercore import log
 
 from ..exception import AggregationError
 from ..grid import Grid

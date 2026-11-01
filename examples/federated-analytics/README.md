@@ -130,7 +130,7 @@ SuperLink connections are defined in the [Flower Configuration](https://flower.a
 
 ```toml
 [superlink.local-deployment]
-address = "127.0.0.1:9093"
+address = "127.0.0.1:8000"
 insecure = true
 ```
 
@@ -149,16 +149,18 @@ The `db-url` parameter accepts a standard PostgreSQL connection string in the fo
 ```shell
 flower-supernode \
      --insecure \
-     --superlink 127.0.0.1:9092 \
-     --clientappio-api-address 127.0.0.1:9094 \
+     --superlink 127.0.0.1:8000 \
+     --host 127.0.0.1 \
+     --port 9094 \
      --node-config="db-url='postgresql+psycopg://flwrlabs:flwrlabs@localhost:5433/flwrlabs'"
 ```
 
 ```shell
 flower-supernode \
      --insecure \
-     --superlink 127.0.0.1:9092 \
-     --clientappio-api-address 127.0.0.1:9095 \
+     --superlink 127.0.0.1:8000 \
+     --host 127.0.0.1 \
+     --port 9095 \
      --node-config="db-url='postgresql+psycopg://flwrlabs:flwrlabs@localhost:5434/flwrlabs'"
 ```
 

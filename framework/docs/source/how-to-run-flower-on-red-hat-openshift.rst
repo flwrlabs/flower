@@ -239,11 +239,11 @@ tutorial on :doc:`how to deploy Flower in GCP <how-to-run-flower-on-gcp>`.
                   image: flwr/superlink:|stable_flwr_version|
                   args:
                     - "--insecure"
+                    - "--host"
+                    - "0.0.0.0"
                   ports: # which ports to expose/available
-                    - containerPort: 9092
-                      name: fleet
-                    - containerPort: 9093
-                      name: control
+                    - containerPort: 8000
+                      name: flwr-http-apis
                   volumeMounts:
                     - name: cache-volume
                       mountPath: /app/.cache
@@ -285,13 +285,9 @@ pod and insert the following YAML definition:
             app: superlink
           ports:  # like a dynamic IP routing table/mapping that routes traffic to the designated ports
           - protocol: TCP
-            port: 9092   # Port for SuperNode connection
-            targetPort: fleet  # the SuperLink container port
-            name: superlink-fleetapi
-          - protocol: TCP
-            port: 9093   # Port for Flower app submission
-            targetPort: control  # the SuperLink container port
-            name: superlink-controlapi
+            port: 8000   # Port for Fleet and Control APIs over HTTP
+            targetPort: flwr-http-apis  # the SuperLink container port
+            name: flwr-http-apis
           type: LoadBalancer  # balances workload, makes the service publicly available
 
 Finally, spin up two SuperNode pods with the following YAML definitions:
@@ -325,9 +321,11 @@ Finally, spin up two SuperNode pods with the following YAML definitions:
                 args:
                   - "--insecure"
                   - "--superlink"
-                  - "superlink-service:9092"
-                  - "--clientappio-api-address"
-                  - "0.0.0.0:9094"
+                  - "superlink-service:8000"
+                  - "--host"
+                  - "0.0.0.0"
+                  - "--port"
+                  - "9094"
                 ports:
                 - containerPort: 9094
                 volumeMounts:
@@ -382,9 +380,11 @@ Finally, spin up two SuperNode pods with the following YAML definitions:
                 args:
                   - "--insecure"
                   - "--superlink"
-                  - "superlink-service:9092"
-                  - "--clientappio-api-address"
-                  - "0.0.0.0:9094"
+                  - "superlink-service:8000"
+                  - "--host"
+                  - "0.0.0.0"
+                  - "--port"
+                  - "9094"
                 ports:
                 - containerPort: 9094
                 volumeMounts:
@@ -679,7 +679,7 @@ connection in the Flower Configuration file:
        :caption: config.toml
 
        [superlink.remote]
-       address = "superlink-service:9093"  # use the service name created earlier
+       address = "superlink-service:8000"  # use the service name created earlier
        insecure = true
 
 And finally, run your Flower app as usual with ``flwr run``:

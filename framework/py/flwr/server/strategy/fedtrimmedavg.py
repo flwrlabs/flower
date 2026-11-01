@@ -28,8 +28,8 @@ from flwr.common import (
     ndarrays_to_parameters,
     parameters_to_ndarrays,
 )
-from flwr.common.logger import log
 from flwr.server.client_proxy import ClientProxy
+from flwr.supercore import log
 
 from .aggregate import aggregate_trimmed_avg
 from .fedavg import FedAvg
@@ -64,7 +64,8 @@ class FedTrimmedAvg(FedAvg):
     initial_parameters : Parameters, optional
         Initial global model parameters.
     beta : float, optional
-        Fraction to cut off of both tails of the distribution. Defaults to 0.2.
+        Fraction to cut off of both tails of the distribution. Must be in the range
+        ``[0, 0.5)``. Defaults to 0.2.
     """
 
     # pylint: disable=too-many-arguments,too-many-instance-attributes, line-too-long
@@ -91,6 +92,9 @@ class FedTrimmedAvg(FedAvg):
         evaluate_metrics_aggregation_fn: MetricsAggregationFn | None = None,
         beta: float = 0.2,
     ) -> None:
+        if not 0.0 <= beta < 0.5:
+            raise ValueError("`beta` must be in the range [0, 0.5).")
+
         super().__init__(
             fraction_fit=fraction_fit,
             fraction_evaluate=fraction_evaluate,

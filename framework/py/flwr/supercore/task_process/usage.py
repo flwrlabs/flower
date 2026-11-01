@@ -18,25 +18,27 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from flwr.proto.appio_pb2 import RecordTaskUsageRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import RecordTaskUsageRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
 from flwr.supercore.typing import JSONObject
 
 MODEL_INFERENCE_USAGE_TYPE = "model_inference"
 WEB_SEARCH_USAGE_TYPE = "web_search"
+FILESYSTEM_LIST_DIRECTORY_USAGE_TYPE = "filesystem_list_directory"
+FILESYSTEM_READ_FILE_USAGE_TYPE = "filesystem_read_file"
 
 
 class _TaskUsageStub(Protocol):
-    """AppIo stub surface needed to record task usage."""
+    """Runtime stub surface needed to record task usage."""
 
     def RecordTaskUsage(  # pylint: disable=invalid-name
         self, request: RecordTaskUsageRequest
     ) -> object:
-        """Record task usage through AppIo."""
+        """Record task usage through the Runtime API."""
 
 
 class TaskUsageRecorder:
-    """Record task usage through the authenticated AppIo task token."""
+    """Record task usage through the authenticated Runtime task token."""
 
     def __init__(self, stub: _TaskUsageStub) -> None:
         self._stub = stub

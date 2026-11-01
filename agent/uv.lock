@@ -48,11 +48,11 @@ wheels = [
 
 [[package]]
 name = "certifi"
-version = "2026.7.22"
+version = "2026.10.19"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a3/c2/24167ea9858356b47a87a50d39908bfdb72ceeefe0041586e704e5376b3a/certifi-2026.7.22.tar.gz", hash = "sha256:741e2c3b351ddf169a738da9f2c048608ff7f2c5cc02f1ebc6b118bb090d5d55", size = 138112, upload-time = "2026-07-22T03:35:12.644Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a6/bd/1436c50cc46699de0230fbaacc1d1de7bfec413176099949e9d5112e88f2/certifi-2026.10.19.tar.gz", hash = "sha256:035c1e85572b141bf1c3a3eff0e33a8eb74917522f2559075ff8d2fea780a1ae", size = 137598, upload-time = "2026-10-20T02:24:16.604Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0b/a7/71ac2cff56fec219ed242bb11b8efb69fcc4bec75db06fb7bfe35de520e6/certifi-2026.7.22-py3-none-any.whl", hash = "sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775", size = 136983, upload-time = "2026-07-22T03:35:11.276Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/51/29046e48f693c54e5b7412216d447a1d8362c9653148d98c02cdf65fa733/certifi-2026.10.19-py3-none-any.whl", hash = "sha256:42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b", size = 136464, upload-time = "2026-10-20T02:24:15.072Z" },
 ]
 
 [[package]]
@@ -164,6 +164,7 @@ dependencies = [
     { name = "furo" },
     { name = "myst-parser" },
     { name = "sphinx" },
+    { name = "sphinx-substitution-extensions" },
 ]
 
 [package.dev-dependencies]
@@ -180,6 +181,7 @@ requires-dist = [
     { name = "furo", specifier = "==2024.8.6" },
     { name = "myst-parser", specifier = "==3.0.1" },
     { name = "sphinx", specifier = "==7.4.7" },
+    { name = "sphinx-substitution-extensions", specifier = "==2022.2.16" },
 ]
 
 [package.metadata.requires-dev]
@@ -566,6 +568,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/98/0b/a866924ded68efec7a1759587a4e478aec7559d8165fac8b2ad1c0e774d6/sphinx_basic_ng-1.0.0b2.tar.gz", hash = "sha256:9ec55a47c90c8c002b5960c57492ec3021f5193cb26cebc2dc4ea226848651c9", size = 20736, upload-time = "2023-07-08T18:40:54.166Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3c/dd/018ce05c532a22007ac58d4f45232514cd9d6dd0ee1dc374e309db830983/sphinx_basic_ng-1.0.0b2-py3-none-any.whl", hash = "sha256:eb09aedbabfb650607e9b4b68c9d240b90b1e1be221d6ad71d61c52e29f7932b", size = 22496, upload-time = "2023-07-08T18:40:52.659Z" },
+]
+
+[[package]]
+name = "sphinx-substitution-extensions"
+version = "2022.2.16"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "docutils" },
+    { name = "sphinx" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/45/ed/f684f94a7ace29ab3032e1be95803147120522207c1f0519b7012e278bed/Sphinx_Substitution_Extensions-2022.2.16-py3-none-any.whl", hash = "sha256:5a8ca34dac3984486344e95c36e3ed4766d402a71bdee7390d600f153db9795b", size = 9778, upload-time = "2022-02-16T12:16:07.583Z" },
 ]
 
 [[package]]

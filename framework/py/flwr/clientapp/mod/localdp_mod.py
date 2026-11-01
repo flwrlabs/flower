@@ -22,7 +22,7 @@ import numpy as np
 from flwr.app import Array, ArrayRecord
 from flwr.app.message import Context, Message
 from flwr.clientapp.typing import ClientAppCallable
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.differential_privacy import (
     add_gaussian_noise_inplace,
     compute_clip_model_update,

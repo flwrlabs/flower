@@ -1,0 +1,186 @@
+// Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+// ==============================================================================
+
+syntax = "proto3";
+
+package flwr.proto;
+
+import "flwr/proto/fab.proto";
+import "flwr/proto/federation_config.proto";
+import "flwr/proto/file.proto";
+import "flwr/proto/message.proto";
+import "flwr/proto/node.proto";
+import "flwr/proto/recorddict.proto";
+import "flwr/proto/run.proto";
+import "flwr/proto/runseries.proto";
+import "flwr/proto/task.proto";
+
+// SendTaskHeartbeat messages
+message SendTaskHeartbeatRequest {}
+message SendTaskHeartbeatResponse { bool success = 1; }
+
+// PushAppMessages messages
+message PushAppMessagesRequest {
+  repeated Message messages_list = 2;
+  repeated ObjectTree message_object_trees = 3;
+}
+message PushAppMessagesResponse {
+  repeated string message_ids = 1;
+  repeated string objects_to_push = 2;
+  string session_id = 3;
+}
+
+// PullAppMessages messages
+message PullAppMessagesRequest {
+  // Absent means no correlation filter; present with no IDs matches nothing.
+  optional StringList reply_to_message_ids = 3;
+}
+message PullAppMessagesResponse {
+  repeated Message messages_list = 1;
+  repeated ObjectTree message_object_trees = 2;
+}
+
+// GetNodes messages
+message GetNodesRequest {}
+message GetNodesResponse { repeated NodeInfo nodes = 1; }
+
+// PushTaskMessage messages
+message PushTaskMessageRequest { Message message = 1; }
+message PushTaskMessageResponse { string message_id = 1; }
+
+// PushTaskEvents messages
+message PushTaskEventsRequest { repeated TaskEvent events = 1; }
+message PushTaskEventsResponse {}
+
+// GetRunSeriesEvents messages
+message GetRunSeriesEventsRequest {
+  // Empty means all event types.
+  repeated string event_types = 1;
+  // ID bounds are exclusive.
+  optional uint64 after_event_id = 2;
+  optional uint64 before_event_id = 3;
+  // Select newest matching events; zero means no limit.
+  // Response remains in ascending ID order.
+  uint32 last_n = 4;
+}
+message GetRunSeriesEventsResponse { repeated TaskEvent events = 1; }
+
+// GetCompactedContexts messages
+message GetCompactedContextsRequest {
+  optional uint32 limit = 1;
+  optional uint64 before_context_id = 2;
+}
+message GetCompactedContextsResponse { repeated CompactedContext contexts = 1; }
+
+// PutCompactedContext messages
+message PutCompactedContextRequest { CompactedContext context = 1; }
+message PutCompactedContextResponse {}
+
+// PullTaskMessage messages
+message PullTaskMessageRequest {
+  optional uint64 limit = 1;
+  // Filter concurrent exchanges by sender task ID.
+  optional uint64 src_task_id = 2;
+}
+message PullTaskMessageResponse { repeated Message messages = 1; }
+
+// RecordTaskUsage messages
+message RecordTaskUsageRequest { TaskUsage task_usage = 1; }
+message RecordTaskUsageResponse {}
+
+// GetConnector messages
+message GetConnectorRequest {}
+message GetConnectorResponse {
+  string connector_ref = 1;
+  string credentials_json = 2;
+  string config_json = 3;
+  uint64 connector_id = 4;
+}
+
+// PullTaskInput messages
+message PullTaskInputRequest {}
+message PullTaskInputResponse {
+  Context context = 1;
+  Run run = 2;
+  Fab fab = 3;
+  SimulationConfig federation_config = 4;
+  uint64 task_id = 5;
+}
+
+// PushTaskOutput messages
+message PushTaskOutputRequest {
+  Context context = 1;
+  string sub_status = 2;
+  string details = 3;
+  // Simulation Runtime usage only.
+  optional double clientapp_runtime = 4;
+}
+message PushTaskOutputResponse {}
+
+// CreateTask messages
+message CreateTaskRequest {
+  string type = 1;
+  optional string fab_hash = 2;
+  optional string model_ref = 3;
+  optional string connector_ref = 4;
+  optional uint64 connector_id = 5;
+}
+message CreateTaskResponse { optional uint64 task_id = 1; }
+
+// AcquireTask messages
+message AcquireTaskRequest {
+  // Task types that can be launched regardless of FAB.
+  repeated string supported_task_types = 1;
+  // AgentApp FABs that can be launched by a ready prestarted executor.
+  repeated string agentapp_fab_hashes = 2;
+}
+message AcquireTaskResponse {
+  Task task = 1;
+  string token = 2;
+}
+
+// PutFile messages
+message PutFileRequest {
+  string key = 1;
+  bytes data = 2;
+  // Absent means create-only
+  optional uint64 expected_revision = 3;
+}
+message PutFileResponse { uint64 revision = 1; }
+
+// GetFile messages
+message GetFileRequest { string key = 1; }
+message GetFileResponse { File file = 1; }
+
+// ListFiles messages
+message ListFilesRequest {
+  string prefix = 1;
+  // Empty means start from beginning.
+  string start_after = 2;
+  optional uint32 limit = 3;
+}
+message ListFilesResponse {
+  repeated FileMetadata files = 1;
+  // Last returned key if more results exist; empty otherwise.
+  string next_start_after = 2;
+}
+
+// DeleteFile messages
+message DeleteFileRequest {
+  string key = 1;
+  // Must match the current revision.
+  uint64 expected_revision = 2;
+}
+message DeleteFileResponse {}

@@ -18,7 +18,7 @@ from logging import WARN
 
 from flwr.app.message import MetricRecord
 from flwr.app.typing import MetricRecordValues
-from flwr.common.logger import log
+from flwr.supercore import log
 
 
 class MetricsRecord(MetricRecord):

@@ -14,9 +14,10 @@
 # ==============================================================================
 """Generate Alembic migration revision without requiring a persistent database.
 
-This tool creates a temporary SQLite database, upgrades it to the current head
-revision, then runs autogenerate to detect schema changes by comparing the
-database against the current table definitions in the schema/ directory.
+This tool creates a temporary SQLite database, upgrades it to all current head
+revisions, then runs autogenerate against the selected branch head to detect schema
+changes by comparing the database against the current table definitions in the
+schema/ directory. The selected branch head defaults to ``flwr@head``.
 
 The temporary database file is automatically cleaned up after the migration
 script is generated in the versions/ directory.

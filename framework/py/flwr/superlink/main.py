@@ -28,19 +28,24 @@ from fastapi.routing import APIRoute, iter_route_contexts
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from flwr.common import log
+from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE
+from flwr.supercore import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
-from flwr.supercore.error import http_error_translator
+from flwr.supercore.dependencies.runtime import RuntimeHandlers
+from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.http_logging import configure_uvicorn_logging
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health
+from flwr.supercore.routers.runtime import create_runtime_router, responses_router
 from flwr.supercore.version import package_version
 from flwr.superlink import extensions
 from flwr.superlink.config_loader import (
     SuperLinkLifespanConfig,
     get_federation_manager,
     get_objectstore_linkstate_factories,
-    load_control_auth_plugins,
+    load_control_authn_plugin,
     load_control_event_log_plugin,
+    load_fleet_event_log_plugin,
 )
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.routers.control import router as control_router
@@ -48,7 +53,12 @@ from flwr.superlink.routers.control.middlewares import (
     ControlAuthenticationMiddleware,
     ControlEventLogMiddleware,
     ControlLicenseMiddleware,
+    ControlSensitiveResponseMiddleware,
 )
+from flwr.superlink.routers.fleet.middlewares import FleetEventLogMiddleware
+from flwr.superlink.routers.fleet.node_auth import NodeAuthMiddleware
+from flwr.superlink.routers.fleet.router import router as fleet_router
+from flwr.superlink.servicer.runtime import runtime_handlers
 
 try:
     from flwr.ee import get_ee_linkstate_db as get_ee_linkstate_db
@@ -62,7 +72,10 @@ except ModuleNotFoundError as exc:
 
 
 if TYPE_CHECKING:
+    from flwr.server.superlink.linkstate import LinkState
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
+
+_RUNTIME_HANDLERS: RuntimeHandlers[LinkState] = runtime_handlers
 
 
 def generate_unique_route_id(route: APIRoute) -> str:
@@ -90,15 +103,18 @@ def _get_middleware() -> list[Middleware]:
     """Return middleware in request execution order, outermost first."""
     return [
         *extensions.get_middleware(),
+        Middleware(ControlSensitiveResponseMiddleware),
         Middleware(BaseHTTPMiddleware, dispatch=http_error_translator),
         Middleware(ControlAuthenticationMiddleware),
         Middleware(ControlLicenseMiddleware),
         Middleware(ProtobufTranslationMiddleware),
         Middleware(ControlEventLogMiddleware),
+        Middleware(NodeAuthMiddleware),
+        Middleware(FleetEventLogMiddleware),
     ]
 
 
-def create_app(
+def create_app(  # pylint: disable=too-many-statements
     config: SuperLinkLifespanConfig | None = None,
     superlink_lifespan_class: type[SuperLinkLifespan] | None = None,
 ) -> FastAPI:
@@ -106,19 +122,27 @@ def create_app(
     if config is None:
         is_simulation = False
         database = get_ee_linkstate_db()
-        authn_plugin, authz_plugin = load_control_auth_plugins(
-            os.getenv("FLWR_ACCOUNT_AUTH_CONFIG"), verify_tls_cert=True
-        )
+        superexec_auth_secret = None
+        artifact_provider = None
+        fleet_api_type = TRANSPORT_TYPE_GRPC_RERE
+        authn_plugin = load_control_authn_plugin()
         event_log_plugin = (
             load_control_event_log_plugin()
             if os.getenv("FLWR_ENABLE_EVENT_LOG") == "1"
             else None
         )
+        fleet_log_plugin = (
+            load_fleet_event_log_plugin() if event_log_plugin is not None else None
+        )
     else:
         is_simulation = config.simulation
         database = config.database
-        authn_plugin, authz_plugin = config.authn_plugin, config.authz_plugin
+        superexec_auth_secret = config.superexec_auth_secret
+        artifact_provider = config.artifact_provider
+        fleet_api_type = config.fleet_api_type
+        authn_plugin = config.authn_plugin
         event_log_plugin = config.event_log_plugin
+        fleet_log_plugin = config.fleet_event_log_plugin
 
     federation_manager = get_federation_manager(is_simulation=is_simulation)
     _, linkstate_factory = get_objectstore_linkstate_factories(
@@ -127,12 +151,12 @@ def create_app(
     # Force initialization before exposing LinkState through FastAPI dependencies
     linkstate_factory.state()
 
-    # Instantiate SuperLink lifespan for legacy gRPC server if required
+    # Instantiate the lifespan which owns the Control and Fleet gRPC servers.
     superlink_lifespan = None
-    if config and not config.disable_grpc_api:
+    if config:
         if superlink_lifespan_class is None:
             raise RuntimeError(
-                "A SuperLink lifespan class is required when legacy gRPC is enabled."
+                "A SuperLink lifespan class is required when configuration is provided."
             )
         superlink_lifespan = superlink_lifespan_class(config, linkstate_factory)
 
@@ -172,17 +196,30 @@ def create_app(
     )
     fastapi_app.state.superlink_lifespan = superlink_lifespan
     fastapi_app.state.linkstate_factory = linkstate_factory
-    fastapi_app.state.account_access_dep = AccountAccessDependency(
-        authn_plugin, authz_plugin
+    fastapi_app.state.enable_supernode_auth = (
+        config.enable_supernode_auth if config else False
     )
+    fastapi_app.state.runtime_state_factory = linkstate_factory
+    fastapi_app.state.runtime_state_factory_error = (
+        ApiErrorCode.LINKSTATE_NOT_INITIALIZED,
+        "SuperLink LinkStateFactory is not initialized.",
+    )
+    fastapi_app.state.runtime_handlers = _RUNTIME_HANDLERS
+    fastapi_app.state.superexec_auth_secret = superexec_auth_secret
+    fastapi_app.state.artifact_provider = artifact_provider
+    fastapi_app.state.fleet_api_type = fleet_api_type
+    fastapi_app.state.account_access_dep = AccountAccessDependency(authn_plugin)
     fastapi_app.state.control_event_log_plugin = event_log_plugin
+    fastapi_app.state.fleet_event_log_plugin = fleet_log_plugin
 
     # Core APIs
     fastapi_app.include_router(health.router)
 
     # SuperLink APIs
     fastapi_app.include_router(control_router)
-    # fastapi_app.include_router(runtime.router)
+    fastapi_app.include_router(fleet_router)
+    fastapi_app.include_router(create_runtime_router("SuperLink"))
+    fastapi_app.include_router(responses_router)
 
     # Extension hooks
     extensions.configure_app(fastapi_app)
@@ -218,6 +255,7 @@ def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
 def __getattr__(name: str) -> FastAPI:
     """Create the module-level FastAPI app lazily."""
     if name == "app":
+        configure_uvicorn_logging()
         fastapi_app = create_app()
         globals()[name] = fastapi_app
         return fastapi_app

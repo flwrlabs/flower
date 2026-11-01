@@ -16,10 +16,55 @@
 
 from datetime import UTC, datetime
 
+import pytest
 from sqlalchemy import Column, MetaData, Table, create_engine, select
+from sqlalchemy.exc import StatementError
 from sqlalchemy.schema import CreateTable
 
-from flwr.supercore.state.schema.types import UTCDateTime
+from flwr.supercore.state.schema.types import UInt64, UTCDateTime
+
+
+@pytest.mark.parametrize(
+    ("value", "stored"),
+    [(None, None), (0, 0), (2**63 - 1, 2**63 - 1), (2**63, -(2**63)), (2**64 - 1, -1)],
+)
+def test_uint64_round_trips_and_filters(value: int | None, stored: int | None) -> None:
+    """Preserve all identifier bits in storage, reads, and typed filters."""
+    engine = create_engine("sqlite:///:memory:")
+    table = Table("sample", MetaData(), Column("identifier", UInt64()))
+    table.create(engine)
+
+    with engine.begin() as conn:
+        conn.execute(table.insert().values(identifier=value))
+        assert (
+            conn.exec_driver_sql("SELECT identifier FROM sample").scalar_one() == stored
+        )
+        assert conn.execute(select(table.c.identifier)).scalar_one() == value
+        assert (
+            conn.execute(
+                select(table.c.identifier).where(table.c.identifier == value)
+            ).scalar_one()
+            == value
+        )
+        if value is not None:
+            assert (
+                conn.execute(
+                    select(table.c.identifier).where(table.c.identifier.in_([value]))
+                ).scalar_one()
+                == value
+            )
+
+
+@pytest.mark.parametrize("value", [-1, 2**64, 1.5])
+def test_uint64_rejects_invalid_identifiers(value: int | float) -> None:
+    """Reject values that cannot be represented as unsigned 64-bit identifiers."""
+    engine = create_engine("sqlite:///:memory:")
+    table = Table("sample", MetaData(), Column("identifier", UInt64()))
+    table.create(engine)
+
+    with engine.begin() as conn:
+        with pytest.raises(StatementError, match="UInt64 requires an integer"):
+            conn.execute(table.insert().values(identifier=value))
 
 
 def test_utc_datetime_compiles_as_timestamp_on_sqlite() -> None:

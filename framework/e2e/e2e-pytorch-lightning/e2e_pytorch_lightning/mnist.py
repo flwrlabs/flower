@@ -14,19 +14,21 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
+MAX_PARTITION_SAMPLES = 100
+
 
 class LitAutoEncoder(pl.LightningModule):
     def __init__(self):
         super().__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(28 * 28, 64),
+            nn.Linear(28 * 28, 16),
             nn.ReLU(),
-            nn.Linear(64, 3),
+            nn.Linear(16, 3),
         )
         self.decoder = nn.Sequential(
-            nn.Linear(3, 64),
+            nn.Linear(3, 16),
             nn.ReLU(),
-            nn.Linear(64, 28 * 28),
+            nn.Linear(16, 28 * 28),
         )
 
     def forward(self, x):
@@ -81,6 +83,7 @@ def load_data(partition_id, num_partitions):
             partitioners={"train": partitioner},
         )
     partition = fds.load_partition(partition_id, "train")
+    partition = partition.select(range(min(MAX_PARTITION_SAMPLES, len(partition))))
 
     partition = partition.with_transform(apply_transforms)
     # 20 % for on federated evaluation

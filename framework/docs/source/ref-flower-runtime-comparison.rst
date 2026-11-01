@@ -47,7 +47,7 @@ deployment runtime.
         computing environment.
     - - **Communication**
       - In-memory communication.
-      - TLS-enabled gRPC.
+      - HTTP for Runtime and Fleet API communication, with TLS support.
     - - **Server-side Infrastructure**
       - In the standard local CLI workflow, ``flwr run`` submits the run to a managed
         local SuperLink, which then coordinates the simulation runtime and the workers
@@ -59,12 +59,12 @@ deployment runtime.
       - A ``ServerApp`` process is initialized inside a controlled environment and
         communicates in-memory with workers.
       - ``ServerApp`` `process or subprocess <ref-flower-network-communication.html>`_
-        runs independently from the SuperLink and communicates with it over gRPC via the
-        ServerAppIO API.
+        runs independently from the SuperLink and communicates with it over HTTP via the
+        Runtime API.
     - - **Client-side Infrastructure**
       - No user-managed client-side infrastructure is required. For local CLI workflows,
         the managed local SuperLink and simulation runtime remain self-contained.
-      - SuperNodes connect to the SuperLink via TLS-enabled gRPC using the Fleet API.
+      - SuperNodes connect to the SuperLink via TLS-enabled HTTP using the Fleet API.
         Node authentication can be enabled.
     - - **Client-side App execution**
       - Each process executes a ``ClientApp`` on demand. They might execute multiple
@@ -72,5 +72,5 @@ deployment runtime.
         ``ClientApps`` are stateless.
       - Initialized as a ``ClientApp`` `process or subprocess
         <ref-flower-network-communication.html>`_, it runs independently from the
-        SuperNode and communicates with it over gRPC via the ClientAppIo API.
-        ``ClientApps`` are stateless.
+        SuperNode and communicates with it over HTTP via the Runtime API. ``ClientApps``
+        are stateless.

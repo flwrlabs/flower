@@ -18,9 +18,9 @@
 from logging import DEBUG
 
 from flwr.app import Context
-from flwr.common.logger import log
 from flwr.serverapp.grid import Grid
 from flwr.serverapp.server_app import LoadServerAppError, ServerApp
+from flwr.supercore import log
 from flwr.supercore.object_ref import load_app
 
 

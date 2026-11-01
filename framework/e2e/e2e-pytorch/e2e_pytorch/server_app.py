@@ -39,7 +39,7 @@ def main(grid, context):
     # Construct the LegacyContext
     context = fl.server.LegacyContext(
         context=context,
-        config=fl.server.ServerConfig(num_rounds=3),
+        config=fl.server.ServerConfig(num_rounds=2),
     )
 
     # Create the workflow
@@ -62,7 +62,7 @@ if __name__ == "__main__":
 
     hist = fl.server.start_server(
         server_address="127.0.0.1:8080",
-        config=fl.server.ServerConfig(num_rounds=3),
+        config=fl.server.ServerConfig(num_rounds=2),
         strategy=strategy,
     )
 

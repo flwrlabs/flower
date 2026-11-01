@@ -205,11 +205,6 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-      - name: Install build tools
-        if: ${{ needs.changes.outputs.framework == 'true' }}
-        run: |
-          python -m pip install -U pip==26.0.1
-        shell: bash
       # Using approach described here for Python location caching:
       # https://blog.allenai.org/python-caching-in-github-actions-e9452698e98d
       - name: Cache Python location
@@ -218,7 +213,12 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.pythonLocation }}
-          key: pythonloc-${{ runner.os }}-${{ matrix.directory }}-${{ env.pythonLocation }}-${{ hashFiles(format('./framework/e2e/{0}/pyproject.toml', matrix.directory)) }}
+          key: pythonloc-${{ runner.os }}-${{ matrix.directory }}-${{ env.pythonLocation }}-${{ hashFiles('.github/workflows/framework-e2e.yml', format('./framework/e2e/{0}/pyproject.toml', matrix.directory)) }}
+      - name: Bootstrap build tools
+        if: ${{ needs.changes.outputs.framework == 'true' }}
+        uses: ./.github/actions/bootstrap
+        with:
+          python-version: "3.11"
       - name: Install dependencies
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: python -m pip install --upgrade . --extra-index-url https://download.pytorch.org/whl/cpu
@@ -258,7 +258,7 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' && github.ref_name == 'main' &&  !steps.cache-restore-python.outputs.cache-hit }}
         with:
           path: ${{ env.pythonLocation }}
-          key: pythonloc-${{ runner.os }}-${{ matrix.directory }}-${{ env.pythonLocation }}-${{ hashFiles(format('./framework/e2e/{0}/pyproject.toml', matrix.directory)) }}
+          key: pythonloc-${{ runner.os }}-${{ matrix.directory }}-${{ env.pythonLocation }}-${{ hashFiles('.github/workflows/framework-e2e.yml', format('./framework/e2e/{0}/pyproject.toml', matrix.directory)) }}
 
   strategies:
     runs-on: ubuntu-24.04
@@ -497,14 +497,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
-      - name: Set up Python
+      - name: Bootstrap build tools
         if: ${{ needs.changes.outputs.framework == 'true' }}
-        uses: actions/setup-python@v6
+        uses: ./.github/actions/bootstrap
         with:
           python-version: "3.11"
-      - name: Install build tools
-        if: ${{ needs.changes.outputs.framework == 'true' }}
-        run: python -m pip install -U pip==26.0.1
       - name: Install dependencies
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: |
@@ -530,12 +527,10 @@ jobs:
     name: ServerApp/run heartbeat test with ${{ matrix.engine }} runtime / Python ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@v5
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Bootstrap build tools
+        uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install build tools
-        run: python -m pip install -U pip==26.0.1
       - name: Install dependencies
         run: |
           cd framework

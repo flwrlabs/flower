@@ -1,0 +1,647 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Runtime API handler tests."""
+
+
+import unittest
+from logging import ERROR
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
+
+from fastapi import status
+
+from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.common.serde import message_to_proto
+from flwr.proto.log_pb2 import (  # pylint: disable=E0611
+    PushLogsRequest,
+    PushLogsResponse,
+)
+from flwr.proto.runseries_pb2 import CompactedContext  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    CreateTaskRequest,
+    CreateTaskResponse,
+    GetCompactedContextsRequest,
+    PullTaskMessageRequest,
+    PushTaskEventsRequest,
+    PushTaskEventsResponse,
+    PushTaskMessageRequest,
+    PutCompactedContextRequest,
+    RecordTaskUsageRequest,
+    SendTaskHeartbeatRequest,
+)
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
+from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
+from flwr.supercore.corestate.utils_test import create_task_message
+from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.error.catalog import API_ERROR_MAP
+from flwr.supercore.task_process.connector import registry as connector_registry
+
+from . import runtime_handlers
+
+
+class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
+    """Tests for shared Runtime API handlers."""
+
+    def setUp(self) -> None:
+        """Set up test fixture."""
+        self.state = Mock()
+        self.state.get_tasks.return_value = []
+
+    def test_get_compacted_contexts(self) -> None:
+        """Apply the default limit and reject zero."""
+        context = CompactedContext(
+            id=1, series_id=42, through_event_id=9, text="Summary"
+        )
+        self.state.get_compacted_contexts.return_value = [context]
+
+        got = runtime_handlers.get_compacted_contexts(
+            GetCompactedContextsRequest(), self.state, 42
+        )
+        self.assertEqual(list(got.contexts), [context])
+        self.state.get_compacted_contexts.assert_called_once_with(
+            42, limit=1, before_context_id=None
+        )
+
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.get_compacted_contexts(
+                GetCompactedContextsRequest(limit=0), self.state, 42
+            )
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_INVALID_COMPACTED_CONTEXT_REQUEST,
+        )
+
+    def test_put_compacted_context(self) -> None:
+        """Store only a valid summary for the authenticated series."""
+        request = PutCompactedContextRequest(
+            context=CompactedContext(
+                series_id=42, through_event_id=9, text="Summary", token_count=123
+            )
+        )
+
+        response = runtime_handlers.put_compacted_context(request, self.state, 42)
+
+        self.assertFalse(response.ListFields())
+        self.state.store_compacted_context.assert_called_once_with(
+            42, 9, "Summary", 123
+        )
+
+        request.context.series_id = 43
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.put_compacted_context(request, self.state, 42)
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_INVALID_COMPACTED_CONTEXT_REQUEST,
+        )
+        self.state.store_compacted_context.assert_called_once()
+
+        with self.assertRaises(FlowerError):
+            runtime_handlers.put_compacted_context(
+                PutCompactedContextRequest(), self.state, 42
+            )
+
+    def test_put_compacted_context_rejects_duplicates(self) -> None:
+        """Map duplicate writes to a conflict response."""
+        request = PutCompactedContextRequest(
+            context=CompactedContext(through_event_id=9, text="Summary")
+        )
+        self.state.store_compacted_context.side_effect = ValueError("Duplicate")
+        with self.assertRaises(FlowerError) as caught:
+            runtime_handlers.put_compacted_context(request, self.state, 42)
+        self.assertEqual(
+            caught.exception.code,
+            ApiErrorCode.RUNTIME_COMPACTED_CONTEXT_ALREADY_EXISTS,
+        )
+        self.assertEqual(
+            API_ERROR_MAP[
+                ApiErrorCode.RUNTIME_COMPACTED_CONTEXT_ALREADY_EXISTS
+            ].http_status_code,
+            status.HTTP_409_CONFLICT,
+        )
+
+    def _create_connector_task(self, connector_ref: str) -> CreateTaskResponse:
+        """Create a connector task as an authenticated AgentApp task."""
+        request = CreateTaskRequest(
+            type=TaskType.CONNECTOR,
+            connector_ref=connector_ref,
+        )
+        return runtime_handlers.create_task(
+            request,
+            self.state,
+            Mock(task_id=789, run_id=123, type=TaskType.AGENT_APP),
+        )
+
+    def test_acquire_task_returns_empty_when_queue_is_empty(self) -> None:
+        """An empty queue must not claim a task."""
+        response = runtime_handlers.acquire_task(
+            AcquireTaskRequest(supported_task_types=[TaskType.CONNECTOR]),
+            self.state,
+        )
+
+        self.assertFalse(response.HasField("task"))
+        self.assertFalse(response.token)
+        self.state.claim_task.assert_not_called()
+
+    def test_acquire_task_retries_after_lost_claim_race(self) -> None:
+        """A contender should try the next eligible task after losing a claim."""
+        tasks = [
+            Task(task_id=1, type=TaskType.CONNECTOR),
+            Task(task_id=2, type=TaskType.CLIENT_APP),
+            Task(task_id=3, type=TaskType.CONNECTOR),
+        ]
+        self.state.get_tasks.return_value = tasks
+        self.state.claim_task.side_effect = [None, "task-token"]
+
+        response = runtime_handlers.acquire_task(
+            AcquireTaskRequest(supported_task_types=[TaskType.CONNECTOR]), self.state
+        )
+
+        self.assertEqual(response.task, tasks[2])
+        self.assertEqual(response.token, "task-token")
+        self.assertEqual(self.state.claim_task.call_count, 2)
+        self.assertEqual(
+            [call.args[0] for call in self.state.claim_task.call_args_list], [1, 3]
+        )
+
+    def test_acquire_task_matches_only_eligible_agentapp_fab(self) -> None:
+        """A FAB-specific warm slot must not claim an unrelated AgentApp."""
+        tasks = [
+            Task(task_id=1, type=TaskType.AGENT_APP, fab_hash="other"),
+            Task(task_id=2, type=TaskType.CONNECTOR),
+            Task(task_id=3, type=TaskType.AGENT_APP, fab_hash="ready"),
+        ]
+        self.state.get_tasks.return_value = tasks
+        self.state.claim_task.return_value = "task-token"
+
+        response = runtime_handlers.acquire_task(
+            AcquireTaskRequest(agentapp_fab_hashes=["ready"]), self.state
+        )
+
+        self.assertEqual(response.task, tasks[2])
+        self.state.claim_task.assert_called_once_with(3)
+
+    def test_send_task_heartbeat_acknowledges_authenticated_task(self) -> None:
+        """SendTaskHeartbeat should use the authenticated task ID."""
+        for success in (True, False):
+            with self.subTest(success=success):
+                # Prepare
+                self.state.reset_mock()
+                self.state.acknowledge_task_heartbeat.return_value = success
+
+                # Execute
+                response = runtime_handlers.send_task_heartbeat(
+                    SendTaskHeartbeatRequest(), self.state, Mock(task_id=123)
+                )
+
+                # Assert
+                self.state.acknowledge_task_heartbeat.assert_called_once_with(123)
+                self.assertEqual(response.success, success)
+
+    def test_create_task_returns_task_id(self) -> None:
+        """CreateTask should create a task for the authenticated run."""
+        # Prepare
+        self.state.create_task.return_value = 456
+        request = CreateTaskRequest(
+            type=TaskType.SIMULATION,
+            fab_hash="fab-hash",
+        )
+
+        # Execute
+        response = runtime_handlers.create_task(
+            request,
+            self.state,
+            Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
+        )
+
+        # Assert
+        self.state.create_task.assert_called_once_with(
+            task_type=TaskType.SIMULATION,
+            run_id=123,
+            fab_hash="fab-hash",
+            model_ref=None,
+            connector_ref=None,
+            connector_id=None,
+            requesting_task_id=789,
+        )
+        self.assertEqual(response.task_id, 456)
+
+    def test_create_task_allows_app_task_types_to_request_creation(self) -> None:
+        """CreateTask should allow app tasks to request task creation."""
+        # Prepare
+        self.state.create_task.return_value = 456
+        request = CreateTaskRequest(type=TaskType.SIMULATION, fab_hash="fab-hash")
+
+        for requesting_task_type in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
+            self.state.create_task.reset_mock()
+
+            with self.subTest(requesting_task_type=requesting_task_type):
+                # Execute
+                response = runtime_handlers.create_task(
+                    request,
+                    self.state,
+                    Mock(task_id=789, run_id=123, type=requesting_task_type),
+                )
+
+                # Assert
+                self.state.create_task.assert_called_once_with(
+                    task_type=TaskType.SIMULATION,
+                    run_id=123,
+                    fab_hash="fab-hash",
+                    model_ref=None,
+                    connector_ref=None,
+                    connector_id=None,
+                    requesting_task_id=789,
+                )
+                self.assertEqual(response.task_id, 456)
+
+    def test_create_task_resolves_bound_connector_without_oauth_configuration(
+        self,
+    ) -> None:
+        """Resolve a run-bound connector without requiring an OAuth application."""
+        self.state.get_run_connector_ids.return_value = [42]
+        self.state.get_connector_by_id.return_value = SimpleNamespace(
+            connector_ref="notion"
+        )
+        self.state.create_task.return_value = 456
+
+        with patch.object(
+            connector_registry,
+            "OAUTH_FLOWS",
+            {},
+        ):
+            response = self._create_connector_task("notion")
+
+        self.state.get_run_connector_ids.assert_called_once_with(123)
+        self.assertEqual(
+            self.state.create_task.call_args.kwargs["connector_ref"], "notion"
+        )
+        self.assertEqual(self.state.create_task.call_args.kwargs["connector_id"], 42)
+        self.assertEqual(response.task_id, 456)
+
+    def test_create_task_rejects_unbound_oauth_connector(self) -> None:
+        """CreateTask should reject OAuth credentials unavailable to the run."""
+        self.state.get_run_connector_ids.return_value = []
+
+        with (
+            patch.object(
+                connector_registry,
+                "OAUTH_FLOWS",
+                {"notion": Mock(connector_ref="notion")},
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            self._create_connector_task("notion")
+
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE,
+        )
+        self.state.create_task.assert_not_called()
+
+    def test_create_task_rejects_unknown_connector(self) -> None:
+        """CreateTask should reject names absent from the connector registry."""
+        with self.assertRaises(FlowerError) as error:
+            self._create_connector_task("unknown")
+
+        self.assertEqual(error.exception.code, ApiErrorCode.CONNECTOR_NOT_FOUND)
+        self.state.get_run_connector_ids.assert_not_called()
+        self.state.create_task.assert_not_called()
+
+    def test_create_task_preserves_builtin_connector_access(self) -> None:
+        """CreateTask should keep credential-free built-in connectors available."""
+        self.state.create_task.return_value = 456
+
+        for connector_ref in ("web_search", "filesystem"):
+            with self.subTest(connector_ref=connector_ref):
+                response = self._create_connector_task(connector_ref)
+                self.assertEqual(response.task_id, 456)
+
+        self.state.get_run_connector_ids.assert_not_called()
+
+    def test_create_task_propagates_state_error(self) -> None:
+        """CreateTask should let state-layer run validation errors propagate."""
+        # Prepare
+        self.state.create_task.side_effect = RuntimeError(
+            "Run 123 not found. create_task requires an existing run."
+        )
+
+        # Execute
+        with self.assertRaises(RuntimeError) as err:
+            runtime_handlers.create_task(
+                CreateTaskRequest(type=TaskType.SIMULATION, fab_hash="fab-hash"),
+                self.state,
+                Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
+            )
+
+        # Assert
+        self.assertEqual(
+            str(err.exception),
+            "Run 123 not found. create_task requires an existing run.",
+        )
+        self.state.create_task.assert_called_once_with(
+            task_type=TaskType.SIMULATION,
+            run_id=123,
+            fab_hash="fab-hash",
+            model_ref=None,
+            connector_ref=None,
+            connector_id=None,
+            requesting_task_id=789,
+        )
+
+    def test_create_task_rejects_missing_required_field(self) -> None:
+        """CreateTask should validate task-type-specific required fields."""
+        # Prepare
+        test_cases = [
+            (
+                CreateTaskRequest(type=TaskType.SERVER_APP),
+                "Task type 'flwr-serverapp' requires fab_hash.",
+            ),
+            (
+                CreateTaskRequest(type=TaskType.CONNECTOR),
+                "Task type 'flwr-connector' requires connector_ref.",
+            ),
+        ]
+
+        for request, detail in test_cases:
+            with self.subTest(task_type=request.type):
+                with self.assertRaises(FlowerError) as error:
+                    runtime_handlers.create_task(
+                        request,
+                        self.state,
+                        Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
+                    )
+
+                self.assertEqual(
+                    error.exception.code,
+                    ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
+                )
+                self.assertEqual(error.exception.message, detail)
+                self.state.create_task.assert_not_called()
+
+    def test_create_task_raises_if_state_creation_fails(self) -> None:
+        """CreateTask should surface task creation failures as INTERNAL."""
+        # Prepare
+        self.state.create_task.return_value = None
+        request = CreateTaskRequest(
+            type=TaskType.SIMULATION,
+            fab_hash="fab-hash",
+        )
+
+        # Execute
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.create_task(
+                request,
+                self.state,
+                Mock(run_id=123, type=TaskType.SERVER_APP),
+            )
+
+        # Assert
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_TASK_CREATION_FAILED,
+        )
+
+    def test_push_task_message_stores_message_for_authenticated_task(self) -> None:
+        """PushTaskMessage should store metadata matching the authenticated task."""
+        # Prepare
+        self.state.store_task_message.return_value = True
+        message = create_task_message(
+            run_id=789,
+            src_task_id=123,
+            dst_task_id=456,
+        )
+        request = PushTaskMessageRequest(message=message_to_proto(message))
+
+        # Execute
+        response = runtime_handlers.push_task_message(
+            request, self.state, Task(task_id=123, run_id=789)
+        )
+
+        # Assert
+        self.state.store_task_message.assert_called_once()
+        stored_message = self.state.store_task_message.call_args.args[0]
+        self.assertEqual(response.message_id, stored_message.metadata.message_id)
+        self.assertEqual(stored_message.metadata.run_id, 789)
+        self.assertEqual(stored_message.metadata.src_node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(stored_message.metadata.dst_node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(stored_message.metadata.src_task_id, 123)
+        self.assertEqual(stored_message.metadata.dst_task_id, 456)
+
+    def test_push_task_message_rejects_mismatched_source_task(self) -> None:
+        """PushTaskMessage should reject a source other than the authenticated task."""
+        message = create_task_message(run_id=789, src_task_id=321, dst_task_id=456)
+        request = PushTaskMessageRequest(message=message_to_proto(message))
+
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.push_task_message(
+                request, self.state, Task(task_id=123, run_id=789)
+            )
+
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_INVALID_TASK_MESSAGE,
+        )
+        self.state.store_task_message.assert_not_called()
+
+    def test_push_task_message_raises_when_state_rejects_message(self) -> None:
+        """PushTaskMessage should raise when CoreState cannot store the message."""
+        # Prepare
+        self.state.store_task_message.return_value = False
+        message = create_task_message(run_id=789, src_task_id=123, dst_task_id=456)
+        request = PushTaskMessageRequest(message=message_to_proto(message))
+        # Execute
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.push_task_message(
+                request, self.state, Task(task_id=123, run_id=789)
+            )
+
+        # Assert
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_INVALID_TASK_MESSAGE,
+        )
+
+    def test_push_task_events_derives_authenticated_task_identity(self) -> None:
+        """PushTaskEvents should derive run and task IDs from task auth."""
+        # Prepare
+        self.state.store_task_events.return_value = True
+        request = PushTaskEventsRequest(
+            events=[
+                TaskEvent(
+                    id=999,
+                    timestamp="client-ts",
+                    run_id=111,
+                    task_id=222,
+                    event=" response.created ",
+                    data='{"payload":"preserved"}',
+                )
+            ]
+        )
+
+        # Execute
+        response = runtime_handlers.push_task_events(
+            request, self.state, Task(task_id=123, run_id=789)
+        )
+
+        # Assert
+        self.state.store_task_events.assert_called_once()
+        stored_events = self.state.store_task_events.call_args.args[0]
+        self.assertIsInstance(response, PushTaskEventsResponse)
+        self.assertEqual(len(stored_events), 1)
+        self.assertIs(stored_events[0], request.events[0])
+        self.assertEqual(stored_events[0].id, 999)
+        self.assertEqual(stored_events[0].timestamp, "client-ts")
+        self.assertEqual(stored_events[0].run_id, 789)
+        self.assertEqual(stored_events[0].task_id, 123)
+        self.assertEqual(stored_events[0].event, " response.created ")
+        self.assertEqual(stored_events[0].data, '{"payload":"preserved"}')
+
+    def test_push_task_events_logs_when_state_rejects_events(self) -> None:
+        """PushTaskEvents should log when CoreState cannot store events."""
+        # Prepare
+        self.state.store_task_events.return_value = False
+        request = PushTaskEventsRequest(
+            events=[
+                TaskEvent(event="response.created", data="{"),
+            ]
+        )
+        # Execute
+        with patch("flwr.supercore.servicer.runtime.runtime_handlers.log") as log_mock:
+            response = runtime_handlers.push_task_events(
+                request, self.state, Task(task_id=123, run_id=789)
+            )
+
+        # Assert
+        self.assertIsInstance(response, PushTaskEventsResponse)
+        log_mock.assert_any_call(
+            ERROR,
+            "Task events could not be stored for task %d of run %d.",
+            123,
+            789,
+        )
+
+    def test_record_task_usage_stores_usage_for_authenticated_metered_task(
+        self,
+    ) -> None:
+        """RecordTaskUsage should store usage for the authenticated AgentApp."""
+        usage = TaskUsage(
+            usage_type="model_inference",
+            provider="openai/gpt-test",
+            input_tokens=10,
+            output_tokens=20,
+            total_tokens=30,
+        )
+        request = RecordTaskUsageRequest(task_usage=usage)
+
+        response = runtime_handlers.record_task_usage(
+            request,
+            self.state,
+            Task(task_id=123, run_id=789, type=TaskType.AGENT_APP),
+        )
+
+        self.state.add_task_usage.assert_called_once_with(123, usage)
+        self.assertIsNotNone(response)
+
+    def test_pull_task_message_uses_authenticated_task_destination(self) -> None:
+        """PullTaskMessage should query messages for the authenticated task."""
+        # Prepare
+        message = create_task_message(
+            src_task_id=123,
+            dst_task_id=321,
+            run_id=789,
+        )
+        message.metadata.__dict__["_message_id"] = "message-id"
+        self.state.get_task_message.return_value = [message]
+
+        # Execute
+        response = runtime_handlers.pull_task_message(
+            PullTaskMessageRequest(limit=5),
+            self.state,
+            Task(task_id=321, run_id=789),
+        )
+
+        # Assert
+        self.state.get_task_message.assert_called_once_with(
+            dst_task_ids=[321],
+            src_task_ids=None,
+            limit=5,
+            order_by="created_at",
+        )
+        self.assertEqual(len(response.messages), 1)
+        self.assertEqual(response.messages[0].metadata.src_task_id, 123)
+        self.assertEqual(response.messages[0].metadata.dst_task_id, 321)
+        self.assertEqual(response.messages[0].metadata.src_node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(response.messages[0].metadata.dst_node_id, SUPERLINK_NODE_ID)
+
+    def test_pull_task_message_filters_source_task(self) -> None:
+        """PullTaskMessage should optionally query messages from one source task."""
+        self.state.get_task_message.return_value = []
+
+        # Execute
+        runtime_handlers.pull_task_message(
+            PullTaskMessageRequest(limit=5, src_task_id=123),
+            self.state,
+            Task(task_id=321, run_id=789),
+        )
+
+        # Assert
+        self.state.get_task_message.assert_called_once_with(
+            dst_task_ids=[321],
+            src_task_ids=[123],
+            limit=5,
+            order_by="created_at",
+        )
+
+    def test_create_task_rejects_disallowed_requesting_task_type(self) -> None:
+        """CreateTask should reject task creation requests from non-app task types."""
+        # Prepare
+        disallowed_requesting_task_types = (
+            set(TaskType) - TASK_TYPES_ALLOWED_TO_CREATE_TASKS
+        ) | {"unknown"}
+
+        for requesting_task_type in disallowed_requesting_task_types:
+            self.state.create_task.reset_mock()
+
+            with self.subTest(requesting_task_type=requesting_task_type):
+                # Execute
+                with self.assertRaises(FlowerError) as error:
+                    runtime_handlers.create_task(
+                        CreateTaskRequest(
+                            type=TaskType.SIMULATION, fab_hash="fab-hash"
+                        ),
+                        self.state,
+                        Mock(run_id=123, type=requesting_task_type),
+                    )
+
+                # Assert
+                self.assertEqual(
+                    error.exception.code,
+                    ApiErrorCode.RUNTIME_TASK_CREATION_NOT_ALLOWED,
+                )
+                self.state.create_task.assert_not_called()
+
+    def test_push_logs_merges_logs_and_stores_them(self) -> None:
+        """PushLogs should concatenate fragments and store them via state."""
+        # Execute
+        response = runtime_handlers.push_logs(
+            PushLogsRequest(run_id=123, logs=["hello", " ", "world"]),
+            self.state,
+            Mock(task_id=123),
+        )
+
+        # Assert
+        self.state.add_task_log.assert_called_once_with(123, "hello world")
+        self.assertIsInstance(response, PushLogsResponse)
