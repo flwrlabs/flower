@@ -22,6 +22,8 @@ CORESTATE_TABLE_NAMES = {
     "fab",
     "message",
     "agent",
+    "conversation",
+    "conversation_participant",
     "run_series",
     "compacted_contexts",
     "series_context",
