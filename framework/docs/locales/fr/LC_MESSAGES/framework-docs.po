@@ -44350,8 +44350,6 @@ msgid ""
 "Time-to-live for this reply in seconds, independent of the original "
 "message's TTL. If unset, defaults to 43,200 seconds (12 hours)."
 msgstr ""
-"Durée de vie (TTL) pour ce message en secondes. Si `None` (par défaut), "
-"la durée de vie est fixée à 43 200 secondes (12 heures)."
 
 #: flwr.app.message.message.Message.create_error_reply:9 of
 msgid "**message** -- A Message containing only the relevant error and metadata."
