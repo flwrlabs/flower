@@ -32,6 +32,22 @@ For simulations that use the Simulation Runtime, ``flwr`` should be installed wi
 
     python -m pip install "flwr[simulation]"
 
+Upgrade an existing installation
+=================================
+
+To upgrade an existing installation, run:
+
+::
+
+    python -m pip install --upgrade flwr
+
+.. note::
+
+    On Windows, stop any running Flower processes (for example, an active simulation
+    or deployment) before upgrading. A running process can keep a Flower executable
+    locked and prevent pip from replacing it. If pip reports a file-in-use error such
+    as ``WinError 32``, stop the process and retry the upgrade.
+
 Using conda (or mamba)
 ======================
 
