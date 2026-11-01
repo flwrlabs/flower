@@ -57,6 +57,20 @@ service Control {
   // Get run series
   rpc GetRunSeries(GetRunSeriesRequest) returns (GetRunSeriesResponse) {}
 
+  // Update run series description
+  rpc UpdateRunSeriesDescription(UpdateRunSeriesDescriptionRequest)
+      returns (UpdateRunSeriesDescriptionResponse) {}
+
+  // List events for all runs in a run series
+  rpc ListRunSeriesEvents(ListRunSeriesEventsRequest)
+      returns (ListRunSeriesEventsResponse) {}
+
+  // Create an agent owned by the authenticated account
+  rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse) {}
+
+  // List agents owned by the authenticated account
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse) {}
+
   // Get login details upon request
   rpc GetLoginDetails(GetLoginDetailsRequest)
       returns (GetLoginDetailsResponse) {}
@@ -95,8 +109,25 @@ service Control {
   rpc ListFederations(ListFederationsRequest)
       returns (ListFederationsResponse) {}
 
+  // List Apps in a Federation
+  rpc ListApps(ListAppsRequest) returns (ListAppsResponse) {}
+
+  // List Federations associated with an App
+  rpc ListAppAssociations(ListAppAssociationsRequest)
+      returns (ListAppAssociationsResponse) {}
+
+  // Add App to a Federation
+  rpc AddApp(AddAppRequest) returns (AddAppResponse) {}
+
+  // Remove App from a Federation
+  rpc RemoveApp(RemoveAppRequest) returns (RemoveAppResponse) {}
+
   // Show Federation
   rpc ShowFederation(ShowFederationRequest) returns (ShowFederationResponse) {}
+
+  // Set Federation icon
+  rpc SetFederationIcon(SetFederationIconRequest)
+      returns (SetFederationIconResponse) {}
 
   // Create Federation
   rpc CreateFederation(CreateFederationRequest)
@@ -151,6 +182,23 @@ service Control {
       returns (stream StreamRunEventsResponse) {}
 }
 
+message AgentConfig {
+  string name = 1;
+  optional string description = 2;
+  optional string title = 3;
+  string app_spec = 4;
+}
+message Agent {
+  uint64 id = 1;
+  AgentConfig config = 2;
+  string created_at = 3;
+  string updated_at = 4;
+}
+message CreateAgentRequest { AgentConfig config = 1; }
+message CreateAgentResponse { Agent agent = 1; }
+message ListAgentsRequest {}
+message ListAgentsResponse { repeated Agent agents = 1; }
+
 message StartRunRequest {
   Fab fab = 1;
   map<string, Scalar> override_config = 2;
@@ -159,6 +207,8 @@ message StartRunRequest {
   string federation = 5;
   optional uint64 series_id = 6;
   repeated string connector_refs = 7;
+  string user_prompt = 8;
+  repeated uint64 connector_ids = 9;
 }
 message StartRunResponse {
   optional uint64 run_id = 1;
@@ -207,6 +257,8 @@ message StreamLogsResponse {
 message ListRunsRequest {
   optional uint64 run_id = 1;
   optional uint64 limit = 2;
+  // Skip this many newer runs when listing runs. Ignored when run_id is set.
+  optional uint64 skip = 3;
 }
 message ListRunsResponse {
   map<uint64, Run> run_dict = 1;
@@ -217,6 +269,7 @@ message ListRunSeriesRequest {
   optional string updated_before = 1;
   optional uint32 limit = 2;
   optional string federation_id = 3;
+  optional bool is_agent = 4; // Temporary filter for agent run series.
 }
 message ListRunSeriesResponse { repeated RunSeries entries = 1; }
 
@@ -224,7 +277,11 @@ message GetRunSeriesRequest { uint64 series_id = 1; }
 message GetRunSeriesResponse {
   RunSeries series = 1;
   Context context = 2;
+  repeated Run runs = 3;
 }
+
+message ListRunSeriesEventsRequest { uint64 series_id = 1; }
+message ListRunSeriesEventsResponse { repeated TaskEvent events = 1; }
 
 message GetLoginDetailsRequest {}
 message GetLoginDetailsResponse {
@@ -241,21 +298,33 @@ message GetAuthTokensResponse {
   string refresh_token = 2;
 }
 
-message ListConnectorsRequest {}
+message RefreshAuthTokensRequest { string refresh_token = 1; }
+message RefreshAuthTokensResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
+message ListConnectorsRequest { string federation = 1; }
 message Connector {
   string connector_ref = 1;
   string display_name = 2;
   string description = 3;
   bool connected = 4;
+  uint64 connector_id = 5;
 }
 message ListConnectorsResponse { repeated Connector connectors = 1; }
 
-message DisconnectConnectorRequest { string connector_ref = 1; }
+message DisconnectConnectorRequest {
+  string connector_ref = 1;
+  uint64 connector_id = 2;
+  string federation = 3;
+}
 message DisconnectConnectorResponse {}
 
 message BeginConnectorOAuthRequest {
   string connector_ref = 1;
   string redirect_uri = 2;
+  string federation = 3;
 }
 message BeginConnectorOAuthResponse {
   string oauth_session_id = 1;
@@ -269,7 +338,10 @@ message CompleteConnectorOAuthRequest {
   string code = 2;
   string state = 3;
 }
-message CompleteConnectorOAuthResponse { string connector_ref = 1; }
+message CompleteConnectorOAuthResponse {
+  string connector_ref = 1;
+  uint64 connector_id = 2;
+}
 
 message StopRunRequest { uint64 run_id = 1; }
 message StopRunResponse { bool success = 1; }
@@ -277,7 +349,11 @@ message StopRunResponse { bool success = 1; }
 message PullArtifactsRequest { uint64 run_id = 1; }
 message PullArtifactsResponse { optional string url = 1; }
 
-message RegisterNodeRequest { bytes public_key = 1; }
+message RegisterNodeRequest {
+  bytes public_key = 1;
+  optional string location = 2;
+  optional string name = 3;
+}
 message RegisterNodeResponse { optional uint64 node_id = 1; }
 
 message UnregisterNodeRequest { uint64 node_id = 1; }
@@ -292,11 +368,49 @@ message ListNodesResponse {
 message ListFederationsRequest {}
 message ListFederationsResponse { repeated Federation federations = 1; }
 
+message AppInfo {
+  string app_id = 1;
+  string fab_hash = 2;
+  string app_type = 3;
+  // True for Hub apps, false for local/custom apps, and absent for legacy apps
+  // whose provenance is unknown.
+  optional bool is_hub_app = 4;
+  string display_name = 5;
+  string description = 6;
+  string color = 7;
+}
+message ListAppsRequest {
+  string federation_id = 1;
+  optional uint64 limit = 2;
+}
+message ListAppsResponse { repeated AppInfo apps = 1; }
+
+message ListAppAssociationsRequest { string app_id = 1; }
+message ListAppAssociationsResponse { repeated string federation_ids = 1; }
+
+message AddAppRequest {
+  string federation_id = 1;
+  string app_id = 2;
+}
+message AddAppResponse {}
+
+message RemoveAppRequest {
+  string federation_id = 1;
+  string app_id = 2;
+}
+message RemoveAppResponse {}
+
 message ShowFederationRequest { string federation_name = 1; }
 message ShowFederationResponse {
   Federation federation = 1;
   string now = 2;
 }
+
+message SetFederationIconRequest {
+  string federation_name = 1;
+  optional string icon_key = 2;
+}
+message SetFederationIconResponse {}
 
 message CreateFederationRequest {
   string federation_name = 1;
@@ -361,3 +475,9 @@ message StreamRunEventsRequest {
   optional uint64 after_task_event_id = 2;
 }
 message StreamRunEventsResponse { TaskEvent task_event = 1; }
+
+message UpdateRunSeriesDescriptionRequest {
+  uint64 series_id = 1;
+  string description = 2;
+}
+message UpdateRunSeriesDescriptionResponse { RunSeries series = 1; }

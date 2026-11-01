@@ -17,6 +17,7 @@
 
 import ctypes
 import json
+import math
 import os
 import re
 import subprocess
@@ -29,12 +30,12 @@ from typing import Any, Literal, TypeVar, cast
 import requests
 
 from flwr.common.constant import FLWR_DIR, FLWR_HOME, NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
-from flwr.common.logger import log
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.version import package_version as flwr_version
 
 from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN, MAX_NAME_LENGTH
-from .typing import JSONValue
+from .typing import JSONObject, JSONValue
 
 T = TypeVar("T", str, bytes)
 PR_SET_DUMPABLE = 4  # from /usr/include/linux/prctl.h
@@ -79,6 +80,14 @@ def strict_json_loads(raw: str | bytes | bytearray) -> JSONValue:
     )
 
 
+def strict_json_loads_object(raw: str | bytes | bytearray) -> JSONObject:
+    """Parse a strict JSON value and require an object."""
+    value = strict_json_loads(raw)
+    if not isinstance(value, dict):
+        raise ValueError("JSON value must be an object.")
+    return value
+
+
 def strict_json_dumps(value: JSONValue, *, compact: bool = False) -> str:
     """Serialize a strict JSON value.
 
@@ -87,6 +96,28 @@ def strict_json_dumps(value: JSONValue, *, compact: bool = False) -> str:
     if compact:
         return json.dumps(value, separators=(",", ":"), allow_nan=False)
     return json.dumps(value, allow_nan=False)
+
+
+def validate_node_location(location: str) -> None:
+    """Validate a SuperNode location in ``<latitude>,<longitude>`` format."""
+    try:
+        latitude_str, longitude_str = location.split(",")
+        latitude = float(latitude_str)
+        longitude = float(longitude_str)
+    except ValueError as err:
+        raise ValueError(
+            "Location must contain two comma-separated numbers: "
+            '"<latitude>,<longitude>".'
+        ) from err
+
+    if not math.isfinite(latitude) or not math.isfinite(longitude):
+        raise ValueError("Latitude and longitude must be finite numbers.")
+
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        raise ValueError(
+            "Latitude must be between -90 and 90 and longitude must be between "
+            "-180 and 180."
+        )
 
 
 def mask_string(value: str, head: int = 4, tail: int = 4) -> str:

@@ -18,6 +18,10 @@ from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
+    CheckConstraint,
+    Column,
+    Double,
     Float,
     ForeignKey,
     Index,
@@ -26,11 +30,15 @@ from sqlalchemy import (
     MetaData,
     PrimaryKeyConstraint,
     String,
+    Table,
+    Text,
+    UniqueConstraint,
+    column,
     text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from flwr.supercore.state.schema.types import UTCDateTime
+from flwr.supercore.state.schema.types import UInt64, UTCDateTime
 
 
 class FlwrBase(DeclarativeBase):
@@ -60,6 +68,108 @@ class Fab(FlwrBase):
     verifications: Mapped[str] = mapped_column(String, nullable=False)
 
 
+class Message(FlwrBase):
+    """Represent message delivery with retained metadata.
+
+    Delivery state is inferred from the flag, deadline, and closing timestamps:
+
+    - Not cleared, deadline in the future: pending and eligible for retrieval.
+    - Not cleared, deadline reached: expired, awaiting passive cleanup.
+    - Cleared, acknowledged_at set: acknowledged.
+    - Cleared, cancelled_at set: cancelled.
+    - Cleared, neither closing timestamp set: expired and cleaned up.
+
+    The expires_at deadline is always set, regardless of the closing outcome.
+    Clearing ends delivery and releases the ObjectStore reference while retaining
+    metadata. Acknowledgment and cancellation timestamps are mutually exclusive.
+    """
+
+    __tablename__ = "message"
+    __table_args__ = (
+        CheckConstraint(
+            "acknowledged_at IS NULL OR cancelled_at IS NULL",
+            name="ck_message_terminal_timestamps_exclusive",
+        ),
+        CheckConstraint(
+            "cleared OR (acknowledged_at IS NULL AND cancelled_at IS NULL)",
+            name="ck_message_terminal_timestamps_require_cleared",
+        ),
+        Index(
+            "idx_message_pending_dst_created_at",
+            "dst_node_id",
+            "created_at",
+            "message_id",
+            postgresql_where=column("cleared", Boolean).is_(False),
+            sqlite_where=column("cleared", Boolean).is_(False),
+        ),
+        Index(
+            "idx_message_pending_dst_run_created_at",
+            "dst_node_id",
+            "run_id",
+            "created_at",
+            "message_id",
+            postgresql_where=column("cleared", Boolean).is_(False),
+            sqlite_where=column("cleared", Boolean).is_(False),
+        ),
+        Index(
+            "idx_message_pending_run_id",
+            "run_id",
+            postgresql_where=column("cleared", Boolean).is_(False),
+            sqlite_where=column("cleared", Boolean).is_(False),
+        ),
+        Index("idx_message_reply_to_message_id", "reply_to_message_id"),
+    )
+
+    message_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    run_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    src_node_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    dst_node_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    src_task_id: Mapped[int | None] = mapped_column(UInt64(), nullable=True)
+    dst_task_id: Mapped[int | None] = mapped_column(UInt64(), nullable=True)
+    reply_to_message_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("message.message_id", ondelete="RESTRICT"), nullable=True
+    )
+    group_id: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[float] = mapped_column(Double, nullable=False)
+    ttl: Mapped[float] = mapped_column(Double, nullable=False)
+    message_type: Mapped[str] = mapped_column(String, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    cleared: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    acknowledged_at: Mapped[datetime | None] = mapped_column(
+        UTCDateTime(), nullable=True
+    )
+    cancelled_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+
+class Agent(FlwrBase):
+    """Represent a persistent agent owned by a Flower account.
+
+    ``app_spec`` identifies the AgentApp and an optional version.
+    """
+
+    __tablename__ = "agent"
+    __table_args__ = (
+        Index("idx_agent_flwr_aid", "flwr_aid"),
+        {"sqlite_autoincrement": True},
+    )
+
+    agent_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    app_spec: Mapped[str] = mapped_column(String, nullable=False)
+    flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
 class RunSeries(FlwrBase):
     """Represent a run series."""
 
@@ -67,6 +177,7 @@ class RunSeries(FlwrBase):
 
     series_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
     federation_id: Mapped[str] = mapped_column(String, nullable=False)
+    is_agent: Mapped[bool] = mapped_column(Boolean, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
@@ -79,6 +190,30 @@ class SeriesContext(FlwrBase):
 
     series_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
     context: Mapped[bytes | None] = mapped_column(LargeBinary)
+
+
+class CompactedContext(FlwrBase):
+    """Represent a compacted event context for a run series.
+
+    ``through_event_id`` is an inclusive event high-water mark for the series.
+    """
+
+    __tablename__ = "compacted_contexts"
+    __table_args__ = (
+        UniqueConstraint("series_id", "through_event_id"),
+        Index("idx_compacted_contexts_series_id_id", "series_id", "id"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
+    series_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    through_event_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    token_count: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
 class SeriesRuns(FlwrBase):
@@ -122,15 +257,53 @@ class Automation(FlwrBase):
     stopped_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
 
 
+class FederationApp(FlwrBase):
+    """Represent an app associated with a federation."""
+
+    __tablename__ = "federation_app"
+    __table_args__ = (
+        Index(
+            "idx_federation_app_federation_id_added_at",
+            "federation_id",
+            "added_at",
+        ),
+        Index(
+            "idx_federation_app_app_id_federation_id",
+            "app_id",
+            "federation_id",
+        ),
+    )
+
+    federation_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    app_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    fab_hash: Mapped[str] = mapped_column(String, nullable=False)
+    app_type: Mapped[str] = mapped_column(String, nullable=False)
+    is_hub_app: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    color: Mapped[str | None] = mapped_column(String, nullable=True)
+    added_by: Mapped[str] = mapped_column(String, nullable=False)
+    added_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
 class Connector(FlwrBase):
-    """Represent connector configuration for an account."""
+    """Represent connector configuration for a federation."""
 
     __tablename__ = "connector"
+    __table_args__ = ({"sqlite_autoincrement": True},)
 
-    flwr_aid: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
-    connector_ref: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    connector_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True, nullable=False
+    )
+    federation_id: Mapped[str] = mapped_column(String, nullable=False)
+    connector_ref: Mapped[str] = mapped_column(String, nullable=False)
     credentials_json: Mapped[str] = mapped_column(String, nullable=False)
     config_json: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    created_by: Mapped[str] = mapped_column(String, nullable=False)
+    deleted_by: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class ConnectorOAuthSession(FlwrBase):
@@ -142,6 +315,7 @@ class ConnectorOAuthSession(FlwrBase):
         String, primary_key=True, nullable=False
     )
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    federation_id: Mapped[str] = mapped_column(String, nullable=False)
     connector_ref: Mapped[str] = mapped_column(String, nullable=False)
     state: Mapped[str] = mapped_column(String, nullable=False)
     redirect_uri: Mapped[str] = mapped_column(String, nullable=False)
@@ -157,7 +331,7 @@ class RunConnector(FlwrBase):
     __tablename__ = "run_connector"
 
     run_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
-    connector_ref: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    connector_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
 
 
 class Task(FlwrBase):
@@ -176,6 +350,7 @@ class Task(FlwrBase):
     fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     model_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     connector_ref: Mapped[str | None] = mapped_column(String, nullable=True)
+    connector_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     token: Mapped[str | None] = mapped_column(String, nullable=True)
     active_until: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     pending_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
@@ -201,7 +376,12 @@ class TaskEvent(FlwrBase):
         Index("idx_task_event_task_id", "task_id"),
     )
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        # Both are signed 64-bit; SQLite requires INTEGER for autoincrement.
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
     timestamp: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     task_id: Mapped[int] = mapped_column(
@@ -212,7 +392,11 @@ class TaskEvent(FlwrBase):
 
 
 class TaskMessage(FlwrBase):
-    """Represent a task message."""
+    """Represent a pending task message.
+
+    Messages are removed when retrieved or expired. An empty table is normal
+    when no messages are waiting to be picked up.
+    """
 
     __tablename__ = "task_message"
     __table_args__ = (
@@ -236,6 +420,16 @@ class TaskMessage(FlwrBase):
     error: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
 
 
+TaskLogsTable = Table(
+    "task_logs",
+    FlwrBase.metadata,
+    Column("timestamp", Float, nullable=False),
+    Column("task_id", BigInteger, ForeignKey("task.task_id"), nullable=False),
+    Column("log", String, nullable=False),
+    Index("idx_task_logs_task_id_timestamp", "task_id", "timestamp"),
+)
+
+
 class ObjectPushSession(FlwrBase):
     """Represent an object push session."""
 
@@ -252,7 +446,11 @@ class ObjectPushSession(FlwrBase):
 
 
 class ObjectPushSessionRoot(FlwrBase):
-    """Represent a root object for an object push session."""
+    """Represent a root object for an object push session.
+
+    These records are removed when uploads complete or sessions are cleaned up,
+    so the table may be empty when no uploads are in progress.
+    """
 
     __tablename__ = "object_push_session_roots"
     __table_args__ = (Index("idx_object_push_session_roots_session_id", "session_id"),)
@@ -268,7 +466,11 @@ class ObjectPushSessionRoot(FlwrBase):
 
 
 class ObjectPushSessionPending(FlwrBase):
-    """Represent a pending object for an object push session."""
+    """Represent a pending object for an object push session.
+
+    Entries are removed as objects are uploaded. The table may be empty once
+    all pending uploads have finished.
+    """
 
     __tablename__ = "object_push_session_pending"
     __table_args__ = (

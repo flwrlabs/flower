@@ -7,7 +7,7 @@
 *************
 
 During a run, the internal ClientApp process could not communicate with the SuperNode
-ClientAppIo API.
+Runtime API.
 
 ****************
  How to Resolve

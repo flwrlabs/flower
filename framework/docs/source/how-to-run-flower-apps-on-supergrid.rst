@@ -14,9 +14,9 @@ connect SuperNodes first, see :doc:`how-to-connect-supernodes-to-supergrid`.
 
 This guide shows two ways to run a Flower App on SuperGrid: directly from `Flower Hub
 <https://flower.ai/apps/>`__, and from a Flower App project on your machine. It uses the
-`@flwrlabs/quickstart-numpy <https://flower.ai/apps/flwrlabs/quickstart-numpy/>`__ app
-as an example, but the same workflow applies to other Flower Apps, whether or not they
-are listed on Flower Hub.
+`@flwrlabs/demo <https://flower.ai/apps/flwrlabs/demo/>`__ app as an example, but the
+same workflow applies to other Flower Apps, whether or not they are listed on Flower
+Hub.
 
 The sections below show the SuperGrid UI workflow. At the end of this page, the same
 steps are shown in compact form with the Flower CLI.
@@ -26,8 +26,8 @@ steps are shown in compact form with the Flower CLI.
 *********************************
 
 Running directly from Flower Hub is the quickest way to get started. Open an app page,
-for example `@flwrlabs/quickstart-numpy
-<https://flower.ai/apps/flwrlabs/quickstart-numpy/>`__, and click ``Run``.
+for example `@flwrlabs/demo <https://flower.ai/apps/flwrlabs/demo/>`__, and click
+``Run``.
 
 .. image:: ./_static/demo_app.png
     :alt: Flower App page on Flower Hub
@@ -56,13 +56,13 @@ Open the ``Logs`` tab to inspect the app logs.
     :align: center
     :target: ./_static/run_logs_dashboard.png
 
-If you return to the federation page, the run appears in the list of runs for that
-federation.
+If you visit the `All runs <https://flower.ai/runs>`__ page, the run appears in the list
+of your runs.
 
-.. image:: ./_static/federation_dashboard_shows_run.png
-    :alt: Federation details page showing the run that was launched
+.. image:: ./_static/all_runs_page.png
+    :alt: All runs page showing the run that was launched
     :align: center
-    :target: ./_static/federation_dashboard_shows_run.png
+    :target: ./_static/all_runs_page.png
 
 ***********************************
  Run Flower apps from your machine
@@ -82,8 +82,8 @@ Pull the app locally with ``flwr new``:
 
 .. code-block:: shell
 
-    $ flwr new @flwrlabs/quickstart-numpy
-    $ cd quickstart-numpy
+    $ flwr new @flwrlabs/demo
+    $ cd demo
 
 Then, log in to SuperGrid with ``flwr login``. This opens a browser window where you can
 authenticate with your SuperGrid account. Finally, run the app with ``flwr run`` and use
@@ -102,19 +102,19 @@ authenticate with your SuperGrid account. Finally, run the app with ``flwr run``
     $ flwr run . --federation @<username>/<federation-name>
     🎊 Successfully started run 1859953118041441032 in federation @<username>/<federation-name>
 
-The run appears in the same SuperGrid federation dashboard.
+The run appears on the `All runs <https://flower.ai/runs>`__ page.
 
-.. image:: ./_static/second_run_started_dashboard.png
-    :alt: SuperGrid dashboard showing the newly started run in the federation
+.. image:: ./_static/second_run_all_runs_page.png
+    :alt: All runs page showing the newly started run
     :align: center
-    :target: ./_static/second_run_started_dashboard.png
+    :target: ./_static/second_run_all_runs_page.png
 
 Customize the run configuration
 ===============================
 
 Flower Apps can define default runtime settings in the ``[tool.flwr.app.config]``
-section of their ``pyproject.toml``. The ``quickstart-numpy`` app used in this guide
-defines ``num-server-rounds`` to control how many rounds its ``ServerApp`` runs:
+section of their ``pyproject.toml``. The ``demo`` app used in this guide defines
+``num-server-rounds`` to control how many rounds its ``ServerApp`` runs:
 
 .. code-block:: toml
 
@@ -125,8 +125,7 @@ Apps can define additional settings in this section and read them from the app c
 example learning rates, model sizes, batch sizes, or dataset-specific options.
 
 You can override app-defined values for a single run with the ``--run-config`` flag. The
-following command runs ``quickstart-numpy`` on SuperGrid with ``num-server-rounds`` set
-to ``5``:
+following command runs ``demo`` on SuperGrid with ``num-server-rounds`` set to ``5``:
 
 .. code-block:: shell
 
@@ -155,7 +154,7 @@ Run an app directly from Flower Hub:
 
 .. code-block:: shell
 
-    $ flwr run @flwrlabs/quickstart-numpy supergrid \
+    $ flwr run @flwrlabs/demo supergrid \
         --federation @<username>/<federation-name> \
         --stream
 

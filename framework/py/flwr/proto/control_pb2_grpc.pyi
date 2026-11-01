@@ -87,6 +87,30 @@ class ControlStub:
     ]
     """Get run series"""
 
+    UpdateRunSeriesDescription: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionRequest,
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse,
+    ]
+    """Update run series description"""
+
+    ListRunSeriesEvents: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListRunSeriesEventsRequest,
+        flwr.proto.control_pb2.ListRunSeriesEventsResponse,
+    ]
+    """List events for all runs in a run series"""
+
+    CreateAgent: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CreateAgentRequest,
+        flwr.proto.control_pb2.CreateAgentResponse,
+    ]
+    """Create an agent owned by the authenticated account"""
+
+    ListAgents: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAgentsRequest,
+        flwr.proto.control_pb2.ListAgentsResponse,
+    ]
+    """List agents owned by the authenticated account"""
+
     GetLoginDetails: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
         flwr.proto.control_pb2.GetLoginDetailsResponse,
@@ -153,11 +177,41 @@ class ControlStub:
     ]
     """List Federations"""
 
+    ListApps: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppsRequest,
+        flwr.proto.control_pb2.ListAppsResponse,
+    ]
+    """List Apps in a Federation"""
+
+    ListAppAssociations: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppAssociationsRequest,
+        flwr.proto.control_pb2.ListAppAssociationsResponse,
+    ]
+    """List Federations associated with an App"""
+
+    AddApp: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.AddAppRequest,
+        flwr.proto.control_pb2.AddAppResponse,
+    ]
+    """Add App to a Federation"""
+
+    RemoveApp: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.RemoveAppRequest,
+        flwr.proto.control_pb2.RemoveAppResponse,
+    ]
+    """Remove App from a Federation"""
+
     ShowFederation: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
         flwr.proto.control_pb2.ShowFederationResponse,
     ]
     """Show Federation"""
+
+    SetFederationIcon: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.SetFederationIconRequest,
+        flwr.proto.control_pb2.SetFederationIconResponse,
+    ]
+    """Set Federation icon"""
 
     CreateFederation: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.CreateFederationRequest,
@@ -291,6 +345,30 @@ class ControlAsyncStub:
     ]
     """Get run series"""
 
+    UpdateRunSeriesDescription: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionRequest,
+        flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse,
+    ]
+    """Update run series description"""
+
+    ListRunSeriesEvents: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListRunSeriesEventsRequest,
+        flwr.proto.control_pb2.ListRunSeriesEventsResponse,
+    ]
+    """List events for all runs in a run series"""
+
+    CreateAgent: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CreateAgentRequest,
+        flwr.proto.control_pb2.CreateAgentResponse,
+    ]
+    """Create an agent owned by the authenticated account"""
+
+    ListAgents: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAgentsRequest,
+        flwr.proto.control_pb2.ListAgentsResponse,
+    ]
+    """List agents owned by the authenticated account"""
+
     GetLoginDetails: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
         flwr.proto.control_pb2.GetLoginDetailsResponse,
@@ -357,11 +435,41 @@ class ControlAsyncStub:
     ]
     """List Federations"""
 
+    ListApps: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppsRequest,
+        flwr.proto.control_pb2.ListAppsResponse,
+    ]
+    """List Apps in a Federation"""
+
+    ListAppAssociations: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppAssociationsRequest,
+        flwr.proto.control_pb2.ListAppAssociationsResponse,
+    ]
+    """List Federations associated with an App"""
+
+    AddApp: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.AddAppRequest,
+        flwr.proto.control_pb2.AddAppResponse,
+    ]
+    """Add App to a Federation"""
+
+    RemoveApp: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.RemoveAppRequest,
+        flwr.proto.control_pb2.RemoveAppResponse,
+    ]
+    """Remove App from a Federation"""
+
     ShowFederation: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
         flwr.proto.control_pb2.ShowFederationResponse,
     ]
     """Show Federation"""
+
+    SetFederationIcon: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.SetFederationIconRequest,
+        flwr.proto.control_pb2.SetFederationIconResponse,
+    ]
+    """Set Federation icon"""
 
     CreateFederation: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.CreateFederationRequest,
@@ -514,6 +622,38 @@ class ControlServicer(metaclass=abc.ABCMeta):
         """Get run series"""
 
     @abc.abstractmethod
+    def UpdateRunSeriesDescription(
+        self,
+        request: flwr.proto.control_pb2.UpdateRunSeriesDescriptionRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse, collections.abc.Awaitable[flwr.proto.control_pb2.UpdateRunSeriesDescriptionResponse]]:
+        """Update run series description"""
+
+    @abc.abstractmethod
+    def ListRunSeriesEvents(
+        self,
+        request: flwr.proto.control_pb2.ListRunSeriesEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListRunSeriesEventsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListRunSeriesEventsResponse]]:
+        """List events for all runs in a run series"""
+
+    @abc.abstractmethod
+    def CreateAgent(
+        self,
+        request: flwr.proto.control_pb2.CreateAgentRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.CreateAgentResponse, collections.abc.Awaitable[flwr.proto.control_pb2.CreateAgentResponse]]:
+        """Create an agent owned by the authenticated account"""
+
+    @abc.abstractmethod
+    def ListAgents(
+        self,
+        request: flwr.proto.control_pb2.ListAgentsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListAgentsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAgentsResponse]]:
+        """List agents owned by the authenticated account"""
+
+    @abc.abstractmethod
     def GetLoginDetails(
         self,
         request: flwr.proto.control_pb2.GetLoginDetailsRequest,
@@ -602,12 +742,52 @@ class ControlServicer(metaclass=abc.ABCMeta):
         """List Federations"""
 
     @abc.abstractmethod
+    def ListApps(
+        self,
+        request: flwr.proto.control_pb2.ListAppsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListAppsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAppsResponse]]:
+        """List Apps in a Federation"""
+
+    @abc.abstractmethod
+    def ListAppAssociations(
+        self,
+        request: flwr.proto.control_pb2.ListAppAssociationsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListAppAssociationsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAppAssociationsResponse]]:
+        """List Federations associated with an App"""
+
+    @abc.abstractmethod
+    def AddApp(
+        self,
+        request: flwr.proto.control_pb2.AddAppRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.AddAppResponse, collections.abc.Awaitable[flwr.proto.control_pb2.AddAppResponse]]:
+        """Add App to a Federation"""
+
+    @abc.abstractmethod
+    def RemoveApp(
+        self,
+        request: flwr.proto.control_pb2.RemoveAppRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.RemoveAppResponse, collections.abc.Awaitable[flwr.proto.control_pb2.RemoveAppResponse]]:
+        """Remove App from a Federation"""
+
+    @abc.abstractmethod
     def ShowFederation(
         self,
         request: flwr.proto.control_pb2.ShowFederationRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.ShowFederationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ShowFederationResponse]]:
         """Show Federation"""
+
+    @abc.abstractmethod
+    def SetFederationIcon(
+        self,
+        request: flwr.proto.control_pb2.SetFederationIconRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.SetFederationIconResponse, collections.abc.Awaitable[flwr.proto.control_pb2.SetFederationIconResponse]]:
+        """Set Federation icon"""
 
     @abc.abstractmethod
     def CreateFederation(

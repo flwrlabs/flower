@@ -28,7 +28,7 @@ class ExecutionSpec:  # pylint: disable=too-many-instance-attributes
     """Describe one TaskExecutor process execution requested by SuperExec."""
 
     task_type: TaskType
-    appio_api_address: str
+    runtime_api_address: str
     token: str
     insecure: bool
     root_certificates_path: str | None
@@ -36,13 +36,14 @@ class ExecutionSpec:  # pylint: disable=too-many-instance-attributes
     parent_pid: int | None
     suppress_output: bool
     task_id: int
+    fab_hash: str | None = None
 
     def __post_init__(self) -> None:
         """Validate fields required by all executors."""
         if not isinstance(self.task_id, int) or self.task_id <= 0:
             raise ValueError("ExecutionSpec requires a positive integer task_id.")
-        if not self.appio_api_address.strip():
-            raise ValueError("ExecutionSpec requires an AppIo API address.")
+        if not self.runtime_api_address.strip():
+            raise ValueError("ExecutionSpec requires a Runtime API address.")
         if not self.token.strip():
             raise ValueError("ExecutionSpec requires a task token.")
 
@@ -88,12 +89,34 @@ class Executor(Protocol):
     """SuperExec component that starts TaskExecutor processes from an ExecutionSpec.
 
     An executor gates capacity, starts processes, and reports the immediate
-    launch outcome; it does not monitor, terminate, reconcile, or report task
-    status.
+    launch outcome. It owns backend resource cleanup, but task status remains
+    the responsibility of the Runtime API.
     """
 
-    def wait_for_capacity(self) -> None:
+    def get_eligible_capacity(
+        self,
+        supported_task_types: set[TaskType],
+        *,
+        insecure: bool = False,
+        root_certificates_path: str | None = None,
+    ) -> tuple[set[TaskType], set[str]]:
+        """Return task types and FABs with capacity for acquisition."""
+
+    def wait_for_capacity(
+        self,
+        task_type: TaskType | None = None,
+        *,
+        fab_hash: str | None = None,
+        insecure: bool = False,
+        root_certificates_path: str | None = None,
+    ) -> None:
         """Wait until the executor can accept one TaskExecutor launch."""
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""
+
+    def reconcile(self) -> None:
+        """Maintain executor-owned resources between task polls."""
+
+    def close(self) -> None:
+        """Release executor-owned resources during SuperExec shutdown."""

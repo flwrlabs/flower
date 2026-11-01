@@ -23,11 +23,11 @@ import math
 import numpy as np
 
 from flwr.common import FitIns, FitRes, Parameters, Scalar
-from flwr.common.logger import warn_deprecated_feature
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy.dpfedavg_fixed import DPFedAvgFixed
 from flwr.server.strategy.strategy import Strategy
+from flwr.supercore.logger import warn_deprecated_feature
 
 
 class DPFedAvgAdaptive(DPFedAvgFixed):

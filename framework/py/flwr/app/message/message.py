@@ -17,14 +17,11 @@
 
 from __future__ import annotations
 
-from logging import WARNING
 from typing import Any, cast, overload
 
 from flwr.app.constants import DEFAULT_TTL
 from flwr.app.error import Error
 from flwr.app.metadata import Metadata
-from flwr.common.constant import MESSAGE_TTL_TOLERANCE
-from flwr.common.logger import log, warn_deprecated_feature
 from flwr.common.serde_utils import (
     error_from_proto,
     error_to_proto,
@@ -42,6 +39,8 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_body,
     get_object_children_ids_from_object_content,
 )
+from flwr.supercore.logger import warn_deprecated_feature
+from flwr.supercore.task_identity import TaskIdentity
 
 from .recorddict import RecordDict
 
@@ -195,9 +194,9 @@ class Message(InflatableObject):
 
             # Set metadata
             metadata = Metadata(
-                run_id=0,  # Will be set before pushed
+                run_id=TaskIdentity.run_id,
                 message_id="",  # Will be set by the SuperLink
-                src_node_id=0,  # Will be set before pushed
+                src_node_id=TaskIdentity.node_id,
                 dst_node_id=dst_node_id,
                 # Instruction messages do not reply to any message
                 reply_to_message_id="",
@@ -205,6 +204,7 @@ class Message(InflatableObject):
                 created_at=now().timestamp(),
                 ttl=ttl or DEFAULT_TTL,
                 message_type=message_type,
+                src_task_id=TaskIdentity.task_id,
                 dst_task_id=dst_task_id,
             )
 
@@ -225,7 +225,6 @@ class Message(InflatableObject):
                 raise MessageInitializationError()
 
             # Set metadata
-            current = now().timestamp()
             metadata = Metadata(
                 run_id=reply_to.metadata.run_id,
                 message_id="",  # Will be set by the SuperLink
@@ -233,14 +232,13 @@ class Message(InflatableObject):
                 dst_node_id=reply_to.metadata.src_node_id,
                 reply_to_message_id=reply_to.metadata.message_id,
                 group_id=reply_to.metadata.group_id,
-                created_at=current,
-                ttl=_limit_reply_ttl(current, ttl, reply_to),
+                created_at=now().timestamp(),
+                ttl=DEFAULT_TTL if ttl is None else ttl,
                 message_type=reply_to.metadata.message_type,
                 src_task_id=reply_to.metadata.dst_task_id,
                 dst_task_id=reply_to.metadata.src_task_id,
             )
 
-        metadata.delivered_at = ""  # Backward compatibility
         var_dict = {
             "_metadata": metadata,
             "_content": content,
@@ -304,11 +302,8 @@ class Message(InflatableObject):
         error : Error
             The error that was encountered.
         ttl : Optional[float] (default: None)
-            Time-to-live for this message in seconds. If unset, it will be set based
-            on the remaining time for the received message before it expires. This
-            follows the equation:
-
-            ttl = msg.meta.ttl - (reply.meta.created_at - msg.meta.created_at)
+            Time-to-live for this reply in seconds, independent of the original
+            message's TTL. If unset, defaults to 43,200 seconds (12 hours).
 
         Returns
         -------
@@ -338,11 +333,8 @@ class Message(InflatableObject):
         content : RecordDict
             The content for the reply message.
         ttl : Optional[float] (default: None)
-            Time-to-live for this message in seconds. If unset, it will be set based
-            on the remaining time for the received message before it expires. This
-            follows the equation:
-
-            ttl = msg.meta.ttl - (reply.meta.created_at - msg.meta.created_at)
+            Time-to-live for this reply in seconds, independent of the original
+            message's TTL. If unset, defaults to 43,200 seconds (12 hours).
 
         Returns
         -------
@@ -459,28 +451,6 @@ def remove_content_from_message(message: Message) -> Message:
         return message
 
     return make_message(metadata=message.metadata, content=RecordDict())
-
-
-def _limit_reply_ttl(
-    current: float, reply_ttl: float | None, reply_to: Message
-) -> float:
-    """Limit the TTL of a reply message such that it does exceed the expiration time of
-    the message it replies to."""
-    # Calculate the maximum allowed TTL
-    max_allowed_ttl = reply_to.metadata.created_at + reply_to.metadata.ttl - current
-
-    if reply_ttl is not None and reply_ttl - max_allowed_ttl > MESSAGE_TTL_TOLERANCE:
-        log(
-            WARNING,
-            "The reply TTL of %.2f seconds exceeded the "
-            "allowed maximum of %.2f seconds. "
-            "The TTL has been updated to the allowed maximum.",
-            reply_ttl,
-            max_allowed_ttl,
-        )
-        return max_allowed_ttl
-
-    return reply_ttl or max_allowed_ttl
 
 
 def _extract_positional_args(

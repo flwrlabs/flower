@@ -20,15 +20,17 @@ from collections.abc import Sequence
 from flwr.supercore.typing import JSONObject
 
 
-def function_tool(
+def function_tool(  # pylint: disable=too-many-arguments
     name: str,
     description: str,
     *,
     properties: JSONObject,
     required: Sequence[str] = (),
+    output_schema: JSONObject | None = None,
+    strict: bool | None = None,
 ) -> JSONObject:
-    """Build one strict function-tool schema."""
-    return {
+    """Build one function-tool schema."""
+    tool: JSONObject = {
         "type": "function",
         "name": name,
         "description": description,
@@ -39,11 +41,16 @@ def function_tool(
             "additionalProperties": False,
         },
     }
+    if output_schema is not None:
+        tool["output_schema"] = output_schema
+    if strict is not None:
+        tool["strict"] = strict
+    return tool
 
 
 def string_property(description: str) -> JSONObject:
-    """Build a string property schema."""
-    return {"type": "string", "description": description}
+    """Build a non-empty string property schema."""
+    return {"type": "string", "minLength": 1, "description": description}
 
 
 def integer_property(description: str, *, minimum: int, maximum: int) -> JSONObject:

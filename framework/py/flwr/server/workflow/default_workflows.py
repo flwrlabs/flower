@@ -23,10 +23,11 @@ from typing import cast
 import flwr.compat.common.recorddict_compat as compat
 from flwr.app import ArrayRecord, ConfigRecord, Context, Message
 from flwr.app.message_type import MessageType
-from flwr.common import Code, EvaluateRes, FitRes, GetParametersIns, log
+from flwr.common import Code, EvaluateRes, FitRes, GetParametersIns
 from flwr.common.constant import MessageTypeLegacy
 from flwr.compat.server.typing import Workflow
 from flwr.serverapp.grid import Grid
+from flwr.supercore import log
 
 from ..client_proxy import ClientProxy
 from ..compat.app_utils import start_update_client_manager_thread

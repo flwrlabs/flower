@@ -22,18 +22,20 @@ import os
 import secrets
 import shutil
 import tempfile
-import threading
 import time
 import unittest
 from abc import abstractmethod
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
-from typing import Any
-from unittest.mock import Mock, PropertyMock, patch
+from typing import Any, cast
+from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from google.protobuf.message import DecodeError
 from parameterized import parameterized
+from sqlalchemy import event, select, update
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.sql.dml import Update
 
 from flwr.app import DEFAULT_TTL, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
@@ -41,7 +43,6 @@ from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
     SUPERLINK_NODE_ID,
-    ErrorCode,
     Status,
     SubStatus,
 )
@@ -53,11 +54,16 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.message_pb2 import Message as ProtoMessage
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
+from flwr.proto.runseries_pb2 import CompactedContext  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
 from flwr.supercore.constant import (
+    AGENT_MESSAGE_CONTENT_RECORD_KEY,
+    AGENT_MESSAGE_TEXT_KEY,
     NOOP_FEDERATION_ID,
+    SYSTEM_MESSAGE_TYPE,
     AutomationStatus,
     NodeStatus,
     TaskType,
@@ -66,10 +72,15 @@ from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import get_object_tree
+from flwr.supercore.inflatable.inflatable_utils import pull_and_inflate_object_from_tree
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.state.schema.corestate_models import (
+    CompactedContext as CompactedContextModel,
+)
 from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.utils import uint64_to_int64
@@ -101,6 +112,237 @@ class StateTest(CoreStateTest):
         """Create a P-384 public key for node creation."""
         _, public_key = generate_key_pairs()
         return public_key_to_bytes(public_key)
+
+    def test_store_messages_policy_results_keep_input_order(self) -> None:
+        """Reject individual endpoints without rejecting the rest of a batch."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        messages = [
+            create_ins_message_obj(SUPERLINK_NODE_ID, dst, run_id)
+            for dst in (2, 3, SUPERLINK_NODE_ID)
+        ]
+        with patch.object(
+            state.federation_manager,
+            "filter_nodes",
+            return_value={SUPERLINK_NODE_ID, 2},
+        ):
+            assert state.store_messages(messages) == [True, False, True]
+        assert [
+            msg.metadata.message_id for msg in state.get_messages(dst_node_id=2)
+        ] == [messages[0].metadata.message_id]
+        assert state.get_messages(dst_node_id=3) == []
+
+    def test_policy_rejection_does_not_register_objects(self) -> None:
+        """Rejected messages never acquire body roots or upload reservations."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        message = create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, 0)
+        with patch.object(state, "preregister_object_tree") as preregister:
+            assert state.store_message_and_object_tree(
+                message, get_object_tree(message), state.start_session(run_id)
+            ) == (False, [])
+            preregister.assert_not_called()
+        assert message.metadata.message_id not in state.object_store
+
+    def test_get_messages_policy_applies_after_limit(self) -> None:
+        """Cancel a rejected candidate without fetching another to fill the limit."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        messages = [
+            create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, run_id)
+            for _ in range(2)
+        ]
+        assert state.store_messages(messages) == [True, True]
+        with patch.object(
+            state, "_check_message_policy", return_value=[False]
+        ) as policy:
+            assert state.get_messages(dst_node_id=SUPERLINK_NODE_ID, limit=1) == []
+        assert len(policy.call_args.args[0]) == 1
+        assert [
+            msg.metadata.message_id
+            for msg in state.get_messages(dst_node_id=SUPERLINK_NODE_ID)
+        ] == [messages[1].metadata.message_id]
+
+    def test_get_messages_policy_error_does_not_cancel(self) -> None:
+        """An operational policy failure propagates without ending delivery."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        message = create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, run_id)
+        assert state.store_messages([message]) == [True]
+        with (
+            patch.object(state, "get_run_info", side_effect=RuntimeError("lookup")),
+            patch.object(
+                state, "cancel_messages", wraps=state.cancel_messages
+            ) as cancel,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "lookup"):
+                state.get_messages(dst_node_id=SUPERLINK_NODE_ID)
+            cancel.assert_not_called()
+        assert len(state.get_messages(dst_node_id=SUPERLINK_NODE_ID)) == 1
+
+    @parameterized.expand([(False,), (True,)])  # type: ignore
+    def test_duplicate_object_tree_does_not_restore_cleared_message(
+        self, acknowledge: bool
+    ) -> None:
+        """Duplicate uploads cannot recreate bodies after ACK or cancellation."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        message = create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, run_id)
+        tree = get_object_tree(message)
+        stored, _ = state.store_message_and_object_tree(
+            message, tree, state.start_session(run_id)
+        )
+        assert stored
+        if acknowledge:
+            state.acknowledge_messages([message.metadata.message_id])
+        else:
+            state.cancel_messages(message_ids=[message.metadata.message_id])
+        assert state.store_message_and_object_tree(
+            message, tree, state.start_session(run_id)
+        ) == (True, [])
+        assert state.object_store.get(message.metadata.message_id) is None
+        assert state.get_messages(dst_node_id=SUPERLINK_NODE_ID) == []
+
+    def test_check_message_policy_empty_batch(self) -> None:
+        """Skip all lookups for an empty batch."""
+        # Prepare: Track run and federation lookups on a fresh state.
+        state = self.state_factory()
+        with (
+            patch.object(state, "get_run_info") as get_runs,
+            patch.object(state.federation_manager, "filter_nodes") as filter_nodes,
+        ):
+            # Execute & Assert: An empty batch produces no policy results.
+            # pylint: disable-next=protected-access
+            assert state._check_message_policy([]) == []
+        # Assert: No run or federation lookup was needed.
+        get_runs.assert_not_called()
+        filter_nodes.assert_not_called()
+
+    @parameterized.expand([(0, True), (1, True), (2, True), (3, False)])  # type: ignore
+    def test_check_message_policy_run_status(
+        self, transitions: int, expected: bool
+    ) -> None:
+        """Allow unfinished runs, including a pending SuperLink prompt."""
+        # Prepare: Create a SuperLink message for a run in the requested status.
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        transition_run_status(state, run_id, transitions)
+        message = create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, run_id)
+        with patch.object(
+            state.federation_manager,
+            "filter_nodes",
+            wraps=state.federation_manager.filter_nodes,
+        ) as filter_nodes:
+            # Execute & Assert: Accept the message only while the run is unfinished.
+            # pylint: disable-next=protected-access
+            assert state._check_message_policy((message,)) == [expected]
+        # Assert: Only unfinished runs require a federation membership lookup.
+        if expected:
+            filter_nodes.assert_called_once_with(
+                {SUPERLINK_NODE_ID}, NOOP_FEDERATION_ID
+            )
+        else:
+            filter_nodes.assert_not_called()
+
+    def test_check_message_policy_batches_runs_and_federations(self) -> None:
+        """Check both endpoints independently while sharing federation lookups."""
+        # Prepare: Mix runs, federations, and allowed and disallowed node IDs.
+        state = self.state_factory()
+        run_a = create_dummy_run(state)
+        run_b = create_dummy_run(state)
+        run_c = create_dummy_run(state, federation_id="other")
+        finished = create_dummy_run(state, federation_id="finished")
+        transition_run_status(state, finished, 3)
+        messages = [
+            create_ins_message_obj(10, 20, run_a),
+            create_ins_message_obj(30, 20, run_b),
+            create_ins_message_obj(SUPERLINK_NODE_ID, 10, run_b),
+            create_ins_message_obj(10, 30, run_a),
+            create_ins_message_obj(40, 40, run_c),
+            create_ins_message_obj(30, 30, run_a),
+            create_ins_message_obj(10, 20, finished),
+            create_ins_message_obj(10, 20, 0),
+        ]
+        members = {
+            NOOP_FEDERATION_ID: {SUPERLINK_NODE_ID, 10, 20},
+            "other": {40},
+        }
+        with (
+            patch.object(state, "get_run_info", wraps=state.get_run_info) as get_runs,
+            patch.object(
+                state.federation_manager,
+                "filter_nodes",
+                side_effect=lambda nodes, federation: nodes & members[federation],
+            ) as filter_nodes,
+        ):
+            # Execute & Assert: Each message receives its policy result in input order.
+            # pylint: disable-next=protected-access
+            assert state._check_message_policy(messages) == [
+                True,
+                False,
+                True,
+                False,
+                True,
+                False,
+                False,
+                False,
+            ]
+        # Assert: Share lookups across messages without storing any messages.
+        get_runs.assert_called_once_with(
+            run_ids=sorted({run_a, run_b, run_c, finished, 0})
+        )
+        assert filter_nodes.call_count == 2
+        filter_nodes.assert_any_call(
+            {SUPERLINK_NODE_ID, 10, 20, 30}, NOOP_FEDERATION_ID
+        )
+        filter_nodes.assert_any_call({40}, "other")
+
+    def test_check_message_policy_missing_federation(self) -> None:
+        """Propagate the manager's error when a federation does not exist."""
+        # Prepare: Mix messages from missing and existing federations.
+        state = self.state_factory()
+        missing = create_dummy_run(state, federation_id="missing")
+        valid = create_dummy_run(state)
+        messages = [
+            create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, missing),
+            create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, valid),
+        ]
+
+        # Execute & Assert: A missing federation raises instead of rejecting a message.
+        with self.assertRaises(ValueError):
+            # pylint: disable-next=protected-access
+            state._check_message_policy(messages)
+
+    @parameterized.expand(  # type: ignore
+        [
+            ("get_run_info", OperationalError("select", {}, RuntimeError("offline"))),
+            ("filter_nodes", OperationalError("select", {}, RuntimeError("offline"))),
+            (
+                "filter_nodes",
+                FlowerError(
+                    ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION, "missing"
+                ),
+            ),
+            ("filter_nodes", FlowerError(ApiErrorCode.NO_PERMISSIONS, "denied")),
+            ("filter_nodes", ValueError("unexpected failure")),
+        ]
+    )
+    def test_check_message_policy_propagates_errors(
+        self, method: str, error: Exception
+    ) -> None:
+        """Propagate all lookup errors without converting them to policy rejection."""
+        # Prepare: Make the selected lookup raise the supplied error.
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        message = create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, run_id)
+        target = state if method == "get_run_info" else state.federation_manager
+        with patch.object(target, method, side_effect=error):
+            # Execute & Assert: Policy evaluation propagates the lookup error.
+            with self.assertRaises(type(error)) as caught:
+                # pylint: disable-next=protected-access
+                state._check_message_policy([message])
+        # Assert: The caller receives the original exception unchanged.
+        assert caught.exception is error
 
     def test_store_and_get_fab(self) -> None:
         """Test storing and retrieving a FAB."""
@@ -154,6 +396,7 @@ class StateTest(CoreStateTest):
         """Test if create_run and get_run_info work correctly."""
         # Prepare
         state: LinkState = self.state_factory()
+        initial_event = TaskEvent(event="message", data='{"type":"message"}')
         run_id = state.create_run(
             None,
             None,
@@ -163,6 +406,7 @@ class StateTest(CoreStateTest):
             None,
             "i1r9f",
             TaskType.SERVER_APP,
+            initial_task_event=initial_event,
         )
 
         # Execute
@@ -175,6 +419,67 @@ class StateTest(CoreStateTest):
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
         assert run.series_id > 0
+        stored_event = state.get_task_events(run_ids=[run_id])[0]
+        assert stored_event.event == initial_event.event
+        assert stored_event.data == initial_event.data
+        assert stored_event.task_id == run.primary_task_id
+
+    @parameterized.expand(  # type: ignore[untyped-decorator]
+        [
+            (TaskType.AGENT_APP, "Hello AgentApp", 1),
+            (TaskType.AGENT_APP, None, 0),
+            (TaskType.SERVER_APP, "Hello ServerApp", 0),
+        ]
+    )
+    def test_create_run_stores_user_prompt_for_agentapp(
+        self,
+        primary_task_type: str,
+        user_prompt: str | None,
+        expected_messages: int,
+    ) -> None:
+        """Store a user prompt as a SuperLink instruction only for AgentApp runs."""
+        state: LinkState = self.state_factory()
+        run_id = state.create_run(
+            fab_id="flwr/test",
+            fab_version="1.0.0",
+            fab_hash="hash",
+            override_config={},
+            federation_id=NOOP_FEDERATION_ID,
+            federation_config=None,
+            flwr_aid="account",
+            primary_task_type=primary_task_type,
+            user_prompt=user_prompt,
+        )
+
+        messages = state.get_messages(dst_node_id=SUPERLINK_NODE_ID, run_id=run_id)
+
+        assert len(messages) == expected_messages
+        if messages:
+            message = pull_and_inflate_object_from_tree(
+                state.object_store.get_object_tree(messages[0].metadata.message_id),
+                lambda obj_id: cast(bytes, state.object_store.get(obj_id)),
+                lambda _: None,
+                return_type=Message,
+            )
+            message.metadata.__dict__["_message_id"] = messages[0].metadata.message_id
+            assert user_prompt is not None
+            assert message.metadata.run_id == run_id
+            assert message.metadata.src_node_id == SUPERLINK_NODE_ID
+            assert message.metadata.dst_node_id == SUPERLINK_NODE_ID
+            assert message.metadata.message_type == SYSTEM_MESSAGE_TYPE
+            assert (
+                message.content[AGENT_MESSAGE_CONTENT_RECORD_KEY][
+                    AGENT_MESSAGE_TEXT_KEY
+                ]
+                == user_prompt
+            )
+            assert (
+                state.object_store.get(message.metadata.message_id) == message.deflate()
+            )
+            assert (
+                state.object_store.get(message.content.object_id)
+                == message.content.deflate()
+            )
 
     def test_create_run_uses_existing_series_id(self) -> None:
         """Test create_run links the run to an existing run series."""
@@ -215,6 +520,29 @@ class StateTest(CoreStateTest):
         runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
         self.assertEqual({run.series_id for run in runs}, {first_run.series_id})
 
+    @parameterized.expand(  # type: ignore[untyped-decorator]
+        [
+            (TaskType.AGENT_APP, True),
+            (TaskType.SERVER_APP, False),
+            (TaskType.SIMULATION, False),
+        ]
+    )
+    def test_create_run_stores_series_agent_status(
+        self, primary_task_type: str, expected_is_agent: bool
+    ) -> None:
+        """Test run series stores whether its first run is an AgentApp."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state, primary_task_type=primary_task_type)
+        run = state.get_run_info(run_ids=[run_id])[0]
+
+        matching_series = state.get_run_series(is_agent=expected_is_agent)
+        other_series = state.get_run_series(is_agent=not expected_is_agent)
+
+        self.assertEqual(
+            [entry.series_id for entry in matching_series], [run.series_id]
+        )
+        self.assertEqual(other_series, [])
+
     def test_claim_automation_returns_stored_run_request(self) -> None:
         """Claiming an automation should return its unresolved run request."""
         state = self.state_factory()
@@ -223,7 +551,7 @@ class StateTest(CoreStateTest):
         previous_next_run_at = (now() - timedelta(seconds=30)).isoformat()
         next_run_at = (now() + timedelta(seconds=30)).isoformat()
         start_run_request = StartRunRequest(
-            app_spec="@flwragent/flwr-agent",
+            app_spec="@flwr/demo",
             federation="@me/health",
             series_id=series_id,
         )
@@ -289,52 +617,23 @@ class StateTest(CoreStateTest):
 
         run_id = create_dummy_run(
             state,
-            connector_refs=["notion", "github", "notion"],
+            connector_ids=[2, 1, 2],
         )
 
         self.assertEqual(
-            list(state.get_run_connector_refs(run_id=run_id)),
-            ["github", "notion"],
+            list(state.get_run_connector_ids(run_id=run_id)),
+            [1, 2],
         )
-
-    def test_create_run_rejects_empty_connector_ref(self) -> None:
-        """An invalid connector allowlist should prevent run creation."""
-        state = self.state_factory()
-
-        run_id = create_dummy_run(state, connector_refs=[""])
-
-        self.assertEqual(run_id, 0)
-        self.assertEqual(list(state.get_run_info()), [])
-
-    def test_create_run_rejects_string_connector_refs(self) -> None:
-        """A string should not be interpreted as a sequence of connector refs."""
-        state = self.state_factory()
-
-        run_id = create_dummy_run(state, connector_refs="notion")
-
-        self.assertEqual(run_id, 0)
-        self.assertEqual(list(state.get_run_info()), [])
 
     def test_store_messages_rejects_stopped_run(self) -> None:
         """Messages cannot be stored after a run is stopped."""
         state = self.state_factory()
-        node_id = create_dummy_node(state)
         run_id = create_dummy_run(state)
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-        self.assertIsNotNone(state.store_message_ins(message=msg))
-        pulled = state.get_message_ins(node_id=node_id, limit=1)[0]
-        reply_msg = Message(RecordDict(), reply_to=pulled)
-
-        self.assertTrue(state.stop_run(run_id))
-
-        self.assertIsNone(state.store_message_ins(message=msg))
-        self.assertIsNone(state.store_message_res(message=reply_msg))
-        self.assertEqual(state.num_message_ins(), 0)
-        self.assertEqual(state.num_message_res(), 0)
+        msg = create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, run_id)
+        assert state.store_messages([msg]) == [True]
+        assert state.stop_run(run_id)
+        assert state.store_messages([msg]) == [False]
+        assert state.get_messages(dst_node_id=SUPERLINK_NODE_ID) == []
 
     def test_cleanup_run(self) -> None:
         """Test cleanup of run-scoped messages and objects."""
@@ -356,7 +655,7 @@ class StateTest(CoreStateTest):
 
         state.cleanup_run(run_id)
 
-        self.assertEqual(state.num_message_ins(), 0)
+        self.assertEqual(state.get_messages(dst_node_id=node_id), [])
         self.assertFalse(msg.metadata.message_id in state.object_store)
         self.assertFalse(
             state.store_object(run_id, session_id, msg.metadata.message_id, b"content")
@@ -499,11 +798,43 @@ class StateTest(CoreStateTest):
         limited_runs = state.get_run_info(
             order_by="pending_at", ascending=True, limit=2
         )
+        second_page = state.get_run_info(
+            order_by="pending_at", ascending=False, limit=2, skip=1
+        )
 
         # Assert
         self.assertEqual([run.run_id for run in ascending_runs], run_ids)
         self.assertEqual([run.run_id for run in descending_runs], run_ids[::-1])
         self.assertEqual([run.run_id for run in limited_runs], run_ids[:2])
+        self.assertEqual([run.run_id for run in second_page], run_ids[1::-1])
+
+    def test_get_run_info_paging_with_equal_timestamps(self) -> None:
+        """Break equal timestamp ties consistently across storage backends."""
+        state = self.state_factory()
+        module = (
+            "flwr.server.superlink.linkstate.in_memory_linkstate"
+            if isinstance(state, InMemoryLinkState)
+            else "flwr.server.superlink.linkstate.sql_linkstate"
+        )
+        run_ids = [1, 1 << 63, (1 << 63) - 1]
+        generated_ids = [
+            value for pair in zip(run_ids, [11, 12, 13], strict=True) for value in pair
+        ]
+        fixed_time = datetime(2026, 1, 1, tzinfo=UTC)
+        with (
+            patch(f"{module}.generate_rand_int_from_bytes", side_effect=generated_ids),
+            patch(f"{module}.now", return_value=fixed_time),
+        ):
+            for _ in run_ids:
+                create_dummy_run(state)
+
+        first_page = state.get_run_info(order_by="pending_at", ascending=False, limit=2)
+        second_page = state.get_run_info(
+            order_by="pending_at", ascending=False, limit=2, skip=2
+        )
+
+        self.assertEqual([run.run_id for run in first_page], [run_ids[2], run_ids[0]])
+        self.assertEqual([run.run_id for run in second_page], [run_ids[1]])
 
     @parameterized.expand([(1,), (2,), (9999,)])  # type: ignore
     def test_get_run_info_limit_without_order_by(self, limit: int) -> None:
@@ -729,52 +1060,6 @@ class StateTest(CoreStateTest):
         assert status.status == Status.PENDING
         state.federation_manager.report_run_usage.assert_not_called()
 
-    def test_get_message_ins_empty(self) -> None:
-        """Validate that a new state has no input Messages."""
-        # Prepare
-        state = self.state_factory()
-
-        # Assert
-        assert state.num_message_ins() == 0
-
-    def test_get_message_res_empty(self) -> None:
-        """Validate that a new state has no reply Messages."""
-        # Prepare
-        state = self.state_factory()
-
-        # Assert
-        assert state.num_message_res() == 0
-
-    def test_store_message_ins_one(self) -> None:
-        """Test store_message_ins."""
-        # Prepare
-        state = self.state_factory()
-        dt = datetime.now(tz=UTC)
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-
-        # Execute
-        state.store_message_ins(message=msg)
-        message_ins_list = state.get_message_ins(node_id=node_id, limit=10)
-
-        # Assert
-        # One returned Message
-        assert len(message_ins_list) == 1
-        assert message_ins_list[0].metadata.delivered_at != ""
-
-        # Attempt to fetch a second time returns empty Message list
-        assert len(state.get_message_ins(node_id=node_id, limit=10)) == 0
-
-        actual_message_ins = message_ins_list[0]
-
-        assert datetime.fromisoformat(actual_message_ins.metadata.delivered_at) > dt
-        assert actual_message_ins.metadata.ttl > 0
-
     def test_store_message_and_object_tree_ins(self) -> None:
         """Test store_message_and_object_tree with instruction Messages."""
         # Prepare
@@ -797,24 +1082,9 @@ class StateTest(CoreStateTest):
         assert stored
         assert msg.metadata.message_id in missing_objects
         assert msg.metadata.message_id in state.object_store
-        message_ins_list = state.get_message_ins(node_id=node_id, limit=1)
+        message_ins_list = state.get_messages(dst_node_id=node_id, limit=1)
         assert len(message_ins_list) == 1
         assert message_ins_list[0].metadata.message_id == msg.metadata.message_id
-
-        # Invalid messages should not preregister objects.
-        invalid_msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=SUPERLINK_NODE_ID,
-                run_id=run_id,
-            )
-        )
-        stored, missing_objects = state.store_message_and_object_tree(
-            invalid_msg, get_object_tree(invalid_msg), session_id
-        )
-        assert not stored
-        assert missing_objects == []
-        assert invalid_msg.metadata.message_id not in state.object_store
 
     def test_store_message_and_object_tree_res(self) -> None:
         """Test store_message_and_object_tree with reply Messages."""
@@ -827,9 +1097,10 @@ class StateTest(CoreStateTest):
                 src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
             )
         )
-        ins_msg_id = state.store_message_ins(msg)
+        assert state.store_messages([msg]) == [True]
+        ins_msg_id = msg.metadata.message_id
         assert ins_msg_id
-        ins_msg = state.get_message_ins(node_id=node_id, limit=1)[0]
+        ins_msg = state.get_messages(dst_node_id=node_id, limit=1)[0]
         res_msg = Message(RecordDict(), reply_to=ins_msg)
         # pylint: disable-next=W0212
         res_msg.metadata._message_id = res_msg.object_id  # type: ignore
@@ -844,223 +1115,13 @@ class StateTest(CoreStateTest):
         assert stored
         assert res_msg.metadata.message_id in missing_objects
         assert res_msg.metadata.message_id in state.object_store
-        replies = state.get_message_res({ins_msg_id})
+        replies = state.get_messages(
+            dst_node_id=SUPERLINK_NODE_ID,
+            run_id=run_id,
+            reply_to_message_ids={ins_msg_id},
+        )
         assert len(replies) == 1
         assert replies[0].metadata.message_id == res_msg.metadata.message_id
-
-    @parameterized.expand([(False,), (True,)])  # type: ignore
-    def test_store_message_ins_duplicate_same_message_is_idempotent(
-        self, deliver_before_retry: bool
-    ) -> None:
-        """Test duplicate store_message_ins with the same Message is idempotent."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id,
-                run_id=run_id,
-            )
-        )
-        retry_msg = message_from_proto(message_to_proto(msg))
-
-        # Execute
-        first_message_id = state.store_message_ins(message=msg)
-        if deliver_before_retry:
-            delivered = state.get_message_ins(node_id=node_id, limit=1)
-            assert len(delivered) == 1
-            assert delivered[0].metadata.delivered_at != ""
-        second_message_id = state.store_message_ins(message=retry_msg)
-
-        # Assert
-        assert first_message_id == msg.metadata.message_id
-        assert second_message_id == msg.metadata.message_id
-        assert state.num_message_ins() == 1
-
-    def test_store_message_ins_invalid_node_id(self) -> None:
-        """Test store_message_ins with invalid node_id."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        node_id2 = create_dummy_node(state)
-        state.delete_node("mock_flwr_aid", node_id2)
-        node_id3 = create_dummy_node(state, activate=False)
-        node_id4 = create_dummy_node(state)
-        invalid_node_id = 61016
-        assert invalid_node_id not in {node_id, node_id2, node_id3, node_id4}
-        run_id = create_dummy_run(state)
-        # A message for a node that doesn't exist
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=invalid_node_id,
-                run_id=run_id,
-            )
-        )
-        # A message with src_node_id that's not that of the SuperLink
-        msg2 = message_from_proto(
-            create_ins_message(src_node_id=61016, dst_node_id=node_id, run_id=run_id)
-        )
-        # A message for a node that is unregistered
-        msg3 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id2, run_id=run_id
-            )
-        )
-        # A message for a node of "registered" status
-        msg4 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id3, run_id=run_id
-            )
-        )
-        # A message for a node outside the federation
-        mock_has_node = Mock(side_effect=lambda nid, _: nid != node_id4)
-        state.federation_manager.has_node = mock_has_node  # type: ignore
-        msg5 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id4, run_id=run_id
-            )
-        )
-
-        # Execute and assert
-        assert state.store_message_ins(msg) is None
-        assert state.store_message_ins(msg2) is None
-        assert state.store_message_ins(msg3) is None
-        assert state.store_message_ins(msg4) is None
-        assert state.store_message_ins(msg5) is None
-
-    def test_store_and_delete_messages(self) -> None:
-        """Test delete_message."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-        msg0 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id,
-                run_id=run_id,
-            )
-        )
-        msg1 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id,
-                run_id=run_id,
-            )
-        )
-        msg2 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id,
-                run_id=run_id,
-            )
-        )
-
-        # Insert three Messages
-        msg_id_0 = state.store_message_ins(message=msg0)
-        msg_id_1 = state.store_message_ins(message=msg1)
-        msg_id_2 = state.store_message_ins(message=msg2)
-
-        assert msg_id_0
-        assert msg_id_1
-        assert msg_id_2
-
-        # Get Message to mark them delivered
-        msg_ins_list = state.get_message_ins(node_id=node_id, limit=None)
-
-        # Insert one reply Message and retrieve it to mark it as delivered
-        msg_res_0 = Message(Error(0), reply_to=msg_ins_list[0])
-        # pylint: disable-next=W0212
-        msg_res_0.metadata._message_id = str(uuid4())  # type: ignore
-
-        _ = state.store_message_res(message=msg_res_0)
-        retrieved_msg_res_0 = state.get_message_res(
-            message_ids={msg_res_0.metadata.reply_to_message_id}
-        )[0]
-        assert retrieved_msg_res_0.error.code == 0
-
-        # Insert one reply Message, but don't retrieve it
-        msg_res_1 = Message(RecordDict(), reply_to=msg_ins_list[1])
-        # pylint: disable-next=W0212
-        msg_res_1.metadata._message_id = str(uuid4())  # type: ignore
-        _ = state.store_message_res(message=msg_res_1)
-
-        # Situation now:
-        # - State has three Message, all of them delivered
-        # - State has two Message replies, one of them delivered, the other not
-        assert state.num_message_ins() == 3
-        assert state.num_message_res() == 2
-
-        state._on_push_session_expired(  # pylint: disable=protected-access
-            {msg_res_0.metadata.message_id}
-        )
-        assert state.num_message_ins() == 3
-        assert state.num_message_res() == 1
-
-        state.delete_messages({msg_id_0})
-        assert state.num_message_ins() == 2
-        assert state.num_message_res() == 1
-
-        state._on_push_session_expired({msg_id_1})  # pylint: disable=protected-access
-        assert state.num_message_ins() == 1
-        assert state.num_message_res() == 0
-
-        state.delete_messages({msg_id_2})
-        assert state.num_message_ins() == 0
-        assert state.num_message_res() == 0
-
-    def test_get_message_ids_from_run_id(self) -> None:
-        """Test get_message_ids_from_run_id."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id_0 = create_dummy_run(state)
-        # Insert Message with the same run_id
-        msg0 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id,
-                run_id=run_id_0,
-            )
-        )
-        msg1 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id,
-                run_id=run_id_0,
-            )
-        )
-        # Insert a Message with a different run_id
-        # then, ensure it does not appear in result
-        run_id_1 = create_dummy_run(state)
-        msg2 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id,
-                run_id=run_id_1,
-            )
-        )
-
-        # Insert three Messages
-        msg_id_0 = state.store_message_ins(message=msg0)
-        msg_id_1 = state.store_message_ins(message=msg1)
-        msg_id_2 = state.store_message_ins(message=msg2)
-
-        assert msg_id_0
-        assert msg_id_1
-        assert msg_id_2
-
-        expected_message_ids = {msg_id_0, msg_id_1}
-
-        # Execute
-        result = state.get_message_ids_from_run_id(run_id_0)
-        bad_result = state.get_message_ids_from_run_id(15)
-
-        self.assertEqual(len(bad_result), 0)
-        self.assertSetEqual(result, expected_message_ids)
 
     # Init tests
     def test_init_state(self) -> None:
@@ -1070,83 +1131,6 @@ class StateTest(CoreStateTest):
 
         # Assert
         assert isinstance(state, LinkState)
-
-    def test_message_ins_store_identity_and_retrieve_identity(self) -> None:
-        """Store identity Message and retrieve it."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id,
-                run_id=run_id,
-            )
-        )
-        # Execute
-        message_ins_uuid = state.store_message_ins(msg)
-        message_ins_list = state.get_message_ins(node_id=node_id, limit=None)
-
-        # Assert
-        assert len(message_ins_list) == 1
-
-        retrieved_message_ins = message_ins_list[0]
-        assert retrieved_message_ins.metadata.message_id == str(message_ins_uuid)
-
-    def test_message_ins_store_delivered_and_fail_retrieving(self) -> None:
-        """Fail retrieving delivered message."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id,
-                run_id=run_id,
-            )
-        )
-        # Execute
-        _ = state.store_message_ins(msg)
-
-        # 1st get: set to delivered
-        message_ins_list = state.get_message_ins(node_id=node_id, limit=None)
-
-        assert len(message_ins_list) == 1
-
-        # 2nd get: no Message because it was already delivered before
-        message_ins_list = state.get_message_ins(node_id=node_id, limit=None)
-
-        # Assert
-        assert len(message_ins_list) == 0
-
-    def test_get_message_ins_limit_throws_for_limit_zero(self) -> None:
-        """Fail call with limit=0."""
-        # Prepare
-        state: LinkState = self.state_factory()
-
-        # Execute & Assert
-        with self.assertRaises(AssertionError):
-            state.get_message_ins(node_id=2, limit=0)
-
-    def test_message_ins_store_invalid_run_id_and_fail(self) -> None:
-        """Store Message with invalid run_id and fail."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=1234,
-                run_id=61016,
-            )
-        )
-
-        # Execute
-        message_id = state.store_message_ins(msg)
-
-        # Assert
-        assert message_id is None
 
     def test_node_ids_initial_state(self) -> None:
         """Test retrieving all node_ids and empty initial state."""
@@ -1202,16 +1186,27 @@ class StateTest(CoreStateTest):
         # Prepare
         state: LinkState = self.state_factory()
         public_key = b"mock"
+        name = "London SuperNode"
+        location = "37.4056,-122.0775"
 
         # Execute
         expected_registered_at = now().timestamp()
-        node_id = state.create_node("fake_aid", "fake_name", public_key, 10)
+        node_id = state.create_node(
+            "fake_aid",
+            "fake_name",
+            public_key,
+            10,
+            location=location,
+            name=name,
+        )
         node = state.get_node_info(node_ids=[node_id])[0]
         actual_registered_at = datetime.fromisoformat(node.registered_at).timestamp()
 
         # Assert
         assert node.node_id == node_id
         assert node.public_key == public_key
+        assert node.location == location
+        assert node.name == name
         self.assertAlmostEqual(actual_registered_at, expected_registered_at, 2)
 
     def test_create_node_public_key_twice(self) -> None:
@@ -1434,80 +1429,6 @@ class StateTest(CoreStateTest):
         # Assert
         assert retrieved_node_id is None
 
-    def test_num_message_ins(self) -> None:
-        """Test if num_message_ins returns correct number of not delivered Messages."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-        msg0 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id,
-                run_id=run_id,
-            )
-        )
-        msg1 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id,
-                run_id=run_id,
-            )
-        )
-
-        # Insert Messages
-        _ = state.store_message_ins(message=msg0)
-        _ = state.store_message_ins(message=msg1)
-
-        # Execute
-        num = state.num_message_ins()
-
-        # Assert
-        assert num == 2
-
-    def test_num_message_res(self) -> None:
-        """Test if num_message_res returns correct number of not delivered Message
-        replies."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        node_id = create_dummy_node(state)
-
-        msg0 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id,
-                run_id=run_id,
-            )
-        )
-        msg1 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id,
-                run_id=run_id,
-            )
-        )
-
-        # Insert Messages
-        _ = state.store_message_ins(message=msg0)
-        _ = state.store_message_ins(message=msg1)
-
-        # Store replies
-        msg_rp0 = Message(RecordDict(), reply_to=msg0)
-        # pylint: disable-next=W0212
-        msg_rp0.metadata._message_id = str(uuid4())  # type: ignore
-        state.store_message_res(msg_rp0)
-        msg_rp1 = Message(RecordDict(), reply_to=msg1)
-        # pylint: disable-next=W0212
-        msg_rp1.metadata._message_id = str(uuid4())  # type: ignore
-        state.store_message_res(msg_rp1)
-
-        # Execute
-        num = state.num_message_res()
-
-        # Assert
-        assert num == 2
-
     def test_acknowledge_node_heartbeat(self) -> None:
         """Test if acknowledge_ping works and get_nodes return online nodes.
 
@@ -1539,15 +1460,15 @@ class StateTest(CoreStateTest):
             }
 
         # Assert
-        # Allow up to 1 decimal place difference due to file-based SQLite DB speed.
-        # CI runs on cracky old machines, so minor delays are expected.
+        # Allow up to one second of difference due to file-based SQLite DB speed.
+        # CI runs on shared machines, so minor delays are expected.
         self.assertSetEqual(online_node_ids, set(node_ids[7:]))
         for node in nodes:
             actual = datetime.fromisoformat(node.last_activated_at).timestamp()
-            self.assertAlmostEqual(actual, expected_activated_at, 1)
+            self.assertAlmostEqual(actual, expected_activated_at, delta=1)
             if node.status == NodeStatus.OFFLINE:
                 actual = datetime.fromisoformat(node.last_deactivated_at).timestamp()
-                self.assertAlmostEqual(actual, expected_deactivated_at, 1)
+                self.assertAlmostEqual(actual, expected_deactivated_at, delta=1)
 
     def test_acknowledge_node_heartbeat_failed(self) -> None:
         """Test that acknowledge_node_heartbeat returns False when the heartbeat
@@ -1560,490 +1481,6 @@ class StateTest(CoreStateTest):
 
         # Assert
         assert not is_successful
-
-    def test_node_unavailable_error(self) -> None:  # pylint: disable=too-many-locals
-        """Test if get_message_res return Message containing node unavailable error."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        node_id_0 = create_dummy_node(state)
-        node_id_1 = create_dummy_node(state)
-        node_id_2 = create_dummy_node(state)
-
-        # Run acknowledge heartbeat
-        state.acknowledge_node_heartbeat(node_id_0, heartbeat_interval=90)
-        state.acknowledge_node_heartbeat(node_id_1, heartbeat_interval=30)
-        state.acknowledge_node_heartbeat(node_id_2, heartbeat_interval=30)
-
-        # Create and store Messages
-        in_message_0 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id_0,
-                run_id=run_id,
-            )
-        )
-        in_message_1 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id_1,
-                run_id=run_id,
-            )
-        )
-        in_message_2 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID,
-                dst_node_id=node_id_2,
-                run_id=run_id,
-            )
-        )
-        message_id_0 = state.store_message_ins(in_message_0)
-        message_id_1 = state.store_message_ins(in_message_1)
-        message_id_2 = state.store_message_ins(in_message_2)
-        assert message_id_0 and message_id_1 and message_id_2
-
-        # Get Message to mark them delivered
-        state.get_message_ins(node_id=node_id_0, limit=None)
-        state.get_message_ins(node_id=node_id_1, limit=None)
-
-        # Delete the 3rd node to simulate unavailability
-        state.delete_node("mock_flwr_aid", node_id_2)
-
-        # Create and store reply Messages
-        res_message_0 = Message(content=RecordDict(), reply_to=in_message_0)
-        # pylint: disable-next=W0212
-        res_message_0.metadata._message_id = res_message_0.object_id  # type: ignore
-        assert state.store_message_res(res_message_0) is not None
-
-        # Execute
-        # Test with current_time + 100s
-        # node_id_0 remain online until current_time + 180s (HEARTBEAT_PATIENCE * 90s)
-        # node_id_1 remain online until current_time + 60s (HEARTBEAT_PATIENCE * 30s)
-        # As a result, a reply message with NODE_UNAVAILABLE
-        # error will generate for node_id_1.
-        future_dt = now() + timedelta(seconds=100)
-        with patch("datetime.datetime") as mock_dt:
-            mock_dt.now.return_value = future_dt
-            res_message_list = state.get_message_res(
-                {message_id_0, message_id_1, message_id_2}
-            )
-            msgs = {msg.metadata.reply_to_message_id: msg for msg in res_message_list}
-
-        # Assert
-        assert len(res_message_list) == 3
-        reply_1 = msgs[message_id_1]  # Offline due to heartbeat timeout
-        assert reply_1.has_error()
-        assert reply_1.error.code == ErrorCode.NODE_UNAVAILABLE
-        reply_2 = msgs[message_id_2]  # Deleted node
-        assert reply_2.has_error()
-        assert reply_2.error.code == ErrorCode.NODE_UNAVAILABLE
-
-    def test_store_message_res_message_ins_expired(self) -> None:
-        """Test behavior of store_message_res when the Message it replies to is
-        expired."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        node_id = create_dummy_node(state)
-        # Create and store a message
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-        state.store_message_ins(message=msg)
-
-        msg_to_reply_to = state.get_message_ins(node_id=node_id, limit=2)[0]
-        reply_msg = Message(RecordDict(), reply_to=msg_to_reply_to)
-
-        # Execute
-        # This patch respresents a very slow communication/ClientApp execution
-        # that triggers TTL
-        future_dt = now() + timedelta(seconds=msg.metadata.ttl)
-        with patch("datetime.datetime") as mock_dt:
-            mock_dt.now.return_value = future_dt
-            result = state.store_message_res(reply_msg)
-
-        # Assert
-        assert result is None
-        assert state.num_message_ins() == 1
-        assert state.num_message_res() == 0
-
-    # pylint: disable=W0212
-    def test_store_message_res_limit_ttl(self) -> None:
-        """Test store_message_res regarding the TTL in reply Message."""
-        current_time = now().timestamp()
-
-        test_cases = [
-            (
-                current_time - 5,
-                10,
-                current_time - 2,
-                6,
-                True,
-            ),  # Message within allowed TTL
-            (
-                current_time - 5,
-                10,
-                current_time - 2,
-                15,
-                False,
-            ),  # Message TTL exceeds max allowed TTL
-        ]
-
-        for (
-            msg_ins_created_at,
-            msg_ins_ttl,
-            msg_res_created_at,
-            msg_res_ttl,
-            expected_store_result,
-        ) in test_cases:
-            # Prepare
-            state: LinkState = self.state_factory()
-            run_id = create_dummy_run(state)
-            node_id = create_dummy_node(state)
-
-            # Create message, tweak created_at and store
-            msg = message_from_proto(
-                create_ins_message(
-                    src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-                )
-            )
-
-            msg.metadata.created_at = msg_ins_created_at
-            msg.metadata.ttl = msg_ins_ttl
-            state.store_message_ins(message=msg)
-
-            reply_msg = Message(RecordDict(), reply_to=msg)
-            reply_msg.metadata._message_id = str(uuid4())  # type: ignore
-            reply_msg.metadata.created_at = msg_res_created_at
-            reply_msg.metadata.ttl = msg_res_ttl
-
-            # Execute
-            res = state.store_message_res(reply_msg)
-
-            # Assert
-            if expected_store_result:
-                assert res is not None
-            else:
-                assert res is None
-
-    def test_store_message_res_node_removed_from_federation(self) -> None:
-        """Test that store_message_res returns None if destination node is removed from
-        federation after message was stored."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-
-        # Store message for node and retrieve
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-        state.store_message_ins(message=msg)
-        assert state.get_message_ins(node_id=node_id, limit=None)
-
-        # Mock removal of node from federation
-        state.federation_manager.filter_nodes = Mock(return_value=set())  # type: ignore
-
-        # Create reply message
-        reply_msg = Message(RecordDict(), reply_to=msg)
-        reply_msg.metadata.__dict__["_message_id"] = reply_msg.object_id
-
-        # Execute
-        result = state.store_message_res(reply_msg)
-
-        # Assert
-        # Should return None since node is no longer in federation
-        assert result is None
-        assert state.num_message_res() == 0
-        assert state.num_message_ins() == 0
-
-    def test_get_message_ins_not_return_expired(self) -> None:
-        """Test get_message_ins not to return expired Messages."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-        # Create message, tweak created_at, ttl and store
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-        msg.metadata.created_at = now().timestamp() - 5
-        msg.metadata.ttl = 5.1
-
-        # Execute
-        state.store_message_ins(message=msg)
-
-        # Assert
-        future_dt = now() + timedelta(seconds=1.1)  # over TTL limit by 1 second
-        with patch("datetime.datetime") as mock_dt:
-            mock_dt.now.return_value = future_dt
-            message_list = state.get_message_ins(node_id=2, limit=None)
-            assert len(message_list) == 0
-
-    def test_get_message_ins_node_removed_from_federation(self) -> None:
-        """Test that get_message_ins returns nothing if node is removed from federation
-        after message was stored."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-
-        # Store message for node
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-        assert state.store_message_ins(message=msg)
-
-        # Mock removal of node from federation
-        state.federation_manager.filter_nodes = Mock(return_value=set())  # type: ignore
-
-        # Execute
-        message_ins_list = state.get_message_ins(node_id=node_id, limit=None)
-
-        # Assert
-        # Should return empty list since node is no longer in federation
-        assert len(message_ins_list) == 0
-        # Message should still be deleted
-        assert state.num_message_ins() == 0
-
-    def test_get_message_res_expired_message_ins(self) -> None:
-        """Test get_message_res to return error Message if the inquired message has
-        expired."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-
-        # A message that will expire before it gets pulled
-        msg1 = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-        ins_msg1_id = state.store_message_ins(msg1)
-        assert ins_msg1_id
-        assert state.num_message_ins() == 1
-
-        future_dt = now() + timedelta(seconds=msg1.metadata.ttl + 0.1)
-        with patch("datetime.datetime") as mock_dt:
-            mock_dt.now.return_value = future_dt  # over TTL limit
-            res_msg = state.get_message_res({ins_msg1_id})[0]
-            assert res_msg.has_error()
-            assert res_msg.error.code == ErrorCode.MESSAGE_UNAVAILABLE
-
-    def test_get_message_res_reply_not_ready(self) -> None:
-        """Test get_message_res to return nothing since reply Message isn't present."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-        ins_msg_id = state.store_message_ins(msg)
-        assert ins_msg_id
-
-        reply = state.get_message_res({ins_msg_id})
-        assert len(reply) == 0
-        # Check message contains error informing reply message hasn't arrived
-        assert state.num_message_ins() == 1
-        assert state.num_message_res() == 0
-
-    def test_get_message_res_empty_ids_returns_empty_list(self) -> None:
-        """Test that get_message_res returns empty for empty input."""
-        state = self.state_factory()
-
-        self.assertEqual(state.get_message_res(set()), [])
-
-    def test_get_message_res_returns_empty_for_missing_message_ins(self) -> None:
-        """Test that get_message_res returns an empty result when the corresponding
-        Message does not exist."""
-        # Prepare
-        state = self.state_factory()
-        message_ins_id = "5b0a3fc2-edba-4525-a89a-04b83420b7c8"
-        # Execute
-        message_res_list = state.get_message_res(message_ids={message_ins_id})
-        print(message_res_list)
-
-        # Assert
-        assert len(message_res_list) == 1
-        assert message_res_list[0].has_error()
-        assert message_res_list[0].error.code == ErrorCode.MESSAGE_UNAVAILABLE
-
-    def test_get_message_res_node_removed_from_federation(self) -> None:
-        """Test that when node is removed from federation after storing message_ins and
-        message_res, both are deleted and get_message_res returns error."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-
-        # Store message_ins and retrieve
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-        assert state.store_message_ins(msg)
-        state.get_message_ins(node_id=node_id, limit=None)
-
-        # Store message_res
-        res_msg = Message(RecordDict(), reply_to=msg)
-        res_msg.metadata.__dict__["_message_id"] = res_msg.object_id
-        assert state.store_message_res(res_msg)
-
-        # Mock removal of node from federation
-        state.federation_manager.filter_nodes = Mock(return_value=set())  # type: ignore
-
-        # Execute
-        message_res_list = state.get_message_res(message_ids={msg.object_id})
-
-        # Assert
-        # Should return error message since node is no longer in federation
-        assert len(message_res_list) == 1
-        assert message_res_list[0].has_error()
-        assert message_res_list[0].error.code == ErrorCode.MESSAGE_UNAVAILABLE
-        # Both message_ins and message_res should be deleted
-        assert state.num_message_ins() == 0
-        assert state.num_message_res() == 0
-
-    def test_get_message_res_return_successful(self) -> None:
-        """Test get_message_res returns correct Message."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-        ins_msg_id = state.store_message_ins(msg)
-        assert state.num_message_ins() == 1
-        assert ins_msg_id
-        # Fetch ins message
-        ins_msg = state.get_message_ins(node_id=node_id, limit=1)[0]
-        # Create reply and insert
-        res_msg = Message(RecordDict(), reply_to=ins_msg)
-        res_msg.metadata._message_id = str(uuid4())  # type: ignore
-        state.store_message_res(res_msg)
-        assert state.num_message_res() == 1
-
-        # Fetch reply
-        reply_msg = state.get_message_res({ins_msg_id})
-
-        # Assert
-        assert reply_msg[0].metadata.dst_node_id == msg.metadata.src_node_id
-
-        # We haven't called deletion of messages
-        assert state.num_message_ins() == 1
-        assert state.num_message_res() == 1
-
-    def test_store_message_res_duplicate_same_message_is_idempotent(self) -> None:
-        """Test duplicate store_message_res with the same Message is idempotent."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-        ins_msg_id = state.store_message_ins(msg)
-        assert ins_msg_id
-
-        ins_msg = state.get_message_ins(node_id=node_id, limit=1)[0]
-        res_msg = Message(RecordDict(), reply_to=ins_msg)
-        res_msg.metadata._message_id = str(uuid4())  # type: ignore
-        retry_res_msg = message_from_proto(message_to_proto(res_msg))
-
-        # Execute
-        first_res_msg_id = state.store_message_res(res_msg)
-        second_res_msg_id = state.store_message_res(retry_res_msg)
-
-        # Assert
-        assert first_res_msg_id == res_msg.metadata.message_id
-        assert second_res_msg_id == res_msg.metadata.message_id
-        assert state.num_message_res() == 1
-
-    def test_store_message_res_rejects_duplicate_reply(self) -> None:
-        """Test store_message_res rejects a second reply for one Message."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-        ins_msg_id = state.store_message_ins(msg)
-        assert ins_msg_id
-
-        ins_msg = state.get_message_ins(node_id=node_id, limit=1)[0]
-        first_res_msg = Message(RecordDict(), reply_to=ins_msg)
-        first_res_msg.metadata._message_id = str(uuid4())  # type: ignore
-        second_res_msg = Message(RecordDict(), reply_to=ins_msg)
-        second_res_msg.metadata._message_id = str(uuid4())  # type: ignore
-
-        # Execute
-        first_res_msg_id = state.store_message_res(first_res_msg)
-        second_res_msg_id = state.store_message_res(second_res_msg)
-
-        # Assert
-        assert first_res_msg_id == first_res_msg.metadata.message_id
-        assert second_res_msg_id is None
-        assert state.num_message_res() == 1
-
-        reply_msg = state.get_message_res({ins_msg_id})
-        assert len(reply_msg) == 1
-        assert reply_msg[0].metadata.message_id == first_res_msg_id
-
-    def test_store_message_res_fail_if_dst_src_node_id_mismatch(self) -> None:
-        """Test store_message_res to fail if there is a mismatch between the dst_node_id
-        of orginal Message and the src_node_id of the reply Message."""
-        # Prepare
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-        state.store_message_ins(msg)
-        assert state.num_message_ins() == 1
-
-        # Fetch ins message
-        ins_msg = state.get_message_ins(node_id=node_id, limit=1)[0]
-        assert state.num_message_ins() == 1
-
-        # Create reply, modify src_node_id and insert
-        res_msg = Message(RecordDict(), reply_to=ins_msg)
-        # pylint: disable=W0212
-        res_msg.metadata._src_node_id = node_id + 1  # type: ignore
-        msg_res_id = state.store_message_res(res_msg)
-
-        # Assert
-        assert msg_res_id is None
-        assert state.num_message_ins() == 1
-        assert state.num_message_res() == 0
 
     def test_create_run_with_and_without_federation_config(self) -> None:
         """Test that run federation config is stored on the run."""
@@ -2218,17 +1655,6 @@ def create_ins_message_obj(src_node_id: int, dst_node_id: int, run_id: int) -> M
     return message_from_proto(proto)
 
 
-def create_res_message_obj(
-    src_node_id: int,
-    dst_node_id: int,
-    run_id: int,
-    error: Error | None = None,
-) -> Message:
-    """Create a (reply) Message object for testing."""
-    proto = create_res_message(src_node_id, dst_node_id, run_id, error)
-    return message_from_proto(proto)
-
-
 def get_primary_task_id(state: LinkState, run_id: int) -> int:
     """Return the primary task ID for a run."""
     run = state.get_run_info(run_ids=[run_id])[0]
@@ -2274,7 +1700,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     flwr_aid: str | None = "mock_flwr_aid",
     primary_task_type: str = TaskType.SERVER_APP,
     series_id: int | None = None,
-    connector_refs: Sequence[str] = (),
+    connector_ids: Sequence[int] = (),
 ) -> int:
     """Create a dummy run."""
     return state.create_run(
@@ -2287,24 +1713,48 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         flwr_aid=flwr_aid,
         primary_task_type=primary_task_type,
         series_id=series_id,
-        connector_refs=connector_refs,
+        connector_ids=connector_ids,
     )
 
 
-def _claim_running_in_separate_process(
+def _claim_running_in_separate_process(  # pylint: disable=too-many-positional-arguments
     database_path: str,
     task_id: int,
+    ready_event: Any,
     start_event: Any,
     result_queue: Any,
+    initialization_lock: Any,
     timeout: float,
 ) -> None:
     """Try to claim STARTING -> RUNNING in a dedicated process."""
+    # Deployments can install additional Alembic revisions in EE. Spawned
+    # children do not inherit the parent process's registration, so load the
+    # optional module before SqlLinkState.initialize() builds its migration
+    # configuration.
+    try:
+        # pylint: disable=import-outside-toplevel
+        import flwr.ee.state.alembic  # noqa: F401  # pylint: disable=unused-import
+
+        # pylint: enable=import-outside-toplevel
+    except ImportError:
+        pass
+
     state = SqlLinkState(
         database_path=database_path,
         federation_manager=NoOpFederationManager(),
         object_store=ObjectStoreFactory().store(),
     )
-    state.initialize()
+    # SQLite cannot safely migrate the shared database from both spawned
+    # processes at once. Serialize only initialization; the claim itself still
+    # starts concurrently after both processes signal readiness.
+    with initialization_lock:
+        try:
+            state.initialize()
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            result_queue.put((False, f"initialization failed: {ex!r}"))
+            ready_event.set()
+            return
+    ready_event.set()
     if not start_event.wait(timeout=timeout):
         result_queue.put((False, "start-event-timeout"))
         return
@@ -2323,6 +1773,39 @@ class InMemoryStateTest(StateTest):
     def state_factory(self) -> InMemoryLinkState:
         """Return InMemoryState."""
         return InMemoryLinkState(NoOpFederationManager(), ObjectStoreFactory().store())
+
+    def test_get_compacted_contexts(self) -> None:
+        """Read one series newest first with an exclusive cursor."""
+        state = self.state_factory()
+        state.compacted_context_store = {
+            context.id: context
+            for context in (
+                CompactedContext(id=1, series_id=42, through_event_id=10, text="First"),
+                CompactedContext(
+                    id=2, series_id=42, through_event_id=20, text="Second"
+                ),
+                CompactedContext(id=3, series_id=43, through_event_id=30, text="Other"),
+            )
+        }
+
+        self.assertEqual(
+            [context.text for context in state.get_compacted_contexts(42, limit=2)],
+            ["Second", "First"],
+        )
+        self.assertEqual(
+            [context.id for context in state.get_compacted_contexts(42)], [2]
+        )
+        self.assertEqual(
+            [
+                context.id
+                for context in state.get_compacted_contexts(42, before_context_id=2)
+            ],
+            [1],
+        )
+        self.assertEqual(
+            [context.text for context in state.get_compacted_contexts(43)],
+            ["Other"],
+        )
 
     def test_owner_aid_index(self) -> None:
         """Test that the owner_aid index works correctly."""
@@ -2352,6 +1835,50 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state.initialize()
         return state
 
+    def test_get_compacted_contexts(self) -> None:
+        """Read only one series in newest-first order with an exclusive cursor."""
+        state = self.state_factory()
+        with state.session() as session:
+            rows = [
+                CompactedContextModel(
+                    series_id=series_id,
+                    through_event_id=event_id,
+                    text=text,
+                    token_count=1,
+                    created_at=now(),
+                )
+                for series_id, event_id, text in (
+                    (42, 10, "First"),
+                    (42, 20, "Second"),
+                    (43, 30, "Other"),
+                )
+            ]
+            session.add_all(rows)
+            session.flush()
+            first_id, second_id = rows[0].id, rows[1].id
+
+        self.assertEqual(
+            [context.text for context in state.get_compacted_contexts(42, limit=2)],
+            ["Second", "First"],
+        )
+        self.assertEqual(
+            [context.id for context in state.get_compacted_contexts(42)],
+            [second_id],
+        )
+        self.assertEqual(
+            [
+                context.id
+                for context in state.get_compacted_contexts(
+                    42, before_context_id=second_id
+                )
+            ],
+            [first_id],
+        )
+        self.assertEqual(
+            [context.text for context in state.get_compacted_contexts(43)],
+            ["Other"],
+        )
+
     def test_get_fab_refreshes_cached_row_in_shared_session(self) -> None:
         """Test get_fab observes raw SQL updates in a shared session."""
         state = self.state_factory()
@@ -2374,26 +1901,86 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state = self.state_factory()
 
         with state.session() as session:
-            state.upsert_connector(
-                flwr_aid="account-a",
+            connector_id = state.create_connector(
+                federation_id="@bob/fed-a",
                 connector_ref="calendar",
                 credentials_json='{"token":"old"}',
                 config_json='{"calendar":"primary"}',
+                created_by="account-a",
             )
-            cached_row = session.get(ConnectorModel, ("account-a", "calendar"))
+            assert connector_id is not None
+            state.get_connectors_by_ref("@bob/fed-a", "calendar")
+            cached_row = session.scalar(
+                select(ConnectorModel).where(
+                    ConnectorModel.federation_id == "@bob/fed-a",
+                    ConnectorModel.connector_ref == "calendar",
+                )
+            )
             assert cached_row is not None
             self.assertEqual(cached_row.credentials_json, '{"token":"old"}')
-            state.upsert_connector(
-                flwr_aid="account-a",
-                connector_ref="calendar",
-                credentials_json='{"token":"new"}',
-                config_json='{"calendar":"work"}',
+            session.execute(
+                update(ConnectorModel)
+                .where(ConnectorModel.connector_id == connector_id)
+                .values(
+                    credentials_json='{"token":"new"}',
+                    config_json='{"calendar":"work"}',
+                )
             )
-            second = state.get_connector(flwr_aid="account-a", connector_ref="calendar")
+            second = state.get_connectors_by_ref("@bob/fed-a", "calendar")[0]
 
         assert second is not None
         self.assertEqual(second.credentials_json, '{"token":"new"}')
         self.assertEqual(second.config_json, '{"calendar":"work"}')
+
+    def test_get_node_info_refreshes_rows_after_offline_tagging(self) -> None:
+        """Test get_node_info observes offline tagging in a shared session."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+
+        with state.session():
+            state.get_node_info(node_ids=[node_id])
+            state.query(
+                "UPDATE node SET online_until = :online_until WHERE node_id = :node_id",
+                {
+                    "online_until": now().timestamp() - 1.0,
+                    "node_id": uint64_to_int64(node_id),
+                },
+            )
+            refreshed = state.get_node_info(node_ids=[node_id])[0]
+
+        self.assertEqual(refreshed.status, NodeStatus.OFFLINE)
+
+    def test_get_run_info_refreshes_rows_after_raw_sql_update(self) -> None:
+        """Test get_run_info observes raw SQL updates in a shared session."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+
+        with state.session():
+            state.get_run_info(run_ids=[run_id])
+            state.store_traffic(run_id, bytes_sent=100, bytes_recv=200)
+            refreshed = state.get_run_info(run_ids=[run_id])[0]
+
+        self.assertEqual(refreshed.bytes_sent, 100)
+        self.assertEqual(refreshed.bytes_recv, 200)
+
+    def test_get_run_status_refreshes_task_after_raw_sql_update(self) -> None:
+        """Test get_run_status observes raw SQL updates in a shared session."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        task_id = get_primary_task_id(state, run_id)
+
+        with state.session():
+            state.get_run_status({run_id})
+            state.query(
+                "UPDATE task SET starting_at = :starting_at WHERE task_id = :task_id",
+                {
+                    "starting_at": now().isoformat(),
+                    "task_id": uint64_to_int64(task_id),
+                },
+            )
+            refreshed = state.get_run_status({run_id})[run_id]
+
+        self.assertEqual(refreshed.status, Status.STARTING)
 
     def test_reserve_nonce_cleans_expired_rows_on_duplicate(self) -> None:
         """Expired nonce cleanup commits even when reservation is duplicate."""
@@ -2462,7 +2049,7 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state = self.state_factory()
         run_id = create_dummy_run(state)
         src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
         assert src_task_id is not None and dst_task_id is not None
 
         current = now().timestamp()
@@ -2518,66 +2105,26 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
     def test_run_series_distinguishes_missing_and_empty_descriptions(self) -> None:
         """Missing and explicitly empty descriptions remain distinct in SQL."""
         state = self.state_factory()
-        self.assertIsNotNone(state.store_run_in_series(1, "@me/fed-a", series_id=None))
         self.assertIsNotNone(
-            state.store_run_in_series(2, "@me/fed-a", series_id=None, description="")
+            state.store_run_in_series(
+                1,
+                "@me/fed-a",
+                is_agent=False,
+                series_id=None,
+            )
+        )
+        self.assertIsNotNone(
+            state.store_run_in_series(
+                2,
+                "@me/fed-a",
+                is_agent=False,
+                series_id=None,
+                description="",
+            )
         )
 
         rows = state.query("SELECT description FROM run_series")
         self.assertCountEqual([row["description"] for row in rows], [None, ""])
-
-    @parameterized.expand(
-        [  # type: ignore
-            ("claim", "_claim_message_ins_rows", (1, 3)),
-            ("load", "_load_message_ins_rows", ({"abc"},)),
-        ]
-    )
-    def test_message_ins_rows_uses_deterministic_ordering(
-        self, _name: str, method: str, args: tuple[Any, ...]
-    ) -> None:
-        """Message querying should use deterministic ordering."""
-        state = self.state_factory()
-        captured: list[str] = []
-
-        # pylint: disable-next=unused-argument
-        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
-            captured.append(query)
-            return []
-
-        state.query = fake_query  # type: ignore[method-assign]
-        getattr(state, method)(*args)
-
-        self.assertTrue(captured)
-        self.assertIn("ORDER BY created_at, message_id", captured[0])
-        self.assertNotIn("rowid", captured[0])
-
-    def test_message_ins_claim_can_append_select_lock_clause(self) -> None:
-        """Message claiming can append a subclass-provided row-locking clause."""
-        # Prepare
-        state = self.state_factory()
-        last_query = ""
-
-        # pylint: disable-next=unused-argument
-        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
-            nonlocal last_query
-            last_query = query
-            return []
-
-        state.query = fake_query  # type: ignore[method-assign]
-
-        # Execute & assert - without lock clause
-        state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
-        self.assertNotIn("FOR TEST LOCK", last_query)
-
-        # Execute & assert - with lock clause
-        with patch.object(
-            type(state),
-            "select_lock_sql",
-            new_callable=PropertyMock,
-            return_value="FOR TEST LOCK",
-        ):
-            state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
-        self.assertIn("FOR TEST LOCK", last_query)
 
     def test_token_expiry_does_not_overwrite_finished_completed_run(self) -> None:
         """Ensure token cleanup doesn't mutate terminal COMPLETED status."""
@@ -2630,7 +2177,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
 
     def _claim_running_process_target(
         self,
-    ) -> Callable[[str, int, Any, Any, float], None]:
+    ) -> Callable[[str, int, Any, Any, Any, Any, float], None]:
         """Return process target for STARTING -> RUNNING claim tests."""
         return _claim_running_in_separate_process
 
@@ -2649,101 +2196,6 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             self.states.append(state)
         return self.states
 
-    def _query_states_in_parallel(
-        self,
-        fn: Callable[[SqlLinkState], Any],
-        timeout: float = _CONCURRENT_TEST_TIMEOUT,
-    ) -> list[Any]:
-        """Query SqlLinkState concurrently and return their results."""
-        n_threads = len(self.states)
-        barrier = threading.Barrier(n_threads + 1)
-        results: list[Any] = [None] * n_threads
-        exceptions: list[Exception] = []
-
-        def _run(idx: int) -> None:
-            try:
-                barrier.wait(timeout=timeout)
-                results[idx] = fn(self.states[idx])
-            except Exception as ex:  # pylint: disable=broad-exception-caught
-                exceptions.append(ex)
-
-        threads = [
-            threading.Thread(target=_run, args=(idx,)) for idx in range(n_threads)
-        ]
-        for thread in threads:
-            thread.start()
-        try:
-            barrier.wait(timeout=timeout)
-        except threading.BrokenBarrierError as ex:
-            exceptions.append(ex)
-        for thread in threads:
-            thread.join(timeout=timeout)
-        alive_threads = [thread for thread in threads if thread.is_alive()]
-        if alive_threads:
-            alive_count = len(alive_threads)
-            raise AssertionError(
-                f"Concurrent test timed out; {alive_count} thread(s) still alive "
-                f"after {timeout} seconds."
-            )
-
-        if exceptions:
-            raise exceptions[0]
-        return results
-
-    # pylint: disable-next=too-many-locals
-    def test_get_message_ins_claim_is_unique_across_replicas(self) -> None:
-        """Ensure concurrent replicas cannot both claim the same instruction."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Prepare
-            db_path = self._shared_sql_database(tmpdir)
-            state = self._create_shared_sql_states(db_path)[0]
-            node_id = create_dummy_node(state)
-            run_id = create_dummy_run(state)
-            msg = create_ins_message_obj(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-            assert state.store_message_ins(message=msg)
-
-            # Execute
-            results = self._query_states_in_parallel(
-                lambda state: state.get_message_ins(node_id=node_id, limit=1)
-            )
-            claimed = [msgs for msgs in results if msgs]
-
-            # Assert
-            assert len(claimed) == 1
-            assert len(claimed[0]) == 1
-
-    def test_get_message_res_claim_is_unique_across_replicas(self) -> None:
-        """Ensure concurrent replicas cannot both claim the same reply Message."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Prepare
-            db_path = self._shared_sql_database(tmpdir)
-            state = self._create_shared_sql_states(db_path)[0]
-
-            node_id = create_dummy_node(state)
-            assert state.store_message_ins(
-                create_ins_message_obj(
-                    src_node_id=SUPERLINK_NODE_ID,
-                    dst_node_id=node_id,
-                    run_id=create_dummy_run(state),
-                )
-            )
-            pulled_ins = state.get_message_ins(node_id=node_id, limit=1)[0]
-
-            msg_res = Message(RecordDict(), reply_to=pulled_ins)
-            msg_res.metadata.__dict__["_message_id"] = str(uuid4())
-            assert state.store_message_res(msg_res)
-
-            # Execute
-            msg_id = pulled_ins.metadata.message_id
-            results = self._query_states_in_parallel(
-                lambda state: state.get_message_res({msg_id}),
-            )
-
-            # Assert
-            assert sum(len(res) for res in results if res is not None) == 1
-
     def test_acknowledge_node_heartbeat_does_not_revive_deleted_node(self) -> None:
         """Ensure a heartbeat cannot move an unregistered node back online."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2753,70 +2205,50 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             heartbeat_state = states[0]
             delete_state = states[1]
             node_id = create_dummy_node(heartbeat_state, activate=False)
-            original_query = heartbeat_state.query
             did_delete = False
 
             def delete_before_heartbeat_update(
-                query: str, data: Any = None
-            ) -> list[dict[str, Any]]:
+                _conn: Any,
+                statement: Any,
+                _multiparams: Any,
+                _params: Any,
+                _execution_options: Any,
+            ) -> None:
                 nonlocal did_delete
-                normalized_query = " ".join(query.split())
-                if not did_delete and normalized_query.startswith(
-                    "UPDATE node SET online_until"
+                if (
+                    not did_delete
+                    and isinstance(statement, Update)
+                    and getattr(statement.table, "name", None) == "node"
                 ):
                     did_delete = True
                     delete_state.delete_node("mock_flwr_aid", node_id)
-                return original_query(query, data)
-
-            heartbeat_state.query = (  # type: ignore[method-assign]
-                delete_before_heartbeat_update
-            )
 
             # Execute
-            acknowledged = heartbeat_state.acknowledge_node_heartbeat(
-                node_id, heartbeat_interval=30
+            engine = heartbeat_state._engine  # pylint: disable=protected-access
+            assert engine is not None
+            event.listen(
+                engine,
+                "before_execute",
+                delete_before_heartbeat_update,
             )
 
+            try:
+                acknowledged = heartbeat_state.acknowledge_node_heartbeat(
+                    node_id, heartbeat_interval=30
+                )
+            finally:
+                event.remove(
+                    engine,
+                    "before_execute",
+                    delete_before_heartbeat_update,
+                )
             # Assert
             assert did_delete
             assert not acknowledged
             node = heartbeat_state.get_node_info(node_ids=[node_id])[0]
             assert node.status == NodeStatus.UNREGISTERED
 
-    # pylint: disable-next=too-many-locals
-    def test_get_message_ins_distributes_available_work_under_contention(self) -> None:
-        """Ensure two replicas can each claim work when two Messages are available."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Prepare
-            db_path = self._shared_sql_database(tmpdir)
-            state = self._create_shared_sql_states(db_path)[0]
-
-            node_id = create_dummy_node(state)
-            run_id = create_dummy_run(state)
-            msg_0 = create_ins_message_obj(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-            msg_1 = create_ins_message_obj(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-            assert state.store_message_ins(message=msg_0)
-            assert state.store_message_ins(message=msg_1)
-
-            # Execute
-            results = self._query_states_in_parallel(
-                lambda state: state.get_message_ins(node_id=node_id, limit=1)
-            )
-            claimed_messages = [msgs for msgs in results if msgs]
-
-            # Assert
-            assert len(claimed_messages) == 2
-            assert all(len(msgs) == 1 for msgs in claimed_messages)
-            assert (
-                claimed_messages[0][0].metadata.message_id
-                != claimed_messages[1][0].metadata.message_id
-            )
-
-    # pylint: disable-next=too-many-locals
+    # pylint: disable-next=too-many-branches,too-many-locals
     def test_activate_task_running_claim_is_atomic_across_replicas(self) -> None:
         """Ensure only one replica can claim STARTING -> RUNNING transition."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2830,23 +2262,58 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             ctx = multiprocessing.get_context("spawn")
             start_event = ctx.Event()
             result_queue = ctx.Queue()
+            initialization_lock = ctx.Lock()
             timeout = self._CONCURRENT_TEST_TIMEOUT
+            ready_events = [ctx.Event(), ctx.Event()]
 
             # Execute
             claim_target = self._claim_running_process_target()
             processes = [
                 ctx.Process(
                     target=claim_target,
-                    args=(db_path, task_id, start_event, result_queue, timeout),
+                    args=(
+                        db_path,
+                        task_id,
+                        ready_events[0],
+                        start_event,
+                        result_queue,
+                        initialization_lock,
+                        timeout,
+                    ),
                 ),
                 ctx.Process(
                     target=claim_target,
-                    args=(db_path, task_id, start_event, result_queue, timeout),
+                    args=(
+                        db_path,
+                        task_id,
+                        ready_events[1],
+                        start_event,
+                        result_queue,
+                        initialization_lock,
+                        timeout,
+                    ),
                 ),
             ]
             for proc in processes:
                 proc.start()
-            # Release both processes to claim at (roughly) the same time.
+
+            # Wait until both replicas have initialized before releasing them to
+            # claim at (roughly) the same time. This keeps SQLite migration startup
+            # contention out of the atomic claim assertion.
+            ready_deadline = time.monotonic() + timeout
+            for ready_event in ready_events:
+                remaining = ready_deadline - time.monotonic()
+                if remaining <= 0 or not ready_event.wait(timeout=remaining):
+                    for proc in processes:
+                        if proc.is_alive():
+                            proc.terminate()
+                    for proc in processes:
+                        proc.join(timeout=1.0)
+                    self.fail(
+                        "Concurrent run-claim test timed out waiting for replicas "
+                        f"to initialize after {timeout} seconds."
+                    )
+
             start_event.set()
             for proc in processes:
                 proc.join(timeout=timeout)

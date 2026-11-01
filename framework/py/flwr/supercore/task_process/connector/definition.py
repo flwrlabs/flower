@@ -12,46 +12,164 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Definition of one account-scoped connector."""
+"""Definitions shared by built-in and federation-scoped connectors."""
 
+from __future__ import annotations
 
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Literal
 
+from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
-from .oauth import OAuthConnectorProvider
+from .oauth import OAuthFlow
 
 ConnectorHandler = Callable[..., JSONValue]
 
 
+class ActionAccess(StrEnum):
+    """Classify whether a connector action reads or writes provider data."""
+
+    READ = "read"
+    WRITE = "write"
+
+
+@dataclass(frozen=True)
+class ActionDefinition:
+    """Describe one provider action independently of its execution."""
+
+    name: str
+    description: str
+    access: ActionAccess
+    input_schema: JSONObject
+    strict: bool = False
+
+    def tool_name(self, provider_ref: str) -> str:
+        """Return the globally unique model-facing action name."""
+        return f"{provider_ref}_{self.name}"
+
+    def tool(self, provider_ref: str) -> JSONObject:
+        """Return the model-facing function tool for this action."""
+        return {
+            "type": "function",
+            "name": self.tool_name(provider_ref),
+            "description": self.description,
+            "parameters": self.input_schema,
+            "strict": self.strict,
+        }
+
+
+@dataclass(frozen=True)
+# pylint: disable-next=too-many-instance-attributes
+class OAuth2Definition:
+    """Describe a standard OAuth 2 authorization-code integration."""
+
+    authorization_url: str
+    token_url: str
+    client_id_env: str
+    client_secret_env: str
+    redirect_uri_env: str
+    scopes: tuple[str, ...] = ()
+    scope_parameter: str = "scope"
+    scope_separator: Literal[" ", ","] = " "
+    token_auth_method: Literal["client_secret_basic", "client_secret_post"] = (
+        "client_secret_basic"
+    )
+    token_response_path: tuple[str, ...] = ()
+    success_field: str | None = None
+    use_pkce: bool = False
+    authorization_params: Mapping[str, str] = field(default_factory=dict)
+    token_params: Mapping[str, str] = field(default_factory=dict)
+    token_request_format: Literal["form", "json"] = "form"
+    token_headers: Mapping[str, str] = field(default_factory=dict)
+    config_fields: tuple[str, ...] = ()
+    allow_additional_scopes: bool = True
+    expected_token_type: str | None = None
+    display_name_fields: tuple[str, ...] = ()
+    display_name_url: str | None = None
+    display_name_method: Literal["GET", "POST"] = "GET"
+    display_name_headers: Mapping[str, str] = field(default_factory=dict)
+    display_name_resolver: Callable[[JSONObject], str] | None = None
+
+
+@dataclass(frozen=True)
+class ProviderDefinition:
+    """Describe one federation-scoped connector provider."""
+
+    ref: str
+    display_name: str
+    description: str
+    actions: tuple[ActionDefinition, ...]
+    oauth: OAuth2Definition | None = None
+
+
+@dataclass(frozen=True)
+class ConnectorExecutionContext:
+    """Infrastructure supplied to one connector action execution."""
+
+    credentials: JSONObject
+    config: JSONObject
+    usage_recorder: TaskUsageRecorder
+    action_name: str | None = None
+
+
+ConnectorExecutor = Callable[[JSONObject, ConnectorExecutionContext], JSONValue]
+
+
+@dataclass(frozen=True)
+class ConnectorToolSource:
+    """Discover connection-specific actions and execute them without registration."""
+
+    discover: Callable[[ConnectorExecutionContext], Sequence[ActionDefinition]]
+    execute: ConnectorExecutor
+
+
 @dataclass(frozen=True)
 class ConnectorDefinition:
-    """Describe all runtime components of one account-scoped connector."""
+    """Group a connector's identity, tools, execution, and optional authentication."""
 
     ref: str
     tools: tuple[JSONObject, ...]
-    handlers: Mapping[str, ConnectorHandler]
-    oauth_provider: OAuthConnectorProvider | None = None
+    executors: Mapping[str, ConnectorExecutor]
+    requires_credentials: bool = False
+    provider: ProviderDefinition | None = None
+    oauth_flow: OAuthFlow | None = None
+    tool_source: ConnectorToolSource | None = None
 
-    def __post_init__(self) -> None:
-        """Reject incomplete definitions when the connector is imported."""
-        if not self.ref:
-            raise ValueError("Connector reference must not be empty.")
-        tool_names = [tool.get("name") for tool in self.tools]
-        if not all(isinstance(name, str) and name for name in tool_names):
-            raise ValueError(f"Connector '{self.ref}' has an invalid tool name.")
-        if len(tool_names) != len(set(tool_names)):
-            raise ValueError(f"Connector '{self.ref}' has duplicate tool names.")
-        if set(tool_names) != set(self.handlers):
+    @classmethod
+    def from_provider(
+        cls,
+        provider: ProviderDefinition,
+        executors: Mapping[str, ConnectorExecutor],
+        oauth_flow: OAuthFlow | None = None,
+        tool_source: ConnectorToolSource | None = None,
+    ) -> ConnectorDefinition:
+        """Build a federation-scoped connector from its provider actions."""
+        action_names = {action.name for action in provider.actions}
+        if action_names != set(executors):
             raise ValueError(
-                f"Connector '{self.ref}' tool schemas and handlers do not match."
+                f"Provider '{provider.ref}' actions and executors do not match."
             )
-        if (
-            self.oauth_provider is not None
-            and self.oauth_provider.connector_ref != self.ref
-        ):
-            raise ValueError(
-                f"Connector '{self.ref}' has an OAuth provider for "
-                f"'{self.oauth_provider.connector_ref}'."
-            )
+        return cls(
+            ref=provider.ref,
+            tools=tuple(action.tool(provider.ref) for action in provider.actions),
+            executors={
+                action.tool_name(provider.ref): executors[action.name]
+                for action in provider.actions
+            },
+            requires_credentials=True,
+            provider=provider,
+            oauth_flow=oauth_flow,
+            tool_source=tool_source,
+        )
+
+
+def build_executor(handler: ConnectorHandler) -> ConnectorExecutor:
+    """Build an executor that unpacks tool arguments and forwards the context."""
+
+    def execute(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONValue:
+        return handler(**arguments, context=context)
+
+    return execute

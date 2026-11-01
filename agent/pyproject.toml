@@ -10,6 +10,7 @@ dependencies = [
     "furo==2024.8.6",
     "myst-parser==3.0.1",
     "sphinx==7.4.7",
+    "sphinx-substitution-extensions==2022.2.16",
 ]
 
 [project.urls]

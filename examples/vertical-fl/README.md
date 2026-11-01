@@ -18,13 +18,13 @@ server is holding the labels of this dataset.
 | Data Distribution     | Clients have different data instances but share the same feature space. Think of different hospitals having different patients' data (samples) but recording the same types of information (features). | Each client holds different features for the same instances. Imagine different institutions holding various tests or measurements for the same group of patients.                                                                                                                                                                                                   |
 | Model Training        | Each client trains a model on their local data, which contains all the feature columns for its samples.                                                                                                | Clients train models on their respective features without having access to the complete feature set. Each model only sees a vertical slice of the data (hence the name 'Vertical').                                                                                                                                                                                 |
 | Aggregation           | The server aggregates these local models by averaging the parameters or gradients to update a global model.                                                                                            | The server aggregates the updates such as gradients or parameters, which are then used to update the global model. However, since each client sees only a part of the features, the server typically has a more complex role, sometimes needing to coordinate more sophisticated aggregation strategies that may involve secure multi-party computation techniques. |
-| Privacy Consideration | The raw data stays on the client's side, only model updates are shared, which helps in maintaining privacy.                                                                                            | VFL is designed to ensure that no participant can access the complete feature set of any sample, thereby preserving the privacy of data.                                                                                                                                                                                                                            |
+| Privacy Consideration | The raw data stays on the client's side, only model updates are shared, which helps in maintaining privacy.                                                                                            | Raw feature columns stay local, but embeddings and gradients can still leak information. Privacy guarantees require additional safeguards.                                                                                                                                                                                                                          |
 
 |               HFL               |               VFL               |
 | :-----------------------------: | :-----------------------------: |
 | ![HFL diagram](_static/hfl.png) | ![VFL diagram](_static/vfl.png) |
 
-Those diagrams illustrate HFL vs VFL using a simplified version of what we will be building in this example. Note that on the VFL side, the server holds the labels (the `Survived` column) and will be the only one capable of performing evaluation.
+Those diagrams illustrate HFL vs VFL using a simplified version of what we will be building in this example. Note that on the VFL side, the server holds the labels (the `Survived` column) and computes the training loss and accuracy.
 
 ## Set up the project
 
@@ -92,6 +92,20 @@ for partition in partitions:
 
 You can control the number of partitions as well as how many features each have by modifying `feature-splits` (defaults to \[`2,3,2`\]) in the `[tool.flwr.app.config]` section of the `pyproject.toml`.
 
+The server reads labels from the final partition of the same `FederatedDataset`
+used to load client features. All parties use the same row-shuffle seed, so each
+embedding row matches its label. This example assumes entities are already
+aligned. Each process downloads the public dataset before column selection, so
+the partitioning emulates data ownership rather than enforcing access control.
+
+Each round has two exchanges. The server first collects one embedding block from
+every feature party, concatenates them in partition order and computes the loss
+and gradients. It then sends each block's gradient back to its party and waits
+for all updates to be acknowledged before starting the next round. Errors or
+missing feature blocks or acknowledgements abort the run. Each exchange waits up to
+`reply-timeout` seconds (120 by default). Increase this setting if a cold dataset
+download or a slow deployment needs longer.
+
 ## Run the project
 
 You can run your Flower project in both _simulation_ and _deployment_ mode without making changes to the code. If you are starting with Flower, we recommend you using the _simulation_ mode as it requires fewer components to be launched manually. By default, `flwr run` will make use of the Simulation Engine.
@@ -115,27 +129,25 @@ By default, the example runs for 250 rounds using three clients. Launch it with 
 flwr run .
 ```
 
-The expected last lines of the log should look like:
+Training loss and accuracy are logged every 25 rounds and in the final round.
+Both metrics come from the same forward pass before that round's model updates.
+They are measured on the training rows, not a held-out test set, so they do not
+estimate generalization performance. Results vary with model initialization.
 
-```shell
-...
-INFO :      --- ServerApp Round 250 / 250 ---
-INFO :      Requesting embeddings from 3 nodes...
-INFO :          Received 3/3 results
-INFO :      Round 250, Loss: 0.3096, Accuracy: 84.94%
-INFO :      Sending gradients to 3 nodes...
-INFO :      
+For example, a three-client CPU simulation with the default configuration produced:
+
+```text
 INFO :      === Final Results ===
-INFO :      Round 25 -> Loss: 0.6458 | Accuracy: 61.89%
-INFO :      Round 50 -> Loss: 0.5888 | Accuracy: 67.76%
-INFO :      Round 75 -> Loss: 0.5265 | Accuracy: 72.49%
-INFO :      Round 100 -> Loss: 0.4939 | Accuracy: 74.41%
-INFO :      Round 125 -> Loss: 0.4499 | Accuracy: 78.13%
-INFO :      Round 150 -> Loss: 0.4012 | Accuracy: 81.51%
-INFO :      Round 175 -> Loss: 0.3691 | Accuracy: 82.07%
-INFO :      Round 200 -> Loss: 0.3710 | Accuracy: 82.75%
-INFO :      Round 225 -> Loss: 0.3172 | Accuracy: 84.44%
-INFO :      Round 250 -> Loss: 0.3096 | Accuracy: 84.94%
+INFO :      Round 25 -> Loss: 0.3622 | Accuracy: 84.55%
+INFO :      Round 50 -> Loss: 0.3201 | Accuracy: 87.71%
+INFO :      Round 75 -> Loss: 0.2897 | Accuracy: 87.71%
+INFO :      Round 100 -> Loss: 0.2638 | Accuracy: 89.18%
+INFO :      Round 125 -> Loss: 0.2265 | Accuracy: 90.42%
+INFO :      Round 150 -> Loss: 0.2497 | Accuracy: 89.97%
+INFO :      Round 175 -> Loss: 0.1962 | Accuracy: 91.43%
+INFO :      Round 200 -> Loss: 0.2136 | Accuracy: 91.43%
+INFO :      Round 225 -> Loss: 0.1802 | Accuracy: 92.11%
+INFO :      Round 250 -> Loss: 0.1484 | Accuracy: 94.25%
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:

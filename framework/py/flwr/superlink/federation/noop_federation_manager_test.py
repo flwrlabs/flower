@@ -143,6 +143,8 @@ def test_get_details_with_valid_federation() -> None:
     assert result.archived is False
     assert result.simulation is True
     assert result.config == expected_config
+    assert result.can_invite_members is False
+    assert result.can_add_supernodes is False
 
 
 def test_get_details_with_invalid_federation() -> None:
@@ -183,6 +185,8 @@ def test_get_details_with_no_runs() -> None:
     assert len(result.runs) == 0
     assert result.archived is False
     assert result.simulation is False
+    assert result.can_invite_members is False
+    assert result.can_add_supernodes is False
 
 
 def test_exists() -> None:
@@ -270,8 +274,15 @@ def test_get_federations() -> None:
     assert len(result2) == 1
     assert result2[0].id == NOOP_FEDERATION_ID
     assert result2[0].description == NOOP_FEDERATION_DESCRIPTION
+    assert len(result2[0].members) == 1
+    assert result2[0].members[0].account.id == NOOP_FLWR_AID
+    assert result2[0].members[0].account.name == NOOP_ACCOUNT_NAME
+    assert result2[0].members[0].role == "owner"
+    assert result2[0].member_count == 1
     assert result2[0].archived is False
     assert result2[0].simulation is False
+    assert result2[0].can_invite_members is False
+    assert result2[0].can_add_supernodes is False
 
 
 def test_simulation_runtime_flag_is_reflected() -> None:
@@ -289,6 +300,16 @@ def test_simulation_runtime_flag_is_reflected() -> None:
     assert details.simulation is True
     assert federations[0].config == DEFAULT_SIMULATION_CONFIG
     assert details.config == DEFAULT_SIMULATION_CONFIG
+
+
+def test_set_icon_key_is_unsupported() -> None:
+    """Test that setting an icon requires federation management support."""
+    manager = NoOpFederationManager()
+
+    with pytest.raises(FlowerError) as error:
+        manager.set_icon_key(NOOP_FLWR_AID, NOOP_FEDERATION_ID, "rocket")
+
+    assert error.value.code == ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT
 
 
 def test_get_simulation_config_returns_defaults_when_unset() -> None:

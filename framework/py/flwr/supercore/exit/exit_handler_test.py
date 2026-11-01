@@ -15,11 +15,27 @@
 """Tests for exit handler functions."""
 
 
-from .exit_handler import add_exit_handler, trigger_exit_handlers
+from collections.abc import Iterator
+
+import pytest
+
+from .exit_handler import (
+    add_exit_handler,
+    registered_exit_handlers,
+    trigger_exit_handlers,
+)
 
 
-def test_trigger_exit_handlers() -> None:
-    """Test that exit handlers are triggered in LIFO order."""
+@pytest.fixture(autouse=True)
+def clear_exit_handlers() -> Iterator[None]:
+    """Clear exit handlers before and after each test."""
+    registered_exit_handlers.clear()
+    yield
+    registered_exit_handlers.clear()
+
+
+def test_trigger_exit_handlers_in_separate_phases() -> None:
+    """Test phase selection and LIFO ordering within each phase."""
     # Prepare
     execution_order = []
 
@@ -32,15 +48,25 @@ def test_trigger_exit_handlers() -> None:
     def handler3() -> None:
         execution_order.append(3)
 
-    add_exit_handler(handler1)
+    def handler4() -> None:
+        execution_order.append(4)
+
+    add_exit_handler(handler1, run_before_force_exit=True)
     add_exit_handler(handler2)
-    add_exit_handler(handler3)
+    add_exit_handler(handler3, run_before_force_exit=True)
+    add_exit_handler(handler4)
 
     # Execute
-    trigger_exit_handlers()
+    trigger_exit_handlers(run_before_force_exit=True)
 
-    # Assert: Handlers should be called in LIFO order (3, 2, 1)
-    assert execution_order == [3, 2, 1]
+    # Assert: Only pre-force handlers should run, in LIFO order
+    assert execution_order == [3, 1]
+
+    # Execute the regular phase
+    trigger_exit_handlers(run_before_force_exit=False)
+
+    # Assert: The regular handler was retained for its phase
+    assert execution_order == [3, 1, 4, 2]
 
 
 def test_trigger_exit_handlers_clears_list() -> None:
@@ -54,11 +80,11 @@ def test_trigger_exit_handlers_clears_list() -> None:
     add_exit_handler(handler)
 
     # Execute & assert
-    trigger_exit_handlers()
+    trigger_exit_handlers(run_before_force_exit=False)
     assert len(execution_count) == 1
 
     # Trigger again. The handler should not be called again
-    trigger_exit_handlers()
+    trigger_exit_handlers(run_before_force_exit=False)
     assert len(execution_count) == 1
 
 
@@ -82,7 +108,7 @@ def test_trigger_exit_handlers_ignores_exceptions() -> None:
     add_exit_handler(handler3)
 
     # Execute - should not raise despite handler2 raising
-    trigger_exit_handlers()
+    trigger_exit_handlers(run_before_force_exit=False)
 
     # Assert - all handlers should have been called in LIFO order
     assert execution_order == [3, 2, 1]

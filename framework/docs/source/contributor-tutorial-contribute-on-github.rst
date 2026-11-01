@@ -213,7 +213,7 @@ And with Flower's repository:
 
        The title should be changed to adhere to the :ref:`pr_title_format` guidelines,
        otherwise it won't be possible to merge the PR. So in this case, a correct title
-       might be ``docs(framework:skip) Fix typos``.
+       might be ``docs(framework:skip): Fix typos``.
 
        The input box in the middle is there for you to describe what your PR does and to
        link it to existing issues. We have placed comments (that won't be rendered once
@@ -345,7 +345,7 @@ Open PR
 - Commit the changes (commit messages are always imperative: "Do something", in this
   case "Change …")
 - Push the changes to your fork
-- Open a PR (as shown above) with title ``docs(framework) Update how-to guide title``
+- Open a PR (as shown above) with title ``docs(framework): Update how-to guide title``
 - Wait for it to be approved!
 - Congrats! 🥳 You're now officially a Flower contributor!
 
@@ -372,26 +372,27 @@ We enforce the following PR title format:
 
 .. code-block::
 
-    <type>(<project>) <subject>
+    <type>(<project>): <subject>
 
-(or ``<type>(<project>:skip) <subject>`` to ignore the PR in the changelog)
+(or ``<type>(<project>:skip): <subject>`` to ignore the PR in the changelog)
 
 Where ``<type>`` needs to be in ``{ci, fix, feat, docs, refactor, break}``,
-``<project>`` should be in ``{framework, baselines, datasets, examples, or '*' when
-modifying multiple projects which requires the ':skip' flag to be used}``, and
-``<subject>`` starts with a capitalised verb in the imperative mood.
+``<project>`` should be in ``{devtool, framework, agent, baselines, datasets, examples,
+benchmarks, glossary, intelligence, hub, model, or '*' when modifying multiple projects
+which requires the ':skip' flag to be used}``, and ``<subject>`` starts with a
+capitalised verb in the imperative mood.
 
 Valid examples:
 
-- ``feat(framework) Add flwr build CLI command``
-- ``refactor(examples:skip) Improve quickstart-pytorch logging``
-- ``ci(*:skip) Enforce PR title format``
+- ``feat(framework): Add flwr build CLI command``
+- ``refactor(examples:skip): Improve quickstart-pytorch logging``
+- ``ci(*:skip): Enforce PR title format``
 
 Invalid examples:
 
-- ``feat(framework): Add flwr build CLI command`` (extra ``:``)
-- ``feat(*) Add flwr build CLI command`` (missing ``skip`` flag along with ``*``)
-- ``feat(skip) Add flwr build CLI command`` (missing ``<project>``)
-- ``feat(framework) add flwr build CLI command`` (non capitalised verb)
-- ``feat(framework) Add flwr build CLI command.`` (dot at the end)
-- ``Add flwr build CLI command.`` (missing ``<type>(<project>)``)
+- ``feat(framework) Add flwr build CLI command`` (missing ``:``)
+- ``feat(*): Add flwr build CLI command`` (missing ``skip`` flag along with ``*``)
+- ``feat(skip): Add flwr build CLI command`` (missing ``<project>``)
+- ``feat(framework): add flwr build CLI command`` (non capitalised verb)
+- ``feat(framework): Add flwr build CLI command.`` (dot at the end)
+- ``Add flwr build CLI command.`` (missing ``<type>(<project>):``)

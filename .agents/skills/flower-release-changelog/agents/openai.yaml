@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flower Release Changelog"
+  short_description: "Classify cached PRs into polished release notes"
+  default_prompt: "Use $flower-release-changelog to polish the generated Framework release changelog from its local PR cache."

@@ -25,7 +25,6 @@ from flwr.app.message_type import MessageType
 from flwr.client import ClientFnExt
 from flwr.clientapp.client_app import ClientApp
 from flwr.common.constant import NUM_PARTITIONS_KEY, PARTITION_ID_KEY, MessageTypeLegacy
-from flwr.common.logger import log
 from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
 from flwr.compat.common.recorddict_compat import (
     evaluateins_to_recorddict,
@@ -39,6 +38,7 @@ from flwr.compat.common.recorddict_compat import (
 )
 from flwr.server.client_proxy import ClientProxy
 from flwr.simulation.ray_transport.ray_actor import VirtualClientEngineActorPool
+from flwr.supercore import log
 from flwr.supercore.date import now
 
 

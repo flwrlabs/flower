@@ -122,15 +122,15 @@ Still, the private sub-package ``flwr.superlink.grid`` defines a "public" API us
 
 .. code-block:: python
 
-    from .grpc_grid import GrpcGrid
+    from .http_grid import HttpGrid
     from .inmemory_grid import InMemoryGrid
 
     __all__ = [
-        "GrpcGrid",
+        "HttpGrid",
         "InMemoryGrid",
     ]
 
-The interesting part is that both ``GrpcGrid`` and ``InMemoryGrid`` are never used by
+The interesting part is that both ``HttpGrid`` and ``InMemoryGrid`` are never used by
 Flower framework users, only by other parts of the Flower framework codebase. Those
 other parts of the codebase import, for example, ``InMemoryGrid`` using ``from
 flwr.superlink.grid import InMemoryGrid`` (i.e., the ``InMemoryGrid`` exported via

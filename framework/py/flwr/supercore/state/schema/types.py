@@ -17,8 +17,34 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import TIMESTAMP
+from sqlalchemy import TIMESTAMP, BigInteger
 from sqlalchemy.types import TypeDecorator
+
+from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
+
+
+class UInt64(TypeDecorator[int]):  # pylint: disable=too-many-ancestors,abstract-method
+    """Store unsigned 64-bit identifiers using signed BIGINT bit patterns."""
+
+    impl = BigInteger
+    cache_ok = True
+
+    @property
+    def python_type(self) -> type[int]:
+        """Return the Python type represented by this column type."""
+        return int
+
+    def process_bind_param(self, value: int | None, _dialect: Any) -> int | None:
+        """Validate and convert an unsigned identifier before binding."""
+        if value is None:
+            return None
+        if not isinstance(value, int) or not 0 <= value < (1 << 64):
+            raise ValueError("UInt64 requires an integer in [0, 2**64).")
+        return uint64_to_int64(value)
+
+    def process_result_value(self, value: int | None, _dialect: Any) -> int | None:
+        """Convert a stored signed identifier back to its unsigned value."""
+        return int64_to_uint64(value) if value is not None else None
 
 
 class UTCDateTime(

@@ -17,7 +17,7 @@
 from logging import WARN
 
 from flwr.app.message import ArrayRecord, ConfigRecord, MetricRecord, RecordDict
-from flwr.common.logger import log
+from flwr.supercore import log
 
 RecordType = ArrayRecord | MetricRecord | ConfigRecord
 

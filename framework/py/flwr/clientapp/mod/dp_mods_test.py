@@ -16,6 +16,7 @@
 
 
 import numpy as np
+import pytest
 
 from flwr.app import (
     Array,
@@ -29,9 +30,18 @@ from flwr.app import (
 from flwr.app.message_type import MessageType
 from flwr.common import NDArray
 from flwr.supercore.differential_privacy import KEY_CLIPPING_NORM, KEY_NORM_BIT
+from flwr.supercore.task_identity import TaskIdentity
 
 from .centraldp_mods import adaptiveclipping_mod, fixedclipping_mod
 from .localdp_mod import LocalDpMod
+
+
+@pytest.fixture(autouse=True)
+def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the task identity used by instruction message tests."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 123)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 456)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 789)
 
 
 def _make_context() -> Context:

@@ -63,8 +63,10 @@ def test_collect_files_depth_limit(tmp_path: Path) -> None:
     deep = Path(*parts) / f"too_deep{TEXT_EXT}"
     write(tmp_path, deep.as_posix(), b"x")
 
-    with pytest.raises(click.ClickException):
+    with pytest.raises(click.ClickException) as exc_info:
         _collect_file_paths(tmp_path)
+    assert "does not meet the project structure requirements" in str(exc_info.value)
+    assert ".gitignore" in str(exc_info.value)
 
 
 def test_collect_files_count_limit(tmp_path: Path) -> None:

@@ -237,7 +237,7 @@ You will need to copy the generated directory in step 1 to the machine that will
 With steps 1-3 completed, you are ready to run Federated Whisper finetuning with Flower's Deployment Eninge. To connect a `SuperNode` to an existing federation (i.e. a running `SuperLink`) you'd do it like this assuming all the python dependencies (i.e. `flwr`, `transformers`, `torch` are installed -- see `pyproject.toml`) in the Python environment of the machine where you are launching the `SuperNode` from:
 
 ```shell
-flower-supernode --superlink="<SUPERLINK-IP>:9092" \
+flower-supernode --superlink="<SUPERLINK-IP>:8000" \
                  --node-config="local-data='<path/to/local/partition>'"
 ```
 
@@ -247,7 +247,7 @@ First, ensure you have a SuperLink connection defined in your Flower Configurati
 
 ```toml
 [superlink.remote]
-address = '127.0.0.1:9093' # IP:9093 of your superlink (assumed localhost superlink)
+address = '127.0.0.1:8000' # IP:8000 of your superlink (assumed localhost superlink)
 insecure = true # Check the documentation to setup with SSL
 ```
 
@@ -271,6 +271,6 @@ Second, generate and copy the a single data partition to your raspbery pi. Do so
 Finally, assuming you have a `SuperLink` running on a machine (e.g. your laptop) and which can be reached by your Raspberry Pi (e.g. because they are in the same network), launch the `SuperNode` as shown earlier:
 
 ```shell
-flower-supernode --superlink="<SUPERLINK-IP>:9092" \
+flower-supernode --superlink="<SUPERLINK-IP>:8000" \
                  --node-config="local-data='<path/to/local/partition>'"
 ```
