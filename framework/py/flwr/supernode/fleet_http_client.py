@@ -46,7 +46,6 @@ from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=
 from flwr.supercore.protobuf.client import ProtobufClient
 
 
-# Match the method names defined by the Fleet protobuf service.
 # pylint: disable=invalid-name
 class FleetHttpClient(ProtobufClient):  # pylint: disable=too-many-public-methods
     """Protobuf-over-HTTP client for the Fleet API."""

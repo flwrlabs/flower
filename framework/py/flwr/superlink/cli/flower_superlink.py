@@ -21,11 +21,9 @@ import os
 import subprocess
 import sys
 import threading
-from collections.abc import Sequence
 from logging import INFO, WARN
 from pathlib import Path
 from time import sleep
-from typing import cast
 
 import grpc
 import uvicorn
@@ -36,26 +34,12 @@ from flwr.common.args import (
 )
 from flwr.common.constant import (
     CONTROL_API_DEFAULT_SERVER_ADDRESS,
-    FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
     FLWR_INTERNAL_GRPC_CONTROL_API,
-    FLWR_INTERNAL_GRPC_FLEET_API,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
-)
-from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
-    add_FleetServicer_to_server,
-)
-from flwr.proto.grpcadapter_pb2_grpc import add_GrpcAdapterServicer_to_server
-from flwr.server.fleet_event_log_interceptor import FleetEventLogInterceptor
-from flwr.server.superlink.fleet.grpc_adapter.grpc_adapter_servicer import (
-    GrpcAdapterServicer,
-)
-from flwr.server.superlink.fleet.grpc_rere.fleet_servicer import FleetServicer
-from flwr.server.superlink.fleet.grpc_rere.node_auth_server_interceptor import (
-    NodeAuthServerInterceptor,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore import log
@@ -70,15 +54,9 @@ from flwr.supercore.constant import (
     UVICORN_DEFAULT_HOST,
 )
 from flwr.supercore.exit import ExitCode, flwr_exit
-from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
 from flwr.supercore.http_logging import get_uvicorn_log_config
-from flwr.supercore.interceptors import (
-    RpcErrorTranslationServerInterceptor,
-    create_fleet_runtime_version_server_interceptor,
-)
 from flwr.supercore.logger import configure_superlink_log_file, console_handler
-from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import get_client_tls_args
 from flwr.supercore.update_check import warn_if_flwr_update_available
@@ -139,8 +117,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
         if os.getenv(FLWR_INTERNAL_GRPC_CONTROL_API) == "1":
             self._start_control_api()
-        if os.getenv(FLWR_INTERNAL_GRPC_FLEET_API) == "1":
-            self._start_fleet_api()
         self._start_superexec_if_needed()
         self._start_health_server_if_needed()
         self._started = True
@@ -194,56 +170,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
             fleet_api_type=config.fleet_api_type,
         )
         self.grpc_servers.append(control_server)
-
-    def _start_fleet_api(self) -> None:
-        config = self.config
-        if config.simulation:
-            return
-
-        fleet_api_address = config.fleet_api_address
-        if not fleet_api_address:
-            if config.fleet_api_type in [
-                TRANSPORT_TYPE_GRPC_RERE,
-                TRANSPORT_TYPE_GRPC_ADAPTER,
-            ]:
-                fleet_api_address = FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
-
-        fleet_address, _, _ = _format_address(cast(str, fleet_api_address))
-        if config.fleet_api_type == TRANSPORT_TYPE_GRPC_RERE:
-            self._start_legacy_fleet_grpc_rere(fleet_address)
-        elif config.fleet_api_type == TRANSPORT_TYPE_GRPC_ADAPTER:
-            self._start_legacy_fleet_grpc_adapter(fleet_address)
-        else:
-            raise ValueError(f"Unknown fleet_api_type: {config.fleet_api_type}")
-
-    def _start_legacy_fleet_grpc_rere(self, fleet_address: str) -> None:
-        """Start the current Fleet gRPC request-response API."""
-        interceptors = [NodeAuthServerInterceptor(self.state_factory)]
-        if self.config.enable_event_log:
-            fleet_log_plugin = self.config.fleet_event_log_plugin
-            if fleet_log_plugin is not None:
-                interceptors.append(FleetEventLogInterceptor(fleet_log_plugin))
-                log(INFO, "Flower Fleet event logging enabled")
-
-        fleet_server = _run_fleet_api_grpc_rere(
-            address=fleet_address,
-            state_factory=self.state_factory,
-            objectstore_factory=self.objectstore_factory,
-            enable_supernode_auth=self.config.enable_supernode_auth,
-            certificates=self.config.certificates,
-            interceptors=interceptors,
-        )
-        self.grpc_servers.append(fleet_server)
-
-    def _start_legacy_fleet_grpc_adapter(self, fleet_address: str) -> None:
-        """Start the current Fleet GrpcAdapter compatibility API."""
-        fleet_server = _run_fleet_api_grpc_adapter(
-            address=fleet_address,
-            state_factory=self.state_factory,
-            objectstore_factory=self.objectstore_factory,
-            certificates=self.config.certificates,
-        )
-        self.grpc_servers.append(fleet_server)
 
     def _start_superexec_if_needed(self) -> None:
         config = self.config
@@ -383,13 +309,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
                 "arguments to your SuperLink. Please refer to the Flower "
                 f"documentation for more information: {url_v}{page}",
             )
-        if args.fleet_api_type != TRANSPORT_TYPE_GRPC_RERE:
-            flwr_exit(
-                ExitCode.SUPERLINK_INVALID_ARGS,
-                "The `--enable-supernode-auth` flag is only supported "
-                "with the gRPC-rere Fleet API transport. Please set "
-                f"`--fleet-api-type` to `{TRANSPORT_TYPE_GRPC_RERE}`.",
-            )
         if args.simulation:
             log(
                 WARN,
@@ -417,14 +336,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
             f" to the Flower documentation for more information: {url_v}{page}",
         )
 
-    fleet_api_address = args.fleet_api_address
-    if not args.simulation and not fleet_api_address:
-        if args.fleet_api_type in [
-            TRANSPORT_TYPE_GRPC_RERE,
-            TRANSPORT_TYPE_GRPC_ADAPTER,
-        ]:
-            fleet_api_address = FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
-
     return SuperLinkLifespanConfig(
         control_address=control_address,
         health_server_address=health_server_address,
@@ -439,8 +350,7 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         enable_event_log=getattr(args, "enable_event_log", False),
         artifact_provider=artifact_provider,
         enable_supernode_auth=enable_supernode_auth,
-        fleet_api_type=args.fleet_api_type,
-        fleet_api_address=fleet_api_address,
+        fleet_api_type="http",
         simulation=args.simulation,
         ssl_ca_certfile=(
             str(Path(args.ssl_ca_certfile).expanduser())
@@ -571,78 +481,6 @@ def _get_superexec_command(
 def _runtime_dependency_install_default() -> bool:
     """Return default runtime dependency installation setting."""
     return os.getenv(FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION) != "1"
-
-
-def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
-    address: str,
-    state_factory: LinkStateFactory,
-    objectstore_factory: ObjectStoreFactory,
-    enable_supernode_auth: bool,
-    certificates: tuple[bytes, bytes, bytes] | None,
-    interceptors: Sequence[grpc.ServerInterceptor] | None = None,
-) -> grpc.Server:
-    """Run Fleet API (gRPC, request-response)."""
-    interceptors = [
-        RpcErrorTranslationServerInterceptor(),
-        *list(interceptors or []),
-    ]
-    interceptors.append(create_fleet_runtime_version_server_interceptor())
-
-    # Create Fleet API gRPC server
-    fleet_servicer = FleetServicer(
-        state_factory=state_factory,
-        objectstore_factory=objectstore_factory,
-        enable_supernode_auth=enable_supernode_auth,
-    )
-    fleet_add_servicer_to_server_fn = add_FleetServicer_to_server
-    fleet_grpc_server = generic_create_grpc_server(
-        servicer_and_add_fn=(fleet_servicer, fleet_add_servicer_to_server_fn),
-        server_address=address,
-        max_message_length=GRPC_MAX_MESSAGE_LENGTH,
-        certificates=certificates,
-        interceptors=interceptors,
-    )
-
-    log(
-        INFO,
-        "Flower Deployment Runtime: Starting Fleet API (gRPC-rere) on %s",
-        fleet_grpc_server.bound_address,
-    )
-    fleet_grpc_server.start()
-
-    return fleet_grpc_server
-
-
-# pylint: disable=R0913, R0917
-def _run_fleet_api_grpc_adapter(
-    address: str,
-    state_factory: LinkStateFactory,
-    objectstore_factory: ObjectStoreFactory,
-    certificates: tuple[bytes, bytes, bytes] | None,
-) -> grpc.Server:
-    """Run Fleet API (GrpcAdapter)."""
-    # Create Fleet API gRPC server
-    fleet_servicer = GrpcAdapterServicer(
-        state_factory=state_factory,
-        objectstore_factory=objectstore_factory,
-        enable_supernode_auth=False,
-    )
-    fleet_add_servicer_to_server_fn = add_GrpcAdapterServicer_to_server
-    fleet_grpc_server = generic_create_grpc_server(
-        servicer_and_add_fn=(fleet_servicer, fleet_add_servicer_to_server_fn),
-        server_address=address,
-        max_message_length=GRPC_MAX_MESSAGE_LENGTH,
-        certificates=certificates,
-    )
-
-    log(
-        INFO,
-        "Flower Deployment Runtime: Starting Fleet API (GrpcAdapter) on %s",
-        fleet_grpc_server.bound_address,
-    )
-    fleet_grpc_server.start()
-
-    return fleet_grpc_server
 
 
 def _parse_args_run_superlink() -> argparse.ArgumentParser:

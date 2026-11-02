@@ -136,7 +136,6 @@ jobs:
             --ignore=py/flwr/simulation/ray_transport/ray_client_proxy_test.py \
             --ignore=py/flwr/server/superlink/fleet/vce/vce_api_test.py \
             --ignore=py/flwr/server/superlink/fleet/vce/backend/raybackend_test.py \
-            --ignore=py/flwr/server/superlink/fleet/grpc_rere \
             --ignore=py/flwr/superlink/servicer/runtime \
             --ignore=py/flwr/supercore/servicer/runtime/runtime_handlers_test.py \
             -n 4 \
@@ -152,7 +151,6 @@ jobs:
             py/flwr/simulation/ray_transport/ray_client_proxy_test.py \
             py/flwr/server/superlink/fleet/vce/vce_api_test.py \
             py/flwr/server/superlink/fleet/vce/backend/raybackend_test.py \
-            py/flwr/server/superlink/fleet/grpc_rere \
             py/flwr/superlink/servicer/runtime \
             py/flwr/supercore/servicer/runtime/runtime_handlers_test.py
       - name: Prepare coverage artifact

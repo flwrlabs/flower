@@ -29,12 +29,10 @@ TRANSPORT_TYPES = [
 
 # Addresses
 # Ports
-FLEETAPI_GRPC_RERE_PORT = "9092"
 CONTROL_API_PORT = "9093"
 # Octets
 SERVER_OCTET = "0.0.0.0"
 CLIENT_OCTET = "127.0.0.1"
-FLEET_API_GRPC_RERE_DEFAULT_ADDRESS = f"{SERVER_OCTET}:{FLEETAPI_GRPC_RERE_PORT}"
 FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS = (
     "[::]:8080"  # IPv6 to keep start_server compatible
 )
@@ -109,14 +107,6 @@ SUPERLINK_NODE_ID = 1
 PARTITION_ID_KEY = "partition-id"
 NUM_PARTITIONS_KEY = "num-partitions"
 
-# Constants for keys in `metadata` of `MessageContainer` in `grpc-adapter`
-GRPC_ADAPTER_METADATA_FLOWER_PACKAGE_NAME_KEY = "flower-package-name"
-GRPC_ADAPTER_METADATA_FLOWER_PACKAGE_VERSION_KEY = "flower-package-version"
-GRPC_ADAPTER_METADATA_FLOWER_VERSION_KEY = "flower-version"  # Deprecated
-GRPC_ADAPTER_METADATA_SHOULD_EXIT_KEY = "should-exit"
-GRPC_ADAPTER_METADATA_MESSAGE_MODULE_KEY = "grpc-message-module"
-GRPC_ADAPTER_METADATA_MESSAGE_QUALNAME_KEY = "grpc-message-qualname"
-
 # Isolation modes
 ISOLATION_MODE_SUBPROCESS = "subprocess"
 ISOLATION_MODE_PROCESS = "process"
@@ -129,7 +119,6 @@ FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION = (
 
 # Internal API toggles
 FLWR_INTERNAL_GRPC_CONTROL_API = "FLWR_INTERNAL_GRPC_CONTROL_API"
-FLWR_INTERNAL_GRPC_FLEET_API = "FLWR_INTERNAL_GRPC_FLEET_API"
 
 # Log streaming configurations
 CONN_REFRESH_PERIOD = 60  # Stream connection refresh period
