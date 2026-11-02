@@ -18,6 +18,7 @@
 import signal
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from .exit_code import ExitCode
 
@@ -25,7 +26,17 @@ SIGNAL_TO_EXIT_CODE: dict[int, int] = {
     signal.SIGINT: ExitCode.GRACEFUL_EXIT_SIGINT,
     signal.SIGTERM: ExitCode.GRACEFUL_EXIT_SIGTERM,
 }
-registered_exit_handlers: list[Callable[[], None]] = []
+
+
+@dataclass(frozen=True)
+class _RegisteredExitHandler:
+    """An exit handler and the phase in which it should run."""
+
+    exit_handler: Callable[[], None]
+    run_before_force_exit: bool
+
+
+registered_exit_handlers: list[_RegisteredExitHandler] = []
 _lock_handlers = threading.Lock()
 
 # SIGQUIT is not available on Windows
@@ -33,7 +44,11 @@ if hasattr(signal, "SIGQUIT"):
     SIGNAL_TO_EXIT_CODE[signal.SIGQUIT] = ExitCode.GRACEFUL_EXIT_SIGQUIT
 
 
-def add_exit_handler(exit_handler: Callable[[], None]) -> None:
+def add_exit_handler(
+    exit_handler: Callable[[], None],
+    *,
+    run_before_force_exit: bool = False,
+) -> None:
     """Add an exit handler to be called on graceful exit.
 
     This function allows you to register additional exit handlers
@@ -44,6 +59,8 @@ def add_exit_handler(exit_handler: Callable[[], None]) -> None:
     exit_handler : Callable[[], None]
         A callable that takes no arguments and performs cleanup or
         other actions before the application exits.
+    run_before_force_exit : bool (default: False)
+        Whether to execute the handler before starting the force-exit timer.
 
     Notes
     -----
@@ -51,16 +68,26 @@ def add_exit_handler(exit_handler: Callable[[], None]) -> None:
     the last registered handler will be the first to be called.
     """
     with _lock_handlers:
-        registered_exit_handlers.append(exit_handler)
+        registered_exit_handlers.append(
+            _RegisteredExitHandler(exit_handler, run_before_force_exit)
+        )
 
 
-def trigger_exit_handlers() -> None:
-    """Trigger all registered exit handlers in LIFO order."""
+def trigger_exit_handlers(*, run_before_force_exit: bool) -> None:
+    """Trigger one phase of registered exit handlers in LIFO order."""
     with _lock_handlers:
-        for handler in reversed(registered_exit_handlers):
-            try:
-                handler()
-            except Exception:  # pylint: disable=broad-exception-caught
-                # Ignore exceptions in exit handlers
-                pass
-        registered_exit_handlers.clear()
+        handlers = []
+        remaining_handlers = []
+        for registered_handler in registered_exit_handlers:
+            if registered_handler.run_before_force_exit == run_before_force_exit:
+                handlers.append(registered_handler.exit_handler)
+            else:
+                remaining_handlers.append(registered_handler)
+        registered_exit_handlers[:] = remaining_handlers
+
+    for exit_handler in reversed(handlers):
+        try:
+            exit_handler()
+        except Exception:  # pylint: disable=broad-exception-caught
+            # Ignore exceptions in exit handlers
+            pass

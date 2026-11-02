@@ -6,7 +6,7 @@ on:
       - 'main'
 jobs:
   autoupdate:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Automatically update mergeable PRs
         uses: adRise/update-pr-branch@v0.10.2

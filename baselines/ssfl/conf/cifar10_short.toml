@@ -1,0 +1,32 @@
+# Short 100-client CIFAR-10 validation (not a full paper run).
+# Federation: flwr federation simulation-config --num-supernodes 100 ...
+num-server-rounds = 3
+num-clients = 100
+fraction-train = 0.1
+fraction-evaluate = 0.0
+local-epochs = 5
+batch-size = 16
+max-partition-samples = 0
+learning-rate = 0.1
+lr-scheduler = "default"
+lr-decay = 0.998
+momentum = 0.0
+weight-decay = 0.0005
+max-grad-norm = 10.0
+dataset = "cifar10"
+model = "resnet18"
+partition-alpha = 0.3
+partition-method = "balanced-dirichlet"
+dense-ratio = 0.5
+saliency-method = "ssfl"
+saliency-batches = 1
+saliency-weighting = "uniform"
+seed = 550
+transport = "sparse"
+evaluate-every = 1
+save-model = true
+save-checkpoints = false
+checkpoint-dir = "outputs/cifar10_short"
+wandb-mode = "disabled"
+wandb-project = "ssfl-flower"
+wandb-run-name = "cifar10_short"

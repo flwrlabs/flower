@@ -87,6 +87,7 @@ implement several abstract methods:
             evaluate_fn: Optional[
                 Callable[[int, ArrayRecord], Optional[MetricRecord]]
             ] = None,
+            should_stop: Optional[Callable[[int, Result], bool]] = None,
         ) -> Result:
             """Execute the federated learning strategy."""
             # Implementation details
@@ -146,8 +147,10 @@ The ``start`` method of the ``Strategy`` base class follows this workflow:
 9. Call ``aggregate_evaluate`` to aggregate the evaluation replies.
 10. Call ``evaluate_fn`` (if provided) to evaluate the aggregated model on the ServerApp
     side.
-11. Repeat steps 2-10 for the specified number of rounds.
-12. Return the final ``Result``, which contains the final model and metrics history.
+11. Call ``should_stop`` (if provided) with the completed round number and accumulated
+    ``Result``. If it returns ``True``, stop executing rounds
+12. Otherwise, repeat steps 2-11 up to ``num_rounds`` times
+13. Return the final ``Result``, which contains the final model and metrics history
 
 The following diagram illustrates the flow.
 

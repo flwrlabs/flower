@@ -27,6 +27,7 @@ from flwr.supercore.version import package_version
 from .app_cmd import publish as app_publish
 from .app_cmd import review as app_review
 from .build import build
+from .chat import chat
 from .config import ls as config_list
 from .federation import add_supernode as federation_add_supernode
 from .federation import archive as federation_archive
@@ -75,6 +76,7 @@ app = typer.Typer(
 
 app.command()(new)
 app.command()(run)
+app.command()(chat)
 app.command()(build)
 app.command()(install)
 app.command(**ALLOW_EXTRAS)(log)

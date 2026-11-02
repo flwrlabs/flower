@@ -8,6 +8,10 @@ ServerApp. You can also build your own custom docker images from scratch with a
 different version of Python or Linux distribution (Ubuntu/Alpine) if that is what you
 need. In this guide, we will explain what images exist and how to build them locally.
 
+Official Alpine images for Flower 1.40.0 and later use Alpine 3.23 and Python 3.13. The
+Alpine Dockerfile defaults to ``DISTRO_VERSION=3.23``. Alpine 3.22 is no longer included
+in the release image matrix.
+
 Before we can start, we need to meet a few prerequisites in our local development
 environment.
 

@@ -17,7 +17,7 @@ permissions:
 jobs:
   authorize:
     name: Authorize manual trigger
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       # Reusable workflows inherit the caller's github context, so event_name is
       # the event that triggered the caller workflow, not "workflow_call".

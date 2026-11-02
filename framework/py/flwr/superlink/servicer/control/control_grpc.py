@@ -20,9 +20,9 @@ from logging import INFO
 import grpc
 
 from flwr.common.event_log_plugin import EventLogWriterPlugin
-from flwr.common.logger import log
 from flwr.proto.control_pb2_grpc import add_ControlServicer_to_server
 from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.supercore import log
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.interceptors import (
@@ -32,11 +32,7 @@ from flwr.supercore.interceptors import (
 from flwr.supercore.license_plugin import LicensePlugin
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.artifact_provider import ArtifactProvider
-from flwr.superlink.auth_plugin import (
-    ControlAuthnPlugin,
-    ControlAuthzPlugin,
-    NoOpControlAuthnPlugin,
-)
+from flwr.superlink.auth_plugin import ControlAuthnPlugin, NoOpControlAuthnPlugin
 
 from .control_account_auth_interceptor import ControlAccountAuthInterceptor
 from .control_event_log_interceptor import ControlEventLogInterceptor
@@ -58,7 +54,6 @@ def run_control_api_grpc(
     objectstore_factory: ObjectStoreFactory,
     certificates: tuple[bytes, bytes, bytes] | None,
     authn_plugin: ControlAuthnPlugin,
-    authz_plugin: ControlAuthzPlugin,
     event_log_plugin: EventLogWriterPlugin | None = None,
     artifact_provider: ArtifactProvider | None = None,
     fleet_api_type: str | None = None,
@@ -77,7 +72,7 @@ def run_control_api_grpc(
     )
     interceptors = [
         RpcErrorTranslationServerInterceptor(),
-        ControlAccountAuthInterceptor(authn_plugin, authz_plugin),
+        ControlAccountAuthInterceptor(authn_plugin),
     ]
     if license_plugin is not None:
         interceptors.append(ControlLicenseInterceptor(license_plugin))

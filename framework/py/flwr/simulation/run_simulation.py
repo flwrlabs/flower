@@ -32,15 +32,13 @@ from flwr.app import Context, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.cli.utils import get_sha256_hash
 from flwr.clientapp import ClientApp
-from flwr.common import log
-from flwr.common.constant import RUN_ID_NUM_BYTES, TASK_ID_NUM_BYTES
-from flwr.common.logger import (
-    set_logger_propagation,
-    update_console_handler,
-    warn_deprecated_feature,
-    warn_deprecated_feature_with_example,
+from flwr.common.constant import (
+    RUN_ID_NUM_BYTES,
+    SUPERLINK_NODE_ID,
+    TASK_ID_NUM_BYTES,
+    Status,
 )
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.server.run_serverapp import run as _run
 from flwr.server.superlink.fleet import vce
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
@@ -52,14 +50,22 @@ from flwr.serverapp import Grid, ServerApp
 from flwr.simulation.ray_transport.utils import (
     enable_tf_gpu_growth as enable_gpu_growth,
 )
+from flwr.supercore import log
 from flwr.supercore.constant import (
     DEFAULT_SIMULATION_CONFIG,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
 )
 from flwr.supercore.exit import ExitCode, flwr_exit
+from flwr.supercore.logger import (
+    set_logger_propagation,
+    update_console_handler,
+    warn_deprecated_feature,
+    warn_deprecated_feature_with_example,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.run import Run
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.grid import InMemoryGrid
@@ -248,7 +254,7 @@ def run_serverapp_th(
     return serverapp_th
 
 
-# pylint: disable=too-many-locals,too-many-positional-arguments
+# pylint: disable=too-many-locals,too-many-positional-arguments,too-many-statements
 def _main_loop(
     num_supernodes: int,
     backend_name: str,
@@ -293,7 +299,9 @@ def _main_loop(
         state.run_ids[run.run_id] = RunRecord(run=run)
         primary_task_id = cast(int, run.primary_task_id)
         state.task_store[primary_task_id] = Task(
-            task_id=primary_task_id, run_id=run.run_id
+            task_id=primary_task_id,
+            run_id=run.run_id,
+            status=TaskStatus(status=Status.RUNNING),
         )
 
         # Initialize Grid
@@ -451,6 +459,10 @@ def _run_simulation(
         run = Run.create_empty(run_id=run_id)
         run.primary_task_id = task_id
         run.federation_id = NOOP_FEDERATION_ID
+        # Use a dummy task identity for this legacy Python API.
+        TaskIdentity.task_id = 1
+        TaskIdentity.run_id = run_id
+        TaskIdentity.node_id = SUPERLINK_NODE_ID
 
     args = (
         num_supernodes,

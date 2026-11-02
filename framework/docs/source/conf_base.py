@@ -176,7 +176,27 @@ templates_path = ["_templates"]
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "ref-exit-codes/_template.rst"]
+exclude_patterns = [
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    "ref-exit-codes/_template.rst",
+    "changelog/v*.md" if current_version == "main" else "changelog/**",
+]
+
+
+def _use_shared_changelog(app, docname, source):
+    """Avoid rendering release branches' historical changelog sources."""
+    if current_version != "main" and docname == "ref-changelog":
+        source[0] = (
+            Path(app.confdir) / "_templates" / "shared-changelog.md"
+        ).read_text(encoding="utf-8")
+
+
+def setup(app):
+    """Configure build-time source replacements."""
+    app.connect("source-read", _use_shared_changelog)
+
 
 # Sphinx redirects, implemented after the doc filename changes.
 # To prevent 404 errors and redirect to the new pages.
@@ -314,8 +334,8 @@ html_theme_options = {
     "light_logo": "flower-logo-light.png",
     "dark_logo": "flower-logo-dark.png",
     "light_css_variables": {
-        "color-announcement-background": "#17222d",
-        "color-announcement-text": "#ffffff",
+        "color-announcement-background": "#f2b705",
+        "color-announcement-text": "#000000",
         # Left sidebar
         "color-sidebar-link-text": "#5e5e5e",
         "color-sidebar-link-text--top-level": "#404040",
@@ -327,8 +347,8 @@ html_theme_options = {
         "color-toc-item-text--active": "#404040",
     },
     "dark_css_variables": {
-        "color-announcement-text": "#ffffff",
-        "color-announcement-background": "#17222d",
+        "color-announcement-text": "#000000",
+        "color-announcement-background": "#f2b705",
         # Left sidebar
         "color-sidebar-link-text": "#7c7c7c",
         "color-sidebar-link-text--top-level": "#ababab",

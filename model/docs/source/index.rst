@@ -20,21 +20,28 @@ academics, and other people building collaborative AI systems.
 Flower Models
 -------------
 
-Flower models are open-weight releases from Flower Labs. These pages describe
-model capabilities, release formats, deployment options, evaluation results,
-safety information, and limitations.
+Flower models include open-weight releases and models available through
+Flower-managed or supported private deployments. These pages describe model
+capabilities, release formats, deployment options, evaluation results, safety
+information, and limitations.
 
 With Flower Model documentation, you can:
 
 - Learn the intended uses and limitations of Flower Labs model releases.
-- Choose between full-precision and quantized model artifacts.
-- Run models locally, through Python libraries, or with serving runtimes.
+- Choose between full-precision and quantized model artifacts, where available.
+- Run supported models locally, through Python libraries and serving runtimes,
+  or through Flower-managed and private deployments.
 - Review architecture, evaluation, and safety information.
 
-The first documented model is Lizzy 7B, a UK-oriented assistant model available
-as both a BF16 Safetensors checkpoint and GGUF quantizations.
+The newest model is Endeavor 1.0, a frontier-class generalist model currently
+in preview.
 
-For product details, see the `Lizzy model page <https://flower.ai/models/lizzy/>`_.
+The first documented model is Lizzy 7B, a UK-oriented assistant
+model available as both a BF16 Safetensors checkpoint and GGUF quantizations.
+
+For product details, see the `Endeavor 1.0 model page
+<https://flower.ai/models/endeavor/>`_ and the `Lizzy model page
+<https://flower.ai/models/lizzy/>`_.
 For background on Flower Labs research, see `Flower Research <https://flower.ai/research/>`_.
 
 
@@ -47,8 +54,8 @@ Model guides provide practical information about Flower Labs models.
   :maxdepth: 1
   :caption: Models
 
+  endeavor
   lizzy-7b
-  enterprise
 
 
 How-to guides
@@ -60,6 +67,7 @@ How-to guides provide step-by-step instructions to help you accomplish specific 
   :maxdepth: 1
   :caption: How-to Guides
 
+  enterprise
   how-to-run-lizzy
 
 
