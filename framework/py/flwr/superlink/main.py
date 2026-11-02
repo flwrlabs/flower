@@ -29,6 +29,7 @@ from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from flwr.supercore import log
+from flwr.supercore.auth import load_superexec_auth_secret
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.dependencies.runtime import RuntimeHandlers
 from flwr.supercore.error import ApiErrorCode, http_error_translator
@@ -121,7 +122,9 @@ def create_app(  # pylint: disable=too-many-statements
     if config is None:
         is_simulation = False
         database = get_ee_linkstate_db()
-        superexec_auth_secret = None
+        superexec_auth_secret = load_superexec_auth_secret(
+            os.getenv("FLWR_SUPEREXEC_AUTH_SECRET_FILE")
+        )
         artifact_provider = None
         fleet_api_type = "http"
         authn_plugin = load_control_authn_plugin()
