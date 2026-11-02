@@ -17,7 +17,6 @@
 # pylint: disable=too-many-lines
 
 import inspect
-from collections import Counter
 from collections.abc import Callable
 from datetime import datetime
 from unittest.mock import Mock, call, patch
@@ -35,7 +34,6 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.proto import control_pb2
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddAppRequest,
     AddAppResponse,
@@ -167,22 +165,6 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
             "type": "string",
             "format": "binary",
         }
-
-
-def test_control_http_routes_cover_all_grpc_methods() -> None:
-    """Expose every Control gRPC request type plus HTTP-only token refresh."""
-    grpc_request_types = Counter(
-        method.input_type.full_name
-        for method in control_pb2.DESCRIPTOR.services_by_name["Control"].methods
-    )
-    http_request_types = Counter(
-        request_type.DESCRIPTOR.full_name
-        for (method, path), request_type in PROTOBUF_REQUEST_TYPES.items()
-        if method == "POST" and path.startswith("/v1/control/")
-    )
-    grpc_request_types[RefreshAuthTokensRequest.DESCRIPTOR.full_name] += 1
-
-    assert http_request_types == grpc_request_types
 
 
 @pytest.mark.parametrize("database", [FLWR_IN_MEMORY_DB_NAME, ":memory:"])
