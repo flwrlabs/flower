@@ -14,18 +14,30 @@
 # ==============================================================================
 """Tests for SuperLink FastAPI application construction."""
 
+from pathlib import Path
 from typing import cast
 from unittest.mock import Mock
 
+import pytest
 from fastapi import FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
+from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
-from flwr.supercore.error import http_error_translator
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    AcquireTaskResponse,
+)
+from flwr.supercore.auth import create_superexec_auth_metadata, derive_auth_secret
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_DB_NAME,
+    SUPEREXEC_AUTH_SIGNATURE_HEADER,
+)
+from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers.health.router import health
 from flwr.superlink.federation import NoOpFederationManager
@@ -156,10 +168,16 @@ def test_create_app_places_extension_middleware_before_control_middleware(
     ]
 
 
+@pytest.mark.parametrize("superexec_auth_secret", [None, b"explicit-secret"])
 def test_create_app_exposes_configured_dependencies(
     monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+    superexec_auth_secret: bytes | None,
 ) -> None:
     """Expose lifespan configuration to HTTP dependencies and middleware."""
+    monkeypatch.setenv(
+        "FLWR_SUPEREXEC_AUTH_SECRET_FILE", str(tmp_path / "missing-secret")
+    )
     monkeypatch.setattr(extensions, "get_middleware", lambda: ())
     monkeypatch.setattr(extensions, "configure_app", lambda _: None)
     monkeypatch.setattr(
@@ -172,7 +190,7 @@ def test_create_app_exposes_configured_dependencies(
     config = Mock(
         simulation=False,
         database=FLWR_IN_MEMORY_DB_NAME,
-        superexec_auth_secret=None,
+        superexec_auth_secret=superexec_auth_secret,
         artifact_provider=artifact_provider,
         fleet_api_type="grpc-rere",
         authn_plugin=Mock(),
@@ -184,6 +202,81 @@ def test_create_app_exposes_configured_dependencies(
     app = main.create_app(config, lifespan_class)
 
     assert app.state.artifact_provider is artifact_provider
+    assert app.state.superexec_auth_secret == superexec_auth_secret
     assert app.state.fleet_api_type == "grpc-rere"
     assert app.state.fleet_event_log_plugin is fleet_event_log_plugin
     lifespan_class.assert_called_once()
+
+
+@pytest.mark.parametrize("signature", ["valid", "missing", "invalid"])
+def test_standalone_app_authenticates_superexec_requests(
+    monkeypatch: MonkeyPatch, tmp_path: Path, signature: str
+) -> None:
+    """Enforce the configured file secret on actual Runtime HTTP requests."""
+    secret = b"test-superexec-secret\n"
+    secret_path = tmp_path / "superexec-secret"
+    secret_path.write_bytes(secret)
+    monkeypatch.setenv("FLWR_SUPEREXEC_AUTH_SECRET_FILE", str(secret_path))
+    app = _create_app(monkeypatch)
+    request = AcquireTaskRequest()
+    headers = {"content-type": PROTOBUF_MEDIA_TYPE}
+    if signature != "missing":
+        headers.update(
+            create_superexec_auth_metadata(
+                auth_secret=derive_auth_secret(secret),
+                method="/flwr.proto.Runtime/AcquireTask",
+                request=request,
+            )
+        )
+        if signature == "invalid":
+            headers[SUPEREXEC_AUTH_SIGNATURE_HEADER] = "invalid"
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/runtime/acquire-task",
+            content=request.SerializeToString(),
+            headers=headers,
+        )
+
+    if signature == "valid":
+        assert response.status_code == 200
+        assert AcquireTaskResponse.FromString(response.content) == AcquireTaskResponse()
+    else:
+        assert response.status_code == 401
+        assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
+
+
+def test_standalone_app_preserves_unset_superexec_auth_default(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Allow unsigned SuperExec requests when no secret file is configured."""
+    monkeypatch.delenv("FLWR_SUPEREXEC_AUTH_SECRET_FILE", raising=False)
+    app = _create_app(monkeypatch)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/runtime/acquire-task",
+            content=AcquireTaskRequest().SerializeToString(),
+            headers={"content-type": PROTOBUF_MEDIA_TYPE},
+        )
+
+    assert app.state.superexec_auth_secret is None
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize("secret_file", ["missing", "empty", "directory", ""])
+def test_standalone_app_rejects_invalid_superexec_secret_file(
+    monkeypatch: MonkeyPatch, tmp_path: Path, secret_file: str
+) -> None:
+    """Fail app construction when an explicitly configured secret cannot load."""
+    secret_path = tmp_path / secret_file
+    if secret_file == "empty":
+        secret_path.touch()
+    elif secret_file == "directory":
+        secret_path.mkdir()
+    monkeypatch.setenv(
+        "FLWR_SUPEREXEC_AUTH_SECRET_FILE", str(secret_path) if secret_file else ""
+    )
+
+    with pytest.raises(ValueError, match="SuperExec auth secret"):
+        _create_app(monkeypatch)
