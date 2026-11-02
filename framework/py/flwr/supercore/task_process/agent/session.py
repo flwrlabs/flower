@@ -29,7 +29,6 @@ from typing import cast
 from uuid import uuid4
 
 from google.protobuf.json_format import ParseDict
-from httpx import HTTPStatusError
 
 from flwr.agentapp import AgentConnectors, AgentEvents, AgentGrid, AgentSession
 from flwr.app import Message
@@ -332,13 +331,8 @@ class AgentRuntime:
             discovered = deepcopy(
                 self._discover_connector_tools(connector_ref, refresh=refresh)
             )
-        except HTTPStatusError as exc:
-            error = FlowerError.from_json(exc.response.text)
-            if (
-                exc.response.status_code == 403
-                and error is not None
-                and error.code == ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE
-            ):
+        except FlowerError as error:
+            if error.code == ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE:
                 log(
                     ERROR,
                     "Skipping tool discovery for unavailable connector %s "
